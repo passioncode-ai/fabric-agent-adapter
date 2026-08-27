@@ -114,7 +114,9 @@ jobs:
           TARBALL="$PWD/$(npm pack --silent)"
           export HOME="$(mktemp -d)"
           cd "$(mktemp -d)"
-          npx --yes "$TARBALL"
+          # A bare `npx <path.tgz>` executes the PATH as a command (126); the
+          # package spec and the command must be named apart.
+          npx --yes --package "$TARBALL" fabric-agent-adapter
           test -f "$HOME/.claude/skills/adapting-projects-to-fabric/SKILL.md"
           test -d "$HOME/.claude/skills/adapting-projects-to-fabric/references"
           test -f "$HOME/.claude/skills/creating-fabric-agents/SKILL.md"
