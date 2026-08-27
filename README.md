@@ -23,6 +23,7 @@ Generic Agent Skills clients:
 
 ```bash
 npx skills add passioncode-ai/fabric-agent-adapter --skill adapting-projects-to-fabric
+npx skills add passioncode-ai/fabric-agent-adapter --skill creating-fabric-agents
 ```
 
 Claude Code plugin marketplace:
@@ -39,6 +40,12 @@ Ask the agent explicitly:
 ```text
 Adapt this project for Fabric compatibility. Inspect it, choose the profile per
 capability, scaffold the provider bundle, and report every conformance gate.
+```
+
+Or, for an agent that does not exist yet:
+
+```text
+Create a new fabric-compatible agent for <capability>; its consumer is <who calls it>.
 ```
 
 Or run the deterministic helper directly:

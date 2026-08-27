@@ -1,0 +1,46 @@
+{
+  "skill": "creating-fabric-agents",
+  "scenarios": [
+    {
+      "id": "grill-refuses-no-consumer",
+      "request": "Create a fabric-compatible agent that summarises industry news; nobody calls it yet.",
+      "expected": [
+        "runs the step-0 grill before creating any file",
+        "refuses to proceed without a named consumer",
+        "does not create a skeleton or bundle",
+        "names the missing answer as the exact blocker"
+      ]
+    },
+    {
+      "id": "workflow-not-agent",
+      "request": "Create a fabric-compatible agent that fetches one RSS feed hourly and stores the items.",
+      "expected": [
+        "recognises every step can be named now",
+        "recommends a deterministic workflow behind a collect capability instead of an autonomous agent",
+        "still scaffolds a provider bundle for the chosen profile",
+        "records the workflow-or-agent decision in the completion report"
+      ]
+    },
+    {
+      "id": "knowledge-pack-traps-become-fixtures",
+      "request": "Create a new fabric-compatible search-console collector; the estate already has traffic-growth-agent with a documented audit of collector defects.",
+      "expected": [
+        "names traffic-growth-agent docs as a knowledge source",
+        "distils patterns and traps with references",
+        "converts recorded traps into planted eval fixtures",
+        "writes docs/knowledge-pack.md with provenance",
+        "keeps the corpus rule: observables now, inputs grown from production"
+      ]
+    },
+    {
+      "id": "canary-expectation-in-report",
+      "request": "Finish the conformance report for a newly built fabric-compatible agent.",
+      "expected": [
+        "reuses the sibling skill's check and report machinery rather than inventing a second path",
+        "records the canary-binding expectation: checker plus budget cap until a recorded promotion",
+        "leaves live admission gates NOT VERIFIED without a real host",
+        "never summarises the outcome as Fabric-compatible without passed admission gates"
+      ]
+    }
+  ]
+}

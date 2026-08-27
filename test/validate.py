@@ -13,21 +13,23 @@ from typing import Any, Dict, List, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
-SKILL = PLUGIN / "skills/adapting-projects-to-fabric"
-SKILL_FILE = SKILL / "SKILL.md"
-VERSION = "0.1.0"
-EXPECTED_FILES = (
-    ROOT / ".claude-plugin/marketplace.json",
-    PLUGIN / ".claude-plugin/plugin.json",
-    SKILL_FILE,
-    ROOT / "README.md",
-    ROOT / "CHANGELOG.md",
-    ROOT / "LICENSE",
-    ROOT / "CONTRIBUTING.md",
-    ROOT / "SECURITY.md",
-    ROOT / "SKILL-CARD.md",
-    ROOT / "test/evals/triggers.json",
-    ROOT / "test/evals/scenarios.json",
+SKILL_NAMES = ("adapting-projects-to-fabric", "creating-fabric-agents")
+SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
+VERSION = "0.2.0"
+EXPECTED_FILES = tuple(
+    [
+        ROOT / ".claude-plugin/marketplace.json",
+        PLUGIN / ".claude-plugin/plugin.json",
+        ROOT / "README.md",
+        ROOT / "CHANGELOG.md",
+        ROOT / "LICENSE",
+        ROOT / "CONTRIBUTING.md",
+        ROOT / "SECURITY.md",
+        ROOT / "SKILL-CARD.md",
+    ]
+    + [SKILLS[name] / "SKILL.md" for name in SKILL_NAMES]
+    + [ROOT / "test/evals" / name / "triggers.json" for name in SKILL_NAMES]
+    + [ROOT / "test/evals" / name / "scenarios.json" for name in SKILL_NAMES]
 )
 STDLIB_IMPORTS = {
     "__future__", "argparse", "ast", "datetime", "hashlib", "importlib", "json",
@@ -68,12 +70,12 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
     return data, body
 
 
-def validate_metadata(data: Dict[str, Any]) -> List[str]:
+def validate_metadata(data: Dict[str, Any], expected_name: str) -> List[str]:
     errors: List[str] = []
     name = data.get("name", "")
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name):
         errors.append("skill name must use lowercase kebab-case")
-    if name != "adapting-projects-to-fabric":
+    if name != expected_name:
         errors.append("skill name must match its directory")
     if len(name) > 64:
         errors.append("skill name exceeds 64 characters")
@@ -132,6 +134,48 @@ def validate_python_imports(path: Path, errors: List[str]) -> None:
                 errors.append("non-stdlib import in %s: %s" % (path.relative_to(ROOT), name))
 
 
+def validate_skill(name: str, errors: List[str]) -> None:
+    skill_dir = SKILLS[name]
+    skill_file = skill_dir / "SKILL.md"
+    skill_text = skill_file.read_text(encoding="utf-8")
+    try:
+        frontmatter, body = parse_frontmatter(skill_text)
+        errors.extend("%s: %s" % (name, e) for e in validate_metadata(frontmatter, name))
+    except ValueError as exc:
+        errors.append("%s: %s" % (name, exc))
+        body = ""
+
+    if len(skill_text.splitlines()) >= 500:
+        errors.append("%s: SKILL.md must stay below 500 lines" % name)
+    if len(skill_text.split()) >= 4750:
+        errors.append("%s: SKILL.md exceeds the 5%% token/word headroom" % name)
+    if re.search(r"[А-Яа-яЁё]", body):
+        errors.append("%s: Cyrillic prose is allowed in trigger metadata, not the skill body" % name)
+
+    linked_refs = set(re.findall(r"\]\(references/([^)]+)\)", skill_text))
+    actual_refs = {path.name for path in (skill_dir / "references").glob("*.md")}
+    if linked_refs != actual_refs:
+        errors.append("%s: every reference must be directly linked exactly once from SKILL.md" % name)
+    for ref in (skill_dir / "references").glob("*.md"):
+        text = ref.read_text(encoding="utf-8")
+        if len(text.splitlines()) > 100 and "## Contents" not in text:
+            errors.append("%s: reference over 100 lines needs Contents: %s" % (name, ref.name))
+
+    triggers = json.loads((ROOT / "test/evals" / name / "triggers.json").read_text(encoding="utf-8"))
+    if triggers.get("skill") != name:
+        errors.append("%s: triggers.json must name its skill" % name)
+    queries = triggers.get("queries", [])
+    positives = sum(item.get("shouldTrigger") is True for item in queries)
+    negatives = sum(item.get("shouldTrigger") is False for item in queries)
+    if len(queries) < 18 or positives < 8 or negatives < 8:
+        errors.append("%s: trigger evals need about twenty balanced positive/negative queries" % name)
+    scenarios = json.loads((ROOT / "test/evals" / name / "scenarios.json").read_text(encoding="utf-8"))
+    if scenarios.get("skill") != name:
+        errors.append("%s: scenarios.json must name its skill" % name)
+    if len(scenarios.get("scenarios", [])) < 3:
+        errors.append("%s: at least three behaviour scenarios are required" % name)
+
+
 def validate_repo() -> List[str]:
     errors: List[str] = []
     for path in EXPECTED_FILES:
@@ -140,33 +184,12 @@ def validate_repo() -> List[str]:
     if errors:
         return errors
 
-    skill_text = SKILL_FILE.read_text(encoding="utf-8")
-    try:
-        frontmatter, body = parse_frontmatter(skill_text)
-        errors.extend(validate_metadata(frontmatter))
-    except ValueError as exc:
-        errors.append(str(exc))
-        body = ""
+    for name in SKILL_NAMES:
+        validate_skill(name, errors)
 
-    if len(skill_text.splitlines()) >= 500:
-        errors.append("SKILL.md must stay below 500 lines")
-    if len(skill_text.split()) >= 4750:
-        errors.append("SKILL.md exceeds the 5% token/word headroom")
-    if re.search(r"[А-Яа-яЁё]", body):
-        errors.append("Cyrillic prose is allowed in trigger metadata, not the skill body")
-
-    linked_refs = set(re.findall(r"\]\(references/([^)]+)\)", skill_text))
-    actual_refs = {path.name for path in (SKILL / "references").glob("*.md")}
-    if linked_refs != actual_refs:
-        errors.append("every reference must be directly linked exactly once from SKILL.md")
-    for ref in (SKILL / "references").glob("*.md"):
-        text = ref.read_text(encoding="utf-8")
-        if len(text.splitlines()) > 100 and "## Contents" not in text:
-            errors.append("reference over 100 lines needs Contents: %s" % ref.name)
-
-    skill_files = [path for path in ROOT.rglob("SKILL.md") if ".git" not in path.parts]
-    if skill_files != [SKILL_FILE]:
-        errors.append("distribution must expose exactly one canonical SKILL.md")
+    skill_files = sorted(path for path in ROOT.rglob("SKILL.md") if ".git" not in path.parts)
+    if skill_files != sorted(SKILLS[name] / "SKILL.md" for name in SKILL_NAMES):
+        errors.append("distribution must expose exactly the canonical SKILL.md files")
 
     marketplace = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
     plugin = json.loads((PLUGIN / ".claude-plugin/plugin.json").read_text(encoding="utf-8"))
@@ -189,16 +212,6 @@ def validate_repo() -> List[str]:
     match = re.search(r"^## ([0-9]+\.[0-9]+\.[0-9]+)", changelog, re.MULTILINE)
     if not match or match.group(1) != VERSION:
         errors.append("top changelog version is out of sync")
-
-    triggers = json.loads((ROOT / "test/evals/triggers.json").read_text(encoding="utf-8"))
-    queries = triggers.get("queries", [])
-    positives = sum(item.get("shouldTrigger") is True for item in queries)
-    negatives = sum(item.get("shouldTrigger") is False for item in queries)
-    if len(queries) < 18 or positives < 8 or negatives < 8:
-        errors.append("trigger evals need about twenty balanced positive/negative queries")
-    scenarios = json.loads((ROOT / "test/evals/scenarios.json").read_text(encoding="utf-8"))
-    if len(scenarios.get("scenarios", [])) < 3:
-        errors.append("at least three behaviour scenarios are required")
 
     for path in ROOT.rglob("*.json"):
         if ".git" not in path.parts:
@@ -230,12 +243,12 @@ def validator_self_test() -> List[str]:
         "compatibility": "Python 3.9+",
         "metadata": {"version": VERSION},
     }
-    if validate_metadata(legal):
+    if validate_metadata(legal, "adapting-projects-to-fabric"):
         return ["validator self-test rejected legal metadata"]
     illegal = dict(legal)
     illegal["name"] = "Bad_Name"
     illegal["description"] = "A vague helper."
-    detected = validate_metadata(illegal)
+    detected = validate_metadata(illegal, "adapting-projects-to-fabric")
     if len(detected) < 3:
         return ["validator self-test did not detect bad name/description/boundary"]
     return []
@@ -253,4 +266,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -1,0 +1,26 @@
+{
+  "skill": "creating-fabric-agents",
+  "queries": [
+    {"query": "Create a new agent that is compatible with the Passion Code fabric from day one.", "shouldTrigger": true},
+    {"query": "Build a fabric-ready SEO agent from scratch for the estate.", "shouldTrigger": true},
+    {"query": "Создай агента, совместимого с фабрикой Passion Code.", "shouldTrigger": true},
+    {"query": "Новый агент под Fabric: исследователь трендов, профиль MCP.", "shouldTrigger": true},
+    {"query": "Design a brand-new Fabric provider for campaign reporting and scaffold its bundle.", "shouldTrigger": true},
+    {"query": "Start a new fabric-compatible marketing agent; its consumer is the weekly review routine.", "shouldTrigger": true},
+    {"query": "Сделай нового агента для фабрики: возможность collect.spend, потребитель — портфельный обсервер.", "shouldTrigger": true},
+    {"query": "Greenfield: build a content-drafting agent that must pass Fabric admission later.", "shouldTrigger": true},
+    {"query": "New Fabric provider from zero — run the intake grill and create the skeleton.", "shouldTrigger": true},
+    {"query": "Спроектируй с нуля fabric-совместимого агента поддержки и заведи ему knowledge pack.", "shouldTrigger": true},
+
+    {"query": "Adapt this existing MCP server to the Fabric Agent Contract.", "shouldTrigger": false},
+    {"query": "Сделай существующего агента совместимым со стандартом Fabric.", "shouldTrigger": false},
+    {"query": "Design the Fabric host registry and admission runtime.", "shouldTrigger": false},
+    {"query": "Build a multi-agent orchestrator for our product.", "shouldTrigger": false},
+    {"query": "Make an agent that posts to LinkedIn every day.", "shouldTrigger": false},
+    {"query": "Write a better system prompt for the research agent.", "shouldTrigger": false},
+    {"query": "Add this MCP server to my Claude Code config.", "shouldTrigger": false},
+    {"query": "Wrap our terminal coding agent as a Fabric local runner.", "shouldTrigger": false},
+    {"query": "Проведи общий аудит проекта и найди баги.", "shouldTrigger": false},
+    {"query": "Create a generic A2A server from scratch.", "shouldTrigger": false}
+  ]
+}

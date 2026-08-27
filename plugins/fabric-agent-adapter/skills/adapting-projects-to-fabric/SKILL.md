@@ -1,11 +1,11 @@
 ---
 name: adapting-projects-to-fabric
-description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract—choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility; also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or general agent design.
+description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract—choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility; also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or a brand-new agent — that is creating-fabric-agents.
 license: MIT
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: passioncode-ai
-  version: "0.1.0"
+  version: "0.2.0"
   contract-version: "0.1.0"
   contract-commit: "20a818e648a4c09a60df0126d11626922e8b9094"
 ---
@@ -22,7 +22,7 @@ Use this skill to adapt or assess a provider project. Do not use it to:
 
 - design the Fabric host, registry, scheduler, admission service, or project binding runtime;
 - add an MCP server to Claude Code, Codex, or an agent gateway;
-- design a new agent whose Fabric compatibility is not part of the request;
+- design a new agent from scratch — that is the sibling skill creating-fabric-agents;
 - claim admission merely because generated files or a valid manifest exist.
 
 If the project has only a browser interface and no stable API, MCP/A2A surface, or CLI,
