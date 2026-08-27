@@ -186,7 +186,18 @@ jobs:
         if: steps.pub.outputs.skip == 'false'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          # Sigstore provenance attests a PUBLIC source repository; npm rejects
+          # it from a private one with E422. Detect instead of hardcoding, so
+          # making this repo public restores provenance with no CI edit.
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = "false" ]; then
+            npm publish --provenance
+          else
+            echo "repository is private — publishing without provenance"
+            npm publish
+          fi
 
       - name: The registry must actually serve it
         if: steps.pub.outputs.skip == 'false'
