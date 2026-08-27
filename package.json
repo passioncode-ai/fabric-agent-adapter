@@ -1,6 +1,6 @@
 {
   "name": "@passioncode-ai/fabric-agent-adapter",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Create new Fabric-compatible agents and adapt existing projects to the Fabric Agent Contract — evidence-backed MCP, A2A, or local-runner provider bundles. This package is the installer CLI.",
   "scripts": {
     "test": "python3 test/validate.py && python3 -m unittest discover -s test -q"

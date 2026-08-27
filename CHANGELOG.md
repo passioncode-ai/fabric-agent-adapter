@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 - 2026-08-27
+
+- Fix the executable bit on `bin/fabric-agent-adapter.js` and `install.sh`: the
+  packed tarball shipped them non-executable, so `npx` failed with exit 126.
+  Caught by the release workflow's own packed-tarball smoke — the gate this
+  release added, doing its job on its first run.
+
 ## 0.3.0 - 2026-08-27
 
 - Ship the npm channel: the package is `@passioncode-ai/fabric-agent-adapter`,

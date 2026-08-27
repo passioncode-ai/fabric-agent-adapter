@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.3.0` |
+| Version | `0.3.1` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `20a818e648a4c09a60df0126d11626922e8b9094` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -24,7 +24,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.3.0` |
+| Version | `0.3.1` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `20a818e648a4c09a60df0126d11626922e8b9094` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |

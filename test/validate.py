@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.3.0"
+VERSION = "0.3.1"
 EXPECTED_FILES = tuple(
     [
         ROOT / ".claude-plugin/marketplace.json",
