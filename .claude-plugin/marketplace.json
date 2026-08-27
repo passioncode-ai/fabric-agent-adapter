@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "fabric-agent-adapter",
+  "owner": {
+    "name": "passioncode-ai",
+    "url": "https://github.com/passioncode-ai"
+  },
+  "description": "Adapt existing agent projects to the versioned Fabric Agent Contract with evidence-backed MCP, A2A, or local-runner provider bundles.",
+  "plugins": [
+    {
+      "name": "fabric-agent-adapter",
+      "displayName": "Fabric Agent Adapter",
+      "source": "./plugins/fabric-agent-adapter",
+      "description": "Inspects an existing agent, API, MCP server, A2A peer, or terminal CLI; selects one Fabric profile per capability; scaffolds a contract-pinned provider bundle; and separates declaration, protocol, semantic, and binding-readiness verdicts.",
+      "version": "0.1.0",
+      "author": {
+        "name": "passioncode-ai",
+        "url": "https://github.com/passioncode-ai"
+      },
+      "homepage": "https://github.com/passioncode-ai/fabric-agent-adapter",
+      "repository": "https://github.com/passioncode-ai/fabric-agent-adapter",
+      "license": "MIT",
+      "keywords": [
+        "fabric",
+        "agent",
+        "compatibility",
+        "mcp",
+        "a2a",
+        "local-runner",
+        "provider",
+        "conformance"
+      ],
+      "category": "development"
+    }
+  ]
+}
+

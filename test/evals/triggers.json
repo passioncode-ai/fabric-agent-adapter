@@ -1,0 +1,27 @@
+{
+  "skill": "adapting-projects-to-fabric",
+  "queries": [
+    {"query": "Adapt this autonomous research agent so Fabric can connect it over A2A.", "shouldTrigger": true},
+    {"query": "Make this MCP server compatible with the Fabric Agent Contract.", "shouldTrigger": true},
+    {"query": "Wrap our terminal coding agent as a Fabric local runner.", "shouldTrigger": true},
+    {"query": "Choose MCP or A2A for this provider and generate fabric-agent.json.", "shouldTrigger": true},
+    {"query": "Проверь проект и подготовь его для подключения к Fabric.", "shouldTrigger": true},
+    {"query": "Сделай этого агента совместимым со стандартом Fabric.", "shouldTrigger": true},
+    {"query": "Как подключить Pruvl к Fabric и пройти проверку совместимости?", "shouldTrigger": true},
+    {"query": "Создай provider bundle, fixtures и probes по Fabric Agent Contract.", "shouldTrigger": true},
+    {"query": "Audit this agent repository against Fabric contract 0.1.0.", "shouldTrigger": true},
+    {"query": "Migrate this HTTP job API into a Fabric-compatible A2A peer.", "shouldTrigger": true},
+
+    {"query": "Build a multi-agent orchestrator for our product.", "shouldTrigger": false},
+    {"query": "Add this MCP server to my Claude Code config.", "shouldTrigger": false},
+    {"query": "Write a better system prompt for the research agent.", "shouldTrigger": false},
+    {"query": "Create a generic A2A server from scratch.", "shouldTrigger": false},
+    {"query": "Review the architecture of this repository.", "shouldTrigger": false},
+    {"query": "Connect an OAuth MCP server through agentgateway.", "shouldTrigger": false},
+    {"query": "Make an agent that posts to LinkedIn every day.", "shouldTrigger": false},
+    {"query": "Install the Fabric repository locally.", "shouldTrigger": false},
+    {"query": "Design the Fabric host registry and admission runtime.", "shouldTrigger": false},
+    {"query": "Проведи общий аудит проекта и найди баги.", "shouldTrigger": false}
+  ]
+}
+

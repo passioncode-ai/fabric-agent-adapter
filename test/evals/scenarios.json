@@ -1,0 +1,60 @@
+{
+  "skill": "adapting-projects-to-fabric",
+  "scenarios": [
+    {
+      "id": "native-mcp-provider",
+      "request": "Adapt an existing stdio MCP keyword analyser to Fabric.",
+      "fixture": "fixtures/projects/native-mcp",
+      "expected": [
+        "selects mcp because Fabric owns the task loop",
+        "pins MCP revision 2026-07-28",
+        "preserves stdio as the connection mode",
+        "does not call the provider an autonomous peer",
+        "leaves live negotiation and semantic admission NOT VERIFIED"
+      ]
+    },
+    {
+      "id": "autonomous-a2a-peer",
+      "request": "Adapt an HTTP research service that starts jobs, streams progress, returns artifacts, and supports cancellation.",
+      "fixture": "fixtures/projects/autonomous-http",
+      "expected": [
+        "selects a2a because the remote service owns the task lifecycle",
+        "pins A2A version 1.0",
+        "requires an Agent Card and task/cancel mapping",
+        "uses bounded non-publishing probes"
+      ]
+    },
+    {
+      "id": "installed-terminal-agent",
+      "request": "Make an installed coding CLI available to one Fabric project.",
+      "fixture": "fixtures/projects/terminal-cli",
+      "expected": [
+        "selects local-runner",
+        "pins fabric-local-runner/0.1",
+        "uses executableRef rather than credentials or an ambient shell command",
+        "requires typed input, result, cancellation, and heartbeat behaviour"
+      ]
+    },
+    {
+      "id": "web-only-project",
+      "request": "Connect a competitor dashboard that only exposes a browser UI.",
+      "fixture": "fixtures/projects/web-only",
+      "expected": [
+        "does not invent an MCP or A2A surface",
+        "reports the stable API or CLI as a missing prerequisite",
+        "does not claim Fabric compatibility"
+      ]
+    },
+    {
+      "id": "collision-safe-scaffold",
+      "request": "Scaffold Fabric files in a repository that already has fabric-agent.json.",
+      "fixture": "fixtures/projects/existing-manifest",
+      "expected": [
+        "refuses to overwrite by default",
+        "lists the conflicting path",
+        "requires explicit --force to replace generated paths"
+      ]
+    }
+  ]
+}
+
