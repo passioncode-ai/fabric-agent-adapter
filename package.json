@@ -1,0 +1,44 @@
+{
+  "name": "@passioncode-ai/fabric-agent-adapter",
+  "version": "0.3.0",
+  "description": "Create new Fabric-compatible agents and adapt existing projects to the Fabric Agent Contract — evidence-backed MCP, A2A, or local-runner provider bundles. This package is the installer CLI.",
+  "scripts": {
+    "test": "python3 test/validate.py && python3 -m unittest discover -s test -q"
+  },
+  "bin": {
+    "fabric-agent-adapter": "bin/fabric-agent-adapter.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin",
+    "plugins",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "SECURITY.md"
+  ],
+  "repository": "github:passioncode-ai/fabric-agent-adapter",
+  "homepage": "https://github.com/passioncode-ai/fabric-agent-adapter",
+  "license": "MIT",
+  "author": {
+    "name": "passioncode-ai",
+    "url": "https://github.com/passioncode-ai"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "fabric",
+    "agent",
+    "compatibility",
+    "mcp",
+    "a2a",
+    "local-runner",
+    "provider",
+    "conformance",
+    "claude-code",
+    "skill"
+  ]
+}

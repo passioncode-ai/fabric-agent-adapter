@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: passioncode-ai
-  version: "0.2.0"
+  version: "0.3.0"
   contract-version: "0.1.0"
   contract-commit: "20a818e648a4c09a60df0126d11626922e8b9094"
 ---

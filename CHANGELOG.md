@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 - 2026-08-27
+
+- Ship the npm channel: the package is `@passioncode-ai/fabric-agent-adapter`,
+  an installer CLI (`bin/fabric-agent-adapter.js`) plus the plugin tree, with
+  `install.sh` as the POSIX fallback.
+- Add toggleable release automation (`release.yml`): a `v*` tag runs validate,
+  checks tag reachability and version sync, cuts the GitHub release from the
+  CHANGELOG section, smoke-tests the packed tarball from a clean cwd (the
+  repository is private, so the tarball — not `npx github:` — is the artifact
+  under test), and publishes to npm with provenance. Armed by RELEASE_ENABLED
+  and PUBLISH_NPMJS repository variables.
+- Extend the validator: package.json joins the version sync, the files
+  whitelist and scoped-access rules are checked, and the new files are required.
+
 ## 0.2.0 - 2026-08-27
 
 - Add the `creating-fabric-agents` skill: the intake grill (capability, named

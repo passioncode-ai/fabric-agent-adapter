@@ -12,7 +12,7 @@
       "displayName": "Fabric Agent Adapter",
       "source": "./plugins/fabric-agent-adapter",
       "description": "Inspects an existing agent, API, MCP server, A2A peer, or terminal CLI; selects one Fabric profile per capability; scaffolds a contract-pinned provider bundle; and separates declaration, protocol, semantic, and binding-readiness verdicts.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "passioncode-ai",
         "url": "https://github.com/passioncode-ai"

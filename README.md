@@ -1,5 +1,9 @@
 # Fabric Agent Adapter
 
+[![npm](https://img.shields.io/npm/v/%40passioncode-ai%2Ffabric-agent-adapter)](https://www.npmjs.com/package/@passioncode-ai/fabric-agent-adapter)
+[![validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml/badge.svg)](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Private, portable Agent Skill for adapting an existing agent project to the
 [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract).
 
@@ -17,7 +21,13 @@ yet ship the host registry/runtime needed to connect and authorize a live provid
 
 ## Install
 
-The repository is private, so authenticate GitHub access first.
+The repository is private; the npm package is public. The npm path needs no GitHub access — the GitHub paths do.
+
+npm — no GitHub access required:
+
+```bash
+npx @passioncode-ai/fabric-agent-adapter        # installs both skills into ~/.claude/skills
+```
 
 Generic Agent Skills clients:
 

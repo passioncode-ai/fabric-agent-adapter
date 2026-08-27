@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 EXPECTED_FILES = tuple(
     [
         ROOT / ".claude-plugin/marketplace.json",
@@ -26,6 +26,10 @@ EXPECTED_FILES = tuple(
         ROOT / "CONTRIBUTING.md",
         ROOT / "SECURITY.md",
         ROOT / "SKILL-CARD.md",
+        ROOT / "package.json",
+        ROOT / "install.sh",
+        ROOT / "bin/fabric-agent-adapter.js",
+        ROOT / ".github/workflows/release.yml",
     ]
     + [SKILLS[name] / "SKILL.md" for name in SKILL_NAMES]
     + [ROOT / "test/evals" / name / "triggers.json" for name in SKILL_NAMES]
@@ -207,6 +211,17 @@ def validate_repo() -> List[str]:
         errors.append("both plugin manifests need $schema")
     if entry.get("source") != "./plugins/fabric-agent-adapter":
         errors.append("marketplace source is incorrect")
+
+    pkg = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    if pkg.get("name") != "@passioncode-ai/fabric-agent-adapter":
+        errors.append("package.json name must be @passioncode-ai/fabric-agent-adapter")
+    if pkg.get("version") != VERSION:
+        errors.append("package.json version is out of sync")
+    if pkg.get("publishConfig", {}).get("access") != "public":
+        errors.append("scoped package needs publishConfig.access public")
+    for entry_name in ("bin", "plugins"):
+        if entry_name not in pkg.get("files", []):
+            errors.append("package.json files whitelist must ship %s" % entry_name)
 
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     match = re.search(r"^## ([0-9]+\.[0-9]+\.[0-9]+)", changelog, re.MULTILINE)
