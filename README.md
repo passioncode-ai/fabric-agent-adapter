@@ -1,4 +1,17 @@
+<p align="center">
+  <a href="https://passioncode.ai/">
+    <img src="assets/passioncode-icon-256.png" width="104" height="104" alt="PassionCode.ai passion fruit mark">
+  </a>
+</p>
+
 # Fabric Agent Adapter
+
+> **PassionCode.ai — The agent-agnostic operating system for AI-native teams.**
+
+**From vibe coding to passion coding.** PassionCode.ai moves the control point from
+managing agents one by one to operating Projects. Fabric Agent Adapter is the portable
+on-ramp: it helps an existing repository become a compatible, replaceable Provider
+without moving the Project onto one proprietary agent runtime.
 
 [![npm](https://img.shields.io/npm/v/%40passioncode-ai%2Ffabric-agent-adapter)](https://www.npmjs.com/package/@passioncode-ai/fabric-agent-adapter)
 [![validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml/badge.svg)](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml)
@@ -93,4 +106,3 @@ claude plugin validate . --strict
 
 The contract repository is normative. Updating the pin requires a new adapter release,
 fixture review, and a complete validation run.
-
