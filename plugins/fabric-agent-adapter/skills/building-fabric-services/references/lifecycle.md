@@ -39,7 +39,8 @@ implements these verbs itself — its CLI calls launchctl the same way.
 | cache (deletable any time) | `~/Library/Caches/<id>/` | `${XDG_CACHE_HOME:-~/.cache}/<id>/` |
 | code | `~/.local/share/<id>/releases/…` | same |
 
-Directories 0700, secret files 0600. A store carries a schema version and the service
+A repository that versions the data itself (a registry, a plan) may hold the data; the
+service's own code checkout and its releases may not. Directories 0700, secret files 0600. A store carries a schema version and the service
 refuses to open a store newer than its code. The cache holds only what can be rebuilt;
 anything the operator would miss belongs in data.
 

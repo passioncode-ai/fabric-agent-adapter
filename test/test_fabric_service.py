@@ -259,5 +259,43 @@ class LiveServiceTests(unittest.TestCase):
         self.assertEqual(results["descriptor.port-claim"]["verdict"], "FAIL")
 
 
+class StateRuleTests(unittest.TestCase):
+    """Data may live in a data repository, never in the service's own code checkout."""
+
+    def probe(self, data, source):
+        checker = load("check_service")
+        d = descriptor(8710, data=str(data))
+        if source:
+            d["source"] = {"repository": source}
+        p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
+        inside = subprocess.run(["git", "-C", str(data), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+        p.state_rule(Path(data), inside)
+        return p.results[-1]["verdict"]
+
+    def repo(self, root, remote):
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "remote", "add", "origin", remote], check=True)
+
+    def test_verdicts(self):
+        checker = load("check_service")
+        self.assertTrue(checker.same_repository("git@github.com:ssheleg/x.git", "https://github.com/ssheleg/x"))
+        self.assertFalse(checker.same_repository("git@github.com:ssheleg/x.git", "https://github.com/ssheleg/y"))
+        with tempfile.TemporaryDirectory() as temp:
+            code = Path(temp) / "code"
+            self.repo(code, "git@github.com:passioncode-ai/svc.git")
+            (code / "data").mkdir()
+            self.assertEqual(self.probe(code / "data", "https://github.com/passioncode-ai/svc"), "FAIL")
+            store = Path(temp) / "store"
+            self.repo(store, "git@github.com:passioncode-ai/svc-registry.git")
+            self.assertEqual(self.probe(store, "https://github.com/passioncode-ai/svc"), "PASS")
+            self.assertEqual(self.probe(store, None), "NOT_RUN")
+            plain = Path(temp) / "plain"
+            plain.mkdir()
+            self.assertEqual(self.probe(plain, "https://github.com/passioncode-ai/svc"), "PASS")
+            rel = Path(temp) / "releases" / "0.1.0"
+            rel.mkdir(parents=True)
+            self.assertEqual(self.probe(rel, "https://github.com/passioncode-ai/svc"), "FAIL")
+
+
 if __name__ == "__main__":
     unittest.main()

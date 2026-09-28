@@ -8,7 +8,7 @@ metadata:
   version: "0.4.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "cc9ed2d13413397bb16f616f50cbb153d788fed8"
+  extension-commit: "0d13406f63ca862269f51c4aee3ced431930313b"
 ---
 
 # Building Fabric services
@@ -84,8 +84,10 @@ MCP registration into a client config, the login flow or the CSRF header.
    burned budget; nothing showed which build was answering.)*
 5. **State outside code.** Data and config in `~/Library/Application Support/<id>/`,
    logs in `~/Library/Logs/<id>/`, cache in `~/Library/Caches/<id>/`; secrets in a 0600
-   file. Never inside the repository or a release directory. *(Deleting a checkout left
-   a plist launchd retried every 10 s, and the data went with it.)*
+   file. Never inside the service's own code checkout or a release directory; a
+   repository that versions the data itself is a store and is fine — declare
+   `source.repository` so the probe can tell them apart. *(Deleting a checkout left a
+   plist launchd retried every 10 s, and the data went with it.)*
 6. **Tokens stay in files and headers.** Mode 0600, owner-checked, never a symlink;
    never in a query string, an argument vector or a plist. The dashboard gets a
    one-time login code, never the token.
