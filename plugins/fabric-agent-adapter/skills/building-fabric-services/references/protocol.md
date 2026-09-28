@@ -31,11 +31,11 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
 ```json
 {
   "protocol": "fabric-service/0.1",
-  "service": { "id": "mobile-publisher", "instance": "default", "name": "Mobile Publisher",
+  "service": { "id": "example-agent", "instance": "default", "name": "Example Agent",
                "version": "0.2.0", "build": { "commit": "8b80be9", "dirty": false, "builtAt": "2026-09-28T17:40:00Z" } },
   "process": { "pid": 58090, "startedAt": "2026-09-28T17:41:02Z" },
   "status": "degraded",
-  "degraded": [{ "source": "llm", "reason": "No model key: localisation is paused." }],
+  "degraded": [{ "source": "llm", "reason": "No model key: drafting is paused." }],
   "summary": [{ "label": "Jobs running", "value": 2 }, { "label": "Awaiting you", "value": 1, "attention": true }],
   "surfaces": { "dashboard": { "path": "/dashboard", "login": true },
                 "mcp": { "path": "/mcp", "transport": "streamable-http" },
@@ -57,8 +57,8 @@ empty, or `null` for an empty log. Retain at least seven days or 1000 events.
 
 ```json
 { "events": [ { "id": "4213", "at": "2026-09-28T17:55:10Z", "kind": "job.awaiting_choice",
-                "level": "notice", "text": "AION store listing is ready for your approval.",
-                "subject": { "type": "app", "id": "aion", "label": "AION" },
+                "level": "notice", "text": "The Q3 report draft is ready for your approval.",
+                "subject": { "type": "report", "id": "q3", "label": "Q3 report" },
                 "link": "/dashboard#/approvals/77", "notify": true } ],
   "cursor": "4213" }
 ```

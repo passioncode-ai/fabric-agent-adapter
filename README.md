@@ -29,7 +29,7 @@ Node reference kits (`scripts/fabric_service.py`, `scripts/fabric-service.mjs`),
 complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live probe:
 
 ```bash
-python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py mobile-publisher
+python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py example-agent
 ```
 
 For provider bundles the adapting skill helps an agent author:

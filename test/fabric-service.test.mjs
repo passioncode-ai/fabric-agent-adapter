@@ -40,14 +40,14 @@ except fs.AlreadyRunning as e:
 
 test('a port is a claim', () => {
   const dir = temp();
-  k.writeDescriptor(descriptor(8791, 'asset-foundry', 'preview'), dir);
-  assert.throws(() => k.writeDescriptor(descriptor(8791, 'copylot'), dir), /8791.*asset-foundry\.preview/);
-  const file = k.writeDescriptor(descriptor(8795), dir);
+  k.writeDescriptor(descriptor(47191, 'maker', 'preview'), dir);
+  assert.throws(() => k.writeDescriptor(descriptor(47191, 'writer'), dir), /47191.*maker\.preview/);
+  const file = k.writeDescriptor(descriptor(47195), dir);
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
 test('invalid descriptors are refused', () => {
-  const bad = { ...descriptor(8766), origin: 'http://0.0.0.0:8766', commands: { doctor: 'brandctl check' } };
+  const bad = { ...descriptor(47166), origin: 'http://0.0.0.0:47166', commands: { doctor: 'brandctl check' } };
   const problems = k.validateDescriptor(bad);
   assert.ok(problems.some((p) => p.includes('origin')));
   assert.ok(problems.some((p) => p.includes('argument array')));
@@ -65,10 +65,10 @@ test('token file must be private and tokens compare by scheme', () => {
 });
 
 test('request guard', () => {
-  assert.equal(k.checkRequest(8710, '127.0.0.1:8710'), null);
-  assert.ok(k.checkRequest(8710, 'evil.example'));
-  assert.ok(k.checkRequest(8710, '127.0.0.1:8710', 'http://evil.example'));
-  assert.ok(k.checkRequest(8710, '127.0.0.1:8710', undefined, 'cross-site'));
+  assert.equal(k.checkRequest(47110, '127.0.0.1:47110'), null);
+  assert.ok(k.checkRequest(47110, 'evil.example'));
+  assert.ok(k.checkRequest(47110, '127.0.0.1:47110', 'http://evil.example'));
+  assert.ok(k.checkRequest(47110, '127.0.0.1:47110', undefined, 'cross-site'));
 });
 
 test('login codes are single use across a restart and revocable', () => {

@@ -4,7 +4,7 @@
 
 | Key | Value | Why |
 |---|---|---|
-| `Label` | reverse-DNS, stable (`com.sshlg.mobile-publisher`) | the host controls the job by label |
+| `Label` | reverse-DNS, stable (`com.example.example-agent`) | the host controls the job by label |
 | `ProgramArguments` | absolute interpreter + module/script inside a **release** directory | a worktree or checkout path breaks the day it moves |
 | `RunAtLoad` | `true` | back at every login |
 | `KeepAlive` | `true` | `{SuccessfulExit:false}` leaves a cleanly exited service down |

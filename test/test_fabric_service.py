@@ -56,30 +56,30 @@ class DescriptorTests(unittest.TestCase):
     def test_port_is_a_claim(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            fs.write_descriptor(descriptor(8791, "asset-foundry", "preview"), root)
+            fs.write_descriptor(descriptor(47191, "maker", "preview"), root)
             with self.assertRaises(fs.ServiceError) as caught:
-                fs.write_descriptor(descriptor(8791, "copylot"), root)
-            self.assertIn("8791", str(caught.exception))
-            self.assertIn("asset-foundry.preview", str(caught.exception))
+                fs.write_descriptor(descriptor(47191, "writer"), root)
+            self.assertIn("47191", str(caught.exception))
+            self.assertIn("maker.preview", str(caught.exception))
 
     def test_reinstall_of_the_same_instance_is_allowed_and_private(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            fs.write_descriptor(descriptor(8795), root)
-            path = fs.write_descriptor(descriptor(8795), root)
+            fs.write_descriptor(descriptor(47195), root)
+            path = fs.write_descriptor(descriptor(47195), root)
             self.assertEqual(path.name, "sample.default.json")
             self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
             self.assertTrue(fs.remove_descriptor("sample", "default", root))
 
     def test_invalid_descriptors_are_refused(self):
-        bad = descriptor(8766)
-        bad["origin"] = "http://0.0.0.0:8766"
+        bad = descriptor(47166)
+        bad["origin"] = "http://0.0.0.0:47166"
         bad["commands"] = {"doctor": "brandctl check && echo ok"}
         problems = fs.validate_descriptor(bad)
         self.assertTrue(any("origin" in p for p in problems))
         self.assertTrue(any("argument array" in p for p in problems))
-        custom = descriptor(8787)
-        custom["auth"] = {"tokenFile": "/tmp/t", "header": "X-Foundry-Token", "scheme": "Bearer"}
+        custom = descriptor(47187)
+        custom["auth"] = {"tokenFile": "/tmp/t", "header": "X-Example-Token", "scheme": "Bearer"}
         self.assertTrue(any("scheme must be none" in p for p in fs.validate_descriptor(custom)))
 
 
@@ -104,11 +104,11 @@ class TokenAndNetworkTests(unittest.TestCase):
         self.assertFalse(fs.token_matches(None, "abcdefghijklmnopqr"))
 
     def test_request_guard(self):
-        self.assertIsNone(fs.check_request(8710, "127.0.0.1:8710"))
-        self.assertIsNone(fs.check_request(8710, "localhost:8710", "http://localhost:8710"))
-        self.assertIsNotNone(fs.check_request(8710, "evil.example"))
-        self.assertIsNotNone(fs.check_request(8710, "127.0.0.1:8710", "http://evil.example"))
-        self.assertIsNotNone(fs.check_request(8710, "127.0.0.1:8710", None, "cross-site"))
+        self.assertIsNone(fs.check_request(47110, "127.0.0.1:47110"))
+        self.assertIsNone(fs.check_request(47110, "localhost:47110", "http://localhost:47110"))
+        self.assertIsNotNone(fs.check_request(47110, "evil.example"))
+        self.assertIsNotNone(fs.check_request(47110, "127.0.0.1:47110", "http://evil.example"))
+        self.assertIsNotNone(fs.check_request(47110, "127.0.0.1:47110", None, "cross-site"))
 
 
 class LoginCodeTests(unittest.TestCase):
@@ -236,11 +236,11 @@ class LiveServiceTests(unittest.TestCase):
     def test_planted_foreign_identity_is_caught(self):
         path = self.services / "sample.default.json"
         doc = json.loads(path.read_text())
-        doc["id"] = "webpilot"
-        path.rename(self.services / "webpilot.default.json")
-        (self.services / "webpilot.default.json").write_text(json.dumps(doc))
-        os.chmod(self.services / "webpilot.default.json", 0o600)
-        out = subprocess.run([sys.executable, str(SCRIPTS / "check_service.py"), "webpilot", "--services-dir",
+        doc["id"] = "runner"
+        path.rename(self.services / "runner.default.json")
+        (self.services / "runner.default.json").write_text(json.dumps(doc))
+        os.chmod(self.services / "runner.default.json", 0o600)
+        out = subprocess.run([sys.executable, str(SCRIPTS / "check_service.py"), "runner", "--services-dir",
                               str(self.services), "--json"], capture_output=True, text=True)
         verdicts = {r["rule"]: r["verdict"] for r in json.loads(out.stdout)["results"]}
         self.assertEqual(verdicts["well-known.identity"], "FAIL")
@@ -253,8 +253,8 @@ class LiveServiceTests(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_planted_port_clash_is_caught(self):
-        clash = descriptor(self.port, "copylot", data=str(self.data))
-        (self.services / "copylot.default.json").write_text(json.dumps(clash))
+        clash = descriptor(self.port, "writer", data=str(self.data))
+        (self.services / "writer.default.json").write_text(json.dumps(clash))
         _, results = self.check()
         self.assertEqual(results["descriptor.port-claim"]["verdict"], "FAIL")
 
@@ -264,7 +264,7 @@ class StateRuleTests(unittest.TestCase):
 
     def probe(self, data, source):
         checker = load("check_service")
-        d = descriptor(8710, data=str(data))
+        d = descriptor(47110, data=str(data))
         if source:
             d["source"] = {"repository": source}
         p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)

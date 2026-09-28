@@ -68,7 +68,7 @@ MCP registration into a client config, the login flow or the CSRF header.
 1. **Loopback only.** Bind `127.0.0.1`. Refuse any `Host` other than
    `127.0.0.1:<port>`, `localhost:<port>`, `[::1]:<port>`; refuse a foreign `Origin` and
    `Sec-Fetch-Site: cross-site` — on every path, the well-known one included.
-   *(A `python -m http.server` on `*:8766` served source code to the LAN here.)*
+   *(A throwaway `python -m http.server` bound to every interface served a source tree to the local network.)*
 2. **One copy, locked before any side effect.** Take the exclusive lock on
    `<data>/service.lock` first — before resuming jobs, starting a scheduler, migrating
    a store or even creating a token. Held → print one sentence naming the holder's pid
@@ -110,7 +110,7 @@ Startup order is the part that goes wrong; keep it exactly:
 ```python
 import fabric_service as fs
 
-dirs = fs.service_dirs("mobile-publisher")
+dirs = fs.service_dirs("example-agent")
 lock = fs.hold_single_instance(dirs["data"])        # 1. lock — exits 75 if held
 token = fs.ensure_token(dirs["data"] / "service.token")  # 2. only now touch state
 log = fs.JsonlEventLog(dirs["data"] / "events.jsonl")    #    (or a view over your own log)

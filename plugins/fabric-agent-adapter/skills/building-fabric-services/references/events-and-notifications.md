@@ -18,9 +18,9 @@ The feed is a view: never copy rows into a second store that can drift from the 
 - `level`: `info` (routine), `notice` (the operator may want to look), `warning`
   (something is degrading), `error` (something failed and needs action).
 - `text`: one sentence, in the operator's language, with the object named and the
-  number stated — "AION store listing is ready for your approval (12 fields in 3
-  locales)." Never a machine id, never a stack trace.
-- `subject`: what it is about (`{type: "app", id: "aion", label: "AION"}`), so a host
+  number stated — "The Q3 report draft is ready for your approval (12 sections, 3
+  languages)." Never a machine id, never a stack trace.
+- `subject`: what it is about (`{type: "report", id: "q3", label: "Q3 report"}`), so a host
   can group.
 - `link`: the page that resolves it.
 
