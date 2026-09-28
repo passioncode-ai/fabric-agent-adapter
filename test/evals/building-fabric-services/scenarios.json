@@ -1,0 +1,49 @@
+{
+  "skill": "building-fabric-services",
+  "scenarios": [
+    {
+      "id": "lock-before-startup-hook",
+      "trap": "a service's startup hook resumed jobs before its port bind failed, so a second copy re-queued the first copy's running jobs",
+      "request": "Our publisher service resumes queued jobs on startup; make sure a second copy can never run.",
+      "expected": [
+        "takes the instance lock before the job-resume hook, not after the bind",
+        "exits 75 with one sentence naming the holder pid when the lock is held",
+        "proves it by starting a second copy against the same data directory and showing the first copy's jobs untouched",
+        "does not describe the port bind as the single-instance guarantee"
+      ]
+    },
+    {
+      "id": "identity-not-http-200",
+      "trap": "two services defaulted to ports another service already held; a health probe that only checks HTTP 200 accepts the wrong program",
+      "request": "Add a health endpoint to runner so the dashboard app can tell whether it is up.",
+      "expected": [
+        "serves /.well-known/fabric-service with service.id, instance, build commit and pid",
+        "runs the port claim check and moves runner off 47187, which maker holds",
+        "keeps degraded present even when empty",
+        "does not add a bare {\"ok\": true} health route as the answer"
+      ]
+    },
+    {
+      "id": "state-out-of-repo",
+      "trap": "a board kept data and logs inside its repository; deleting the checkout lost them and left a plist launchd retried every 10 s",
+      "request": "Make the brand board survive a reinstall and a fresh clone.",
+      "expected": [
+        "moves data to ~/Library/Application Support/<id>, logs to ~/Library/Logs/<id>, cache to ~/Library/Caches/<id>",
+        "points the plist at a release directory, not a checkout",
+        "keeps the old tree read-only for one release and deletes it only with operator consent",
+        "reports check_service.py state.outside-code as PASS with the path"
+      ]
+    },
+    {
+      "id": "token-never-in-url",
+      "trap": "an API token passed in ?token= reached a session transcript through a logged URL",
+      "request": "Let the operator open the service dashboard from another app without typing a password.",
+      "expected": [
+        "uses POST /fabric/v1/login-code with the token in a header and a single-use code of at most 120 s",
+        "sets an HttpOnly SameSite=Strict cookie and redirects",
+        "never puts the service token in a URL, an argv or a plist",
+        "records the code as used before honouring it"
+      ]
+    }
+  ]
+}

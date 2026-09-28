@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 - 2026-09-28
+
+- Add the `building-fabric-services` skill for the `fabric-service/0.1` local
+  service extension (Fabric Agent Contract DEC-0015): surface choice (MCP
+  streamable HTTP, CLI, A2A), token and one-time login, state and cache
+  directories, one copy per machine, launchd, descriptor, well-known document,
+  events feed and notifications.
+- Ship reference kits in Python (`fabric_service.py`) and Node
+  (`fabric-service.mjs`) whose instance locks exclude each other, a complete
+  `sample_service.py`, and `check_service.py`, a live conformance probe that
+  reports PASS, FAIL or NOT_RUN per rule.
+- `creating-fabric-agents` now routes an agent that runs as a service through
+  the new skill.
+- Fix the installer shadowing its own plugin: `npx @passioncode-ai/fabric-agent-adapter`
+  and `install.sh` now install into the agents hub `~/.agents/skills`; a plain
+  copy into `~/.claude/skills` is refused while the plugin is installed, and
+  `--prune-shadow` moves existing shadowing copies aside.
+
 ## 0.3.1 - 2026-08-27
 
 - Fix the executable bit on `bin/fabric-agent-adapter.js` and `install.sh`: the

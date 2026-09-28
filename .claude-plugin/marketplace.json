@@ -5,14 +5,14 @@
     "name": "passioncode-ai",
     "url": "https://github.com/passioncode-ai"
   },
-  "description": "Adapt existing agent projects to the versioned Fabric Agent Contract with evidence-backed MCP, A2A, or local-runner provider bundles.",
+  "description": "Create Fabric-compatible agents, run them as always-alive local services with dashboards, and adapt existing projects to the versioned Fabric Agent Contract.",
   "plugins": [
     {
       "name": "fabric-agent-adapter",
       "displayName": "Fabric Agent Adapter",
       "source": "./plugins/fabric-agent-adapter",
-      "description": "Inspects an existing agent, API, MCP server, A2A peer, or terminal CLI; selects one Fabric profile per capability; scaffolds a contract-pinned provider bundle; and separates declaration, protocol, semantic, and binding-readiness verdicts.",
-      "version": "0.3.1",
+      "description": "Inspects an existing agent, API, MCP server, A2A peer, or terminal CLI; selects one Fabric profile per capability; scaffolds a contract-pinned provider bundle; and separates declaration, protocol, semantic, and binding-readiness verdicts; builds long-lived local agent services that follow fabric-service/0.1 with reference kits and a live conformance probe.",
+      "version": "0.4.0",
       "author": {
         "name": "passioncode-ai",
         "url": "https://github.com/passioncode-ai"
@@ -34,4 +34,3 @@
     }
   ]
 }
-
