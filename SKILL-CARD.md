@@ -48,7 +48,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 |---|---|
 | Version | `0.4.0` |
 | Plugin | `fabric-agent-adapter` |
-| Extension | `fabric-service/0.1` (Fabric Agent Contract DEC-0015) at `0d13406f63ca862269f51c4aee3ced431930313b` |
+| Extension | `fabric-service/0.1` (Fabric Agent Contract DEC-0015) at `a5a27092ba0dcc5facfbeae8b359146dfb403e9a` |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
 | Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, probe report |
