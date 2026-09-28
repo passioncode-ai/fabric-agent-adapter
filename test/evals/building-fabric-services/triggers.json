@@ -1,0 +1,25 @@
+{
+  "skill": "building-fabric-services",
+  "queries": [
+    {"query": "Make this agent a local service with an always-on dashboard that survives a reboot.", "shouldTrigger": true},
+    {"query": "Сделай агенту дашборд, который всегда работает и не плодит копии.", "shouldTrigger": true},
+    {"query": "Где нашему агенту хранить настройки и кэш, чтобы они пережили переустановку?", "shouldTrigger": true},
+    {"query": "Подключи Mobile Publisher к Fabric Dashboards по протоколу.", "shouldTrigger": true},
+    {"query": "Add the fabric-service well-known endpoint and an events feed to the brand board.", "shouldTrigger": true},
+    {"query": "Migrate asset-foundry's server to the fabric-service protocol.", "shouldTrigger": true},
+    {"query": "Our Copylot server starts twice sometimes; make sure only one copy runs and launchd restarts it.", "shouldTrigger": true},
+    {"query": "How should other agents talk to this local agent — MCP or CLI — and how do they authenticate?", "shouldTrigger": true},
+    {"query": "Локальный сервис агента: как сделать авторизацию дашборда и уведомления оператору?", "shouldTrigger": true},
+    {"query": "Check whether the observatory server conforms to fabric-service/0.1.", "shouldTrigger": true},
+    {"query": "Write a cron job that exports yesterday's sales to CSV at 6am.", "shouldTrigger": false},
+    {"query": "Deploy our Next.js SaaS dashboard to DigitalOcean App Platform.", "shouldTrigger": false},
+    {"query": "Generate the fabric-agent.json provider manifest for this MCP server.", "shouldTrigger": false},
+    {"query": "Build the Fabric Dashboards desktop app window and tray icon.", "shouldTrigger": false},
+    {"query": "Design a colour palette for the analytics dashboard.", "shouldTrigger": false},
+    {"query": "Сделай лендинг для нового продукта.", "shouldTrigger": false},
+    {"query": "Write a system prompt for the research agent.", "shouldTrigger": false},
+    {"query": "Set up Stripe checkout for the Pro plan.", "shouldTrigger": false},
+    {"query": "Fix the typo in the README heading.", "shouldTrigger": false},
+    {"query": "Добавь график выручки на дашборд в Grafana.", "shouldTrigger": false}
+  ]
+}

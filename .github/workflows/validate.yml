@@ -16,8 +16,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - run: python3 -m unittest discover -s test -v
       - run: python3 test/validate.py
+      - run: node --test test/
 
   claude-plugin:
     runs-on: ubuntu-latest

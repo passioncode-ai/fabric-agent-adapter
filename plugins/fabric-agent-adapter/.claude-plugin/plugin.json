@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "fabric-agent-adapter",
   "displayName": "Fabric Agent Adapter",
-  "description": "Create new Fabric-compatible agents and adapt existing projects to the Fabric Agent Contract through evidence-backed MCP, A2A, or local-runner provider bundles.",
-  "version": "0.3.1",
+  "description": "Create new Fabric-compatible agents, build them as always-alive local services with dashboards (fabric-service/0.1), and adapt existing projects to the Fabric Agent Contract through evidence-backed MCP, A2A, or local-runner provider bundles.",
+  "version": "0.4.0",
   "author": {
     "name": "passioncode-ai",
     "url": "https://github.com/passioncode-ai"
@@ -22,4 +22,3 @@
     "conformance"
   ]
 }
-

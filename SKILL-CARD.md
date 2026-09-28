@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.3.1` |
+| Version | `0.4.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `20a818e648a4c09a60df0126d11626922e8b9094` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -24,7 +24,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.3.1` |
+| Version | `0.4.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `20a818e648a4c09a60df0126d11626922e8b9094` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
@@ -40,3 +40,23 @@ skill), Fabric host implementation, or generic agent construction.
 
 The grill refuses to proceed without a named consumer, and the report always carries the
 canary-binding expectation: checker plus budget cap until a recorded promotion.
+
+
+# Skill card: building-fabric-services
+
+| Field | Value |
+|---|---|
+| Version | `0.4.0` |
+| Plugin | `fabric-agent-adapter` |
+| Extension | `fabric-service/0.1` (Fabric Agent Contract DEC-0015) at `cc9ed2d13413397bb16f616f50cbb153d788fed8` |
+| Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
+| Inputs | service id, port, callers and surfaces, store, notification-worthy events |
+| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, probe report |
+| Mutations | the target service's files; the plist in `~/Library/LaunchAgents`; one descriptor in the services directory |
+| Network | loopback only; the probe talks to `127.0.0.1:<port>` |
+| Secrets | the service token is created 0600 and read, never printed |
+
+Triggers include making an agent a local service, an always-on dashboard, where an agent
+stores settings, connecting a service to Fabric Dashboards, and migrating or checking a
+service against `fabric-service/0.1`. It does not trigger for cron jobs, hosted SaaS, the
+provider manifest (the adapting skill) or the Fabric Dashboards app.

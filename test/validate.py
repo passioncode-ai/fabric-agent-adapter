@@ -13,9 +13,9 @@ from typing import Any, Dict, List, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
-SKILL_NAMES = ("adapting-projects-to-fabric", "creating-fabric-agents")
+SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.3.1"
+VERSION = "0.4.0"
 EXPECTED_FILES = tuple(
     [
         ROOT / ".claude-plugin/marketplace.json",
@@ -38,7 +38,8 @@ EXPECTED_FILES = tuple(
 STDLIB_IMPORTS = {
     "__future__", "argparse", "ast", "datetime", "hashlib", "importlib", "json",
     "os", "pathlib", "re", "subprocess", "sys", "tempfile", "typing", "unittest",
-    "urllib",
+    "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets",
+    "shutil", "signal", "socket", "stat", "threading", "time",
 }
 
 
@@ -134,7 +135,10 @@ def validate_python_imports(path: Path, errors: List[str]) -> None:
         elif isinstance(node, ast.ImportFrom) and node.module:
             names = [node.module]
         for name in names:
-            if name.split(".", 1)[0] not in STDLIB_IMPORTS:
+            root = name.split(".", 1)[0]
+            if (path.parent / (root + ".py")).is_file():
+                continue  # a sibling module shipped in the same scripts directory
+            if root not in STDLIB_IMPORTS:
                 errors.append("non-stdlib import in %s: %s" % (path.relative_to(ROOT), name))
 
 

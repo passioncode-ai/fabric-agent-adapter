@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: passioncode-ai
-  version: "0.3.1"
+  version: "0.4.0"
   contract-version: "0.1.0"
   contract-commit: "20a818e648a4c09a60df0126d11626922e8b9094"
 ---
@@ -92,6 +92,13 @@ The generated placeholders are deliberate blockers; a bundle still containing on
 ready for admission.
 
 ## Step 4 — implement against the observables
+
+If the agent keeps running on the operator's computer — it answers other agents, runs
+long jobs or shows a dashboard — build it as a service with the sibling skill
+`building-fabric-services`: its instance lock, launchd plist, descriptor, well-known
+document and events feed are part of this step, not a later retrofit. If that skill is
+absent, apply the `fabric-service/0.1` rules from the pinned contract's
+`docs/specification/service.md` by hand and mark its probe `NOT_RUN`.
 
 Build the capability behind the chosen surface. Keep model choice and internal reasoning
 outside the contract; expose typed outcomes, evidence, and protocol-visible state. Every

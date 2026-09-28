@@ -17,10 +17,22 @@ without moving the Project onto one proprietary agent runtime.
 [![validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml/badge.svg)](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Private, portable Agent Skill for adapting an existing agent project to the
-[Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract).
+Private, portable Agent Skills for the
+[Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract):
+`adapting-projects-to-fabric`, `creating-fabric-agents` and
+`building-fabric-services`.
 
-It helps an agent author:
+`building-fabric-services` makes an agent a long-lived local service with a dashboard
+that is always alive, runs as one copy, keeps its state through a reinstall and appears
+in Fabric Dashboards by itself — the `fabric-service/0.1` extension. It ships Python and
+Node reference kits (`scripts/fabric_service.py`, `scripts/fabric-service.mjs`), a
+complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live probe:
+
+```bash
+python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py mobile-publisher
+```
+
+For provider bundles the adapting skill helps an agent author:
 
 - inspect the project's stable integration surfaces without executing it;
 - choose A2A `1.0`, MCP `2026-07-28`, or `fabric-local-runner/0.1` per capability;
@@ -39,7 +51,8 @@ The repository is private; the npm package is public. The npm path needs no GitH
 npm — no GitHub access required:
 
 ```bash
-npx @passioncode-ai/fabric-agent-adapter        # installs both skills into ~/.claude/skills
+npx @passioncode-ai/fabric-agent-adapter        # installs every skill into the agents hub ~/.agents/skills
+npx @passioncode-ai/fabric-agent-adapter --prune-shadow   # remove ~/.claude/skills copies that shadow the plugin
 ```
 
 Generic Agent Skills clients:
@@ -47,6 +60,7 @@ Generic Agent Skills clients:
 ```bash
 npx skills add passioncode-ai/fabric-agent-adapter --skill adapting-projects-to-fabric
 npx skills add passioncode-ai/fabric-agent-adapter --skill creating-fabric-agents
+npx skills add passioncode-ai/fabric-agent-adapter --skill building-fabric-services
 ```
 
 Claude Code plugin marketplace:
@@ -63,6 +77,12 @@ Ask the agent explicitly:
 ```text
 Adapt this project for Fabric compatibility. Inspect it, choose the profile per
 capability, scaffold the provider bundle, and report every conformance gate.
+```
+
+Or, for an agent that must keep running with a dashboard:
+
+```text
+Make this agent a local service with an always-on dashboard, following fabric-service/0.1.
 ```
 
 Or, for an agent that does not exist yet:
