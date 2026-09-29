@@ -59,5 +59,13 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(run(Path(temp), "--target", "cursor").returncode, 2)
 
 
+    def test_help_names_the_org_scoped_launcher(self):
+        # The bare `passioncode` name on npm is not ours; pointing people at it hands them
+        # whoever registers it.
+        with tempfile.TemporaryDirectory() as temp:
+            out = run(Path(temp), "--help").stdout
+        self.assertIn("npx @passioncode-ai/passioncode@latest update", out)
+        self.assertNotIn("npx passioncode@", out)
+
 if __name__ == "__main__":
     unittest.main()

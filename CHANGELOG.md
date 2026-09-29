@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The installer's help names the launcher by its npm org name,
+  `npx @passioncode-ai/passioncode@latest update`; the bare `passioncode` is not ours.
+
 ## 0.4.2 - 2026-09-29
 
 - Kit: `LoopbackHTTPServer`, a `ThreadingHTTPServer` whose bind asks no resolver.
