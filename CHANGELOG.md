@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2 - 2026-09-29
+
+- Kit: `LoopbackHTTPServer`, a `ThreadingHTTPServer` whose bind asks no resolver.
+  `http.server` calls `socket.getfqdn()` between `bind()` and `listen()`; on a macOS
+  CI runner that held a service's port bound but silent for over 20 seconds. The
+  sample service and the skill's startup order use it, and the skill names the trap.
+- Kit: a garbled pid file (for example a superscript digit) now reads as "no pid"
+  instead of raising `ValueError` while naming the holder of a lock.
+
 ## 0.4.1 - 2026-09-29
 
 ### Fixed

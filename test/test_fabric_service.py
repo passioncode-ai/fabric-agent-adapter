@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 import urllib.request
 
 
@@ -50,6 +51,44 @@ class LockTests(unittest.TestCase):
             self.assertEqual(caught.exception.holder_pid, os.getpid())
             first.release()
             fs.InstanceLock(Path(temp)).acquire().release()
+
+
+class LoopbackServerTests(unittest.TestCase):
+    """http.server's server_bind() calls socket.getfqdn() between bind() and listen(); a Mac
+    with a slow resolver then holds the port bound but silent (seen on a macOS CI runner)."""
+
+    def test_binding_never_asks_the_resolver(self):
+        import http.server
+        with mock.patch("socket.getfqdn", side_effect=AssertionError("resolver asked at bind")):
+            srv = fs.LoopbackHTTPServer(("127.0.0.1", 0), http.server.BaseHTTPRequestHandler)
+        try:
+            self.assertEqual(srv.server_name, "127.0.0.1")
+            self.assertTrue(srv.daemon_threads)
+        finally:
+            srv.server_close()
+
+    def test_the_sample_service_uses_it(self):
+        sample = load("sample_service")
+        with tempfile.TemporaryDirectory() as temp, \
+                mock.patch("socket.getfqdn", side_effect=AssertionError("resolver asked at bind")):
+            args = sample.main.__globals__["argparse"].Namespace(
+                id="sample", instance="default", name="Sample", port=0, data_dir=temp,
+                token_file=None, degraded=None)
+            svc = sample.Service(args)
+            srv = sample.make_server(svc)
+            srv.server_close()
+        self.assertIsInstance(srv, sample.fs.LoopbackHTTPServer)
+
+
+class LockTests2(unittest.TestCase):
+    def test_a_garbled_pid_file_reads_as_no_pid(self):
+        # str.isdigit() accepts a superscript two; int() of it raised instead of saying "unknown".
+        with tempfile.TemporaryDirectory() as temp:
+            for text in ("\u00b2", "12x", ""):
+                (Path(temp) / "pid").write_text(text)
+                self.assertIsNone(fs._read_pid(Path(temp) / "pid"), repr(text))
+            (Path(temp) / "pid").write_text("4242\n")
+            self.assertEqual(fs._read_pid(Path(temp) / "pid"), 4242)
 
 
 class DescriptorTests(unittest.TestCase):

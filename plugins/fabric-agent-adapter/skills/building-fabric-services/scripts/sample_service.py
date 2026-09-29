@@ -14,7 +14,7 @@ import argparse
 import html
 import json
 import os
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 import signal
 import sys
@@ -157,11 +157,14 @@ def make_handler(svc: Service):
     return Handler
 
 
+def make_server(svc: Service) -> fs.LoopbackHTTPServer:
+    return fs.LoopbackHTTPServer(("127.0.0.1", svc.port), make_handler(svc))
+
+
 def serve(args: argparse.Namespace) -> int:
     svc = Service(args)
     svc.start()
-    server = ThreadingHTTPServer(("127.0.0.1", svc.port), make_handler(svc))
-    server.daemon_threads = True
+    server = make_server(svc)
 
     def stop(signum: int, _frame: Any) -> None:
         svc.log.append("service.stopping", "info", "%s is stopping." % svc.name)

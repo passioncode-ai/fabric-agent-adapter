@@ -17,7 +17,7 @@ def run(home, *args):
 
 
 def fake_plugin(home):
-    install = home / ".claude/plugins/cache/fabric-agent-adapter/fabric-agent-adapter/0.4.0"
+    install = home / ".claude/plugins/cache/fabric-agent-adapter/fabric-agent-adapter/0.4.2"
     (install / "skills").mkdir(parents=True)
     (home / ".claude/plugins/installed_plugins.json").write_text(json.dumps(
         {"version": 2, "plugins": {"fabric-agent-adapter@fabric-agent-adapter": [{"installPath": str(install)}]}}))
