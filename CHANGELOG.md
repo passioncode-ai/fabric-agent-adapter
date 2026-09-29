@@ -7,8 +7,7 @@
 - **License.** The adapter is now source-available under
   `PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0`, with a
   commercial license on request (contact@passioncode.ai). Versions up to and including
-  v0.4.2, and npm releases up to and including 0.3.1, were released under MIT and remain
-  available under it. The manifests, the three skills' `license:` and the README say the
+  v0.4.2, on GitHub and on npm, were released under MIT and remain available under it. The manifests, the three skills' `license:` and the README say the
   same; contributions come in under `CLA.md`, which the new PR template asks for.
   `test/validate.py` fails a tree that slips back to MIT.
 - Author and marketplace owner are PassionCode.ai (`https://passioncode.ai/`).

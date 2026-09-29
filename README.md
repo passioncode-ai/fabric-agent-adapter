@@ -136,6 +136,6 @@ fixture review, and a complete validation run.
 Source-available under PolyForm Noncommercial or Internal Use; commercial license on
 request (contact@passioncode.ai). SPDX:
 `PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0` — see
-[LICENSE](LICENSE). Versions up to and including v0.4.2 (npm up to 0.3.1) were released
-under the MIT License and remain available under it. Contributions are accepted under
+[LICENSE](LICENSE). Versions up to and including v0.4.2 (on GitHub and on npm) were
+released under the MIT License and remain available under it. Contributions are accepted under
 [CLA.md](CLA.md) ([CONTRIBUTING.md](CONTRIBUTING.md)).

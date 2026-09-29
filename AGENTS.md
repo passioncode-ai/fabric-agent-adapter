@@ -56,7 +56,7 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
   `package.json` ships to npm.
 - Source-available, never "open source" or "MIT": `PolyForm-Noncommercial-1.0.0 OR
   LicenseRef-PolyForm-Internal-Use-1.0.0` in every manifest and skill; releases up to v0.4.2
-  stay MIT. Contributions come in under `CLA.md`. `test/validate.py` enforces it.
+  (GitHub and npm) stay MIT. Contributions come in under `CLA.md`. `test/validate.py` enforces it.
 - Examples, evals and docs use neutral names (`example-agent`); an agent someone built for
   themselves never appears in them.
 

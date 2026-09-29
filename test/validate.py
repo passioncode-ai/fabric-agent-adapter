@@ -441,7 +441,7 @@ def validate_repo() -> List[str]:
     # same thing, and contributions come in under the CLA the PR template asks for.
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
     for needle in ("# PolyForm Noncommercial License 1.0.0", "# PolyForm Internal Use License 1.0.0",
-                   "remain available\nunder MIT"):
+                   "released under the MIT License"):
         if needle not in license_text:
             errors.append("LICENSE must carry both PolyForm texts and the MIT-history sentence (%r)" % needle)
     if re.search(r"(?<![\"\u201c])\bopen[- ]source\b|license-MIT", (ROOT / "README.md").read_text(encoding="utf-8"), re.IGNORECASE):
