@@ -213,8 +213,8 @@ jobs:
           # The read replica lags the write master — "published" is a claim
           # until it is served; poll instead of trusting the exit code alone.
           # 18x10s missed the FIRST scoped publish of this package by seconds
-          # (registry served it at +4min); 5 minutes covers the observed lag.
-          for _ in $(seq 1 30); do
+          # (+4 min for 0.3.1; 0.4.3 on 2026-09-29 was still unserved at +5 min); 10 minutes.
+          for _ in $(seq 1 60); do
             got=$(npm view "${{ steps.pub.outputs.name }}" version 2>/dev/null || echo "")
             if [ "$got" = "${{ steps.t.outputs.ver }}" ]; then
               echo "OK: registry serves ${{ steps.pub.outputs.name }}@$got"
@@ -222,5 +222,5 @@ jobs:
             fi
             sleep 10
           done
-          echo "registry still does not serve ${{ steps.t.outputs.ver }} after 5 minutes"
+          echo "registry still does not serve ${{ steps.t.outputs.ver }} after 10 minutes"
           exit 1
