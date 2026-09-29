@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 EXPECTED_FILES = tuple(
     [
         ROOT / ".claude-plugin/marketplace.json",
@@ -38,7 +38,7 @@ EXPECTED_FILES = tuple(
 STDLIB_IMPORTS = {
     "__future__", "argparse", "ast", "datetime", "hashlib", "importlib", "json",
     "os", "pathlib", "re", "subprocess", "sys", "tempfile", "typing", "unittest",
-    "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets",
+    "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets", "socketserver",
     "shutil", "signal", "socket", "stat", "threading", "time",
 }
 

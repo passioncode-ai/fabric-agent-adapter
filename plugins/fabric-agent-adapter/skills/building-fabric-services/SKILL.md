@@ -15,7 +15,7 @@ license: MIT
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). No network or package install; the contract checkout is optional.
 metadata:
   author: passioncode-ai
-  version: "0.4.1"
+  version: "0.4.2"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
@@ -126,7 +126,7 @@ token = fs.ensure_token(dirs["data"] / "service.token")  # 2. only now touch sta
 log = fs.JsonlEventLog(dirs["data"] / "events.jsonl")    #    (or a view over your own log)
 codes = fs.LoginCodes(dirs["data"] / "auth")
 resume_jobs()                                        # 3. side effects after the lock
-serve("127.0.0.1", port)                             # 4. bind loopback
+fs.LoopbackHTTPServer(("127.0.0.1", port), Handler)  # 4. bind loopback, no resolver
 ```
 
 Node: `const lock = await holdSingleInstance(dirs.data)` first, then the same order.
@@ -224,6 +224,9 @@ this estate needs.
   explicitly in the plist; never copy the whole shell environment into it.
 - A plist pointing at a worktree or a checkout breaks the day it moves. Point it at a
   release.
+- `http.server.HTTPServer` asks the resolver for its FQDN between `bind()` and
+  `listen()`. With a slow resolver (a macOS CI runner, a Mac offline) the port is bound
+  but silent: connects time out instead of being refused. Use `fs.LoopbackHTTPServer`.
 - `logging.basicConfig` called twice: the second call is a no-op, so a server's own
   log file stays empty. Configure logging once, in the entry point.
 - Hand-made `.plist.bak` files in `~/Library/LaunchAgents` are never cleaned up; keep

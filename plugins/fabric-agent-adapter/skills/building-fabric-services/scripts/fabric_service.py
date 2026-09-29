@@ -15,12 +15,14 @@ import datetime as _dt
 import errno
 import hashlib
 import hmac
+import http.server
 import json
 import os
 from pathlib import Path
 import plistlib
 import re
 import secrets
+import socketserver
 import stat
 import subprocess
 import sys
@@ -166,7 +168,7 @@ class InstanceLock:
 def _read_pid(path: Path) -> Optional[int]:
     try:
         text = path.read_text().strip()
-        return int(text) if text.isdigit() else None
+        return int(text) if re.fullmatch(r"[0-9]{1,10}", text, re.ASCII) else None
     except OSError:
         return None
 
@@ -236,6 +238,20 @@ def check_request(port: int, host: Optional[str], origin: Optional[str] = None,
 
 
 # --- descriptor --------------------------------------------------------------
+
+class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
+    """ThreadingHTTPServer for a loopback service: threads are daemons, and the bind asks
+    no resolver. HTTPServer.server_bind() calls socket.getfqdn() between bind() and listen();
+    on a Mac with a slow resolver the port then stays bound but silent, so a host sees
+    neither an answer nor a refusal."""
+
+    daemon_threads = True
+
+    def server_bind(self) -> None:
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name, self.server_port = host, port
+
 
 def descriptor_path(service_id: str, instance: str = "default", directory: Optional[Path] = None) -> Path:
     return (directory or services_dir()) / ("%s.%s.json" % (service_id, instance))
