@@ -20,7 +20,7 @@ claude plugin validate ./plugins/fabric-agent-adapter --strict
 claude plugin validate . --strict
 ```
 
-`npm test` runs the first two plus `node --test test/`. `python3 test/validate.py --frontmatter
+`npm test` runs the first two plus `node --test 'test/*.test.mjs'`. `python3 test/validate.py --frontmatter
 <SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs all four in two jobs
 (`python`, `claude-plugin`). `.github/workflows/release.yml` validates, creates a GitHub release
 and publishes to npm on a `v*` tag, but only when the repository variables `RELEASE_ENABLED` and
