@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.4.2"
+VERSION = "0.4.3"
+LICENSE_SPDX = "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0"
 EXPECTED_FILES = tuple(
     [
         ROOT / ".claude-plugin/marketplace.json",
@@ -23,6 +24,8 @@ EXPECTED_FILES = tuple(
         ROOT / "README.md",
         ROOT / "CHANGELOG.md",
         ROOT / "LICENSE",
+        ROOT / "CLA.md",
+        ROOT / ".github/pull_request_template.md",
         ROOT / "CONTRIBUTING.md",
         ROOT / "SECURITY.md",
         ROOT / "SKILL-CARD.md",
@@ -268,8 +271,8 @@ def validate_metadata(data: Dict[str, Any], expected_name: str) -> List[str]:
         errors.append("description must include a NOT-for boundary")
     if len(description) > 1024:
         errors.append("description exceeds 1024 characters")
-    if data.get("license") != "MIT":
-        errors.append("skill license must be MIT")
+    if data.get("license") != LICENSE_SPDX:
+        errors.append("skill license must be %s" % LICENSE_SPDX)
     if len(data.get("compatibility", "")) > 500:
         errors.append("compatibility exceeds 500 characters")
     metadata = data.get("metadata")
@@ -386,7 +389,7 @@ def validate_repo() -> List[str]:
             errors.append("%s version is out of sync" % label)
         if value.get("displayName") != "Fabric Agent Adapter":
             errors.append("%s displayName is missing" % label)
-        if value.get("license") != "MIT":
+        if value.get("license") != LICENSE_SPDX:
             errors.append("%s license is out of sync" % label)
     if not marketplace.get("$schema") or not plugin.get("$schema"):
         errors.append("both plugin manifests need $schema")
@@ -434,6 +437,22 @@ def validate_repo() -> List[str]:
     if "validate.py\" --frontmatter" not in release:
         errors.append("release smoke must parse the installed SKILL.md front matter strictly")
 
+    # The license is source-available; the README, the manifests and the skills say the
+    # same thing, and contributions come in under the CLA the PR template asks for.
+    license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    for needle in ("# PolyForm Noncommercial License 1.0.0", "# PolyForm Internal Use License 1.0.0",
+                   "remain available\nunder MIT"):
+        if needle not in license_text:
+            errors.append("LICENSE must carry both PolyForm texts and the MIT-history sentence (%r)" % needle)
+    if re.search(r"(?<![\"\u201c])\bopen[- ]source\b|license-MIT", (ROOT / "README.md").read_text(encoding="utf-8"), re.IGNORECASE):
+        errors.append("README.md calls the adapter open source or MIT; it is source-available")
+    if "I agree to CLA.md" not in (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8"):
+        errors.append("the PR template must carry the 'I agree to CLA.md' checkbox")
+    if "CLA.md" not in (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8"):
+        errors.append("CONTRIBUTING.md must say contributions are accepted under CLA.md")
+    if pkg.get("license") != LICENSE_SPDX:
+        errors.append("package.json license is out of sync")
+
     workflow = (ROOT / ".github/workflows/validate.yml").read_text(encoding="utf-8")
     for command in (
         "python3 test/validate.py",
@@ -449,7 +468,7 @@ def validator_self_test() -> List[str]:
     legal = {
         "name": "adapting-projects-to-fabric",
         "description": "Use when adapting a provider to Fabric. NOT for general design.",
-        "license": "MIT",
+        "license": LICENSE_SPDX,
         "compatibility": "Python 3.9+",
         "metadata": {"version": VERSION},
     }

@@ -10,3 +10,9 @@ A contract-pin update is a compatibility change: review all three profiles, rege
 fixtures intentionally, and release a new version. Never copy a newer normative rule into
 this repository while leaving the old pin in metadata.
 
+## License of contributions
+
+This repository is source-available under
+`PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0`
+([LICENSE](LICENSE)). Contributions are accepted under the
+[Contributor License Agreement](CLA.md): tick its box in the pull request template.

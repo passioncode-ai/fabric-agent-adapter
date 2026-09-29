@@ -25,8 +25,8 @@
     },
     {
       "id": "state-out-of-repo",
-      "trap": "a board kept data and logs inside its repository; deleting the checkout lost them and left a plist launchd retried every 10 s",
-      "request": "Make the brand board survive a reinstall and a fresh clone.",
+      "trap": "a dashboard service kept data and logs inside its repository; deleting the checkout lost them and left a plist launchd retried every 10 s",
+      "request": "Make example-agent's dashboard survive a reinstall and a fresh clone.",
       "expected": [
         "moves data to ~/Library/Application Support/<id>, logs to ~/Library/Logs/<id>, cache to ~/Library/Caches/<id>",
         "points the plist at a release directory, not a checkout",

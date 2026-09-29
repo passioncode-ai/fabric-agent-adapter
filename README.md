@@ -15,7 +15,7 @@ without moving the Project onto one proprietary agent runtime.
 
 [![npm](https://img.shields.io/npm/v/%40passioncode-ai%2Ffabric-agent-adapter)](https://www.npmjs.com/package/@passioncode-ai/fabric-agent-adapter)
 [![validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml/badge.svg)](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml)
-[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![license](https://img.shields.io/badge/license-source--available-blue.svg)](LICENSE)
 
 Private, portable Agent Skills for the
 [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract):
@@ -126,7 +126,16 @@ checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`.
 ## Contract pin
 
 - version: `0.1.0`
-- commit: `20a818e648a4c09a60df0126d11626922e8b9094`
+- commit: `a5a27092ba0dcc5facfbeae8b359146dfb403e9a`
 
 The contract repository is normative. Updating the pin requires a new adapter release,
 fixture review, and a complete validation run.
+
+## License
+
+Source-available under PolyForm Noncommercial or Internal Use; commercial license on
+request (contact@passioncode.ai). SPDX:
+`PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0` — see
+[LICENSE](LICENSE). Versions up to and including v0.4.2 (npm up to 0.3.1) were released
+under the MIT License and remain available under it. Contributions are accepted under
+[CLA.md](CLA.md) ([CONTRIBUTING.md](CONTRIBUTING.md)).

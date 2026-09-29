@@ -1,13 +1,13 @@
 ---
 name: adapting-projects-to-fabric
 description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract—choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility; also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or a brand-new agent — that is creating-fabric-agents.
-license: MIT
+license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode.
 metadata:
-  author: passioncode-ai
-  version: "0.4.2"
+  author: PassionCode.ai
+  version: "0.4.3"
   contract-version: "0.1.0"
-  contract-commit: "20a818e648a4c09a60df0126d11626922e8b9094"
+  contract-commit: "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
 ---
 
 # Adapting projects to Fabric
@@ -22,6 +22,9 @@ Use this skill to adapt or assess a provider project. Do not use it to:
 
 - design the Fabric host, registry, scheduler, admission service, or project binding runtime;
 - add an MCP server to Claude Code, Codex, or an agent gateway;
+- answer wire-level MCP or A2A questions (transports, sessions, auth handshakes, task
+  states on the wire) — that is `agent-interop` (agent-stack); the pinned contract stays
+  normative for what Fabric requires;
 - design a new agent from scratch — that is the sibling skill creating-fabric-agents;
 - claim admission merely because generated files or a valid manifest exist.
 
@@ -67,7 +70,7 @@ Use exactly:
 
 - contract version `0.1.0`;
 - repository `https://github.com/passioncode-ai/fabric-agent-contract`;
-- commit `20a818e648a4c09a60df0126d11626922e8b9094`.
+- commit `a5a27092ba0dcc5facfbeae8b359146dfb403e9a`.
 
 Read the pinned contract's guide
 `docs/guides/connecting-compatible-agents.md`, the selected profile specification, and

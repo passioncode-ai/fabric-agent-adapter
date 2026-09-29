@@ -1,13 +1,13 @@
 ---
 name: creating-fabric-agents
 description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit — «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch". Runs the intake grill (capability, named consumer, workflow-or-agent, MCP/A2A/local-runner profile, effect declarations), distils source projects into a knowledge pack whose recorded failures become planted eval fixtures, scaffolds the pinned contract bundle, and sets the two-clock eval expectation with the conformance report. NOT for adapting an existing project (use adapting-projects-to-fabric), building the Fabric host or orchestrator, or generic agent design where Fabric compatibility is not part of the request.
-license: MIT
+license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
-  author: passioncode-ai
-  version: "0.4.2"
+  author: PassionCode.ai
+  version: "0.4.3"
   contract-version: "0.1.0"
-  contract-commit: "20a818e648a4c09a60df0126d11626922e8b9094"
+  contract-commit: "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
 ---
 
 # Creating Fabric-compatible agents
@@ -29,6 +29,17 @@ Use this skill to design and build a new provider. Do not use it to:
   will never be a provider;
 - claim admission: the deliverable is an admission-ready provider bundle, never a
   connected provider.
+
+## Handing off to neighbouring skills
+
+- The agent's own loop — tool calls, routing and fallback, memory, sub-agents — is
+  designed with `agent-orchestrator` (agent-stack).
+- Its eval suite beyond the step-2 observables — trajectories, judges, regression
+  fixtures from traces — is built with `agent-evals` (agent-stack).
+- Packaging the agent as an Agent Skill or Claude Code plugin goes through `make-skill`.
+
+When one of them is not installed, do that part by hand against its own documentation
+and say in the report which skill was missing.
 
 ## Step 0 — the intake grill
 
@@ -82,7 +93,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri>
 ```
 
-Pin exactly contract `0.1.0` at commit `20a818e648a4c09a60df0126d11626922e8b9094` and
+Pin exactly contract `0.1.0` at commit `a5a27092ba0dcc5facfbeae8b359146dfb403e9a` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check

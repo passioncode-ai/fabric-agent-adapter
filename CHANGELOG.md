@@ -1,9 +1,34 @@
 # Changelog
 
-## Unreleased
+## 0.4.3 - 2026-09-29
+
+### Changed
+
+- **License.** The adapter is now source-available under
+  `PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0`, with a
+  commercial license on request (contact@passioncode.ai). Versions up to and including
+  v0.4.2, and npm releases up to and including 0.3.1, were released under MIT and remain
+  available under it. The manifests, the three skills' `license:` and the README say the
+  same; contributions come in under `CLA.md`, which the new PR template asks for.
+  `test/validate.py` fails a tree that slips back to MIT.
+- Author and marketplace owner are PassionCode.ai (`https://passioncode.ai/`).
+- **Contract pin** moves from `20a818e` to `a5a2709` (fabric-agent-contract `main`), the
+  commit `building-fabric-services` already pinned. Between the two the provider
+  profiles are unchanged — only the `fabric-service/0.1` extension was added — and
+  `adapt_project.py check --contract` gives the same verdicts for an MCP, an A2A and a
+  local-runner bundle at both commits (declaration shape PASS). One pin for all three
+  skills.
+- `creating-fabric-agents` hands the agent's own loop to `agent-orchestrator`, its
+  eval suite to `agent-evals` (agent-stack) and plugin packaging to `make-skill`;
+  `adapting-projects-to-fabric` sends wire-level MCP/A2A questions to `agent-interop`.
+
+### Fixed
 
 - The installer's help names the launcher by its npm org name,
   `npx @passioncode-ai/passioncode@latest update`; the bare `passioncode` is not ours.
+- A distributed eval named a personal agent as its example service; the
+  `building-fabric-services` evals use `example-agent`, and its description says "a
+  macOS machine" instead of naming whose.
 
 ## 0.4.2 - 2026-09-29
 

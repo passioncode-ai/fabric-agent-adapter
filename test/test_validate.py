@@ -25,9 +25,9 @@ def front(*lines, body="# Body\n"):
 
 
 LEGAL_TAIL = (
-    "license: MIT",
+    "license: " + validate.LICENSE_SPDX,
     "metadata:",
-    '  author: passioncode-ai',
+    '  author: PassionCode.ai',
     '  version: "%s"' % validate.VERSION,
 )
 
@@ -94,7 +94,7 @@ class BlockAndQuotedScalarTests(unittest.TestCase):
         text = skill(["description: >-", "  Use when X extension: which surface", "  (MCP, CLI) # not a comment. NOT for Y."])
         data, body = validate.parse_frontmatter(text)
         self.assertEqual(data["description"], "Use when X extension: which surface (MCP, CLI) # not a comment. NOT for Y.")
-        self.assertEqual(data["license"], "MIT")
+        self.assertEqual(data["license"], validate.LICENSE_SPDX)
         self.assertEqual(body, "# Body\n")
 
     def test_folded_block_blank_line_is_a_newline(self):
@@ -174,6 +174,46 @@ class RepositorySkillFilesTests(unittest.TestCase):
 
     def test_repository_validates(self):
         self.assertEqual(validate.validator_self_test() + validate.validate_repo(), [])
+
+
+class LicenseTests(unittest.TestCase):
+    """The relicense holds: a copy of the repository that slips back to MIT fails."""
+
+    def _validate_copy(self, mutate):
+        import shutil
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / "repo"
+            shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns(".git", "__pycache__", "node_modules"))
+            mutate(copy)
+            run = subprocess.run([sys.executable, str(copy / "test/validate.py")], capture_output=True, text=True)
+            return run.returncode, run.stdout + run.stderr
+
+    def test_the_real_tree_passes_the_license_checks(self):
+        code, out = self._validate_copy(lambda copy: None)
+        self.assertEqual(code, 0, out)
+
+    def test_an_mit_badge_fails(self):
+        def mutate(copy):
+            readme = copy / "README.md"
+            readme.write_text(readme.read_text(encoding="utf-8") + "\n![license](https://img.shields.io/badge/license-MIT-green.svg)\n", encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("source-available", out)
+
+    def test_a_manifest_back_on_mit_fails(self):
+        def mutate(copy):
+            manifest = copy / "plugins/fabric-agent-adapter/.claude-plugin/plugin.json"
+            manifest.write_text(manifest.read_text(encoding="utf-8").replace(validate.LICENSE_SPDX, "MIT"), encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("plugin license is out of sync", out)
+
+    def test_a_pr_template_without_the_cla_box_fails(self):
+        code, out = self._validate_copy(lambda copy: (copy / ".github/pull_request_template.md").write_text("## What changes\n", encoding="utf-8"))
+        self.assertEqual(code, 1)
+        self.assertIn("I agree to CLA.md", out)
 
 
 if __name__ == "__main__":
