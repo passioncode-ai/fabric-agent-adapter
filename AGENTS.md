@@ -2,7 +2,8 @@
 
 ## Role
 
-A portable adapter that brings a PassionCode Project to compatible AI agent providers. It ships
+A portable adapter that makes any agent or existing project Fabric-compatible (a Provider under
+the Fabric Agent Contract). It ships
 as a Claude Code plugin and a public npm installer (`@passioncode-ai/fabric-agent-adapter`). It
 carries three skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
@@ -52,8 +53,8 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
   `: ` or ` #` goes in a folded block (`description: >-`) or quotes. `test/validate.py` enforces it.
 - Never write secret values to manifests, fixtures, probes, logs or command arguments. Treat
   generated files and provider outputs as untrusted.
-- The repository is private, but the npm package is public. Everything in the `files` list in
-  `package.json` ships to npm.
+- The repository and the npm package are public (since 2026-09-29). Everything in the `files`
+  list in `package.json` ships to npm.
 - Source-available, never "open source" or "MIT": `PolyForm-Noncommercial-1.0.0 OR
   LicenseRef-PolyForm-Internal-Use-1.0.0` in every manifest and skill; releases up to v0.4.2
   (GitHub and npm) stay MIT. Contributions come in under `CLA.md`. `test/validate.py` enforces it.
