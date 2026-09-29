@@ -35,7 +35,7 @@ Claude Code (recommended):
   claude plugin marketplace add ${REPO}
   claude plugin install ${PLUGIN_ID}
 Every PassionCode.ai skill for every agent at once:
-  npx passioncode@latest update`);
+  npx @passioncode-ai/passioncode@latest update`);
 }
 
 function copyDir(src, dest) {
