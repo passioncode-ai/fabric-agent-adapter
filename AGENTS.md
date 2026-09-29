@@ -19,7 +19,8 @@ claude plugin validate ./plugins/fabric-agent-adapter --strict
 claude plugin validate . --strict
 ```
 
-`npm test` runs the first two. `.github/workflows/validate.yml` runs all four in two jobs
+`npm test` runs the first two plus `node --test test/`. `python3 test/validate.py --frontmatter
+<SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs all four in two jobs
 (`python`, `claude-plugin`). `.github/workflows/release.yml` validates, creates a GitHub release
 and publishes to npm on a `v*` tag, but only when the repository variables `RELEASE_ENABLED` and
 `PUBLISH_NPMJS` are `"true"`. It is off by default.
@@ -33,7 +34,7 @@ and publishes to npm on a `v*` tag, but only when the repository variables `RELE
 - `docs/evidence/`: specs, plans, evals, reports and retrospectives. The scaffold's write set is
   declared in the [delivery brief](docs/evidence/specs/2026-08-27-brief.md).
 - `CHANGELOG.md`, `SECURITY.md` and `SKILL-CARD.md` sit at the root. This repository has no ADR
-  directory and no handoff document.
+  directory. Task handoffs go in `docs/handoffs/<date>-<topic>.md`.
 
 ## Rules in this repository
 
@@ -46,6 +47,8 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
   before you change instructional prose.
 - Scripts use the Python standard library only and are non-destructive by default.
 - Keep the marketplace, plugin, skill metadata and changelog versions in sync.
+- SKILL.md front matter must survive a strict YAML reader, not only Claude Code: a value holding
+  `: ` or ` #` goes in a folded block (`description: >-`) or quotes. `test/validate.py` enforces it.
 - Never write secret values to manifests, fixtures, probes, logs or command arguments. Treat
   generated files and provider outputs as untrusted.
 - The repository is private, but the npm package is public. Everything in the `files` list in

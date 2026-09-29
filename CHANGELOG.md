@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.1 - 2026-09-29
+
+### Fixed
+
+- `building-fabric-services` could not be loaded by a strict YAML reader: its
+  front-matter `description` was an unquoted plain scalar holding `: `
+  ("fabric-service/0.1 extension: which surface", line 3, column 493), which YAML
+  rejects with "mapping values are not allowed here". Claude Code read it
+  leniently, so the plugin worked, but an agent reading the skill from
+  `~/.agents/skills` could drop it. The description is now a folded block
+  scalar (`>-`) with the exact same text (927 characters).
+- The validator could not see that class of defect: `test/validate.py` now
+  parses every SKILL.md front matter strictly (standard library only) and
+  rejects what a YAML reader rejects in an unquoted value — `: ` or a trailing
+  `:`, ` #` (a comment that silently truncates the value), a leading indicator
+  character, a duplicate key, an unclosed quote, an undeclared multi-line
+  value — with the line and column. `test/test_validate.py` plants each case.
+  `validate.py --frontmatter <SKILL.md ...>` checks installed copies anywhere.
+- The release smoke test looked for `~/.claude/skills`, where the installer has
+  not written since 0.4.0, so it would fail on the first release that ran it.
+  It now checks all three skills in `~/.agents/skills`, that `~/.claude/skills`
+  stays untouched, and that the installed front matter parses strictly.
+- `SKILL-CARD.md` versions and the release smoke paths joined the validator's
+  sync checks.
+
 ## 0.4.0 - 2026-09-28
 
 - Add the `building-fabric-services` skill for the `fabric-service/0.1` local

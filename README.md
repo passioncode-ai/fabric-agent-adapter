@@ -119,6 +119,10 @@ claude plugin validate ./plugins/fabric-agent-adapter --strict
 claude plugin validate . --strict
 ```
 
+`test/validate.py` reads every SKILL.md front matter as strictly as a YAML parser does; an
+unquoted value holding `: ` fails it. `python3 test/validate.py --frontmatter <SKILL.md ...>`
+checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`.
+
 ## Contract pin
 
 - version: `0.1.0`

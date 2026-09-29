@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 EXPECTED_FILES = tuple(
     [
         ROOT / ".claude-plugin/marketplace.json",
@@ -43,36 +43,213 @@ STDLIB_IMPORTS = {
 }
 
 
+# Front matter is read the way the STRICTEST consumer reads it, not the way Claude Code
+# does. Claude Code tolerates an unquoted `description:` holding `: `; a YAML 1.2 reader
+# answers "mapping values are not allowed here" and the agent drops the skill. Standard
+# library only (the repository rule), so this is a deliberately small YAML subset: a flat
+# mapping whose values are plain, quoted or block scalars, plus one level of nested
+# mapping. Anything outside that subset is an error, never a guess.
+FRONTMATTER_KEY = re.compile(r"[A-Za-z0-9_-]+")
+BLOCK_HEADER = re.compile(r"([|>])([+-]?)")
+# Characters that may not open a plain scalar at all (YAML 1.2, c-indicator).
+PLAIN_FORBIDDEN_FIRST = set("[]{},#&*!|>'\"%@`")
+# Characters that may open a plain scalar only when a non-space follows.
+PLAIN_NEEDS_NONSPACE_NEXT = set("-?:")
+DOUBLE_QUOTE_ESCAPES = {
+    "0": "\0", "a": "\a", "b": "\b", "t": "\t", "\t": "\t", "n": "\n", "v": "\v",
+    "f": "\f", "r": "\r", "e": "\x1b", " ": " ", '"': '"', "/": "/", "\\": "\\",
+    "N": "\x85", "_": "\xa0", "L": " ", "P": " ",
+}
+HEX_ESCAPES = {"x": 2, "u": 4, "U": 8}
+
+
+def _where(lineno: int, column: int) -> str:
+    return "line %d, column %d" % (lineno, column)
+
+
+def check_plain_scalar(value: str, lineno: int, column: int) -> str:
+    """Return a plain scalar unchanged, or raise where a strict YAML reader would.
+
+    `column` is the 1-based column of the scalar's first character, so every message
+    points at the offending character the way PyYAML and libyaml do.
+    """
+    first = value[0]
+    nxt = value[1:2]
+    if first in PLAIN_FORBIDDEN_FIRST or (first in PLAIN_NEEDS_NONSPACE_NEXT and nxt in ("", " ", "\t")):
+        raise ValueError(
+            "%s: a plain scalar cannot start with %r; use a block scalar (>-) or quotes"
+            % (_where(lineno, column), first))
+    for index, ch in enumerate(value):
+        if ch == ":" and value[index + 1:index + 2] in ("", " ", "\t"):
+            raise ValueError(
+                "%s: mapping values are not allowed here — an unquoted value holds ': ' "
+                "or ends with ':'; use a block scalar (>-) or quotes"
+                % _where(lineno, column + index))
+        if ch == "#" and index and value[index - 1] in (" ", "\t"):
+            raise ValueError(
+                "%s: ' #' starts a comment inside an unquoted value, so the text after it "
+                "is silently dropped; use a block scalar (>-) or quotes"
+                % _where(lineno, column + index))
+    return value
+
+
+def _decode_double_quoted(value: str, lineno: int, column: int) -> str:
+    out: List[str] = []
+    index = 1
+    while index < len(value):
+        ch = value[index]
+        if ch == '"':
+            _check_after_quote(value[index + 1:], lineno, column + index + 1)
+            return "".join(out)
+        if ch == "\\":
+            code = value[index + 1:index + 2]
+            if code in DOUBLE_QUOTE_ESCAPES:
+                out.append(DOUBLE_QUOTE_ESCAPES[code])
+                index += 2
+                continue
+            if code in HEX_ESCAPES:
+                width = HEX_ESCAPES[code]
+                digits = value[index + 2:index + 2 + width]
+                if len(digits) == width and all(c in "0123456789abcdefABCDEF" for c in digits):
+                    out.append(chr(int(digits, 16)))
+                    index += 2 + width
+                    continue
+            raise ValueError("%s: invalid escape in a double-quoted scalar" % _where(lineno, column + index))
+        out.append(ch)
+        index += 1
+    raise ValueError("%s: double-quoted scalar is not closed on its line" % _where(lineno, column))
+
+
+def _decode_single_quoted(value: str, lineno: int, column: int) -> str:
+    out: List[str] = []
+    index = 1
+    while index < len(value):
+        ch = value[index]
+        if ch == "'":
+            if value[index + 1:index + 2] == "'":
+                out.append("'")
+                index += 2
+                continue
+            _check_after_quote(value[index + 1:], lineno, column + index + 1)
+            return "".join(out)
+        out.append(ch)
+        index += 1
+    raise ValueError("%s: single-quoted scalar is not closed on its line" % _where(lineno, column))
+
+
+def _check_after_quote(rest: str, lineno: int, column: int) -> None:
+    stripped = rest.lstrip(" \t")
+    if stripped and not (stripped.startswith("#") and stripped != rest):
+        raise ValueError("%s: unexpected text after a closing quote" % _where(lineno, column))
+
+
+def _scalar(value: str, lineno: int, column: int) -> str:
+    if value.startswith('"'):
+        return _decode_double_quoted(value, lineno, column)
+    if value.startswith("'"):
+        return _decode_single_quoted(value, lineno, column)
+    return check_plain_scalar(value, lineno, column)
+
+
+def _read_block_scalar(style: str, chomp: str, lines: List[str], start: int,
+                       parent_indent: int, lineno: int) -> Tuple[str, int]:
+    """Read the block scalar whose header sits on line `start - 1`; return (text, next)."""
+    end = start
+    while end < len(lines) and (not lines[end].strip() or
+                                len(lines[end]) - len(lines[end].lstrip(" ")) > parent_indent):
+        end += 1
+    content = lines[start:end]
+    while content and not content[-1].strip():  # trailing blank lines belong to chomping
+        content.pop()
+    if not content:
+        raise ValueError("%s: block scalar has no content" % _where(lineno, len(lines[start - 1])))
+    indent = min(len(l) - len(l.lstrip(" ")) for l in content if l.strip())
+    if "\t" in "".join(l[:indent] for l in content if l.strip()):
+        raise ValueError("%s: tabs cannot indent a block scalar" % _where(lineno + 1, 1))
+    body = [l[indent:] if l.strip() else "" for l in content]
+    if style == "|":
+        text = "\n".join(body)
+    else:  # folded: a line break between two non-empty, non-indented lines becomes a space
+        parts: List[str] = []
+        for i, line in enumerate(body):
+            if i:
+                prev = body[i - 1]
+                more_indented = line.startswith((" ", "\t")) or prev.startswith((" ", "\t"))
+                if line and prev and not more_indented:
+                    parts.append(" ")
+                elif prev or more_indented:
+                    parts.append("\n")
+            parts.append(line)
+        text = "".join(parts)
+    if chomp == "+":
+        text += "\n" * (1 + (end - start - len(content)))
+    elif chomp == "":
+        text += "\n"
+    return text, end
+
+
 def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
+    """Parse SKILL.md front matter strictly; raise ValueError with line and column."""
     if not text.startswith("---\n"):
         raise ValueError("SKILL.md must start with YAML frontmatter")
     try:
         raw, body = text[4:].split("\n---\n", 1)
     except ValueError as exc:
         raise ValueError("SKILL.md frontmatter is not closed") from exc
+    lines = raw.split("\n")
     data: Dict[str, Any] = {}
-    nested: Dict[str, str] = {}
+    nested: Dict[str, Any] = {}
     nested_key = None
-    for line in raw.splitlines():
-        if line.startswith("  ") and nested_key:
-            key, sep, value = line.strip().partition(":")
-            if not sep:
-                raise ValueError("invalid nested frontmatter line: %s" % line)
-            nested[key] = value.strip().strip('"')
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        lineno = index + 2  # line 1 is the opening ---
+        if not line.strip() or line.lstrip().startswith("#"):
+            index += 1
             continue
-        key, sep, value = line.partition(":")
-        if not sep:
-            raise ValueError("invalid frontmatter line: %s" % line)
-        key = key.strip()
-        value = value.strip()
-        if value:
-            data[key] = value.strip('"')
+        if "\t" in line[:len(line) - len(line.lstrip())]:
+            raise ValueError("%s: tabs cannot indent YAML" % _where(lineno, 1))
+        indent = len(line) - len(line.lstrip(" "))
+        if indent and nested_key is None:
+            raise ValueError("%s: unexpected indented line — a multi-line value needs a "
+                             "block scalar (>-) or quotes" % _where(lineno, 1))
+        if indent not in (0, 2):
+            raise ValueError("%s: nested keys must be indented by exactly two spaces" % _where(lineno, 1))
+        target = nested if indent else data
+        if not indent:
+            _require_children(nested_key, nested, lineno)
             nested_key = None
+        key, sep, rest = line[indent:].partition(":")
+        if not sep or not FRONTMATTER_KEY.fullmatch(key) or (rest and not rest.startswith((" ", "\t"))):
+            raise ValueError("%s: expected 'key: value'" % _where(lineno, indent + 1))
+        if key in target:
+            raise ValueError("%s: duplicate key %r" % (_where(lineno, indent + 1), key))
+        value = rest.strip(" \t")
+        column = indent + len(key) + 2 + (len(rest) - len(rest.lstrip(" \t")))
+        header = BLOCK_HEADER.fullmatch(value.split(" #", 1)[0].rstrip()) if value else None
+        if header:
+            target[key], index = _read_block_scalar(header.group(1), header.group(2), lines,
+                                                    index + 1, indent, lineno)
+            continue
+        if value.startswith("#"):
+            raise ValueError("%s: the value of %r is a comment, so the key reads as null; quote "
+                             "it or use a block scalar (>-)" % (_where(lineno, column), key))
+        if value:
+            target[key] = _scalar(value, lineno, column)
+        elif indent:
+            raise ValueError("%s: nested value for %r is empty" % (_where(lineno, indent + 1), key))
         else:
             nested = {}
             data[key] = nested
             nested_key = key
+        index += 1
+    _require_children(nested_key, nested, len(lines) + 1)
     return data, body
+
+
+def _require_children(key: Any, nested: Dict[str, Any], lineno: int) -> None:
+    if key is not None and not nested:
+        raise ValueError("line %d: %r has no value — YAML reads it as null" % (lineno - 1, key))
 
 
 def validate_metadata(data: Dict[str, Any], expected_name: str) -> List[str]:
@@ -243,6 +420,20 @@ def validate_repo() -> List[str]:
             validate_python_imports(path, errors)
     validate_links(errors)
 
+    card = (ROOT / "SKILL-CARD.md").read_text(encoding="utf-8")
+    card_versions = re.findall(r"^\| Version \| `([^`]+)` \|$", card, re.MULTILINE)
+    if len(card_versions) != len(SKILL_NAMES) or set(card_versions) != {VERSION}:
+        errors.append("SKILL-CARD.md needs one Version row per skill, each at %s" % VERSION)
+
+    release = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    for name in SKILL_NAMES:
+        if 'test -f "$HOME/.agents/skills/%s/SKILL.md"' % name not in release:
+            errors.append("release smoke must check the agents hub install of %s" % name)
+    if 'test -f "$HOME/.claude/skills/' in release:
+        errors.append("release smoke expects ~/.claude/skills, where the installer no longer writes")
+    if "validate.py\" --frontmatter" not in release:
+        errors.append("release smoke must parse the installed SKILL.md front matter strictly")
+
     workflow = (ROOT / ".github/workflows/validate.yml").read_text(encoding="utf-8")
     for command in (
         "python3 test/validate.py",
@@ -270,10 +461,45 @@ def validator_self_test() -> List[str]:
     detected = validate_metadata(illegal, "adapting-projects-to-fabric")
     if len(detected) < 3:
         return ["validator self-test did not detect bad name/description/boundary"]
-    return []
+    planted = "---\nname: x\ndescription: Use when X extension: which. NOT for Y.\n---\n"
+    try:
+        parse_frontmatter(planted)
+    except ValueError:
+        return []
+    return ["validator self-test accepted an unquoted ': ' in a front-matter value"]
 
 
-def main() -> int:
+def check_frontmatter_files(paths: List[str]) -> List[str]:
+    """Strictly parse the front matter of the given SKILL.md files (any location)."""
+    errors: List[str] = []
+    if not paths:
+        return ["--frontmatter needs at least one SKILL.md path"]
+    for raw in paths:
+        path = Path(raw)
+        try:
+            data, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            errors.append("%s: %s" % (raw, exc))
+            continue
+        description = data.get("description")
+        if not isinstance(description, str) or not description:
+            errors.append("%s: description must be a non-empty string" % raw)
+        elif len(description) > 1024:
+            errors.append("%s: description exceeds 1024 characters (%d)" % (raw, len(description)))
+    return errors
+
+
+def main(argv: List[str]) -> int:
+    if argv[:1] == ["--frontmatter"]:
+        errors = check_frontmatter_files(argv[1:])
+        for error in errors:
+            print("ERROR: %s" % error)
+        if not errors:
+            print("OK: %d SKILL.md front matter block(s) parse strictly" % len(argv[1:]))
+        return 1 if errors else 0
+    if argv:
+        print("usage: validate.py [--frontmatter SKILL.md ...]")
+        return 2
     errors = validator_self_test() + validate_repo()
     if errors:
         for error in errors:
@@ -284,4 +510,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

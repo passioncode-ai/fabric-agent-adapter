@@ -111,15 +111,22 @@ jobs:
           # smoke cannot clone here. Pack the checked-out tag and install the
           # tarball instead — which also tests the exact artifact npm will
           # serve, files whitelist included.
+          REPO="$PWD"
           TARBALL="$PWD/$(npm pack --silent)"
           export HOME="$(mktemp -d)"
           cd "$(mktemp -d)"
           # A bare `npx <path.tgz>` executes the PATH as a command (126); the
           # package spec and the command must be named apart.
           npx --yes --package "$TARBALL" fabric-agent-adapter
-          test -f "$HOME/.claude/skills/adapting-projects-to-fabric/SKILL.md"
-          test -d "$HOME/.claude/skills/adapting-projects-to-fabric/references"
-          test -f "$HOME/.claude/skills/creating-fabric-agents/SKILL.md"
+          # Since 0.4.0 the installer writes to the agents hub, never ~/.claude/skills
+          # (a plain copy there shadows the plugin). Every shipped skill must land.
+          test -f "$HOME/.agents/skills/adapting-projects-to-fabric/SKILL.md"
+          test -d "$HOME/.agents/skills/adapting-projects-to-fabric/references"
+          test -f "$HOME/.agents/skills/building-fabric-services/SKILL.md"
+          test -f "$HOME/.agents/skills/creating-fabric-agents/SKILL.md"
+          test ! -e "$HOME/.claude/skills"
+          # The installed copies must survive a strict YAML reader, not only Claude Code.
+          python3 "$REPO/test/validate.py" --frontmatter "$HOME"/.agents/skills/*/SKILL.md
           echo "OK: released ${{ steps.t.outputs.tag }} installs cleanly from the packed tarball"
 
   publish:

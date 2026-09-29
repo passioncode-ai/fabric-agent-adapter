@@ -1,11 +1,21 @@
 ---
 name: building-fabric-services
-description: Use when building or running an agent as a long-lived local service with a dashboard on the operator's Mac — «сделай агенту дашборд», «локальный сервис агента», «дашборд должен всегда работать и не плодить копии», «где агенту хранить настройки», «подключи агента к Fabric Dashboards», "make this agent a local service", "always-on dashboard", "fabric-service protocol", "add the well-known endpoint", "migrate a service to fabric-service". Covers the fabric-service/0.1 extension: which surface to expose (MCP streamable HTTP, CLI, A2A), the token and one-time login, where state, config, logs and cache live, one copy per machine, launchd, the descriptor, the well-known document, the events feed and notifications; ships Python and Node reference kits and a live conformance probe. NOT for a one-off script or cron job, a hosted SaaS, the provider manifest itself (adapting-projects-to-fabric), or building Fabric Dashboards.
+description: >-
+  Use when building or running an agent as a long-lived local service with a dashboard on the
+  operator's Mac — «сделай агенту дашборд», «локальный сервис агента», «дашборд должен всегда
+  работать и не плодить копии», «где агенту хранить настройки», «подключи агента к Fabric
+  Dashboards», "make this agent a local service", "always-on dashboard", "fabric-service
+  protocol", "add the well-known endpoint", "migrate a service to fabric-service". Covers the
+  fabric-service/0.1 extension: which surface to expose (MCP streamable HTTP, CLI, A2A), the token
+  and one-time login, where state, config, logs and cache live, one copy per machine, launchd, the
+  descriptor, the well-known document, the events feed and notifications; ships Python and Node
+  reference kits and a live conformance probe. NOT for a one-off script or cron job, a hosted
+  SaaS, the provider manifest itself (adapting-projects-to-fabric), or building Fabric Dashboards.
 license: MIT
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). No network or package install; the contract checkout is optional.
 metadata:
   author: passioncode-ai
-  version: "0.4.0"
+  version: "0.4.1"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
