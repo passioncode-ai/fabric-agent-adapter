@@ -17,7 +17,7 @@ without moving the Project onto one proprietary agent runtime.
 [![validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml/badge.svg)](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml)
 [![license](https://img.shields.io/badge/license-source--available-blue.svg)](LICENSE)
 
-Private, portable Agent Skills for the
+Portable Agent Skills that make any agent Fabric-compatible, for the
 [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract):
 `adapting-projects-to-fabric`, `creating-fabric-agents` and
 `building-fabric-services`.
@@ -46,7 +46,7 @@ yet ship the host registry/runtime needed to connect and authorize a live provid
 
 ## Install
 
-The repository is private; the npm package is public. The npm path needs no GitHub access — the GitHub paths do.
+The repository and the npm package are public; neither path needs an account.
 
 npm — no GitHub access required:
 
