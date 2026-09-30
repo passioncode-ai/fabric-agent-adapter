@@ -15,10 +15,10 @@ license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). No network or package install; the contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.5.1"
+  version: "0.5.2"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "9cd778eb6f14b977f9a5b4930826f62dc95c5619"
+  extension-commit: "2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f"
 ---
 
 # Building Fabric services

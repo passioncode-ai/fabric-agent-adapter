@@ -287,7 +287,7 @@ class Probe:
             self.add("interop.well-known-capabilities", "FAIL" if extra else "PASS",
                      ("listed but not in the manifest: " + ", ".join(extra)) if extra else "%d listed, all in the manifest" % len(listed))
         if not mcp_surface or not self.token:
-            for rule in ("interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
+            for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
                 self.add(rule, "NOT_RUN", "no MCP surface" if not mcp_surface else "no readable token")
         else:
             try:
@@ -298,11 +298,20 @@ class Probe:
             if listing is not None:
                 sent = self.sent_traceparent
                 tools = {t.get("name"): t for t in (listing.get("result") or {}).get("tools", []) if isinstance(t, dict)}
+                self.object_root_rule(tools)
                 self.tools_match_rule(capabilities, manifest_path, tools)
                 self.job_tools_rule(capabilities, tools)
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
         self.events_trace_rule(self.events)
+
+    def object_root_rule(self, tools: Dict[str, Any]) -> None:
+        """FAC-SEM-023 (DEC-0018): every listed tool's outputSchema, when present, has root type object —
+        a client may refuse the whole tools/list otherwise, whatever the SDK in the tests accepted."""
+        bad = sorted(n for n, t in tools.items() if "outputSchema" in t and (t.get("outputSchema") or {}).get("type") != "object")
+        with_schema = sum(1 for t in tools.values() if "outputSchema" in t)
+        self.add("interop.output-schema-object", "FAIL" if bad else "PASS",
+                 ("outputSchema root is not type object: " + ", ".join(bad)) if bad else "%d outputSchemas, every root type object" % with_schema)
 
     def tools_match_rule(self, capabilities: List[Dict[str, Any]], manifest_path: Optional[Path], tools: Dict[str, Any]) -> None:
         """FAC-SEM-017: each mcp capability is served as the tool of its name, with its schemas and derived annotations."""

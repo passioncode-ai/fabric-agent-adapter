@@ -5,9 +5,9 @@ license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.5.1"
+  version: "0.5.2"
   contract-version: "0.1.0"
-  contract-commit: "9cd778eb6f14b977f9a5b4930826f62dc95c5619"
+  contract-commit: "2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f"
 ---
 
 # Adapting projects to Fabric
@@ -70,7 +70,7 @@ Use exactly:
 
 - contract version `0.1.0`;
 - repository `https://github.com/passioncode-ai/fabric-agent-contract`;
-- commit `9cd778eb6f14b977f9a5b4930826f62dc95c5619`.
+- commit `2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f`.
 
 Read the pinned contract's guide
 `docs/guides/connecting-compatible-agents.md`, the selected profile specification, and

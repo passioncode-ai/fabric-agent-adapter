@@ -5,9 +5,9 @@ license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.5.1"
+  version: "0.5.2"
   contract-version: "0.1.0"
-  contract-commit: "9cd778eb6f14b977f9a5b4930826f62dc95c5619"
+  contract-commit: "2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f"
 ---
 
 # Creating Fabric-compatible agents
@@ -93,7 +93,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri>
 ```
 
-Pin exactly contract `0.1.0` at commit `9cd778eb6f14b977f9a5b4930826f62dc95c5619` and
+Pin exactly contract `0.1.0` at commit `2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check

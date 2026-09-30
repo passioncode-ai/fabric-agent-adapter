@@ -30,6 +30,10 @@ import fabric_service as _fs  # noqa: E402
 PROTOCOL = "fabric-interop/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"
+# Revisions a client may name in `initialize`. MCP 2026-07-28 needs no handshake, but clients
+# built on earlier revisions (Claude Code 2.1.285 among them) still open with one, and a server
+# that refuses it is marked failed before tools/list is ever called.
+HANDSHAKE_REVISIONS = ("2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28")
 CONTRACT_VERSION = "0.1.0"
 JOB_STATES = ("working", "input_required", "completed", "failed", "cancelled")
 OUTCOMES = ("succeeded", "partial", "failed", "cancelled", "blocked")
@@ -112,8 +116,16 @@ def expected_annotations(effect: str, idempotency: str) -> Dict[str, bool]:
 def job_tool_output_schema(output_schema: Dict[str, Any]) -> Dict[str, Any]:
     """DEC-0017: a job-backed tool's outputSchema is oneOf[result envelope, job handle], self-contained,
     so structuredContent always conforms; the manifest's capability keeps the pure output schema."""
-    return {"oneOf": [{"type": "object", "required": list(ENVELOPE_REQUIRED), "properties": {"output": output_schema}},
+    return {"type": "object",
+            "oneOf": [{"type": "object", "required": list(ENVELOPE_REQUIRED), "properties": {"output": output_schema}},
                       JOB_HANDLE_SCHEMA]}
+
+
+def require_object_root(name: str, output_schema: Any) -> None:
+    """DEC-0018 (FAC-SEM-023): an outputSchema is rooted at type object. MCP requires it, and a client
+    may reject the WHOLE tools/list when one tool's outputSchema is, say, a bare oneOf."""
+    if not isinstance(output_schema, dict) or output_schema.get("type") != "object":
+        raise InteropError("Tool %s: an outputSchema must have root type \"object\"." % name)
 
 
 def is_job_capability(capability: Dict[str, Any]) -> bool:
@@ -125,6 +137,7 @@ def tool_for_capability(capability: Dict[str, Any], input_schema: Dict[str, Any]
                         title: Optional[str] = None) -> Dict[str, Any]:
     """The MCP tool for one manifest capability: its name, its input schema as it is, derived annotations,
     and its output schema — wrapped in the job union when the capability is a job (DEC-0017)."""
+    require_object_root(capability["name"], output_schema)
     tool: Dict[str, Any] = {
         "name": capability["name"],
         "inputSchema": input_schema,
@@ -391,6 +404,8 @@ class McpToolServer:
     def add_tool(self, tool: Dict[str, Any], handler: Handler) -> None:
         if tool["name"] in self.handlers:
             raise InteropError("Tool %s is served twice." % tool["name"])
+        if "outputSchema" in tool:
+            require_object_root(tool["name"], tool["outputSchema"])
         self.tools.append(tool)
         self.handlers[tool["name"]] = handler
 
@@ -423,6 +438,13 @@ class McpToolServer:
         meta = params.get("_meta") or {}
         span = child_traceparent(meta.get("traceparent"))
         method = message["method"]
+        if method == "initialize":
+            asked = params.get("protocolVersion")
+            return {"jsonrpc": "2.0", "id": rid, "result": {
+                "protocolVersion": asked if asked in HANDSHAKE_REVISIONS else MCP_REVISION,
+                "capabilities": {"tools": {"listChanged": False}}, "serverInfo": self.info}}
+        if method == "ping":
+            return {"jsonrpc": "2.0", "id": rid, "result": {}}
         if method == "server/discover":
             return {"jsonrpc": "2.0", "id": rid, "result": {"resultType": "complete", "capabilities": {"tools": {}},
                                                              "serverInfo": self.info, "_meta": {"traceparent": span}}}

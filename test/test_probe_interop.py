@@ -138,7 +138,7 @@ class SampleInteropTests(LiveSample):
 
 
 class ProbeInteropTests(LiveSample):
-    RULES = ("interop.manifest-link", "interop.well-known-capabilities", "interop.tools-match", "interop.job-tools",
+    RULES = ("interop.output-schema-object", "interop.manifest-link", "interop.well-known-capabilities", "interop.tools-match", "interop.job-tools",
              "interop.unknown-job", "interop.trace-propagation", "interop.events-trace")
 
     def test_the_sample_passes_every_interop_rule(self):
@@ -209,6 +209,15 @@ class ProbeRuleUnitTests(unittest.TestCase):
             self.assertEqual(probe.results[-1]["verdict"], "FAIL")
             probe.tools_match_rule([cap], Path(temp) / "fabric-agent.json", {"example.draft": dict(bare, outputSchema=fi.job_tool_output_schema(out))})
             self.assertEqual(probe.results[-1]["verdict"], "PASS", probe.results[-1]["evidence"])
+
+    def test_a_tool_whose_output_schema_root_is_not_object_fails(self):
+        probe = self.probe({})
+        probe.object_root_rule({"a": {"name": "a", "outputSchema": {"type": "object"}}, "b": {"name": "b"},
+                                "c": {"name": "c", "outputSchema": {"oneOf": [{"type": "object"}]}}})
+        self.assertEqual(probe.results[-1]["verdict"], "FAIL")
+        self.assertIn("c", probe.results[-1]["evidence"])
+        probe.object_root_rule({"a": {"name": "a", "outputSchema": {"type": "object", "oneOf": [{"type": "object"}]}}, "b": {"name": "b"}})
+        self.assertEqual(probe.results[-1]["verdict"], "PASS")
 
     def test_events_with_half_a_trace_fail(self):
         probe = self.probe({})
