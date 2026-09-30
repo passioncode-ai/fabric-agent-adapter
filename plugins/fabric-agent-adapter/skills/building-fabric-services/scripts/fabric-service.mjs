@@ -22,6 +22,8 @@ const INSTANCE = /^[a-z][a-z0-9-]{0,31}$/;
 const KIND = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}$/;
 const ORIGIN = /^http:\/\/127\.0\.0\.1:([0-9]{3,5})$/;
 const CODE = /^[A-Za-z0-9_-]{16,256}$/;
+const TRACE_ID = /^(?!0{32}$)[0-9a-f]{32}$/;
+const SPAN_ID = /^(?!0{16}$)[0-9a-f]{16}$/;
 const O_EXLOCK = 0x20; // BSD/macOS: open(2) takes flock(LOCK_EX); absent from fs.constants
 
 export class ServiceError extends Error {}
@@ -281,16 +283,21 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
   return doc;
 }
 
-export function makeEvent(id, at, kind, level, text, { subject, link, notify } = {}) {
+// An event about traced work carries traceId and spanId together (fabric-interop/0.1 C3.4 c);
+// traceIds(traceparent) in fabric-interop.mjs gives both.
+export function makeEvent(id, at, kind, level, text, { subject, link, notify, traceId, spanId } = {}) {
   if (!LEVELS.includes(level)) throw new ServiceError(`level must be one of ${LEVELS.join(', ')}.`);
   if (!KIND.test(kind)) throw new ServiceError(`kind ${kind} must be dotted lowercase.`);
   const sentence = String(text).split(/\s+/).filter(Boolean).join(' ');
   if (!sentence) throw new ServiceError('An event needs a sentence.');
   if (link !== undefined && (!link.startsWith('/') || link.startsWith('//'))) throw new ServiceError('link must be a path on this service.');
+  if ((traceId === undefined) !== (spanId === undefined)) throw new ServiceError('An event carries traceId and spanId together, or neither.');
+  if (traceId !== undefined && !(TRACE_ID.test(traceId) && SPAN_ID.test(spanId))) throw new ServiceError('traceId is 32 and spanId 16 lowercase hex characters, not all zeros.');
   const event = { id: String(id), at, kind, level, text: sentence.slice(0, 500) };
   if (subject) event.subject = subject;
   if (link) event.link = link;
   if (notify) event.notify = true;
+  if (traceId !== undefined) Object.assign(event, { traceId, spanId });
   return event;
 }
 

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.4.3"
+VERSION = "0.5.0"
 LICENSE_SPDX = "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0"
 EXPECTED_FILES = tuple(
     [
@@ -364,6 +364,61 @@ def validate_skill(name: str, errors: List[str]) -> None:
         errors.append("%s: at least three behaviour scenarios are required" % name)
 
 
+# #region contract-pin — docs: README.md#contract-pin
+# G-11: one contract pin. fabric-contract.lock.json is the pin; every live file that
+# names a contract revision names that one. Dated records keep the revision of their
+# day, and tests plant other revisions on purpose, so both are excluded. The same rule
+# as the contract's `pnpm pin:check` (docs/specification/versioning.md#one-contract-pin).
+PIN_FILE = ROOT / "fabric-contract.lock.json"
+PIN_EXCLUDED = ("docs/evidence", "docs/handoffs", "test", "CHANGELOG.md", "fabric-contract.lock.json", "node_modules")
+PIN_MENTION = re.compile(r"fabric[- ]agent[- ]contract|contract[-_ ]?(pin|commit|revision)|CONTRACT_COMMIT", re.IGNORECASE)
+PIN_HEX = re.compile(r"(?<![0-9a-zA-Z:])[0-9a-f]{7,40}(?![0-9a-zA-Z])")
+
+
+def contract_pin_drift(root: Path, commit: str) -> List[str]:
+    drift: List[str] = []
+    for path in sorted(root.rglob("*")):
+        rel = path.relative_to(root).as_posix()
+        if not path.is_file() or ".git" in path.parts or any(rel == x or rel.startswith(x + "/") for x in PIN_EXCLUDED):
+            continue
+        if path.suffix not in (".md", ".json", ".py", ".mjs", ".js", ".yml", ".yaml", ".toml", ".txt"):
+            continue
+        section = False
+        for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if re.match(r"^#{1,6}\s", line):
+                section = bool(PIN_MENTION.search(line))
+            other_repo = "github.com/" in line and "fabric-agent-contract" not in line
+            # In this repository a full 40-character commit is always a contract pin,
+            # however the sentence around it is worded.
+            candidates = [] if other_repo else [h for h in PIN_HEX.findall(line) if len(h) == 40]
+            if section or PIN_MENTION.search(line):
+                candidates = PIN_HEX.findall(line)
+            for found in dict.fromkeys(candidates):
+                if re.search(r"[a-f]", found) and re.search(r"[0-9]", found) and not commit.startswith(found):
+                    drift.append("contract pin: %s:%d names %s; the pin is %s" % (rel, number, found, commit))
+    return drift
+
+
+def validate_contract_pin(errors: List[str], root: Path = ROOT) -> None:
+    try:
+        pin = json.loads((root / "fabric-contract.lock.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        errors.append("contract pin: fabric-contract.lock.json is missing or unreadable (%s)" % exc.__class__.__name__)
+        return
+    commit = str(pin.get("commit", ""))
+    if pin.get("contract") != "fabric-agent-contract" or not re.fullmatch(r"[0-9a-f]{40}", commit) \
+            or pin.get("repository") != "https://github.com/passioncode-ai/fabric-agent-contract":
+        errors.append("contract pin: fabric-contract.lock.json needs contract, version, repository and a 40-character commit")
+        return
+    script = (SKILLS["adapting-projects-to-fabric"] / "scripts/adapt_project.py").read_text(encoding="utf-8")
+    for constant, expected in (("CONTRACT_COMMIT", commit), ("CONTRACT_VERSION", pin.get("version"))):
+        match = re.search(r'^%s = "([^"]+)"' % constant, script, re.MULTILINE)
+        if not match or match.group(1) != expected:
+            errors.append("contract pin: adapt_project.py %s is %s; the pin says %s" % (constant, match.group(1) if match else "missing", expected))
+    errors.extend(contract_pin_drift(root, commit))
+# #endregion contract-pin
+
+
 def validate_repo() -> List[str]:
     errors: List[str] = []
     for path in EXPECTED_FILES:
@@ -374,6 +429,7 @@ def validate_repo() -> List[str]:
 
     for name in SKILL_NAMES:
         validate_skill(name, errors)
+    validate_contract_pin(errors)
 
     skill_files = sorted(path for path in ROOT.rglob("SKILL.md") if ".git" not in path.parts)
     if skill_files != sorted(SKILLS[name] / "SKILL.md" for name in SKILL_NAMES):

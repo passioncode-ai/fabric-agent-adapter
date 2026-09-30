@@ -54,7 +54,27 @@
         "lists the conflicting path",
         "requires explicit --force to replace generated paths"
       ]
+    },
+    {
+      "id": "provider-entry-for-a-stdio-agent",
+      "trap": "an installer wrote the agent's API key into the entry's env and reused an id that another service already had",
+      "request": "Our example-agent runs as `example-agent mcp` over stdio. Make Fabric find it.",
+      "expected": [
+        "writes a fabric-provider/0.1 entry with fabric_provider.py write, argv as an array, never a shell string",
+        "puts env values as secret-ref:<name> references, never the key itself",
+        "refuses an id that is already a service (FAC-SEM-013) and says so",
+        "points manifest at the agent's fabric-agent.json and removes the entry on uninstall"
+      ]
+    },
+    {
+      "id": "capability-is-its-tool",
+      "trap": "a scaffold kept the placeholder tool name, so the MCP tool Fabric called did not exist",
+      "request": "Scaffold an MCP provider bundle for our long-running summarise capability.",
+      "expected": [
+        "requires the MCP tool of the capability's own name (requiredFeatures tool:<capability>)",
+        "passes --job so the capability's interop block says job: true",
+        "states that the served tool's schemas must equal the manifest's (FAC-SEM-017)"
+      ]
     }
   ]
 }
-

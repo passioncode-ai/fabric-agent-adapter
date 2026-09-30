@@ -2,13 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.4.3` |
+| Version | `0.5.0` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `a5a27092ba0dcc5facfbeae8b359146dfb403e9a` |
+| Contract | Fabric Agent Contract `0.1.0` at `a22dea359ba04b8fe549abe81a5131552cb90eff` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
 | Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base |
-| Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report |
-| Mutations | only the seven documented target-project paths; collisions refused by default |
+| Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`) |
+| Mutations | only the seven documented target-project paths; collisions refused by default; `fabric_provider.py write` writes one entry in the providers directory |
 | Network | not required for structural mode; private contract checkout required for exact schema validation |
 | Secrets | never accepted or emitted |
 
@@ -24,9 +24,9 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.4.3` |
+| Version | `0.5.0` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `a5a27092ba0dcc5facfbeae8b359146dfb403e9a` |
+| Contract | Fabric Agent Contract `0.1.0` at `a22dea359ba04b8fe549abe81a5131552cb90eff` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
 | Inputs | capability, named consumer, workflow-or-agent decision, profile, effect and tenancy declarations, knowledge sources |
 | Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton, provider bundle via the sibling scaffolder, conformance report with the canary expectation |
@@ -46,14 +46,14 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.4.3` |
+| Version | `0.5.0` |
 | Plugin | `fabric-agent-adapter` |
-| Extension | `fabric-service/0.1` (Fabric Agent Contract DEC-0015) at `a5a27092ba0dcc5facfbeae8b359146dfb403e9a` |
+| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `a22dea359ba04b8fe549abe81a5131552cb90eff` |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
-| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, probe report |
+| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, probe report |
 | Mutations | the target service's files; the plist in `~/Library/LaunchAgents`; one descriptor in the services directory |
-| Network | loopback only; the probe talks to `127.0.0.1:<port>` |
+| Network | loopback only; the probe talks to `127.0.0.1:<port>`, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id |
 | Secrets | the service token is created 0600 and read, never printed |
 
 Triggers include making an agent a local service, an always-on dashboard, where an agent

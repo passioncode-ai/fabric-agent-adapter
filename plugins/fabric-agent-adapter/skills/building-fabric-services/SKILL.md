@@ -15,10 +15,10 @@ license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). No network or package install; the contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.4.3"
+  version: "0.5.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
+  extension-commit: "a22dea359ba04b8fe549abe81a5131552cb90eff"
 ---
 
 # Building Fabric services
@@ -72,6 +72,13 @@ Answer before writing code, and record the answers in the project README:
 
 Read [the surfaces and auth reference](references/surfaces-and-auth.md) when wiring
 MCP registration into a client config, the login flow or the CSRF header.
+
+When other agents or Fabric call the service over MCP, it follows `fabric-interop/0.1`:
+each manifest capability is the tool of its name, long work is a job with a stable id,
+a question for a person is an elicitation, and every call carries one trace. Read
+[the interop reference](references/interop.md) before writing an MCP tool; the helpers
+are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
+[`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs).
 
 ## Step 2 — the non-negotiables
 
@@ -144,6 +151,13 @@ On every request call `check_request(port, host, origin, sec_fetch_site)` and an
 `SIGTERM` drains in-flight work within `ExitTimeOut`, then exits; interrupted work
 resumes on the next start.
 
+The MCP surface (`POST /mcp`, service token) is `fabric_interop.McpToolServer.handle`
+in Python; jobs live in `fabric_interop.JobStore(dirs["data"] / "jobs")`, created after
+the lock like every other piece of state. Add `"mcp": {"path": "/mcp", "transport":
+"streamable-http", "capabilities": [...]}` to the well-known surfaces, and point the
+descriptor's `fabricManifest` at a manifest whose service key names this
+`<id>.<instance>` — `sample_service.py register` shows both.
+
 ## Step 4 — install it
 
 The installer, not the service, owns the plist and the descriptor. Sequence:
@@ -186,7 +200,9 @@ python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,
-launchd pid equals answering pid) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass —
+launchd pid equals answering pid, and the `interop.*` rules: manifest link, capability
+list, tools equal to the manifest, job tools, unknown job, trace propagation, event
+trace pairs) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass —
 name it in the report.
 
 Then prove the lock: start a second copy by hand against the same data directory; it

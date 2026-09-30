@@ -44,6 +44,39 @@
         "never puts the service token in a URL, an argv or a plist",
         "records the code as used before honouring it"
       ]
+    },
+    {
+      "id": "long-tool-becomes-a-job",
+      "trap": "a tool that renders a long report blocked the MCP request for minutes, and after a restart the caller had no way to find the work again",
+      "request": "Our example-agent service has a report tool that takes minutes. Make Fabric able to call it and come back for the result.",
+      "expected": [
+        "declares job: true in the capability's interop block of the manifest",
+        "returns {job: {id, status: working}} in structuredContent and serves fabric.job.get and fabric.job.cancel",
+        "keeps jobs in fabric_interop.JobStore under the data directory, so the id survives a restart, and shows it by restarting",
+        "answers fabric.job.get for an unknown id with isError and unknown-job, never a fresh job",
+        "completes with the result envelope: done, proof, scope, notVerified, output and usage"
+      ]
+    },
+    {
+      "id": "trace-through-the-service",
+      "trap": "a service started a new trace for every call and published events without trace ids, so Fabric's run graph lost the hop",
+      "request": "Fabric shows our service as a dead end in the run graph. Fix the tracing.",
+      "expected": [
+        "reads _meta.traceparent and runs the call as a child span (fabric_interop.child_traceparent)",
+        "puts the same trace id, as a new child span, on every outgoing call",
+        "adds traceId and spanId, together, to every event about the traced work",
+        "proves it with check_service.py: interop.trace-propagation and interop.events-trace PASS"
+      ]
+    },
+    {
+      "id": "choice-not-secret-over-form",
+      "trap": "a job asked the operator for an API key through a form-mode elicitation, which puts the key in the client's hands",
+      "request": "The publish job needs the operator to pick a title and to connect their publishing account.",
+      "expected": [
+        "asks for the title as a titled single-select in form mode (choice_request)",
+        "asks for the account through URL mode (url_request), never a form field for the key",
+        "moves the job to input_required and resumes it on fabric.job.get with inputResponses"
+      ]
     }
   ]
 }

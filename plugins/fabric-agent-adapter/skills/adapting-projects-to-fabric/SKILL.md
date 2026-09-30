@@ -5,9 +5,9 @@ license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.4.3"
+  version: "0.5.0"
   contract-version: "0.1.0"
-  contract-commit: "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
+  contract-commit: "a22dea359ba04b8fe549abe81a5131552cb90eff"
 ---
 
 # Adapting projects to Fabric
@@ -70,7 +70,7 @@ Use exactly:
 
 - contract version `0.1.0`;
 - repository `https://github.com/passioncode-ai/fabric-agent-contract`;
-- commit `a5a27092ba0dcc5facfbeae8b359146dfb403e9a`.
+- commit `a22dea359ba04b8fe549abe81a5131552cb90eff`.
 
 Read the pinned contract's guide
 `docs/guides/connecting-compatible-agents.md`, the selected profile specification, and
@@ -93,7 +93,10 @@ python3 <skill-dir>/scripts/adapt_project.py scaffold <project-root> \
   --schema-base https://agents.example/fabric
 ```
 
-Valid profiles are `mcp`, `a2a`, and `local-runner`. The helper creates only the locked
+Valid profiles are `mcp`, `a2a`, and `local-runner`. For `mcp` the capability is served
+as the MCP tool of its own name (`requiredFeatures: ["tool:<capability>"]`, contract
+`fabric-interop/0.1`); add `--job` when its work may outlive one request, which writes
+`"job": true` in the capability's interop block. The helper creates only the locked
 target paths. It refuses any collision. Do not use `--force` unless the user explicitly
 authorizes replacement after the exact conflicting files and diff are shown.
 
@@ -108,12 +111,25 @@ Preserve the chosen ownership boundary:
 - A2A maps the provider's remote task, progress, artifact, cancellation, and terminal
   states; Fabric does not take over its internal loop.
 - MCP exposes bounded tools/resources/prompts while Fabric owns planning and retries.
+  The served tool's name, input and output schemas equal the manifest's (FAC-SEM-017);
+  long work returns a job handle and serves `fabric.job.get` / `fabric.job.cancel`; a
+  question for a person is a form-mode choice, a secret goes through URL mode; every call
+  runs as a child span of `_meta.traceparent`. The kit for all of it is
+  `building-fabric-services`'s `scripts/fabric_interop.py`.
 - Local runner maps typed input, executable identity, result location, cancellation,
   heartbeat, and partial results without relying on ambient accounts.
 
 Keep model selection and provider-internal reasoning outside the Fabric contract. Expose
 typed outcomes, evidence, artifacts, and protocol-visible state—not chain-of-thought.
 Treat all provider output as untrusted until schemas and semantic assertions pass.
+
+### 4b. Announce an agent that is not a service
+
+An agent Fabric reaches as a CLI or a stdio MCP server gets a provider entry, written by
+its installer with [`scripts/fabric_provider.py`](scripts/fabric_provider.py) and removed
+by its uninstaller — argv arrays only, env values as `secret-ref:` references, never the
+id of an existing service. Load [provider entries](references/provider-entry.md). An
+agent that runs as a service uses a descriptor instead (`building-fabric-services`).
 
 ### 5. Make probes safe and meaningful
 

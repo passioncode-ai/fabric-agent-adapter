@@ -5,9 +5,9 @@ license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.4.3"
+  version: "0.5.0"
   contract-version: "0.1.0"
-  contract-commit: "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
+  contract-commit: "a22dea359ba04b8fe549abe81a5131552cb90eff"
 ---
 
 # Creating Fabric-compatible agents
@@ -93,7 +93,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri>
 ```
 
-Pin exactly contract `0.1.0` at commit `a5a27092ba0dcc5facfbeae8b359146dfb403e9a` and
+Pin exactly contract `0.1.0` at commit `a22dea359ba04b8fe549abe81a5131552cb90eff` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check
@@ -101,6 +101,12 @@ contract's `docs/guides/connecting-compatible-agents.md` and mark the structural
 
 The generated placeholders are deliberate blockers; a bundle still containing one is not
 ready for admission.
+
+A new agent is called the `fabric-interop/0.1` way from its first version: add `--job`
+for a capability whose work may outlive one request, serve each capability as the MCP
+tool of its name, and carry the caller's trace (the `building-fabric-services` interop
+reference). An agent that is not a service is announced with a provider entry
+(`adapting-projects-to-fabric`, `scripts/fabric_provider.py`).
 
 ## Step 4 — implement against the observables
 

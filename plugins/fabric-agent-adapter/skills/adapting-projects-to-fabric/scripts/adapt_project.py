@@ -16,7 +16,8 @@ from urllib.parse import urlparse
 
 CONTRACT_VERSION = "0.1.0"
 CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"
-CONTRACT_COMMIT = "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"
+CONTRACT_COMMIT = "a22dea359ba04b8fe549abe81a5131552cb90eff"
+INTEROP_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"
 A2A_VERSION = "1.0"
 LOCAL_VERSION = "fabric-local-runner/0.1"
@@ -167,7 +168,8 @@ def _profile(args: argparse.Namespace, schema_base: str) -> Dict[str, Any]:
             "kind": "mcp",
             "protocolRevision": MCP_REVISION,
             "connection": connection,
-            "requiredFeatures": ["tool:replace-me"],
+            # fabric-interop/0.1 C3.1: the capability is served as the MCP tool of its own name.
+            "requiredFeatures": ["tool:%s" % args.capability_name],
             "probes": [probe],
         }
     if profile == "a2a":
@@ -215,6 +217,8 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
     _require_absolute_uri(args.agent_card_url, "Agent Card URL")
     if urlparse(args.agent_card_url).scheme != "https":
         raise AdaptationError("Agent Card URL must use HTTPS")
+    if getattr(args, "job", False) and args.profile != "mcp":
+        raise AdaptationError("--job marks an MCP capability as a job (fabric-interop/0.1); %s has no job handle" % args.profile)
     for runtime_arg in args.runtime_arg:
         lowered = runtime_arg.lower().replace("_", "").replace("-", "")
         if any(term in lowered for term in ("password", "apikey", "accesstoken", "clientsecret")):
@@ -249,6 +253,8 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
             }
         ],
     }
+    if getattr(args, "job", False):
+        manifest["capabilities"][0]["extensions"] = {INTEROP_KEY: {"job": True}}
     lock = {
         "contract": "fabric-agent-contract",
         "version": CONTRACT_VERSION,
@@ -431,6 +437,12 @@ def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
                     errors.append("capability[%d] must pin %s=%s" % (index, expected[0], expected[1]))
                 if not profile.get("probes"):
                     errors.append("capability[%d] must declare probes" % index)
+                block = (capability.get("extensions") or {}).get(INTEROP_KEY)
+                if block is not None:
+                    if not isinstance(block, dict) or set(block) - {"job"} or not isinstance(block.get("job", False), bool):
+                        errors.append("capability[%d] interop block must be {\"job\": true|false}" % index)
+                    elif kind != "mcp":
+                        errors.append("capability[%d] interop block is for an mcp capability, not %s" % (index, kind))
                 for field in ("inputSchema", "outputSchema"):
                     value = capability.get(field)
                     try:
@@ -503,6 +515,7 @@ def build_parser() -> argparse.ArgumentParser:
     scaffold.add_argument("--runner-kind", default="replace-me")
     scaffold.add_argument("--executable-ref", default="urn:executable:replace-me")
     scaffold.add_argument("--runtime-arg", action="append", default=[])
+    scaffold.add_argument("--job", action="store_true", help="the capability's work may outlive one request (fabric-interop/0.1 job)")
     scaffold.add_argument("--force", action="store_true")
     scaffold.add_argument("--json", action="store_true")
 
