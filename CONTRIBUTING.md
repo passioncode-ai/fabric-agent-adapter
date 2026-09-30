@@ -12,7 +12,7 @@ this repository while leaving the old pin in metadata.
 
 ## License of contributions
 
-This repository is source-available under
-`PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0`
-([LICENSE](LICENSE)). Contributions are accepted under the
-[Contributor License Agreement](CLA.md): tick its box in the pull request template.
+This repository is open source under the [GNU AGPL-3.0](LICENSE), or available under a
+[commercial license](COMMERCIAL-LICENSE.md): `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`.
+Contributions are accepted under the [Contributor License Agreement](CLA.md), which allows that
+dual licence: tick its box in the pull request template.

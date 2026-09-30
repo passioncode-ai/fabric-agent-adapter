@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -15,8 +16,17 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.5.2"
-LICENSE_SPDX = "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0"
+VERSION = "0.5.3"
+# Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
+# knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
+# here because that repository is not readable from this one's CI.
+LICENSE_SPDX = "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial"
+FIRST_AGPL_VERSION = "0.5.3"
+TEMPLATE_SHA256 = {
+    "LICENSE": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+    "COMMERCIAL-LICENSE.md": "9bd2312a9dc20d13aab5af26d63d943aa03c304febf42a32160a205496a9155f",
+    "CLA.md": "9a80c3d37a1f6cebdce422c54bf90cc8a57085d2e0959b04f2d48295f4320bd3",
+}
 EXPECTED_FILES = tuple(
     [
         ROOT / ".claude-plugin/marketplace.json",
@@ -24,6 +34,7 @@ EXPECTED_FILES = tuple(
         ROOT / "README.md",
         ROOT / "CHANGELOG.md",
         ROOT / "LICENSE",
+        ROOT / "COMMERCIAL-LICENSE.md",
         ROOT / "CLA.md",
         ROOT / ".github/pull_request_template.md",
         ROOT / "CONTRIBUTING.md",
@@ -339,6 +350,15 @@ def validate_skill(name: str, errors: List[str]) -> None:
         errors.append("%s: SKILL.md exceeds the 5%% token/word headroom" % name)
     if re.search(r"[А-Яа-яЁё]", body):
         errors.append("%s: Cyrillic prose is allowed in trigger metadata, not the skill body" % name)
+    # The repository the skill builds follows the PassionCode.ai standard when it is one; an agent
+    # someone builds for themselves is outside the organization and its licence is its owner's.
+    flat = " ".join(body.split())
+    if "For a PassionCode.ai repository" not in flat or "knowledge/repository-standard.md" not in flat:
+        errors.append("%s: SKILL.md must send a PassionCode.ai repository to the repository standard "
+                      "(knowledge/repository-standard.md)" % name)
+    if "builds for themselves" not in flat or "its owner's choice" not in flat:
+        errors.append("%s: SKILL.md must say an agent someone builds for themselves is outside the standard "
+                      "and its licence is its owner's choice" % name)
 
     linked_refs = set(re.findall(r"\]\(references/([^)]+)\)", skill_text))
     actual_refs = {path.name for path in (skill_dir / "references").glob("*.md")}
@@ -459,7 +479,7 @@ def validate_repo() -> List[str]:
         errors.append("package.json version is out of sync")
     if pkg.get("publishConfig", {}).get("access") != "public":
         errors.append("scoped package needs publishConfig.access public")
-    for entry_name in ("bin", "plugins"):
+    for entry_name in ("bin", "plugins", "LICENSE", "COMMERCIAL-LICENSE.md"):
         if entry_name not in pkg.get("files", []):
             errors.append("package.json files whitelist must ship %s" % entry_name)
 
@@ -493,15 +513,25 @@ def validate_repo() -> List[str]:
     if "validate.py\" --frontmatter" not in release:
         errors.append("release smoke must parse the installed SKILL.md front matter strictly")
 
-    # The license is source-available; the README, the manifests and the skills say the
-    # same thing, and contributions come in under the CLA the PR template asks for.
-    license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    for needle in ("# PolyForm Noncommercial License 1.0.0", "# PolyForm Internal Use License 1.0.0",
-                   "released under the MIT License"):
-        if needle not in license_text:
-            errors.append("LICENSE must carry both PolyForm texts and the MIT-history sentence (%r)" % needle)
-    if re.search(r"(?<![\"\u201c])\bopen[- ]source\b|license-MIT", (ROOT / "README.md").read_text(encoding="utf-8"), re.IGNORECASE):
-        errors.append("README.md calls the adapter open source or MIT; it is source-available")
+    # The licence (Fabric ADR-0092): the three files are the knowledge base templates, the README
+    # says it in the organization's wording and names the PolyForm and MIT releases before it, and
+    # contributions come in under the CLA the PR template asks for.
+    template_names = {"LICENSE": "the AGPL-3.0 template", "COMMERCIAL-LICENSE.md": "the knowledge base template",
+                      "CLA.md": "the knowledge base template"}
+    for name, digest in TEMPLATE_SHA256.items():
+        path = ROOT / name
+        if not path.is_file():
+            continue  # already reported as a missing file
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            errors.append("%s is not %s byte for byte (fabric-workspace knowledge/templates/)" % (name, template_names[name]))
+    readme_text = (ROOT / "README.md").read_text(encoding="utf-8")
+    if re.search(r"license-source--available|license-MIT|Source-available under|^Source-available", readme_text, re.IGNORECASE | re.MULTILINE):
+        errors.append("README.md still states the retired licence (source-available / MIT); it is AGPL-3.0 or commercial")
+    license_section = readme_text.split("\n## License\n", 1)[1] if "\n## License\n" in readme_text else ""
+    for needle in ("Open source under the [GNU AGPL-3.0](LICENSE)", "[commercial license](COMMERCIAL-LICENSE.md)",
+                   "contact@passioncode.ai", "Versions before %s were released under" % FIRST_AGPL_VERSION):
+        if needle not in license_section:
+            errors.append("README.md ## License must carry the licensing wording: %r" % needle)
     if "I agree to CLA.md" not in (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8"):
         errors.append("the PR template must carry the 'I agree to CLA.md' checkbox")
     if "CLA.md" not in (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8"):

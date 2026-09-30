@@ -41,6 +41,27 @@
         "leaves live admission gates NOT VERIFIED without a real host",
         "never summarises the outcome as Fabric-compatible without passed admission gates"
       ]
+    },
+    {
+      "id": "passioncode-repository-follows-the-standard",
+      "request": "Create a new fabric-compatible agent in a new passioncode-ai repository; its consumer is the Fabric pipeline that drafts release notes.",
+      "expected": [
+        "copies LICENSE, COMMERCIAL-LICENSE.md and CLA.md byte for byte from the knowledge base templates",
+        "writes AGPL-3.0-only OR LicenseRef-PassionCode-Commercial into every manifest and SKILL.md license",
+        "gives the README a full-name first heading, a Quick start for a new teammate with an MCP registration and one proving call verified by a real client, and a License section",
+        "opens AGENTS.md with the Read first block, ends it with After work, and makes CLAUDE.md start with @AGENTS.md",
+        "runs org-index check_format.py for the repository and reports its findings"
+      ]
+    },
+    {
+      "id": "own-agent-licence-is-the-owners-choice",
+      "request": "Create a fabric-compatible agent in my own personal GitHub account; it is just for me.",
+      "expected": [
+        "treats the agent as outside the PassionCode.ai standard",
+        "leaves the licence to its owner and adds no AGPL or commercial licence files unasked",
+        "publishes nothing and lists the agent in no organization launcher, map or example",
+        "still writes the README quick start with a verified MCP call"
+      ]
     }
   ]
 }

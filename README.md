@@ -6,20 +6,18 @@
 
 # Fabric Agent Adapter
 
-> **PassionCode.ai — The agent-agnostic operating system for AI-native teams.**
-
-**From vibe coding to passion coding.** PassionCode.ai moves the control point from
-managing agents one by one to operating Projects. Fabric Agent Adapter is the portable
-on-ramp: it helps an existing repository become a compatible, replaceable Provider
-without moving the Project onto one proprietary agent runtime.
+**Fabric Agent Adapter** makes any agent Fabric-compatible. Fabric is PassionCode.ai's
+product, the CEO AI agent: you talk to Fabric, and it chooses, binds and runs the agents that
+do the work. This adapter is how an agent becomes one Fabric can bind — three Agent Skills,
+Python and Node reference kits and a live conformance probe for the
+[Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract). It also works
+on its own: the skills, kits and probe need no Fabric install.
 
 [![npm](https://img.shields.io/npm/v/%40passioncode-ai%2Ffabric-agent-adapter)](https://www.npmjs.com/package/@passioncode-ai/fabric-agent-adapter)
 [![validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml/badge.svg)](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml)
-[![license](https://img.shields.io/badge/license-source--available-blue.svg)](LICENSE)
+[![license](https://img.shields.io/badge/license-AGPL--3.0%20or%20commercial-blue.svg)](LICENSE)
 
-Portable Agent Skills that make any agent Fabric-compatible, for the
-[Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract):
-`adapting-projects-to-fabric`, `creating-fabric-agents` and
+The skills are `adapting-projects-to-fabric`, `creating-fabric-agents` and
 `building-fabric-services`.
 
 `building-fabric-services` makes an agent a long-lived local service with a dashboard
@@ -52,15 +50,24 @@ For provider bundles the adapting skill helps an agent author:
 The skill never treats generated files as admission. Fabric contract `0.1.0` does not
 yet ship the host registry/runtime needed to connect and authorize a live provider.
 
-## Install
+## Quick start for a new teammate
 
-The repository and the npm package are public; neither path needs an account.
+### Install
 
-npm — no GitHub access required:
+With the [PassionCode.ai launcher](https://github.com/passioncode-ai/passioncode) the adapter
+comes with every other PassionCode.ai skill — `npx @passioncode-ai/passioncode@latest update`,
+then restart your agents. Alone, without any account:
 
 ```bash
 npx @passioncode-ai/fabric-agent-adapter        # installs every skill into the agents hub ~/.agents/skills
 npx @passioncode-ai/fabric-agent-adapter --prune-shadow   # remove ~/.claude/skills copies that shadow the plugin
+```
+
+Claude Code plugin marketplace:
+
+```text
+/plugin marketplace add passioncode-ai/fabric-agent-adapter
+/plugin install fabric-agent-adapter@fabric-agent-adapter
 ```
 
 Generic Agent Skills clients:
@@ -71,12 +78,61 @@ npx skills add passioncode-ai/fabric-agent-adapter --skill creating-fabric-agent
 npx skills add passioncode-ai/fabric-agent-adapter --skill building-fabric-services
 ```
 
-Claude Code plugin marketplace:
+### Configure
 
-```text
-/plugin marketplace add passioncode-ai/fabric-agent-adapter
-/plugin install fabric-agent-adapter@fabric-agent-adapter
+Nothing: no account, no key, no environment variable. A service built with the kit creates
+its own token file (mode 600) in its data directory.
+
+### MCP
+
+The adapter is not an MCP server; it builds them. Its sample service serves every capability
+as the MCP tool of its name (`fabric-interop/0.1`), so the proof is a real client calling one.
+With Python 3.9+ and the Claude Code CLI, in a throwaway directory and a temporary MCP config
+(your own Claude Code configuration is not read or written):
+
+```bash
+KIT=plugins/fabric-agent-adapter/skills/building-fabric-services/scripts   # or ~/.agents/skills/building-fabric-services/scripts
+DATA=$(mktemp -d); SERVICES=$(mktemp -d); WORK=$(mktemp -d)
+python3 "$KIT/sample_service.py" serve --port 47190 --data-dir "$DATA" &
+python3 "$KIT/sample_service.py" register --port 47190 --data-dir "$DATA" --services-dir "$SERVICES"
+python3 "$KIT/check_service.py" sample --services-dir "$SERVICES"   # exit 0: no FAIL
+# Register the service for one client run; the token goes in a header, never in argv.
+python3 - "$DATA/service.token" "$WORK/mcp.json" <<'EOF'
+import json, os, sys
+token = open(sys.argv[1]).read().strip()
+with os.fdopen(os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
+    json.dump({"mcpServers": {"sample": {"type": "http", "url": "http://127.0.0.1:47190/mcp",
+               "headers": {"Authorization": "Bearer " + token}}}}, f)
+EOF
+(cd "$WORK" && claude -p "Call the tool mcp__sample__sample_echo with text 'ping' and reply with only the text it returns." \
+  --strict-mcp-config --mcp-config "$WORK/mcp.json" --allowedTools mcp__sample__sample_echo --max-turns 3 < /dev/null)
+# -> ping
+kill %1
 ```
+
+Verified 2026-09-30 with Claude Code 2.1.285: the CLI connected to the sample over
+streamable HTTP, called `sample.echo` and printed `ping`. The probe prints one line per rule —
+`PASS`, `FAIL` or `NOT_RUN` with its evidence — and exits 1 on any `FAIL`; run it against your
+own service by its id once its installer has written the descriptor.
+`FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py` repeats the connection check
+(every sample tool listed, no model call) in the test suite.
+
+### Develop
+
+There is no build step and no dependency beyond Python 3.9+ and Node.js:
+
+```bash
+npm test                     # validate.py, the Python unit tests, the Node kit tests
+python3 -m unittest discover -s test -v
+python3 test/validate.py
+claude plugin validate ./plugins/fabric-agent-adapter --strict
+claude plugin validate . --strict
+```
+
+`test/validate.py` reads every SKILL.md front matter as strictly as a YAML parser does; an
+unquoted value holding `: ` fails it. `python3 test/validate.py --frontmatter <SKILL.md ...>`
+checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`. Start in
+[AGENTS.md](AGENTS.md); contributions follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Use
 
@@ -118,36 +174,6 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
 Scaffolding is non-destructive by default. It writes only the paths declared in the
 [delivery brief](docs/evidence/specs/2026-08-27-brief.md) and refuses collisions.
 
-## Verify one service (newcomer path)
-
-After installing (above), with Python 3.9+ and no other dependency:
-
-```bash
-KIT=plugins/fabric-agent-adapter/skills/building-fabric-services/scripts   # or ~/.agents/skills/building-fabric-services/scripts
-DATA=$(mktemp -d); SERVICES=$(mktemp -d)
-python3 "$KIT/sample_service.py" serve --port 47190 --data-dir "$DATA" &
-python3 "$KIT/sample_service.py" register --port 47190 --data-dir "$DATA" --services-dir "$SERVICES"
-python3 "$KIT/check_service.py" sample --services-dir "$SERVICES"   # exit 0: no FAIL
-kill %1
-```
-
-The probe prints one line per rule — `PASS`, `FAIL` or `NOT_RUN` with its evidence — and
-exits 1 on any `FAIL`. Run it against your own service by its id once its installer has
-written the descriptor.
-
-## Validate this repository
-
-```bash
-python3 -m unittest discover -s test -v
-python3 test/validate.py
-claude plugin validate ./plugins/fabric-agent-adapter --strict
-claude plugin validate . --strict
-```
-
-`test/validate.py` reads every SKILL.md front matter as strictly as a YAML parser does; an
-unquoted value holding `: ` fails it. `python3 test/validate.py --frontmatter <SKILL.md ...>`
-checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`.
-
 ## Contract pin
 
 The one pin is [`fabric-contract.lock.json`](fabric-contract.lock.json):
@@ -162,9 +188,8 @@ new adapter release, fixture review, and a complete validation run.
 
 ## License
 
-Source-available under PolyForm Noncommercial or Internal Use; commercial license on
-request (contact@passioncode.ai). SPDX:
-`PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0` — see
-[LICENSE](LICENSE). Versions up to and including v0.4.2 (on GitHub and on npm) were
-released under the MIT License and remain available under it. Contributions are accepted under
-[CLA.md](CLA.md) ([CONTRIBUTING.md](CONTRIBUTING.md)).
+Open source under the [GNU AGPL-3.0](LICENSE). A [commercial license](COMMERCIAL-LICENSE.md) is
+available for use that does not meet the AGPL's terms — contact@passioncode.ai.
+Versions before 0.5.3 were released under PolyForm Noncommercial or Internal Use (v0.4.3 to
+v0.5.2) and MIT (v0.4.2 and earlier); each keeps the licence it was released under.
+Contributions are accepted under [CLA.md](CLA.md) ([CONTRIBUTING.md](CONTRIBUTING.md)).

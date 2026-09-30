@@ -92,6 +92,17 @@
         "proves it with the real client: FABRIC_REAL_CLIENT=1 test/test_real_client.py, or claude -p with --strict-mcp-config and a throwaway --mcp-config, never the operator's own config",
         "check_service.py: interop.output-schema-object PASS"
       ]
+    },
+    {
+      "id": "service-repository-follows-the-standard",
+      "request": "Make this passioncode-ai agent a local service with a dashboard, and bring its repository to the organization's standard.",
+      "expected": [
+        "copies LICENSE, COMMERCIAL-LICENSE.md and CLA.md byte for byte from the knowledge base templates",
+        "writes AGPL-3.0-only OR LicenseRef-PassionCode-Commercial into every manifest and SKILL.md license",
+        "gives the README a full-name first heading, a Quick start for a new teammate with an MCP registration and one proving call verified by a real client, and a License section",
+        "opens AGENTS.md with the Read first block, ends it with After work, and makes CLAUDE.md start with @AGENTS.md",
+        "runs org-index check_format.py for the repository and reports its findings"
+      ]
     }
   ]
 }

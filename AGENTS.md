@@ -1,10 +1,19 @@
-# fabric-agent-adapter — working in this repository
+# Working in fabric-agent-adapter
 
-## Role
+## Read first
 
-A portable adapter that makes any agent or existing project Fabric-compatible (a Provider under
-the Fabric Agent Contract). It ships
-as a Claude Code plugin and a public npm installer (`@passioncode-ai/fabric-agent-adapter`). It
+1. The PassionCode.ai knowledge base — `fabric-workspace/knowledge/` in your clone (org-index
+   `scripts/clone_all.sh` makes it) or https://wiki.passioncode.ai/knowledge — at least its
+   [README](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/README.md),
+   vision, principles and how-to-work.
+2. This file, then the organization's
+   [CONTRIBUTING.md](https://github.com/passioncode-ai/.github/blob/main/CONTRIBUTING.md).
+
+## What this repository is
+
+Fabric Agent Adapter: makes any agent or existing project Fabric-compatible (a Provider under
+the Fabric Agent Contract) — Agent Skills, reference kits and a conformance probe. It is how an
+agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm installer (`@passioncode-ai/fabric-agent-adapter`). It
 carries three skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
 and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service
@@ -12,10 +21,10 @@ that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabri
 Agents that are not services get a `fabric-provider/0.1` entry from
 `adapting-projects-to-fabric/scripts/fabric_provider.py`.
 
-## Build and test
+## Commands
 
-There is no build step. These are the validation commands from `README.md` ("Validate this
-repository"):
+There is no build step. These are the commands from `README.md` ("Quick start for a new
+teammate" → Develop):
 
 ```bash
 python3 -m unittest discover -s test -v
@@ -28,11 +37,14 @@ claude plugin validate . --strict
 <SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs all four in two jobs
 (`python`, `claude-plugin`). `.github/workflows/release.yml` validates, creates a GitHub release
 and publishes to npm on a `v*` tag, but only when the repository variables `RELEASE_ENABLED` and
-`PUBLISH_NPMJS` are `"true"`. It is off by default.
+`PUBLISH_NPMJS` are `"true"` — off by default in a fork, both `true` here
+(`gh variable list -R passioncode-ai/fabric-agent-adapter`). MCP (register + proving call): the
+README's "Quick start → MCP" runs the sample service and calls `sample.echo` from `claude -p`
+with `--strict-mcp-config` and a temporary config.
 
 ## Where things live
 
-- `plugins/fabric-agent-adapter/`: the plugin and its two skills. `.claude-plugin/marketplace.json`
+- `plugins/fabric-agent-adapter/`: the plugin and its three skills. `.claude-plugin/marketplace.json`
   holds the marketplace entry.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
   `test/evals/<skill>/`.
@@ -41,7 +53,7 @@ and publishes to npm on a `v*` tag, but only when the repository variables `RELE
 - `CHANGELOG.md`, `SECURITY.md` and `SKILL-CARD.md` sit at the root. This repository has no ADR
   directory. Task handoffs go in `docs/handoffs/<date>-<topic>.md`.
 
-## Rules in this repository
+## Local rules
 
 These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
 
@@ -59,9 +71,14 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
   generated files and provider outputs as untrusted.
 - The repository and the npm package are public (since 2026-09-29). Everything in the `files`
   list in `package.json` ships to npm.
-- Source-available, never "open source" or "MIT": `PolyForm-Noncommercial-1.0.0 OR
-  LicenseRef-PolyForm-Internal-Use-1.0.0` in every manifest and skill; releases up to v0.4.2
-  (GitHub and npm) stay MIT. Contributions come in under `CLA.md`. `test/validate.py` enforces it.
+- The licence is the organization's (Fabric ADR-0092): `AGPL-3.0-only OR
+  LicenseRef-PassionCode-Commercial` in every manifest and skill, and `LICENSE`,
+  `COMMERCIAL-LICENSE.md` and `CLA.md` byte for byte the knowledge base templates. Released
+  versions keep theirs: v0.4.3 to v0.5.2 PolyForm Noncommercial or Internal Use, v0.4.2 and
+  earlier MIT (GitHub and npm). Contributions come in under `CLA.md`. `test/validate.py`
+  enforces all of it.
+- The MCP step of the README quick start is verified with a real client (`claude -p` with
+  `--strict-mcp-config` and a temporary config), never only through the kit's own tests.
 - Examples, evals and docs use neutral names (`example-agent`); an agent someone built for
   themselves never appears in them.
 
@@ -77,3 +94,10 @@ rules and onboarding live in [passioncode-ai/org-index](https://github.com/passi
 
 Where this file is stricter than RULES.md, this file wins. A change to this repository's
 role, dependencies or test command updates its row in `org-index/repositories.json` in the same change.
+
+## After work
+
+In the same run: update this repository's docs with the change; if a cross-repository fact changed
+(a product, a version, a plan row, a principle), update the page in `fabric-workspace/knowledge/`
+that owns it; land both; publish (`node scripts/workspace.mjs sync` from a Fabric checkout) or
+leave it to the scheduled sync. Leave a handoff with the exact next task.

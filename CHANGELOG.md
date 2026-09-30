@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.5.3 - 2026-09-30
+
+Follows Fabric ADR-0092 (the organization's licence) and the PassionCode.ai repository
+standard (fabric-workspace `knowledge/repository-standard.md`). No behaviour of the skills'
+scripts, the kits or the probe changes; the contract pin stays at `2ea54f7`.
+
+### Changed
+
+- **License.** From this version the adapter is open source under the GNU AGPL-3.0, or
+  available under a commercial license from PassionCode.ai (contact@passioncode.ai): SPDX
+  `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial` in `package.json`, the marketplace entry,
+  the plugin manifest and the three skills' `license:`. `LICENSE` is the unmodified AGPL-3.0 text
+  and `COMMERCIAL-LICENSE.md` is new; both, with `CLA.md`, are byte for byte the knowledge base
+  templates and now ship in the npm package. Versions v0.4.3 to v0.5.2 stay under PolyForm
+  Noncommercial or Internal Use, and v0.4.2 and earlier under MIT.
+- **The skills send a PassionCode.ai repository to the repository standard.**
+  `creating-fabric-agents` (step 2), `adapting-projects-to-fabric` and `building-fabric-services`
+  (a new section each) name the licence files, the README quick start with a verified MCP call,
+  `AGENTS.md` read-first and `CLAUDE.md` `@AGENTS.md`; an agent someone builds for themselves is
+  outside the standard, and its licence is its owner's choice.
+- **README** follows the standard: the first paragraph says what the adapter is and that it
+  works without Fabric; `## Quick start for a new teammate` (Install, Configure, MCP, Develop)
+  replaces "Install", "Verify one service" and "Validate this repository", and its MCP step was
+  run with a real client (Claude Code 2.1.285, `--strict-mcp-config`, a temporary config).
+- **AGENTS.md** opens with the knowledge base *Read first* block and closes with *After work*.
+
+### Added
+
+- `test/validate.py` fails a tree whose `LICENSE`, `COMMERCIAL-LICENSE.md` or `CLA.md` differs
+  from the template by one byte, whose README still states the retired licence or lacks the
+  licensing wording, whose package does not ship the licence files, or whose skill drops the
+  repository-standard paragraph; each rule was watched failing on a planted copy
+  (`test/test_validate.py` `LicenseTests`, `RepositoryStandardTests`).
+
 ## 0.5.2 - 2026-09-30
 
 Follows Fabric Agent Contract DEC-0018. **Contract pin** moves from `9cd778e` to `2ea54f7`.
