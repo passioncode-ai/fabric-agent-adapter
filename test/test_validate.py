@@ -178,7 +178,9 @@ class RepositorySkillFilesTests(unittest.TestCase):
 
 
 class LicenseTests(unittest.TestCase):
-    """The relicense holds: a copy of the repository that slips back to MIT fails."""
+    """Fabric ADR-0092: AGPL-3.0-only OR the PassionCode.ai commercial licence, in every file that
+    states a licence, with LICENSE, COMMERCIAL-LICENSE.md and CLA.md byte for byte the knowledge
+    base templates. A copy of the repository that slips back to PolyForm, or drifts, fails."""
 
     def _validate_copy(self, mutate):
         import shutil
@@ -191,31 +193,96 @@ class LicenseTests(unittest.TestCase):
             run = subprocess.run([sys.executable, str(copy / "test/validate.py")], capture_output=True, text=True)
             return run.returncode, run.stdout + run.stderr
 
+    def test_the_expression_is_the_organizations(self):
+        self.assertEqual(validate.LICENSE_SPDX, "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial")
+
     def test_the_real_tree_passes_the_license_checks(self):
         code, out = self._validate_copy(lambda copy: None)
         self.assertEqual(code, 0, out)
 
-    def test_an_mit_badge_fails(self):
+    def test_an_edited_agpl_text_fails(self):
         def mutate(copy):
-            readme = copy / "README.md"
-            readme.write_text(readme.read_text(encoding="utf-8") + "\n![license](https://img.shields.io/badge/license-MIT-green.svg)\n", encoding="utf-8")
+            lic = copy / "LICENSE"
+            lic.write_text(lic.read_text(encoding="utf-8").replace("GNU AFFERO", "GNU AFERO", 1), encoding="utf-8")
         code, out = self._validate_copy(mutate)
         self.assertEqual(code, 1)
-        self.assertIn("source-available", out)
+        self.assertIn("LICENSE is not the AGPL-3.0 template", out)
 
-    def test_a_manifest_back_on_mit_fails(self):
+    def test_a_missing_commercial_license_fails(self):
+        code, out = self._validate_copy(lambda copy: (copy / "COMMERCIAL-LICENSE.md").unlink())
+        self.assertEqual(code, 1)
+        self.assertIn("COMMERCIAL-LICENSE.md", out)
+
+    def test_a_drifted_cla_fails(self):
+        def mutate(copy):
+            cla = copy / "CLA.md"
+            cla.write_text(cla.read_text(encoding="utf-8") + "\nAn extra clause.\n", encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("CLA.md is not the knowledge base template", out)
+
+    def test_a_source_available_badge_fails(self):
+        def mutate(copy):
+            readme = copy / "README.md"
+            readme.write_text(readme.read_text(encoding="utf-8") + "\n![license](https://img.shields.io/badge/license-source--available-blue.svg)\n", encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("README.md still states the retired licence", out)
+
+    def test_a_readme_without_the_earlier_versions_sentence_fails(self):
+        def mutate(copy):
+            readme = copy / "README.md"
+            readme.write_text(readme.read_text(encoding="utf-8").replace("Versions before", "Releases before"), encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("README.md ## License", out)
+
+    def test_a_manifest_back_on_polyform_fails(self):
         def mutate(copy):
             manifest = copy / "plugins/fabric-agent-adapter/.claude-plugin/plugin.json"
-            manifest.write_text(manifest.read_text(encoding="utf-8").replace(validate.LICENSE_SPDX, "MIT"), encoding="utf-8")
+            manifest.write_text(manifest.read_text(encoding="utf-8").replace(
+                validate.LICENSE_SPDX, "PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0"), encoding="utf-8")
         code, out = self._validate_copy(mutate)
         self.assertEqual(code, 1)
         self.assertIn("plugin license is out of sync", out)
+
+    def test_a_package_that_does_not_ship_the_commercial_license_fails(self):
+        def mutate(copy):
+            pkg = copy / "package.json"
+            data = json.loads(pkg.read_text(encoding="utf-8"))
+            data["files"] = [f for f in data["files"] if f != "COMMERCIAL-LICENSE.md"]
+            pkg.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("package.json files whitelist must ship COMMERCIAL-LICENSE.md", out)
 
     def test_a_pr_template_without_the_cla_box_fails(self):
         code, out = self._validate_copy(lambda copy: (copy / ".github/pull_request_template.md").write_text("## What changes\n", encoding="utf-8"))
         self.assertEqual(code, 1)
         self.assertIn("I agree to CLA.md", out)
 
+
+class RepositoryStandardTests(unittest.TestCase):
+    """Each skill tells the repository it builds to follow the PassionCode.ai repository standard,
+    and says that an agent someone builds for themselves is outside it."""
+
+    _validate_copy = LicenseTests._validate_copy
+
+    def test_a_skill_that_drops_the_standard_fails(self):
+        def mutate(copy):
+            skill = copy / "plugins/fabric-agent-adapter/skills/building-fabric-services/SKILL.md"
+            skill.write_text(skill.read_text(encoding="utf-8").replace("knowledge/repository-standard.md", "knowledge/"), encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("building-fabric-services: SKILL.md must send a PassionCode.ai repository to the repository standard", out)
+
+    def test_a_skill_that_forgets_the_owners_choice_fails(self):
+        def mutate(copy):
+            skill = copy / "plugins/fabric-agent-adapter/skills/creating-fabric-agents/SKILL.md"
+            skill.write_text(skill.read_text(encoding="utf-8").replace("its owner's", "the organization's"), encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: SKILL.md must say an agent someone builds for themselves", out)
 
 
 class PinTests(unittest.TestCase):

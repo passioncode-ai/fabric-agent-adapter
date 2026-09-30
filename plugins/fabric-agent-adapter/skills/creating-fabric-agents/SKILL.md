@@ -1,11 +1,11 @@
 ---
 name: creating-fabric-agents
 description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit — «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch". Runs the intake grill (capability, named consumer, workflow-or-agent, MCP/A2A/local-runner profile, effect declarations), distils source projects into a knowledge pack whose recorded failures become planted eval fixtures, scaffolds the pinned contract bundle, and sets the two-clock eval expectation with the conformance report. NOT for adapting an existing project (use adapting-projects-to-fabric), building the Fabric host or orchestrator, or generic agent design where Fabric compatibility is not part of the request.
-license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
+license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.5.2"
+  version: "0.5.3"
   contract-version: "0.1.0"
   contract-commit: "2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f"
 ---
@@ -79,6 +79,25 @@ consumer, and the eval **observables** — for each requirement, the pass/fail c
 that would show it met, written now, before the implementation. The input corpus is NOT
 authored now: it grows from real traces once the provider runs, and the step-1 fixtures
 are its seed because a source project's recorded failures count as production.
+
+**For a PassionCode.ai repository**, the new agent's repository follows the organization's
+[repository standard](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/repository-standard.md) (`knowledge/repository-standard.md`
+in the organization's knowledge base; a clone has it at `fabric-workspace/knowledge/`) from its
+first commit:
+
+- `LICENSE`, `COMMERCIAL-LICENSE.md` and `CLA.md` copied byte for byte from the knowledge base's
+  `templates/`, and `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial` in every manifest and
+  every SKILL.md `license:`; `SECURITY.md` when the repository is public;
+- a README whose first heading is the full name, with `## Quick start for a new teammate`
+  (Install; Configure, key names only; MCP, the registration command and one proving tool call,
+  verified with a real client in a temporary config; Develop) and `## License`;
+- an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
+  and a `CLAUDE.md` whose first line is `@AGENTS.md`.
+
+org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
+someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
+choice, nothing about it is published or listed by the organization, and none of these files is
+required of it — though the verified MCP quick start is still how anyone learns to drive it.
 
 ## Step 3 — scaffold the provider bundle
 

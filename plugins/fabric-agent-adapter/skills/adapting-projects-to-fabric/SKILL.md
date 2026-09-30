@@ -1,11 +1,11 @@
 ---
 name: adapting-projects-to-fabric
 description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract—choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility; also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or a brand-new agent — that is creating-fabric-agents.
-license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
+license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.5.2"
+  version: "0.5.3"
   contract-version: "0.1.0"
   contract-commit: "2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f"
 ---
@@ -178,6 +178,27 @@ Include commands and exit codes, immutable endpoint or artifact identities, and 
 unverified surfaces. If live Fabric admission/runtime does not yet exist, the last gates
 remain `NOT VERIFIED`; the completed deliverable is an adaptation-ready provider bundle,
 not a connected provider.
+
+## The repository around the provider
+
+**For a PassionCode.ai repository**, the adapted project's repository follows the organization's
+[repository standard](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/repository-standard.md) (`knowledge/repository-standard.md`
+in the organization's knowledge base; a clone has it at `fabric-workspace/knowledge/`) from its
+first commit:
+
+- `LICENSE`, `COMMERCIAL-LICENSE.md` and `CLA.md` copied byte for byte from the knowledge base's
+  `templates/`, and `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial` in every manifest and
+  every SKILL.md `license:`; `SECURITY.md` when the repository is public;
+- a README whose first heading is the full name, with `## Quick start for a new teammate`
+  (Install; Configure, key names only; MCP, the registration command and one proving tool call,
+  verified with a real client in a temporary config; Develop) and `## License`;
+- an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
+  and a `CLAUDE.md` whose first line is `@AGENTS.md`.
+
+org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
+someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
+choice, nothing about it is published or listed by the organization, and none of these files is
+required of it — though the verified MCP quick start is still how anyone learns to drive it.
 
 ## Completion format
 
