@@ -187,6 +187,9 @@ def make_handler(svc: Service):
                 except fs.ServiceError as exc:
                     return self._send(400, {"error": str(exc)})
                 return self._send(200, page)
+            if url.path == "/mcp":
+                # No server-to-client stream here: Streamable HTTP says 405 for a GET.
+                return self._send(405, {"error": "POST JSON-RPC to /mcp."}, {"Allow": "POST"})
             if url.path == "/fabric/v1/login":
                 cookie = svc.codes.redeem((query.get("code") or [None])[0])
                 if not cookie:

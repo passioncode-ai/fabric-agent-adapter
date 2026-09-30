@@ -1,6 +1,6 @@
 # Being called: `fabric-interop/0.1`
 
-Normative source: the Fabric Agent Contract's `docs/specification/interop.md` (DEC-0016, rulings DEC-0017)
+Normative source: the Fabric Agent Contract's `docs/specification/interop.md` (DEC-0016, rulings DEC-0017 and DEC-0018)
 at the commit this plugin pins. This page says how the kit implements it; where the two
 differ, the contract is right.
 
@@ -50,15 +50,32 @@ response = server.handle(json_rpc_message)          # POST /mcp body in, JSON re
 - Log events about the work with `**fi.trace_ids(ctx.traceparent)` so the pair lands on
   the event.
 
-`McpToolServer` answers `server/discover`, `tools/list` and `tools/call` with JSON
-responses — enough for Fabric and for the probe. A service already on an MCP SDK keeps
+`McpToolServer` answers `initialize` and `ping` (clients such as Claude Code 2.1.285 still
+open with a handshake, and a server that refuses it is marked failed), `server/discover`,
+`tools/list` and `tools/call` with JSON responses. Every tool's `outputSchema` must be
+rooted at `type: object` (DEC-0018): `add_tool` refuses any other root, because a client may
+drop the whole tool list over one bad schema — an SDK-level test will not show it, so check
+with the real client (below). A service already on an MCP SDK keeps
 the SDK and uses only the helpers. The Node kit has the helpers and the same job file
 format, without the dispatcher. `scripts/sample_service.py` is the worked example:
 `sample.echo` answers at once, `sample.draft` is a job that stops for a title choice.
 
-The contract owner's rulings (DEC-0017) the kit follows: a job tool's `outputSchema` is the
-self-contained union `oneOf[result envelope, job handle]` (`job_tool_output_schema`), so
-its `structuredContent` always conforms; an event about untraced work carries no trace pair.
+The contract owner's rulings the kit follows: a job tool's `outputSchema` is the
+self-contained `{type: object, oneOf: [result envelope, job handle]}` (`job_tool_output_schema`,
+DEC-0017 amended by DEC-0018), so its `structuredContent` always conforms; an event about
+untraced work carries no trace pair.
+
+**Check with a real client**, never only an SDK: `FABRIC_REAL_CLIENT=1 python3 -m unittest
+test.test_real_client` in the adapter repository, or by hand — a throwaway directory, a
+temporary `--mcp-config` (mode 600, the token in a header) and `--strict-mcp-config`, so
+the operator's own configuration is not touched:
+
+```bash
+claude -p "Reply with the single word OK." --strict-mcp-config --mcp-config "$TMP/mcp.json" \
+  --output-format stream-json --verbose --max-turns 1
+```
+
+The first `system/init` event lists `mcp_servers` (`connected`) and the `mcp__<server>__*` tools.
 
 ## What the probe checks
 
@@ -66,6 +83,7 @@ its `structuredContent` always conforms; an event about untraced work carries no
 
 | Rule | PASS when | NOT_RUN when |
 |---|---|---|
+| `interop.output-schema-object` | every listed tool's `outputSchema`, when present, has root `type: object` (FAC-SEM-023) | no MCP surface |
 | `interop.manifest-link` | the manifest `fabricManifest` names carries the service key with this `<id>.<instance>` (G-07) | the descriptor names no manifest |
 | `interop.well-known-capabilities` | every name in `surfaces.mcp.capabilities` is a manifest capability | the surface lists none |
 | `interop.tools-match` | every `mcp` capability is served as its tool, schemas equal to the files beside the manifest (matched by `$id`; a job's output wrapped in the DEC-0017 union), annotations derived | no manifest, no MCP surface, or a schema is not beside the manifest |

@@ -38,7 +38,7 @@ HANDLE = {"type": "object", "required": ["job"], "additionalProperties": False, 
 
 
 def union(output):
-    return {"oneOf": [{"type": "object", "required": ["id", "contractVersion", "outcome", "done", "proof", "scope", "notVerified", "artifacts",
+    return {"type": "object", "oneOf": [{"type": "object", "required": ["id", "contractVersion", "outcome", "done", "proof", "scope", "notVerified", "artifacts",
                                                      "createdAt", "producer", "output", "usage"], "properties": {"output": output}}, HANDLE]}
 
 
@@ -90,6 +90,14 @@ class ToolTests(unittest.TestCase):
                     {"name": "example.draft", "effect": "draft", "idempotency": "none", "extensions": {fi.EXTENSION_KEY: {"job": True}}}):
             self.assertEqual(fi.tool_for_capability(cap, {"type": "object"}, out)["outputSchema"], union(out))
         self.assertIs(fi.tool_for_capability({"name": "example.echo", "effect": "none", "idempotency": "none"}, {"type": "object"}, out)["outputSchema"], out)
+
+    def test_an_output_schema_that_is_not_object_rooted_is_refused(self):
+        for bad in ({"type": "array", "items": {"type": "string"}}, {"oneOf": [{"type": "object"}]}, {"type": "string"}):
+            with self.assertRaises(fi.InteropError, msg=bad):
+                fi.tool_for_capability({"name": "example.echo", "effect": "none", "idempotency": "none"}, {"type": "object"}, bad)
+        server = fi.McpToolServer("example-agent", "1.0.0")
+        with self.assertRaises(fi.InteropError):
+            server.add_tool({"name": "example.raw", "inputSchema": {"type": "object"}, "outputSchema": {"oneOf": [{"type": "object"}]}}, lambda a, c: {})
 
     def test_a_capability_is_served_as_a_tool_of_the_same_name(self):
         schema_in = {"type": "object", "properties": {"text": {"type": "string"}}}
@@ -261,6 +269,22 @@ class McpServerTests(unittest.TestCase):
         result = self.call("tools/call", {"name": "fabric.job.get", "arguments": {"id": "job_missing"}})["result"]
         self.assertTrue(result["isError"])
         self.assertIn("unknown-job", result["content"][0]["text"])
+
+    def test_initialize_handshake_for_clients_that_still_send_it(self):
+        # Claude Code 2.1.285 opens every HTTP server with initialize; without it the server is "failed".
+        for asked, answered in (("2025-06-18", "2025-06-18"), ("2025-11-25", "2025-11-25"), ("2026-07-28", "2026-07-28"), ("1999-01-01", fi.MCP_REVISION)):
+            result = self.server.handle({"jsonrpc": "2.0", "id": 7, "method": "initialize",
+                                         "params": {"protocolVersion": asked, "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}})["result"]
+            self.assertEqual(result["protocolVersion"], answered, asked)
+            self.assertIn("tools", result["capabilities"])
+            self.assertEqual(result["serverInfo"]["name"], "example-agent")
+        self.assertEqual(self.server.handle({"jsonrpc": "2.0", "id": 8, "method": "ping"})["result"], {})
+        self.assertIsNone(self.server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}))
+
+    def test_every_listed_output_schema_is_object_rooted(self):
+        for tool in self.call("tools/list")["result"]["tools"]:
+            if "outputSchema" in tool:
+                self.assertEqual(tool["outputSchema"].get("type"), "object", tool["name"])
 
     def test_protocol_errors(self):
         self.assertEqual(self.call("resources/list")["error"]["code"], -32601)

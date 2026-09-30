@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.5.2 - 2026-09-30
+
+Follows Fabric Agent Contract DEC-0018. **Contract pin** moves from `9cd778e` to `2ea54f7`.
+
+### Fixed
+
+- **Real clients could not connect to a kit-built MCP surface.** Claude Code 2.1.285 opens
+  every HTTP server with `initialize`; `McpToolServer` answered `-32601`, so the client marked
+  the server `failed` before calling `tools/list`. Every test drove the dispatcher directly,
+  so none saw it. It now answers `initialize` (echoing a supported protocol version) and
+  `ping`, and the sample answers `GET /mcp` with 405.
+- **Every tool's `outputSchema` is rooted at `type: object`** (DEC-0018, FAC-SEM-023): the job
+  union is `{type: object, oneOf: [envelope, handle]}` in both kits, `tool_for_capability` /
+  `toolForCapability` and `McpToolServer.add_tool` refuse any other root, and the probe gains
+  `interop.output-schema-object`, which FAILs a tool whose root is not type object.
+
+### Added
+
+- `test/test_real_client.py`, opt-in (`FABRIC_REAL_CLIENT=1`): the sample service listed by
+  the installed `claude` CLI, in a throwaway directory with `--strict-mcp-config`, stopped at
+  its init event before any model call.
+
 ## 0.5.1 - 2026-09-30
 
 Aligns the kits, the probe and the provider writer with the contract owner's rulings,

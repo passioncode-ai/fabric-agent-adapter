@@ -58,7 +58,11 @@ test('DEC-0017: the full envelope carries its trace; a job tool serves the union
   assert.throws(() => envelope({ outcome: 'succeeded', notVerified: [{ claim: 'x', reason: 'y' }] }), i.InteropError);
   const out = { type: 'object' };
   const u = i.jobToolOutputSchema(out);
+  assert.equal(u.type, 'object');
   assert.equal(u.oneOf[0].properties.output, out);
+  for (const bad of [{ type: 'array' }, { oneOf: [{ type: 'object' }] }]) {
+    assert.throws(() => i.toolForCapability({ name: 'example.echo', effect: 'none', idempotency: 'none' }, {}, bad), i.InteropError);
+  }
   assert.deepEqual(u.oneOf[1].properties.job.properties.status, { const: 'working' });
   assert.deepEqual(i.toolForCapability({ name: 'example.draft', effect: 'draft', idempotency: 'none', job: true }, {}, out).outputSchema, u);
   const dir = temp();

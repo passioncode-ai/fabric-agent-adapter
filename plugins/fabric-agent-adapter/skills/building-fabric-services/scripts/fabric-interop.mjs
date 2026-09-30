@@ -66,10 +66,17 @@ export function expectedAnnotations(effect, idempotency) {
 }
 
 // DEC-0017: a job-backed tool serves oneOf[result envelope, job handle]; the manifest keeps the pure output schema.
-export const jobToolOutputSchema = (outputSchema) => ({ oneOf: [{ type: 'object', required: [...ENVELOPE_REQUIRED], properties: { output: outputSchema } }, JOB_HANDLE_SCHEMA] });
+export const jobToolOutputSchema = (outputSchema) => ({ type: 'object', oneOf: [{ type: 'object', required: [...ENVELOPE_REQUIRED], properties: { output: outputSchema } }, JOB_HANDLE_SCHEMA] });
 export const isJobCapability = (capability) => capability.job === true || capability.extensions?.[EXTENSION_KEY]?.job === true;
 
+// DEC-0018 (FAC-SEM-023): an outputSchema is rooted at type object; a client may reject the whole
+// tools/list when one tool's outputSchema is, say, a bare oneOf.
+export function requireObjectRoot(name, outputSchema) {
+  if (!outputSchema || typeof outputSchema !== 'object' || outputSchema.type !== 'object') throw new InteropError(`Tool ${name}: an outputSchema must have root type "object".`);
+}
+
 export function toolForCapability(capability, inputSchema, outputSchema, title) {
+  requireObjectRoot(capability.name, outputSchema);
   const served = isJobCapability(capability) ? jobToolOutputSchema(outputSchema) : outputSchema;
   const tool = { name: capability.name, inputSchema, outputSchema: served, annotations: expectedAnnotations(capability.effect, capability.idempotency) };
   if (capability.description) tool.description = capability.description;
