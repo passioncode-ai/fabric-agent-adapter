@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.4 - 2026-10-01
+
+### Changed
+
+- **Contract pin** moves from `2ea54f7` to `74d3852`: Fabric Agent Contract was re-created as a
+  public repository with one clean history on 2026-09-30, so the old commit no longer exists.
+  Its schemas, source and fixtures are byte-identical to `2ea54f7` (`git diff --stat` over
+  `schemas src fixtures` is empty); no kit, probe or skill behaviour changes.
+
 ## 0.5.3 - 2026-09-30
 
 Follows Fabric ADR-0092 (the organization's licence) and the PassionCode.ai repository
