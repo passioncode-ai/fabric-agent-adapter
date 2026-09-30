@@ -179,7 +179,7 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 The one pin is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `2ea54f70c161c8b3bf7ec3c567735c7a2d4ce12f`
+- commit: `74d3852f122f5ca5cbc4138a201483531dfa5006`
 
 Every other mention of the contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree
