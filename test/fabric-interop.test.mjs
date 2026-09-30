@@ -11,7 +11,8 @@ const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-interop-'));
 const usage = { inputTokens: 1, outputTokens: 2, wallMs: 3 };
 const scope = { project: 'urn:p', run: 'urn:r', node: 'urn:n', binding: { id: 'urn:b', revision: 1, contentHash: `sha256:${'1'.repeat(64)}` }, writeScopes: [] };
-const envelope = () => i.resultEnvelope({ done: [], proof: [], scope, notVerified: [], output: {}, usage });
+const producer = { id: 'urn:fabric:provider:example-agent', revision: 1, contentHash: `sha256:${'2'.repeat(64)}` };
+const envelope = (extra = {}) => i.resultEnvelope({ outcome: 'partial', done: [], proof: [], scope, notVerified: [], output: {}, usage, producer, ...extra });
 
 test('traceparent: W3C in, W3C out, a child keeps the trace', () => {
   assert.equal(i.parseTraceparent(PARENT).traceId, TRACE);
@@ -51,9 +52,26 @@ test('jobs: a stable handle, the Python file format, terminal states stay termin
   assert.deepEqual(Object.keys(onDisk).sort(), ['job', 'private']);
 });
 
+test('DEC-0017: the full envelope carries its trace; a job tool serves the union', () => {
+  const env = envelope({ traceparent: PARENT });
+  assert.deepEqual(Object.keys(env).sort(), ['artifacts', 'contractVersion', 'createdAt', 'done', 'id', 'notVerified', 'outcome', 'output', 'producer', 'proof', 'scope', 'trace', 'usage']);
+  assert.throws(() => envelope({ outcome: 'succeeded', notVerified: [{ claim: 'x', reason: 'y' }] }), i.InteropError);
+  const out = { type: 'object' };
+  const u = i.jobToolOutputSchema(out);
+  assert.equal(u.oneOf[0].properties.output, out);
+  assert.deepEqual(u.oneOf[1].properties.job.properties.status, { const: 'working' });
+  assert.deepEqual(i.toolForCapability({ name: 'example.draft', effect: 'draft', idempotency: 'none', job: true }, {}, out).outputSchema, u);
+  const dir = temp();
+  const store = new i.JobStore(dir);
+  const id = store.create('example.draft', {}, { traceparent: PARENT }).job.id;
+  assert.deepEqual(store.complete(id, envelope()).result.trace, { traceparent: PARENT });
+  const other = store.create('example.draft', {}, { traceparent: PARENT }).job.id;
+  assert.throws(() => store.complete(other, envelope({ traceparent: i.childTraceparent(PARENT) })), i.InteropError);
+});
+
 test('form mode never asks for a secret; a choice is a titled single-select', () => {
   assert.throws(() => i.formRequest('Paste it.', { apiKey: { type: 'string' } }), i.InteropError);
   const req = i.choiceRequest('Pick.', 'title', [['a', 'A'], ['b', 'B']]);
   assert.deepEqual(req.params.requestedSchema.properties.title.oneOf, [{ const: 'a', title: 'A' }, { const: 'b', title: 'B' }]);
-  assert.throws(() => i.resultEnvelope({ done: [], proof: [], scope, notVerified: [], output: {}, usage: { inputTokens: -1, outputTokens: 0, wallMs: 0 } }), i.InteropError);
+  assert.throws(() => envelope({ usage: { inputTokens: -1, outputTokens: 0, wallMs: 0 } }), i.InteropError);
 });

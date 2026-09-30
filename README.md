@@ -153,7 +153,7 @@ checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`.
 The one pin is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `a22dea359ba04b8fe549abe81a5131552cb90eff`
+- commit: `9cd778eb6f14b977f9a5b4930826f62dc95c5619`
 
 Every other mention of the contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree

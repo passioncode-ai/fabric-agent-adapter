@@ -63,7 +63,8 @@
         "writes a fabric-provider/0.1 entry with fabric_provider.py write, argv as an array, never a shell string",
         "puts env values as secret-ref:<name> references, never the key itself",
         "refuses an id that is already a service (FAC-SEM-013) and says so",
-        "points manifest at the agent's fabric-agent.json and removes the entry on uninstall"
+        "points manifest at the agent's fabric-agent.json and removes the entry on uninstall",
+        "writes providerId equal to the manifest's provider.id, and refuses the entry when the manifest does not resolve or names another provider (FAC-SEM-014)"
       ]
     },
     {

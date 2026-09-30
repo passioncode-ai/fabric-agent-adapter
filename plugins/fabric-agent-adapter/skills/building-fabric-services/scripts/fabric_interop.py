@@ -10,7 +10,7 @@ it, so a service that calls these functions inherits the rule:
 - C3.3 a question for a person is an elicitation (form mode, never a secret; URL mode for those);
 - C3.4 every answer is a child span of the caller's traceparent, and so is every event.
 
-Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016).
+Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016, rulings DEC-0017).
 """
 
 # #region interop-kit — docs: plugins/fabric-agent-adapter/skills/building-fabric-services/references/interop.md#the-kit
@@ -30,7 +30,18 @@ import fabric_service as _fs  # noqa: E402
 PROTOCOL = "fabric-interop/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"
+CONTRACT_VERSION = "0.1.0"
 JOB_STATES = ("working", "input_required", "completed", "failed", "cancelled")
+OUTCOMES = ("succeeded", "partial", "failed", "cancelled", "blocked")
+ENVELOPE_REQUIRED = ["id", "contractVersion", "outcome", "done", "proof", "scope", "notVerified", "artifacts",
+                     "createdAt", "producer", "output", "usage"]
+# The job handle inline, as a job tool's outputSchema carries it (contract interop-job-handle.schema.json).
+JOB_HANDLE_SCHEMA: Dict[str, Any] = {
+    "type": "object", "required": ["job"], "additionalProperties": False,
+    "properties": {"job": {"type": "object", "required": ["id", "status"], "additionalProperties": False,
+                           "properties": {"id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$"},
+                                          "status": {"const": "working"}}}},
+}
 TERMINAL = ("completed", "failed", "cancelled")
 
 _TRACEPARENT = re.compile(r"^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$")
@@ -98,16 +109,26 @@ def expected_annotations(effect: str, idempotency: str) -> Dict[str, bool]:
     return hints
 
 
+def job_tool_output_schema(output_schema: Dict[str, Any]) -> Dict[str, Any]:
+    """DEC-0017: a job-backed tool's outputSchema is oneOf[result envelope, job handle], self-contained,
+    so structuredContent always conforms; the manifest's capability keeps the pure output schema."""
+    return {"oneOf": [{"type": "object", "required": list(ENVELOPE_REQUIRED), "properties": {"output": output_schema}},
+                      JOB_HANDLE_SCHEMA]}
+
+
+def is_job_capability(capability: Dict[str, Any]) -> bool:
+    block = (capability.get("extensions") or {}).get(EXTENSION_KEY) or {}
+    return capability.get("job") is True or block.get("job") is True
+
+
 def tool_for_capability(capability: Dict[str, Any], input_schema: Dict[str, Any], output_schema: Dict[str, Any],
                         title: Optional[str] = None) -> Dict[str, Any]:
-    """The MCP tool for one manifest capability: its name, its two schemas as they are, derived annotations.
-
-    A job-capable tool still serves the capability's outputSchema, though its
-    structuredContent is the job handle (contract OQ-0006)."""
+    """The MCP tool for one manifest capability: its name, its input schema as it is, derived annotations,
+    and its output schema — wrapped in the job union when the capability is a job (DEC-0017)."""
     tool: Dict[str, Any] = {
         "name": capability["name"],
         "inputSchema": input_schema,
-        "outputSchema": output_schema,
+        "outputSchema": job_tool_output_schema(output_schema) if is_job_capability(capability) else output_schema,
         "annotations": expected_annotations(capability.get("effect", ""), capability.get("idempotency", "")),
     }
     if capability.get("description"):
@@ -153,16 +174,30 @@ def _usage(usage: Any) -> Dict[str, Any]:
     return dict(usage)
 
 
-def result_envelope(*, done: List[Dict[str, Any]], proof: List[Dict[str, Any]], scope: Dict[str, Any],
-                    not_verified: List[Dict[str, Any]], output: Any, usage: Dict[str, Any]) -> Dict[str, Any]:
-    """DONE / PROOF / SCOPE / NOT VERIFIED (DEC-0011) plus the output and usage; the four collections are always present."""
-    for label, value in (("done", done), ("proof", proof), ("notVerified", not_verified)):
+def result_envelope(*, outcome: str, done: List[Dict[str, Any]], proof: List[Dict[str, Any]], scope: Dict[str, Any],
+                    not_verified: List[Dict[str, Any]], output: Any, usage: Dict[str, Any], producer: Dict[str, Any],
+                    artifacts: Optional[List[Dict[str, Any]]] = None, traceparent: Optional[str] = None,
+                    result_id: Optional[str] = None, created_at: Optional[str] = None) -> Dict[str, Any]:
+    """The full result envelope (contract result.schema.json, DEC-0011, DEC-0017): the same shape a
+    synchronous call returns, with output, usage and — when the work was traced — its trace."""
+    if outcome not in OUTCOMES:
+        raise InteropError("outcome must be one of %s." % ", ".join(OUTCOMES))
+    for label, value in (("done", done), ("proof", proof), ("notVerified", not_verified), ("artifacts", artifacts or [])):
         if not isinstance(value, list):
             raise InteropError("%s must be a list, even when empty." % label)
-    if not isinstance(scope, dict):
-        raise InteropError("scope must be an object.")
-    return {"done": list(done), "proof": list(proof), "scope": dict(scope), "notVerified": list(not_verified),
-            "output": output, "usage": _usage(usage)}
+    if outcome == "succeeded" and not_verified:
+        raise InteropError("A succeeded result cannot keep unverified claims (FAC-SEM-001); report partial.")
+    if not isinstance(scope, dict) or not isinstance(producer, dict):
+        raise InteropError("scope and producer must be objects.")
+    envelope: Dict[str, Any] = {
+        "id": result_id or "urn:fabric:result:" + secrets.token_hex(12), "contractVersion": CONTRACT_VERSION,
+        "outcome": outcome, "done": list(done), "proof": list(proof), "scope": dict(scope),
+        "notVerified": list(not_verified), "artifacts": list(artifacts or []), "createdAt": created_at or _fs.now_iso(),
+        "producer": dict(producer), "output": output, "usage": _usage(usage),
+    }
+    if parse_traceparent(traceparent):
+        envelope["trace"] = {"traceparent": traceparent}
+    return envelope
 
 
 # --- C3.3 awaiting a choice ------------------------------------------------------------
@@ -287,8 +322,17 @@ class JobStore:
         return matched
 
     def complete(self, job_id: str, envelope: Dict[str, Any]) -> Dict[str, Any]:
-        if not isinstance(envelope, dict) or not {"done", "proof", "scope", "notVerified", "output", "usage"} <= set(envelope):
+        """The envelope carries the job's trace, authoritative for the stored result (DEC-0017); one that names
+        another span is refused, so fabric.job.get's _meta and the envelope always agree (FAC-SEM-022)."""
+        if not isinstance(envelope, dict) or not set(ENVELOPE_REQUIRED) <= set(envelope):
             raise InteropError("A completed job carries the full result envelope; build it with result_envelope.")
+        stored = self.traceparent(job_id)
+        given = (envelope.get("trace") or {}).get("traceparent")
+        ids = lambda value: ((parse_traceparent(value) or {}).get("trace_id"), (parse_traceparent(value) or {}).get("span_id"))
+        if stored and given and ids(given) != ids(stored):
+            raise InteropError("Job %s ran in span %s; its result names another trace." % (job_id, stored))
+        if stored and not given:
+            envelope = dict(envelope, trace={"traceparent": stored})
         return self._transition(job_id, "completed", result=envelope)
 
     def fail(self, job_id: str, code: Any, message: str) -> Dict[str, Any]:
@@ -404,6 +448,8 @@ class McpToolServer:
         job_id = str(arguments.get("id", ""))
         try:
             job_span = self.jobs.traceparent(job_id) or span
+            state = self.jobs.get(job_id)
+            job_span = ((state.get("result") or {}).get("trace") or {}).get("traceparent") or job_span
             if name == "fabric.job.cancel":
                 state = self.jobs.get(job_id)
                 if state["status"] not in TERMINAL:

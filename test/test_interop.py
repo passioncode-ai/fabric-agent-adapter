@@ -30,9 +30,21 @@ SCOPE = {"project": "urn:fabric:project:example", "run": "urn:fabric:run:r-1", "
          "binding": {"id": "urn:fabric:binding:b", "revision": 1, "contentHash": "sha256:" + "1" * 64}, "writeScopes": []}
 
 
+PRODUCER = {"id": "urn:fabric:provider:example-agent", "revision": 1, "contentHash": "sha256:" + "2" * 64}
+ENVELOPE_KEYS = ["artifacts", "contractVersion", "createdAt", "done", "id", "notVerified", "outcome", "output", "producer", "proof", "scope", "usage"]
+# The canonical job-tool union of the contract (DEC-0017, docs/specification/interop.md, jobToolOutputSchema).
+HANDLE = {"type": "object", "required": ["job"], "additionalProperties": False, "properties": {"job": {"type": "object", "required": ["id", "status"], "additionalProperties": False,
+          "properties": {"id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$"}, "status": {"const": "working"}}}}}
+
+
+def union(output):
+    return {"oneOf": [{"type": "object", "required": ["id", "contractVersion", "outcome", "done", "proof", "scope", "notVerified", "artifacts",
+                                                     "createdAt", "producer", "output", "usage"], "properties": {"output": output}}, HANDLE]}
+
+
 def envelope(**extra):
-    base = dict(done=[{"claimId": "DRAFT", "statement": "A draft was written."}], proof=[], scope=SCOPE,
-                not_verified=[{"claim": "DRAFT", "reason": "not checked"}], output={"title": "a"}, usage=USAGE)
+    base = dict(outcome="partial", done=[{"claimId": "DRAFT", "statement": "A draft was written."}], proof=[], scope=SCOPE,
+                not_verified=[{"claim": "DRAFT", "reason": "not checked"}], output={"title": "a"}, usage=USAGE, producer=PRODUCER)
     base.update(extra)
     return fi.result_envelope(**base)
 
@@ -71,6 +83,14 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(fi.expected_annotations("delete", "required"), {"destructiveHint": True, "idempotentHint": True})
         self.assertEqual(fi.expected_annotations("publish", "supported"), {})
 
+    def test_a_job_tool_serves_the_union_and_the_capability_keeps_its_output(self):
+        out = {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}
+        self.assertEqual(fi.job_tool_output_schema(out), union(out))
+        for cap in ({"name": "example.draft", "effect": "draft", "idempotency": "none", "job": True},
+                    {"name": "example.draft", "effect": "draft", "idempotency": "none", "extensions": {fi.EXTENSION_KEY: {"job": True}}}):
+            self.assertEqual(fi.tool_for_capability(cap, {"type": "object"}, out)["outputSchema"], union(out))
+        self.assertIs(fi.tool_for_capability({"name": "example.echo", "effect": "none", "idempotency": "none"}, {"type": "object"}, out)["outputSchema"], out)
+
     def test_a_capability_is_served_as_a_tool_of_the_same_name(self):
         schema_in = {"type": "object", "properties": {"text": {"type": "string"}}}
         schema_out = {"type": "object"}
@@ -82,9 +102,21 @@ class ToolTests(unittest.TestCase):
 
 
 class EnvelopeAndChoiceTests(unittest.TestCase):
-    def test_envelope_has_the_four_collections_output_and_usage(self):
+    def test_envelope_is_the_full_result_envelope(self):
         env = envelope()
-        self.assertEqual(sorted(env), ["done", "notVerified", "output", "proof", "scope", "usage"])
+        self.assertEqual(sorted(env), ENVELOPE_KEYS)
+        self.assertEqual(env["contractVersion"], "0.1.0")
+        self.assertTrue(env["id"].startswith("urn:fabric:result:"))
+        traced = envelope(traceparent=PARENT)
+        self.assertEqual(traced["trace"], {"traceparent": PARENT})
+        self.assertNotIn("trace", envelope(traceparent="garbage"))
+
+    def test_envelope_refuses_succeeded_with_unverified_claims(self):
+        with self.assertRaises(fi.InteropError):
+            envelope(outcome="succeeded")
+        with self.assertRaises(fi.InteropError):
+            envelope(outcome="done")
+        self.assertEqual(envelope(outcome="succeeded", not_verified=[])["outcome"], "succeeded")
 
     def test_envelope_refuses_bad_usage(self):
         with self.assertRaises(fi.InteropError):
@@ -153,6 +185,15 @@ class JobStoreTests(unittest.TestCase):
         with self.assertRaises(fi.InteropError):
             store.cancel(job_id)
 
+    def test_the_envelope_carries_the_job_trace_and_must_agree_with_it(self):
+        store = fi.JobStore(self.dir)
+        job_id = store.create("example.draft", {}, traceparent=PARENT)["job"]["id"]
+        self.assertEqual(store.complete(job_id, envelope())["result"]["trace"], {"traceparent": PARENT})
+        other = store.create("example.draft", {}, traceparent=PARENT)["job"]["id"]
+        with self.assertRaises(fi.InteropError):
+            store.complete(other, envelope(traceparent=fi.child_traceparent(PARENT)))
+        self.assertEqual(store.get(other)["status"], "working")
+
     def test_answers_for_unknown_keys_are_ignored(self):
         store = fi.JobStore(self.dir)
         job_id = store.create("example.draft", {})["job"]["id"]
@@ -212,6 +253,9 @@ class McpServerTests(unittest.TestCase):
         got = self.call("tools/call", {"name": "fabric.job.get", "arguments": {"id": handle["job"]["id"]}})["result"]
         self.assertEqual(got["structuredContent"]["job"]["id"], handle["job"]["id"])
         self.assertEqual(fi.parse_traceparent(got["_meta"]["traceparent"])["trace_id"], "4bf92f3577b34da6a3ce929d0e0e4736")
+        self.jobs.complete(handle["job"]["id"], envelope())
+        done = self.call("tools/call", {"name": "fabric.job.get", "arguments": {"id": handle["job"]["id"]}})["result"]
+        self.assertEqual(done["_meta"]["traceparent"], done["structuredContent"]["job"]["result"]["trace"]["traceparent"])
 
     def test_an_unknown_job_is_an_error_result(self):
         result = self.call("tools/call", {"name": "fabric.job.get", "arguments": {"id": "job_missing"}})["result"]

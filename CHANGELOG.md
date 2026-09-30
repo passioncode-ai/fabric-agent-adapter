@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.5.1 - 2026-09-30
+
+Aligns the kits, the probe and the provider writer with the contract owner's rulings,
+Fabric Agent Contract DEC-0017. **Contract pin** moves from `a22dea3` to `9cd778e`.
+
+### Changed
+
+- **A job's result is the full result envelope** (OQ-0002): `result_envelope` /
+  `resultEnvelope` now build the contract's `result.schema.json` shape — `id`,
+  `contractVersion`, `outcome`, `artifacts`, `createdAt`, `producer` beside the four
+  collections, `output` and `usage` — and refuse `succeeded` with unverified claims
+  (FAC-SEM-001). `outcome` and `producer` are new required arguments.
+- **The envelope carries its trace** (OQ-0003): `trace: {traceparent}`, authoritative for
+  a stored result. `JobStore.complete` fills it from the job's span and refuses an envelope
+  that names another span; `fabric.job.get` answers with the envelope's traceparent in
+  `_meta`, so the two always agree (FAC-SEM-022).
+- **A job-backed tool serves `oneOf[result envelope, job handle]`** (OQ-0006):
+  `tool_for_capability` / `toolForCapability` wrap the output schema with
+  `job_tool_output_schema` / `jobToolOutputSchema` for a job capability, so
+  `structuredContent` always conforms; the manifest keeps the pure schema. The probe's
+  `interop.tools-match` expects the union for a job capability.
+- **Provider entries name their provider by URI** (OQ-0001): `fabric_provider.py` requires
+  `providerId` (`--provider-id`), refuses an entry whose manifest does not resolve or whose
+  `provider.id` differs, and `validate` checks that the file is named `<id>.json`.
+
 ## 0.5.0 - 2026-09-30
 
 ### Added

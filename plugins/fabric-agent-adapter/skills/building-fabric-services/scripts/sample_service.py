@@ -110,6 +110,8 @@ class Service:
         title = "About %s" % topic if choice == "plain" else "What is %s?" % topic
         body = "%s. This sample note was written by the sample service." % title
         self.jobs.complete(job_id, fi.result_envelope(
+            outcome="partial", traceparent=ctx.traceparent,
+            producer={"id": "urn:fabric:provider:%s" % self.id, "revision": 1, "contentHash": "sha256:" + "0" * 64},
             done=[{"claimId": "NOTE", "statement": "A note titled %s was drafted." % title}], proof=[],
             scope={"project": "urn:fabric:project:sample", "run": "urn:fabric:run:%s" % job_id, "node": "urn:fabric:node:draft",
                    "binding": {"id": "urn:fabric:binding:sample.draft", "revision": 1, "contentHash": "sha256:" + "0" * 64}, "writeScopes": []},

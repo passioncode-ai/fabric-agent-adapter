@@ -2,7 +2,7 @@
 // The Node twin of fabric_interop.py: the same rules and the same job file format, so a
 // job written by one kit is read by the other. The minimal MCP dispatcher is Python-only;
 // a Node service uses the official MCP SDK for the wire and these helpers for the rules.
-// Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016).
+// Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016, rulings DEC-0017).
 // #region interop-kit-node — docs: plugins/fabric-agent-adapter/skills/building-fabric-services/references/interop.md#the-kit
 
 import crypto from 'node:crypto';
@@ -14,6 +14,15 @@ export const PROTOCOL = 'fabric-interop/0.1';
 export const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1';
 export const MCP_REVISION = '2026-07-28';
 export const TERMINAL = ['completed', 'failed', 'cancelled'];
+export const CONTRACT_VERSION = '0.1.0';
+const OUTCOMES = ['succeeded', 'partial', 'failed', 'cancelled', 'blocked'];
+const ENVELOPE_REQUIRED = ['id', 'contractVersion', 'outcome', 'done', 'proof', 'scope', 'notVerified', 'artifacts', 'createdAt', 'producer', 'output', 'usage'];
+// The job handle inline, as a job tool's outputSchema carries it (contract interop-job-handle.schema.json).
+export const JOB_HANDLE_SCHEMA = {
+  type: 'object', required: ['job'], additionalProperties: false,
+  properties: { job: { type: 'object', required: ['id', 'status'], additionalProperties: false,
+    properties: { id: { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$' }, status: { const: 'working' } } } },
+};
 
 const TRACEPARENT = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/;
 const JOB_ID = /^[A-Za-z0-9._:-]{1,128}$/;
@@ -56,9 +65,13 @@ export function expectedAnnotations(effect, idempotency) {
   return hints;
 }
 
-// A job-capable tool still serves the capability's outputSchema (contract OQ-0006).
+// DEC-0017: a job-backed tool serves oneOf[result envelope, job handle]; the manifest keeps the pure output schema.
+export const jobToolOutputSchema = (outputSchema) => ({ oneOf: [{ type: 'object', required: [...ENVELOPE_REQUIRED], properties: { output: outputSchema } }, JOB_HANDLE_SCHEMA] });
+export const isJobCapability = (capability) => capability.job === true || capability.extensions?.[EXTENSION_KEY]?.job === true;
+
 export function toolForCapability(capability, inputSchema, outputSchema, title) {
-  const tool = { name: capability.name, inputSchema, outputSchema, annotations: expectedAnnotations(capability.effect, capability.idempotency) };
+  const served = isJobCapability(capability) ? jobToolOutputSchema(outputSchema) : outputSchema;
+  const tool = { name: capability.name, inputSchema, outputSchema: served, annotations: expectedAnnotations(capability.effect, capability.idempotency) };
   if (capability.description) tool.description = capability.description;
   if (title) tool.title = title;
   return tool;
@@ -85,12 +98,21 @@ function checkUsage(usage) {
   return { ...usage };
 }
 
-export function resultEnvelope({ done, proof, scope, notVerified, output, usage }) {
-  for (const [label, value] of [['done', done], ['proof', proof], ['notVerified', notVerified]]) {
+// The full result envelope (contract result.schema.json, DEC-0017): the shape a synchronous call returns.
+export function resultEnvelope({ outcome, done, proof, scope, notVerified, output, usage, producer, artifacts = [], traceparent, id, createdAt }) {
+  if (!OUTCOMES.includes(outcome)) throw new InteropError(`outcome must be one of ${OUTCOMES.join(', ')}.`);
+  for (const [label, value] of [['done', done], ['proof', proof], ['notVerified', notVerified], ['artifacts', artifacts]]) {
     if (!Array.isArray(value)) throw new InteropError(`${label} must be a list, even when empty.`);
   }
-  if (!scope || typeof scope !== 'object') throw new InteropError('scope must be an object.');
-  return { done: [...done], proof: [...proof], scope: { ...scope }, notVerified: [...notVerified], output, usage: checkUsage(usage) };
+  if (outcome === 'succeeded' && notVerified.length) throw new InteropError('A succeeded result cannot keep unverified claims (FAC-SEM-001); report partial.');
+  if (!scope || typeof scope !== 'object' || !producer || typeof producer !== 'object') throw new InteropError('scope and producer must be objects.');
+  const envelope = {
+    id: id ?? `urn:fabric:result:${crypto.randomBytes(12).toString('hex')}`, contractVersion: CONTRACT_VERSION, outcome,
+    done: [...done], proof: [...proof], scope: { ...scope }, notVerified: [...notVerified], artifacts: [...artifacts],
+    createdAt: createdAt ?? nowIso(), producer: { ...producer }, output, usage: checkUsage(usage),
+  };
+  if (parseTraceparent(traceparent)) envelope.trace = { traceparent };
+  return envelope;
 }
 
 // --- C3.3 awaiting a choice ------------------------------------------------------------------
@@ -176,10 +198,15 @@ export class JobStore {
     return matched;
   }
 
+  // The envelope carries the job's trace, authoritative for the stored result (DEC-0017, FAC-SEM-022).
   complete(jobId, envelope) {
-    const needed = ['done', 'proof', 'scope', 'notVerified', 'output', 'usage'];
-    if (!envelope || !needed.every((k) => k in envelope)) throw new InteropError('A completed job carries the full result envelope; build it with resultEnvelope.');
-    return this.transition(jobId, 'completed', { result: envelope });
+    if (!envelope || !ENVELOPE_REQUIRED.every((k) => k in envelope)) throw new InteropError('A completed job carries the full result envelope; build it with resultEnvelope.');
+    const stored = this.traceparent(jobId);
+    const given = envelope.trace?.traceparent;
+    const ids = (v) => { const p = parseTraceparent(v); return p ? `${p.traceId}-${p.spanId}` : null; };
+    if (stored && given && ids(given) !== ids(stored)) throw new InteropError(`Job ${jobId} ran in span ${stored}; its result names another trace.`);
+    const result = stored && !given ? { ...envelope, trace: { traceparent: stored } } : envelope;
+    return this.transition(jobId, 'completed', { result });
   }
 
   fail(jobId, code, message) { return this.transition(jobId, 'failed', { error: { code, message } }); }

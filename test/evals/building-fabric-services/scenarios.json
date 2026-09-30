@@ -54,7 +54,9 @@
         "returns {job: {id, status: working}} in structuredContent and serves fabric.job.get and fabric.job.cancel",
         "keeps jobs in fabric_interop.JobStore under the data directory, so the id survives a restart, and shows it by restarting",
         "answers fabric.job.get for an unknown id with isError and unknown-job, never a fresh job",
-        "completes with the result envelope: done, proof, scope, notVerified, output and usage"
+        "completes with the result envelope: done, proof, scope, notVerified, output and usage",
+        "declares the job tool's outputSchema as oneOf[result envelope, job handle] (job_tool_output_schema), while the manifest keeps the pure output schema",
+        "completes with the full result envelope — id, contractVersion, outcome, artifacts, createdAt, producer, output, usage — the same shape a synchronous call returns"
       ]
     },
     {
@@ -65,7 +67,9 @@
         "reads _meta.traceparent and runs the call as a child span (fabric_interop.child_traceparent)",
         "puts the same trace id, as a new child span, on every outgoing call",
         "adds traceId and spanId, together, to every event about the traced work",
-        "proves it with check_service.py: interop.trace-propagation and interop.events-trace PASS"
+        "proves it with check_service.py: interop.trace-propagation and interop.events-trace PASS",
+        "records the trace in the result envelope's trace field, and answers fabric.job.get with the same traceparent in _meta",
+        "puts no trace pair on an event about untraced work"
       ]
     },
     {
