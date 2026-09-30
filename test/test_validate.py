@@ -8,6 +8,7 @@ here: an independent PyYAML read is a gate command, not a test dependency.
 """
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -215,6 +216,52 @@ class LicenseTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("I agree to CLA.md", out)
 
+
+
+class PinTests(unittest.TestCase):
+    """G-11: one contract pin. fabric-contract.lock.json is it; every live mention equals it."""
+
+    _validate_copy = LicenseTests._validate_copy
+
+    def test_a_readme_naming_another_contract_commit_fails(self):
+        def mutate(copy):
+            readme = copy / "README.md"
+            readme.write_text(readme.read_text(encoding="utf-8") + "\nBuilt against fabric-agent-contract `20a818e648a4c09a60df0126d11626922e8b9094`.\n", encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("contract pin", out)
+        self.assertIn("README.md", out)
+
+    def test_a_script_constant_off_the_pin_fails(self):
+        def mutate(copy):
+            script = copy / "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_project.py"
+            text = script.read_text(encoding="utf-8")
+            pin = json.loads((copy / "fabric-contract.lock.json").read_text())["commit"]
+            script.write_text(text.replace(pin, "a5a27092ba0dcc5facfbeae8b359146dfb403e9a"), encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("adapt_project.py", out)
+
+    def test_a_full_commit_in_any_wording_must_be_the_pin(self):
+        def mutate(copy):
+            skill = copy / "plugins/fabric-agent-adapter/skills/building-fabric-services/SKILL.md"
+            pin = json.loads((copy / "fabric-contract.lock.json").read_text())["commit"]
+            skill.write_text(skill.read_text(encoding="utf-8").replace(pin, "20a818e648a4c09a60df0126d11626922e8b9094", 1), encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("building-fabric-services/SKILL.md", out)
+
+    def test_a_missing_lock_fails(self):
+        code, out = self._validate_copy(lambda copy: (copy / "fabric-contract.lock.json").unlink())
+        self.assertEqual(code, 1)
+        self.assertIn("fabric-contract.lock.json", out)
+
+    def test_dated_records_keep_the_revision_of_their_day(self):
+        def mutate(copy):
+            note = copy / "docs/handoffs/2026-01-01-old.md"
+            note.write_text("Contract pin was `20a818e648a4c09a60df0126d11626922e8b9094`.\n", encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 0, out)
 
 if __name__ == "__main__":
     unittest.main()

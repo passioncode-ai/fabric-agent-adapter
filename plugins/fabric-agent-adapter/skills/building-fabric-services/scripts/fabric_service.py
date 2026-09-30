@@ -46,6 +46,8 @@ _INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 _KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}$")
 _ORIGIN = re.compile(r"^http://127\.0\.0\.1:([0-9]{3,5})$")
 _CODE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
+_TRACE_ID = re.compile(r"^(?!0{32}$)[0-9a-f]{32}$")
+_SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
 
 
 class ServiceError(Exception):
@@ -404,8 +406,12 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
 # --- events ------------------------------------------------------------------
 
 def make_event(event_id: Any, at: str, kind: str, level: str, text: str, *, subject: Optional[Dict[str, str]] = None,
-               link: Optional[str] = None, notify: bool = False) -> Dict[str, Any]:
-    """One activity event: one sentence a person reads, never a machine id."""
+               link: Optional[str] = None, notify: bool = False, trace_id: Optional[str] = None,
+               span_id: Optional[str] = None) -> Dict[str, Any]:
+    """One activity event: one sentence a person reads, never a machine id.
+
+    An event about traced work carries its trace as a pair, `trace_id` and `span_id`
+    (fabric-interop/0.1 C3.4 c); fabric_interop.trace_ids(traceparent) gives both."""
     if level not in LEVELS:
         raise ServiceError("level must be one of %s." % ", ".join(LEVELS))
     if not _KIND.match(kind):
@@ -415,6 +421,10 @@ def make_event(event_id: Any, at: str, kind: str, level: str, text: str, *, subj
         raise ServiceError("An event needs a sentence.")
     if link is not None and (not link.startswith("/") or link.startswith("//")):
         raise ServiceError("link must be a path on this service.")
+    if (trace_id is None) != (span_id is None):
+        raise ServiceError("An event carries traceId and spanId together, or neither.")
+    if trace_id is not None and not (_TRACE_ID.match(trace_id) and _SPAN_ID.match(str(span_id))):
+        raise ServiceError("traceId is 32 and spanId 16 lowercase hex characters, not all zeros.")
     event: Dict[str, Any] = {"id": str(event_id), "at": at, "kind": kind, "level": level, "text": text[:500]}
     if subject:
         event["subject"] = subject
@@ -422,6 +432,8 @@ def make_event(event_id: Any, at: str, kind: str, level: str, text: str, *, subj
         event["link"] = link
     if notify:
         event["notify"] = True
+    if trace_id is not None:
+        event["traceId"], event["spanId"] = trace_id, span_id
     return event
 
 

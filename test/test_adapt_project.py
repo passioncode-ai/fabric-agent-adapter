@@ -29,6 +29,7 @@ def scaffold_args(profile: str, force: bool = False) -> argparse.Namespace:
         executable_ref="urn:executable:demo",
         runtime_arg=[],
         force=force,
+        job=False,
     )
 
 
@@ -104,6 +105,49 @@ class ScaffoldTests(unittest.TestCase):
             args.provider_id = "provider/demo"
             with self.assertRaises(ADAPTER.AdaptationError):
                 ADAPTER.scaffold_project(Path(temp), args)
+
+
+class InteropScaffoldTests(unittest.TestCase):
+    """fabric-interop/0.1: a capability is served as the MCP tool of its own name; --job marks long work."""
+
+    def test_mcp_capability_requires_the_tool_of_its_own_name(self):
+        with tempfile.TemporaryDirectory() as temp:
+            ADAPTER.scaffold_project(Path(temp), scaffold_args("mcp"))
+            manifest = json.loads((Path(temp) / "fabric-agent.json").read_text())
+            self.assertEqual(manifest["capabilities"][0]["profile"]["requiredFeatures"], ["tool:demo.run"])
+
+    def test_job_flag_writes_the_interop_block(self):
+        args = scaffold_args("mcp")
+        args.job = True
+        with tempfile.TemporaryDirectory() as temp:
+            ADAPTER.scaffold_project(Path(temp), args)
+            manifest = json.loads((Path(temp) / "fabric-agent.json").read_text())
+            self.assertEqual(manifest["capabilities"][0]["extensions"], {ADAPTER.INTEROP_KEY: {"job": True}})
+            self.assertEqual(ADAPTER.check_project(Path(temp), None)["gates"]["localStructure"]["status"], "PASS")
+
+    def test_job_flag_is_for_mcp_only(self):
+        args = scaffold_args("local-runner")
+        args.job = True
+        with tempfile.TemporaryDirectory() as temp, self.assertRaises(ADAPTER.AdaptationError):
+            ADAPTER.scaffold_project(Path(temp), args)
+
+    def test_check_refuses_a_malformed_interop_block(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ADAPTER.scaffold_project(root, scaffold_args("mcp"))
+            manifest = json.loads((root / "fabric-agent.json").read_text())
+            manifest["capabilities"][0]["extensions"] = {ADAPTER.INTEROP_KEY: {"job": "yes"}}
+            (root / "fabric-agent.json").write_text(json.dumps(manifest))
+            check = ADAPTER.check_project(root, None)
+            self.assertEqual(check["gates"]["localStructure"]["status"], "FAIL")
+            self.assertTrue(any("interop" in r for r in check["gates"]["localStructure"]["receipts"]))
+
+    def test_the_lock_names_the_one_pin(self):
+        pin = json.loads((ROOT / "fabric-contract.lock.json").read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            ADAPTER.scaffold_project(Path(temp), scaffold_args("mcp"))
+            lock = json.loads((Path(temp) / "fabric-contract.lock.json").read_text())
+            self.assertEqual({k: lock[k] for k in pin}, pin)
 
 
 class CheckTests(unittest.TestCase):

@@ -32,6 +32,14 @@ complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live pro
 python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py example-agent
 ```
 
+Services and agents that other agents call follow `fabric-interop/0.1`: each capability
+is the MCP tool of its name, long work is a job with a stable id (`fabric.job.get`,
+`fabric.job.cancel`), a question for a person is an elicitation, and every call carries
+one W3C trace. The kits ship the helpers (`scripts/fabric_interop.py`,
+`scripts/fabric-interop.mjs`), the sample service serves a job end to end, and the probe
+checks the interop rules. An agent that is not a service is announced with a provider
+entry: `adapting-projects-to-fabric/scripts/fabric_provider.py`.
+
 For provider bundles the adapting skill helps an agent author:
 
 - inspect the project's stable integration surfaces without executing it;
@@ -110,6 +118,23 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
 Scaffolding is non-destructive by default. It writes only the paths declared in the
 [delivery brief](docs/evidence/specs/2026-08-27-brief.md) and refuses collisions.
 
+## Verify one service (newcomer path)
+
+After installing (above), with Python 3.9+ and no other dependency:
+
+```bash
+KIT=plugins/fabric-agent-adapter/skills/building-fabric-services/scripts   # or ~/.agents/skills/building-fabric-services/scripts
+DATA=$(mktemp -d); SERVICES=$(mktemp -d)
+python3 "$KIT/sample_service.py" serve --port 47190 --data-dir "$DATA" &
+python3 "$KIT/sample_service.py" register --port 47190 --data-dir "$DATA" --services-dir "$SERVICES"
+python3 "$KIT/check_service.py" sample --services-dir "$SERVICES"   # exit 0: no FAIL
+kill %1
+```
+
+The probe prints one line per rule — `PASS`, `FAIL` or `NOT_RUN` with its evidence — and
+exits 1 on any `FAIL`. Run it against your own service by its id once its installer has
+written the descriptor.
+
 ## Validate this repository
 
 ```bash
@@ -125,11 +150,15 @@ checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`.
 
 ## Contract pin
 
-- version: `0.1.0`
-- commit: `a5a27092ba0dcc5facfbeae8b359146dfb403e9a`
+The one pin is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
-The contract repository is normative. Updating the pin requires a new adapter release,
-fixture review, and a complete validation run.
+- version: `0.1.0`
+- commit: `a22dea359ba04b8fe549abe81a5131552cb90eff`
+
+Every other mention of the contract revision — this section, the skills' metadata, the
+skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree
+where one does not. The contract repository is normative. Updating the pin requires a
+new adapter release, fixture review, and a complete validation run.
 
 ## License
 

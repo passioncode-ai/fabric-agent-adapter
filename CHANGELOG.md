@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.5.0 - 2026-09-30
+
+### Added
+
+- **`fabric-interop/0.1` in the kits** (Fabric Agent Contract DEC-0016).
+  `building-fabric-services/scripts/fabric_interop.py` and its Node twin
+  `fabric-interop.mjs`: W3C trace context (`child_traceparent`, `trace_ids`), a
+  capability served as the MCP tool of its name with annotations from its effect,
+  durable jobs (`JobStore`: ids survive a restart, terminal states never change,
+  `unknown-job` for an unknown id), the result envelope with `usage`, and elicitations
+  (a titled single-select in form mode, URL mode for secrets; form mode refuses a
+  secret field). Python also ships `McpToolServer`, a minimal `tools/list` /
+  `tools/call` dispatcher with `fabric.job.get` and `fabric.job.cancel` built in.
+- Events carry `traceId` and `spanId` as a pair (`make_event`, `makeEvent`).
+- The sample service serves MCP at `/mcp`: `sample.echo`, and `sample.draft`, a job
+  that stops for a title choice and completes with a traced result. `register` writes
+  its manifest and schemas and points the descriptor's `fabricManifest` at it.
+- The probe `check_service.py` gains seven `interop.*` rules: manifest link (G-07),
+  capability list, tools equal to the manifest (FAC-SEM-017), job tools, unknown job,
+  trace propagation and event trace pairs. It calls only `tools/list` and
+  `fabric.job.get` for a made-up id.
+- `adapting-projects-to-fabric/scripts/fabric_provider.py`: writes, validates and
+  removes `fabric-provider/0.1` entries for agents that are not services — argv only,
+  env values as `secret-ref:` references, never the id of an existing service.
+- `adapt_project.py scaffold --job` writes the capability's interop block; an `mcp`
+  capability now requires the tool of its own name instead of `tool:replace-me`, and
+  `check` refuses a malformed interop block.
+- Skills teach it: `building-fabric-services` gains `references/interop.md`,
+  `adapting-projects-to-fabric` gains `references/provider-entry.md` and step 4b, and
+  `creating-fabric-agents` starts new agents on it. Trigger and scenario evals added
+  first.
+
+### Changed
+
+- **Contract pin** moves from `a5a2709` to `a22dea3` (fabric-agent-contract `main`,
+  AR-1: interop, provider entries, runner catalogue, pipelines). The provider profiles
+  and every existing schema field are unchanged; the contract added schemas and
+  optional fields only (DEC-0016). **One pin**: `fabric-contract.lock.json`, and
+  `test/validate.py` fails any live file that names another contract revision (G-11).
+- The README has a newcomer path that starts the sample service and probes it.
+
 ## 0.4.3 - 2026-09-29
 
 ### Changed

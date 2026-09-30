@@ -7,7 +7,10 @@ the Fabric Agent Contract). It ships
 as a Claude Code plugin and a public npm installer (`@passioncode-ai/fabric-agent-adapter`). It
 carries three skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
-and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service.
+and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service
+that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`).
+Agents that are not services get a `fabric-provider/0.1` entry from
+`adapting-projects-to-fabric/scripts/fabric_provider.py`.
 
 ## Build and test
 
@@ -42,7 +45,8 @@ and publishes to npm on a `v*` tag, but only when the repository variables `RELE
 
 These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
 
-- Start from the pinned Fabric contract (`0.1.0`, the commit is in `README.md`). Updating the pin
+- Start from the pinned Fabric contract (`0.1.0`; the one pin is `fabric-contract.lock.json`, and
+  `test/validate.py` fails any other revision named in a live file). Updating the pin
   is a compatibility change: review all three profiles, regenerate fixtures intentionally and
   release a new version. Never copy a newer normative rule in while the old pin stays in metadata.
 - Write the intended behaviour and evidence first. Add or update the trigger and scenario evals
