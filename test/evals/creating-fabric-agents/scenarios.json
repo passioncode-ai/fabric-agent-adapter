@@ -23,9 +23,9 @@
     },
     {
       "id": "knowledge-pack-traps-become-fixtures",
-      "request": "Create a new fabric-compatible search-console collector; the estate already has traffic-growth-agent with a documented audit of collector defects.",
+      "request": "Create a new fabric-compatible search-console collector; the estate already has example-growth-agent with a documented audit of collector defects.",
       "expected": [
-        "names traffic-growth-agent docs as a knowledge source",
+        "names example-growth-agent docs as a knowledge source",
         "distils patterns and traps with references",
         "converts recorded traps into planted eval fixtures",
         "writes docs/knowledge-pack.md with provenance",
