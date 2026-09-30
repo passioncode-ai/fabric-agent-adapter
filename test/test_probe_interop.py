@@ -108,8 +108,10 @@ class SampleInteropTests(LiveSample):
             "id": job_id, "inputResponses": {"title_choice": {"action": "accept", "content": {"title": choice}}}}}, 3)
         job = done["result"]["structuredContent"]["job"]
         self.assertEqual(job["status"], "completed")
-        self.assertEqual(sorted(job["result"]), ["done", "notVerified", "output", "proof", "scope", "usage"])
-        self.assertIn(TRACE, done["result"]["_meta"]["traceparent"])
+        self.assertEqual(sorted(job["result"]), ["artifacts", "contractVersion", "createdAt", "done", "id", "notVerified", "outcome",
+                                                 "output", "producer", "proof", "scope", "trace", "usage"])
+        self.assertEqual(done["result"]["_meta"]["traceparent"], job["result"]["trace"]["traceparent"])
+        self.assertIn(TRACE, job["result"]["trace"]["traceparent"])
         page = json.loads(urllib.request.urlopen(urllib.request.Request(
             "http://127.0.0.1:%d/fabric/v1/events?limit=50" % self.port, headers={"Authorization": "Bearer " + self.token})).read())
         traced = [e for e in page["events"] if e.get("traceId")]
@@ -192,6 +194,21 @@ class ProbeRuleUnitTests(unittest.TestCase):
         self.assertEqual(probe.results[-1]["verdict"], "FAIL")
         probe.trace_rule({"result": {"_meta": {"traceparent": "00-" + TRACE + "-00f067aa0ba902b7-01"}}}, PARENT)
         self.assertEqual(probe.results[-1]["verdict"], "FAIL", "echoing the caller's own span is not a child span")
+
+    def test_a_job_tool_serving_the_bare_output_schema_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            out = {"$id": "urn:x:out", "type": "object"}
+            (Path(temp) / "x.schema.json").write_text(json.dumps(out))
+            (Path(temp) / "in.schema.json").write_text(json.dumps({"$id": "urn:x:in", "type": "object"}))
+            cap = {"name": "example.draft", "effect": "draft", "idempotency": "none", "inputSchema": "urn:x:in", "outputSchema": "urn:x:out",
+                   "profile": {"kind": "mcp"}, "extensions": {SERVICE_KEY.replace("service", "interop"): {"job": True}}}
+            probe = self.probe({})
+            fi = load("fabric_interop")
+            bare = {"name": "example.draft", "inputSchema": {"$id": "urn:x:in", "type": "object"}, "outputSchema": out, "annotations": {}}
+            probe.tools_match_rule([cap], Path(temp) / "fabric-agent.json", {"example.draft": bare})
+            self.assertEqual(probe.results[-1]["verdict"], "FAIL")
+            probe.tools_match_rule([cap], Path(temp) / "fabric-agent.json", {"example.draft": dict(bare, outputSchema=fi.job_tool_output_schema(out))})
+            self.assertEqual(probe.results[-1]["verdict"], "PASS", probe.results[-1]["evidence"])
 
     def test_events_with_half_a_trace_fail(self):
         probe = self.probe({})

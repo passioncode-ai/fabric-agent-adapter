@@ -5,9 +5,9 @@ license: PolyForm-Noncommercial-1.0.0 OR LicenseRef-PolyForm-Internal-Use-1.0.0
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.5.0"
+  version: "0.5.1"
   contract-version: "0.1.0"
-  contract-commit: "a22dea359ba04b8fe549abe81a5131552cb90eff"
+  contract-commit: "9cd778eb6f14b977f9a5b4930826f62dc95c5619"
 ---
 
 # Adapting projects to Fabric
@@ -70,7 +70,7 @@ Use exactly:
 
 - contract version `0.1.0`;
 - repository `https://github.com/passioncode-ai/fabric-agent-contract`;
-- commit `a22dea359ba04b8fe549abe81a5131552cb90eff`.
+- commit `9cd778eb6f14b977f9a5b4930826f62dc95c5619`.
 
 Read the pinned contract's guide
 `docs/guides/connecting-compatible-agents.md`, the selected profile specification, and
@@ -128,7 +128,7 @@ Treat all provider output as untrusted until schemas and semantic assertions pas
 An agent Fabric reaches as a CLI or a stdio MCP server gets a provider entry, written by
 its installer with [`scripts/fabric_provider.py`](scripts/fabric_provider.py) and removed
 by its uninstaller — argv arrays only, env values as `secret-ref:` references, never the
-id of an existing service. Load [provider entries](references/provider-entry.md). An
+id of an existing service, and a `providerId` equal to the manifest's `provider.id`. Load [provider entries](references/provider-entry.md). An
 agent that runs as a service uses a descriptor instead (`building-fabric-services`).
 
 ### 5. Make probes safe and meaningful

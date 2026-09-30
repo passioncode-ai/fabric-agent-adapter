@@ -1,7 +1,7 @@
 # Provider entries: agents that are not services
 
 Normative source: the Fabric Agent Contract's `docs/specification/provider.md`
-(`fabric-provider/0.1`, DEC-0016) at the commit this plugin pins.
+(`fabric-provider/0.1`, DEC-0016, rulings DEC-0017) at the commit this plugin pins.
 
 An agent Fabric reaches as a CLI or a stdio MCP server — not a long-running service —
 is announced by one entry, `providers/<id>.json`, in the same root as the services
@@ -22,7 +22,8 @@ service or a provider, never both.
 and refuses what the contract refuses.
 
 ```bash
-python3 scripts/fabric_provider.py write --id example-agent --name "Example Agent" \
+python3 scripts/fabric_provider.py write --id example-agent --provider-id https://agents.example/providers/example-agent \
+  --name "Example Agent" \
   --manifest ~/.local/share/example-agent/fabric-agent.json --installed-by "example-agent 1.0.0" \
   --env EXAMPLE_API_KEY=secret-ref:example-agent/EXAMPLE_API_KEY \
   --stdio ~/.local/bin/example-agent mcp
@@ -35,19 +36,22 @@ python3 scripts/fabric_provider.py remove example-agent      # the uninstaller
 
 It refuses, with one sentence that never quotes a value:
 
+- a manifest that does not resolve, or whose `provider.id` is not the entry's
+  `providerId` — the two URIs are compared as URIs (FAC-SEM-014);
 - an id that is already a service in `services/` (FAC-SEM-013);
 - an env value that is not `secret-ref:<name>`, or a reference that has the shape of a
-  credential itself — a token prefix, a private key, a JWT (FAC-SEM-015);
+  credential itself — a token prefix, a private key, a JWT (FAC-SEM-015: a value is
+  checked by its form; name patterns apply to names);
 - a URL other than `http://127.0.0.1:<port>/mcp`, a manifest path that is not an
   absolute or `~/` path to `fabric-agent.json`, a shell-string command, unknown fields.
 
+`validate` also checks that the file is named `<id>.json` (FAC-SEM-014, slug half).
 From Python: `write_provider_entry(entry)`, `remove_provider_entry(id)`,
-`validate_provider_entry(entry)`, `providers_dir()`.
+`validate_provider_entry(entry)`, `manifest_problems(entry)`, `providers_dir()`.
 
 ## What the entry does not do
 
 It grants nothing: Fabric lists the agent, and admission (probes) and a project binding
 still decide what it may do. The manifest it points at is the authority for the
-agent's capabilities. The contract's rule that the manifest's `provider.id` "equals" the
-entry's id cannot hold as written — `provider.id` is a URI, the entry id a slug — so only
-"the manifest resolves" is checked until the contract answers OQ-0001.
+agent's capabilities. Equality is between like things (DEC-0017): the slug `id` with the
+file name, the URI `providerId` with the manifest's URI `provider.id`.

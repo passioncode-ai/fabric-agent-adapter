@@ -321,6 +321,9 @@ class Probe:
                 schema = self.resolve_schema(manifest_path, str(cap.get(side)))
                 if schema is None:
                     unresolved.append("%s %s" % (name, cap.get(side)))
+                elif side == "outputSchema" and fi.is_job_capability(cap):
+                    if tool.get(side) != fi.job_tool_output_schema(schema):
+                        problems.append("%s is a job: its outputSchema must be oneOf[result envelope, job handle] around %s (DEC-0017)" % (name, cap.get(side)))
                 elif tool.get(side) != schema:
                     problems.append("%s serves an %s that differs from %s" % (name, side, cap.get(side)))
             annotations = tool.get("annotations") or {}

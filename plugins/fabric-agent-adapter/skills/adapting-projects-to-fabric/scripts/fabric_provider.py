@@ -6,13 +6,13 @@ the providers directory, beside the services directory. Only its installer write
 entry and only its uninstaller removes it; the entry grants no Project access.
 Standard library only; it does not import the service kit, so this skill stands alone.
 
-  fabric_provider.py write --id ID --name NAME --manifest PATH --installed-by TEXT
+  fabric_provider.py write --id ID --provider-id URI --name NAME --manifest PATH --installed-by TEXT
                            (--url http://127.0.0.1:PORT/mcp | --stdio EXECUTABLE [ARG ...])
                            [--env NAME=secret-ref:REF ...] [--summary TEXT] [--repository URL]
   fabric_provider.py remove ID
   fabric_provider.py validate PATH
 
-Normative source: fabric-agent-contract docs/specification/provider.md (DEC-0016).
+Normative source: fabric-agent-contract docs/specification/provider.md (DEC-0016, rulings DEC-0017).
 """
 
 # #region provider-writer — docs: plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/references/provider-entry.md#the-writer
@@ -35,7 +35,8 @@ _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 _SECRET_REF = re.compile(r"^secret-ref:([A-Za-z0-9][A-Za-z0-9._/:@-]{0,255})$")
 _LOCAL_PATH = re.compile(r"^(~/|/)[^\x00]*$")
 _URL = re.compile(r"^http://127\.0\.0\.1:([0-9]{1,5})/mcp$")
-FIELDS = {"protocol", "id", "name", "summary", "manifest", "run", "source", "installedAt", "installedBy", "extensions"}
+_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s]+$")
+FIELDS = {"protocol", "id", "providerId", "name", "summary", "manifest", "run", "source", "installedAt", "installedBy", "extensions"}
 # FAC-SEM-015 reads a credential by its SHAPE: a reference named after a key is fine.
 CREDENTIAL_SHAPES = [re.compile(p) for p in (
     r"^(sk|pk|rk)[-_](live|test|proj|or|ant)?[-_]?[A-Za-z0-9_-]{16,}",
@@ -82,7 +83,7 @@ def validate_provider_entry(entry: Any) -> List[str]:
     if not isinstance(entry, dict):
         return ["an entry is a JSON object"]
     problems: List[str] = []
-    for key in ("protocol", "id", "name", "manifest", "run", "installedAt", "installedBy"):
+    for key in ("protocol", "id", "providerId", "name", "manifest", "run", "installedAt", "installedBy"):
         if key not in entry:
             problems.append("missing %s" % key)
     for key in sorted(set(entry) - FIELDS):
@@ -93,6 +94,8 @@ def validate_provider_entry(entry: Any) -> List[str]:
         problems.append("protocol must be %s" % PROTOCOL)
     if not _ID.match(str(entry["id"])):
         problems.append("id must match %s" % _ID.pattern)
+    if not _URI.match(str(entry["providerId"])):
+        problems.append("providerId is the absolute URI of the manifest's provider.id")
     if not isinstance(entry["name"], str) or not 1 <= len(entry["name"]) <= 80:
         problems.append("name is 1 to 80 characters")
     if "summary" in entry and (not isinstance(entry["summary"], str) or len(entry["summary"]) > 200):
@@ -130,6 +133,20 @@ def _run_problems(run: Any) -> List[str]:
     return problems
 
 
+def manifest_problems(entry: Dict[str, Any]) -> List[str]:
+    """FAC-SEM-014 (DEC-0017), URI half: the manifest resolves and its provider.id equals providerId."""
+    try:
+        manifest = json.loads(Path(os.path.expanduser(str(entry["manifest"]))).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ["the manifest %s does not resolve (FAC-SEM-014)" % entry["manifest"]]
+    provider = manifest.get("provider") if isinstance(manifest, dict) else None
+    if not isinstance(provider, dict) or not isinstance(manifest.get("capabilities"), list):
+        return ["%s is not a provider manifest (FAC-SEM-014)" % entry["manifest"]]
+    if provider.get("id") != entry["providerId"]:
+        return ["providerId %s is not the manifest's provider.id %s (FAC-SEM-014)" % (entry["providerId"], provider.get("id"))]
+    return []
+
+
 def _atomic_write(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     os.chmod(path.parent, 0o700)
@@ -163,6 +180,8 @@ def _service_ids(directory: Path) -> Dict[str, str]:
 def write_provider_entry(entry: Dict[str, Any], directory: Optional[Path] = None, services: Optional[Path] = None) -> Path:
     """Installer-only. Refuses an invalid entry and an id that is already a service (FAC-SEM-013)."""
     problems = validate_provider_entry(entry)
+    if not problems:
+        problems = manifest_problems(entry)
     if problems:
         raise ProviderError("Provider entry is invalid: %s." % "; ".join(problems))
     clash = _service_ids(services or services_dir()).get(entry["id"])
@@ -193,6 +212,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     write = sub.add_parser("write")
     write.add_argument("--id", required=True)
+    write.add_argument("--provider-id", required=True, help="the manifest's provider.id (a URI)")
     write.add_argument("--name", required=True)
     write.add_argument("--summary")
     write.add_argument("--manifest", required=True)
@@ -212,7 +232,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("removed" if remove_provider_entry(args.id) else "no entry for %s" % args.id)
             return 0
         if args.command == "validate":
-            problems = validate_provider_entry(json.loads(args.path.read_text(encoding="utf-8")))
+            entry = json.loads(args.path.read_text(encoding="utf-8"))
+            problems = validate_provider_entry(entry)
+            if isinstance(entry, dict) and entry.get("id") != args.path.stem:
+                problems.append("the file name %s is not <id>.json for %s (FAC-SEM-014)" % (args.path.name, entry.get("id")))
+            if not problems:
+                problems = manifest_problems(entry)
             print("; ".join(problems) if problems else "valid")
             return 1 if problems else 0
         env: Dict[str, str] = {}
@@ -224,7 +249,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         run: Dict[str, Any] = {"mcp": {"url": args.url}} if args.url else {"mcp": {"stdio": {"command": args.stdio}}}
         if env and args.stdio:
             run["mcp"]["stdio"]["env"] = env
-        entry: Dict[str, Any] = {"protocol": PROTOCOL, "id": args.id, "name": args.name, "manifest": args.manifest,
+        entry: Dict[str, Any] = {"protocol": PROTOCOL, "id": args.id, "providerId": args.provider_id, "name": args.name, "manifest": args.manifest,
                                  "run": run, "installedAt": _now(), "installedBy": args.installed_by}
         if args.summary:
             entry["summary"] = args.summary
