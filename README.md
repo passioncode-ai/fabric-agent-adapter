@@ -36,7 +36,7 @@ and a portable `scripts/check_dashboard_link.py` gate for generated renderers.
 It rejects primary HTTP when the host is available, failed-host browser fallback,
 and local links addressed to another device. A skill install alone does not filter
 every provider's final answer; the renderer must invoke the gate with trusted host
-context. This checkout contains the change; published package 0.5.5 does not.
+context. This checkout contains the change; published package 0.5.6 does not.
 
 Services and agents that other agents call follow `fabric-interop/0.1`: each capability
 is the MCP tool of its name, long work is a job with a stable id (`fabric.job.get`,
