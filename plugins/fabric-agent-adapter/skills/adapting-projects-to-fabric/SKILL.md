@@ -2,7 +2,7 @@
 name: adapting-projects-to-fabric
 description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract—choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility; also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or a brand-new agent — that is creating-fabric-agents.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
-compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode.
+compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
   version: "0.5.4"
@@ -74,7 +74,7 @@ Use exactly:
 
 Read the pinned contract's guide
 `docs/guides/connecting-compatible-agents.md`, the selected profile specification, and
-the referenced JSON Schemas before implementing protocol details. If the private checkout
+the referenced JSON Schemas before implementing protocol details. If the contract checkout
 is unavailable, continue only through local structure and mark exact schema validation
 `NOT_RUN`; do not reconstruct missing normative rules from memory.
 

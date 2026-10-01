@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- **Docs.** The skills' `compatibility` line, the skill card and `adapting-projects-to-fabric` no
+  longer call the Fabric Agent Contract checkout private: the contract is a public repository
+  since 2026-09-30. `AGENTS.md` points at the knowledge base's `knowledge/rules.md` (Fabric
+  ADR-0093) instead of the moved org-index `RULES.md`. The README's MCP quick start is
+  re-verified from the npm package. No script, kit or probe changes.
+
 ## 0.5.4 - 2026-10-01
 
 ### Changed
