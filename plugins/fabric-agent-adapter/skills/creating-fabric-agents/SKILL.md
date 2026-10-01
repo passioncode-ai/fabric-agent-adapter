@@ -2,7 +2,7 @@
 name: creating-fabric-agents
 description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit — «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch". Runs the intake grill (capability, named consumer, workflow-or-agent, MCP/A2A/local-runner profile, effect declarations), distils source projects into a knowledge pack whose recorded failures become planted eval fixtures, scaffolds the pinned contract bundle, and sets the two-clock eval expectation with the conformance report. NOT for adapting an existing project (use adapting-projects-to-fabric), building the Fabric host or orchestrator, or generic agent design where Fabric compatibility is not part of the request.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
-compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned private fabric-agent-contract checkout. Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
+compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
   version: "0.5.4"

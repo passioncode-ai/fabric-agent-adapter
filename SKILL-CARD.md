@@ -9,7 +9,7 @@
 | Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base |
 | Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`) |
 | Mutations | only the seven documented target-project paths; collisions refused by default; `fabric_provider.py write` writes one entry in the providers directory |
-| Network | not required for structural mode; private contract checkout required for exact schema validation |
+| Network | not required for structural mode; a contract checkout (public repository) required for exact schema validation |
 | Secrets | never accepted or emitted |
 
 Triggers include explicit requests to connect, adapt, migrate, or check a project against
@@ -31,7 +31,7 @@ a provider because those actions require a real Fabric host/runtime.
 | Inputs | capability, named consumer, workflow-or-agent decision, profile, effect and tenancy declarations, knowledge sources |
 | Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton, provider bundle via the sibling scaffolder, conformance report with the canary expectation |
 | Mutations | new project files plus the sibling scaffolder's documented target paths; collisions refused by default |
-| Network | not required for structural mode; private contract checkout required for exact schema validation |
+| Network | not required for structural mode; a contract checkout (public repository) required for exact schema validation |
 | Secrets | never accepted or emitted |
 
 Triggers include explicit requests to create, design, or build a NEW Fabric-compatible

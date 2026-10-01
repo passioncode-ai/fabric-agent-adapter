@@ -93,15 +93,17 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
 
 ## Organisation
 
-This repository is one of the `passioncode-ai` repositories. **The org map, the shared
-rules and onboarding live in [passioncode-ai/org-index](https://github.com/passioncode-ai/org-index)**
-(private; readable by every org member):
+This repository is one of the `passioncode-ai` repositories. The organization's rules —
+branches, commits, CI, leases, secrets, handoffs — live in the knowledge base,
+[`knowledge/rules.md`](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/rules.md)
+(Fabric ADR-0093); the repository map and onboarding are in
+[passioncode-ai/org-index](https://github.com/passioncode-ai/org-index) (both private; readable
+by every org member):
 
-- [README](https://github.com/passioncode-ai/org-index#repositories): which repository owns what, and how they connect
-- [RULES.md](https://github.com/passioncode-ai/org-index/blob/main/RULES.md): branches, commits, CI, leases, secrets, handoffs
+- [repositories](https://github.com/passioncode-ai/org-index#repositories): which repository owns what, and how they connect
 - [ONBOARDING.md](https://github.com/passioncode-ai/org-index/blob/main/ONBOARDING.md): setting up a new contributor's machine
 
-Where this file is stricter than RULES.md, this file wins. A change to this repository's
+Where this file is stricter than the organization's rules, this file wins. A change to this repository's
 role, dependencies or test command updates its row in `org-index/repositories.json` in the same change.
 
 ## After work

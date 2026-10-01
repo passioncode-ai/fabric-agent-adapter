@@ -110,8 +110,9 @@ EOF
 kill %1
 ```
 
-Verified 2026-09-30 with Claude Code 2.1.285: the CLI connected to the sample over
-streamable HTTP, called `sample.echo` and printed `ping`. The probe prints one line per rule —
+Verified 2026-10-01 from the published npm package 0.5.4 (`npx` into a throwaway hub, `KIT`
+pointing at the installed skill) with Claude Code 2.1.286: the probe reported 27 rules, 0 FAIL;
+the CLI connected to the sample over streamable HTTP, called `sample.echo` and printed `ping`. The probe prints one line per rule —
 `PASS`, `FAIL` or `NOT_RUN` with its evidence — and exits 1 on any `FAIL`; run it against your
 own service by its id once its installer has written the descriptor.
 `FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py` repeats the connection check
