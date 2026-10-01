@@ -62,6 +62,36 @@
         "publishes nothing and lists the agent in no organization launcher, map or example",
         "still writes the README quick start with a verified MCP call"
       ]
+    },
+    {
+      "id": "dashboard-primary-link",
+      "trap": "the consumer returns a localhost URL despite an installed dashboard host",
+      "request": "Give me the dashboard link for the registered example-agent.default service.",
+      "expected": [
+        "discover and use the host link tool",
+        "return open_link as the primary dashboard action",
+        "do not start a second service or browser"
+      ]
+    },
+    {
+      "id": "installed-host-open-fails",
+      "trap": "a failed installed host is treated as an absent host",
+      "request": "Open example-agent.default; Fabric Dashboards is installed but its opener failed.",
+      "expected": [
+        "report open_failed or host status",
+        "do not open HTTP or run another server",
+        "do not claim page_ready from OS dispatch"
+      ]
+    },
+    {
+      "id": "remote-dashboard-handoff",
+      "trap": "a phone receives the computer localhost dashboard URL",
+      "request": "I am on my phone; open the dashboard on my workstation.",
+      "expected": [
+        "address a supported remote open action to the workstation",
+        "otherwise report unavailable transport",
+        "do not say a local custom scheme or localhost opens the workstation from the phone"
+      ]
     }
   ]
 }

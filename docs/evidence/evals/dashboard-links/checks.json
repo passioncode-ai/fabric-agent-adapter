@@ -1,0 +1,37 @@
+{
+  "at": "2026-10-01T16:37:42.926231+00:00",
+  "scope": "source branch, no released/installed skill change",
+  "checks": [
+    {
+      "command": "npm test",
+      "exit_code": 0,
+      "python_tests": 136,
+      "python_skipped": 1,
+      "node_tests": 15
+    },
+    {
+      "command": "FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py -v",
+      "exit_code": 0,
+      "tests": 1
+    },
+    {
+      "command": "claude plugin validate ./plugins/fabric-agent-adapter --strict",
+      "exit_code": 0
+    },
+    {
+      "command": "claude plugin validate . --strict",
+      "exit_code": 0
+    },
+    {
+      "check": "planted gate bypass",
+      "receipt": "mutation.json"
+    },
+    {
+      "check": "Claude Code and Codex supplied-context arms",
+      "receipt": "model-arms.json",
+      "automatic_routing": "NOT_RUN"
+    }
+  ],
+  "fresh_checkout": "PENDING",
+  "hosted_ci": "NOT_RUN (nightly policy)"
+}

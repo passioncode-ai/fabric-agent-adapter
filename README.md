@@ -30,6 +30,14 @@ complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live pro
 python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py example-agent
 ```
 
+Dashboard handoffs use the host-generated `open_link` as the primary action. The
+three skills carry the same [consumer procedure](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-links.md)
+and a portable `scripts/check_dashboard_link.py` gate for generated renderers.
+It rejects primary HTTP when the host is available, failed-host browser fallback,
+and local links addressed to another device. A skill install alone does not filter
+every provider's final answer; the renderer must invoke the gate with trusted host
+context. This checkout contains the change; published package 0.5.5 does not.
+
 Services and agents that other agents call follow `fabric-interop/0.1`: each capability
 is the MCP tool of its name, long work is a job with a stable id (`fabric.job.get`,
 `fabric.job.cancel`), a question for a person is an elicitation, and every call carries

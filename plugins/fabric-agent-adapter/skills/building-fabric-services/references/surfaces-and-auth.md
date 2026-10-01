@@ -17,8 +17,9 @@
 ## CLI for people and scripts
 
 `<tool> service status|start|stop|restart` (launchctl on the label, then the
-well-known document), `<tool> dashboard` (asks for a login code and opens it; with
-Fabric Dashboards installed it opens the service there instead), `<tool> doctor --json`
+well-known document), `<tool> dashboard` (resolve the exact service and use the Fabric Dashboards host
+opener first; installed-but-failed never falls back to a browser; only confirmed
+absence permits explicit browser fallback and its one-time login flow), `<tool> doctor --json`
 (the same checks the probe runs, plus provider keys), `--json` on every command. Print
 a sign-in link only when stdout is a terminal.
 

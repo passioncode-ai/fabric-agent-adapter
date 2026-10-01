@@ -1,0 +1,6 @@
+{
+  "check": "installed-raw-http fixture detects a gate permitting browser fallback for installed host",
+  "baseline_exit": 1,
+  "mutant_exit": 0,
+  "expected_exit": 1
+}

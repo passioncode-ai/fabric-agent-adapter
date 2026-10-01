@@ -213,3 +213,15 @@ Report:
 
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates
 passed against a real provider and the project binding is valid.
+
+## Dashboard handoff — also for consumers
+
+When handing a registered service dashboard to a person, or writing the generated
+agent's completion/notification instructions, read and apply
+[dashboard links](references/dashboard-links.md): use the host's `open_link`,
+check the target device and host, and run the bundled output gate before delivery.
+An installed host failure never means browser fallback. This applies in Claude
+Code, Codex and other providers; it needs no host-specific hook. MCP unavailable:
+report the unresolved capability or use an approved project resolver; no automatic
+client configuration. Python unavailable: perform the reference's manual checks
+and report the executable gate NOT_RUN. Headless agents need no dashboard.

@@ -103,6 +103,36 @@
         "opens AGENTS.md with the Read first block, ends it with After work, and makes CLAUDE.md start with @AGENTS.md",
         "runs org-index check_format.py for the repository and reports its findings"
       ]
+    },
+    {
+      "id": "dashboard-primary-link",
+      "trap": "the consumer returns a localhost URL despite an installed dashboard host",
+      "request": "Give me the dashboard link for the registered example-agent.default service.",
+      "expected": [
+        "discover and use the host link tool",
+        "return open_link as the primary dashboard action",
+        "do not start a second service or browser"
+      ]
+    },
+    {
+      "id": "installed-host-open-fails",
+      "trap": "a failed installed host is treated as an absent host",
+      "request": "Open example-agent.default; Fabric Dashboards is installed but its opener failed.",
+      "expected": [
+        "report open_failed or host status",
+        "do not open HTTP or run another server",
+        "do not claim page_ready from OS dispatch"
+      ]
+    },
+    {
+      "id": "remote-dashboard-handoff",
+      "trap": "a phone receives the computer localhost dashboard URL",
+      "request": "I am on my phone; open the dashboard on my workstation.",
+      "expected": [
+        "address a supported remote open action to the workstation",
+        "otherwise report unavailable transport",
+        "do not say a local custom scheme or localhost opens the workstation from the phone"
+      ]
     }
   ]
 }

@@ -1,0 +1,160 @@
+{
+  "observed_at": "2026-10-01T16:34:09.894784+00:00",
+  "scope": "three frozen supplied-context cases; automatic skill activation NOT_RUN",
+  "request": "This is a frozen output evaluation, not an operational task. Use no tools, read no files, make no changes. For each case return only a JSON array of objects with id, kind (native_link/browser_link/remote_open/unavailable), url (or null), device_id (or null), status.\nCase A: Operator says \"Give me the dashboard\" on workstation. Viewer=target=workstation. Trusted resolver gives service example-agent.default, open_link fabric-dashboards://service/example-agent.default?path=%2Fdashboard, http_url http://127.0.0.1:47195/dashboard. Host state available. Pick the primary action.\nCase B: Operator says \"Open the dashboard\" on workstation. Installed host open returned open_failed. HTTP origin is reachable. Pick the next action; do not claim a tool actually ran in this evaluation.\nCase C: Operator is on phone, target workstation. Same resolver as A. There is NO remote-open transport available. Pick the action you can truthfully deliver now.\n",
+  "records": [
+    {
+      "provider": "claude",
+      "arm": "baseline",
+      "axis": "output correctness with supplied context; automatic routing NOT_RUN",
+      "exit_code": 0,
+      "answer": "```json\n[{\"id\":\"A\",\"kind\":\"native_link\",\"url\":\"fabric-dashboards://service/example-agent.default?path=%2Fdashboard\",\"device_id\":\"workstation\",\"status\":\"ready\"}]\n```\n\n```json\n[{\"id\":\"B\",\"kind\":\"browser_link\",\"url\":\"http://127.0.0.1:47195/dashboard\",\"device_id\":\"workstation\",\"status\":\"ready_fallback_after_open_failed\"}]\n```\n\n```json\n[{\"id\":\"C\",\"kind\":\"unavailable\",\"url\":null,\"device_id\":\"workstation\",\"status\":\"remote_open_transport_unavailable\"}]\n```",
+      "is_error": false,
+      "judgments": [
+        {
+          "case": "A",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        },
+        {
+          "case": "B",
+          "axis": "output correctness",
+          "verdict": "FAIL"
+        },
+        {
+          "case": "C",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        }
+      ],
+      "format_verdict": "FAIL: requested one array, received multiple fenced arrays",
+      "routing_verdict": "NOT_RUN: reference supplied explicitly; automatic activation not measured"
+    },
+    {
+      "provider": "claude",
+      "arm": "with_reference",
+      "axis": "output correctness with supplied context; automatic routing NOT_RUN",
+      "exit_code": 0,
+      "answer": "```json\n[\n  {\n    \"id\": \"A\",\n    \"kind\": \"native_link\",\n    \"url\": \"fabric-dashboards://service/example-agent.default?path=%2Fdashboard\",\n    \"device_id\": null,\n    \"status\": \"allowed: url совпадает с resolved open_link, host available, viewer=target=workstation; executable gate NOT_RUN, проверка выполнена вручную\"\n  },\n  {\n    \"id\": \"B\",\n    \"kind\": \"unavailable\",\n    \"url\": null,\n    \"device_id\": null,\n    \"status\": \"open_failed: хост установлен, значит он не absent; переход на HTTP в браузере запрещён, сообщить об ошибке открытия\"\n  },\n  {\n    \"id\": \"C\",\n    \"kind\": \"unavailable\",\n    \"url\": null,\n    \"device_id\": null,\n    \"status\": \"no_remote_transport: viewer=phone, target=workstation; custom scheme и localhost на телефоне не откроют компьютер; для диагностики можно отдельно дать копируемый URI с пометкой target=workstation, но это не open action\"\n  }\n]\n```",
+      "is_error": false,
+      "judgments": [
+        {
+          "case": "A",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        },
+        {
+          "case": "B",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        },
+        {
+          "case": "C",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        }
+      ],
+      "format_verdict": "PASS",
+      "routing_verdict": "NOT_RUN: reference supplied explicitly; automatic activation not measured"
+    },
+    {
+      "provider": "codex",
+      "arm": "baseline",
+      "axis": "output correctness with supplied context; automatic routing NOT_RUN",
+      "exit_code": 0,
+      "answer": "[\n  {\n    \"id\": \"A\",\n    \"kind\": \"native_link\",\n    \"url\": \"fabric-dashboards://service/example-agent.default?path=%2Fdashboard\",\n    \"device_id\": null,\n    \"status\": \"available\"\n  },\n  {\n    \"id\": \"B\",\n    \"kind\": \"browser_link\",\n    \"url\": \"http://127.0.0.1:47195/dashboard\",\n    \"device_id\": null,\n    \"status\": \"fallback_available_not_executed\"\n  },\n  {\n    \"id\": \"C\",\n    \"kind\": \"unavailable\",\n    \"url\": null,\n    \"device_id\": null,\n    \"status\": \"remote_open_unavailable_workstation_localhost_not_accessible_from_phone\"\n  }\n]",
+      "item_types": [
+        "error",
+        "error",
+        "agent_message"
+      ],
+      "tool_items": 0,
+      "item_errors": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Under-development features enabled: skip_host_skill_discovery. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in <home>/.codex/config.toml."
+        },
+        {
+          "id": "item_1",
+          "type": "error",
+          "message": "Exceeded skills context budget. All skill descriptions were removed and 215 additional skills were not included in the model-visible skills list."
+        }
+      ],
+      "errors": [],
+      "judgments": [
+        {
+          "case": "A",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        },
+        {
+          "case": "B",
+          "axis": "output correctness",
+          "verdict": "FAIL"
+        },
+        {
+          "case": "C",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        }
+      ],
+      "format_verdict": "PASS",
+      "routing_verdict": "NOT_RUN: reference supplied explicitly; automatic activation not measured"
+    },
+    {
+      "provider": "codex",
+      "arm": "with_reference",
+      "axis": "output correctness with supplied context; automatic routing NOT_RUN",
+      "exit_code": 0,
+      "answer": "[\n  {\n    \"id\": \"A\",\n    \"kind\": \"native_link\",\n    \"url\": \"fabric-dashboards://service/example-agent.default?path=%2Fdashboard\",\n    \"device_id\": \"workstation\",\n    \"status\": \"resolved; executable gate NOT_RUN\"\n  },\n  {\n    \"id\": \"B\",\n    \"kind\": \"unavailable\",\n    \"url\": null,\n    \"device_id\": \"workstation\",\n    \"status\": \"open_failed; installed host is not absent; no browser fallback or tool execution\"\n  },\n  {\n    \"id\": \"C\",\n    \"kind\": \"unavailable\",\n    \"url\": null,\n    \"device_id\": \"workstation\",\n    \"status\": \"remote-open transport unavailable; no executable action deliverable on phone\"\n  }\n]",
+      "item_types": [
+        "error",
+        "error",
+        "agent_message"
+      ],
+      "tool_items": 0,
+      "item_errors": [
+        {
+          "id": "item_0",
+          "type": "error",
+          "message": "Under-development features enabled: skip_host_skill_discovery. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in <home>/.codex/config.toml."
+        },
+        {
+          "id": "item_1",
+          "type": "error",
+          "message": "Exceeded skills context budget. All skill descriptions were removed and 154 additional skills were not included in the model-visible skills list."
+        }
+      ],
+      "errors": [],
+      "judgments": [
+        {
+          "case": "A",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        },
+        {
+          "case": "B",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        },
+        {
+          "case": "C",
+          "axis": "output correctness",
+          "verdict": "PASS"
+        }
+      ],
+      "format_verdict": "PASS",
+      "routing_verdict": "NOT_RUN: reference supplied explicitly; automatic activation not measured"
+    }
+  ],
+  "provider_versions": {
+    "claude": "2.1.286 (Claude Code)",
+    "codex": "codex-cli 0.159.3"
+  },
+  "limits": [
+    "Three frozen supplied-context cases only; one sample per arm, no general success-rate inference.",
+    "Codex emitted unstable-feature and skills-context-budget warnings. Those are retained separately from output judgments.",
+    "Earlier harness attempt completed model calls but failed saving its report; corrected harness reran arms. No improvement inferred from the harness error."
+  ]
+}

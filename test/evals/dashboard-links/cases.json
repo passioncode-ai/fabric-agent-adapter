@@ -1,0 +1,196 @@
+{
+  "scope": "frozen structured handoff artifacts, not measured model outputs",
+  "cases": [
+    {
+      "id": "native-primary",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1"
+        }
+      },
+      "expected_ok": true
+    },
+    {
+      "id": "installed-raw-http",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "failed-is-not-absent",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "unknown"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "phone-localhost",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "not_installed"
+        },
+        "target_device": "workstation",
+        "viewer_device": "phone",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "confirmed-absent",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "not_installed"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": true
+    },
+    {
+      "id": "never-fallback",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "not_installed"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "never",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "wrong-instance",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.preview?path=%2Fdashboard%23%2Fjobs%2F1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "phone-native",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "phone",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "addressed-remote-action",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "phone",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "remote_open",
+          "device_id": "workstation",
+          "service": "example-agent.default",
+          "path": "/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": true
+    }
+  ]
+}
