@@ -10,7 +10,7 @@
 | `KeepAlive` | `true` | `{SuccessfulExit:false}` leaves a cleanly exited service down |
 | `ThrottleInterval` | `10` | bounds a crash loop |
 | `ExitTimeOut` | drain time + margin (40 s default) | SIGKILL arrives after it |
-| `ProcessType` | `Background` | scheduler hint |
+| `ProcessType` | `Standard` — never `Background`, and no `Nice` > 0 or `LowPriorityIO` | a host probes the service and agents call it while the Mac is busy; a background job is starved for tens of seconds under load and every host reports an outage that never happened (the probe's `lifecycle.priority` rule fails it) |
 | `EnvironmentVariables` | `PATH` set explicitly; `*_FILE` paths to secrets | never a secret value — the plist is world-readable in backups |
 | `StandardOutPath`/`StandardErrorPath` | `~/Library/Logs/<id>/service.log` | one place the host tails |
 

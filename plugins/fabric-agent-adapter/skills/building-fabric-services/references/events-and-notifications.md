@@ -26,11 +26,32 @@ The feed is a view: never copy rows into a second store that can drift from the 
 
 ## When to set `notify: true`
 
-Notify when the operator must act (an approval is waiting, a key expired, a job failed
-after retries) or asked to be told (a long job finished). Do not notify for routine
-progress, retries that will succeed, or anything that fires more than a few times an
-hour. The host decides whether to show it — quiet hours, per-service settings — and
-debounces; the service decides only what is notification-worthy.
+`notify: true` asks the host to interrupt the operator. Hosts treat it as a request, not an
+order: Fabric Dashboards shows a banner only for a **decision**, a **failure** or a **warning**,
+once per episode, and puts everything else in Activity (its ADR-0010). Write events so that rule
+lands on what matters:
+
+| The operator… | Event | `notify` |
+|---|---|---|
+| must decide or act — a choice, an approval, a key to enter | kind says it: `job.awaiting_choice`, `plan.awaiting_approval`, `human_step.opened`; level `notice` | `true` |
+| lost work — a job failed after its retries, a key expired | level `error`; kind `*.failed`, `*.expired` | `true` |
+| will lose work soon — a degraded source that blocks orders | level `warning`, `service.degraded`, **once when it starts** | `true` |
+| asked to be told when a long job finishes | `job.delivered`, level `notice` | `true` only if that person asked; a host may still keep it in Activity |
+| only needs the record — progress, retries, recoveries, syncs | `job.started`, `service.recovered`, `*.cleared`, level `info` or `notice` | `false` |
+
+- **One episode, one request.** Notify on the transition, never on each poll: a source that
+  flaps between degraded and healthy sends `service.degraded` with `notify: true` once, and later
+  repeats with `notify: false` until it has stayed healthy for a while. Asking the same question
+  about the same subject again is not news.
+- **Say who wants what.** `subject` names the thing (`{type: "job", id: "…", label: "Q3 report"}`)
+  so a host can tell episodes apart and group; `text` names the object and what the operator
+  should do ("The storyboard of the Q3 launch video waits for your decision."); `link` opens the
+  page where they do it. The host adds the agent's name and instance.
+- **One channel.** A service with a descriptor raises no banners of its own (AppleScript
+  `display notification`, a notifier binary, its own notification-centre entries): the operator
+  would get each one twice, from a sender that is not the host. Publish the event; the host
+  delivers it, honouring quiet hours and per-service settings.
+- Anything that would fire more than a few times an hour is not a notification.
 
 ## Lifecycle events every service emits
 

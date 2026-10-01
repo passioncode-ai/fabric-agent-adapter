@@ -39,6 +39,36 @@ import fabric_interop as fi  # noqa: E402
 Result = Dict[str, str]
 
 
+
+def plist_problems(plist: dict, label: object, token: object = None) -> list:
+    """What makes a service's launchd job unfit to stay up: identity, restart, secrets."""
+    problems = []
+    if plist.get("Label") != label:
+        problems.append("Label %r" % plist.get("Label"))
+    if plist.get("RunAtLoad") is not True:
+        problems.append("RunAtLoad is not true")
+    if plist.get("KeepAlive") is not True:
+        problems.append("KeepAlive is %r, not true" % plist.get("KeepAlive"))
+    for key, value in (plist.get("EnvironmentVariables") or {}).items():
+        if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)$", key) and not key.endswith("_FILE"):
+            problems.append("secret-like variable %s in the plist" % key)
+        if token and token in str(value):
+            problems.append("the service token itself is in the plist")
+    return problems
+
+
+def priority_problems(plist: dict) -> list:
+    """A service that answers hosts and agents must not be scheduled as background work."""
+    out = []
+    if plist.get("ProcessType", "Standard") in ("Background", "Adaptive"):
+        out.append("ProcessType is %s" % plist.get("ProcessType"))
+    if isinstance(plist.get("Nice"), int) and plist["Nice"] > 0:
+        out.append("Nice is %d" % plist["Nice"])
+    if plist.get("LowPriorityIO") is True or plist.get("LowPriorityBackgroundIO") is True:
+        out.append("low-priority I/O")
+    return out
+
+
 class Probe:
     def __init__(self, descriptor_path: Path, descriptor: Dict[str, Any], services_dir: Path, skip_login: bool):
         self.path = descriptor_path
@@ -416,19 +446,12 @@ class Probe:
         except (OSError, ValueError) as exc:
             self.add("lifecycle.plist", "FAIL", "cannot read %s: %s" % (plist_path, exc))
             return
-        problems = []
-        if plist.get("Label") != life.get("label"):
-            problems.append("Label %r" % plist.get("Label"))
-        if plist.get("RunAtLoad") is not True:
-            problems.append("RunAtLoad is not true")
-        if plist.get("KeepAlive") is not True:
-            problems.append("KeepAlive is %r, not true" % plist.get("KeepAlive"))
-        for key, value in (plist.get("EnvironmentVariables") or {}).items():
-            if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)$", key) and not key.endswith("_FILE"):
-                problems.append("secret-like variable %s in the plist" % key)
-            if self.token and self.token in str(value):
-                problems.append("the service token itself is in the plist")
+        problems = plist_problems(plist, life.get("label"), self.token)
         self.add("lifecycle.plist", "FAIL" if problems else "PASS", "; ".join(problems) or "%s: RunAtLoad, KeepAlive, no secrets" % plist_path.name)
+        slow = priority_problems(plist)
+        self.add("lifecycle.priority", "FAIL" if slow else "PASS",
+                 "; ".join(slow) + " — macOS may starve the service under load and hosts then see an outage; use ProcessType Standard"
+                 if slow else "%s: scheduled as a standard process" % plist_path.name)
         if not shutil.which("launchctl"):
             self.add("lifecycle.one-copy", "NOT_RUN", "launchctl is not available")
             return
