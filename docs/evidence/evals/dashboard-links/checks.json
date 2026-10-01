@@ -32,6 +32,23 @@
       "automatic_routing": "NOT_RUN"
     }
   ],
-  "fresh_checkout": "PENDING",
+  "fresh_checkout": {
+    "commit": "232fd94e3b08ea00af077e3f3c60d8422301eff4",
+    "checks": [
+      {
+        "command": "git clone remote branch",
+        "exit_code": 0
+      },
+      {
+        "command": "python3 test/validate.py",
+        "exit_code": 0
+      },
+      {
+        "command": "python3 -m unittest discover -s test -p test_dashboard_links.py",
+        "exit_code": 0
+      }
+    ],
+    "status": "PASS"
+  },
   "hosted_ci": "NOT_RUN (nightly policy)"
 }
