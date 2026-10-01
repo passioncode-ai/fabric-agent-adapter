@@ -30,10 +30,10 @@ installed host failure as browser fallback. See the
   The first harness run failed writing its receipt; corrected reruns are recorded,
   not retroactively labelled a successful harness run.
 
-## Boundaries and next task
+## Implementation-stage boundaries (superseded by release below)
 
-No version bump, tag, npm publish or installed-skill/cache replacement. Published
-0.5.5 remains unchanged. The gate validates structured actions with trusted host
+At the initial implementation handoff there was no version bump, tag, npm publish
+or installed-skill replacement. The operator then requested completion and installation. The gate validates structured actions with trusted host
 context; it is not a host hook, discovery, authentication, transport or a scan of
 all free-form final answers. A generated managed renderer must actually call it.
 A headless provider needs no dashboard. No Fabric contract revision change.
@@ -48,3 +48,24 @@ release); building-fabric-services contract. AGENTS.md and knowledge rules read.
 No shared guarded registry edits here, no leases required. Local-only: account
 state, model CLI sessions/config, temporary MCP credentials and dependency trees.
 No test service retained. Dated eval artifacts use neutral public examples only.
+
+## Release 0.5.6
+
+Integrated [PR #22](https://github.com/passioncode-ai/fabric-agent-adapter/pull/22)
+as `1b473987feeeb04ee67a1122d6baadc83bc03816`; annotated tag `v0.5.6`.
+[GitHub release](https://github.com/passioncode-ai/fabric-agent-adapter/releases/tag/v0.5.6)
+and [release workflow 36904135102](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/36904135102)
+completed successfully, including validation, packed installer smoke and npm publication.
+Version metadata is synchronized across the npm package, marketplace, plugin, all
+three skills, validator and skill card. The Fabric contract pin remains 0.1.0.
+
+The release candidate repeated `npm test`: 136 Python tests (one opt-in skip),
+15 Node tests, validator and both strict Claude plugin checks passed.
+Installed-byte and registry receipts are recorded in `dashboard-links-release.json`.
+
+Remaining integration: the future communicator renderer must call the checker;
+remote device transport and the lifecycle broker are separate modules. Already
+running agent sessions retain their loaded skill context until restarted.
+
+Release route: task-pipeline, make-skill release, agent-sync for CHANGELOG.md.
+The initial no-release boundary above records the earlier stage, not current status.

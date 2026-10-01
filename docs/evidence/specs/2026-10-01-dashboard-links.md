@@ -1,6 +1,6 @@
 # Dashboard handoff rule and portable gate
 
-Authorized scope: retrofit the three existing Fabric skills and their generated
+Initial authorized scope (extended to release/install by the operator on 2026-10-01): retrofit the three existing Fabric skills and their generated
 agent/service handoff instructions. No release, cache replacement, protocol pin
 change or new globally active hook. Skills cannot force every host's final answer.
 

@@ -1,0 +1,79 @@
+{
+  "name": "@passioncode-ai/fabric-agent-adapter",
+  "version": "0.5.6",
+  "tarball": "https://registry.npmjs.org/@passioncode-ai/fabric-agent-adapter/-/fabric-agent-adapter-0.5.6.tgz",
+  "integrity": "sha512-V4hpZ8/HQ+QAxuEdooL5/4lKktEj3/xgcQ/t4CXMD7JeDlyKOAKk46aTOB1RDWUyHZRp+YYYPG6DqUBxbu/QOg==",
+  "bytes": 103910,
+  "result": "served and verified",
+  "observed_at": "2026-10-01T18:14:46.527437+00:00",
+  "source_commit": "1b473987feeeb04ee67a1122d6baadc83bc03816",
+  "release_workflow": 36904135102,
+  "release_workflow_result": "success",
+  "installed_via": "@passioncode-ai/passioncode@0.1.17 update",
+  "installed_gates": [
+    {
+      "skill": "building-fabric-services",
+      "channel": "hub",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "building-fabric-services",
+      "channel": "codex",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "building-fabric-services",
+      "channel": "claude-plugin",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "creating-fabric-agents",
+      "channel": "hub",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "creating-fabric-agents",
+      "channel": "codex",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "creating-fabric-agents",
+      "channel": "claude-plugin",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "adapting-projects-to-fabric",
+      "channel": "hub",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "adapting-projects-to-fabric",
+      "channel": "codex",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    },
+    {
+      "skill": "adapting-projects-to-fabric",
+      "channel": "claude-plugin",
+      "byte_match": true,
+      "gate_cases": 9,
+      "pass": true
+    }
+  ],
+  "already_running_sessions": "restart required; global automatic activation not claimed"
+}
