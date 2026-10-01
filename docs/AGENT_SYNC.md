@@ -1,4 +1,4 @@
-<!-- agent-sync:generated source=fabric-agent-adapter@358c529 cfg=7e659db26ca8 at=2026-09-30T23:50:30Z — regenerate with `agent_sync.py setup`, do not hand-edit -->
+<!-- agent-sync:generated source=fabric-agent-adapter@2494421 cfg=fdcf545589d0 at=2026-10-01T15:52:09Z — regenerate with `agent_sync.py setup`, do not hand-edit -->
 
 # How documentation and coordination work in fabric-agent-adapter
 
@@ -29,6 +29,8 @@ None declared here. Ids live in the parent repository; reserve them there.
 
 - `fabric-contract.lock.json`
 - `CHANGELOG.md`
+- `docs/backlog-sources.json`
+- `docs/backlog.md`
 
 ### Gates run before a change is considered done
 

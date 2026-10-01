@@ -9,7 +9,9 @@
   "idRegisters": {},
   "guardedFiles": [
     "fabric-contract.lock.json",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/backlog-sources.json",
+    "docs/backlog.md"
   ],
   "claimTags": {},
   "gates": [
