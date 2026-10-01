@@ -25,6 +25,7 @@ def load(name):
 
 
 fs = load("fabric_service")
+check = load("check_service")
 
 
 def free_port():
@@ -209,6 +210,16 @@ class DocumentTests(unittest.TestCase):
                                                 stdout_path=Path("/tmp/l"), environment={"TOKEN_FILE": "/t"}))
         self.assertIs(plist["KeepAlive"], True)
         self.assertIs(plist["RunAtLoad"], True)
+        self.assertEqual(plist["ProcessType"], "Standard", "a Background job is starved under load")
+        self.assertEqual(check.priority_problems(plist), [])
+
+    def test_probe_names_a_background_priority_job(self):
+        slow = {"Label": "a.b.c", "RunAtLoad": True, "KeepAlive": True, "ProcessType": "Background", "Nice": 5, "LowPriorityIO": True}
+        self.assertEqual(check.priority_problems(slow), ["ProcessType is Background", "Nice is 5", "low-priority I/O"])
+        self.assertEqual(check.plist_problems(slow, "a.b.c"), [])
+        self.assertEqual(check.priority_problems({"ProcessType": "Interactive"}), [])
+        self.assertEqual(check.plist_problems({"Label": "x", "RunAtLoad": True, "KeepAlive": False}, "a.b.c"),
+                         ["Label 'x'", "KeepAlive is False, not true"])
 
 
 class LiveServiceTests(unittest.TestCase):

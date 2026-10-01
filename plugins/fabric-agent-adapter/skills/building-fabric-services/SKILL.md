@@ -15,7 +15,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.5.6"
+  version: "0.5.7"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "74d3852f122f5ca5cbc4138a201483531dfa5006"
@@ -163,7 +163,10 @@ descriptor's `fabricManifest` at a manifest whose service key names this
 The installer, not the service, owns the plist and the descriptor. Sequence:
 
 1. `write_descriptor(descriptor)` — refuses a port or `id.instance` another descriptor
-   claims. A preview or branch copy is a second **instance**, never a second id.
+   claims. A preview or branch copy is a second **instance**, never a second id — and it is
+   one more service the operator sees, probes and gets notified by. Verify a release with its
+   own doctor or self-check before it replaces `default`; a temporary instance is uninstalled
+   (`launchd_uninstall`, `remove_descriptor`) as soon as its check is done, not left running.
 2. `launchd_plist(...)` then `launchd_install(...)` — writes and lints the plist,
    `bootout` and waits for the unload, `bootstrap` with retries on the transient I/O
    error, then polls the well-known document until it answers with **this** identity.
@@ -183,8 +186,10 @@ others, and every error is a sentence with the next action. Read
 
 The events feed is a **view over the log you already keep** — a jobs table, a JSONL
 journal — not a second store. Each event is one sentence a person reads; set
-`notify: true` only for what the operator must act on or would want to hear about
-unprompted, with a `link` to the page that resolves it. Read
+`notify: true` only when the operator must decide, or something failed or degrades their
+work — once per episode, with a `subject` and a `link` to the page that resolves it. A
+question's kind says so (`*.awaiting_*`, `*.approval_*`, `human_step.opened`). The service
+raises no banners of its own: the host is the one channel. Read
 [the events reference](references/events-and-notifications.md) for mapping an existing
 log, retention and notification policy.
 

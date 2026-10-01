@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.7 - 2026-10-01
+
+### Changed
+
+- **A service is scheduled as a standard process.** `launchd_plist` writes `ProcessType Standard`
+  instead of `Background`, and `references/lifecycle.md` says why: a background job, `Nice` > 0 or
+  low-priority I/O lets macOS starve a service under load for tens of seconds, and every host then
+  reports an outage that never happened (measured on 2026-10-01: two services built from the kit
+  were reported down more than 30 times in a day while their processes ran without a restart). The
+  probe gains a `lifecycle.priority` rule that fails such a plist.
+- **Notifications.** `references/events-and-notifications.md` states when to set `notify: true` —
+  a decision, a failure, a warning that blocks work — once per episode, with a `subject`, a sentence
+  that says what the operator should do and a `link`; questions say so in their kind; a service with
+  a descriptor raises no banners of its own. This matches the host rule in Fabric Dashboards
+  ADR-0010.
+- **Instances.** Step 4 of `building-fabric-services`: a preview or branch instance is uninstalled
+  once its check is done instead of running beside `default`.
+
 ## 0.5.6 - 2026-10-01
 
 ### Changed

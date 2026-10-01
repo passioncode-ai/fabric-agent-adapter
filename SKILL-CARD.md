@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.5.6` |
+| Version | `0.5.7` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `74d3852f122f5ca5cbc4138a201483531dfa5006` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -24,7 +24,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.5.6` |
+| Version | `0.5.7` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `74d3852f122f5ca5cbc4138a201483531dfa5006` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
@@ -46,7 +46,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.5.6` |
+| Version | `0.5.7` |
 | Plugin | `fabric-agent-adapter` |
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `74d3852f122f5ca5cbc4138a201483531dfa5006` |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |

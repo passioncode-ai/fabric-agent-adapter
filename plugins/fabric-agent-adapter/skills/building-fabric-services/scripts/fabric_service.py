@@ -596,7 +596,10 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
         "KeepAlive": True,
         "ThrottleInterval": 10,
         "ExitTimeOut": exit_timeout,
-        "ProcessType": "Background",
+        # Standard, never Background: a host probes the service and agents call it while the Mac
+        # is busy; Background (and Nice/LowPriorityIO) lets macOS starve it for tens of seconds
+        # under load, and every host then reports an outage that never happened.
+        "ProcessType": "Standard",
         "StandardOutPath": str(stdout_path),
         "StandardErrorPath": str(stdout_path),
         "EnvironmentVariables": env,
