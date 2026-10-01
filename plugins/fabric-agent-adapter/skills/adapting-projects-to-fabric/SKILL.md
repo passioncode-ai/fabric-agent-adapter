@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.5.5"
+  version: "0.5.6"
   contract-version: "0.1.0"
   contract-commit: "74d3852f122f5ca5cbc4138a201483531dfa5006"
 ---
@@ -213,3 +213,15 @@ Report:
 
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates
 passed against a real provider and the project binding is valid.
+
+## Dashboard handoff — also for consumers
+
+When handing a registered service dashboard to a person, or writing the generated
+agent's completion/notification instructions, read and apply
+[dashboard links](references/dashboard-links.md): use the host's `open_link`,
+check the target device and host, and run the bundled output gate before delivery.
+An installed host failure never means browser fallback. This applies in Claude
+Code, Codex and other providers; it needs no host-specific hook. MCP unavailable:
+report the unresolved capability or use an approved project resolver; no automatic
+client configuration. Python unavailable: perform the reference's manual checks
+and report the executable gate NOT_RUN. Headless agents need no dashboard.

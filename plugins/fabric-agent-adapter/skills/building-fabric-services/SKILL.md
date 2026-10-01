@@ -1,7 +1,7 @@
 ---
 name: building-fabric-services
 description: >-
-  Use when building or running an agent as a long-lived local service with a dashboard on
+  Use when handing out or opening a Fabric service dashboard, or building a local agent service on
   a macOS machine — «сделай агенту дашборд», «локальный сервис агента», «дашборд должен всегда
   работать и не плодить копии», «где агенту хранить настройки», «подключи агента к Fabric
   Dashboards», "make this agent a local service", "always-on dashboard", "fabric-service
@@ -12,10 +12,10 @@ description: >-
   reference kits and a live conformance probe. NOT for a one-off script or cron job, a hosted
   SaaS, the provider manifest itself (adapting-projects-to-fabric), or building Fabric Dashboards.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
-compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). No network or package install; the contract checkout is optional.
+compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.5.5"
+  version: "0.5.6"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "74d3852f122f5ca5cbc4138a201483531dfa5006"
@@ -275,3 +275,15 @@ Report: the `id`, port and surfaces with the Step 0 answers; files created or ch
 the probe table verbatim with every `NOT_RUN` explained; the lock and kill-9 results
 with pids; and the one next command. Never call a service conformant while the probe
 reports a `FAIL`.
+
+## Dashboard handoff — also for consumers
+
+When handing a registered service dashboard to a person, or writing the generated
+agent's completion/notification instructions, read and apply
+[dashboard links](references/dashboard-links.md): use the host's `open_link`,
+check the target device and host, and run the bundled output gate before delivery.
+An installed host failure never means browser fallback. This applies in Claude
+Code, Codex and other providers; it needs no host-specific hook. MCP unavailable:
+report the unresolved capability or use an approved project resolver; no automatic
+client configuration. Python unavailable: perform the reference's manual checks
+and report the executable gate NOT_RUN. Headless agents need no dashboard.

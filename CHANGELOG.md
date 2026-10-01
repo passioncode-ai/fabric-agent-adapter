@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.6 - 2026-10-01
+
+### Changed
+
+- All three skills carry the dashboard handoff procedure: resolve the exact service instance, prefer its native `open_link`, check host availability, and refuse browser fallback after an installed-host failure. Remote viewers require an addressed transport.
+- A portable structured-output checker validates native links, confirmed-absence browser fallback and remote-open requests before handoff. It does not open links or grant authority.
+- [Evidence](docs/handoffs/2026-10-01-dashboard-links.md) includes regression fixtures and supplied-context Claude Code/Codex comparisons. Automatic skill activation across all sessions is not established.
+
 ## 0.5.5 - 2026-10-01
 
 ### Changed

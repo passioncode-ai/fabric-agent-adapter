@@ -88,6 +88,22 @@
     {
       "query": "Write a generic OpenTelemetry exporter for our Kubernetes cluster.",
       "shouldTrigger": false
+    },
+    {
+      "query": "Give me the dashboard link for the registered Fabric service example-agent.default.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Open this Fabric service dashboard in the installed Fabric Dashboards application.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Print the API base URL for this hosted SaaS integration.",
+      "shouldTrigger": false
+    },
+    {
+      "query": "Add an OAuth callback URL to a hosted login flow.",
+      "shouldTrigger": false
     }
   ]
 }
