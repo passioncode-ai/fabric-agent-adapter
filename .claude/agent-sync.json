@@ -1,0 +1,26 @@
+{
+  "backend": "fs",
+  "leaseBackend": "git",
+  "leaseRemote": "origin",
+  "integrationBranch": "main",
+  "leaseTtlSeconds": 2700,
+  "renewIntervalSeconds": 300,
+  "gated": true,
+  "idRegisters": {},
+  "guardedFiles": [
+    "fabric-contract.lock.json",
+    "CHANGELOG.md"
+  ],
+  "claimTags": {},
+  "gates": [
+    "python3 -m unittest discover -s test -v"
+  ],
+  "mirror": {
+    "enabled": false,
+    "sources": []
+  },
+  "mergeLog": {
+    "file": "docs/MERGES.md",
+    "retentionDays": 7
+  }
+}

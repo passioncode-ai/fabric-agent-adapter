@@ -81,6 +81,15 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
   `--strict-mcp-config` and a temporary config), never only through the kit's own tests.
 - Examples, evals and docs use neutral names (`example-agent`); an agent someone built for
   themselves never appears in them.
+- **Shared registers are edited under a lease.** [docs/AGENT_SYNC.md](docs/AGENT_SYNC.md)
+  (generated from `.claude/agent-sync.json` by `agent_sync.py setup`; never edited by hand) lists
+  the guarded files and the gate. Run `agent_sync.py acquire <file>` before editing one and
+  `agent_sync.py release <file>` after, on every path including failure. The lease is a ref under
+  `refs/agent-sync/leases/` on `origin`, so another contributor's agent sees it
+  (`git ls-remote origin 'refs/agent-sync/leases/*'`); the record plane is local (`fs`), and
+  `.agent-sync/` is git-ignored. No register here carries a "Next free ID" line, so nothing is
+  reserved yet; a register that gains one is declared under `idRegisters` and taken with
+  `agent_sync.py reserve <REG>`.
 
 ## Organisation
 
