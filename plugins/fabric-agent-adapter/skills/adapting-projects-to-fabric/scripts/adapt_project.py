@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 CONTRACT_VERSION = "0.1.0"
 CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"
-CONTRACT_COMMIT = "74d3852f122f5ca5cbc4138a201483531dfa5006"
+CONTRACT_COMMIT = "2ce392291c6668598d12cd38327e24696b5ca15c"
 INTEROP_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"
 A2A_VERSION = "1.0"

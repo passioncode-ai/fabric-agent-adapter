@@ -1,6 +1,7 @@
 // Reference kit for the fabric-service/0.1 local service extension — Node.js 20+, no dependencies.
 // The Node twin of fabric_service.py: same rules, same file formats, interoperable locks.
-// Normative source: fabric-agent-contract docs/specification/service.md (DEC-0015).
+// Normative source: fabric-agent-contract docs/specification/service.md (DEC-0015; the remote
+// placement — an online agent or dashboard at an https origin — DEC-0019).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -16,11 +17,16 @@ export const STATUSES = ['starting', 'ready', 'degraded', 'stopping'];
 export const EVENTS_DEFAULT_LIMIT = 50;
 export const EVENTS_MAX_LIMIT = 200;
 export const SESSION_COOKIE = 'fabric_session';
+// DEC-0019: a remote placement's cookie is host-bound and HTTPS-only.
+export const REMOTE_SESSION_COOKIE = '__Host-fabric_session';
+export const PLACEMENTS = ['local', 'remote'];
 
 const ID = /^[a-z][a-z0-9-]{1,62}$/;
 const INSTANCE = /^[a-z][a-z0-9-]{0,31}$/;
 const KIND = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}$/;
 const ORIGIN = /^http:\/\/127\.0\.0\.1:([0-9]{3,5})$/;
+const REMOTE_ORIGIN = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?::([0-9]{1,5}))?$/;
+const RESERVED_HOST = /(^|\.)(localhost|local|internal|home\.arpa|lan|localdomain)$/;
 const CODE = /^[A-Za-z0-9_-]{16,256}$/;
 const TRACE_ID = /^(?!0{32}$)[0-9a-f]{32}$/;
 const SPAN_ID = /^(?!0{16}$)[0-9a-f]{16}$/;
@@ -212,14 +218,18 @@ export function readDescriptors(dir = servicesDir()) {
 
 export function validateDescriptor(d) {
   const problems = [];
-  for (const key of ['protocol', 'id', 'instance', 'name', 'origin', 'auth', 'lifecycle', 'paths', 'installedAt', 'installedBy']) {
+  const remote = placementOf(d) === 'remote';
+  if (d.placement !== undefined && !PLACEMENTS.includes(d.placement)) problems.push('placement must be local or remote');
+  const required = ['protocol', 'id', 'instance', 'name', 'origin', 'auth', 'lifecycle', 'installedAt', 'installedBy'];
+  for (const key of remote ? required : [...required, 'paths']) {
     if (!(key in d)) problems.push(`missing ${key}`);
   }
   if (problems.length) return problems;
   if (d.protocol !== PROTOCOL) problems.push(`protocol must be ${PROTOCOL}`);
   if (!ID.test(d.id)) problems.push(`id must match ${ID}`);
   if (!INSTANCE.test(d.instance)) problems.push(`instance must match ${INSTANCE}`);
-  if (!ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
+  if (remote) problems.push(...remoteOriginProblems(d.origin));
+  else if (!ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
   if (!d.auth?.tokenFile) problems.push('auth.tokenFile is required');
   if ((d.auth?.header ?? 'Authorization') !== 'Authorization' && (d.auth?.scheme ?? 'Bearer') !== 'none') {
     problems.push('a custom auth header carries the raw token: scheme must be none');
@@ -228,12 +238,31 @@ export function validateDescriptor(d) {
   if (d.lifecycle?.manager === 'launchd' && !(d.lifecycle.label && String(d.lifecycle.plist ?? '').endsWith('.plist'))) {
     problems.push('a launchd service declares label and plist');
   }
+  if (remote) {
+    if (d.lifecycle?.manager !== 'none') problems.push('a remote service is supervised by its platform: lifecycle.manager must be none');
+    for (const field of ['label', 'plist']) if (d.lifecycle?.[field] !== undefined) problems.push(`a remote service has no launchd ${field}`);
+    if (d.commands?.update !== undefined) problems.push('a remote service declares no update command');
+  }
   for (const [name, argv] of Object.entries(d.commands ?? {})) {
     if (!['doctor', 'update'].includes(name)) problems.push(`unknown command ${name}`);
     else if (!Array.isArray(argv) || !argv.length || !argv.every((a) => typeof a === 'string')) problems.push(`command ${name} must be an argument array`);
     else if (!/^(~\/|\/)/.test(argv[0])) problems.push(`command ${name} must start with an absolute or ~/ executable`);
   }
   return problems;
+}
+
+/** DEC-0019: `local` unless the descriptor says `remote`. */
+export function placementOf(d) {
+  return d?.placement === 'remote' ? 'remote' : 'local';
+}
+
+/** Problems with a remote origin: https, a public DNS name, an optional port, nothing else. */
+export function remoteOriginProblems(origin) {
+  const m = REMOTE_ORIGIN.exec(String(origin ?? ''));
+  if (!m) return ['a remote origin must be https://<dns-name>[:<port>] with no path, query or IP literal'];
+  if (RESERVED_HOST.test(m[1])) return [`a remote service cannot live on the reserved name ${m[1]}`];
+  if (m[2] !== undefined && (Number(m[2]) < 1 || Number(m[2]) > 65535)) return ['the origin port is out of range'];
+  return [];
 }
 
 export function portOf(origin) {
@@ -246,10 +275,12 @@ export function writeDescriptor(d, dir = servicesDir()) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
-  const port = portOf(d.origin);
+  // DEC-0019: only a local placement claims a port on this computer.
+  const port = placementOf(d) === 'remote' ? null : portOf(d.origin);
   for (const [file, other] of readDescriptors(dir)) {
     const key = `${other.id}.${other.instance ?? 'default'}`;
     if (key === me) continue;
+    if (port === null) continue; // a remote origin's port is another computer's
     let otherPort = null;
     try { otherPort = portOf(String(other.origin ?? '')); } catch { continue; }
     if (otherPort === port) throw new ServiceError(`Port ${port} is already claimed by ${key} (${file}).`);
@@ -318,25 +349,39 @@ export async function eventsPage(fetch, after, limit) {
 // --- operator login -------------------------------------------------------------------
 
 export class LoginCodes {
-  constructor(stateDir, ttlSeconds = 120) {
-    this.dir = ensurePrivateDir(stateDir);
+  // `stateDir` — a local service keeps codes and the session key in files. An online service
+  // (DEC-0019) usually has no durable disk: pass `stateDir = null` with `{ store, key }` — `store`
+  // like `new MemoryCodeStore()` (a restart forgets every code, so none can be replayed) and
+  // `key` a Buffer from a platform secret, so sessions survive a deploy.
+  constructor(stateDir, ttlSeconds = 120, { store = null, key = null } = {}) {
     this.ttl = Math.min(ttlSeconds, 120);
-    this.keyPath = path.join(this.dir, 'session.key');
-    this.codesPath = path.join(this.dir, 'login-codes.json');
+    this.store = store;
+    this.fixedKey = key;
+    if (stateDir) {
+      this.dir = ensurePrivateDir(stateDir);
+      this.keyPath = path.join(this.dir, 'session.key');
+      this.codesPath = path.join(this.dir, 'login-codes.json');
+    } else if (!store || !key) {
+      throw new ServiceError('LoginCodes without a state directory needs { store, key }.');
+    }
+    if (key && Buffer.from(key).length < 32) throw new ServiceError('the session key must be at least 32 bytes.');
   }
 
   key() {
+    if (this.fixedKey) return Buffer.from(this.fixedKey);
     if (!fs.existsSync(this.keyPath)) atomicWrite(this.keyPath, crypto.randomBytes(32), 0o600);
     return fs.readFileSync(this.keyPath);
   }
 
   load() {
+    if (this.store) return this.store.load();
     try { return JSON.parse(fs.readFileSync(this.codesPath, 'utf8')); } catch { return {}; }
   }
 
   save(codes) {
     const horizon = Date.now() / 1000 - 3600;
     const kept = Object.fromEntries(Object.entries(codes).filter(([, v]) => (v.expires ?? 0) > horizon));
+    if (this.store) { this.store.save(kept); return; }
     atomicWrite(this.codesPath, JSON.stringify(kept), 0o600);
   }
 
@@ -372,11 +417,71 @@ export class LoginCodes {
   }
 
   revokeAll() {
+    if (this.fixedKey) throw new ServiceError('a platform-held session key is rotated on the platform, not here.');
     atomicWrite(this.keyPath, crypto.randomBytes(32), 0o600);
   }
 }
 
+/** DEC-0019: a code store held in memory — for an online service with no durable disk. */
+export class MemoryCodeStore {
+  constructor() { this.codes = {}; }
+  load() { return JSON.parse(JSON.stringify(this.codes)); }
+  save(codes) { this.codes = JSON.parse(JSON.stringify(codes)); }
+}
+
 export const sessionCookieHeader = (value, maxAge = 30 * 86400) => `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+/** DEC-0019: the remote cookie — `__Host-` name, Secure, no Domain, Path=/. */
+export const remoteSessionCookieHeader = (value, maxAge = 30 * 86400) => `${REMOTE_SESSION_COOKIE}=${value}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+
+/**
+ * DEC-0019: the request guard of an online service. `origin` is the service's own origin
+ * (`https://agent.example.com`). `forwardedProto` is the platform-set scheme where TLS ends
+ * before the process (`x-forwarded-proto`); pass `undefined` when the process terminates TLS.
+ * Returns the refusal sentence, or null.
+ */
+export function checkRemoteRequest(origin, host, requestOrigin, secFetchSite, forwardedProto) {
+  const own = new URL(origin);
+  if (String(host ?? '').toLowerCase() !== own.host) return `Host ${host} is not this service.`;
+  if (forwardedProto !== undefined && forwardedProto !== null && String(forwardedProto).split(',')[0].trim() !== 'https') return 'This service answers over https only.';
+  if (requestOrigin !== undefined && requestOrigin !== null && requestOrigin !== own.origin) return `Origin ${requestOrigin} is not this service.`;
+  if (secFetchSite === 'cross-site') return 'Cross-site requests are refused.';
+  return null;
+}
+
+/**
+ * DEC-0019: may this request read the well-known document? A local service answers anyone (the
+ * loopback guard already ran); a remote one only the bearer of the service token. A `false`
+ * answer is a `401` with an EMPTY body — nothing about the service is disclosed.
+ */
+export function wellKnownAllowed(placement, authorization, token, scheme = 'Bearer') {
+  return placement !== 'remote' || tokenMatches(authorization, token, scheme);
+}
+
+/** The token directory a host-side installer uses for remote services on this computer. */
+export function remoteTokenFile(id, instance = 'default', dir = servicesDir()) {
+  return path.join(path.dirname(dir), 'tokens', `${id}.${instance}.token`);
+}
+
+/**
+ * DEC-0019, installer side: register an online service on THIS computer. Writes the token file
+ * (0600, never printed) and the descriptor; the same token must be set on the hosting platform as
+ * a secret. Returns the descriptor path. `token` is read from the caller — a file or stdin —
+ * never from an argument vector.
+ */
+export function registerRemote({ id, instance = 'default', name, summary, origin, token, doctor, dir = servicesDir(), installedBy = 'fabric-service register-remote' }) {
+  if (!token || String(token).trim().length < 16) throw new ServiceError('the service token must be at least 16 characters.');
+  const tokenFile = remoteTokenFile(id, instance, dir);
+  const d = {
+    protocol: PROTOCOL, id, instance, name, ...(summary ? { summary } : {}), placement: 'remote', origin,
+    auth: { tokenFile }, lifecycle: { manager: 'none' }, ...(doctor ? { commands: { doctor } } : {}),
+    installedAt: nowIso(), installedBy,
+  };
+  const problems = validateDescriptor(d);
+  if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
+  ensurePrivateDir(path.dirname(tokenFile));
+  atomicWrite(tokenFile, String(token).trim(), 0o600);
+  return writeDescriptor(d, dir);
+}
 
 export function cookieValue(header, name = SESSION_COOKIE) {
   for (const part of String(header ?? '').split(';')) {

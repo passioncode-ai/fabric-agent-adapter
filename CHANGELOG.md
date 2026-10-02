@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.0 - 2026-10-02
+
+### Added
+
+- **Online agents and dashboards become Fabric services** — the remote placement of
+  `fabric-service/0.1` (Fabric Agent Contract DEC-0019). `building-fabric-services` gains the
+  section *Online services — the remote placement* and `references/remote-placement.md`; its
+  boundary no longer excludes an online agent, only a hosted product with no agent behind it.
+- **Kits (Node and Python, the same rules):** `checkRemoteRequest` / `check_remote_request` (Host,
+  Origin, cross-site, a forwarded scheme that is not https), `wellKnownAllowed` /
+  `well_known_allowed` (the well-known document only for the token, `401` with an empty body
+  otherwise), `remoteSessionCookieHeader` (`__Host-fabric_session`, `Secure`), `MemoryCodeStore`
+  and `LoginCodes(null, …, { store, key })` for a service with no durable disk and a session key
+  held by its platform, `registerRemote` / `register_remote` (token file 0600 + descriptor on the
+  operator's computer), placement-aware `validateDescriptor` and port claims.
+- **`scripts/sample-remote-service.mjs`** — a complete online service, with its own TLS or behind
+  a platform router.
+- **The probe checks a remote service** over TLS with the certificate verified (`--ca-file`,
+  `--connect` for tests): `well-known.requires-token`, the guards, events, the single-use login and
+  `login.cookie-host-bound`; launchd, lock and loopback rules are `NOT_RUN` with that reason.
+
+### Changed
+
+- **Contract pin** moves from `74d3852` to `2ce3922` (DEC-0019 merged).
+
 ## 0.5.7 - 2026-10-01
 
 ### Changed
