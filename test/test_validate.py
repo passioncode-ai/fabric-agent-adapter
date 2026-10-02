@@ -256,10 +256,18 @@ class LicenseTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("package.json files whitelist must ship COMMERCIAL-LICENSE.md", out)
 
-    def test_a_pr_template_without_the_cla_box_fails(self):
+    def test_a_pr_template_without_the_cla_sentence_fails(self):
         code, out = self._validate_copy(lambda copy: (copy / ".github/pull_request_template.md").write_text("## What changes\n", encoding="utf-8"))
         self.assertEqual(code, 1)
-        self.assertIn("I agree to CLA.md", out)
+        self.assertIn("opening the pull request means agreeing to CLA.md", out)
+
+    def test_a_pr_template_with_a_cla_checkbox_fails(self):
+        def mutate(copy):
+            p = copy / ".github/pull_request_template.md"
+            p.write_text(p.read_text(encoding="utf-8") + "\n- [ ] I agree to CLA.md for this contribution.\n", encoding="utf-8")
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1)
+        self.assertIn("must not ask anyone to tick a CLA checkbox", out)
 
 
 class RepositoryStandardTests(unittest.TestCase):

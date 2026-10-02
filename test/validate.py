@@ -25,7 +25,7 @@ FIRST_AGPL_VERSION = "0.5.3"
 TEMPLATE_SHA256 = {
     "LICENSE": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
     "COMMERCIAL-LICENSE.md": "9bd2312a9dc20d13aab5af26d63d943aa03c304febf42a32160a205496a9155f",
-    "CLA.md": "e78a221a2a9573770591fac8d388dca8e7a84f90dae138d4fd2366afbf83175a",
+    "CLA.md": "cf44ce2b052fd75e9ef48f8124fb6eed71513c9152aac90eede0a2132951e408",
 }
 EXPECTED_FILES = tuple(
     [
@@ -532,8 +532,11 @@ def validate_repo() -> List[str]:
                    "contact@passioncode.ai", "Versions before %s were released under" % FIRST_AGPL_VERSION):
         if needle not in license_section:
             errors.append("README.md ## License must carry the licensing wording: %r" % needle)
-    if "I agree to CLA.md" not in (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8"):
-        errors.append("the PR template must carry the 'I agree to CLA.md' checkbox")
+    pr_template = (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8")
+    if "means you agree to the repository's `CLA.md`" not in pr_template:
+        errors.append("the PR template must say that opening the pull request means agreeing to CLA.md")
+    if re.search(r"- \[[ xX]\][^\n]*CLA", pr_template):
+        errors.append("the PR template must not ask anyone to tick a CLA checkbox")
     if "CLA.md" not in (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8"):
         errors.append("CONTRIBUTING.md must say contributions are accepted under CLA.md")
     if pkg.get("license") != LICENSE_SPDX:
