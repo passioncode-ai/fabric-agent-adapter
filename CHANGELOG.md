@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The probe speaks MCP 2026-07-28 Streamable HTTP headers.** `check_service.py` sent no
+  `Mcp-Method` or `Mcp-Name`, so a server that validates them (as the spec requires of a server
+  that reads the body, and as SDK v2 servers do) answered `400 HeaderMismatch` (`-32020`) and the
+  probe failed `interop.tools-match` and `interop.unknown-job` against a healthy service. Every
+  MCP POST now derives the headers from its own JSON-RPC body: `Mcp-Method` from `method` on
+  requests and notifications, `Mcp-Name` from `params.name` (`tools/call`, `prompts/get`) or
+  `params.uri` (`resources/read`), with the spec's `=?base64?…?=` encoding for a value that is not
+  plain header-safe ASCII.
+- **Legacy servers.** A 400/404/405 whose body is not a modern JSON-RPC error (`-32020`, `-32021`,
+  `-32022`, `-32601`) marks an initialize-based server (2025-11-25 and earlier): the probe opens a
+  session with `initialize` and `notifications/initialized`, sends `Mcp-Session-Id` and the
+  negotiated `MCP-Protocol-Version`, and keeps that era for the rest of the run. A modern error is
+  reported with its code and message instead of being fallen back from.
+- Regression: `test/test_mcp_probe_headers.py` runs the probe against a local strict server that
+  refuses absent or mismatched headers, a legacy session server, and a server that refuses every
+  version, and pins the spec's encoding table.
+
 ## 0.5.7 - 2026-10-01
 
 ### Changed

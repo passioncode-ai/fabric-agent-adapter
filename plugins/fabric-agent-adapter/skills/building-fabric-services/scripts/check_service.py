@@ -17,6 +17,7 @@ exist. They never call a capability.
 from __future__ import annotations
 
 import argparse
+import base64
 import errno
 import http.client
 import json
@@ -37,6 +38,67 @@ import fabric_service as fs  # noqa: E402
 import fabric_interop as fi  # noqa: E402
 
 Result = Dict[str, str]
+
+# MCP 2026-07-28 Streamable HTTP mirrors body fields into headers (transports/streamable-http,
+# "Standard Request Headers"): Mcp-Method on every request, Mcp-Name on the named methods. A server
+# that processes the body MUST refuse a missing or mismatched one with 400 and HeaderMismatch.
+MCP_NAMED_METHODS = {"tools/call": "name", "prompts/get": "name", "resources/read": "uri"}
+# Errors only a modern server returns: HeaderMismatch, MissingRequiredClientCapability,
+# UnsupportedProtocolVersion, and Method not found. A 4xx carrying one of them is never a reason
+# to fall back to `initialize` (spec: Backward Compatibility).
+MODERN_ERROR_CODES = (-32020, -32021, -32022, -32601)
+LEGACY_FALLBACK_STATUSES = (400, 404, 405)
+# Initialize-based revisions the probe can fall back to, newest first.
+LEGACY_REVISIONS = tuple(sorted((r for r in fi.HANDSHAKE_REVISIONS if r < fi.MCP_REVISION), reverse=True))
+_BASE64_SENTINEL = ("=?base64?", "?=")
+
+
+def encode_header_value(value: str) -> str:
+    """A body value as a header value: plain when it is visible ASCII or inner spaces, else the
+    Base64 sentinel `=?base64?<utf-8 base64>?=` (also for a plain value that looks like one)."""
+    plain = (all(0x20 <= ord(c) <= 0x7E for c in value) and value == value.strip(" ")
+             and not (value.startswith(_BASE64_SENTINEL[0]) and value.endswith(_BASE64_SENTINEL[1])))
+    if plain:
+        return value
+    return "%s%s%s" % (_BASE64_SENTINEL[0], base64.b64encode(value.encode("utf-8")).decode("ascii"), _BASE64_SENTINEL[1])
+
+
+def mcp_headers(message: Dict[str, Any]) -> Dict[str, str]:
+    """Mcp-Method and, for a named method, Mcp-Name, derived from the JSON-RPC body itself.
+
+    Requests and notifications both name their method: 2026-07-28 requires it on every request
+    and defines no header rule for a notification, so mirroring the body there is the only value
+    a strict server could compare against, and a legacy server ignores unknown headers."""
+    method = message.get("method")
+    headers = {"Mcp-Method": str(method)}
+    field = MCP_NAMED_METHODS.get(str(method))
+    value = (message.get("params") or {}).get(field) if field else None
+    if isinstance(value, str):
+        headers["Mcp-Name"] = encode_header_value(value)
+    return headers
+
+
+def rpc_body(resp_headers: Dict[str, str], raw: bytes) -> Any:
+    """The JSON-RPC message in a response, from application/json or the last SSE data line."""
+    if resp_headers.get("content-type", "").startswith("text/event-stream"):
+        data = [line[5:].strip() for line in raw.decode("utf-8", "replace").splitlines() if line.startswith("data:")]
+        raw = (data[-1] if data else "null").encode()
+    return json.loads(raw or b"null")
+
+
+def rpc_error(resp_headers: Dict[str, str], raw: bytes) -> Optional[Dict[str, Any]]:
+    try:
+        body = rpc_body(resp_headers, raw)
+    except ValueError:
+        return None
+    error = body.get("error") if isinstance(body, dict) else None
+    return error if isinstance(error, dict) else None
+
+
+def describe_failure(status: int, path: str, resp_headers: Dict[str, str], raw: bytes) -> str:
+    error = rpc_error(resp_headers, raw)
+    detail = (": JSON-RPC %s %s" % (error.get("code"), str(error.get("message", ""))[:200])) if error else ""
+    return "HTTP %d from %s%s" % (status, path, detail)
 
 
 
@@ -80,6 +142,10 @@ class Probe:
         self.token: Optional[str] = None
         self.events: Optional[List[Dict[str, Any]]] = None
         self.sent_traceparent: Optional[str] = None
+        # The MCP era is a property of the server: found on the first call, kept for the rest.
+        self.mcp_era: Optional[str] = None  # "modern" or "legacy"
+        self.mcp_revision: str = fi.MCP_REVISION
+        self.mcp_session: Optional[str] = None
         try:
             self.port = fs.port_of(str(descriptor.get("origin", "")))
         except fs.ServiceError:
@@ -256,24 +322,69 @@ class Probe:
 
     # interop (fabric-interop/0.1) ----------------------------------------------------
     # #region probe-interop — docs: plugins/fabric-agent-adapter/skills/building-fabric-services/references/interop.md#what-the-probe-checks
+    def mcp_post(self, path: str, message: Dict[str, Any], revision: Optional[str]) -> Tuple[int, Dict[str, str], bytes]:
+        """POST one JSON-RPC message with the headers its body implies (and the legacy session, if any)."""
+        headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+        if revision:
+            headers["MCP-Protocol-Version"] = revision
+        if self.mcp_session:
+            headers["Mcp-Session-Id"] = self.mcp_session
+        headers.update(mcp_headers(message))
+        headers.update(self.auth_headers())
+        return self.request("POST", path, headers, json.dumps(message).encode())
+
     def mcp_call(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        """One JSON-RPC request to the MCP surface, as a child of a fresh probe trace."""
+        """One JSON-RPC request to the MCP surface, as a child of a fresh probe trace.
+
+        Modern first (2026-07-28: version and capabilities in `_meta`, mirrored headers). A
+        400/404/405 whose body is not a modern JSON-RPC error marks a legacy server: the probe
+        opens a session with `initialize` + `notifications/initialized` and retries, and keeps
+        that era for the rest of the run (spec: Streamable HTTP, Backward Compatibility)."""
         path = (((self.wk or {}).get("surfaces") or {}).get("mcp") or {}).get("path", "/mcp")
         self.sent_traceparent = fi.child_traceparent(None)
+        if self.mcp_era != "legacy":
+            body = dict(params)
+            body["_meta"] = {"io.modelcontextprotocol/protocolVersion": fi.MCP_REVISION,
+                             "io.modelcontextprotocol/clientCapabilities": {}, "traceparent": self.sent_traceparent}
+            status, resp_headers, raw = self.mcp_post(path, {"jsonrpc": "2.0", "id": 1, "method": method, "params": body}, fi.MCP_REVISION)
+            if status == 200:
+                self.mcp_era = "modern"
+                return rpc_body(resp_headers, raw)
+            error = rpc_error(resp_headers, raw)
+            modern_error = error is not None and error.get("code") in MODERN_ERROR_CODES
+            if self.mcp_era == "modern" or status not in LEGACY_FALLBACK_STATUSES or modern_error:
+                raise OSError(describe_failure(status, path, resp_headers, raw))
+            self.legacy_open(path, describe_failure(status, path, resp_headers, raw))
         body = dict(params)
-        body["_meta"] = {"io.modelcontextprotocol/protocolVersion": fi.MCP_REVISION,
-                         "io.modelcontextprotocol/clientCapabilities": {}, "traceparent": self.sent_traceparent}
-        headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
-                   "MCP-Protocol-Version": fi.MCP_REVISION}
-        headers.update(self.auth_headers())
-        message = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": body}).encode()
-        status, resp_headers, raw = self.request("POST", path, headers, message)
+        body["_meta"] = {"traceparent": self.sent_traceparent}
+        status, resp_headers, raw = self.mcp_post(path, {"jsonrpc": "2.0", "id": 1, "method": method, "params": body}, self.mcp_revision)
         if status != 200:
-            raise OSError("HTTP %d from %s" % (status, path))
-        if resp_headers.get("content-type", "").startswith("text/event-stream"):
-            data = [line[5:].strip() for line in raw.decode().splitlines() if line.startswith("data:")]
-            raw = (data[-1] if data else "null").encode()
-        return json.loads(raw)
+            raise OSError("%s (legacy %s session)" % (describe_failure(status, path, resp_headers, raw), self.mcp_revision))
+        return rpc_body(resp_headers, raw)
+
+    def legacy_open(self, path: str, modern_failure: str) -> None:
+        """The initialize handshake of revisions up to 2025-11-25, entered only after a non-modern refusal."""
+        def failed(what: str) -> OSError:
+            return OSError("the modern request was refused (%s) and the legacy fallback failed: %s" % (modern_failure, what))
+        init = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {
+            "protocolVersion": LEGACY_REVISIONS[0], "capabilities": {},
+            "clientInfo": {"name": "fabric-check-service", "version": fi.PROTOCOL.rsplit("/", 1)[-1]}}}
+        self.mcp_session = None
+        status, resp_headers, raw = self.mcp_post(path, init, None)
+        if status != 200:
+            raise failed("initialize " + describe_failure(status, path, resp_headers, raw))
+        try:
+            answered = (rpc_body(resp_headers, raw).get("result") or {}).get("protocolVersion")
+        except (ValueError, AttributeError):
+            answered = None
+        if answered not in LEGACY_REVISIONS:
+            raise failed("initialize answered protocolVersion %r; the probe falls back to %s only" % (answered, ", ".join(LEGACY_REVISIONS)))
+        self.mcp_revision = answered
+        self.mcp_session = resp_headers.get("mcp-session-id") or None
+        status, resp_headers, raw = self.mcp_post(path, {"jsonrpc": "2.0", "method": "notifications/initialized"}, answered)
+        if not 200 <= status < 300:
+            raise failed("notifications/initialized " + describe_failure(status, path, resp_headers, raw))
+        self.mcp_era = "legacy"
 
     def load_manifest(self) -> Tuple[Optional[Dict[str, Any]], Optional[Path], str]:
         named = self.d.get("fabricManifest")
