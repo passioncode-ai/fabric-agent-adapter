@@ -50,6 +50,10 @@ MODERN_ERROR_CODES = (-32020, -32021, -32022, -32601)
 LEGACY_FALLBACK_STATUSES = (400, 404, 405)
 # Initialize-based revisions the probe can fall back to, newest first.
 LEGACY_REVISIONS = tuple(sorted((r for r in fi.HANDSHAKE_REVISIONS if r < fi.MCP_REVISION), reverse=True))
+# The first revision, on the deprecated HTTP+SSE transport: a real revision, but not one a
+# Streamable HTTP probe can check.
+PRE_STREAMABLE_REVISIONS = ("2024-11-05",)
+MODERN_REVISIONS = (fi.MCP_REVISION,)
 _BASE64_SENTINEL = ("=?base64?", "?=")
 # Sent on every modern request (basic/index: clients SHOULD) and in a legacy initialize.
 CLIENT_INFO = {"name": "fabric-check-service", "version": fi.PROTOCOL.rsplit("/", 1)[-1]}
@@ -157,6 +161,9 @@ class Probe:
         self.mcp_revision: str = fi.MCP_REVISION
         self.mcp_session: Optional[str] = None
         self.mcp_modern_refusal: Optional[str] = None  # why the 2026-07-28 request was refused, when it was
+        # The era of the last answer that carried a JSON-RPC object. `mcp_era` routes requests;
+        # this one is what interop.mcp-revision reports, so an accepted-but-empty answer is not "served".
+        self.mcp_answered: Optional[str] = None
         try:
             self.port = fs.port_of(str(descriptor.get("origin", "")))
         except fs.ServiceError:
@@ -361,7 +368,9 @@ class Probe:
             status, resp_headers, raw = self.mcp_post(path, {"jsonrpc": "2.0", "id": 1, "method": method, "params": body}, fi.MCP_REVISION)
             if status == 200:
                 self.mcp_era = "modern"
-                return self.answer_of(path, status, resp_headers, raw)
+                answer = self.answer_of(path, status, resp_headers, raw)
+                self.mcp_answered = "modern"
+                return answer
             error = rpc_error(resp_headers, raw)
             modern_error = error is not None and error.get("code") in MODERN_ERROR_CODES
             if self.mcp_era == "modern" or status not in LEGACY_FALLBACK_STATUSES or modern_error:
@@ -374,7 +383,9 @@ class Probe:
         status, resp_headers, raw = self.mcp_post(path, {"jsonrpc": "2.0", "id": 1, "method": method, "params": body}, self.mcp_revision)
         if status != 200:
             raise OSError("%s (legacy %s session)" % (describe_failure(status, path, resp_headers, raw), self.mcp_revision))
-        return self.answer_of(path, status, resp_headers, raw)
+        answer = self.answer_of(path, status, resp_headers, raw)
+        self.mcp_answered = "legacy"
+        return answer
 
     @staticmethod
     def answer_of(path: str, status: int, resp_headers: Dict[str, str], raw: bytes) -> Dict[str, Any]:
@@ -410,9 +421,10 @@ class Probe:
         if status != 200:
             raise failed("initialize " + describe_failure(status, path, resp_headers, raw))
         try:
-            answered = (rpc_body(resp_headers, raw).get("result") or {}).get("protocolVersion")
+            result = rpc_body(resp_headers, raw).get("result")
         except ValueError:
-            answered = None
+            result = None
+        answered = result.get("protocolVersion") if isinstance(result, dict) else None
         if answered not in LEGACY_REVISIONS:
             raise failed("initialize answered protocolVersion %r; the probe falls back to %s only" % (answered, ", ".join(LEGACY_REVISIONS)))
         self.mcp_revision = answered
@@ -490,16 +502,25 @@ class Probe:
         silent: it FAILs a service whose manifest declares a modern protocolRevision."""
         profiles = [c.get("profile") or {} for c in capabilities]
         declared = sorted({str(p["protocolRevision"]) for p in profiles if p.get("kind") == "mcp" and p.get("protocolRevision")})
-        if self.mcp_era is None:
-            self.add("interop.mcp-revision", "NOT_RUN", "no MCP request was answered")
+        if self.mcp_answered is None:
+            accepted = (" (a %s request was accepted at HTTP level)" % (fi.MCP_REVISION if self.mcp_era == "modern" else "legacy " + self.mcp_revision)
+                        if self.mcp_era else "")
+            self.add("interop.mcp-revision", "NOT_RUN", "no MCP request was answered with a JSON-RPC object" + accepted)
             return
-        if self.mcp_era == "modern":
+        unknown = [r for r in declared if r not in MODERN_REVISIONS + LEGACY_REVISIONS + PRE_STREAMABLE_REVISIONS]
+        ancient = [r for r in declared if r in PRE_STREAMABLE_REVISIONS]
+        if unknown or ancient:
+            reasons = (["the manifest declares an unknown protocolRevision %s" % ", ".join(repr(r) for r in unknown)] if unknown else []) + \
+                      (["the manifest declares %s, which predates Streamable HTTP (2025-03-26) and cannot be checked here" % ", ".join(ancient)] if ancient else [])
+            self.add("interop.mcp-revision", "FAIL", "; ".join(reasons))
+            return
+        if self.mcp_answered == "modern":
             self.add("interop.mcp-revision", "PASS", "served as MCP %s (per-request _meta, Mcp-Method/Mcp-Name headers)%s"
                      % (fi.MCP_REVISION, "; the manifest declares " + ", ".join(declared) if declared else ""))
             return
         how = "served only through a legacy %s session after the %s request was refused (%s)" % (
             self.mcp_revision, fi.MCP_REVISION, self.mcp_modern_refusal)
-        modern_declared = [r for r in declared if r not in LEGACY_REVISIONS]
+        modern_declared = [r for r in declared if r in MODERN_REVISIONS]
         if modern_declared:
             self.add("interop.mcp-revision", "FAIL", "the manifest declares MCP %s, but the service was %s" % (", ".join(modern_declared), how))
         elif declared:

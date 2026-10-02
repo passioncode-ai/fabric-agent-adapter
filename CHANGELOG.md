@@ -23,21 +23,28 @@
   that answered and the refusal that caused the fallback. It FAILs when only the legacy session
   worked but the manifest declares MCP 2026-07-28, so a dual-era service whose modern path is
   broken no longer gets PASS on every interop rule. A service whose `mcp` capabilities declare
-  only a legacy revision passes. A service that declares no revision gets NOT_RUN.
+  only a legacy revision passes. A service that declares no revision gets NOT_RUN. The rule
+  counts only an answer that carried a JSON-RPC object, so an HTTP 200 alone is not called
+  served. A declared revision that is unknown, or that predates Streamable HTTP (2024-11-05),
+  FAILs with that reason. A legacy `initialize` whose `result` is not an object fails cleanly
+  instead of crashing the probe.
 - **Empty answers fail.** A 200 without a JSON-RPC object (an empty body, an event stream with no
   `data:` line, or non-object JSON) FAILs the rule that asked. Before this fix such an answer
   dropped five interop rules on `tools/list`, or crashed the probe on `tools/call`.
 - `references/interop.md` ("What the probe checks") documents the headers, the fallback and the
   new rule.
-- Regression: `test/test_mcp_probe_headers.py` (25 tests) runs the probe against local fixtures:
+- Regression: `test/test_mcp_probe_headers.py` (33 tests) runs the probe against local fixtures:
   - a strict server that refuses absent or mismatched headers
   - a legacy session server
   - a dual-era server whose modern path is broken
   - a server that refuses every version
   - servers that answer 200 with an empty body
   - a legacy server whose handshake fails
+  - a legacy server whose `initialize` result is malformed
+  - a legacy server whose `tools/list` fails after the handshake
+  - manifests that declare a junk or pre-Streamable-HTTP revision
 
-  It also pins the spec's encoding table.
+  It also pins the spec's encoding table, and the live-sample test now pins `interop.mcp-revision`.
 
 ## 0.5.7 - 2026-10-01
 

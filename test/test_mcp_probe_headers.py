@@ -67,7 +67,8 @@ class Fixture(ThreadingHTTPServer):
 
     def __init__(self, mode):
         # "strict", "legacy", "broken_modern" (dual-era, modern path refused with a non-modern
-        # error), "unsupported", "empty_list", "empty_call", "legacy_bad_notification"
+        # error), "unsupported", "empty_list", "empty_call", "legacy_bad_notification",
+        # "legacy_list_result" (initialize result is a list), "legacy_list_500" (handshake ok, tools/list 500)
         self.mode = mode
         self.seen = []
         self.initialized = False
@@ -156,6 +157,16 @@ class Handler(BaseHTTPRequestHandler):
     def legacy_bad_notification(self, message, h):
         if message.get("method") == "notifications/initialized":
             return self.reply(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": "Bad Request: no"}})
+        self.legacy(message, h)
+
+    def legacy_list_result(self, message, h):
+        if message.get("method") == "initialize":
+            return self.reply(200, {"jsonrpc": "2.0", "id": message.get("id"), "result": [LEGACY]}, {"Mcp-Session-Id": SESSION})
+        self.legacy(message, h)
+
+    def legacy_list_500(self, message, h):
+        if message.get("method") == "tools/list" and h.get("mcp-session-id") == SESSION:
+            return self.reply(500)
         self.legacy(message, h)
 
     def legacy(self, message, h, pre_session_code=-32000):
@@ -429,6 +440,13 @@ class ProbeAgainstStrictServerEraTests(FixtureCase):
 class EmptyListBodyTests(FixtureCase):
     mode = "empty_list"
 
+    def test_an_accepted_but_empty_answer_is_not_called_served(self):
+        probe = self.probe(declared=MODERN)
+        probe.interop_rules()
+        era = {r["rule"]: r for r in probe.results}["interop.mcp-revision"]
+        self.assertEqual(era["verdict"], "NOT_RUN", era)
+        self.assertNotIn("served", era["evidence"])
+
     def test_an_empty_200_on_tools_list_fails_instead_of_dropping_rules(self):
         probe = self.probe(declared=MODERN)
         probe.interop_rules()
@@ -458,6 +476,64 @@ class EmptySseBodyTests(unittest.TestCase):
             checker.rpc_body({"content-type": "text/event-stream"}, b": keep-alive\n\n")
         with self.assertRaises(ValueError):
             checker.rpc_body({"content-type": "application/json"}, b"[1, 2]")
+
+
+class MalformedLegacyInitializeTests(FixtureCase):
+    mode = "legacy_list_result"
+
+    def test_a_non_object_initialize_result_fails_cleanly(self):
+        probe = self.probe()
+        with self.assertRaises(OSError) as caught:
+            probe.mcp_call("tools/list", {})
+        self.assertIn("protocolVersion None", str(caught.exception))
+        self.assertIsNone(probe.mcp_session)
+
+    def test_the_rules_fail_instead_of_crashing(self):
+        probe = self.probe(declared=MODERN)
+        probe.interop_rules()
+        results = {r["rule"]: r for r in probe.results}
+        self.assertEqual(results["interop.tools-match"]["verdict"], "FAIL", probe.results)
+        self.assertEqual(results["interop.mcp-revision"]["verdict"], "NOT_RUN", probe.results)
+
+
+class LegacyListFailsAfterHandshakeTests(FixtureCase):
+    mode = "legacy_list_500"
+
+    def test_a_handshake_alone_is_not_called_served(self):
+        probe = self.probe(declared=LEGACY)
+        probe.interop_rules()
+        results = {r["rule"]: r for r in probe.results}
+        self.assertEqual(results["interop.tools-match"]["verdict"], "FAIL", probe.results)
+        era = results["interop.mcp-revision"]
+        self.assertEqual(era["verdict"], "NOT_RUN", era)
+        self.assertNotIn("served", era["evidence"])
+        self.assertEqual(len(self.server.deleted), 1, "the open session is still closed")
+
+
+class DeclaredRevisionTests(FixtureCase):
+    """Only known revision strings count; a junk or pre-Streamable-HTTP one FAILs for what it is."""
+
+    def era(self, declared):
+        probe = self.probe(declared=declared)
+        probe.interop_rules()
+        return {r["rule"]: r for r in probe.results}["interop.mcp-revision"]
+
+    def test_a_junk_revision_fails_as_unknown(self):
+        era = self.era("garbage")
+        self.assertEqual(era["verdict"], "FAIL", era)
+        self.assertIn("unknown protocolRevision", era["evidence"])
+        self.assertIn("garbage", era["evidence"])
+
+    def test_a_pre_streamable_http_revision_fails_as_such(self):
+        era = self.era("2024-11-05")
+        self.assertEqual(era["verdict"], "FAIL", era)
+        self.assertIn("2024-11-05", era["evidence"])
+        self.assertIn("predates Streamable HTTP", era["evidence"])
+        self.assertNotIn("unknown", era["evidence"])
+
+
+class DeclaredRevisionLegacyTests(DeclaredRevisionTests):
+    mode = "legacy"
 
 
 class FailedLegacyOpenTests(FixtureCase):

@@ -96,7 +96,7 @@ The first `system/init` event lists `mcp_servers` (`connected`) and the `mcp__<s
 | `interop.unknown-job` | `fabric.job.get` for a made-up id answers `isError` with `unknown-job` | `fabric.job.get` is not served |
 | `interop.trace-propagation` | the answer's `_meta.traceparent` has the probe's trace id and a new span | the answer carries no traceparent |
 | `interop.events-trace` | every event with a trace carries both `traceId` and `spanId`, well formed | no events page was read |
-| `interop.mcp-revision` | the MCP surface answered a 2026-07-28 request, or it answered only through a legacy session and every `mcp` capability's `protocolRevision` is a legacy revision. FAIL when only the legacy session worked but the manifest declares 2026-07-28 | no MCP surface, no request was answered, or only the legacy session worked and no capability declares a `protocolRevision` |
+| `interop.mcp-revision` | the MCP surface answered a 2026-07-28 request with a JSON-RPC object, or it answered only through a legacy session and every `mcp` capability's `protocolRevision` is a legacy revision. It FAILs in three cases: only the legacy session worked but the manifest declares 2026-07-28; a declared revision is unknown; a declared revision predates Streamable HTTP (2024-11-05) | no MCP surface; no request was answered with a JSON-RPC object (an HTTP 200 alone is not an answer); only the legacy session worked and no capability declares a `protocolRevision` |
 
 `python3 scripts/check_service.py <id>` prints them with the rest; `--json` for a machine.
 
