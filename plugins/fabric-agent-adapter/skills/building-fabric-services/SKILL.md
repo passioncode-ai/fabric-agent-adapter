@@ -1,24 +1,24 @@
 ---
 name: building-fabric-services
 description: >-
-  Use when handing out or opening a Fabric service dashboard, or building a local agent service on
-  a macOS machine — «сделай агенту дашборд», «локальный сервис агента», «дашборд должен всегда
-  работать и не плодить копии», «где агенту хранить настройки», «подключи агента к Fabric
-  Dashboards», "make this agent a local service", "always-on dashboard", "fabric-service
-  protocol", "add the well-known endpoint", "migrate a service to fabric-service". Covers the
-  fabric-service/0.1 extension: which surface to expose (MCP streamable HTTP, CLI, A2A), the token
-  and one-time login, where state, config, logs and cache live, one copy per machine, launchd, the
-  descriptor, the well-known document, the events feed and notifications; ships Python and Node
-  reference kits and a live conformance probe. NOT for a one-off script or cron job, a hosted
-  SaaS, the provider manifest itself (adapting-projects-to-fabric), or building Fabric Dashboards.
+  Use when handing out or opening a Fabric service dashboard, building a local agent service on a
+  macOS machine, or making an ONLINE agent or dashboard (https origin, the remote placement) a
+  Fabric service — «сделай агенту дашборд», «локальный сервис агента», «онлайн-дашборд в Fabric»,
+  «подключи агента к Fabric Dashboards», "make this agent a local service", "make an online
+  dashboard a Fabric service", "fabric-service protocol", "add the well-known endpoint". Covers
+  fabric-service/0.1: surfaces, token and one-time login, state, one copy, launchd, descriptor,
+  well-known document, events; online: the https guard, the token-gated well-known document, the
+  __Host- cookie, registering it on the operator's computer; ships Python and Node kits, a TLS
+  sample and a live probe. NOT for a one-off script or cron job, a hosted product with no agent
+  behind it, the provider manifest (adapting-projects-to-fabric), or building Fabric Dashboards.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.5.7"
+  version: "0.6.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "74d3852f122f5ca5cbc4138a201483531dfa5006"
+  extension-commit: "2ce392291c6668598d12cd38327e24696b5ca15c"
 ---
 
 # Building Fabric services
@@ -40,7 +40,8 @@ to review one. Do not use it for:
 
 - a script, a cron job or a one-shot CLI — nothing stays running, so there is nothing
   to supervise; a launchd `StartInterval` job needs no descriptor;
-- a hosted SaaS — the protocol is loopback-only by design;
+- a hosted product with no agent behind it. An online agent or dashboard that should appear in
+  Fabric IS in scope: it is the remote placement — read [Online services](#online-services--the-remote-placement);
 - the provider manifest and admission bundle — that is `adapting-projects-to-fabric`
   (a service that is also a provider does both);
 - the Fabric Dashboards app itself.
@@ -234,6 +235,36 @@ org-index `scripts/check_format.py` reports 0 findings for it before it is calle
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
 choice, nothing about it is published or listed by the organization, and none of these files is
 required of it — though the verified MCP quick start is still how anyone learns to drive it.
+
+## Online services — the remote placement
+
+An agent or a dashboard that runs online — on a platform, a server, a hosted app — becomes a
+Fabric service with the same four routes and one descriptor on the operator's computer
+(`placement: "remote"`, DEC-0019). Nothing about launchd, the lock or loopback applies; three
+things change and the kits implement each:
+
+| | What the online service does | Kit |
+|---|---|---|
+| Guard | refuse a foreign `Host`/`Origin` and `cross-site`; behind a TLS router refuse a forwarded scheme that is not `https` | `checkRemoteRequest` / `check_remote_request` |
+| Well-known | only for the token; otherwise `401` with an **empty** body | `wellKnownAllowed('remote', …)` / `well_known_allowed` |
+| Session | `__Host-fabric_session`, `Secure`; codes in memory, the key from a platform secret so sessions survive a deploy | `remoteSessionCookieHeader`, `new LoginCodes(null, 120, { store: new MemoryCodeStore(), key })` |
+
+1. **Serve the four routes** in the app that already exists — not beside it. The complete worked
+   example is [`scripts/sample-remote-service.mjs`](scripts/sample-remote-service.mjs): it runs
+   with its own TLS or behind a platform router.
+2. **Secrets live on the platform:** the service token and the session key (32 bytes) are
+   platform secrets, never in the repository, a URL or an argument vector.
+3. **Register it on the operator's computer** — the installer side, run there:
+   `registerRemote({ id, name, origin, token })` / `register_remote(...)` writes the token file
+   (0600) and the descriptor; pass the token from a file or stdin, never in argv. Public names
+   only in public artifacts: a private service is registered by a local descriptor and nowhere
+   else.
+4. **Verify** with the probe: `check_service.py <id>` checks TLS, the token-gated well-known
+   document, the guards, events, the single-use login and the host-bound cookie; launchd, lock
+   and loopback rules are `NOT_RUN` with that reason.
+
+Read [the remote placement reference](references/remote-placement.md) for the failure
+behaviour a host shows, rotation, a multi-process platform, and what a host will not do.
 
 ## Migrating an existing service
 
