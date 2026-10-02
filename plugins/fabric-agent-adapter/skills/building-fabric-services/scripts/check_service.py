@@ -51,6 +51,8 @@ LEGACY_FALLBACK_STATUSES = (400, 404, 405)
 # Initialize-based revisions the probe can fall back to, newest first.
 LEGACY_REVISIONS = tuple(sorted((r for r in fi.HANDSHAKE_REVISIONS if r < fi.MCP_REVISION), reverse=True))
 _BASE64_SENTINEL = ("=?base64?", "?=")
+# Sent on every modern request (basic/index: clients SHOULD) and in a legacy initialize.
+CLIENT_INFO = {"name": "fabric-check-service", "version": fi.PROTOCOL.rsplit("/", 1)[-1]}
 
 
 def encode_header_value(value: str) -> str:
@@ -78,12 +80,20 @@ def mcp_headers(message: Dict[str, Any]) -> Dict[str, str]:
     return headers
 
 
-def rpc_body(resp_headers: Dict[str, str], raw: bytes) -> Any:
-    """The JSON-RPC message in a response, from application/json or the last SSE data line."""
+def rpc_body(resp_headers: Dict[str, str], raw: bytes) -> Dict[str, Any]:
+    """The JSON-RPC message in a response, from application/json or the last SSE data line.
+
+    ValueError when there is none: an empty body, an event stream without a data line, or JSON
+    that is not an object. A rule fed by it then FAILs instead of being silently left out."""
     if resp_headers.get("content-type", "").startswith("text/event-stream"):
         data = [line[5:].strip() for line in raw.decode("utf-8", "replace").splitlines() if line.startswith("data:")]
-        raw = (data[-1] if data else "null").encode()
-    return json.loads(raw or b"null")
+        raw = data[-1].encode() if data else b""
+    if not raw.strip():
+        raise ValueError("no JSON-RPC object in the response (empty body)")
+    body = json.loads(raw)
+    if not isinstance(body, dict):
+        raise ValueError("no JSON-RPC object in the response (got %s)" % type(body).__name__)
+    return body
 
 
 def rpc_error(resp_headers: Dict[str, str], raw: bytes) -> Optional[Dict[str, Any]]:
@@ -146,6 +156,7 @@ class Probe:
         self.mcp_era: Optional[str] = None  # "modern" or "legacy"
         self.mcp_revision: str = fi.MCP_REVISION
         self.mcp_session: Optional[str] = None
+        self.mcp_modern_refusal: Optional[str] = None  # why the 2026-07-28 request was refused, when it was
         try:
             self.port = fs.port_of(str(descriptor.get("origin", "")))
         except fs.ServiceError:
@@ -345,37 +356,62 @@ class Probe:
         if self.mcp_era != "legacy":
             body = dict(params)
             body["_meta"] = {"io.modelcontextprotocol/protocolVersion": fi.MCP_REVISION,
+                             "io.modelcontextprotocol/clientInfo": dict(CLIENT_INFO),
                              "io.modelcontextprotocol/clientCapabilities": {}, "traceparent": self.sent_traceparent}
             status, resp_headers, raw = self.mcp_post(path, {"jsonrpc": "2.0", "id": 1, "method": method, "params": body}, fi.MCP_REVISION)
             if status == 200:
                 self.mcp_era = "modern"
-                return rpc_body(resp_headers, raw)
+                return self.answer_of(path, status, resp_headers, raw)
             error = rpc_error(resp_headers, raw)
             modern_error = error is not None and error.get("code") in MODERN_ERROR_CODES
             if self.mcp_era == "modern" or status not in LEGACY_FALLBACK_STATUSES or modern_error:
                 raise OSError(describe_failure(status, path, resp_headers, raw))
-            self.legacy_open(path, describe_failure(status, path, resp_headers, raw))
+            refusal = describe_failure(status, path, resp_headers, raw)
+            self.legacy_open(path, refusal)
+            self.mcp_modern_refusal = refusal
         body = dict(params)
         body["_meta"] = {"traceparent": self.sent_traceparent}
         status, resp_headers, raw = self.mcp_post(path, {"jsonrpc": "2.0", "id": 1, "method": method, "params": body}, self.mcp_revision)
         if status != 200:
             raise OSError("%s (legacy %s session)" % (describe_failure(status, path, resp_headers, raw), self.mcp_revision))
-        return rpc_body(resp_headers, raw)
+        return self.answer_of(path, status, resp_headers, raw)
+
+    @staticmethod
+    def answer_of(path: str, status: int, resp_headers: Dict[str, str], raw: bytes) -> Dict[str, Any]:
+        try:
+            return rpc_body(resp_headers, raw)
+        except ValueError as exc:
+            raise ValueError("HTTP %d from %s: %s" % (status, path, exc)) from None
+
+    def legacy_close(self, path: str) -> None:
+        """End a legacy session with DELETE (2025-11-25: a client SHOULD). Best effort: 405 and errors are ignored."""
+        if not self.mcp_session:
+            return
+        headers = {"Mcp-Session-Id": self.mcp_session, "MCP-Protocol-Version": self.mcp_revision}
+        headers.update(self.auth_headers())
+        try:
+            self.request("DELETE", path, headers)
+        except OSError:
+            pass
+        finally:
+            self.mcp_session = None
 
     def legacy_open(self, path: str, modern_failure: str) -> None:
         """The initialize handshake of revisions up to 2025-11-25, entered only after a non-modern refusal."""
         def failed(what: str) -> OSError:
+            # no half-open session survives: the next attempt starts modern and clean
+            self.mcp_session = None
+            self.mcp_revision = fi.MCP_REVISION
             return OSError("the modern request was refused (%s) and the legacy fallback failed: %s" % (modern_failure, what))
         init = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {
-            "protocolVersion": LEGACY_REVISIONS[0], "capabilities": {},
-            "clientInfo": {"name": "fabric-check-service", "version": fi.PROTOCOL.rsplit("/", 1)[-1]}}}
+            "protocolVersion": LEGACY_REVISIONS[0], "capabilities": {}, "clientInfo": dict(CLIENT_INFO)}}
         self.mcp_session = None
         status, resp_headers, raw = self.mcp_post(path, init, None)
         if status != 200:
             raise failed("initialize " + describe_failure(status, path, resp_headers, raw))
         try:
             answered = (rpc_body(resp_headers, raw).get("result") or {}).get("protocolVersion")
-        except (ValueError, AttributeError):
+        except ValueError:
             answered = None
         if answered not in LEGACY_REVISIONS:
             raise failed("initialize answered protocolVersion %r; the probe falls back to %s only" % (answered, ", ".join(LEGACY_REVISIONS)))
@@ -428,7 +464,8 @@ class Probe:
             self.add("interop.well-known-capabilities", "FAIL" if extra else "PASS",
                      ("listed but not in the manifest: " + ", ".join(extra)) if extra else "%d listed, all in the manifest" % len(listed))
         if not mcp_surface or not self.token:
-            for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
+            for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation",
+                         "interop.mcp-revision"):
                 self.add(rule, "NOT_RUN", "no MCP surface" if not mcp_surface else "no readable token")
         else:
             try:
@@ -444,7 +481,31 @@ class Probe:
                 self.job_tools_rule(capabilities, tools)
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
+            self.mcp_revision_rule(capabilities)
+            self.legacy_close(mcp_surface.get("path", "/mcp") if isinstance(mcp_surface, dict) else "/mcp")
         self.events_trace_rule(self.events)
+
+    def mcp_revision_rule(self, capabilities: List[Dict[str, Any]]) -> None:
+        """Which MCP era served the probe. A pass reached only through the legacy fallback is never
+        silent: it FAILs a service whose manifest declares a modern protocolRevision."""
+        profiles = [c.get("profile") or {} for c in capabilities]
+        declared = sorted({str(p["protocolRevision"]) for p in profiles if p.get("kind") == "mcp" and p.get("protocolRevision")})
+        if self.mcp_era is None:
+            self.add("interop.mcp-revision", "NOT_RUN", "no MCP request was answered")
+            return
+        if self.mcp_era == "modern":
+            self.add("interop.mcp-revision", "PASS", "served as MCP %s (per-request _meta, Mcp-Method/Mcp-Name headers)%s"
+                     % (fi.MCP_REVISION, "; the manifest declares " + ", ".join(declared) if declared else ""))
+            return
+        how = "served only through a legacy %s session after the %s request was refused (%s)" % (
+            self.mcp_revision, fi.MCP_REVISION, self.mcp_modern_refusal)
+        modern_declared = [r for r in declared if r not in LEGACY_REVISIONS]
+        if modern_declared:
+            self.add("interop.mcp-revision", "FAIL", "the manifest declares MCP %s, but the service was %s" % (", ".join(modern_declared), how))
+        elif declared:
+            self.add("interop.mcp-revision", "PASS", "the manifest declares only %s; %s" % (", ".join(declared), how))
+        else:
+            self.add("interop.mcp-revision", "NOT_RUN", "%s; no mcp capability declares a protocolRevision to judge it against" % how)
 
     def object_root_rule(self, tools: Dict[str, Any]) -> None:
         """FAC-SEM-023 (DEC-0018): every listed tool's outputSchema, when present, has root type object —

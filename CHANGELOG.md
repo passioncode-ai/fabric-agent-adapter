@@ -15,11 +15,29 @@
 - **Legacy servers.** A 400/404/405 whose body is not a modern JSON-RPC error (`-32020`, `-32021`,
   `-32022`, `-32601`) marks an initialize-based server (2025-11-25 and earlier): the probe opens a
   session with `initialize` and `notifications/initialized`, sends `Mcp-Session-Id` and the
-  negotiated `MCP-Protocol-Version`, and keeps that era for the rest of the run. A modern error is
-  reported with its code and message instead of being fallen back from.
-- Regression: `test/test_mcp_probe_headers.py` runs the probe against a local strict server that
-  refuses absent or mismatched headers, a legacy session server, and a server that refuses every
-  version, and pins the spec's encoding table.
+  negotiated `MCP-Protocol-Version`, keeps that era for the rest of the run and closes the session
+  with `DELETE`. A failed handshake leaves no session behind. A modern error is reported with its
+  code and message and never causes a fallback. Modern requests now carry
+  `io.modelcontextprotocol/clientInfo`.
+- **A pass through the fallback is visible.** The new rule `interop.mcp-revision` names the era
+  that answered and the refusal that caused the fallback. It FAILs when only the legacy session
+  worked but the manifest declares MCP 2026-07-28, so a dual-era service whose modern path is
+  broken no longer gets PASS on every interop rule. A service whose `mcp` capabilities declare
+  only a legacy revision passes. A service that declares no revision gets NOT_RUN.
+- **Empty answers fail.** A 200 without a JSON-RPC object (an empty body, an event stream with no
+  `data:` line, or non-object JSON) FAILs the rule that asked. Before this fix such an answer
+  dropped five interop rules on `tools/list`, or crashed the probe on `tools/call`.
+- `references/interop.md` ("What the probe checks") documents the headers, the fallback and the
+  new rule.
+- Regression: `test/test_mcp_probe_headers.py` (25 tests) runs the probe against local fixtures:
+  - a strict server that refuses absent or mismatched headers
+  - a legacy session server
+  - a dual-era server whose modern path is broken
+  - a server that refuses every version
+  - servers that answer 200 with an empty body
+  - a legacy server whose handshake fails
+
+  It also pins the spec's encoding table.
 
 ## 0.5.7 - 2026-10-01
 

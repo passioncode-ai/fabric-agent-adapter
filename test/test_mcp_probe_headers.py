@@ -16,6 +16,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import tempfile
 import threading
 import unittest
 import http.client
@@ -65,9 +66,12 @@ class Fixture(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, mode):
-        self.mode = mode  # "strict", "legacy" or "unsupported"
+        # "strict", "legacy", "broken_modern" (dual-era, modern path refused with a non-modern
+        # error), "unsupported", "empty_list", "empty_call", "legacy_bad_notification"
+        self.mode = mode
         self.seen = []
         self.initialized = False
+        self.deleted = []
         super().__init__(("127.0.0.1", 0), Handler)
 
 
@@ -85,6 +89,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_DELETE(self):
+        h = {k.lower(): v for k, v in self.headers.items()}
+        self.server.seen.append({"method": "DELETE", "headers": h, "body": None})
+        if h.get("mcp-session-id") == SESSION:
+            self.server.deleted.append(h)
+            self.server.initialized = False
+            return self.reply(200)
+        self.reply(404)
 
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
@@ -121,6 +134,8 @@ class Handler(BaseHTTPRequestHandler):
                                                                           "data": {"supported": [MODERN], "requested": version}}})
         if "id" not in message:
             return self.reply(202)
+        if (self.server.mode, method) in (("empty_list", "tools/list"), ("empty_call", "tools/call")):
+            return self.reply(200)  # 200 with no body: a handler that wrote nothing, or a proxy
         result = answer(rid, method, params)
         if result is None:
             return self.reply(404, {"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "Method not found"}})
@@ -131,8 +146,19 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(400, {"jsonrpc": "2.0", "id": message.get("id"), "error": {"code": UNSUPPORTED_PROTOCOL_VERSION, "message": "Unsupported protocol version",
                                                                              "data": {"supported": ["2099-01-01"], "requested": MODERN}}})
 
+    empty_list = strict
+    empty_call = strict
+
     # legacy 2025-11-25 Streamable HTTP: initialize, a session, then requests ----------------------
-    def legacy(self, message, h):
+    def broken_modern(self, message, h):
+        self.legacy(message, h, pre_session_code=-32600)
+
+    def legacy_bad_notification(self, message, h):
+        if message.get("method") == "notifications/initialized":
+            return self.reply(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": "Bad Request: no"}})
+        self.legacy(message, h)
+
+    def legacy(self, message, h, pre_session_code=-32000):
         rid, method, params = message.get("id"), message.get("method"), message.get("params") or {}
         if method == "initialize":
             asked = params.get("protocolVersion")
@@ -141,7 +167,7 @@ class Handler(BaseHTTPRequestHandler):
                 "serverInfo": {"name": "example-agent", "version": "1"}}}, {"Mcp-Session-Id": SESSION})
         if h.get("mcp-session-id") != SESSION:
             # what a 2025-11-25 SDK answers before initialize: not a recognized modern error
-            return self.reply(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": "Bad Request: Server not initialized"}})
+            return self.reply(400, {"jsonrpc": "2.0", "id": None, "error": {"code": pre_session_code, "message": "Bad Request: Server not initialized"}})
         if h.get("mcp-protocol-version") != LEGACY:
             return self.reply(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": "Bad Request: Unsupported protocol version"}})
         if method == "notifications/initialized":
@@ -169,8 +195,15 @@ class FixtureCase(unittest.TestCase):
         self.server.server_close()
         self.thread.join(5)
 
-    def probe(self):
+    def probe(self, declared=None):
+        """A probe pointed at the fixture; `declared` writes a manifest whose mcp capability names that protocolRevision."""
         descriptor = {"id": "example-agent", "instance": "default", "origin": "http://127.0.0.1:%d" % self.port}
+        if declared is not None:
+            directory = tempfile.TemporaryDirectory()
+            self.addCleanup(directory.cleanup)
+            manifest = Path(directory.name) / "fabric-agent.json"
+            manifest.write_text(json.dumps({"capabilities": [{"name": "example.echo", "profile": {"kind": "mcp", "protocolRevision": declared}}]}))
+            descriptor["fabricManifest"] = str(manifest)
         probe = checker.Probe(Path("/nonexistent"), descriptor, Path("/nonexistent"), True)
         probe.token = TOKEN
         probe.wk = {"surfaces": {"mcp": {"path": "/mcp"}}}
@@ -327,13 +360,117 @@ class ProbeAgainstLegacyServerTests(FixtureCase):
         self.assertEqual(call["headers"]["mcp-name"], "fabric.job.get")
         self.assertEqual(probe.mcp_era, "legacy")
 
-    def test_the_interop_rules_pass_end_to_end(self):
+    def test_without_a_declared_revision_the_legacy_pass_is_named_not_hidden(self):
         probe = self.probe()
         probe.interop_rules()
-        verdicts = {r["rule"]: r["verdict"] for r in probe.results}
-        self.assertEqual(verdicts["interop.unknown-job"], "PASS", probe.results)
-        self.assertEqual(verdicts["interop.trace-propagation"], "PASS", probe.results)
-        self.assertNotIn("FAIL", verdicts.values(), probe.results)
+        results = {r["rule"]: r for r in probe.results}
+        self.assertEqual(results["interop.unknown-job"]["verdict"], "PASS", probe.results)
+        self.assertEqual(results["interop.trace-propagation"]["verdict"], "PASS", probe.results)
+        era = results["interop.mcp-revision"]
+        self.assertEqual(era["verdict"], "NOT_RUN", era)
+        self.assertIn("legacy %s session" % LEGACY, era["evidence"])
+        self.assertIn("-32000", era["evidence"], "the modern refusal is quoted")
+
+    def test_a_service_declaring_only_a_legacy_revision_passes_legacy(self):
+        probe = self.probe(declared=LEGACY)
+        probe.interop_rules()
+        era = {r["rule"]: r for r in probe.results}["interop.mcp-revision"]
+        self.assertEqual(era["verdict"], "PASS", era)
+        self.assertIn("legacy %s session" % LEGACY, era["evidence"])
+
+    def test_a_service_declaring_2026_07_28_fails_when_only_legacy_works(self):
+        probe = self.probe(declared=MODERN)
+        probe.interop_rules()
+        era = {r["rule"]: r for r in probe.results}["interop.mcp-revision"]
+        self.assertEqual(era["verdict"], "FAIL", era)
+        self.assertIn(MODERN, era["evidence"])
+        self.assertIn(LEGACY, era["evidence"])
+
+    def test_the_legacy_session_is_closed_with_delete(self):
+        probe = self.probe()
+        probe.interop_rules()
+        self.assertEqual(len(self.server.deleted), 1, self.methods())
+        self.assertEqual(self.server.deleted[0]["mcp-protocol-version"], LEGACY)
+        self.assertEqual(self.methods()[-1], "DELETE")
+        self.assertIsNone(probe.mcp_session)
+
+
+class ProbeAgainstBrokenModernPathTests(FixtureCase):
+    """A dual-era server whose 2026-07-28 path is broken: the legacy session works, the contract does not."""
+    mode = "broken_modern"
+
+    def test_a_fallback_pass_fails_the_declared_revision(self):
+        probe = self.probe(declared=MODERN)
+        probe.interop_rules()
+        results = {r["rule"]: r for r in probe.results}
+        self.assertEqual(results["interop.unknown-job"]["verdict"], "PASS", "the legacy session itself works")
+        era = results["interop.mcp-revision"]
+        self.assertEqual(era["verdict"], "FAIL", era)
+        self.assertIn("-32600", era["evidence"])
+        self.assertIn("legacy %s session" % LEGACY, era["evidence"])
+
+
+class ProbeAgainstStrictServerEraTests(FixtureCase):
+    def test_a_modern_server_passes_the_revision_rule(self):
+        probe = self.probe(declared=MODERN)
+        probe.interop_rules()
+        era = {r["rule"]: r for r in probe.results}["interop.mcp-revision"]
+        self.assertEqual(era["verdict"], "PASS", era)
+        self.assertIn(MODERN, era["evidence"])
+        self.assertNotIn("DELETE", self.methods(), "no session, nothing to close")
+
+    def test_modern_requests_carry_client_info(self):
+        self.probe().mcp_call("tools/list", {})
+        meta = self.server.seen[0]["body"]["params"]["_meta"]
+        self.assertEqual(meta["io.modelcontextprotocol/clientInfo"]["name"], "fabric-check-service")
+        self.assertIn("version", meta["io.modelcontextprotocol/clientInfo"])
+
+
+class EmptyListBodyTests(FixtureCase):
+    mode = "empty_list"
+
+    def test_an_empty_200_on_tools_list_fails_instead_of_dropping_rules(self):
+        probe = self.probe(declared=MODERN)
+        probe.interop_rules()
+        results = {r["rule"]: r for r in probe.results}
+        self.assertEqual(results["interop.tools-match"]["verdict"], "FAIL", probe.results)
+        self.assertIn("no JSON-RPC object", results["interop.tools-match"]["evidence"])
+
+    def test_mcp_call_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            self.probe().mcp_call("tools/list", {})
+
+
+class EmptyCallBodyTests(FixtureCase):
+    mode = "empty_call"
+
+    def test_an_empty_200_on_tools_call_fails_the_rule_without_a_crash(self):
+        probe = self.probe()
+        probe.interop_rules()
+        results = {r["rule"]: r for r in probe.results}
+        self.assertEqual(results["interop.unknown-job"]["verdict"], "FAIL", probe.results)
+        self.assertIn("no JSON-RPC object", results["interop.unknown-job"]["evidence"])
+
+
+class EmptySseBodyTests(unittest.TestCase):
+    def test_an_event_stream_without_data_is_not_a_message(self):
+        with self.assertRaises(ValueError):
+            checker.rpc_body({"content-type": "text/event-stream"}, b": keep-alive\n\n")
+        with self.assertRaises(ValueError):
+            checker.rpc_body({"content-type": "application/json"}, b"[1, 2]")
+
+
+class FailedLegacyOpenTests(FixtureCase):
+    mode = "legacy_bad_notification"
+
+    def test_a_failed_handshake_leaves_no_session_behind(self):
+        probe = self.probe()
+        with self.assertRaises(OSError) as caught:
+            probe.mcp_call("tools/list", {})
+        self.assertIn("notifications/initialized", str(caught.exception))
+        self.assertIsNone(probe.mcp_session)
+        self.assertIsNone(probe.mcp_era)
+        self.assertEqual(probe.mcp_revision, fi.MCP_REVISION)
 
 
 if __name__ == "__main__":
