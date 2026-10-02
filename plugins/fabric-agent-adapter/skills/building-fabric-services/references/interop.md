@@ -23,6 +23,11 @@ The interop block sits in the manifest under the capability's `extensions`:
 
 That key has one spelling (the contract's `src/extensions.ts`); copy it, never retype it.
 
+## Contents
+
+- [The kit](#the-kit)
+- [What the probe checks](#what-the-probe-checks), including how the probe speaks MCP: headers, the legacy fallback, empty answers
+
 ## The kit
 
 ```python
@@ -91,5 +96,29 @@ The first `system/init` event lists `mcp_servers` (`connected`) and the `mcp__<s
 | `interop.unknown-job` | `fabric.job.get` for a made-up id answers `isError` with `unknown-job` | `fabric.job.get` is not served |
 | `interop.trace-propagation` | the answer's `_meta.traceparent` has the probe's trace id and a new span | the answer carries no traceparent |
 | `interop.events-trace` | every event with a trace carries both `traceId` and `spanId`, well formed | no events page was read |
+| `interop.mcp-revision` | the MCP surface answered a 2026-07-28 request with a JSON-RPC object, or it answered only through a legacy session and every `mcp` capability's `protocolRevision` is a legacy revision. It FAILs in three cases: only the legacy session worked but the manifest declares 2026-07-28; a declared revision is unknown; a declared revision predates Streamable HTTP (2024-11-05) | no MCP surface; no request was answered with a JSON-RPC object (an HTTP 200 alone is not an answer); only the legacy session worked and no capability declares a `protocolRevision` |
 
 `python3 scripts/check_service.py <id>` prints them with the rest; `--json` for a machine.
+
+**How the probe speaks MCP.** Every POST is a 2026-07-28 Streamable HTTP request. `_meta`
+carries `io.modelcontextprotocol/protocolVersion`, `clientInfo` and `clientCapabilities`. The
+headers are derived from the JSON-RPC body being sent:
+
+- `MCP-Protocol-Version` equal to `_meta`
+- `Mcp-Method` from `method`, on requests and notifications
+- `Mcp-Name` from `params.name` (`tools/call`, `prompts/get`) or from `params.uri`
+  (`resources/read`)
+
+A value that is not plain header-safe ASCII is sent as `=?base64?…?=`. A server that validates
+these headers, as an SDK v2 server does, therefore accepts the probe.
+
+The probe falls back to the legacy handshake only when the answer is 400, 404 or 405 and the
+body is not a modern JSON-RPC error (`-32020` HeaderMismatch, `-32021`, `-32022`, `-32601`).
+That marks an initialize-based server (2025-11-25 and earlier). The probe then runs
+`initialize` and `notifications/initialized`, carries `Mcp-Session-Id` and the negotiated
+`MCP-Protocol-Version`, keeps that era for the run, and ends the session with `DELETE`.
+`interop.mcp-revision` reports which era answered, together with the refusal that caused the
+fallback. A modern error is reported as it came and never causes a fallback.
+
+A 200 without a JSON-RPC object FAILs the rule that asked: an empty body, an event stream with
+no `data:` line, or JSON that is not an object.

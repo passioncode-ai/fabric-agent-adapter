@@ -139,7 +139,7 @@ class SampleInteropTests(LiveSample):
 
 class ProbeInteropTests(LiveSample):
     RULES = ("interop.output-schema-object", "interop.manifest-link", "interop.well-known-capabilities", "interop.tools-match", "interop.job-tools",
-             "interop.unknown-job", "interop.trace-propagation", "interop.events-trace")
+             "interop.unknown-job", "interop.trace-propagation", "interop.events-trace", "interop.mcp-revision")
 
     def test_the_sample_passes_every_interop_rule(self):
         code, results = self.check()
