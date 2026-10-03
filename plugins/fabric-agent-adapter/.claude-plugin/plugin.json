@@ -3,7 +3,7 @@
   "name": "fabric-agent-adapter",
   "displayName": "Fabric Agent Adapter",
   "description": "Create new Fabric-compatible agents, build them as always-alive local services with dashboards (fabric-service/0.1), and adapt existing projects to the Fabric Agent Contract through evidence-backed MCP, A2A, or local-runner provider bundles.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "author": {
     "name": "PassionCode.ai",
     "url": "https://passioncode.ai/"

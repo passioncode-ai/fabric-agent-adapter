@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.2 - 2026-10-03
+
+### Added
+
+- **`building-fabric-services` says how a product behaves under a host lifecycle broker** — the
+  always-on per-user service agents ask to start, stop and restart products
+  (`references/lifecycle.md`, "Being managed by a host lifecycle broker"): quit through both the
+  platform's quit and `SIGTERM`, stay in the background when opened non-activating, keep the
+  designated requirement stable, expose honest readiness. Measured on the first broker that
+  stops apps: a desktop app that closes its window on `SIGTERM` and keeps running, and one that
+  takes focus when launched in the background — both are what this section prevents.
+
 ## 0.6.1 - 2026-10-03
 
 ### Fixed
