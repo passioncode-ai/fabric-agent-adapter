@@ -11,6 +11,7 @@ Normative source: fabric-agent-contract docs/specification/service.md (DEC-0015)
 
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import errno
 import hashlib
@@ -22,12 +23,16 @@ from pathlib import Path
 import plistlib
 import re
 import secrets
+import shutil
+import signal
 import socketserver
 import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import traceback
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 import urllib.error
 import urllib.parse
@@ -36,6 +41,22 @@ import urllib.request
 PROTOCOL = "fabric-service/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/service/0.1"
 EXIT_ALREADY_RUNNING = 75
+# Lifecycle contract (fabric-workspace knowledge/lifecycle.md). A launchd-supervised copy that finds
+# the lock held backs off in-process for this long before its exit 75 (LC-03, F8): under KeepAlive
+# with ThrottleInterval 10 that is a few starts an hour instead of one every 10 s.
+SUPERVISOR_ENV = "FABRIC_SERVICE_SUPERVISOR"
+LOCK_WAIT_SUPERVISED_SECONDS = 300.0
+LOCK_BACKOFF_FIRST_SECONDS = 0.5
+LOCK_BACKOFF_MAX_SECONDS = 30.0
+# LC-01: SIGTERM reaches exit in at most 10 s with work in flight — drain 8 s, then hand over,
+# and a hard exit 2 s later if the hand-over itself hangs. ExitTimeOut sits above both.
+DRAIN_SECONDS = 8.0
+DRAIN_GRACE_SECONDS = 2.0
+EXIT_HARD_STOP = 70
+DEFAULT_EXIT_TIMEOUT = 15
+# LC-12: logs rotate by size, 5 x 5 MB by default.
+LOG_MAX_BYTES = 5 * 1024 * 1024
+LOG_BACKUPS = 5
 LOGIN_CODE_TTL_SECONDS = 120
 EVENTS_DEFAULT_LIMIT = 50
 EVENTS_MAX_LIMIT = 200
@@ -180,13 +201,42 @@ def _read_pid(path: Path) -> Optional[int]:
         return None
 
 
-def hold_single_instance(data_dir: Path) -> InstanceLock:
-    """Take the lock or exit 75 with one sentence naming the holder."""
-    try:
-        return InstanceLock(data_dir).acquire()
-    except AlreadyRunning as exc:
-        print(str(exc), file=sys.stderr)
-        raise SystemExit(EXIT_ALREADY_RUNNING)
+def supervised_by_launchd() -> bool:
+    """True when launchd started this process from a plist written by ``launchd_plist``.
+
+    The plist says so explicitly (``FABRIC_SERVICE_SUPERVISOR=launchd``); the parent process or
+    ``XPC_SERVICE_NAME`` is not evidence — a terminal inside an app carries one too."""
+    return os.environ.get(SUPERVISOR_ENV) == "launchd"
+
+
+def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *,
+                         sleep: Callable[[float], None] = time.sleep,
+                         clock: Callable[[], float] = time.monotonic) -> InstanceLock:
+    """Take the lock or exit 75 with one sentence naming the holder.
+
+    Started by hand, a held lock exits 75 at once. Under launchd (KeepAlive) an immediate exit
+    is a respawn every ThrottleInterval, forever; so a supervised copy first backs off in-process
+    (0.5 s doubling to 30 s, ``LOCK_WAIT_SUPERVISED_SECONDS`` in all), takes over if the holder
+    leaves, and exits 75 only when the wait runs out. Nothing has been touched while it waits.
+    ``wait_seconds`` overrides the choice (0 = never wait)."""
+    if wait_seconds is None:
+        wait_seconds = LOCK_WAIT_SUPERVISED_SECONDS if supervised_by_launchd() else 0.0
+    deadline = clock() + max(0.0, wait_seconds)
+    delay = LOCK_BACKOFF_FIRST_SECONDS
+    announced = False
+    while True:
+        try:
+            return InstanceLock(data_dir).acquire()
+        except AlreadyRunning as exc:
+            remaining = deadline - clock()
+            if remaining <= 0:
+                print(str(exc), file=sys.stderr)
+                raise SystemExit(EXIT_ALREADY_RUNNING)
+            if not announced:
+                print("%s Waiting up to %.0f s for it to exit." % (exc, remaining), file=sys.stderr, flush=True)
+                announced = True
+            sleep(min(delay, remaining))
+            delay = min(delay * 2, LOCK_BACKOFF_MAX_SECONDS)
 
 
 # --- token -------------------------------------------------------------------
@@ -533,6 +583,171 @@ class JsonlEventLog:
         return [r for r in rows if int(r["id"]) > floor][:limit]
 
 
+# --- logs (LC-12) ---------------------------------------------------------------
+
+class RotatingLog:
+    """One structured log: JSON lines rotated by size (5 x 5 MB by default), files 0600 in a
+    0700 directory. ``service.jsonl`` -> ``.1`` ... ``.<backups>``; the oldest falls off.
+
+    Never pass a token, a cookie, a login code or a request body that may carry one."""
+
+    def __init__(self, path: Path, max_bytes: int = LOG_MAX_BYTES, backups: int = LOG_BACKUPS):
+        if max_bytes < 256 or backups < 1:
+            raise ServiceError("A rotating log needs max_bytes >= 256 and at least one backup.")
+        self.path = Path(path)
+        self.max_bytes = max_bytes
+        self.backups = backups
+        self._lock = threading.Lock()
+
+    def _line(self, record: Dict[str, Any]) -> bytes:
+        data = (json.dumps(record, ensure_ascii=False) + "\n").encode()
+        if len(data) <= self.max_bytes:
+            return data
+        record = dict(record, truncated=True)
+        message = str(record.get("message", ""))
+        while message:
+            message = message[: len(message) // 2]
+            record["message"] = message
+            data = (json.dumps(record, ensure_ascii=False) + "\n").encode()
+            if len(data) <= self.max_bytes:
+                return data
+        return (json.dumps({"at": record.get("at"), "level": record.get("level"), "message": "",
+                            "truncated": True}) + "\n").encode()
+
+    def write(self, level: str, message: str, **fields: Any) -> None:
+        record: Dict[str, Any] = {"at": now_iso(), "level": str(level), "message": str(message)}
+        record.update(fields)
+        data = self._line(record)
+        with self._lock:
+            ensure_private_dir(self.path.parent)
+            try:
+                size = self.path.stat().st_size
+            except FileNotFoundError:
+                size = 0
+            if size and size + len(data) > self.max_bytes:
+                self._rotate()
+            fd = os.open(str(self.path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            try:
+                os.write(fd, data)
+            finally:
+                os.close(fd)
+
+    def _rotate(self) -> None:
+        for index in range(self.backups - 1, 0, -1):
+            older = Path("%s.%d" % (self.path, index))
+            if older.exists():
+                os.replace(older, "%s.%d" % (self.path, index + 1))
+        os.replace(self.path, "%s.1" % self.path)
+
+
+def cap_stdout_log(path: Path, max_bytes: int = LOG_MAX_BYTES) -> bool:
+    """Call once at start: a launchd stdout file over ``max_bytes`` is copied to ``<path>.1`` and
+    truncated in place. launchd holds the file open for append, so a rename would leave it
+    writing to the old name; truncation keeps its descriptor valid. Returns True when capped."""
+    path = Path(path)
+    try:
+        size = path.stat().st_size
+    except FileNotFoundError:
+        return False
+    if size <= max_bytes:
+        return False
+    backup = Path("%s.1" % path)
+    shutil.copyfile(path, backup)
+    os.chmod(backup, 0o600)
+    with open(path, "r+b") as handle:
+        handle.truncate(0)
+    return True
+
+
+# --- shutdown (LC-01) -------------------------------------------------------------
+
+class Stopping(ServiceError):
+    """The service is stopping and takes no new work."""
+
+
+class Drain:
+    """SIGTERM/SIGINT: stop taking new work, drain in-flight work until ``deadline``, then hand
+    over with ``on_stop(drained)``. A hand-over that hangs is cut by a hard exit
+    (``EXIT_HARD_STOP``) ``grace`` seconds later, so quit reaches exit inside the lifecycle bound.
+
+        drain = fs.Drain()
+        drain.install(lambda drained: server.shutdown(),
+                      on_stopping=lambda: log.append("service.stopping", "info", "Stopping."))
+        with drain.work():          # raises fs.Stopping once a stop has begun
+            ...
+    """
+
+    def __init__(self, deadline: float = DRAIN_SECONDS, grace: float = DRAIN_GRACE_SECONDS):
+        self.deadline = deadline
+        self.grace = grace
+        self._cond = threading.Condition()
+        self._inflight = 0
+        self._stopping = False
+
+    @property
+    def stopping(self) -> bool:
+        return self._stopping
+
+    @property
+    def inflight(self) -> int:
+        return self._inflight
+
+    @contextlib.contextmanager
+    def work(self):
+        with self._cond:
+            if self._stopping:
+                raise Stopping("The service is stopping and takes no new work.")
+            self._inflight += 1
+        try:
+            yield
+        finally:
+            with self._cond:
+                self._inflight -= 1
+                self._cond.notify_all()
+
+    def request_stop(self) -> bool:
+        """Refuse new work from now on; False when a stop had already begun."""
+        with self._cond:
+            if self._stopping:
+                return False
+            self._stopping = True
+            return True
+
+    def wait(self, timeout: Optional[float] = None) -> bool:
+        """Wait for in-flight work to finish; True when it did inside ``timeout``."""
+        end = None if timeout is None else time.monotonic() + timeout
+        with self._cond:
+            while self._inflight > 0:
+                left = None if end is None else end - time.monotonic()
+                if left is not None and left <= 0:
+                    return False
+                self._cond.wait(left)
+            return True
+
+    def install(self, on_stop: Callable[[bool], None], *, on_stopping: Optional[Callable[[], None]] = None,
+                signals: Sequence[int] = (signal.SIGTERM, signal.SIGINT)) -> "Drain":
+        """Install the handlers (main thread only). A second signal changes nothing: the hard-exit
+        timer already holds the deadline."""
+        def handler(_signum: int, _frame: Any) -> None:
+            if self.request_stop():
+                threading.Thread(target=self._stop, args=(on_stopping, on_stop), daemon=True).start()
+
+        for sig in signals:
+            signal.signal(sig, handler)
+        return self
+
+    def _stop(self, on_stopping: Optional[Callable[[], None]], on_stop: Callable[[bool], None]) -> None:
+        hard = threading.Timer(self.deadline + self.grace, os._exit, args=(EXIT_HARD_STOP,))
+        hard.daemon = True
+        hard.start()
+        if on_stopping is not None:
+            try:
+                on_stopping()
+            except Exception:  # a failing stop notice must not stop the drain
+                traceback.print_exc()
+        on_stop(self.wait(self.deadline))
+
+
 # --- operator login ----------------------------------------------------------
 
 class LoginCodes:
@@ -710,13 +925,18 @@ def cookie_value(cookie_header: Optional[str], name: str = SESSION_COOKIE) -> Op
 
 def launchd_plist(label: str, program_arguments: Sequence[str], *, working_directory: Path,
                   stdout_path: Path, environment: Optional[Dict[str, str]] = None,
-                  exit_timeout: int = 40) -> bytes:
-    """RunAtLoad + KeepAlive true + ThrottleInterval 10; no secret may appear in `environment`."""
+                  exit_timeout: int = DEFAULT_EXIT_TIMEOUT) -> bytes:
+    """RunAtLoad + KeepAlive true + ThrottleInterval 10; no secret may appear in `environment`.
+
+    ``ExitTimeOut`` (15 s) sits above the drain and its hard exit (``Drain``: 8 + 2 s), so launchd's
+    SIGKILL never arrives first. ``FABRIC_SERVICE_SUPERVISOR=launchd`` tells the lock to back off
+    instead of exiting into a respawn loop."""
     env = dict(environment or {})
     for key in env:
         if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)$", key) and not key.endswith("_FILE"):
             raise ServiceError("Environment variable %s looks like a secret; pass a *_FILE path instead." % key)
     env.setdefault("PATH", "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+    env[SUPERVISOR_ENV] = "launchd"
     plist = {
         "Label": label,
         "ProgramArguments": list(program_arguments),
@@ -756,17 +976,47 @@ def fetch_well_known(origin: str, timeout: float = 2.0) -> Optional[Dict[str, An
         return None
 
 
+_OVERRIDE_ROW = re.compile(r'^\s*"([^"]+)"\s*=>\s*(\S+)\s*$')
+
+
+def launchd_override(label: str) -> Optional[str]:
+    """The operator's launchd override for ``label``: ``"disabled"``, ``"enabled"``, None when
+    none is recorded (a first install), or ``"unknown"`` when the table cannot be read.
+
+    Reads ``launchctl print-disabled gui/<uid>``; macOS 14+ prints ``=> disabled|enabled``,
+    older releases ``=> true|false`` (true means disabled)."""
+    result = _launchctl("print-disabled", _domain())
+    if result.returncode != 0:
+        return "unknown"
+    for line in result.stdout.splitlines():
+        match = _OVERRIDE_ROW.match(line)
+        if match and match.group(1) == label:
+            return "disabled" if match.group(2) in ("disabled", "true") else "enabled"
+    return None
+
+
 def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin: str,
-                    service_id: str, instance: str = "default", timeout: float = 40.0) -> Dict[str, Any]:
+                    service_id: str, instance: str = "default", timeout: float = 40.0,
+                    force_enable: bool = False) -> Dict[str, Any]:
     """Write + lint the plist, bootout and WAIT for unload, bootstrap (retry EIO 5), then
-    poll the well-known document until it answers with this identity."""
+    poll the well-known document until it answers with this identity.
+
+    The operator's intent wins (LC-14): only a first install (no override recorded) enables the
+    label. A label the operator disabled stays disabled and unloaded — the plist is still
+    rewritten, so the new release is what starts once they turn it back on — and the answer is
+    ``{"disabled": True, "label", "plist", "loaded"}`` instead of the well-known document.
+    ``force_enable`` is for an operator who asked for the service to be switched on."""
     plist_path = Path(plist_path)
     atomic_write(plist_path, plist_bytes, 0o644)
     lint = subprocess.run(["plutil", "-lint", str(plist_path)], capture_output=True, text=True)
     if lint.returncode != 0:
         raise ServiceError("plist failed plutil -lint: %s" % lint.stdout.strip())
     target = "%s/%s" % (_domain(), label)
-    _launchctl("enable", target)
+    override = launchd_override(label)
+    if force_enable or override is None:
+        _launchctl("enable", target)
+    elif override == "disabled":
+        return {"disabled": True, "label": label, "plist": str(plist_path), "loaded": launchd_loaded(label)}
     _launchctl("bootout", target)
     deadline = time.time() + 15
     while launchd_loaded(label) and time.time() < deadline:
@@ -789,12 +1039,66 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))
 
 
-def launchd_uninstall(label: str, plist_path: Path) -> None:
-    _launchctl("bootout", "%s/%s" % (_domain(), label))
+def launchd_uninstall(label: str, plist_path: Path, *, timeout: float = 30.0, purge: bool = False,
+                      service_id: Optional[str] = None) -> Dict[str, Any]:
+    """Symmetric with ``launchd_install`` (LC-14): bootout and WAIT until the job is gone, remove
+    the plist, and reset the override to ``enabled`` — launchctl has no verb that deletes an
+    override, and a leftover ``disabled`` would make a later fresh install stay off. Data stays
+    unless ``purge`` (then ``service_id`` names whose data, logs and cache go). A job still
+    loaded at ``timeout`` raises, leaving the plist and data in place."""
+    if purge and not service_id:
+        raise ServiceError("purge needs the service id whose data, logs and cache to remove.")
+    target = "%s/%s" % (_domain(), label)
+    _launchctl("bootout", target)
+    deadline = time.monotonic() + timeout
+    while launchd_loaded(label):
+        if time.monotonic() >= deadline:
+            raise ServiceError("launchd job %s is still loaded %.0f s after bootout; nothing was removed." % (label, timeout))
+        time.sleep(0.1)
     try:
         Path(plist_path).unlink()
+        plist_removed = True
     except FileNotFoundError:
-        pass
+        plist_removed = False
+    _launchctl("enable", target)
+    purged: List[str] = []
+    if purge:
+        for directory in service_dirs(str(service_id)).values():
+            if directory.is_symlink():
+                directory.unlink()
+            elif directory.exists():
+                shutil.rmtree(directory)
+            else:
+                continue
+            purged.append(str(directory))
+    return {"unloaded": True, "plistRemoved": plist_removed, "override": "enabled", "purged": purged}
+
+
+def prune_releases(releases_dir: Path, keep: int = 2, *, current: Optional[Path] = None) -> List[Path]:
+    """Keep the release the job runs and the one before it (LC-11 rollback, LC-15); remove
+    older release directories, newest first by modification time. ``current`` (a release or a
+    symlink to one) is never removed, even after a rollback to an older release. Symlinks and
+    files in ``releases_dir`` are left alone. Returns what was removed."""
+    if keep < 2:
+        raise ServiceError("keep at least the current release and the one before it (keep >= 2).")
+    root = Path(releases_dir)
+    if not root.is_dir():
+        return []
+    releases = [p for p in root.iterdir() if p.is_dir() and not p.is_symlink()]
+    releases.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    keepers: List[Path] = []
+    if current is not None:
+        resolved = Path(current).resolve()
+        keepers.extend(p for p in releases if p.resolve() == resolved)
+    for release in releases:
+        if len(keepers) >= keep:
+            break
+        if release not in keepers:
+            keepers.append(release)
+    removed = [p for p in releases if p not in keepers]
+    for release in removed:
+        shutil.rmtree(release)
+    return removed
 
 
 # --- helpers for input validation -----------------------------------------------

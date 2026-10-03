@@ -15,7 +15,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.6.1"
+  version: "0.7.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "2ce392291c6668598d12cd38327e24696b5ca15c"
@@ -90,7 +90,9 @@ are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
 2. **One copy, locked before any side effect.** Take the exclusive lock on
    `<data>/service.lock` first — before resuming jobs, starting a scheduler, migrating
    a store or even creating a token. Held → print one sentence naming the holder's pid
-   and exit **75**. Binding the port is not a lock. *(A second copy re-queued the first
+   and exit **75**. Binding the port is not a lock. Under launchd the kit backs off
+   in-process first (up to 300 s), so a duplicate is a few starts an hour, not a
+   `KeepAlive` respawn every 10 s. *(A second copy re-queued the first
    copy's running jobs in its startup hook, before its bind failed.)*
 3. **launchd is the only supervisor.** `RunAtLoad` true, `KeepAlive` true,
    `ThrottleInterval` 10, `ExitTimeOut` above your drain time. Never start yourself
@@ -129,7 +131,7 @@ Startup order is the part that goes wrong; keep it exactly:
 import fabric_service as fs
 
 dirs = fs.service_dirs("example-agent")
-lock = fs.hold_single_instance(dirs["data"])        # 1. lock — exits 75 if held
+lock = fs.hold_single_instance(dirs["data"])        # 1. lock — exits 75 if held (backs off first under launchd)
 token = fs.ensure_token(dirs["data"] / "service.token")  # 2. only now touch state
 log = fs.JsonlEventLog(dirs["data"] / "events.jsonl")    #    (or a view over your own log)
 codes = fs.LoginCodes(dirs["data"] / "auth")
@@ -149,8 +151,10 @@ On every request call `check_request(port, host, origin, sec_fetch_site)` and an
 | `POST /fabric/v1/login-code` | service token | `LoginCodes.issue()` |
 | `GET /fabric/v1/login?code=` | the code | `LoginCodes.redeem(code)` → `Set-Cookie: session_cookie_header(...)`, 302 to the dashboard |
 
-`SIGTERM` drains in-flight work within `ExitTimeOut`, then exits; interrupted work
-resumes on the next start.
+`SIGTERM` drains in-flight work, then exits — 10 s at most, inside `ExitTimeOut`
+(`fs.Drain` / `new Drain()`: `with drain.work():` refuses new work once a stop began);
+interrupted work resumes on the next start. Log through `RotatingLog` (5 × 5 MB, 0600)
+and call `cap_stdout_log` once at start.
 
 The MCP surface (`POST /mcp`, service token) is `fabric_interop.McpToolServer.handle`
 in Python; jobs live in `fabric_interop.JobStore(dirs["data"] / "jobs")`, created after
@@ -171,8 +175,11 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
 2. `launchd_plist(...)` then `launchd_install(...)` — writes and lints the plist,
    `bootout` and waits for the unload, `bootstrap` with retries on the transient I/O
    error, then polls the well-known document until it answers with **this** identity.
-3. Uninstall: `launchd_uninstall`, `remove_descriptor`; keep data unless the operator
-   asks to purge.
+   A label the operator disabled stays disabled: only a first install enables.
+3. Uninstall: `launchd_uninstall` (waits for the unload, removes the plist, resets the
+   override; `purge=True` removes data only when the operator asks), `remove_descriptor`.
+4. After an upgrade, `prune_releases(releases_dir, current=…)` keeps the running release
+   and the one before it.
 
 Code runs from an immutable release directory; an upgrade writes a new release,
 rewrites the plist and restarts. Read [the lifecycle reference](references/lifecycle.md)

@@ -23,6 +23,20 @@ def fake_plugin(home):
         {"version": 2, "plugins": {"fabric-agent-adapter@fabric-agent-adapter": [{"installPath": str(install)}]}}))
 
 
+def launcher_links(home):
+    """Hub links the PassionCode launcher owns: ~/.agents/skills/<name> -> ~/.passioncode/current/..."""
+    links = {}
+    for name in SKILLS:
+        target = home / ".passioncode/current/plugins/fabric-agent-adapter/skills" / name
+        target.mkdir(parents=True)
+        (target / "SKILL.md").write_text("launcher copy")
+        link = home / ".agents/skills" / name
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target)
+        links[name] = (link, target)
+    return links
+
+
 class InstallerTests(unittest.TestCase):
     def test_default_installs_into_the_agents_hub_and_never_into_claude(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -53,6 +67,40 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(shadow.exists())
             self.assertTrue(any((home / ".claude/skills-shadow-backup").iterdir()))
+
+    def test_launcher_managed_hub_links_survive_force(self):
+        # LC-14 / F16: one owner per artefact on disk. A plain copy over the launcher's link
+        # freezes the skill at this version and the launcher no longer updates it.
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            links = launcher_links(home)
+            result = run(home, "--force")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for name, (link, target) in links.items():
+                self.assertTrue(link.is_symlink(), name)
+                self.assertEqual(Path(os.readlink(link)), target)
+            self.assertIn("npx @passioncode-ai/passioncode@latest update", result.stdout)
+
+    def test_install_sh_leaves_launcher_links_alone(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            links = launcher_links(home)
+            result = subprocess.run(["bash", str(ROOT / "install.sh")], capture_output=True, text=True,
+                                    env=dict(os.environ, HOME=str(home)))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for name, (link, target) in links.items():
+                self.assertTrue(link.is_symlink(), name)
+                self.assertEqual(Path(os.readlink(link)), target)
+            self.assertIn("passioncode", result.stdout)
+
+    def test_install_sh_still_installs_where_nothing_is_managed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            result = subprocess.run(["bash", str(ROOT / "install.sh")], capture_output=True, text=True,
+                                    env=dict(os.environ, HOME=str(home)))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for name in SKILLS:
+                self.assertTrue((home / ".agents/skills" / name / "SKILL.md").is_file())
 
     def test_unknown_arguments_are_a_usage_error(self):
         with tempfile.TemporaryDirectory() as temp:
