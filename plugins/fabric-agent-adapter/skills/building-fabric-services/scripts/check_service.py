@@ -4,6 +4,13 @@
   check_service.py <id>[.<instance>]          # find the descriptor in the services directory
   check_service.py --descriptor PATH
   options: --services-dir DIR  --json  --skip-login
+           --ca-file PEM  --connect HOST:PORT     (remote placement: trust a test CA; dial another address)
+
+A remote placement (DEC-0019 — an online agent or dashboard at an https origin) is probed over
+TLS with the certificate verified: the well-known document must refuse a request without the
+token (401, empty body), the guards must refuse a foreign Host/Origin and cross-site requests,
+and the session cookie must be __Host- and Secure. Loopback, launchd, lock and state rules do
+not apply to it and are reported NOT_RUN with that reason.
 
 Every rule gets PASS, FAIL or NOT_RUN with its evidence. Exit 0 when nothing
 FAILs, 1 when something does, 2 on a usage error. The probe only reads, except
@@ -30,7 +37,10 @@ import shutil
 import stat
 import subprocess
 import sys
+import socket
+import ssl
 import time
+import urllib.parse
 from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -145,8 +155,42 @@ def priority_problems(plist: dict) -> list:
     return out
 
 
+# A platform router (Heroku, Fly, Render, a CDN) routes by Host, so a request naming a foreign
+# Host never reaches an online service: the router itself answers, typically 404 or 421. That is
+# still a refusal — the service disclosed nothing — so for a remote placement the host check
+# accepts it, as long as the body is not the well-known document. Every other guard request names
+# the right Host, reaches the service, and must be the service's own 403.
+PLATFORM_HOST_REFUSALS = (400, 404, 421)
+
+
+def guard_verdict(rule: str, remote: bool, status: int, body: bytes) -> Tuple[str, str]:
+    if status == 403:
+        return "PASS", "HTTP 403"
+    disclosed = b"fabric-service/" in (body or b"")
+    if rule == "network.host-check" and remote and status in PLATFORM_HOST_REFUSALS and not disclosed:
+        return "PASS", "HTTP %d from the platform router: a foreign Host never reaches the service" % status
+    return "FAIL", "HTTP %d%s" % (status, ", and the body is the well-known document" if disclosed else "")
+
+
+class _PinnedHTTPS(http.client.HTTPSConnection):
+    """HTTPS to the origin's name (SNI, certificate, Host) over a socket dialled elsewhere."""
+
+    def __init__(self, name: str, port: int, dial: Tuple[str, int], context: ssl.SSLContext, timeout: float):
+        super().__init__(name, port, context=context, timeout=timeout)
+        self._dial = dial
+        self._ctx = context
+
+    def connect(self) -> None:
+        raw = socket.create_connection(self._dial, timeout=self.timeout)
+        self.sock = self._ctx.wrap_socket(raw, server_hostname=self.host)
+
+
 class Probe:
-    def __init__(self, descriptor_path: Path, descriptor: Dict[str, Any], services_dir: Path, skip_login: bool):
+    def __init__(self, descriptor_path: Path, descriptor: Dict[str, Any], services_dir: Path, skip_login: bool,
+                 ca_file: Optional[str] = None, connect: Optional[str] = None):
+        self.remote = fs.placement_of(descriptor) == "remote"
+        self.ca_file = ca_file
+        self.connect = connect
         self.path = descriptor_path
         self.d = descriptor
         self.dir = services_dir
@@ -164,6 +208,13 @@ class Probe:
         # The era of the last answer that carried a JSON-RPC object. `mcp_era` routes requests;
         # this one is what interop.mcp-revision reports, so an accepted-but-empty answer is not "served".
         self.mcp_answered: Optional[str] = None
+        self.netloc = ""
+        if self.remote:
+            parts = urllib.parse.urlsplit(str(descriptor.get("origin", "")))
+            self.netloc = parts.netloc
+            self.host_name = parts.hostname or ""
+            self.port = (parts.port or 443) if not fs.remote_origin_problems(descriptor.get("origin")) else 0
+            return
         try:
             self.port = fs.port_of(str(descriptor.get("origin", "")))
         except fs.ServiceError:
@@ -174,8 +225,17 @@ class Probe:
 
     def request(self, method: str, path: str, headers: Optional[Dict[str, str]] = None,
                 body: Optional[bytes] = None) -> Tuple[int, Dict[str, str], bytes]:
-        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
-        base = {"Host": "127.0.0.1:%d" % self.port}
+        if self.remote:
+            context = ssl.create_default_context(cafile=self.ca_file) if self.ca_file else ssl.create_default_context()
+            if self.connect:
+                host, _, port = self.connect.rpartition(":")
+                conn = _PinnedHTTPS(self.host_name, self.port, (host, int(port)), context, 8)
+            else:
+                conn = http.client.HTTPSConnection(self.host_name, self.port, context=context, timeout=8)
+            base = {"Host": self.netloc}
+        else:
+            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+            base = {"Host": "127.0.0.1:%d" % self.port}
         base.update(headers or {})
         try:
             conn.request(method, path, body=body, headers=base)
@@ -204,17 +264,32 @@ class Probe:
                 continue
             if key == me:
                 clashes.append("%s declared again in %s" % (me, path.name))
-            elif other.get("origin") == self.d.get("origin"):
+            elif not self.remote and fs.placement_of(other) != "remote" and other.get("origin") == self.d.get("origin"):
                 clashes.append("port %d also claimed by %s" % (self.port, key))
-        self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or "port %d is unique" % self.port)
+        unique = "a remote origin claims no port here" if self.remote else "port %d is unique" % self.port
+        self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
 
     # well-known ----------------------------------------------------------------
     def well_known_rules(self) -> None:
+        protected: Dict[str, str] = {}
+        if self.remote:
+            try:
+                status, _, body = self.request("GET", "/.well-known/fabric-service")
+            except (OSError, ssl.SSLError) as exc:
+                self.add("well-known.answers", "FAIL", "no TLS answer on %s: %s" % (self.d.get("origin"), exc))
+                return
+            self.add("well-known.requires-token", "PASS" if status == 401 and not body else "FAIL",
+                     "HTTP %d without a token, %d byte(s)" % (status, len(body)))
+            self.read_token()
+            if not self.token:
+                self.add("well-known.answers", "NOT_RUN", "no readable token to ask with")
+                return
+            protected = self.auth_headers()
         try:
             timings = []
             for _ in range(3):
                 started = time.perf_counter()
-                status, headers, body = self.request("GET", "/.well-known/fabric-service")
+                status, headers, body = self.request("GET", "/.well-known/fabric-service", protected)
                 timings.append((time.perf_counter() - started) * 1000)
         except OSError as exc:
             self.add("well-known.answers", "FAIL", "no answer on %s: %s" % (self.d.get("origin"), exc))
@@ -229,7 +304,10 @@ class Probe:
             return
         self.add("well-known.answers", "PASS", "HTTP 200")
         median = sorted(timings)[1]
-        self.add("well-known.fast", "PASS" if median < 100 else "FAIL", "median %.1f ms" % median)
+        if self.remote:
+            self.add("well-known.fast", "PASS" if median < 8000 else "FAIL", "median %.1f ms (remote: no 100 ms budget)" % median)
+        else:
+            self.add("well-known.fast", "PASS" if median < 100 else "FAIL", "median %.1f ms" % median)
         wk = self.wk
         problems = []
         if wk.get("protocol") != fs.PROTOCOL:
@@ -261,10 +339,19 @@ class Probe:
             ("network.cross-site-check", {"Sec-Fetch-Site": "cross-site"}),
         ):
             try:
-                status, _, _ = self.request("GET", "/.well-known/fabric-service", headers)
-                self.add(rule, "PASS" if status == 403 else "FAIL", "HTTP %d" % status)
-            except OSError as exc:
+                sent = dict(headers)
+                if self.remote:
+                    sent.update(self.auth_headers())
+                    if "Origin" in sent:
+                        sent["Origin"] = "https://evil.example"
+                status, _, body = self.request("GET", "/.well-known/fabric-service", sent)
+                verdict, evidence = guard_verdict(rule, self.remote, status, body)
+                self.add(rule, verdict, evidence)
+            except (OSError, ssl.SSLError) as exc:
                 self.add(rule, "NOT_RUN", str(exc))
+        if self.remote:
+            self.add("network.loopback-only", "NOT_RUN", "a remote placement is reached over https, not loopback")
+            return
         if not shutil.which("lsof"):
             self.add("network.loopback-only", "NOT_RUN", "lsof is not installed")
             return
@@ -275,13 +362,18 @@ class Probe:
                  ", ".join(names) or "nothing listens on %d" % self.port)
 
     # auth, events, login ----------------------------------------------------------
-    def auth_rules(self) -> None:
+    def read_token(self) -> None:
+        if any(r["rule"] == "auth.token-file" for r in self.results):
+            return
         token_file = str((self.d.get("auth") or {}).get("tokenFile", ""))
         try:
             self.token = fs.read_token(fs.expand(token_file))
             self.add("auth.token-file", "PASS", "%s is 0600 and owned by you" % token_file)
         except (fs.ServiceError, OSError) as exc:
             self.add("auth.token-file", "FAIL", str(exc))
+
+    def auth_rules(self) -> None:
+        self.read_token()
         events_path = ((self.wk or {}).get("surfaces") or {}).get("events", {}).get("path", "/fabric/v1/events")
         try:
             status, _, _ = self.request("GET", events_path + "?limit=1")
@@ -335,6 +427,10 @@ class Probe:
             return
         cookie = headers1.get("set-cookie", "")
         ok = status1 in (302, 303) and "HttpOnly" in cookie and "SameSite=Strict" in cookie and status2 not in (302, 303)
+        if self.remote:
+            host_bound = cookie.startswith("__Host-") and "Secure" in cookie and "Path=/" in cookie and "domain=" not in cookie.lower()
+            self.add("login.cookie-host-bound", "PASS" if host_bound else "FAIL",
+                     "the session cookie is __Host-, Secure, Path=/, no Domain" if host_bound else "cookie: %s" % cookie.split(";", 1)[0].split("=")[0])
         self.add("login.single-use", "PASS" if ok else "FAIL",
                  "first redeem HTTP %d (%s), second HTTP %d" % (status1, "cookie ok" if "HttpOnly" in cookie else "no HttpOnly cookie", status2))
 
@@ -625,6 +721,9 @@ class Probe:
 
     # lifecycle ----------------------------------------------------------------
     def lifecycle_rules(self) -> None:
+        if self.remote:
+            self.add("lifecycle.platform", "NOT_RUN", "a remote placement is supervised by its platform; launchd, lock and state rules do not apply")
+            return
         life = self.d.get("lifecycle") or {}
         data = fs.expand(str((self.d.get("paths") or {}).get("data", "~/")))
         inside = subprocess.run(["git", "-C", str(data), "rev-parse", "--show-toplevel"], capture_output=True, text=True) if data.is_dir() and shutil.which("git") else None
@@ -748,6 +847,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--services-dir")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--skip-login", action="store_true")
+    parser.add_argument("--ca-file", help="remote placement: trust this CA bundle instead of the system store (tests)")
+    parser.add_argument("--connect", help="remote placement: dial HOST:PORT while speaking TLS to the origin's name (tests)")
     args = parser.parse_args(argv)
     if not args.target and not args.descriptor:
         parser.print_usage(sys.stderr)
@@ -759,7 +860,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     except (OSError, ValueError) as exc:
         print("No readable descriptor at %s: %s" % (path, exc), file=sys.stderr)
         return 1
-    results = Probe(path, descriptor, services_dir, args.skip_login).run()
+    results = Probe(path, descriptor, services_dir, args.skip_login, args.ca_file, args.connect).run()
     failed = sum(r["verdict"] == "FAIL" for r in results)
     if args.json:
         print(json.dumps({"descriptor": str(path), "results": results, "failed": failed}, indent=2))

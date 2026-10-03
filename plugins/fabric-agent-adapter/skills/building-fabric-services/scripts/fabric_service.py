@@ -30,6 +30,7 @@ import tempfile
 import time
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 import urllib.error
+import urllib.parse
 import urllib.request
 
 PROTOCOL = "fabric-service/0.1"
@@ -45,6 +46,10 @@ _ID = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
 _INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 _KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}$")
 _ORIGIN = re.compile(r"^http://127\.0\.0\.1:([0-9]{3,5})$")
+# DEC-0019: a remote placement — an online agent or dashboard — lives at an https DNS name.
+_REMOTE_ORIGIN = re.compile(r"^https://((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?::([0-9]{1,5}))?$")
+_RESERVED_HOST = re.compile(r"(^|\.)(localhost|local|internal|home\.arpa|lan|localdomain)$")
+PLACEMENTS = ("local", "remote")
 _CODE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
 _TRACE_ID = re.compile(r"^(?!0{32}$)[0-9a-f]{32}$")
 _SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
@@ -275,7 +280,12 @@ def read_descriptors(directory: Optional[Path] = None) -> List[Tuple[Path, Dict[
 def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
     """Structural checks mirroring service-descriptor.schema.json (the schema stays normative)."""
     problems: List[str] = []
-    required = ("protocol", "id", "instance", "name", "origin", "auth", "lifecycle", "paths", "installedAt", "installedBy")
+    remote = placement_of(descriptor) == "remote"
+    if "placement" in descriptor and descriptor["placement"] not in PLACEMENTS:
+        problems.append("placement must be local or remote")
+    required = ("protocol", "id", "instance", "name", "origin", "auth", "lifecycle", "installedAt", "installedBy")
+    if not remote:
+        required = required + ("paths",)
     for key in required:
         if key not in descriptor:
             problems.append("missing %s" % key)
@@ -287,7 +297,9 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         problems.append("id must match %s" % _ID.pattern)
     if not _INSTANCE.match(str(descriptor["instance"])):
         problems.append("instance must match %s" % _INSTANCE.pattern)
-    if not _ORIGIN.match(str(descriptor["origin"])):
+    if remote:
+        problems.extend(remote_origin_problems(descriptor["origin"]))
+    elif not _ORIGIN.match(str(descriptor["origin"])):
         problems.append("origin must be http://127.0.0.1:<port>")
     auth = descriptor.get("auth") or {}
     if "tokenFile" not in auth:
@@ -301,6 +313,14 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         problems.append("lifecycle.manager must be launchd or none")
     if life.get("manager") == "launchd" and not (life.get("label") and str(life.get("plist", "")).endswith(".plist")):
         problems.append("a launchd service declares label and plist")
+    if remote:
+        if life.get("manager") != "none":
+            problems.append("a remote service is supervised by its platform: lifecycle.manager must be none")
+        for field in ("label", "plist"):
+            if field in life:
+                problems.append("a remote service has no launchd %s" % field)
+        if "update" in (descriptor.get("commands") or {}):
+            problems.append("a remote service declares no update command")
     for name, argv in (descriptor.get("commands") or {}).items():
         if name not in ("doctor", "update"):
             problems.append("unknown command %s" % name)
@@ -309,6 +329,23 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         elif not re.match(r"^(~/|/)", argv[0]):
             problems.append("command %s must start with an absolute or ~/ executable" % name)
     return problems
+
+
+def placement_of(descriptor: Dict[str, Any]) -> str:
+    """DEC-0019: ``local`` unless the descriptor says ``remote``."""
+    return "remote" if (descriptor or {}).get("placement") == "remote" else "local"
+
+
+def remote_origin_problems(origin: Any) -> List[str]:
+    """Problems with a remote origin: https, a public DNS name, an optional port, nothing else."""
+    match = _REMOTE_ORIGIN.match(str(origin or ""))
+    if not match:
+        return ["a remote origin must be https://<dns-name>[:<port>] with no path, query or IP literal"]
+    if _RESERVED_HOST.search(match.group(1)):
+        return ["a remote service cannot live on the reserved name %s" % match.group(1)]
+    if match.group(2) is not None and not 1 <= int(match.group(2)) <= 65535:
+        return ["the origin port is out of range"]
+    return []
 
 
 def port_of(origin: str) -> int:
@@ -325,10 +362,11 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
     root = directory or services_dir()
     me = "%s.%s" % (descriptor["id"], descriptor["instance"])
-    port = port_of(descriptor["origin"])
+    # DEC-0019: only a local placement claims a port on this computer.
+    port = None if placement_of(descriptor) == "remote" else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):
         key = "%s.%s" % (other.get("id"), other.get("instance", "default"))
-        if key == me:
+        if key == me or port is None:  # a remote origin's port is another computer's
             continue
         try:
             other_port = port_of(str(other.get("origin", "")))
@@ -501,18 +539,33 @@ class LoginCodes:
     """Single-use login codes (<=120 s), recorded as used BEFORE they are honoured,
     and HMAC-signed session cookies revoked by rotating the key."""
 
-    def __init__(self, state_dir: Path, ttl: int = LOGIN_CODE_TTL_SECONDS):
-        self.dir = ensure_private_dir(Path(state_dir))
+    def __init__(self, state_dir: Optional[Path], ttl: int = LOGIN_CODE_TTL_SECONDS, *,
+                 store: Optional["MemoryCodeStore"] = None, key: Optional[bytes] = None):
+        # A local service keeps codes and the key in files. An online one (DEC-0019) usually has no
+        # durable disk: pass state_dir=None with store=MemoryCodeStore() (a restart forgets every
+        # code, so none can be replayed) and key= bytes from a platform secret (sessions survive a deploy).
         self.ttl = min(ttl, LOGIN_CODE_TTL_SECONDS)
-        self._key_path = self.dir / "session.key"
-        self._codes_path = self.dir / "login-codes.json"
+        self._store = store
+        self._fixed_key = key
+        if state_dir is not None:
+            self.dir = ensure_private_dir(Path(state_dir))
+            self._key_path = self.dir / "session.key"
+            self._codes_path = self.dir / "login-codes.json"
+        elif store is None or key is None:
+            raise ServiceError("LoginCodes without a state directory needs store= and key=.")
+        if key is not None and len(key) < 32:
+            raise ServiceError("the session key must be at least 32 bytes.")
 
     def _key(self) -> bytes:
+        if self._fixed_key is not None:
+            return bytes(self._fixed_key)
         if not self._key_path.exists():
             atomic_write(self._key_path, secrets.token_bytes(32), 0o600)
         return self._key_path.read_bytes()
 
     def _load(self) -> Dict[str, Any]:
+        if self._store is not None:
+            return self._store.load()
         try:
             return json.loads(self._codes_path.read_text())
         except (OSError, ValueError):
@@ -521,6 +574,9 @@ class LoginCodes:
     def _save(self, codes: Dict[str, Any]) -> None:
         horizon = time.time() - 3600
         codes = {k: v for k, v in codes.items() if v.get("expires", 0) > horizon}
+        if self._store is not None:
+            self._store.save(codes)
+            return
         atomic_write(self._codes_path, json.dumps(codes).encode(), 0o600)
 
     def issue(self) -> Dict[str, str]:
@@ -559,14 +615,87 @@ class LoginCodes:
         return hmac.compare_digest(mac, expected)
 
     def revoke_all(self) -> None:
+        if self._fixed_key is not None:
+            raise ServiceError("a platform-held session key is rotated on the platform, not here.")
         atomic_write(self._key_path, secrets.token_bytes(32), 0o600)
 
 
+class MemoryCodeStore:
+    """DEC-0019: a login-code store held in memory — for an online service with no durable disk."""
+
+    def __init__(self) -> None:
+        self._codes: Dict[str, Any] = {}
+
+    def load(self) -> Dict[str, Any]:
+        return json.loads(json.dumps(self._codes))
+
+    def save(self, codes: Dict[str, Any]) -> None:
+        self._codes = json.loads(json.dumps(codes))
+
+
 SESSION_COOKIE = "fabric_session"
+REMOTE_SESSION_COOKIE = "__Host-fabric_session"
 
 
 def session_cookie_header(value: str, max_age: int = 30 * 86400) -> str:
     return "%s=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d" % (SESSION_COOKIE, value, max_age)
+
+
+def remote_session_cookie_header(value: str, max_age: int = 30 * 86400) -> str:
+    """DEC-0019: the remote cookie — __Host- name, Secure, no Domain, Path=/."""
+    return "%s=%s; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=%d" % (REMOTE_SESSION_COOKIE, value, max_age)
+
+
+def check_remote_request(origin: str, host: Optional[str], request_origin: Optional[str] = None,
+                         sec_fetch_site: Optional[str] = None, forwarded_proto: Optional[str] = None) -> Optional[str]:
+    """DEC-0019: the request guard of an online service; returns the refusal sentence or None.
+    ``forwarded_proto`` is the platform-set scheme where TLS ends before the process; pass None
+    when the process terminates TLS itself."""
+    own = urllib.parse.urlsplit(origin)
+    own_host = own.netloc.lower()
+    if str(host or "").lower() != own_host:
+        return "Host %s is not this service." % host
+    if forwarded_proto is not None and str(forwarded_proto).split(",")[0].strip() != "https":
+        return "This service answers over https only."
+    if request_origin is not None and request_origin != "%s://%s" % (own.scheme, own_host):
+        return "Origin %s is not this service." % request_origin
+    if sec_fetch_site == "cross-site":
+        return "Cross-site requests are refused."
+    return None
+
+
+def well_known_allowed(placement: str, authorization: Optional[str], token: str, scheme: str = "Bearer") -> bool:
+    """DEC-0019: a local service answers anyone (the loopback guard already ran); a remote one only
+    the bearer of the service token. False is a 401 with an EMPTY body."""
+    return placement != "remote" or token_matches(authorization, token, scheme)
+
+
+def remote_token_file(service_id: str, instance: str = "default", directory: Optional[Path] = None) -> Path:
+    return (directory or services_dir()).parent / "tokens" / ("%s.%s.token" % (service_id, instance))
+
+
+def register_remote(*, service_id: str, name: str, origin: str, token: str, instance: str = "default",
+                    summary: Optional[str] = None, doctor: Optional[List[str]] = None,
+                    directory: Optional[Path] = None, installed_by: str = "fabric-service register-remote") -> Path:
+    """DEC-0019, installer side: register an online service on THIS computer — the token file
+    (0600, never printed) and the descriptor. The same token is set on the platform as a secret."""
+    if not token or len(token.strip()) < 16:
+        raise ServiceError("the service token must be at least 16 characters.")
+    root = directory or services_dir()
+    token_file = remote_token_file(service_id, instance, root)
+    descriptor: Dict[str, Any] = {"protocol": PROTOCOL, "id": service_id, "instance": instance, "name": name,
+                                  "placement": "remote", "origin": origin, "auth": {"tokenFile": str(token_file)},
+                                  "lifecycle": {"manager": "none"}, "installedAt": now_iso(), "installedBy": installed_by}
+    if summary:
+        descriptor["summary"] = summary
+    if doctor:
+        descriptor["commands"] = {"doctor": list(doctor)}
+    problems = validate_descriptor(descriptor)
+    if problems:
+        raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
+    ensure_private_dir(token_file.parent)
+    atomic_write(token_file, token.strip().encode(), 0o600)
+    return write_descriptor(descriptor, root)
 
 
 def cookie_value(cookie_header: Optional[str], name: str = SESSION_COOKIE) -> Optional[str]:

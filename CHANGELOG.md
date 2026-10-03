@@ -46,6 +46,55 @@
 
   It also pins the spec's encoding table, and the live-sample test now pins `interop.mcp-revision`.
 
+## 0.6.2 - 2026-10-03
+
+### Added
+
+- **`building-fabric-services` says how a product behaves under a host lifecycle broker** — the
+  always-on per-user service agents ask to start, stop and restart products
+  (`references/lifecycle.md`, "Being managed by a host lifecycle broker"): quit through both the
+  platform's quit and `SIGTERM`, stay in the background when opened non-activating, keep the
+  designated requirement stable, expose honest readiness. Measured on the first broker that
+  stops apps: a desktop app that closes its window on `SIGTERM` and keeps running, and one that
+  takes focus when launched in the background — both are what this section prevents.
+
+## 0.6.1 - 2026-10-03
+
+### Fixed
+
+- **`check_service.py` no longer fails every online service hosted behind a platform router.**
+  `network.host-check` required the service's own `403`, but Heroku, Fly, Render and CDNs route
+  by `Host`: a foreign one is answered by the router (`404`/`421`) and never reaches the process.
+  For a remote placement that answer now passes, unless its body is the well-known document. The
+  Origin and cross-site checks are unchanged — they reach the service and need its `403`. Found on
+  the first real online service: 26 PASS and 1 false FAIL before, 0 FAIL after (`guard_verdict`,
+  `test/test_fabric_service_remote.py::GuardVerdict`, 4 mutations killed).
+
+## 0.6.0 - 2026-10-02
+
+### Added
+
+- **Online agents and dashboards become Fabric services** — the remote placement of
+  `fabric-service/0.1` (Fabric Agent Contract DEC-0019). `building-fabric-services` gains the
+  section *Online services — the remote placement* and `references/remote-placement.md`; its
+  boundary no longer excludes an online agent, only a hosted product with no agent behind it.
+- **Kits (Node and Python, the same rules):** `checkRemoteRequest` / `check_remote_request` (Host,
+  Origin, cross-site, a forwarded scheme that is not https), `wellKnownAllowed` /
+  `well_known_allowed` (the well-known document only for the token, `401` with an empty body
+  otherwise), `remoteSessionCookieHeader` (`__Host-fabric_session`, `Secure`), `MemoryCodeStore`
+  and `LoginCodes(null, …, { store, key })` for a service with no durable disk and a session key
+  held by its platform, `registerRemote` / `register_remote` (token file 0600 + descriptor on the
+  operator's computer), placement-aware `validateDescriptor` and port claims.
+- **`scripts/sample-remote-service.mjs`** — a complete online service, with its own TLS or behind
+  a platform router.
+- **The probe checks a remote service** over TLS with the certificate verified (`--ca-file`,
+  `--connect` for tests): `well-known.requires-token`, the guards, events, the single-use login and
+  `login.cookie-host-bound`; launchd, lock and loopback rules are `NOT_RUN` with that reason.
+
+### Changed
+
+- **Contract pin** moves from `74d3852` to `2ce3922` (DEC-0019 merged).
+
 ## 0.5.7 - 2026-10-01
 
 ### Changed

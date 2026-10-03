@@ -22,7 +22,10 @@ The skills are `adapting-projects-to-fabric`, `creating-fabric-agents` and
 
 `building-fabric-services` makes an agent a long-lived local service with a dashboard
 that is always alive, runs as one copy, keeps its state through a reinstall and appears
-in Fabric Dashboards by itself — the `fabric-service/0.1` extension. It ships Python and
+in Fabric Dashboards by itself — the `fabric-service/0.1` extension. It also makes an **online** agent
+or dashboard — an `https` origin on a platform — a Fabric service (the remote placement, DEC-0019): the same
+four routes behind the token, a `__Host-` session cookie, and one descriptor on the operator's computer;
+`scripts/sample-remote-service.mjs` is the complete example. It ships Python and
 Node reference kits (`scripts/fabric_service.py`, `scripts/fabric-service.mjs`), a
 complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live probe:
 
@@ -188,7 +191,7 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 The one pin is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `74d3852f122f5ca5cbc4138a201483531dfa5006`
+- commit: `2ce392291c6668598d12cd38327e24696b5ca15c`
 
 Every other mention of the contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree
