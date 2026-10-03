@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.1 - 2026-10-03
+
+### Fixed
+
+- **`check_service.py` no longer fails every online service hosted behind a platform router.**
+  `network.host-check` required the service's own `403`, but Heroku, Fly, Render and CDNs route
+  by `Host`: a foreign one is answered by the router (`404`/`421`) and never reaches the process.
+  For a remote placement that answer now passes, unless its body is the well-known document. The
+  Origin and cross-site checks are unchanged — they reach the service and need its `403`. Found on
+  the first real online service: 26 PASS and 1 false FAIL before, 0 FAIL after (`guard_verdict`,
+  `test/test_fabric_service_remote.py::GuardVerdict`, 4 mutations killed).
+
 ## 0.6.0 - 2026-10-02
 
 ### Added

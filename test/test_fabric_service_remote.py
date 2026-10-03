@@ -113,6 +113,34 @@ probe = load("check_service")
 
 
 @unittest.skipUnless(shutil.which("openssl") and shutil.which("node"), "needs openssl and node")
+class GuardVerdict(unittest.TestCase):
+    """A platform router answers a foreign Host before the service does (DEC-0019 behind a PaaS)."""
+
+    def test_the_service_refusing_is_a_pass_everywhere(self):
+        for rule in ("network.host-check", "network.origin-check", "network.cross-site-check"):
+            for remote_placement in (True, False):
+                self.assertEqual(probe.guard_verdict(rule, remote_placement, 403, b"")[0], "PASS")
+
+    def test_a_router_refusing_a_foreign_host_is_a_pass_for_a_remote_placement_only(self):
+        verdict, evidence = probe.guard_verdict("network.host-check", True, 404, b"no such app")
+        self.assertEqual(verdict, "PASS")
+        self.assertIn("platform router", evidence)
+        self.assertEqual(probe.guard_verdict("network.host-check", True, 421, b"")[0], "PASS")
+        self.assertEqual(probe.guard_verdict("network.host-check", False, 404, b"")[0], "FAIL", "loopback has no router")
+
+    def test_the_other_guards_reach_the_service_and_need_its_403(self):
+        self.assertEqual(probe.guard_verdict("network.origin-check", True, 404, b"")[0], "FAIL")
+        self.assertEqual(probe.guard_verdict("network.cross-site-check", True, 421, b"")[0], "FAIL")
+
+    def test_an_answer_that_discloses_the_document_never_passes(self):
+        doc = json.dumps({"protocol": "fabric-service/0.1"}).encode()
+        verdict, evidence = probe.guard_verdict("network.host-check", True, 404, doc)
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("well-known document", evidence)
+        self.assertEqual(probe.guard_verdict("network.host-check", True, 200, doc)[0], "FAIL")
+        self.assertEqual(probe.guard_verdict("network.host-check", True, 401, b"")[0], "FAIL")
+
+
 class ProbeAgainstTheTlsSample(unittest.TestCase):
     """The probe against the shipped online sample, over real TLS — the way a host meets it."""
 

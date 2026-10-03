@@ -79,6 +79,23 @@ def priority_problems(plist: dict) -> list:
     return out
 
 
+# A platform router (Heroku, Fly, Render, a CDN) routes by Host, so a request naming a foreign
+# Host never reaches an online service: the router itself answers, typically 404 or 421. That is
+# still a refusal — the service disclosed nothing — so for a remote placement the host check
+# accepts it, as long as the body is not the well-known document. Every other guard request names
+# the right Host, reaches the service, and must be the service's own 403.
+PLATFORM_HOST_REFUSALS = (400, 404, 421)
+
+
+def guard_verdict(rule: str, remote: bool, status: int, body: bytes) -> Tuple[str, str]:
+    if status == 403:
+        return "PASS", "HTTP 403"
+    disclosed = b"fabric-service/" in (body or b"")
+    if rule == "network.host-check" and remote and status in PLATFORM_HOST_REFUSALS and not disclosed:
+        return "PASS", "HTTP %d from the platform router: a foreign Host never reaches the service" % status
+    return "FAIL", "HTTP %d%s" % (status, ", and the body is the well-known document" if disclosed else "")
+
+
 class _PinnedHTTPS(http.client.HTTPSConnection):
     """HTTPS to the origin's name (SNI, certificate, Host) over a socket dialled elsewhere."""
 
@@ -243,8 +260,9 @@ class Probe:
                     sent.update(self.auth_headers())
                     if "Origin" in sent:
                         sent["Origin"] = "https://evil.example"
-                status, _, _ = self.request("GET", "/.well-known/fabric-service", sent)
-                self.add(rule, "PASS" if status == 403 else "FAIL", "HTTP %d" % status)
+                status, _, body = self.request("GET", "/.well-known/fabric-service", sent)
+                verdict, evidence = guard_verdict(rule, self.remote, status, body)
+                self.add(rule, verdict, evidence)
             except (OSError, ssl.SSLError) as exc:
                 self.add(rule, "NOT_RUN", str(exc))
         if self.remote:
