@@ -12,6 +12,19 @@ import path from 'node:path';
 export const PROTOCOL = 'fabric-service/0.1';
 export const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/service/0.1';
 export const EXIT_ALREADY_RUNNING = 75;
+// Lifecycle contract (fabric-workspace knowledge/lifecycle.md), the same values as fabric_service.py.
+// A launchd-supervised copy that finds the lock held backs off in-process before its exit 75 (LC-03).
+export const SUPERVISOR_ENV = 'FABRIC_SERVICE_SUPERVISOR';
+export const LOCK_WAIT_SUPERVISED_SECONDS = 300;
+export const LOCK_BACKOFF_FIRST_SECONDS = 0.5;
+export const LOCK_BACKOFF_MAX_SECONDS = 30;
+// LC-01: SIGTERM reaches exit in at most 10 s with work in flight — drain 8 s, hard exit 2 s later.
+export const DRAIN_SECONDS = 8;
+export const DRAIN_GRACE_SECONDS = 2;
+export const EXIT_HARD_STOP = 70;
+// LC-12: logs rotate by size, 5 x 5 MB by default.
+export const LOG_MAX_BYTES = 5 * 1024 * 1024;
+export const LOG_BACKUPS = 5;
 export const LEVELS = ['info', 'notice', 'warning', 'error'];
 export const STATUSES = ['starting', 'ready', 'degraded', 'stopping'];
 export const EVENTS_DEFAULT_LIMIT = 50;
@@ -151,13 +164,42 @@ function readPid(file) {
   }
 }
 
-export async function holdSingleInstance(dataDir) {
-  try {
-    return await new InstanceLock(dataDir).acquire();
-  } catch (error) {
-    if (!(error instanceof AlreadyRunning)) throw error;
-    process.stderr.write(`${error.message}\n`);
-    process.exit(EXIT_ALREADY_RUNNING);
+/** True when launchd started this process from a plist that says so (FABRIC_SERVICE_SUPERVISOR=launchd). */
+export const supervisedByLaunchd = () => process.env[SUPERVISOR_ENV] === 'launchd';
+
+const sleepSeconds = (s) => new Promise((resolve) => setTimeout(resolve, s * 1000));
+
+/**
+ * Take the lock or exit 75 with one sentence naming the holder. Started by hand, a held lock exits
+ * 75 at once. Under launchd (KeepAlive) an immediate exit is a respawn every ThrottleInterval,
+ * forever; so a supervised copy first backs off in-process (0.5 s doubling to 30 s,
+ * LOCK_WAIT_SUPERVISED_SECONDS in all), takes over if the holder leaves, and exits 75 only when
+ * the wait runs out. `waitSeconds` overrides the choice (0 = never wait).
+ */
+export async function holdSingleInstance(dataDir, {
+  waitSeconds, sleep = sleepSeconds, clock = () => performance.now() / 1000, exit = (code) => process.exit(code),
+} = {}) {
+  const wait = waitSeconds ?? (supervisedByLaunchd() ? LOCK_WAIT_SUPERVISED_SECONDS : 0);
+  const deadline = clock() + Math.max(0, wait);
+  let delay = LOCK_BACKOFF_FIRST_SECONDS;
+  let announced = false;
+  for (;;) {
+    try {
+      return await new InstanceLock(dataDir).acquire();
+    } catch (error) {
+      if (!(error instanceof AlreadyRunning)) throw error;
+      const remaining = deadline - clock();
+      if (remaining <= 0) {
+        process.stderr.write(`${error.message}\n`);
+        return exit(EXIT_ALREADY_RUNNING);
+      }
+      if (!announced) {
+        process.stderr.write(`${error.message} Waiting up to ${Math.round(remaining)} s for it to exit.\n`);
+        announced = true;
+      }
+      await sleep(Math.min(delay, remaining));
+      delay = Math.min(delay * 2, LOCK_BACKOFF_MAX_SECONDS);
+    }
   }
 }
 
@@ -344,6 +386,159 @@ export function parseLimit(raw) {
 export async function eventsPage(fetch, after, limit) {
   const events = (await fetch(after ?? null, limit)).slice(0, limit);
   return { events, cursor: events.length ? events.at(-1).id : (after ?? null) };
+}
+
+// --- logs (LC-12) ------------------------------------------------------------------------
+
+/**
+ * One structured log: JSON lines rotated by size (5 x 5 MB by default), files 0600 in a 0700
+ * directory. `service.jsonl` -> `.1` ... `.<backups>`; the oldest falls off. Never pass a token,
+ * a cookie, a login code or a request body that may carry one.
+ */
+export class RotatingLog {
+  constructor(file, { maxBytes = LOG_MAX_BYTES, backups = LOG_BACKUPS } = {}) {
+    if (maxBytes < 256 || backups < 1) throw new ServiceError('A rotating log needs maxBytes >= 256 and at least one backup.');
+    this.file = file;
+    this.maxBytes = maxBytes;
+    this.backups = backups;
+  }
+
+  line(record) {
+    let data = Buffer.from(`${JSON.stringify(record)}\n`);
+    if (data.length <= this.maxBytes) return data;
+    const cut = { ...record, truncated: true };
+    let message = String(record.message ?? '');
+    while (message) {
+      message = message.slice(0, Math.floor(message.length / 2));
+      cut.message = message;
+      data = Buffer.from(`${JSON.stringify(cut)}\n`);
+      if (data.length <= this.maxBytes) return data;
+    }
+    return Buffer.from(`${JSON.stringify({ at: record.at, level: record.level, message: '', truncated: true })}\n`);
+  }
+
+  write(level, message, fields = {}) {
+    const data = this.line({ at: nowIso(), level: String(level), message: String(message), ...fields });
+    ensurePrivateDir(path.dirname(this.file));
+    let size = 0;
+    try { size = fs.statSync(this.file).size; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (size && size + data.length > this.maxBytes) this.rotate();
+    const fd = fs.openSync(this.file, 'a', 0o600);
+    try { fs.writeSync(fd, data); } finally { fs.closeSync(fd); }
+  }
+
+  rotate() {
+    for (let i = this.backups - 1; i > 0; i -= 1) {
+      if (fs.existsSync(`${this.file}.${i}`)) fs.renameSync(`${this.file}.${i}`, `${this.file}.${i + 1}`);
+    }
+    fs.renameSync(this.file, `${this.file}.1`);
+  }
+}
+
+/**
+ * Call once at start: a launchd stdout file over `maxBytes` is copied to `<file>.1` and truncated
+ * in place (launchd holds it open for append, so a rename would leave it writing to the old name).
+ */
+export function capStdoutLog(file, maxBytes = LOG_MAX_BYTES) {
+  let size;
+  try { size = fs.statSync(file).size; } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+  if (size <= maxBytes) return false;
+  fs.copyFileSync(file, `${file}.1`);
+  fs.chmodSync(`${file}.1`, 0o600);
+  fs.truncateSync(file, 0);
+  return true;
+}
+
+// --- shutdown (LC-01) ----------------------------------------------------------------------
+
+export class Stopping extends ServiceError {}
+
+/**
+ * SIGTERM/SIGINT: stop taking new work, drain in-flight work until `deadline` seconds, then hand
+ * over with `onStop(drained)`. A hand-over that never settles is cut by a hard exit
+ * (EXIT_HARD_STOP) `grace` seconds later.
+ *
+ *   const drain = new Drain().install((drained) => server.close(() => process.exit(0)),
+ *     { onStopping: () => log.append('service.stopping', 'info', 'Stopping.') });
+ *   await drain.work(async () => { ... });   // rejects with Stopping once a stop has begun
+ */
+export class Drain {
+  constructor({ deadline = DRAIN_SECONDS, grace = DRAIN_GRACE_SECONDS } = {}) {
+    this.deadline = deadline;
+    this.grace = grace;
+    this.inflight = 0;
+    this.stopping = false;
+    this.waiters = new Set();
+  }
+
+  async work(fn) {
+    if (this.stopping) throw new Stopping('The service is stopping and takes no new work.');
+    this.inflight += 1;
+    try {
+      return await fn();
+    } finally {
+      this.inflight -= 1;
+      if (this.inflight === 0) for (const wake of this.waiters) wake();
+    }
+  }
+
+  /** Refuse new work from now on; false when a stop had already begun. */
+  requestStop() {
+    if (this.stopping) return false;
+    this.stopping = true;
+    return true;
+  }
+
+  /** Resolves true when in-flight work finished inside `timeoutSeconds`, false otherwise. */
+  wait(timeoutSeconds) {
+    if (this.inflight === 0) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const wake = () => { clearTimeout(timer); this.waiters.delete(wake); resolve(true); };
+      const timer = setTimeout(() => { this.waiters.delete(wake); resolve(false); }, timeoutSeconds * 1000);
+      this.waiters.add(wake);
+    });
+  }
+
+  install(onStop, { onStopping, signals = ['SIGTERM', 'SIGINT'] } = {}) {
+    const handler = () => {
+      if (!this.requestStop()) return; // a second signal changes nothing: the hard exit holds the deadline
+      setTimeout(() => process.exit(EXIT_HARD_STOP), (this.deadline + this.grace) * 1000).unref();
+      (async () => {
+        try { await onStopping?.(); } catch (error) { process.stderr.write(`${error?.stack ?? error}\n`); }
+        await onStop(await this.wait(this.deadline));
+      })();
+    };
+    for (const signal of signals) process.on(signal, handler);
+    return this;
+  }
+}
+
+// --- releases (LC-11, LC-15) -----------------------------------------------------------------
+
+/**
+ * Keep the release the job runs and the one before it; remove older release directories, newest
+ * first by modification time. `current` (a release or a symlink to one) is never removed, even
+ * after a rollback. Symlinks and files are left alone. Returns the removed paths.
+ */
+export function pruneReleases(releasesDir, { keep = 2, current } = {}) {
+  if (keep < 2) throw new ServiceError('keep at least the current release and the one before it (keep >= 2).');
+  if (!fs.existsSync(releasesDir)) return [];
+  const releases = fs.readdirSync(releasesDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.isSymbolicLink())
+    .map((e) => path.join(releasesDir, e.name))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  const keepers = [];
+  if (current) {
+    const resolved = fs.realpathSync(current);
+    keepers.push(...releases.filter((p) => fs.realpathSync(p) === resolved));
+  }
+  for (const release of releases) {
+    if (keepers.length >= keep) break;
+    if (!keepers.includes(release)) keepers.push(release);
+  }
+  const removed = releases.filter((p) => !keepers.includes(p));
+  for (const release of removed) fs.rmSync(release, { recursive: true, force: true });
+  return removed;
 }
 
 // --- operator login -------------------------------------------------------------------

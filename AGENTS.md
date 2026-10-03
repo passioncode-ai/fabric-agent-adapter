@@ -91,6 +91,33 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
   reserved yet; a register that gains one is declared under `idRegisters` and taken with
   `agent_sync.py reserve <REG>`.
 
+## Lifecycle
+
+The org contract is [knowledge/lifecycle.md](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/lifecycle.md);
+this repository both obeys it and ships its service layer
+([`references/lifecycle.md`](plugins/fabric-agent-adapter/skills/building-fabric-services/references/lifecycle.md)).
+
+**Background footprint (LC-09): none.** The plugin is skills only — no hooks, no `.mcp.json`,
+no launchd job, no port, no per-session server, no login item. Nothing runs without a window
+and nothing idles; there is nothing to stop. `install.sh` and `bin/fabric-agent-adapter.js` run
+once when a person calls them and exit.
+
+| What | Started by | Cadence | With no window | Stopped by | Idle budget |
+|---|---|---|---|---|---|
+| `install.sh`, `npx @passioncode-ai/fabric-agent-adapter` | a person | on demand | nothing | exits when done | 0 |
+| Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`) | resident | the service | `launchctl bootout` + `disable`, or `launchd_uninstall` | declared by each service in its own `AGENTS.md` |
+| Test suites (`npm test`) | a person or CI | on demand | nothing | exit; the lifecycle tests kill their own children in `finally` | 0 |
+
+The kit's services own their labels and ports; this repository owns none. Tests never touch the
+operator's launchd jobs: `test/test_fabric_service_lifecycle.py` puts a fake `launchctl` first on
+`PATH` and uses throwaway labels (`ai.passioncode.test.lifecycle-<hex>`) (LC-14).
+
+**Build retention (LC-15).** There is no build step and no release artefact on the machine: npm
+and GitHub releases are built by `.github/workflows/release.yml` in CI. Output directories: none.
+The only caches are `__pycache__/` (cap: 5 MB) and an `npm pack` tarball if someone makes one (keep
+none). Clean command: `find . -name __pycache__ -prune -exec rm -rf {} + && rm -f *.tgz`. Services
+built with the kit prune their own releases with `prune_releases` (current + previous).
+
 ## Organisation
 
 This repository is one of the `passioncode-ai` repositories. The organization's rules —
