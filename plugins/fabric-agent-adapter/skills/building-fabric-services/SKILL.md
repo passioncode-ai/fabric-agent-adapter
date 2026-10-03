@@ -15,7 +15,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.6.1"
+  version: "0.6.2"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "2ce392291c6668598d12cd38327e24696b5ca15c"
@@ -176,7 +176,8 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
 
 Code runs from an immutable release directory; an upgrade writes a new release,
 rewrites the plist and restarts. Read [the lifecycle reference](references/lifecycle.md)
-for the plist fields, the release layout, log rotation and the Linux case.
+for the plist fields, the release layout, log rotation, behaving under a host lifecycle broker
+and the Linux case.
 
 ## Step 5 — the dashboard and the events
 
