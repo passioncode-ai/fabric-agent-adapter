@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.3 - 2026-10-04
+
+### Changed
+
+- **Agents and services get every credential from Project Observatory, by name.**
+  `building-fabric-services` principle 5: a service takes its provider credentials from the vault
+  through `use_secret.py serve` (Project Observatory 0.15.0), never from a copy beside the service;
+  a remote service's platform copy is recorded with `vault.py moved`. `creating-fabric-agents`
+  carries the same rule for agents from their first commit: no `.env` of their own, no key file
+  beside their data, no value in code, configuration or a commit, and `use_secret.py run
+  --vault-only` at launch.
+
 ## 0.6.2 - 2026-10-03
 
 ### Added
