@@ -44,6 +44,14 @@ same objects — well-known document, events feed, login code — at the same pa
 - **Behind a router**: check the platform-set forwarded scheme; `Host` is preserved by common
   platforms and must equal the origin's host.
 
+## Checking it
+
+`check_service.py <id>` probes a remote placement over verified TLS. Behind a platform router
+(Heroku, Fly, Render, a CDN) a request that names a foreign `Host` never reaches the process: the
+router answers it, usually `404` or `421`. The probe counts that as the refusal it is, as long as
+the body is not the well-known document. The Origin and cross-site checks name the right `Host`,
+reach the service, and still need its own `403`.
+
 ## What a host does and will not do
 
 | Situation | Host |
