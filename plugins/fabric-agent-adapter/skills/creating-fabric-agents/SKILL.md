@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.6.2"
+  version: "0.6.3"
   contract-version: "0.1.0"
   contract-commit: "2ce392291c6668598d12cd38327e24696b5ca15c"
 ---
@@ -93,6 +93,13 @@ first commit:
   verified with a real client in a temporary config; Develop) and `## License`;
 - an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
   and a `CLAUDE.md` whose first line is `@AGENTS.md`.
+
+**Every credential the agent uses comes from Project Observatory, by name**, from its first
+commit: the README's Configure section lists key NAMES; the agent finds them with
+`observatory_credentials` and runs with `use_secret.py run --vault-only` (a long-running
+service: `use_secret.py serve`), with `OBSERVATORY_VAULT_ONLY=1` in its environment. No `.env`
+of its own, no key file beside its data, no value in code, configuration or a commit. A
+workflow names the keys it needs in its checkpoint (`credentials`), never their values.
 
 org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
