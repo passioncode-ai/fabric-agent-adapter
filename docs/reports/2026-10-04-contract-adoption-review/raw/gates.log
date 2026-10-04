@@ -1,0 +1,31 @@
+{
+  "candidate": "05b8451cc7acd64112078395866cc35b5d217fb1",
+  "npm_test": {
+    "exit": 0,
+    "python_tests": 201,
+    "python_skipped": 1,
+    "skip_reason": "test_real_client.py requires opt-in FABRIC_REAL_CLIENT=1; not run within this source-only review",
+    "node_tests": 38
+  },
+  "strict_plugin": {
+    "exit": 0
+  },
+  "strict_marketplace": {
+    "exit": 0
+  },
+  "frozen_old_dependencies": {
+    "exit": 0
+  },
+  "frozen_new_dependencies": {
+    "exit": 0
+  },
+  "four_surfaces": {
+    "cases": 40,
+    "failures": 0
+  },
+  "published_npm": "0.6.3",
+  "github_release": "v0.6.3",
+  "source": "0.7.0 unreleased",
+  "nightly_caller": "UNKNOWN; only release and validate workflows found on adapter, org-index check does not call adapter",
+  "no_hosted_dispatch": true
+}
