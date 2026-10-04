@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "reports": 65,
+  "catalog_issues": 23,
+  "generated_files": 30,
+  "committed": true,
+  "pushed": false,
+  "reason": "local wiki branch is 21 commits behind remote"
+}

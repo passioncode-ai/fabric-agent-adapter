@@ -1,0 +1,41 @@
+{"schema":"manifest.schema.json","name":"receive_project_message","actual":true,"want":true}
+{"schema":"manifest.schema.json","name":"demo.run","actual":true,"want":true}
+{"schema":"manifest.schema.json","name":"ab","actual":true,"want":true}
+{"schema":"manifest.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":true,"want":true}
+{"schema":"manifest.schema.json","name":"_leading","actual":false,"want":false}
+{"schema":"manifest.schema.json","name":"a","actual":false,"want":false}
+{"schema":"manifest.schema.json","name":"Acase","actual":false,"want":false}
+{"schema":"manifest.schema.json","name":"bad space","actual":false,"want":false}
+{"schema":"manifest.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":false,"want":false}
+{"schema":"manifest.schema.json","name":42,"actual":false,"want":false}
+{"schema":"interop-agent-call.schema.json","name":"receive_project_message","actual":true,"want":true}
+{"schema":"interop-agent-call.schema.json","name":"demo.run","actual":true,"want":true}
+{"schema":"interop-agent-call.schema.json","name":"ab","actual":true,"want":true}
+{"schema":"interop-agent-call.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":true,"want":true}
+{"schema":"interop-agent-call.schema.json","name":"_leading","actual":false,"want":false}
+{"schema":"interop-agent-call.schema.json","name":"a","actual":false,"want":false}
+{"schema":"interop-agent-call.schema.json","name":"Acase","actual":false,"want":false}
+{"schema":"interop-agent-call.schema.json","name":"bad space","actual":false,"want":false}
+{"schema":"interop-agent-call.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":false,"want":false}
+{"schema":"interop-agent-call.schema.json","name":42,"actual":false,"want":false}
+{"schema":"pipeline.schema.json","name":"receive_project_message","actual":true,"want":true}
+{"schema":"pipeline.schema.json","name":"demo.run","actual":true,"want":true}
+{"schema":"pipeline.schema.json","name":"ab","actual":true,"want":true}
+{"schema":"pipeline.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":true,"want":true}
+{"schema":"pipeline.schema.json","name":"_leading","actual":false,"want":false}
+{"schema":"pipeline.schema.json","name":"a","actual":false,"want":false}
+{"schema":"pipeline.schema.json","name":"Acase","actual":false,"want":false}
+{"schema":"pipeline.schema.json","name":"bad space","actual":false,"want":false}
+{"schema":"pipeline.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":false,"want":false}
+{"schema":"pipeline.schema.json","name":42,"actual":false,"want":false}
+{"schema":"service-well-known.schema.json","name":"receive_project_message","actual":true,"want":true}
+{"schema":"service-well-known.schema.json","name":"demo.run","actual":true,"want":true}
+{"schema":"service-well-known.schema.json","name":"ab","actual":true,"want":true}
+{"schema":"service-well-known.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":true,"want":true}
+{"schema":"service-well-known.schema.json","name":"_leading","actual":false,"want":false}
+{"schema":"service-well-known.schema.json","name":"a","actual":false,"want":false}
+{"schema":"service-well-known.schema.json","name":"Acase","actual":false,"want":false}
+{"schema":"service-well-known.schema.json","name":"bad space","actual":false,"want":false}
+{"schema":"service-well-known.schema.json","name":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","actual":false,"want":false}
+{"schema":"service-well-known.schema.json","name":42,"actual":false,"want":false}
+{"cases":40,"fails":0}

@@ -1,0 +1,27 @@
+# Independent bounded review replay. Pass adapter/old/new paths as arguments.
+from pathlib import Path
+import importlib.util,json,sys,tempfile,shutil,subprocess
+root,old,new=map(Path,sys.argv[1:]);sys.path.insert(0,str(root/'test'))
+from test_adapt_project import ADAPTER,scaffold_args
+spec=importlib.util.spec_from_file_location('review_validate',root/'test/validate.py');v=importlib.util.module_from_spec(spec);spec.loader.exec_module(v)
+results=[]
+def record(name,observed,expected):
+ results.append({'case':name,'observed':observed,'expected':expected,'matches':observed==expected})
+for profile in ('mcp','a2a','local-runner'):
+ fixture=root/'test/fixtures/contract-revisions/legacy'/profile
+ record('legacy-'+profile,ADAPTER.check_project(fixture,old)['gates']['declarationShape']['status'],'PASS')
+ with tempfile.TemporaryDirectory() as t:
+  bundle=Path(t);args=scaffold_args(profile);args.capability_name='receive_project_message';ADAPTER.scaffold_project(bundle,args)
+  record('new-underscore-'+profile,ADAPTER.check_project(bundle,new)['gates']['declarationShape']['status'],'PASS')
+  record('new-lock-old-checkout-'+profile,ADAPTER.check_project(bundle,old)['gates']['declarationShape']['status'],'FAIL')
+  for field,value in [('commit','a'*40),('repository','https://example.invalid/contract'),('version','0.2.0'),('contract','forged')]:
+   lockpath=bundle/'fabric-contract.lock.json';initial=lockpath.read_text();lock=json.loads(initial);lock[field]=value;lockpath.write_text(json.dumps(lock))
+   result=ADAPTER.check_project(bundle,new);record(profile+'-bad-'+field,result['gates']['declarationShape']['status'],'FAIL');lockpath.write_text(initial)
+ record('legacy-lock-new-checkout-'+profile,ADAPTER.check_project(fixture,new)['gates']['declarationShape']['status'],'FAIL')
+for const,tail in [('CONTRACT_COMMIT',' + "bad"'),('CONTRACT_VERSION',' + "bad"'),('CONTRACT_REPOSITORY',' + "/forged"')]:
+ with tempfile.TemporaryDirectory() as t:
+  p=Path(t)/'repo';shutil.copytree(root,p,ignore=shutil.ignore_patterns('.git','__pycache__','node_modules'))
+  f=p/v.PIN_ADAPTER;f.write_text('\n'.join(line+tail if line.startswith(const+' = ') else line for line in f.read_text().splitlines())+'\n')
+  run=subprocess.run(['python3',str(p/'test/validate.py')],capture_output=True,text=True)
+  results.append({'case':'dynamic-'+const,'observed':run.returncode,'expected':1,'matches':run.returncode==1,'output':run.stdout+run.stderr})
+print(json.dumps({'candidate':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'old':subprocess.check_output(['git','rev-parse','HEAD'],cwd=old,text=True).strip(),'new':subprocess.check_output(['git','rev-parse','HEAD'],cwd=new,text=True).strip(),'results':results},indent=2))

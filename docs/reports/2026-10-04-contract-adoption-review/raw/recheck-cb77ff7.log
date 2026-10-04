@@ -1,0 +1,172 @@
+{
+  "candidate": "cb77ff78406e0dd7bdc4f67bdd104a0d108d2c46",
+  "old": "2ce392291c6668598d12cd38327e24696b5ca15c",
+  "new": "df55c8c54a23251342a7ee57ba95642b7eb39e61",
+  "results": [
+    {
+      "case": "legacy-mcp",
+      "observed": "PASS",
+      "expected": "PASS",
+      "matches": true
+    },
+    {
+      "case": "new-underscore-mcp",
+      "observed": "PASS",
+      "expected": "PASS",
+      "matches": true
+    },
+    {
+      "case": "new-lock-old-checkout-mcp",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "mcp-bad-commit",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "mcp-bad-repository",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "mcp-bad-version",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "mcp-bad-contract",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "legacy-lock-new-checkout-mcp",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "legacy-a2a",
+      "observed": "PASS",
+      "expected": "PASS",
+      "matches": true
+    },
+    {
+      "case": "new-underscore-a2a",
+      "observed": "PASS",
+      "expected": "PASS",
+      "matches": true
+    },
+    {
+      "case": "new-lock-old-checkout-a2a",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "a2a-bad-commit",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "a2a-bad-repository",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "a2a-bad-version",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "a2a-bad-contract",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "legacy-lock-new-checkout-a2a",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "legacy-local-runner",
+      "observed": "PASS",
+      "expected": "PASS",
+      "matches": true
+    },
+    {
+      "case": "new-underscore-local-runner",
+      "observed": "PASS",
+      "expected": "PASS",
+      "matches": true
+    },
+    {
+      "case": "new-lock-old-checkout-local-runner",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "local-runner-bad-commit",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "local-runner-bad-repository",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "local-runner-bad-version",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "local-runner-bad-contract",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "legacy-lock-new-checkout-local-runner",
+      "observed": "FAIL",
+      "expected": "FAIL",
+      "matches": true
+    },
+    {
+      "case": "dynamic-CONTRACT_COMMIT",
+      "observed": 1,
+      "expected": 1,
+      "matches": true,
+      "output": "ERROR: contract pin: adapt_project.py CONTRACT_COMMIT must be an exact string literal equal to df55c8c54a23251342a7ee57ba95642b7eb39e61\n"
+    },
+    {
+      "case": "dynamic-CONTRACT_VERSION",
+      "observed": 1,
+      "expected": 1,
+      "matches": true,
+      "output": "ERROR: contract pin: adapt_project.py CONTRACT_VERSION must be an exact string literal equal to 0.1.0\n"
+    },
+    {
+      "case": "dynamic-CONTRACT_REPOSITORY",
+      "observed": 1,
+      "expected": 1,
+      "matches": true,
+      "output": "ERROR: contract pin: adapt_project.py CONTRACT_REPOSITORY must be an exact string literal equal to https://github.com/passioncode-ai/fabric-agent-contract\n"
+    }
+  ]
+}
