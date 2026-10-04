@@ -16,7 +16,11 @@ from urllib.parse import urlparse
 
 CONTRACT_VERSION = "0.1.0"
 CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"
-CONTRACT_COMMIT = "2ce392291c6668598d12cd38327e24696b5ca15c"
+CONTRACT_COMMIT = "df55c8c54a23251342a7ee57ba95642b7eb39e61"
+# #region supported-contract-revisions — docs: README.md#contract-pin
+# Only this declaration may name a legacy revision in live files.
+SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "2ce392291c6668598d12cd38327e24696b5ca15c")
+# #endregion supported-contract-revisions
 INTEROP_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"
 A2A_VERSION = "1.0"
@@ -357,7 +361,9 @@ def _walk_keys(value: Any, prefix: str = "") -> Iterable[Tuple[str, Any]]:
             yield from _walk_keys(item, "%s[%d]" % (prefix, index))
 
 
-def _contract_shape(manifest: Path, contract: Path) -> Tuple[str, List[str]]:
+def _contract_shape(manifest: Path, contract: Path, selected_commit: str) -> Tuple[str, List[str]]:
+    if selected_commit not in SUPPORTED_CONTRACT_COMMITS:
+        return "FAIL", ["unsupported selected contract revision"]
     if not contract.is_dir():
         return "NOT_RUN", ["contract checkout is not a directory: %s" % contract]
     try:
@@ -367,8 +373,19 @@ def _contract_shape(manifest: Path, contract: Path) -> Tuple[str, List[str]]:
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError) as exc:
         return "NOT_RUN", ["cannot read contract commit: %s" % exc]
-    if head != CONTRACT_COMMIT:
-        return "NOT_RUN", ["contract checkout is %s; expected %s" % (head, CONTRACT_COMMIT)]
+    if head != selected_commit:
+        return "FAIL", ["contract checkout is %s; selected lock requires %s" % (head, selected_commit)]
+    try:
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=normal"], cwd=str(contract), check=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return "NOT_RUN", ["cannot verify clean contract checkout: %s" % exc]
+    if dirty:
+        return "FAIL", ["contract checkout has modifications; exact selected schema is required"]
+    if not (contract / "node_modules/.bin/tsx").is_file():
+        return "NOT_RUN", ["pinned contract dependencies are missing; run pnpm install --frozen-lockfile"]
 
     code = """import {readFile} from 'node:fs/promises';
 import {createValidator,validateDocument} from './src/validator.ts';
@@ -391,8 +408,10 @@ import {SCHEMA_PREFIX} from './src/contract.ts';
         return "NOT_RUN", ["contract shape validation timed out"]
     if run.returncode != 0:
         detail = (run.stdout + "\n" + run.stderr).strip()
+        if run.returncode != 3:
+            return "NOT_RUN", [detail[-4000:] or "contract validator could not run"]
         return "FAIL", [detail[-4000:] or "contract validator failed"]
-    return "PASS", ["manifest validated by pinned contract schema"]
+    return "PASS", ["manifest validated by selected contract schema at %s" % selected_commit]
 
 
 def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
@@ -406,11 +425,19 @@ def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
     manifest = _load_json(manifest_path, errors)
     lock = _load_json(root / "fabric-contract.lock.json", errors)
     profile_kind = None
+    lock_errors: List[str] = []
     if isinstance(lock, dict):
+        if lock.get("contract") != "fabric-agent-contract":
+            lock_errors.append("contract lock contract must be fabric-agent-contract")
+        if lock.get("repository") != CONTRACT_REPOSITORY:
+            lock_errors.append("contract lock repository must be %s" % CONTRACT_REPOSITORY)
         if lock.get("version") != CONTRACT_VERSION:
-            errors.append("contract lock version must be %s" % CONTRACT_VERSION)
-        if lock.get("commit") != CONTRACT_COMMIT:
-            errors.append("contract lock commit must be %s" % CONTRACT_COMMIT)
+            lock_errors.append("contract lock version must be %s" % CONTRACT_VERSION)
+        if lock.get("commit") not in SUPPORTED_CONTRACT_COMMITS:
+            lock_errors.append("contract lock commit must be an explicitly supported immutable revision")
+    else:
+        lock_errors.append("contract lock must be an object")
+    errors.extend(lock_errors)
 
     if isinstance(manifest, dict):
         if manifest.get("contractVersion") != CONTRACT_VERSION:
@@ -462,8 +489,10 @@ def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
 
     shape_status = "NOT_RUN"
     shape_receipts = ["pass --contract PATH pointing at the pinned checkout"]
-    if contract is not None and manifest_path.is_file():
-        shape_status, shape_receipts = _contract_shape(manifest_path, contract)
+    if lock_errors:
+        shape_status, shape_receipts = "FAIL", lock_errors
+    elif contract is not None and manifest_path.is_file():
+        shape_status, shape_receipts = _contract_shape(manifest_path, contract, lock["commit"])
 
     local_status = "PASS" if not errors else "FAIL"
     ready = local_status == "PASS" and shape_status == "PASS" and not warnings

@@ -338,5 +338,58 @@ class PinTests(unittest.TestCase):
         code, out = self._validate_copy(mutate)
         self.assertEqual(code, 0, out)
 
+    def test_legacy_pin_in_another_live_file_is_not_an_exception(self):
+        def mutate(copy):
+            with (copy / "README.md").open("a") as note:
+                note.write('\nLegacy contract: 2ce392291c6668598d12cd38327e24696b5ca15c\n')
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn("README.md", out)
+
+    def test_allowlist_cannot_be_expanded_or_forged(self):
+        def mutate(copy):
+            script = copy / validate.PIN_ADAPTER
+            text = script.read_text()
+            script.write_text(text.replace('2ce392291c6668598d12cd38327e24696b5ca15c', 'a' * 40))
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn("reviewed pair", out)
+
+    def test_default_cannot_be_reset_to_supported_legacy(self):
+        def mutate(copy):
+            script = copy / validate.PIN_ADAPTER
+            text = script.read_text()
+            script.write_text(text.replace(validate.PIN_SUPPORTED_DECLARATION,
+                validate.PIN_SUPPORTED_DECLARATION + '\nCONTRACT_COMMIT = "2ce392291c6668598d12cd38327e24696b5ca15c"'))
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn("contract pin", out)
+
+    def test_allowlist_cannot_be_reassigned_dynamically(self):
+        def mutate(copy):
+            script = copy / validate.PIN_ADAPTER
+            with script.open("a") as note:
+                note.write('\nSUPPORTED_CONTRACT_COMMITS = tuple()\n')
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn("immutable declaration", out)
+
+    def test_local_lease_renewal_file_is_not_distribution_json(self):
+        def mutate(copy):
+            note = copy / '.agent-sync/renew/run--fabric-contract.lock.json'
+            note.parent.mkdir(parents=True, exist_ok=True)
+            note.write_text('123 pid renewal metadata\n')
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 0, out)
+
+    def test_canonical_default_cannot_be_forged(self):
+        def mutate(copy):
+            path = copy / "fabric-contract.lock.json"
+            pin = json.loads(path.read_text()); pin['commit'] = 'a' * 40
+            path.write_text(json.dumps(pin))
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn("reviewed current revision", out)
+
 if __name__ == "__main__":
     unittest.main()

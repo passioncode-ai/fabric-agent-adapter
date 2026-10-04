@@ -1,0 +1,21 @@
+{
+  "asOf": "2026-10-04",
+  "baseline": "46acc8bb774dbdb1e27022e566bcd0076221bea9",
+  "beforeEvents": [
+    "push",
+    "pull_request",
+    "workflow_call"
+  ],
+  "afterEvents": [
+    "workflow_dispatch",
+    "workflow_call"
+  ],
+  "jobsUnchanged": true,
+  "scheduleAdded": false,
+  "actionlint": {
+    "command": "actionlint .github/workflows/validate.yml",
+    "exitCode": 0
+  },
+  "centralNightlyEnrollment": "UNKNOWN: accessible org-index check.yml validates its own index, not a downstream adapter matrix; Fabric nightly.yml path is 404",
+  "operatorPolicy": "https://github.com/passioncode-ai/org-index/blob/44dbca21877028c7a39da7182335215f8c019589/docs/CI-BATCHING.md"
+}

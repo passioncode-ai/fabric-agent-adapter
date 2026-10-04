@@ -1,0 +1,54 @@
+{
+  "contractVersion": "0.1.0",
+  "provider": {
+    "id": "https://agents.example/providers/demo",
+    "revision": 1,
+    "contentHash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "createdAt": "2026-10-04T11:38:25Z",
+    "createdBy": "urn:fabric:adapter:author",
+    "name": "Demo provider",
+    "identity": {
+      "subject": "https://agents.example/providers/demo",
+      "method": "tls"
+    },
+    "supportedContractVersions": [
+      "0.1.0"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "https://agents.example/capabilities/demo",
+      "name": "demo.run",
+      "inputSchema": "https://agents.example/fabric/schemas/capability-input.schema.json",
+      "outputSchema": "https://agents.example/fabric/schemas/capability-output.schema.json",
+      "effect": "none",
+      "idempotency": "none",
+      "dataClasses": [
+        "public"
+      ],
+      "profile": {
+        "kind": "a2a",
+        "protocolVersion": "1.0",
+        "agentCardUrl": "https://agents.example/.well-known/agent-card.json",
+        "skillIds": [
+          "replace-me"
+        ],
+        "binding": "REST",
+        "streaming": false,
+        "pushNotifications": false,
+        "probes": [
+          {
+            "id": "safe-shape-probe",
+            "inputFixture": "https://agents.example/fabric/fixtures/admission-input.json",
+            "outputSchema": "https://agents.example/fabric/schemas/capability-output.schema.json",
+            "timeoutMs": 30000,
+            "sideEffectCeiling": "none",
+            "assertions": [
+              "returns a typed result without external effects"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -117,6 +117,16 @@
         "otherwise report unavailable transport",
         "do not say a local custom scheme or localhost opens the workstation from the phone"
       ]
+    },
+    {
+      "id": "revision-specific-legacy-and-current-bundles",
+      "request": "Check a previously issued provider bundle, then scaffold example-agent with receive_project_message.",
+      "expected": [
+        "retains the explicit supported legacy lock and validates only with its matching checkout",
+        "scaffolds the current default contract and validates underscore names against its compiled schema",
+        "rejects unknown locks and mismatched checkouts without automatic migration",
+        "does not infer COM approval or runtime admission from a declared capability name"
+      ]
     }
   ]
 }

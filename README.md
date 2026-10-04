@@ -188,15 +188,38 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 
 ## Contract pin
 
-The one pin is [`fabric-contract.lock.json`](fabric-contract.lock.json):
+The default pin for new bundles is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `2ce392291c6668598d12cd38327e24696b5ca15c`
+- commit: `df55c8c54a23251342a7ee57ba95642b7eb39e61`
 
-Every other mention of the contract revision — this section, the skills' metadata, the
+Every other mention of the default contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree
-where one does not. The contract repository is normative. Updating the pin requires a
-new adapter release, fixture review, and a complete validation run.
+where one does not. The sole live legacy exception is the immutable
+`SUPPORTED_CONTRACT_COMMITS` declaration in the scaffolder: previously issued bundles
+keep their selected legacy lock and require that exact clean contract checkout. The
+checker validates the lock's contract, repository, version and supported full SHA before
+running its selected schema. Unknown locks, modified checkouts and revision mismatches fail.
+Missing checkouts or dependencies are `NOT_RUN`, never admission.
+
+There is no automatic upgrade or downgrade. An intentional migration requires review of
+the whole bundle and validation against the new selected schema; editing a lock alone
+does not prove runtime compatibility. Underscore names such as `receive_project_message`
+are declarations only: they confer no COM grant or authority. Legacy revisions cannot
+validate those names. The contract repository is normative. Updating the default pin
+requires fixture review, complete validation and a new adapter release before propagation.
+
+To run both compiled-schema integration arms, install the frozen dependencies in separate
+clean checkouts at the supported revisions, then run:
+
+```bash
+FABRIC_CONTRACT_OLD=/path/to/legacy-contract FABRIC_CONTRACT_NEW=/path/to/current-contract \
+  python3 -m unittest discover -s test -p test_contract_revisions.py -v
+```
+
+Without both environment variables, those tests explicitly skip as `NOT_RUN`.
+This source checkout is 0.7.0 pending release; the verified published GitHub/npm version
+on 2026-10-04 is 0.6.3. Source delivery does not update installed skills or live sessions.
 
 ## License
 
