@@ -661,7 +661,7 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
         models = []
         for row in days[date].values():
             seen = bases[(date, row["provider"], row["model"])]
-            row["costBasis"] = seen.pop() if len(seen) == 1 else "mixed"
+            row["costBasis"] = next(iter(seen)) if len(seen) == 1 else "mixed"
             models.append(_close_totals(row))
         models.sort(key=lambda m: (m["provider"], m["model"]))
         day = {"date": date, "calls": 0, "unpricedCalls": 0, "inputTokens": 0, "outputTokens": 0,
@@ -688,7 +688,8 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
 
 class JsonlUsageLedger:
     """Usage receipts for services that keep none yet: append-only JSON lines, mode 0600, pruned
-    to the reported window so the file stays bounded (LC-12)."""
+    to the reported window so the file stays bounded (LC-12). One writer process — the service,
+    which holds its instance lock; the lock here orders that process's threads."""
 
     def __init__(self, path: Path):
         self.path = Path(path)
@@ -723,8 +724,9 @@ class JsonlUsageLedger:
         now = now or _dt.datetime.now(_dt.timezone.utc)
         first = (now - _dt.timedelta(days=USAGE_DAYS - 1)).strftime("%Y-%m-%d")
         with self._lock:
-            kept = [r for r in self.receipts() if str(r.get("at", ""))[:10] >= first]
-            dropped = len(self.receipts()) - len(kept)
+            every = self.receipts()
+            kept = [r for r in every if str(r.get("at", ""))[:10] >= first]
+            dropped = len(every) - len(kept)
             if dropped:
                 atomic_write(self.path, "".join(json.dumps(r, separators=(",", ":")) + "\n" for r in kept).encode("utf-8"))
             return dropped

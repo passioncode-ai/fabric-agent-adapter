@@ -462,7 +462,8 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
   return report;
 }
 
-/** Usage receipts for services that keep none yet: append-only JSON lines, 0600, pruned to the window (LC-12). */
+/** Usage receipts for services that keep none yet: append-only JSON lines, 0600, pruned to the window (LC-12).
+ *  One writer process (the service holds its instance lock); every method is synchronous, so calls never interleave. */
 export class JsonlUsageLedger {
   constructor(file) { this.file = file; }
 
