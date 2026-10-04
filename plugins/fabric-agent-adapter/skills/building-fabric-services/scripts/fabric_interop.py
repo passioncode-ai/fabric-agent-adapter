@@ -395,9 +395,11 @@ def mcp_header_problem(message: Any, headers: Any) -> Optional[str]:
     if not isinstance(message, dict) or headers is None:
         return None
     def header(name: str) -> Optional[str]:
-        value = headers.get(name)
+        value = headers.get(name) if hasattr(headers, "get") else None
         if value is None and isinstance(headers, dict):
             value = next((v for k, v in headers.items() if k.lower() == name.lower()), None)
+        if isinstance(value, (list, tuple)):
+            value = value[0] if value else None
         return None if value is None else str(value)
     declared = header("MCP-Protocol-Version") == MCP_REVISION
     method = message.get("method")
