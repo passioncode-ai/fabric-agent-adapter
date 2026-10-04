@@ -1,0 +1,18 @@
+{
+  "candidate": "cb77ff78406e0dd7bdc4f67bdd104a0d108d2c46",
+  "verdict": "ACCEPT",
+  "replay_expected_outcomes": 27,
+  "replay_matched": 27,
+  "npm_test_exit": 0,
+  "python_tests": 208,
+  "python_skipped": 1,
+  "node_tests": 38,
+  "strict_plugin_exit": 0,
+  "strict_marketplace_exit": 0,
+  "diff_check_exit": 0,
+  "nightly_enrollment": "UNKNOWN",
+  "real_client": "NOT_RUN opt-in",
+  "release": "NOT_RUN",
+  "installation": "NOT_RUN",
+  "index": "root-owned final run; reviewer did not rerun"
+}

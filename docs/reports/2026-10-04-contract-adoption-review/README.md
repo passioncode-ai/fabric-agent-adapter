@@ -4,16 +4,16 @@ report:
   title: "Fabric Agent Adapter immutable contract adoption: independent review"
   kind: review
   project: fabric-agent-contract
-  domains: [engineering]
+  domains: [correctness, ci-cd]
   as_of: 2026-10-04
   status: active
   valid_until: 2026-10-11
   summary: >-
     The adapter candidate preserves exact-revision schema selection for issued and new
     bundles, and the compiled current schemas accept underscore capability names.
-    Changes are required: the distribution validator accepts dynamic suffixes on
-    the reviewed commit, repository and version declarations. Nightly CI enrollment
-    remains unverified; source acceptance does not establish release or installation.
+    The initial validator rejection is retained; a subsequent independently checked
+    fix rejects all three forged suffixes and earns bounded source ACCEPT. Nightly CI
+    enrollment remains unverified; acceptance establishes no release or installation.
   sources:
     - name: "Reviewed adapter candidate"
       url: "https://github.com/passioncode-ai/fabric-agent-adapter/tree/05b8451cc7acd64112078395866cc35b5d217fb1"
@@ -26,11 +26,11 @@ report:
   consumers: [fabric]
 ---
 
-<sub>ssheleg skills — working-in-passioncode · task-pipeline · make-skill</sub>
+<sub>ssheleg skills — working-in-passioncode · task-pipeline · make-skill · project-reports</sub>
 
 # Independent review
 
-## Verdict and scope
+## Initial verdict and scope
 
 **CHANGES** for [adapter PR 32 candidate](https://github.com/passioncode-ai/fabric-agent-adapter/tree/05b8451cc7acd64112078395866cc35b5d217fb1).
 This is a source and compiled-schema judgment, formed before reading the author's proof.
@@ -128,9 +128,53 @@ Prerequisites: both supported contract objects and frozen dependencies; ordinary
 access. Original untracked dependency files were preserved. Reviewer worktrees are resumable
 and retain no live service or hosted job.
 
+Generated report indexing completed and committed its generated files locally, but the tool
+skipped its wiki push because that checkout is 21 commits behind its remote. The source-owned
+adapter report is pushed; wiki publication is not complete. Existing unrelated wiki work was
+preserved; no reset, stash, blind pull or force-push was attempted.
+
 **Next task:** read the author's new exact SHA, inspect its validator diff, run the independent
 replay against that object, append the new source verdict with receipts, then let the parent
 perform integration under repository policy. Do not release or install from this report.
+
+## Appended independent recheck — 2026-10-04
+
+**ACCEPT**, bounded to immutable contract adoption source at
+[adapter candidate `cb77ff7`](https://github.com/passioncode-ai/fabric-agent-adapter/tree/cb77ff78406e0dd7bdc4f67bdd104a0d108d2c46).
+The original CHANGES verdict and raw failure receipts above remain intact. This appended
+verdict supersedes the original integration hold only for this exact reviewed fix.
+
+The reviewer fetched and selected the new Git object in a second isolated worktree; no author
+logs were used to establish the results. The
+[new AST gate](https://github.com/passioncode-ai/fabric-agent-adapter/blob/cb77ff78406e0dd7bdc4f67bdd104a0d108d2c46/test/validate.py#L450)
+requires a single plain top-level binding whose entire value is the expected string literal,
+and requires the reviewed static supported tuple. It rejects alternate bindings, deletes,
+semicolon/chained assignments, protected import/function/match bindings and namespace
+mutation constructs. The original text scanner's legacy exception stays at its sole exact line.
+
+The same independent replay now produces **27/27 expected outcomes**. In particular, each
+original dynamic suffix produces CLI exit 1 with the corresponding exact-string-literal error;
+all 24 previously passing profile/lock behavior checks remain passing. Receipt:
+[raw/recheck-cb77ff7.log](raw/recheck-cb77ff7.log). The adapter scaffolder and contract objects are
+unchanged by this corrective commit, so the initial independently compiled 40-case,
+four-surface result continues to apply.
+
+The reviewer independently executed the full `npm test` with both exact compiled contract
+checkout variables: exit 0, **208 Python tests with one opt-in real-client skip**, and **38 Node
+tests passed**. Receipt: [raw/npm-recheck-cb77ff7.log](raw/npm-recheck-cb77ff7.log).
+Both strict plugin/marketplace checks and `git diff --check` exited 0 on the new object.
+
+Report frontmatter and the repository structural validator pass. A separate cold remote clone
+read the previously pushed original report commit successfully; the appended report's pushed
+branch must also be verified at handoff. No further report-index invocation is performed here:
+the root owns the single final generated-index run, after source reports are pushed. The earlier
+wiki publication blocker above remains explicit.
+
+**Exact next task:** the parent may integrate the exact accepted adapter candidate under the
+normal repository policy and bring in these report-only commits. Preserve the UNKNOWN nightly
+caller and unexecuted real-client boundary. Source version 0.7.0 remains unreleased; published
+and inspected installed version remain 0.6.3. Release, installation, CI dispatch and live
+admission need their own authorized evidence and are not granted by this verdict.
 
 ## Actual skills used
 
@@ -147,5 +191,6 @@ the source-owned report header and generated index workflow. No UI or design ski
 - `working-in-passioncode` — repository and nightly CI policy — not a skill this family ships
 - [`task-pipeline`](https://github.com/ssheleg/task-pipeline) — bounded independent review and durable handoff
 - [`make-skill`](https://github.com/ssheleg/make-skill) — plugin and validator review
+- `project-reports` — report metadata and generated index — not a skill this family ships
 
 <sub>A star on [the bundle](https://github.com/ssheleg/sshlg-skills) helps.</sub>
