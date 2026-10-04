@@ -387,13 +387,17 @@ def validate_skill(name: str, errors: List[str]) -> None:
 
 # #region contract-pin — docs: README.md#contract-pin
 # G-11: one contract pin. fabric-contract.lock.json is the pin; every live file that
-# names a contract revision names that one. Dated records keep the revision of their
+# names a default contract revision names that one. The exact immutable supported
+# declaration is the sole compatibility exception. Dated records keep the revision of their
 # day, and tests plant other revisions on purpose, so both are excluded. The same rule
 # as the contract's `pnpm pin:check` (docs/specification/versioning.md#one-contract-pin).
 PIN_FILE = ROOT / "fabric-contract.lock.json"
-PIN_EXCLUDED = ("docs/evidence", "docs/handoffs", "test", "CHANGELOG.md", "fabric-contract.lock.json", "node_modules")
+PIN_EXCLUDED = ("docs/evidence", "docs/handoffs", "test", "CHANGELOG.md", "fabric-contract.lock.json", "node_modules", ".agent-sync")
 PIN_MENTION = re.compile(r"fabric[- ]agent[- ]contract|contract[-_ ]?(pin|commit|revision)|CONTRACT_COMMIT", re.IGNORECASE)
 PIN_HEX = re.compile(r"(?<![0-9a-zA-Z:])[0-9a-f]{7,40}(?![0-9a-zA-Z])")
+PIN_ADAPTER = "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_project.py"
+PIN_DEFAULT_COMMIT = "df55c8c54a23251342a7ee57ba95642b7eb39e61"
+PIN_SUPPORTED_DECLARATION = 'SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "2ce392291c6668598d12cd38327e24696b5ca15c")'
 
 
 def contract_pin_drift(root: Path, commit: str) -> List[str]:
@@ -406,6 +410,8 @@ def contract_pin_drift(root: Path, commit: str) -> List[str]:
             continue
         section = False
         for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            if rel == PIN_ADAPTER and line == PIN_SUPPORTED_DECLARATION:
+                continue
             if re.match(r"^#{1,6}\s", line):
                 section = bool(PIN_MENTION.search(line))
             other_repo = "github.com/" in line and "fabric-agent-contract" not in line
@@ -427,15 +433,59 @@ def validate_contract_pin(errors: List[str], root: Path = ROOT) -> None:
         errors.append("contract pin: fabric-contract.lock.json is missing or unreadable (%s)" % exc.__class__.__name__)
         return
     commit = str(pin.get("commit", ""))
+    if commit != PIN_DEFAULT_COMMIT:
+        errors.append("contract pin: default commit must be the reviewed current revision")
     if pin.get("contract") != "fabric-agent-contract" or not re.fullmatch(r"[0-9a-f]{40}", commit) \
-            or pin.get("repository") != "https://github.com/passioncode-ai/fabric-agent-contract":
+            or pin.get("repository") != "https://github.com/passioncode-ai/fabric-agent-contract" \
+            or pin.get("version") != "0.1.0":
         errors.append("contract pin: fabric-contract.lock.json needs contract, version, repository and a 40-character commit")
         return
-    script = (SKILLS["adapting-projects-to-fabric"] / "scripts/adapt_project.py").read_text(encoding="utf-8")
-    for constant, expected in (("CONTRACT_COMMIT", commit), ("CONTRACT_VERSION", pin.get("version"))):
-        match = re.search(r'^%s = "([^"]+)"' % constant, script, re.MULTILINE)
-        if not match or match.group(1) != expected:
-            errors.append("contract pin: adapt_project.py %s is %s; the pin says %s" % (constant, match.group(1) if match else "missing", expected))
+    script = (root / PIN_ADAPTER).read_text(encoding="utf-8")
+    if script.splitlines().count(PIN_SUPPORTED_DECLARATION) != 1:
+        errors.append("contract pin: supported immutable revision declaration must equal the reviewed pair")
+    try:
+        tree = ast.parse(script)
+    except SyntaxError as exc:
+        errors.append("contract pin: adapt_project.py cannot be parsed (%s)" % exc)
+        return
+    expected_literals = {"CONTRACT_COMMIT": commit, "CONTRACT_VERSION": pin.get("version"),
+                         "CONTRACT_REPOSITORY": pin.get("repository")}
+    protected = set(expected_literals) | {"SUPPORTED_CONTRACT_COMMITS"}
+    declarations = {}
+    for constant in protected:
+        bindings = [node for node in ast.walk(tree) if (
+            isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)) and node.id == constant
+            or isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == constant
+            or isinstance(node, ast.arg) and node.arg == constant
+            or isinstance(node, ast.ExceptHandler) and node.name == constant
+            or isinstance(node, ast.alias) and (node.asname or node.name.split(".")[0]) == constant
+            or type(node).__name__ in ("MatchAs", "MatchStar") and node.name == constant
+            or type(node).__name__ == "MatchMapping" and node.rest == constant
+        )]
+        plain = [node for node in tree.body if isinstance(node, ast.Assign)
+                 and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                 and node.targets[0].id == constant]
+        if len(bindings) != 1 or len(plain) != 1:
+            errors.append("contract pin: %s must have exactly one immutable declaration (plain top-level assignment)" % constant)
+        else:
+            declarations[constant] = plain[0].value
+    for constant, expected in expected_literals.items():
+        value = declarations.get(constant)
+        if not isinstance(value, ast.Constant) or not isinstance(value.value, str) or value.value != expected:
+            errors.append("contract pin: adapt_project.py %s must be an exact string literal equal to %s" % (constant, expected))
+    supported = declarations.get("SUPPORTED_CONTRACT_COMMITS")
+    if not (isinstance(supported, ast.Tuple) and len(supported.elts) == 2
+            and isinstance(supported.elts[0], ast.Name) and supported.elts[0].id == "CONTRACT_COMMIT"
+            and isinstance(supported.elts[1], ast.Constant)
+            and supported.elts[1].value == "2ce392291c6668598d12cd38327e24696b5ca15c"):
+        errors.append("contract pin: SUPPORTED_CONTRACT_COMMITS must be the reviewed static tuple")
+    # A portable scaffolder has no reason to mutate its module namespace dynamically.
+    reflection = {"globals", "locals", "vars", "exec", "eval", "setattr", "delattr", "__dict__"}
+    if any(isinstance(node, ast.Name) and node.id in reflection
+           or isinstance(node, ast.Attribute) and (node.attr in reflection
+               or node.attr in protected and isinstance(node.ctx, (ast.Store, ast.Del)))
+           for node in ast.walk(tree)):
+        errors.append("contract pin: dynamic namespace definitions or attribute mutations are forbidden")
     errors.extend(contract_pin_drift(root, commit))
 # #endregion contract-pin
 
@@ -490,7 +540,7 @@ def validate_repo() -> List[str]:
         errors.append("top changelog version is out of sync")
 
     for path in ROOT.rglob("*.json"):
-        if ".git" not in path.parts:
+        if ".git" not in path.parts and ".agent-sync" not in path.parts:
             try:
                 json.loads(path.read_text(encoding="utf-8"))
             except json.JSONDecodeError as exc:

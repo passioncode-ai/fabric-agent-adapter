@@ -1,0 +1,76 @@
+{
+  "asOf": "2026-10-04",
+  "command": "FABRIC_CONTRACT_OLD=<exact legacy checkout> FABRIC_CONTRACT_NEW=<exact current checkout> npm test",
+  "exitCode": 0,
+  "summary": [
+    "OK: Fabric Agent Adapter distribution is valid",
+    "\u2139 tests 38",
+    "\u2139 pass 38",
+    "\u2139 fail 0",
+    "\u2139 skipped 0",
+    "Ran 200 tests in 72.575s",
+    "OK (skipped=1)"
+  ],
+  "contractRevisions": {
+    "legacy": "2ce392291c6668598d12cd38327e24696b5ca15c",
+    "current": "df55c8c54a23251342a7ee57ba95642b7eb39e61"
+  },
+  "skipped": "opt-in real Claude client: FABRIC_REAL_CLIENT unset; no COM runtime smoke in this scope",
+  "baselineMutation": {
+    "baselineSource": "46acc8bb774dbdb1e27022e566bcd0076221bea9",
+    "completeLegacyLocalCheck": "PASS",
+    "constantOnlyRepinLegacyLocalCheck": "FAIL"
+  },
+  "strictPluginValidation": {
+    "plugin": 0,
+    "marketplace": 0
+  },
+  "makeSkill": {
+    "adapting": {
+      "pass": 19,
+      "gap": 0
+    },
+    "creating": {
+      "pass": 19,
+      "gap": 0
+    },
+    "building": {
+      "pass": 18,
+      "gap": 1,
+      "gapName": "BODY_HEADROOM",
+      "tokens": 4756,
+      "scope": "pre-existing house headroom gap; contract metadata pin only changed"
+    }
+  },
+  "publishedChecks": {
+    "githubLatest": "v0.6.3",
+    "npmLatest": "0.6.3",
+    "sourceVersion": "0.7.0",
+    "installedOrSessionReload": "NOT_RUN: no propagation authorized"
+  },
+  "hostedCI": "NOT_RUN: no dispatch; push/PR triggers removed before push, workflow_call retained; nightly enrollment UNKNOWN (ci-policy.json)",
+  "baselineTDD": {
+    "command": "python3 -m unittest discover -s test -p test_contract_revisions.py -v",
+    "exitCode": 1,
+    "status": "initial new-default/non-object-lock checks FAIL; selected-revision API and mocked forged-lock tests ERROR before implementation; compiled arms initially skipped",
+    "repairedCheck": "final npm gate runs both compiled arms"
+  },
+  "focusedAfterCIPolicy": {
+    "distributionValidator": 0,
+    "actionlint": 0,
+    "jobsBeforeAfter": "identical parsed dictionaries"
+  },
+  "installedReadback": {
+    "date": "2026-10-04",
+    "scope": "three ~/.agents/skills/<skill>/SKILL.md metadata blocks",
+    "version": "0.6.3",
+    "revision": "2ce392291c6668598d12cd38327e24696b5ca15c",
+    "mutation": false
+  },
+  "finalFocusedPinGate": {
+    "command": "python3 -m unittest discover -s test -p test_validate.py -q",
+    "tests": 50,
+    "exitCode": 0,
+    "reason": "explicit repository-constant consistency was added after full gate; code schema arms unchanged"
+  }
+}

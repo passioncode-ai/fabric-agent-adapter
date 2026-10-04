@@ -7,7 +7,7 @@ metadata:
   author: PassionCode.ai
   version: "0.7.0"
   contract-version: "0.1.0"
-  contract-commit: "2ce392291c6668598d12cd38327e24696b5ca15c"
+  contract-commit: "df55c8c54a23251342a7ee57ba95642b7eb39e61"
 ---
 
 # Creating Fabric-compatible agents
@@ -119,11 +119,15 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri>
 ```
 
-Pin exactly contract `0.1.0` at commit `2ce392291c6668598d12cd38327e24696b5ca15c` and
+Pin exactly contract `0.1.0` at commit `df55c8c54a23251342a7ee57ba95642b7eb39e61` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check
 `NOT_RUN` — do not reconstruct normative rules from memory.
+
+This default accepts underscore capability names; a declared communications name does
+not grant COM access or prove runtime admission. Existing bundles retain their explicit
+supported revision and require its exact checkout; never silently migrate their lock.
 
 The generated placeholders are deliberate blockers; a bundle still containing one is not
 ready for admission.

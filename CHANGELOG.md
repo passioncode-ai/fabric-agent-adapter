@@ -41,6 +41,15 @@ The service kit meets the organization's
 
 ### Changed
 
+- **CO-193 contract adoption (source, pending release):** new bundles use the shared
+  capability-name schema and accept underscore names. Complete previously issued bundles
+  remain checkable at their explicitly supported legacy revision. The checker rejects
+  forged locks, revision mismatches and modified checkouts; unavailable dependencies remain
+  `NOT_RUN`. This adds no COM runtime, grant or admission authority.
+- Align validation triggers with the operator's 2026-09-25 CI policy: replace automatic
+  push/PR runs with manual dispatch, retaining the reusable release-validation workflow.
+  Existing test jobs and commands are unchanged; no new nightly schedule is asserted.
+
 - `launchd_plist`'s default `ExitTimeOut` is 15 s (was 40): above the drain and its hard exit, so
   launchd's SIGKILL never comes first, and inside LC-01's 10 s quit bound for the service itself.
 - `references/lifecycle.md` links the org contract and maps each LC rule to the kit.
@@ -395,4 +404,3 @@ Fabric Agent Contract DEC-0017. **Contract pin** moves from `a22dea3` to `9cd778
 - Add a standard-library project inspector, non-destructive scaffolder, and checker.
 - Add contract pinning and independent conformance gate reporting.
 - Add trigger/scenario evals, unit tests, repository validator, and plugin packaging.
-

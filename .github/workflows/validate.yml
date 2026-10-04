@@ -1,8 +1,7 @@
 name: validate
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
   workflow_call:
 
 permissions:
@@ -33,4 +32,3 @@ jobs:
       - run: npm install --global @anthropic-ai/claude-code
       - run: claude plugin validate ./plugins/fabric-agent-adapter --strict
       - run: claude plugin validate . --strict
-

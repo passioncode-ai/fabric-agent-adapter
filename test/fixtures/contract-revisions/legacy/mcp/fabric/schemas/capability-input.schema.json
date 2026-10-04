@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agents.example/fabric/schemas/capability-input.schema.json",
+  "title": "Capability input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "request": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "request"
+  ]
+}

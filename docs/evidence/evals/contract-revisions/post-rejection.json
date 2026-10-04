@@ -1,0 +1,45 @@
+{
+  "asOf": "2026-10-04",
+  "rejectedCandidate": "05b8451cc7acd64112078395866cc35b5d217fb1",
+  "reason": "literal-prefix regex plus Store count accepted effective dynamic pin values",
+  "redBeforeFix": {
+    "tests": 3,
+    "failures": 3,
+    "CLIResultEach": {
+      "exitCode": 0,
+      "message": "OK: Fabric Agent Adapter distribution is valid"
+    },
+    "suffixes": {
+      "CONTRACT_COMMIT": " + \"bad\"",
+      "CONTRACT_VERSION": " + \"bad\"",
+      "CONTRACT_REPOSITORY": " + \"/forged\""
+    }
+  },
+  "fix": "exact plain top-level single-name AST assignments; exact string constants; static reviewed tuple; reject alternative binding/deletion and dynamic namespace mutation",
+  "directCopiedRootRecheck": "all three now return contract pin exact-string-literal errors",
+  "command": "FABRIC_CONTRACT_OLD=<exact legacy checkout> FABRIC_CONTRACT_NEW=<exact current checkout> npm test",
+  "exitCode": 0,
+  "summary": [
+    "OK: Fabric Agent Adapter distribution is valid",
+    "\u2139 tests 38",
+    "\u2139 pass 38",
+    "\u2139 fail 0",
+    "\u2139 skipped 0",
+    "Ran 208 tests in 79.783s",
+    "OK (skipped=1)"
+  ],
+  "liveProtocolOrRelease": "NOT_RUN: source prerequisite only",
+  "reviewStatus": "pending independent exact-SHA recheck; initial rejection retained",
+  "focusedValidator": {
+    "tests": 57,
+    "exitCode": 0
+  },
+  "strictPluginValidation": {
+    "plugin": 0,
+    "marketplace": 0
+  },
+  "actionlint": {
+    "workflow": ".github/workflows/validate.yml",
+    "exitCode": 0
+  }
+}
