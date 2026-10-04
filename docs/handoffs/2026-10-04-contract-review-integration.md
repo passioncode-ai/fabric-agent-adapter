@@ -42,6 +42,8 @@ Source links at the accepted object:
 - `reports.py check docs/reports/2026-10-04-contract-adoption-review`: one report, zero errors.
 - `python3 test/validate.py`: exit 0. This delivery does not rerun the full runtime suite;
   the exact accepted implementation's full owner and independent receipts are linked above.
+- Fresh remote clone of `757992136cd0df5a30bda9c4337df90645593f9e`: structural validator
+  exit 0, all ten review blobs hash-identical, handoff and report readable.
 - Observatory update check: exit 0, no pending output. No guarded register is modified,
   no IDs are allocated, and no leases are needed for this evidence-only file set.
 - `gh release view` and `npm view @passioncode-ai/fabric-agent-adapter version` on this cut:

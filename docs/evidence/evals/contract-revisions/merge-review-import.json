@@ -67,5 +67,11 @@
     "npm": "0.6.3"
   },
   "sourceVersion": "0.7.0 unreleased",
-  "indexWikiReleaseInstall": "NOT_RUN: root owns final cross-repository publication; no release or install authorized"
+  "indexWikiReleaseInstall": "NOT_RUN: root owns final cross-repository publication; no release or install authorized",
+  "coldCheckout": {
+    "remoteBranchCommit": "757992136cd0df5a30bda9c4337df90645593f9e",
+    "distributionValidator": 0,
+    "identicalImportedBlobs": 10,
+    "entryAndReportReadable": true
+  }
 }
