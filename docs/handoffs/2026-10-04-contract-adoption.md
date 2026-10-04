@@ -12,6 +12,7 @@ CO-193 naming prerequisite only, not the future message/claim runtime.
 
 Baseline: `46acc8bb774dbdb1e27022e566bcd0076221bea9` (origin/main).
 Implementation: [`497a199c9b32039f07baf310bbf7a0c5eed3bbb5`](https://github.com/passioncode-ai/fabric-agent-adapter/commit/497a199c9b32039f07baf310bbf7a0c5eed3bbb5).
+Draft PR: [#32](https://github.com/passioncode-ai/fabric-agent-adapter/pull/32).
 Branch: `codex/contract-pin-adoption-20261004`, existing origin
 `git@github.com:passioncode-ai/fabric-agent-adapter.git`. Original checkout's untracked
 `node_modules/` and `pnpm-lock.yaml` were preserved; work used an isolated worktree.
@@ -44,13 +45,16 @@ Code/test entry points at the implementation commit:
 ## Checks actually run
 
 [Machine-readable gate receipt](../evidence/evals/contract-revisions/checks.json),
-[CI-policy receipt](../evidence/evals/contract-revisions/ci-policy.json).
+[CI-policy receipt](../evidence/evals/contract-revisions/ci-policy.json),
+[fresh remote-checkout receipt](../evidence/evals/contract-revisions/fresh-checkout.json).
 
 - `npm test` with both exact contract paths: exit 0, 200 Python tests (one skipped),
   38 Node tests, zero failures. Both compiled-schema arms ran, covering all profiles,
   accepted legacy names, underscore names, length/syntax negatives, mismatched revisions
   and forged locks. The sole skip is the existing opt-in real Claude client test.
 - `python3 test/validate.py`: exit 0; negative pin/allowlist tests pass.
+  After explicit source repository-constant consistency was added, the focused validator
+  suite ran again: 50 tests, exit 0; compiled schema code was unchanged.
 - Both `claude plugin validate ... --strict` commands: exit 0.
 - `actionlint .github/workflows/validate.yml`: exit 0; parsed before/after workflow jobs
   are identical. Events are manual/reusable only; original workflow had no schedule.
@@ -70,7 +74,10 @@ returned v0.6.3 / 0.6.3 on 2026-10-04. Read-only inspection of all three install
 `~/.agents/skills/<skill>/SKILL.md` files returned 0.6.3 at the old revision. No install,
 plugin update, session reload, tag, merge, release, deployment or live MCP configuration
 was performed. No COM smoke, grants, transport or runtime claim is delivered.
-Hosted CI was not dispatched and is not claimed passing.
+Hosted CI was not dispatched and is not claimed passing. A fresh remote clone of
+`a32b389017d13089000c83e314afc1509a843a4c` opened all packet links and passed the
+distribution and local revision checks; compiled arms were explicitly NOT_RUN in that
+cold clone, and remain covered by the owner gate above.
 
 Nightly enrollment is **UNKNOWN**: accessible org-index `check.yml` at
 `44dbca21877028c7a39da7182335215f8c019589` validates only its own index, not a downstream

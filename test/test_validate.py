@@ -391,5 +391,16 @@ class PinTests(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("reviewed current revision", out)
 
+    def test_source_repository_constant_must_match_lock(self):
+        def mutate(copy):
+            script = copy / validate.PIN_ADAPTER
+            text = script.read_text()
+            script.write_text(text.replace(
+                'CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"',
+                'CONTRACT_REPOSITORY = "https://evil.example/contract"'))
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn("CONTRACT_REPOSITORY", out)
+
 if __name__ == "__main__":
     unittest.main()

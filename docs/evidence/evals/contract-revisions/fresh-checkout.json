@@ -1,0 +1,11 @@
+{
+  "asOf": "2026-10-04",
+  "branch": "codex/contract-pin-adoption-20261004",
+  "checkedCommit": "a32b389017d13089000c83e314afc1509a843a4c",
+  "freshRemoteClone": 0,
+  "distributionValidator": 0,
+  "focusedRevisionTests": 0,
+  "schemaArms": "NOT_RUN in cold clone (variables unset); actual compiled arms ran in owner gate checks.json",
+  "access": "all linked repository artifacts present",
+  "expectedEntry": "docs/handoffs/2026-10-04-contract-adoption.md"
+}

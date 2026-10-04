@@ -59,5 +59,18 @@
     "distributionValidator": 0,
     "actionlint": 0,
     "jobsBeforeAfter": "identical parsed dictionaries"
+  },
+  "installedReadback": {
+    "date": "2026-10-04",
+    "scope": "three ~/.agents/skills/<skill>/SKILL.md metadata blocks",
+    "version": "0.6.3",
+    "revision": "2ce392291c6668598d12cd38327e24696b5ca15c",
+    "mutation": false
+  },
+  "finalFocusedPinGate": {
+    "command": "python3 -m unittest discover -s test -p test_validate.py -q",
+    "tests": 50,
+    "exitCode": 0,
+    "reason": "explicit repository-constant consistency was added after full gate; code schema arms unchanged"
   }
 }

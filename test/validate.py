@@ -449,7 +449,8 @@ def validate_contract_pin(errors: List[str], root: Path = ROOT) -> None:
                   and isinstance(node.ctx, ast.Store) and node.id == constant]
         if len(writes) != 1:
             errors.append("contract pin: %s must have exactly one immutable declaration" % constant)
-    for constant, expected in (("CONTRACT_COMMIT", commit), ("CONTRACT_VERSION", pin.get("version"))):
+    for constant, expected in (("CONTRACT_COMMIT", commit), ("CONTRACT_VERSION", pin.get("version")),
+                               ("CONTRACT_REPOSITORY", pin.get("repository"))):
         match = re.search(r'^%s = "([^"]+)"' % constant, script, re.MULTILINE)
         if not match or match.group(1) != expected:
             errors.append("contract pin: adapt_project.py %s is %s; the pin says %s" % (constant, match.group(1) if match else "missing", expected))
