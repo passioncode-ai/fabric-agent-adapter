@@ -402,5 +402,80 @@ class PinTests(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn("CONTRACT_REPOSITORY", out)
 
+    def _assert_dynamic_suffix_rejected(self, constant, suffix):
+        def mutate(copy):
+            script = copy / validate.PIN_ADAPTER
+            lines = script.read_text().splitlines()
+            script.write_text('\n'.join(line + suffix if line.startswith(constant + ' = ')
+                                        else line for line in lines) + '\n')
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn(constant, out)
+
+    def test_contract_commit_dynamic_suffix_is_rejected(self):
+        self._assert_dynamic_suffix_rejected('CONTRACT_COMMIT', ' + "bad"')
+
+    def test_contract_version_dynamic_suffix_is_rejected(self):
+        self._assert_dynamic_suffix_rejected('CONTRACT_VERSION', ' + "bad"')
+
+    def test_contract_repository_dynamic_suffix_is_rejected(self):
+        self._assert_dynamic_suffix_rejected('CONTRACT_REPOSITORY', ' + "/forged"')
+
+    def test_pin_bindings_cannot_be_changed_by_alternative_writes(self):
+        mutations = [
+            'CONTRACT_VERSION += "bad"',
+            'del CONTRACT_VERSION',
+            'CONTRACT_VERSION: str = "0.1.0"',
+            'def CONTRACT_VERSION():\n    return "0.1.0"',
+            'globals()["CONTRACT_VERSION"] = "bad"',
+            'namespace = globals\nnamespace()["CONTRACT_VERSION"] = "bad"',
+            'exec("CONTRACT_VERSION = chr(120)")',
+            'sys.modules[__name__].CONTRACT_VERSION = "bad"',
+        ]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation):
+                def mutate(copy):
+                    script = copy / validate.PIN_ADAPTER
+                    with script.open('a') as out:
+                        out.write('\n' + mutation + '\n')
+                code, out = self._validate_copy(mutate)
+                self.assertEqual(code, 1, out)
+                self.assertIn('contract pin', out)
+
+    def test_semicolon_reassignment_and_chained_assignment_are_rejected(self):
+        self._assert_dynamic_suffix_rejected('CONTRACT_VERSION', '; CONTRACT_VERSION = "bad"')
+        def mutate(copy):
+            script = copy / validate.PIN_ADAPTER
+            script.write_text(script.read_text().replace(
+                'CONTRACT_VERSION = "0.1.0"', 'other = CONTRACT_VERSION = "0.1.0"'))
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn('plain top-level assignment', out)
+
+    @unittest.skipUnless(sys.version_info >= (3, 10), 'match bindings require Python 3.10+')
+    def test_pattern_capture_cannot_replace_pin_binding(self):
+        def mutate(copy):
+            script = copy / validate.PIN_ADAPTER
+            with script.open('a') as out:
+                out.write('\nmatch "bad":\n    case CONTRACT_VERSION:\n        pass\n')
+        code, out = self._validate_copy(mutate)
+        self.assertEqual(code, 1, out)
+        self.assertIn('immutable declaration', out)
+
+    def test_exact_source_literals_match_runtime_and_default_bundle(self):
+        from test_adapt_project import ADAPTER, scaffold_args
+        import tempfile
+        pin = json.loads((ROOT / 'fabric-contract.lock.json').read_text())
+        errors = []
+        validate.validate_contract_pin(errors)
+        self.assertEqual(errors, [])
+        self.assertEqual(ADAPTER.CONTRACT_COMMIT, pin['commit'])
+        self.assertEqual(ADAPTER.CONTRACT_VERSION, pin['version'])
+        self.assertEqual(ADAPTER.CONTRACT_REPOSITORY, pin['repository'])
+        with tempfile.TemporaryDirectory() as temp:
+            ADAPTER.scaffold_project(Path(temp), scaffold_args('mcp'))
+            lock = json.loads((Path(temp) / 'fabric-contract.lock.json').read_text())
+            self.assertEqual({key: lock[key] for key in pin}, pin)
+
 if __name__ == "__main__":
     unittest.main()

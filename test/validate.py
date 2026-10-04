@@ -443,17 +443,49 @@ def validate_contract_pin(errors: List[str], root: Path = ROOT) -> None:
     script = (root / PIN_ADAPTER).read_text(encoding="utf-8")
     if script.splitlines().count(PIN_SUPPORTED_DECLARATION) != 1:
         errors.append("contract pin: supported immutable revision declaration must equal the reviewed pair")
-    tree = ast.parse(script)
-    for constant in ("CONTRACT_COMMIT", "CONTRACT_VERSION", "CONTRACT_REPOSITORY", "SUPPORTED_CONTRACT_COMMITS"):
-        writes = [node for node in ast.walk(tree) if isinstance(node, ast.Name)
-                  and isinstance(node.ctx, ast.Store) and node.id == constant]
-        if len(writes) != 1:
-            errors.append("contract pin: %s must have exactly one immutable declaration" % constant)
-    for constant, expected in (("CONTRACT_COMMIT", commit), ("CONTRACT_VERSION", pin.get("version")),
-                               ("CONTRACT_REPOSITORY", pin.get("repository"))):
-        match = re.search(r'^%s = "([^"]+)"' % constant, script, re.MULTILINE)
-        if not match or match.group(1) != expected:
-            errors.append("contract pin: adapt_project.py %s is %s; the pin says %s" % (constant, match.group(1) if match else "missing", expected))
+    try:
+        tree = ast.parse(script)
+    except SyntaxError as exc:
+        errors.append("contract pin: adapt_project.py cannot be parsed (%s)" % exc)
+        return
+    expected_literals = {"CONTRACT_COMMIT": commit, "CONTRACT_VERSION": pin.get("version"),
+                         "CONTRACT_REPOSITORY": pin.get("repository")}
+    protected = set(expected_literals) | {"SUPPORTED_CONTRACT_COMMITS"}
+    declarations = {}
+    for constant in protected:
+        bindings = [node for node in ast.walk(tree) if (
+            isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)) and node.id == constant
+            or isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == constant
+            or isinstance(node, ast.arg) and node.arg == constant
+            or isinstance(node, ast.ExceptHandler) and node.name == constant
+            or isinstance(node, ast.alias) and (node.asname or node.name.split(".")[0]) == constant
+            or type(node).__name__ in ("MatchAs", "MatchStar") and node.name == constant
+            or type(node).__name__ == "MatchMapping" and node.rest == constant
+        )]
+        plain = [node for node in tree.body if isinstance(node, ast.Assign)
+                 and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                 and node.targets[0].id == constant]
+        if len(bindings) != 1 or len(plain) != 1:
+            errors.append("contract pin: %s must have exactly one immutable declaration (plain top-level assignment)" % constant)
+        else:
+            declarations[constant] = plain[0].value
+    for constant, expected in expected_literals.items():
+        value = declarations.get(constant)
+        if not isinstance(value, ast.Constant) or not isinstance(value.value, str) or value.value != expected:
+            errors.append("contract pin: adapt_project.py %s must be an exact string literal equal to %s" % (constant, expected))
+    supported = declarations.get("SUPPORTED_CONTRACT_COMMITS")
+    if not (isinstance(supported, ast.Tuple) and len(supported.elts) == 2
+            and isinstance(supported.elts[0], ast.Name) and supported.elts[0].id == "CONTRACT_COMMIT"
+            and isinstance(supported.elts[1], ast.Constant)
+            and supported.elts[1].value == "2ce392291c6668598d12cd38327e24696b5ca15c"):
+        errors.append("contract pin: SUPPORTED_CONTRACT_COMMITS must be the reviewed static tuple")
+    # A portable scaffolder has no reason to mutate its module namespace dynamically.
+    reflection = {"globals", "locals", "vars", "exec", "eval", "setattr", "delattr", "__dict__"}
+    if any(isinstance(node, ast.Name) and node.id in reflection
+           or isinstance(node, ast.Attribute) and (node.attr in reflection
+               or node.attr in protected and isinstance(node.ctx, (ast.Store, ast.Del)))
+           for node in ast.walk(tree)):
+        errors.append("contract pin: dynamic namespace definitions or attribute mutations are forbidden")
     errors.extend(contract_pin_drift(root, commit))
 # #endregion contract-pin
 

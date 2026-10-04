@@ -116,3 +116,29 @@ this owner packet is not a second editable COM backlog.
 - [`agent-sync`](https://github.com/ssheleg/agent-sync) — exclusive lock and changelog leases
 
 <sub>A star on [the bundle](https://github.com/ssheleg/sshlg-skills) helps.</sub>
+
+## Independent rejection and correction
+
+The initial candidate `05b8451cc7acd64112078395866cc35b5d217fb1` was independently
+**rejected**: `validate_contract_pin` combined a literal-prefix regex with a Store-count
+check, accepting expressions that appended `"bad"` to the commit/version, or `"/forged"`
+to the repository. Each full copied-root CLI reproduction returned exit 0 before repair.
+Three new tests reproduced that defect as three actual failures. The initial candidate
+and [original receipt](../evidence/evals/contract-revisions/checks.json) remain in history;
+they are not substituted for an independent acceptance result.
+
+Correction requires each default binding to be one plain top-level single-name assignment
+whose AST value is a string constant exactly equal to the canonical lock. The compatibility
+binding must be the reviewed static tuple. Alternative assignments, augmented writes,
+deletions, named definitions/import bindings, pattern captures and dynamic namespace or
+protected attribute mutations are rejected. Positive tests compare statically verified
+literals to runtime constants and the generated default bundle lock.
+
+[Post-rejection owner gate](../evidence/evals/contract-revisions/post-rejection.json) records
+the red cases and the rerun. The initial independent rejection is retained; the next task
+is an appended independent review of the new exact SHA before merge. No release or
+installed-session propagation is implied by the correction.
+
+Correction owner gate: 208 Python tests (one existing opt-in real-client skip), 38 Node
+tests, exit 0 with both compiled contract arms. The focused validator suite passed 57
+tests; both strict plugin checks and actionlint exited 0 again.
