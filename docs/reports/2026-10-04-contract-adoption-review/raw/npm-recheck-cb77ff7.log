@@ -1,0 +1,62 @@
+
+> @passioncode-ai/fabric-agent-adapter@0.7.0 test
+> python3 test/validate.py && python3 -m unittest discover -s test -q && node --test 'test/*.test.mjs'
+
+OK: Fabric Agent Adapter distribution is valid
+Another copy is already running (process 65543 holds /var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/tmpqp0v70ze/service.lock).
+Another copy is already running (process 65543 holds /var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/tmpi83ymo4y/service.lock). Waiting up to 300 s for it to exit.
+Another copy is already running (process 65543 holds /var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/tmpi83ymo4y/service.lock).
+Another copy is already running (process 65543 holds /var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/tmp_7nbn8ng/service.lock). Waiting up to 300 s for it to exit.
+----------------------------------------------------------------------
+Ran 208 tests in 94.446s
+
+OK (skipped=1)
+✔ traceparent: W3C in, W3C out, a child keeps the trace (0.610834ms)
+✔ events carry traceId and spanId as a pair (1.279292ms)
+✔ a capability is served as a tool of its name with derived annotations (0.113875ms)
+✔ jobs: a stable handle, the Python file format, terminal states stay terminal (18.187542ms)
+✔ DEC-0017: the full envelope carries its trace; a job tool serves the union (30.214458ms)
+✔ form mode never asks for a secret; a choice is a titled single-select (0.488375ms)
+Another copy is already running (process 78844 holds /var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/fabric-life-Zb8WNI/service.lock). Waiting up to 300 s for it to exit.
+Another copy is already running (process 78844 holds /var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/fabric-life-FM0CjC/service.lock). Waiting up to 300 s for it to exit.
+Another copy is already running (process 78844 holds /var/folders/3r/yrdx_c051cv22q3r3k0ylvdm0000gn/T/fabric-life-FM0CjC/service.lock).
+✔ by hand, a held lock still exits 75 at once (43.561125ms)
+✔ a supervised copy takes over when the holder leaves (19.437625ms)
+✔ a supervised copy backs off, capped, then exits 75 (5.566917ms)
+✔ a real supervised process waits before its exit 75 (1540.880875ms)
+✔ LC-12 writing past the cap rotates; files 0600, directory 0700 (26.455917ms)
+✔ LC-12 defaults are 5 x 5 MB and an oversized line is cut (0.765875ms)
+✔ LC-12 the launchd stdout file is capped at start (0.739416ms)
+✔ LC-01 an idle service exits at once and refuses new work (234.712166ms)
+✔ LC-01 a busy service finishes its work, then exits (1035.699ms)
+✔ LC-01 work past the deadline is interrupted inside it (1245.907833ms)
+✔ LC-01 a hung hand-over is cut by the hard exit (1736.749958ms)
+✔ LC-01 the default drain fits the 10 s bound (0.356416ms)
+✔ LC-15 two builds later two releases remain (4.793292ms)
+✔ LC-15 a rolled-back current release is never pruned; links and files stay (3.770625ms)
+✔ a remote descriptor validates without paths; local still needs them (1.521833ms)
+✔ a remote origin is https on a public name — nothing else (0.263375ms)
+✔ a remote descriptor carries nothing of launchd and no update (0.108208ms)
+✔ the remote request guard (0.106666ms)
+✔ the well-known document of a remote service is behind the token (0.087834ms)
+✔ login codes in memory with a platform key: single use, sessions survive a restart, codes do not (0.82775ms)
+✔ the remote session cookie is __Host-, Secure, HttpOnly, Strict, Path=/ and has no Domain (0.07375ms)
+✔ registerRemote writes a 0600 token and a descriptor that claims no port (51.182333ms)
+✔ the sample online service over real TLS, met the way a host meets it (144.76325ms)
+✔ second holder of the instance lock is refused with the pid (17.783584ms)
+✔ the Node lock and the Python lock exclude each other (78.266917ms)
+✔ a port is a claim (9.4335ms)
+✔ invalid descriptors are refused (0.143792ms)
+✔ token file must be private and tokens compare by scheme (5.030542ms)
+✔ request guard (0.127333ms)
+✔ login codes are single use across a restart and revocable (20.104167ms)
+✔ well-known and events follow the rules (0.686541ms)
+✔ holdSingleInstance exits 75 in a second process (42.37175ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5951.186458

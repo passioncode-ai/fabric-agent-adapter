@@ -1,0 +1,77 @@
+{
+  "asOf": "2026-10-04",
+  "baseMain": "c5be1e9b095503b99815b38d4106b5a493112379",
+  "acceptedSource": "cb77ff78406e0dd7bdc4f67bdd104a0d108d2c46",
+  "merge": {
+    "pr": 32,
+    "mergedAt": "2026-10-04T12:08:56Z",
+    "oid": "c5be1e9b095503b99815b38d4106b5a493112379"
+  },
+  "reviewPacketSource": "5f88fb4e1fb28a546407db786995be382232623e",
+  "unchangedImportedBlobs": [
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/README.md",
+      "blob": "ce6ea6a89440b10edb2abe292d4f7f97732cab56"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/.gitkeep",
+      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/four-surfaces.log",
+      "blob": "7daf9f54406c8520288de9821ea0eff6386a90e4"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/gates.log",
+      "blob": "13fc72bd1ecfcb4d8d28b24caaa0c75d70b8516f"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/independent-checks.log",
+      "blob": "48a595146a17c5d06a4a8295875f197811bb0a29"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/index-receipt.log",
+      "blob": "31422af7970334d5080388c0a6c607e75fc572cd"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/npm-recheck-cb77ff7.log",
+      "blob": "acfbe80b63e9017f6f92207e65a0ccb0a90c8598"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/recheck-cb77ff7.log",
+      "blob": "932b370d278399e8cf17c6c69fa6d296ad1a06b6"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/recheck-gates.log",
+      "blob": "85faea9a2da4633091eb077f9ba317e0097bdbcb"
+    },
+    {
+      "path": "docs/reports/2026-10-04-contract-adoption-review/raw/replay.log",
+      "blob": "bba461840f8bc4f77f6e7c6cf873f910220e98e5"
+    }
+  ],
+  "checks": {
+    "reportsHeader": {
+      "reports": 1,
+      "errors": 0,
+      "exitCode": 0
+    },
+    "structuralValidator": 0,
+    "gitDiffCheck": 0,
+    "exactPacketDiff": 0
+  },
+  "runtimeRetest": "NOT_RUN: unchanged source code; owner and independent208Python+38Node receipts retained",
+  "nightlyEnrollment": "UNKNOWN",
+  "published": {
+    "github": "v0.6.3",
+    "npm": "0.6.3"
+  },
+  "sourceVersion": "0.7.0 unreleased",
+  "indexWikiReleaseInstall": "NOT_RUN: root owns final cross-repository publication; no release or install authorized",
+  "coldCheckout": {
+    "remoteBranchCommit": "757992136cd0df5a30bda9c4337df90645593f9e",
+    "distributionValidator": 0,
+    "identicalImportedBlobs": 10,
+    "entryAndReportReadable": true
+  }
+}
