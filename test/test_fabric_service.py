@@ -270,6 +270,7 @@ class LiveServiceTests(unittest.TestCase):
         self.assertEqual(failed, {})
         self.assertEqual(code, 0)
         for rule in ("well-known.identity", "network.host-check", "events.requires-token", "events.page",
+                     "usage.requires-token", "usage.report",
                      "login.single-use", "lifecycle.instance-lock", "descriptor.port-claim"):
             self.assertEqual(results[rule]["verdict"], "PASS", rule)
         self.assertEqual(results["lifecycle.launchd"]["verdict"], "NOT_RUN")
@@ -349,3 +350,97 @@ class StateRuleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UsageReportTests(unittest.TestCase):
+    """DEC-0021: the usage report a service answers at surfaces.usage, from its own receipts."""
+
+    def setUp(self):
+        self.case = json.loads((ROOT / "test/fixtures/usage/receipts.json").read_text())
+        import datetime as dt
+        self.now = dt.datetime(2026, 10, 4, 12, tzinfo=dt.timezone.utc)
+
+    def report(self, **kw):
+        return fs.usage_report(self.case["receipts"], service_id="example-agent", now=self.now, **kw)
+
+    def test_days_models_and_sums(self):
+        r = self.report()
+        e = self.case["expect"]
+        self.assertEqual([d["date"] for d in r["days"]], e["days"], "31-day window, oldest first; an old receipt drops out")
+        d0, d1 = r["days"]
+        self.assertEqual(d0["calls"], e["day0"]["calls"])
+        self.assertEqual(d0["inputTokens"], e["day0"]["inputTokens"])
+        self.assertAlmostEqual(d0["costUsd"], e["day0"]["costUsd"], places=6)
+        self.assertEqual(d0["byModel"][0]["costBasis"], "mixed", "provider and price-list on one model")
+        self.assertEqual(d1["unpricedCalls"], 1)
+        self.assertAlmostEqual(d1["costUsd"], e["day1"]["costUsd"], places=6)
+        local = [m for m in d1["byModel"] if m["provider"] == "local"][0]
+        self.assertIsNone(local["costUsd"], "unknown is null, never 0")
+        for day in r["days"]:
+            for field in ("calls", "unpricedCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
+                self.assertEqual(day[field], sum(m[field] for m in day["byModel"]), field)
+
+    def test_a_day_of_only_unpriced_calls_costs_null(self):
+        r = fs.usage_report([fs.make_usage_receipt("local", "llama", input_tokens=1, output_tokens=1, at="2026-10-04T01:00:00Z")],
+                            service_id="example-agent", now=self.now, budget={"period": "day", "limitUsd": 5})
+        self.assertIsNone(r["days"][0]["costUsd"])
+        self.assertIsNone(r["budget"]["spentUsd"], "spend against the budget is unknown, not 0")
+
+    def test_budget_counts_the_current_month(self):
+        self.assertAlmostEqual(self.report(budget={"period": "month", "limitUsd": 100})["budget"]["spentUsd"],
+                               self.case["expect"]["budgetMonthSpent"], places=6)
+        with self.assertRaises(fs.ServiceError):
+            self.report(budget={"period": "week", "limitUsd": 1})
+
+    def test_receipt_refuses_what_the_report_cannot_carry(self):
+        with self.assertRaises(fs.ServiceError):
+            fs.make_usage_receipt("Anthropic", "m", input_tokens=1, output_tokens=1)
+        with self.assertRaises(fs.ServiceError):
+            fs.make_usage_receipt("anthropic", "m", input_tokens=-1, output_tokens=1)
+        with self.assertRaises(fs.ServiceError):
+            fs.make_usage_receipt("anthropic", "m", input_tokens=1, output_tokens=1, cost_usd=0.1, cost_basis="unknown")
+        with self.assertRaises(fs.ServiceError):
+            fs.make_usage_receipt("anthropic", "m", input_tokens=1, output_tokens=1, cost_basis="provider")
+        receipt = fs.make_usage_receipt("anthropic", "m", input_tokens=1, output_tokens=1)
+        self.assertEqual((receipt["costUsd"], receipt["costBasis"]), (None, "unknown"))
+        self.assertNotIn("prompt", receipt)
+
+    def test_ledger_is_private_bounded_and_survives_a_torn_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = fs.JsonlUsageLedger(Path(tmp) / "usage" / "usage.jsonl")
+            for r in self.case["receipts"]:
+                ledger.record(r)
+            self.assertEqual(os.stat(ledger.path).st_mode & 0o777, 0o600)
+            with open(ledger.path, "a") as f:
+                f.write('{"torn":')
+            self.assertEqual(len(ledger.receipts()), 5)
+            ledger.record(self.case["receipts"][3])
+            self.assertEqual(len(ledger.receipts()), 6, "a receipt written after a torn line is not glued to it")
+            self.assertEqual(ledger.prune(self.now), 1, "the August receipt goes")
+            self.assertEqual(len(ledger.receipts()), 5)
+            self.assertNotIn("torn", ledger.path.read_text(), "the rewrite drops the torn line")
+            self.assertEqual([d["date"] for d in ledger.report(service_id="example-agent", now=self.now)["days"]], self.case["expect"]["days"])
+
+
+class UsageCheckTests(unittest.TestCase):
+    """check_service.py reads a declared usage report and holds it to FAC-SEM-025."""
+
+    def report(self):
+        case = json.loads((ROOT / "test/fixtures/usage/receipts.json").read_text())
+        import datetime as dt
+        return fs.usage_report(case["receipts"], service_id="example-agent", now=dt.datetime(2026, 10, 4, 12, tzinfo=dt.timezone.utc))
+
+    def test_the_kits_report_passes(self):
+        self.assertEqual(check.usage_problems(self.report(), "example-agent", "default"), [])
+
+    def test_zero_for_unknown_wrong_service_and_bad_sums_fail(self):
+        r = self.report()
+        [m for m in r["days"][1]["byModel"] if m["provider"] == "local"][0]["costUsd"] = 0
+        self.assertTrue(any("must be null" in p for p in check.usage_problems(r, "example-agent", "default")))
+        self.assertTrue(any("reports for" in p for p in check.usage_problems(self.report(), "example-agent", "preview")))
+        r = self.report()
+        r["days"][0]["inputTokens"] += 1
+        self.assertTrue(any("inputTokens is not the sum" in p for p in check.usage_problems(r, "example-agent", "default")))
+        r = self.report()
+        r["days"].reverse()
+        self.assertTrue(any("run forward" in p for p in check.usage_problems(r, "example-agent", "default")))

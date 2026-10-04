@@ -71,6 +71,8 @@ class Service:
         self.lock = fs.hold_single_instance(self.data)
         self.token = fs.ensure_token(self.token_file)
         self.log = fs.JsonlEventLog(self.data / "events.jsonl")
+        self.usage = fs.JsonlUsageLedger(self.data / "usage.jsonl")  # DEC-0021
+        self.usage.prune()
         self.codes = fs.LoginCodes(self.data / "auth")
         self.jobs = fi.JobStore(self.data / "jobs")
         self.mcp = fi.McpToolServer(self.id, VERSION, jobs=self.jobs, on_job_started=self.draft_started, on_input=self.draft_answered)
@@ -116,6 +118,8 @@ class Service:
                    "binding": {"id": "urn:fabric:binding:sample.draft", "revision": 1, "contentHash": "sha256:" + "0" * 64}, "writeScopes": []},
             not_verified=[{"claim": "NOTE", "reason": "no checker has read the note"}],
             output={"title": title, "body": body}, usage={"inputTokens": 0, "outputTokens": 0, "wallMs": 1}))
+        # The sample writes from a template: one call that costs a known $0 (DEC-0021 usage report).
+        self.usage.record(fs.make_usage_receipt("local", "sample-template", input_tokens=0, output_tokens=0, cost_usd=0.0, cost_basis="price-list"))
         self.log.append("job.completed", "info", "The note %s is drafted." % title, **fi.trace_ids(ctx.traceparent))
 
     def well_known(self) -> Dict[str, Any]:
@@ -124,7 +128,8 @@ class Service:
             started_at=self.started_at, status="ready", degraded=self.degraded,
             summary=[{"label": "Events", "value": len(self.log.fetch(None, fs.EVENTS_MAX_LIMIT))}],
             surfaces={"dashboard": {"path": "/", "login": True}, "events": {"path": "/fabric/v1/events"},
-                      "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]}},
+                      "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]},
+                      "usage": {"path": fs.USAGE_PATH}},
         )
 
 
@@ -186,6 +191,10 @@ def make_handler(svc: Service):
                 except fs.ServiceError as exc:
                     return self._send(400, {"error": str(exc)})
                 return self._send(200, page)
+            if url.path == fs.USAGE_PATH:
+                if not self._token_ok():
+                    return
+                return self._send(200, svc.usage.report(service_id=svc.id, instance=svc.instance))
             if url.path == "/mcp":
                 # No server-to-client stream here: Streamable HTTP says 405 for a GET.
                 return self._send(405, {"error": "POST JSON-RPC to /mcp."}, {"Allow": "POST"})

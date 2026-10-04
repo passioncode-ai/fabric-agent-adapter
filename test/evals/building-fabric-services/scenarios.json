@@ -167,6 +167,17 @@
         "uninstall waits for the job to unload, removes the plist, resets the override and removes data only with an explicit purge",
         "keeps the current and the previous release and prunes older ones"
       ]
+    },
+    {
+      "id": "agent-reports-its-own-spend",
+      "trap": "the agent's spend lived only in a summary tile («Spend today, $»), unknown local-model calls counted as $0, and the host could neither add it up nor compare it with other agents",
+      "request": "Make example-agent report what it spends on models so Fabric Dashboards can show it.",
+      "expected": [
+        "records one usage receipt per model call from the provider's own usage numbers, without prompts, outputs or caller identities",
+        "declares surfaces.usage in the well-known document and answers the usage report behind the service token (DEC-0021)",
+        "reports up to 31 UTC days per provider and model; a call without a price counts in unpricedCalls and its cost is null, never 0",
+        "states its own budget in the report only if it enforces one, and keeps the receipts bounded to the reported window"
+      ]
     }
   ]
 }

@@ -5,9 +5,10 @@ description: >-
   macOS machine, or making an ONLINE agent or dashboard (https origin, the remote placement) a
   Fabric service — «сделай агенту дашборд», «локальный сервис агента», «онлайн-дашборд в Fabric»,
   «подключи агента к Fabric Dashboards», "make this agent a local service", "make an online
-  dashboard a Fabric service", "fabric-service protocol", "add the well-known endpoint". Covers
+  dashboard a Fabric service", "fabric-service protocol", "add the well-known endpoint", «расходы агента
+  на модели». Covers
   fabric-service/0.1: surfaces, token and one-time login, state, one copy, launchd, descriptor,
-  well-known document, events; online: the https guard, the token-gated well-known document, the
+  well-known document, events, the usage report (spend per model); online: the https guard, the token-gated well-known document, the
   __Host- cookie, registering it on the operator's computer; ships Python and Node kits, a TLS
   sample and a live probe. NOT for a one-off script or cron job, a hosted product with no agent
   behind it, the provider manifest (adapting-projects-to-fabric), or building Fabric Dashboards.
@@ -15,10 +16,10 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.7.0"
+  version: "0.8.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "df55c8c54a23251342a7ee57ba95642b7eb39e61"
+  extension-commit: "9091d3d6606b0c4b5591a38c3674356a01fd7f55"
 ---
 
 # Building Fabric services
@@ -205,6 +206,11 @@ question's kind says so (`*.awaiting_*`, `*.approval_*`, `human_step.opened`). T
 raises no banners of its own: the host is the one channel. Read
 [the events reference](references/events-and-notifications.md) for mapping an existing
 log, retention and notification policy.
+
+An agent that calls paid models reports **what it spent**: one receipt per call from the
+provider's own usage numbers, served behind the token at `surfaces.usage` as the DEC-0021 usage
+report. An unknown cost is null, never 0. Read [the usage reference](references/usage.md)
+before wiring it.
 
 ## Step 6 — verify
 

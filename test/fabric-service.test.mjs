@@ -106,3 +106,40 @@ test('holdSingleInstance exits 75 in a second process', async () => {
   assert.doesNotMatch(child.stdout, /ran/);
   lock.release();
 });
+
+// DEC-0021: the Node twin builds the same usage report as fabric_service.py from the same receipts.
+const usageCase = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/usage/receipts.json'), 'utf8'));
+
+test('usage report: days, models, sums and unknown cost as null — same numbers as the Python kit', () => {
+  const now = Date.parse(usageCase.now);
+  const r = k.usageReport(usageCase.receipts, { id: 'example-agent', now, budget: { period: 'month', limitUsd: 100 } });
+  assert.deepEqual(r.days.map((d) => d.date), usageCase.expect.days);
+  const [d0, d1] = r.days;
+  assert.equal(d0.calls, usageCase.expect.day0.calls);
+  assert.ok(Math.abs(d0.costUsd - usageCase.expect.day0.costUsd) < 1e-6);
+  assert.equal(d0.byModel[0].costBasis, 'mixed');
+  assert.equal(d1.unpricedCalls, 1);
+  assert.equal(d1.byModel.find((m) => m.provider === 'local').costUsd, null, 'unknown is null, never 0');
+  for (const day of r.days) for (const f of ['calls', 'unpricedCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) {
+    assert.equal(day[f], day.byModel.reduce((n, m) => n + m[f], 0), f);
+  }
+  assert.ok(Math.abs(r.budget.spentUsd - usageCase.expect.budgetMonthSpent) < 1e-6);
+  assert.throws(() => k.usageReport([], { id: 'example-agent', budget: { period: 'week', limitUsd: 1 } }), k.ServiceError);
+});
+
+test('usage receipt refuses what the report cannot carry; the ledger is private, bounded and survives a torn line', () => {
+  assert.throws(() => k.makeUsageReceipt('Anthropic', 'm', { inputTokens: 1, outputTokens: 1 }), k.ServiceError);
+  assert.throws(() => k.makeUsageReceipt('anthropic', 'm', { inputTokens: 1, outputTokens: 1, costUsd: 0.1, costBasis: 'unknown' }), k.ServiceError);
+  assert.throws(() => k.makeUsageReceipt('anthropic', 'm', { inputTokens: 1, outputTokens: 1, costBasis: 'provider' }), k.ServiceError);
+  assert.equal(k.makeUsageReceipt('anthropic', 'm', { inputTokens: 1, outputTokens: 1 }).costBasis, 'unknown');
+  const dir = temp();
+  const ledger = new k.JsonlUsageLedger(path.join(dir, 'usage', 'usage.jsonl'));
+  for (const r of usageCase.receipts) ledger.record(r);
+  assert.equal(fs.statSync(ledger.file).mode & 0o777, 0o600);
+  fs.appendFileSync(ledger.file, '{"torn":');
+  ledger.record(usageCase.receipts[3]);
+  assert.equal(ledger.receipts().length, 6, 'a receipt written after a torn line is not glued to it');
+  assert.equal(ledger.prune(Date.parse(usageCase.now)), 1);
+  assert.equal(ledger.receipts().length, 5);
+  assert.ok(!fs.readFileSync(ledger.file, 'utf8').includes('torn'));
+});

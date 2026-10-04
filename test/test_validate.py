@@ -353,7 +353,7 @@ class PinTests(unittest.TestCase):
             script.write_text(text.replace('2ce392291c6668598d12cd38327e24696b5ca15c', 'a' * 40))
         code, out = self._validate_copy(mutate)
         self.assertEqual(code, 1, out)
-        self.assertIn("reviewed pair", out)
+        self.assertIn("reviewed list", out)
 
     def test_default_cannot_be_reset_to_supported_legacy(self):
         def mutate(copy):

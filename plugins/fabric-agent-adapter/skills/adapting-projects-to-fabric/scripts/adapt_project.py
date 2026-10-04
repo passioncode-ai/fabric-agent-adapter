@@ -16,10 +16,10 @@ from urllib.parse import urlparse
 
 CONTRACT_VERSION = "0.1.0"
 CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"
-CONTRACT_COMMIT = "df55c8c54a23251342a7ee57ba95642b7eb39e61"
+CONTRACT_COMMIT = "9091d3d6606b0c4b5591a38c3674356a01fd7f55"
 # #region supported-contract-revisions — docs: README.md#contract-pin
 # Only this declaration may name a legacy revision in live files.
-SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "2ce392291c6668598d12cd38327e24696b5ca15c")
+SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
 # #endregion supported-contract-revisions
 INTEROP_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"

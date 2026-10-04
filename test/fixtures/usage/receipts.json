@@ -1,0 +1,16 @@
+{
+  "now": "2026-10-04T12:00:00Z",
+  "receipts": [
+    {"at": "2026-10-03T09:00:00Z", "provider": "anthropic", "model": "claude-sonnet-5-5", "inputTokens": 1000, "outputTokens": 200, "cacheReadTokens": 500, "cacheWriteTokens": 0, "costUsd": 0.0123456789, "costBasis": "provider"},
+    {"at": "2026-10-03T10:00:00Z", "provider": "anthropic", "model": "claude-sonnet-5-5", "inputTokens": 1000, "outputTokens": 200, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costUsd": 0.0123, "costBasis": "price-list"},
+    {"at": "2026-10-04T08:00:00Z", "provider": "local", "model": "llama-4-8b", "inputTokens": 300, "outputTokens": 30, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costUsd": null, "costBasis": "unknown"},
+    {"at": "2026-10-04T08:05:00Z", "provider": "openrouter", "model": "google/gemini-3-flash", "inputTokens": 400, "outputTokens": 40, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costUsd": 0.002, "costBasis": "provider"},
+    {"at": "2026-08-01T00:00:00Z", "provider": "anthropic", "model": "old", "inputTokens": 1, "outputTokens": 1, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costUsd": 9.0, "costBasis": "provider"}
+  ],
+  "expect": {
+    "days": ["2026-10-03", "2026-10-04"],
+    "day0": {"calls": 2, "unpricedCalls": 0, "inputTokens": 2000, "costUsd": 0.024646, "basis": "mixed"},
+    "day1": {"calls": 2, "unpricedCalls": 1, "costUsd": 0.002, "unpricedModelCost": null},
+    "budgetMonthSpent": 0.026646
+  }
+}

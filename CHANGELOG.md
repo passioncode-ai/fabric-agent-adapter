@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.0 - 2026-10-04
+
+Agents report what they spend (Fabric Agent Contract DEC-0021). The contract pin moves to
+`9091d3d6606b0c4b5591a38c3674356a01fd7f55`; bundles issued under `df55c8c` (DEC-0020) and
+`2ce3922` (DEC-0019) stay valid.
+
+### Added
+
+- **Usage report in both kits.** `make_usage_receipt` / `makeUsageReceipt` record one model call
+  from the provider's own numbers (no prompt, output or caller). `usage_report` / `usageReport`
+  build the `service-usage.schema.json` answer: 31 UTC days per provider and model, day totals
+  that are the sums of the rows (FAC-SEM-025), and an unknown cost as `null`, never `0`.
+  `JsonlUsageLedger` keeps receipts as 0600 JSON lines pruned to the window. A line torn by a
+  killed writer is skipped and never glued to the next receipt. The Python and Node twins
+  produce the same report from the same receipts (`test/fixtures/usage/receipts.json`).
+- `sample_service.py` declares `surfaces.usage` and serves the report behind the token.
+- `check_service.py` adds `usage.requires-token` and `usage.report` when a service declares the
+  surface.
+- `references/usage.md`; SKILL.md Step 5 and the protocol reference name the surface; trigger
+  and scenario evals `agent-reports-its-own-spend`.
+
+### Changed
+
+- Contract pin `df55c8c` → `9091d3d` (lock, scaffolder default, metadata). The supported earlier
+  revisions are now a reviewed list of two, `test/validate.py` checks it, and
+  `test_contract_revisions` runs against real checkouts of `2ce3922` and `9091d3d`.
+
 ## 0.7.0 - 2026-10-04
 
 The service kit meets the organization's

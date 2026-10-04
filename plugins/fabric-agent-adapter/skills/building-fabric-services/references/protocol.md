@@ -1,7 +1,7 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `df55c8c54a23251342a7ee57ba95642b7eb39e61`
-(`docs/specification/service.md`, DEC-0015). The contract's schemas are normative;
+Pinned to `fabric-agent-contract` commit `9091d3d6606b0c4b5591a38c3674356a01fd7f55`
+(`docs/specification/service.md`, DEC-0015; the usage report DEC-0021). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
@@ -47,7 +47,8 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
 - `status`: `starting | ready | degraded | stopping`. No answer means `down`.
 - `build` needs `commit` or `digest` (`sha256:<64 hex>`).
 - `summary`: at most six tiles; `attention: true` counts toward the host's badge.
-- `surfaces.events` is required; `dashboard` and `mcp` when the service has them.
+- `surfaces.events` is required; `dashboard` and `mcp` when the service has them; `usage`
+  (DEC-0021) when the service reports its spend — see [the usage reference](usage.md).
 
 ## Events page — `GET /fabric/v1/events?after=<cursor>&limit=<n>`
 
@@ -81,3 +82,4 @@ single use, at most 120 s, recorded as used before it is honoured. `GET` that UR
 | `FAC-SEM-010` | no two descriptors claim one port or one `id.instance` |
 | `FAC-SEM-011` | `ready` carries no degraded source |
 | `FAC-SEM-012` | commands start with an absolute or `~/` executable |
+| `FAC-SEM-025` | a usage report adds up; an all-unpriced row costs `null`, not `0` (DEC-0021) |

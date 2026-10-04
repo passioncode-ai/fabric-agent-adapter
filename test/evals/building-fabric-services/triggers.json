@@ -104,6 +104,14 @@
     {
       "query": "Add an OAuth callback URL to a hosted login flow.",
       "shouldTrigger": false
+    },
+    {
+      "query": "Make my agent service report how much it spends on LLM calls so the dashboard can show it.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Пусть агент сам отдаёт свои расходы на модели по протоколу, чтобы дашборд их показал.",
+      "shouldTrigger": true
     }
   ]
 }

@@ -583,6 +583,157 @@ class JsonlEventLog:
         return [r for r in rows if int(r["id"]) > floor][:limit]
 
 
+# --- usage report (DEC-0021) -------------------------------------------------------
+
+USAGE_PATH = "/fabric/v1/usage"
+USAGE_DAYS = 31
+COST_BASES = ("provider", "price-list", "unknown")
+_PROVIDER = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
+
+
+def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_tokens: int,
+                       cache_read_tokens: int = 0, cache_write_tokens: int = 0,
+                       cost_usd: Optional[float] = None, cost_basis: Optional[str] = None,
+                       at: Optional[str] = None) -> Dict[str, Any]:
+    """One model call, from the provider's own usage numbers. No prompt, output or caller.
+
+    `cost_usd` is None when the call cannot be priced: the report counts it as unpriced and
+    never as $0. `cost_basis` is `provider` (the provider reported the charge) or `price-list`
+    (computed from a published price list); it is `unknown` when there is no cost."""
+    if not _PROVIDER.match(provider or ""):
+        raise ServiceError("provider must be a lowercase name such as anthropic or openrouter.")
+    model = str(model or "").strip()
+    if not model or len(model) > 128:
+        raise ServiceError("model must be 1 to 128 characters.")
+    counts = {"inputTokens": input_tokens, "outputTokens": output_tokens,
+              "cacheReadTokens": cache_read_tokens, "cacheWriteTokens": cache_write_tokens}
+    for name, value in counts.items():
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise ServiceError("%s must be a non-negative integer." % name)
+    if cost_usd is not None and (isinstance(cost_usd, bool) or not isinstance(cost_usd, (int, float)) or cost_usd < 0 or cost_usd != cost_usd):
+        raise ServiceError("cost_usd must be a non-negative number or None.")
+    basis = cost_basis or ("unknown" if cost_usd is None else "provider")
+    if basis not in COST_BASES or (cost_usd is None) != (basis == "unknown"):
+        raise ServiceError("cost_basis is provider or price-list with a cost, unknown without one.")
+    return {"at": at or now_iso(), "provider": provider, "model": model, **counts,
+            "costUsd": None if cost_usd is None else float(cost_usd), "costBasis": basis}
+
+
+def _add_totals(row: Dict[str, Any], receipt: Dict[str, Any]) -> None:
+    row["calls"] += 1
+    for name in ("inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
+        row[name] += int(receipt.get(name) or 0)
+    if receipt.get("costUsd") is None:
+        row["unpricedCalls"] += 1
+    else:
+        row["_cost"] += float(receipt["costUsd"])
+
+
+def _close_totals(row: Dict[str, Any]) -> Dict[str, Any]:
+    cost = row.pop("_cost")
+    row["costUsd"] = None if row["calls"] and row["unpricedCalls"] == row["calls"] else round(cost, 6)
+    return row
+
+
+def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instance: str = "default",
+                 now: Optional[_dt.datetime] = None,
+                 budget: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The `service-usage.schema.json` answer: the last 31 UTC days, oldest first, per provider
+    and model. Days without calls are omitted. A row whose calls are all unpriced has
+    `costUsd: None`; totals are the sums of the model rows (FAC-SEM-025)."""
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    first = (now - _dt.timedelta(days=USAGE_DAYS - 1)).strftime("%Y-%m-%d")
+    last = now.strftime("%Y-%m-%d")
+    days: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    bases: Dict[Tuple[str, str, str], set] = {}
+    for r in receipts:
+        date = str(r.get("at", ""))[:10]
+        if not (first <= date <= last):
+            continue
+        key = (r["provider"], r["model"])
+        row = days.setdefault(date, {}).setdefault("%s\u0000%s" % key, {
+            "provider": r["provider"], "model": r["model"], "calls": 0, "unpricedCalls": 0,
+            "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "cacheWriteTokens": 0, "_cost": 0.0})
+        _add_totals(row, r)
+        bases.setdefault((date,) + key, set()).add(r.get("costBasis") or "unknown")
+    out_days = []
+    for date in sorted(days):
+        models = []
+        for row in days[date].values():
+            seen = bases[(date, row["provider"], row["model"])]
+            row["costBasis"] = seen.pop() if len(seen) == 1 else "mixed"
+            models.append(_close_totals(row))
+        models.sort(key=lambda m: (m["provider"], m["model"]))
+        day = {"date": date, "calls": 0, "unpricedCalls": 0, "inputTokens": 0, "outputTokens": 0,
+               "cacheReadTokens": 0, "cacheWriteTokens": 0, "_cost": 0.0}
+        for m in models:
+            for name in ("calls", "unpricedCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
+                day[name] += m[name]
+            day["_cost"] += m["costUsd"] or 0.0
+        day = _close_totals(day)
+        day["byModel"] = models
+        out_days.append(day)
+    report: Dict[str, Any] = {"protocol": PROTOCOL, "service": {"id": service_id, "instance": instance},
+                              "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "currency": "USD", "days": out_days}
+    if budget is not None:
+        if budget.get("period") not in ("day", "month") or not isinstance(budget.get("limitUsd"), (int, float)) or budget["limitUsd"] <= 0:
+            raise ServiceError("budget is {period: day|month, limitUsd > 0}.")
+        prefix = last if budget["period"] == "day" else last[:7]
+        window = [d for d in out_days if d["date"].startswith(prefix)]
+        unknown = bool(window) and all(d["costUsd"] is None for d in window)
+        spent = None if unknown else round(sum(d["costUsd"] or 0.0 for d in window), 6)
+        report["budget"] = {"period": budget["period"], "limitUsd": float(budget["limitUsd"]), "spentUsd": spent}
+    return report
+
+
+class JsonlUsageLedger:
+    """Usage receipts for services that keep none yet: append-only JSON lines, mode 0600, pruned
+    to the reported window so the file stays bounded (LC-12)."""
+
+    def __init__(self, path: Path):
+        self.path = Path(path)
+        self._lock = threading.Lock()
+
+    def record(self, receipt: Dict[str, Any]) -> None:
+        line = json.dumps(receipt, separators=(",", ":")) + "\n"
+        with self._lock:
+            ensure_private_dir(self.path.parent)
+            fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o600)
+            try:
+                size = os.fstat(fd).st_size
+                if size and os.pread(fd, 1, size - 1) != b"\n":
+                    line = "\n" + line  # a killed writer left a torn line: never glue a receipt to it
+                os.write(fd, line.encode("utf-8"))
+            finally:
+                os.close(fd)
+
+    def receipts(self) -> List[Dict[str, Any]]:
+        if not self.path.exists():
+            return []
+        out = []
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            try:
+                out.append(json.loads(line))
+            except ValueError:
+                continue  # a torn last line from a killed writer is skipped, not fatal
+        return out
+
+    def prune(self, now: Optional[_dt.datetime] = None) -> int:
+        """Drop receipts older than the reported window; returns how many were dropped."""
+        now = now or _dt.datetime.now(_dt.timezone.utc)
+        first = (now - _dt.timedelta(days=USAGE_DAYS - 1)).strftime("%Y-%m-%d")
+        with self._lock:
+            kept = [r for r in self.receipts() if str(r.get("at", ""))[:10] >= first]
+            dropped = len(self.receipts()) - len(kept)
+            if dropped:
+                atomic_write(self.path, "".join(json.dumps(r, separators=(",", ":")) + "\n" for r in kept).encode("utf-8"))
+            return dropped
+
+    def report(self, *, service_id: str, instance: str = "default", now: Optional[_dt.datetime] = None,
+               budget: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return usage_report(self.receipts(), service_id=service_id, instance=instance, now=now, budget=budget)
+
+
 # --- logs (LC-12) ---------------------------------------------------------------
 
 class RotatingLog:

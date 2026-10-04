@@ -324,6 +324,42 @@ class Probe:
         self.add("events.page", "FAIL" if bad else "PASS",
                  ("bad events: " + ", ".join(bad)) if bad else "%d event(s), cursor %r" % (len(events), page["cursor"]))
 
+    def usage_rules(self) -> None:
+        """DEC-0021: a declared usage report requires the token and adds up (FAC-SEM-025)."""
+        usage = ((self.wk or {}).get("surfaces") or {}).get("usage")
+        if not usage:
+            self.add("usage.report", "NOT_RUN", "surfaces.usage not declared (optional; a service that calls paid models should offer it)")
+            return
+        path = str(usage.get("path", ""))
+        if not path.startswith("/") or path.startswith("//"):
+            self.add("usage.report", "FAIL", "surfaces.usage.path %r is not a path on the origin" % path)
+            return
+        try:
+            status, _, _ = self.request("GET", path)
+            self.add("usage.requires-token", "PASS" if status == 401 else "FAIL", "HTTP %d without a token" % status)
+        except OSError as exc:
+            self.add("usage.requires-token", "NOT_RUN", str(exc))
+        if not self.token:
+            self.add("usage.report", "NOT_RUN", "no readable token")
+            return
+        try:
+            status, _, body = self.request("GET", path, self.auth_headers())
+        except OSError as exc:
+            self.add("usage.report", "NOT_RUN", str(exc))
+            return
+        if status != 200:
+            self.add("usage.report", "FAIL", "HTTP %d with the token" % status)
+            return
+        try:
+            report = json.loads(body)
+        except ValueError:
+            self.add("usage.report", "FAIL", "not JSON")
+            return
+        problems = usage_problems(report, str(self.d.get("id")), str(self.d.get("instance", "default")))
+        days = report.get("days") if isinstance(report, dict) else None
+        self.add("usage.report", "FAIL" if problems else "PASS",
+                 "; ".join(problems[:5]) if problems else "%d day(s), unknown cost kept null" % len(days or []))
+
     def login_rules(self) -> None:
         dashboard = ((self.wk or {}).get("surfaces") or {}).get("dashboard")
         if not dashboard or not dashboard.get("login"):
@@ -621,10 +657,62 @@ class Probe:
         if self.wk is not None:
             self.network_rules()
             self.auth_rules()
+            self.usage_rules()
             self.login_rules()
             self.interop_rules()
         self.lifecycle_rules()
         return self.results
+
+
+def usage_problems(report: Any, service_id: str, instance: str) -> List[str]:
+    """What makes this not a DEC-0021 usage report of the service: shape, identity and the sums of
+    FAC-SEM-025. An unknown cost must be null; a day's totals are the sums of its models."""
+    if not isinstance(report, dict):
+        return ["not an object"]
+    out: List[str] = []
+    if report.get("protocol") != fs.PROTOCOL:
+        out.append("protocol is %r" % report.get("protocol"))
+    if report.get("service") != {"id": service_id, "instance": instance}:
+        out.append("reports for %r, not %s.%s" % (report.get("service"), service_id, instance))
+    if report.get("currency") != "USD":
+        out.append("currency is not USD")
+    days = report.get("days")
+    if not isinstance(days, list) or len(days) > fs.USAGE_DAYS:
+        return out + ["days is not a list of at most 31"]
+    fields = ("calls", "unpricedCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")
+
+    def priced(row: Dict[str, Any], at: str) -> None:
+        calls, unpriced, cost = row.get("calls", 0), row.get("unpricedCalls", 0), row.get("costUsd")
+        if unpriced > calls:
+            out.append("%s: more unpriced calls than calls" % at)
+        if calls and unpriced == calls and cost is not None:
+            out.append("%s: every call is unpriced, so the cost must be null, not %r" % (at, cost))
+        if unpriced < calls and cost is None:
+            out.append("%s: priced calls carry a cost" % at)
+        if cost is not None and (not isinstance(cost, (int, float)) or cost < 0):
+            out.append("%s: costUsd is not a non-negative number" % at)
+
+    previous = ""
+    for i, day in enumerate(days):
+        at = "days[%d]" % i
+        date = str(day.get("date", "")) if isinstance(day, dict) else ""
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date) or date <= previous:
+            out.append("%s: dates must run forward" % at)
+        previous = date
+        priced(day, at)
+        models = day.get("byModel") if isinstance(day, dict) else None
+        if not isinstance(models, list):
+            out.append("%s: byModel missing" % at)
+            continue
+        for j, m in enumerate(models):
+            priced(m, "%s.byModel[%d]" % (at, j))
+        for f in fields:
+            if day.get(f, 0) != sum(m.get(f, 0) for m in models):
+                out.append("%s: %s is not the sum of its models" % (at, f))
+        known = sum(m["costUsd"] for m in models if isinstance(m.get("costUsd"), (int, float)))
+        if isinstance(day.get("costUsd"), (int, float)) and abs(day["costUsd"] - known) > 1e-6:
+            out.append("%s: costUsd is not the sum of its models' known costs" % at)
+    return out
 
 
 def same_repository(a: str, b: str) -> bool:

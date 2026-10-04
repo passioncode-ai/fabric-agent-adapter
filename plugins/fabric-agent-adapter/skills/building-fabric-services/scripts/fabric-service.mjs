@@ -1,7 +1,7 @@
 // Reference kit for the fabric-service/0.1 local service extension — Node.js 20+, no dependencies.
 // The Node twin of fabric_service.py: same rules, same file formats, interoperable locks.
 // Normative source: fabric-agent-contract docs/specification/service.md (DEC-0015; the remote
-// placement — an online agent or dashboard at an https origin — DEC-0019).
+// placement — an online agent or dashboard at an https origin — DEC-0019; the usage report DEC-0021).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -386,6 +386,119 @@ export function parseLimit(raw) {
 export async function eventsPage(fetch, after, limit) {
   const events = (await fetch(after ?? null, limit)).slice(0, limit);
   return { events, cursor: events.length ? events.at(-1).id : (after ?? null) };
+}
+
+// --- usage report (DEC-0021) -------------------------------------------------------------
+
+export const USAGE_PATH = '/fabric/v1/usage';
+export const USAGE_DAYS = 31;
+export const COST_BASES = ['provider', 'price-list', 'unknown'];
+const PROVIDER = /^[a-z][a-z0-9._-]{0,63}$/;
+const COUNTS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'];
+
+/**
+ * One model call, from the provider's own usage numbers. No prompt, output or caller.
+ * `costUsd` null means it cannot be priced: the report counts it as unpriced, never as $0.
+ */
+export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0, costUsd = null, costBasis, at } = {}) {
+  if (!PROVIDER.test(provider ?? '')) throw new ServiceError('provider must be a lowercase name such as anthropic or openrouter.');
+  model = String(model ?? '').trim();
+  if (!model || model.length > 128) throw new ServiceError('model must be 1 to 128 characters.');
+  const counts = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens };
+  for (const [name, value] of Object.entries(counts)) if (!Number.isInteger(value) || value < 0) throw new ServiceError(`${name} must be a non-negative integer.`);
+  if (costUsd !== null && (typeof costUsd !== 'number' || !Number.isFinite(costUsd) || costUsd < 0)) throw new ServiceError('costUsd must be a non-negative number or null.');
+  const basis = costBasis ?? (costUsd === null ? 'unknown' : 'provider');
+  if (!COST_BASES.includes(basis) || (costUsd === null) !== (basis === 'unknown')) throw new ServiceError('costBasis is provider or price-list with a cost, unknown without one.');
+  return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis };
+}
+
+const utcDate = (ms) => new Date(ms).toISOString().slice(0, 10);
+const emptyRow = (extra = {}) => ({ ...extra, calls: 0, unpricedCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0 });
+function closeRow(row) {
+  const { cost, ...rest } = row;
+  return { ...rest, costUsd: rest.calls && rest.unpricedCalls === rest.calls ? null : Math.round(cost * 1e6) / 1e6 };
+}
+
+/**
+ * The service-usage.schema.json answer: the last 31 UTC days, oldest first, per provider and
+ * model; days without calls are omitted. A row whose calls are all unpriced costs null; totals
+ * are the sums of the model rows (FAC-SEM-025).
+ */
+export function usageReport(receipts, { id, instance = 'default', now = Date.now(), budget } = {}) {
+  const first = utcDate(now - (USAGE_DAYS - 1) * 86_400_000), last = utcDate(now);
+  const days = new Map();
+  for (const r of receipts) {
+    const date = String(r.at ?? '').slice(0, 10);
+    if (date < first || date > last) continue;
+    const rows = days.get(date) ?? new Map();
+    days.set(date, rows);
+    const k = `${r.provider}\u0000${r.model}`;
+    const row = rows.get(k) ?? emptyRow({ provider: r.provider, model: r.model, bases: new Set() });
+    rows.set(k, row);
+    row.calls += 1;
+    for (const c of COUNTS) row[c] += Number(r[c] ?? 0);
+    if (r.costUsd === null || r.costUsd === undefined) row.unpricedCalls += 1; else row.cost += r.costUsd;
+    row.bases.add(r.costBasis ?? 'unknown');
+  }
+  const outDays = [...days.keys()].sort().map((date) => {
+    const models = [...days.get(date).values()]
+      .map(({ bases, ...row }) => closeRow({ ...row, costBasis: bases.size === 1 ? [...bases][0] : 'mixed' }))
+      .sort((a, b) => (a.provider + a.model < b.provider + b.model ? -1 : 1));
+    const day = emptyRow({ date });
+    for (const m of models) {
+      for (const c of ['calls', 'unpricedCalls', ...COUNTS]) day[c] += m[c];
+      day.cost += m.costUsd ?? 0;
+    }
+    return { ...closeRow(day), byModel: models };
+  });
+  const report = { protocol: PROTOCOL, service: { id, instance }, generatedAt: new Date(now).toISOString().replace(/\.\d{3}Z$/, 'Z'), currency: 'USD', days: outDays };
+  if (budget !== undefined) {
+    if (!['day', 'month'].includes(budget?.period) || typeof budget.limitUsd !== 'number' || !(budget.limitUsd > 0)) throw new ServiceError('budget is {period: day|month, limitUsd > 0}.');
+    const prefix = budget.period === 'day' ? last : last.slice(0, 7);
+    const window = outDays.filter((d) => d.date.startsWith(prefix));
+    const unknown = window.length > 0 && window.every((d) => d.costUsd === null);
+    report.budget = { period: budget.period, limitUsd: budget.limitUsd, spentUsd: unknown ? null : Math.round(window.reduce((n, d) => n + (d.costUsd ?? 0), 0) * 1e6) / 1e6 };
+  }
+  return report;
+}
+
+/** Usage receipts for services that keep none yet: append-only JSON lines, 0600, pruned to the window (LC-12). */
+export class JsonlUsageLedger {
+  constructor(file) { this.file = file; }
+
+  record(receipt) {
+    ensurePrivateDir(path.dirname(this.file));
+    const fd = fs.openSync(this.file, 'a+', 0o600);
+    try {
+      const { size } = fs.fstatSync(fd);
+      const last = Buffer.alloc(1);
+      // A killed writer left a torn line: never glue a receipt to it.
+      const lead = size && fs.readSync(fd, last, 0, 1, size - 1) === 1 && last[0] !== 0x0a ? '\n' : '';
+      fs.writeSync(fd, lead + JSON.stringify(receipt) + '\n');
+    } finally {
+      fs.closeSync(fd);
+    }
+  }
+
+  receipts() {
+    if (!fs.existsSync(this.file)) return [];
+    const out = [];
+    for (const line of fs.readFileSync(this.file, 'utf8').split('\n')) {
+      if (!line) continue;
+      try { out.push(JSON.parse(line)); } catch { /* a torn last line from a killed writer is skipped */ }
+    }
+    return out;
+  }
+
+  prune(now = Date.now()) {
+    const first = utcDate(now - (USAGE_DAYS - 1) * 86_400_000);
+    const all = this.receipts();
+    const kept = all.filter((r) => String(r.at ?? '').slice(0, 10) >= first);
+    if (kept.length !== all.length) atomicWrite(this.file, kept.map((r) => JSON.stringify(r) + '\n').join(''));
+    return all.length - kept.length;
+  }
+
+  report(options) { return usageReport(this.receipts(), options); }
 }
 
 // --- logs (LC-12) ------------------------------------------------------------------------
