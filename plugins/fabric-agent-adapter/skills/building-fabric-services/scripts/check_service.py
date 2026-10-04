@@ -396,7 +396,7 @@ class Probe:
         body["_meta"] = {"io.modelcontextprotocol/protocolVersion": fi.MCP_REVISION,
                          "io.modelcontextprotocol/clientCapabilities": {}, "traceparent": self.sent_traceparent}
         headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
-                   "MCP-Protocol-Version": fi.MCP_REVISION}
+                   **fi.mcp_request_headers(method, params)}
         headers.update(self.auth_headers())
         message = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": body}).encode()
         status, resp_headers, raw = self.request("POST", path, headers, message)

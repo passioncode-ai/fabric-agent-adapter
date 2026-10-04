@@ -79,3 +79,15 @@ test('form mode never asks for a secret; a choice is a titled single-select', ()
   assert.deepEqual(req.params.requestedSchema.properties.title.oneOf, [{ const: 'a', title: 'A' }, { const: 'b', title: 'B' }]);
   assert.throws(() => envelope({ usage: { inputTokens: -1, outputTokens: 0, wallMs: 0 } }), i.InteropError);
 });
+
+// MCP 2026-07-28 standard headers: the Node twin agrees with fabric_interop.py.
+test('mcpHeaderProblem refuses a declared request without Mcp-Method/Mcp-Name and any mismatch; matching headers pass', () => {
+  const call = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'sample.echo', arguments: {} } };
+  assert.match(i.mcpHeaderProblem(call, { 'MCP-Protocol-Version': i.MCP_REVISION }), /Mcp-Method header is absent/);
+  assert.match(i.mcpHeaderProblem(call, { 'mcp-protocol-version': i.MCP_REVISION, 'mcp-method': 'tools/call' }), /Mcp-Name header is absent/);
+  assert.match(i.mcpHeaderProblem(call, { 'Mcp-Method': 'tools/list' }), /disagrees/);
+  assert.match(i.mcpHeaderProblem(call, new Headers({ 'Mcp-Method': 'tools/call', 'Mcp-Name': 'other' })), /Mcp-Name disagrees/);
+  assert.equal(i.mcpHeaderProblem(call, i.mcpRequestHeaders('tools/call', call.params)), null);
+  assert.equal(i.mcpHeaderProblem(call, {}), null, 'an earlier revision may omit them');
+  assert.deepEqual(i.mcpRequestHeaders('tools/list'), { 'MCP-Protocol-Version': i.MCP_REVISION, 'Mcp-Method': 'tools/list' });
+});

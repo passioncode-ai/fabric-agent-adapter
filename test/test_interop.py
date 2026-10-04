@@ -298,3 +298,34 @@ class McpServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class McpStandardHeaderTests(unittest.TestCase):
+    """MCP 2026-07-28 Streamable HTTP: Mcp-Method on every request, Mcp-Name on tools/call,
+    prompts/get and resources/read; a server rejects a mismatch (the official server SDK answers
+    -32020, and Frame Agent's live server did on 2026-10-04 when the probe omitted them)."""
+
+    CALL = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "sample.echo", "arguments": {}}}
+
+    def test_a_declared_2026_request_without_the_headers_is_refused(self):
+        self.assertIn("Mcp-Method header is absent", fi.mcp_header_problem(self.CALL, {"MCP-Protocol-Version": fi.MCP_REVISION}))
+        self.assertIn("Mcp-Name header is absent", fi.mcp_header_problem(self.CALL, {"mcp-protocol-version": fi.MCP_REVISION, "mcp-method": "tools/call"}))
+
+    def test_headers_that_disagree_with_the_body_are_refused_whatever_the_revision(self):
+        self.assertIn("disagrees", fi.mcp_header_problem(self.CALL, {"Mcp-Method": "tools/list"}))
+        self.assertIn("Mcp-Name disagrees", fi.mcp_header_problem(self.CALL, {"Mcp-Method": "tools/call", "Mcp-Name": "other"}))
+        read = {"jsonrpc": "2.0", "id": 2, "method": "resources/read", "params": {"uri": "file:///a"}}
+        self.assertIn("params.uri", fi.mcp_header_problem(read, {"Mcp-Method": "resources/read", "Mcp-Name": "file:///b"}))
+
+    def test_matching_headers_and_earlier_clients_pass(self):
+        self.assertIsNone(fi.mcp_header_problem(self.CALL, fi.mcp_request_headers("tools/call", self.CALL["params"])))
+        self.assertIsNone(fi.mcp_header_problem(self.CALL, {}), "an earlier revision may omit them")
+        self.assertIsNone(fi.mcp_header_problem(self.CALL, None), "a caller that passes no headers keeps the old behaviour")
+        self.assertEqual(fi.mcp_request_headers("tools/list", {}), {"MCP-Protocol-Version": fi.MCP_REVISION, "Mcp-Method": "tools/list"})
+
+    def test_the_server_answers_a_mismatch_with_the_header_error(self):
+        server = fi.McpToolServer("sample", "0.0.1")
+        answer = server.handle(self.CALL, {"MCP-Protocol-Version": fi.MCP_REVISION})
+        self.assertEqual(answer["error"]["code"], fi.HEADER_MISMATCH)
+        listed = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}}, fi.mcp_request_headers("tools/list", {}))
+        self.assertIn("tools", listed["result"])

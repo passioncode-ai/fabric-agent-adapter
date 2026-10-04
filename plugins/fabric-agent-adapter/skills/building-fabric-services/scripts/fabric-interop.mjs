@@ -220,3 +220,45 @@ export class JobStore {
   cancel(jobId) { return this.transition(jobId, 'cancelled'); }
 }
 // #endregion interop-kit-node
+
+// --- MCP 2026-07-28 standard headers ------------------------------------------------------
+
+export const NAMED_METHODS = { 'tools/call': 'name', 'prompts/get': 'name', 'resources/read': 'uri' };
+export const HEADER_MISMATCH = -32020; // the code the official 2026-07-28 server SDK answers a header/body mismatch with
+
+/**
+ * MCP 2026-07-28 Streamable HTTP mirrors the body in `Mcp-Method` (every request and
+ * notification) and `Mcp-Name` (`params.name` or `params.uri` of tools/call, prompts/get,
+ * resources/read). A server MUST reject a mismatch; a request that declares 2026-07-28 must carry
+ * them. Returns the problem as a sentence, or null. `headers` is a plain object (any case) or a
+ * Headers instance.
+ */
+export function mcpHeaderProblem(message, headers) {
+  if (!message || typeof message !== 'object' || !headers) return null;
+  const header = (name) => {
+    if (typeof headers.get === 'function') return headers.get(name) ?? null;
+    const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());
+    const value = key === undefined ? undefined : headers[key];
+    return value === undefined ? null : String(Array.isArray(value) ? value[0] : value);
+  };
+  const declared = header('MCP-Protocol-Version') === MCP_REVISION;
+  const { method } = message;
+  const sent = header('Mcp-Method');
+  if (sent === null && declared) return `the body names method ${method} but the required Mcp-Method header is absent`;
+  if (sent !== null && sent !== method) return `Mcp-Method ${sent} disagrees with the body's method ${method}`;
+  const field = NAMED_METHODS[method];
+  if (field) {
+    const named = header('Mcp-Name');
+    if (named === null && declared) return `the body carries params.${field} but the required Mcp-Name header is absent`;
+    if (named !== null && named !== String(message.params?.[field])) return `Mcp-Name disagrees with the body's params.${field}`;
+  }
+  return null;
+}
+
+/** The standard headers a 2026-07-28 client sends with one request. */
+export function mcpRequestHeaders(method, params = {}) {
+  const out = { 'MCP-Protocol-Version': MCP_REVISION, 'Mcp-Method': method };
+  const field = NAMED_METHODS[method];
+  if (field && params[field] !== undefined && params[field] !== null) out['Mcp-Name'] = String(params[field]);
+  return out;
+}

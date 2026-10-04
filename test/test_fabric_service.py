@@ -9,6 +9,7 @@ import tempfile
 import time
 import unittest
 from unittest import mock
+import urllib.error
 import urllib.request
 
 
@@ -274,6 +275,21 @@ class LiveServiceTests(unittest.TestCase):
                      "login.single-use", "lifecycle.instance-lock", "descriptor.port-claim"):
             self.assertEqual(results[rule]["verdict"], "PASS", rule)
         self.assertEqual(results["lifecycle.launchd"]["verdict"], "NOT_RUN")
+
+    def test_mcp_without_the_2026_standard_headers_is_a_400(self):
+        """The sample checks Mcp-Method/Mcp-Name as MCP 2026-07-28 requires; the probe sends them."""
+        fi_mod = load("fabric_interop")
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}).encode()
+        token = (self.data / "service.token").read_text().strip()
+        def post(headers):
+            req = urllib.request.Request("http://127.0.0.1:%d/mcp" % self.port, data=body, method="POST",
+                                         headers={"Content-Type": "application/json", "Authorization": "Bearer " + token, **headers})
+            try:
+                return urllib.request.urlopen(req, timeout=5).status
+            except urllib.error.HTTPError as exc:
+                return exc.code
+        self.assertEqual(post({"MCP-Protocol-Version": fi_mod.MCP_REVISION}), 400)
+        self.assertEqual(post(fi_mod.mcp_request_headers("tools/list", {})), 200)
 
     def test_second_copy_exits_75_and_leaves_the_first_serving(self):
         second = subprocess.run([sys.executable, str(SCRIPTS / "sample_service.py"), "serve", "--port",

@@ -382,6 +382,50 @@ JOB_REQUEST_SCHEMA = {"type": "object", "required": ["id"], "additionalPropertie
     "inputResponses": {"type": "object"}}}
 
 
+NAMED_METHODS = {"tools/call": "name", "prompts/get": "name", "resources/read": "uri"}
+HEADER_MISMATCH = -32020  # the code the official 2026-07-28 server SDK answers a header/body mismatch with
+
+
+def mcp_header_problem(message: Any, headers: Any) -> Optional[str]:
+    """MCP 2026-07-28 Streamable HTTP mirrors the body in `Mcp-Method` (every request and
+    notification) and `Mcp-Name` (`params.name` or `params.uri` of tools/call, prompts/get,
+    resources/read). A server MUST reject a mismatch; a request that declares 2026-07-28 must
+    carry them. Earlier revisions may omit them, but what they send must still agree.
+    `headers` is any case-insensitive mapping with `.get` (http.server's message, a dict)."""
+    if not isinstance(message, dict) or headers is None:
+        return None
+    def header(name: str) -> Optional[str]:
+        value = headers.get(name)
+        if value is None and isinstance(headers, dict):
+            value = next((v for k, v in headers.items() if k.lower() == name.lower()), None)
+        return None if value is None else str(value)
+    declared = header("MCP-Protocol-Version") == MCP_REVISION
+    method = message.get("method")
+    sent = header("Mcp-Method")
+    if sent is None and declared:
+        return "the body names method %s but the required Mcp-Method header is absent" % method
+    if sent is not None and sent != method:
+        return "Mcp-Method %s disagrees with the body's method %s" % (sent, method)
+    field = NAMED_METHODS.get(str(method))
+    if field:
+        value = (message.get("params") or {}).get(field)
+        named = header("Mcp-Name")
+        if named is None and declared:
+            return "the body carries params.%s but the required Mcp-Name header is absent" % field
+        if named is not None and named != str(value):
+            return "Mcp-Name disagrees with the body's params.%s" % field
+    return None
+
+
+def mcp_request_headers(method: str, params: Dict[str, Any]) -> Dict[str, str]:
+    """The standard headers a 2026-07-28 client sends with one request."""
+    out = {"MCP-Protocol-Version": MCP_REVISION, "Mcp-Method": method}
+    field = NAMED_METHODS.get(method)
+    if field and params.get(field) is not None:
+        out["Mcp-Name"] = str(params[field])
+    return out
+
+
 class McpToolServer:
     """tools/list and tools/call for an MCP 2026-07-28 server, with fabric.job.get/cancel built in.
 
@@ -428,9 +472,15 @@ class McpToolServer:
     def _error(rid: Any, code: int, message: str) -> Dict[str, Any]:
         return {"jsonrpc": "2.0", "id": rid, "error": {"code": code, "message": message}}
 
-    def handle(self, message: Any) -> Optional[Dict[str, Any]]:
+    def handle(self, message: Any, headers: Any = None) -> Optional[Dict[str, Any]]:
+        """One JSON-RPC message. Pass the HTTP request headers so the 2026-07-28 standard headers
+        are checked (`mcp_header_problem`); a mismatch answers HEADER_MISMATCH even for a
+        notification, so the transport can return HTTP 400."""
         if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
             return self._error(message.get("id") if isinstance(message, dict) else None, -32600, "Invalid request.")
+        problem = mcp_header_problem(message, headers)
+        if problem:
+            return self._error(message.get("id"), HEADER_MISMATCH, "Bad Request: the request headers and body disagree: " + problem)
         if "id" not in message:
             return None  # a notification gets no response
         rid = message["id"]

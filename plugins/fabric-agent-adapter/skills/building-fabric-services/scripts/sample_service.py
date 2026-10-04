@@ -226,10 +226,12 @@ def make_handler(svc: Service):
                     return self._send(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error."}})
                 try:
                     with svc.drain.work():
-                        response = svc.mcp.handle(message)
+                        response = svc.mcp.handle(message, self.headers)
                 except fs.Stopping as exc:
                     return self._send(503, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": str(exc)}},
                                       {"Retry-After": "5"})
+                if response is not None and (response.get("error") or {}).get("code") == fi.HEADER_MISMATCH:
+                    return self._send(400, response)
                 return self._send(202) if response is None else self._send(200, response)
             if url.path == "/fabric/v1/login-code":
                 if not self._token_ok():

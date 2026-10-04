@@ -21,6 +21,17 @@ Agents report what they spend (Fabric Agent Contract DEC-0021). The contract pin
 - `references/usage.md`; SKILL.md Step 5 and the protocol reference name the surface; trigger
   and scenario evals `agent-reports-its-own-spend`.
 
+### Fixed
+
+- **MCP 2026-07-28 standard headers.** The probe's MCP calls now send `Mcp-Method`, and `Mcp-Name`
+  for `tools/call`. Without them a server on the official 2026-07-28 SDK answers HTTP 400 (seen live
+  against a local agent on 2026-10-04: `tools/list failed: HTTP 400 from /mcp`).
+  `fabric_interop.McpToolServer.handle(message, headers)` checks them the way the specification
+  requires: a mismatch is refused with `-32020` whatever the revision, and a request that declares
+  2026-07-28 must carry them. Callers that pass no headers keep the old behaviour.
+  `mcp_header_problem` / `mcp_request_headers` are in both kits (Node: `mcpHeaderProblem`,
+  `mcpRequestHeaders`). The sample service answers a mismatch with HTTP 400.
+
 ### Changed
 
 - Contract pin `df55c8c` → `9091d3d` (lock, scaffolder default, metadata). The supported earlier
