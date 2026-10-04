@@ -20,9 +20,7 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-import signal
 import sys
-import threading
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -66,6 +64,7 @@ class Service:
         self.degraded = [{"source": "demo", "reason": args.degraded}] if args.degraded else []
         self.started_at = fs.now_iso()
         self.build = {"commit": os.environ.get("FABRIC_BUILD_COMMIT", "0000000"), "builtAt": self.started_at}
+        self.drain = fs.Drain()  # LC-01: SIGTERM drains in-flight calls, then the server stops
 
     def start(self) -> None:
         # Rule: the lock comes before ANY side effect, including creating the token.
@@ -216,7 +215,12 @@ def make_handler(svc: Service):
                     message = json.loads(self.rfile.read(length) or b"null")
                 except ValueError:
                     return self._send(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error."}})
-                response = svc.mcp.handle(message)
+                try:
+                    with svc.drain.work():
+                        response = svc.mcp.handle(message)
+                except fs.Stopping as exc:
+                    return self._send(503, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": str(exc)}},
+                                      {"Retry-After": "5"})
                 return self._send(202) if response is None else self._send(200, response)
             if url.path == "/fabric/v1/login-code":
                 if not self._token_ok():
@@ -247,12 +251,10 @@ def serve(args: argparse.Namespace) -> int:
     svc.start()
     server = make_server(svc)
 
-    def stop(signum: int, _frame: Any) -> None:
-        svc.log.append("service.stopping", "info", "%s is stopping." % svc.name)
-        threading.Thread(target=server.shutdown, daemon=True).start()
-
-    signal.signal(signal.SIGTERM, stop)
-    signal.signal(signal.SIGINT, stop)
+    # Stop taking calls, let in-flight ones finish (8 s at most), then end serve_forever; a
+    # hand-over that hangs is cut by the kit's hard exit, inside launchd's ExitTimeOut.
+    svc.drain.install(lambda drained: server.shutdown(),
+                      on_stopping=lambda: svc.log.append("service.stopping", "info", "%s is stopping." % svc.name))
     try:
         server.serve_forever(poll_interval=0.2)
     finally:

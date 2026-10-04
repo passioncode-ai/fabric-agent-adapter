@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.6.3"
+VERSION = "0.7.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -54,7 +54,7 @@ STDLIB_IMPORTS = {
     "os", "pathlib", "re", "subprocess", "sys", "tempfile", "typing", "unittest",
     "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets", "socketserver",
     "shutil", "signal", "socket", "ssl", "stat", "threading", "time",
-    "random", "io", "contextlib",
+    "random", "io", "contextlib", "textwrap", "traceback",
 }
 
 

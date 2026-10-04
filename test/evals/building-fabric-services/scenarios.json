@@ -133,6 +133,40 @@
         "otherwise report unavailable transport",
         "do not say a local custom scheme or localhost opens the workstation from the phone"
       ]
+    },
+    {
+      "id": "operator-off-survives-upgrade",
+      "trap": "launchd_install called launchctl enable on every run, so a service the operator had switched off (bootout + disable) came back on the next upgrade",
+      "request": "Ship version 2 of our example-agent service; the installer should restart it on the new release.",
+      "expected": [
+        "reads launchctl print-disabled before touching the job and leaves a disabled label disabled and unloaded",
+        "enables only on a first install (no override recorded) or when the operator asks for it explicitly",
+        "still rewrites the plist so the new release is what starts once the operator turns it back on",
+        "proves it with a throwaway label or a fake launchctl: install, disable, upgrade, still disabled",
+        "does not run the test against the operator's real launchd jobs"
+      ]
+    },
+    {
+      "id": "duplicate-under-keepalive",
+      "trap": "a second launchd copy hit the held lock and exited 75 at once; KeepAlive restarted it every 10 s forever",
+      "request": "Two installs of example-agent point at the same data directory and the log shows it restarting every ten seconds. Fix the restart loop.",
+      "expected": [
+        "keeps the lock before any side effect and the one-sentence exit 75 for a copy started by hand",
+        "makes a launchd-supervised copy back off in-process on the held lock before exiting 75, so respawns drop from every 10 s to a few per hour",
+        "marks supervision explicitly in the plist environment rather than guessing from the parent process",
+        "names the duplicate install as the real defect to remove"
+      ]
+    },
+    {
+      "id": "stop-drains-and-uninstall-is-symmetric",
+      "trap": "a service ignored SIGTERM until launchd killed it, its log grew without bound, and uninstall left the launchd override behind so a later reinstall stayed disabled",
+      "request": "Make example-agent stop cleanly, keep its log bounded, and give it a real uninstall.",
+      "expected": [
+        "on SIGTERM stops taking new work, drains in-flight work within the deadline and exits inside the lifecycle bound, with a hard exit if the hand-over hangs",
+        "logs JSON lines rotated by size (5 x 5 MB default, mode 0600) and caps the launchd stdout file at start",
+        "uninstall waits for the job to unload, removes the plist, resets the override and removes data only with an explicit purge",
+        "keeps the current and the previous release and prunes older ones"
+      ]
     }
   ]
 }

@@ -48,6 +48,15 @@ function copyDir(src, dest) {
   }
 }
 
+// A link in the hub belongs to whoever made it: 'launcher' for the PassionCode launcher's
+// ~/.passioncode/... links, 'other' for any other link, null for a directory or nothing.
+function linkOwner(dest) {
+  let info;
+  try { info = fs.lstatSync(dest); } catch { return null; }
+  if (!info.isSymbolicLink()) return null;
+  return fs.readlinkSync(dest).split(path.sep).includes('.passioncode') ? 'launcher' : 'other';
+}
+
 function pluginInstalled(home) {
   try {
     const data = JSON.parse(fs.readFileSync(path.join(home, '.claude/plugins/installed_plugins.json'), 'utf8'));
@@ -129,6 +138,15 @@ function main(argv) {
   const destRoot = target === 'claude' ? path.join(home, '.claude', 'skills') : path.join(home, '.agents', 'skills');
   for (const name of names) {
     const dest = path.join(destRoot, name);
+    const owner = linkOwner(dest);
+    if (owner) {
+      // One owner per artefact on disk: a plain copy over someone else's link freezes the skill
+      // at this version, and its owner stops updating it. --force does not override this.
+      console.log(owner === 'launcher'
+        ? `skip: ${name} at ${dest} is managed by the PassionCode launcher — update it with: npx @passioncode-ai/passioncode@latest update`
+        : `skip: ${name} at ${dest} is a link managed elsewhere — remove the link first to install a copy here`);
+      continue;
+    }
     if (fs.existsSync(dest) && !force) {
       console.log(`skip: ${name} already installed at ${dest} (rerun with --force to overwrite)`);
       continue;

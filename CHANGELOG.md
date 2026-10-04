@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.7.0 - 2026-10-04
+
+The service kit meets the organization's
+[product lifecycle contract](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/lifecycle.md)
+(LC-01…LC-15). Findings F7, F8, F9, F16 of the 2026-10-03 lifecycle audit.
+
+### Fixed
+
+- **An upgrade no longer switches back on a service the operator switched off (LC-14, F7).**
+  `launchd_install` called `launchctl enable` on every run. It now reads `launchctl
+  print-disabled` and enables only on a first install (no override recorded); a disabled label
+  stays disabled and unloaded, its plist is still rewritten, and the answer is
+  `{"disabled": true, ...}`. `force_enable=True` is the operator's explicit switch-on.
+  Tests: `test_fabric_service_lifecycle.LaunchdInstallTests` (fake `launchctl`, throwaway labels).
+- **A duplicate copy under `KeepAlive` no longer respawns every 10 s (LC-03, F8).** A
+  launchd-supervised copy (`FABRIC_SERVICE_SUPERVISOR=launchd`, now written by `launchd_plist`)
+  backs off in-process on a held lock — 0.5 s doubling to 30 s, 300 s in all — takes over if the
+  holder leaves, and exits 75 only then. Started by hand it still exits 75 at once (the contract's
+  one-copy rule). Python and Node. Tests: `SupervisedLockTests`, `fabric-service-lifecycle.test.mjs`.
+- **Uninstall is symmetric with install (LC-14, F9).** `launchd_uninstall` waits until launchd
+  reports the job gone (raises, removing nothing, at its timeout), removes the plist, resets the
+  override to `enabled`, and with `purge=True` removes the service's data, logs and cache. It now
+  returns a summary dict instead of `None`. Tests: `LaunchdUninstallTests`.
+- **The installers leave launcher-managed hub links alone (F16).** `install.sh` and
+  `npx @passioncode-ai/fabric-agent-adapter` (even with `--force`) skip a `~/.agents/skills/<name>`
+  that is a symlink, naming `npx @passioncode-ai/passioncode@latest update` when it points into
+  `~/.passioncode`. Tests: `test_installer.InstallerTests.test_launcher_managed_hub_links_survive_force`,
+  `test_install_sh_leaves_launcher_links_alone`.
+
+### Added
+
+- **`Drain` (Python and Node, LC-01, F9):** SIGTERM/SIGINT stops new work (`work()` raises
+  `Stopping`), drains in-flight work for 8 s, hands over, and hard-exits (`EXIT_HARD_STOP`, 70)
+  2 s later if the hand-over hangs. `sample_service.py` uses it and answers `503` while stopping.
+- **`RotatingLog` and `cap_stdout_log` / `capStdoutLog` (LC-12, F9):** JSON-lines log rotated by
+  size, 5 × 5 MB, files 0600 in a 0700 directory; the launchd stdout file is capped at start.
+- **`prune_releases` / `pruneReleases` (LC-11, LC-15):** keeps the running release and the one
+  before it, removes older ones, never removes `current` after a rollback.
+
+### Changed
+
+- `launchd_plist`'s default `ExitTimeOut` is 15 s (was 40): above the drain and its hard exit, so
+  launchd's SIGKILL never comes first, and inside LC-01's 10 s quit bound for the service itself.
+- `references/lifecycle.md` links the org contract and maps each LC rule to the kit.
+- Three scenario evals: `operator-off-survives-upgrade`, `duplicate-under-keepalive`,
+  `stop-drains-and-uninstall-is-symmetric`.
+
 ## 0.6.3 - 2026-10-04
 
 ### Changed
