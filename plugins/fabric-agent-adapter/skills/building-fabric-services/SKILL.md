@@ -103,8 +103,12 @@ are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
    digest and the process start time. *(A service ran on stale code after an edit and
    burned budget; nothing showed which build was answering.)*
 5. **State outside code.** Data and config in `~/Library/Application Support/<id>/`,
-   logs in `~/Library/Logs/<id>/`, cache in `~/Library/Caches/<id>/`; secrets in a 0600
-   file. Never inside the service's own code checkout or a release directory; a
+   logs in `~/Library/Logs/<id>/`, cache in `~/Library/Caches/<id>/`; the service's own
+   access token in a 0600 file it generates (principle 6). **Every provider credential the
+   service uses comes from Project Observatory, by name** — the plist starts the service
+   with `use_secret.py serve --consumer <label> <project> <NAME>[,<NAME>] -- <command>`, which
+   reads the vault only and records the consumer so a rotation names it; never a copy of a
+   key in a `.env`, a config file or the plist. Never inside the service's own code checkout or a release directory; a
    repository that versions the data itself is a store and is fine — declare
    `source.repository` so the probe can tell them apart. *(Deleting a checkout left a
    plist launchd retried every 10 s, and the data went with it.)*
@@ -183,7 +187,8 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
 
 Code runs from an immutable release directory; an upgrade writes a new release,
 rewrites the plist and restarts. Read [the lifecycle reference](references/lifecycle.md)
-for the plist fields, the release layout, log rotation and the Linux case.
+for the plist fields, the release layout, log rotation, behaving under a host lifecycle broker
+and the Linux case.
 
 ## Step 5 — the dashboard and the events
 
@@ -260,7 +265,10 @@ things change and the kits implement each:
    example is [`scripts/sample-remote-service.mjs`](scripts/sample-remote-service.mjs): it runs
    with its own TLS or behind a platform router.
 2. **Secrets live on the platform:** the service token and the session key (32 bytes) are
-   platform secrets, never in the repository, a URL or an argument vector.
+   platform secrets, never in the repository, a URL or an argument vector. A provider key the
+   remote service needs is issued and kept in Project Observatory, pushed to the platform, and
+   the movement recorded with `vault.py moved --at <provider>`, so the platform's copy is
+   known rather than invisible.
 3. **Register it on the operator's computer** — the installer side, run there:
    `registerRemote({ id, name, origin, token })` / `register_remote(...)` writes the token file
    (0600) and the descriptor; pass the token from a file or stdin, never in argv. Public names

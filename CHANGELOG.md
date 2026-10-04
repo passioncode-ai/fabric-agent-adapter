@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0 - 2026-10-03
+## 0.7.0 - 2026-10-04
 
 The service kit meets the organization's
 [product lifecycle contract](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/lifecycle.md)
@@ -46,6 +46,30 @@ The service kit meets the organization's
 - `references/lifecycle.md` links the org contract and maps each LC rule to the kit.
 - Three scenario evals: `operator-off-survives-upgrade`, `duplicate-under-keepalive`,
   `stop-drains-and-uninstall-is-symmetric`.
+
+## 0.6.3 - 2026-10-04
+
+### Changed
+
+- **Agents and services get every credential from Project Observatory, by name.**
+  `building-fabric-services` principle 5: a service takes its provider credentials from the vault
+  through `use_secret.py serve` (Project Observatory 0.15.0), never from a copy beside the service;
+  a remote service's platform copy is recorded with `vault.py moved`. `creating-fabric-agents`
+  carries the same rule for agents from their first commit: no `.env` of their own, no key file
+  beside their data, no value in code, configuration or a commit, and `use_secret.py run
+  --vault-only` at launch.
+
+## 0.6.2 - 2026-10-03
+
+### Added
+
+- **`building-fabric-services` says how a product behaves under a host lifecycle broker** — the
+  always-on per-user service agents ask to start, stop and restart products
+  (`references/lifecycle.md`, "Being managed by a host lifecycle broker"): quit through both the
+  platform's quit and `SIGTERM`, stay in the background when opened non-activating, keep the
+  designated requirement stable, expose honest readiness. Measured on the first broker that
+  stops apps: a desktop app that closes its window on `SIGTERM` and keeps running, and one that
+  takes focus when launched in the background — both are what this section prevents.
 
 ## 0.6.1 - 2026-10-03
 

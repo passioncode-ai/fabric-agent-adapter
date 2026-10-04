@@ -23,6 +23,7 @@ wins and this page is the defect. The rule each section serves:
 - [Directories](#directories)
 - [Logs](#logs)
 - [Shutdown](#shutdown)
+- [Being managed by a host lifecycle broker](#being-managed-by-a-host-lifecycle-broker)
 - [Linux](#linux)
 
 ## launchd plist (generate it with `launchd_plist`)
@@ -117,6 +118,27 @@ with drain.work():                       # raises fs.Stopping once a stop has be
 
 Work longer than the drain is journalled before it starts and resumes on the next start;
 it is never a reason to raise the deadline.
+
+## Being managed by a host lifecycle broker
+
+A host may run a lifecycle broker: one always-on per-user service that agents ask to start,
+stop and restart products, instead of launching or killing them themselves. A product it manages
+has to survive being driven from outside:
+
+- **Quit reaches exit through both doors.** A broker asks the platform's own quit first — on
+  macOS `NSRunningApplication.terminate()`, the path Cmd+Q and the Dock take — and `SIGTERM` a few
+  seconds later. Handle both and exit inside the deadline (fabric-workspace LC-01). A desktop app
+  that answers `SIGTERM` by closing its window and staying alive is stopped late or not at all.
+- **A background launch stays in the background.** A broker opens the app non-activating
+  (`NSWorkspace.OpenConfiguration.activates = false`); do not call `app.focus()`, `show()` on a
+  focused window, or activate on `ready` when nobody asked for a window. Taking focus from the
+  person is the one side effect they always notice.
+- **Identity is the designated requirement.** A broker pins the app by team + bundle id, so an
+  update signed by the same team keeps working and anything else is refused (LC-05). Never ship an
+  ad-hoc or differently signed build to a machine that pins you.
+- **Starting is not ready.** Expose readiness the broker can probe without a person — the
+  well-known document for a service, a process-level answer for a plain app — and keep it honest
+  while the app is still starting.
 
 ## Linux
 
