@@ -2,9 +2,9 @@
 
 ## 0.8.0 - 2026-10-04
 
-Agents report what they spend (Fabric Agent Contract DEC-0021). The contract pin moves to
-`9091d3d6606b0c4b5591a38c3674356a01fd7f55`; bundles issued under `df55c8c` (DEC-0020) and
-`2ce3922` (DEC-0019) stay valid.
+Agents report what they spend (Fabric Agent Contract DEC-0021), and a service may keep its MCP
+credential apart from the host's token (DEC-0024). The contract pin moves to the DEC-0024 merge;
+bundles issued under the DEC-0021, DEC-0020 and DEC-0019 revisions stay valid.
 
 ### Added
 
@@ -20,6 +20,16 @@ Agents report what they spend (Fabric Agent Contract DEC-0021). The contract pin
   surface.
 - `references/usage.md`; SKILL.md Step 5 and the protocol reference name the surface; trigger
   and scenario evals `agent-reports-its-own-spend`.
+
+### Added (DEC-0024)
+
+- **A service may keep its MCP credential apart from the host's token.** When the well-known
+  document says `surfaces.mcp.auth: "own"`, `check_service.py` no longer calls MCP with the
+  descriptor's token as a caller. It checks that the surface refuses that token
+  (`interop.mcp-own-auth`) and leaves the caller rules NOT_RUN with the reason. Before this, two
+  services that separate the roles on purpose were reported as `interop.tools-match` FAIL
+  (401/403). `references/surfaces-and-auth.md` explains when to do it. The contract pin moves to
+  `23f9fda4c05f8a3852246ee98d4f2adf74ed0875`; `9091d3d` joins the supported earlier revisions.
 
 ### Fixed
 

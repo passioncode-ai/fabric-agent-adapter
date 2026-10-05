@@ -448,9 +448,24 @@ class Probe:
             extra = sorted(set(listed) - names)
             self.add("interop.well-known-capabilities", "FAIL" if extra else "PASS",
                      ("listed but not in the manifest: " + ", ".join(extra)) if extra else "%d listed, all in the manifest" % len(listed))
-        if not mcp_surface or not self.token:
+        own = bool(mcp_surface) and mcp_surface.get("auth") == "own"
+        if own and self.token:
+            # DEC-0024: the MCP surface has credentials of its own and must refuse the host's token.
+            try:
+                self.mcp_call("tools/list", {})
+                self.add("interop.mcp-own-auth", "FAIL", "surfaces.mcp.auth is own, yet the MCP surface accepted the descriptor's token")
+            except OSError as exc:
+                refused = any(code in str(exc) for code in ("HTTP 401", "HTTP 403"))
+                self.add("interop.mcp-own-auth", "PASS" if refused else "NOT_RUN",
+                         ("the MCP surface refuses the host's token (%s), as auth: own says" % exc) if refused else str(exc))
+            except ValueError as exc:
+                self.add("interop.mcp-own-auth", "NOT_RUN", str(exc))
+        if not mcp_surface or not self.token or own:
+            reason = ("no MCP surface" if not mcp_surface
+                      else "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)" if own
+                      else "no readable token")
             for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
-                self.add(rule, "NOT_RUN", "no MCP surface" if not mcp_surface else "no readable token")
+                self.add(rule, "NOT_RUN", reason)
         else:
             try:
                 listing = self.mcp_call("tools/list", {})

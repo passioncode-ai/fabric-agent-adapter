@@ -6,6 +6,12 @@
   origin, stateless JSON responses unless the tools stream.
 - Authenticate with the service token in the declared header. OAuth is for remote
   multi-user servers, not for a loopback service.
+- **Or keep the two roles apart (DEC-0024).** The descriptor's token is the host's: it reads
+  events and the usage report, and it mints operator login codes. An MCP token sits in every
+  client's `~/.claude.json`. When that matters, give agents their own token (`service.token`
+  for agents, `host.token` named by the descriptor), declare `surfaces.mcp.auth: "own"`, and
+  make `/mcp` refuse the host's token. `check_service.py` then checks only that refusal
+  (`interop.mcp-own-auth`) and leaves the caller rules NOT_RUN.
 - Register it into a client config with the service's own command
   (`<tool> mcp-register`), which writes `{"type":"http","url":"http://127.0.0.1:<port>/mcp","headers":{...}}`
   atomically, aborts if the file changed meanwhile, and keeps one 0600 backup. The token

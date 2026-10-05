@@ -396,9 +396,9 @@ PIN_EXCLUDED = ("docs/evidence", "docs/handoffs", "test", "CHANGELOG.md", "fabri
 PIN_MENTION = re.compile(r"fabric[- ]agent[- ]contract|contract[-_ ]?(pin|commit|revision)|CONTRACT_COMMIT", re.IGNORECASE)
 PIN_HEX = re.compile(r"(?<![0-9a-zA-Z:])[0-9a-f]{7,40}(?![0-9a-zA-Z])")
 PIN_ADAPTER = "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_project.py"
-PIN_DEFAULT_COMMIT = "9091d3d6606b0c4b5591a38c3674356a01fd7f55"
-PIN_PREVIOUS_COMMITS = ("df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
-PIN_SUPPORTED_DECLARATION = 'SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")'
+PIN_DEFAULT_COMMIT = "23f9fda4c05f8a3852246ee98d4f2adf74ed0875"
+PIN_PREVIOUS_COMMITS = ("9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
+PIN_SUPPORTED_DECLARATION = 'SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")'
 
 
 def contract_pin_drift(root: Path, commit: str) -> List[str]:
@@ -475,7 +475,7 @@ def validate_contract_pin(errors: List[str], root: Path = ROOT) -> None:
         if not isinstance(value, ast.Constant) or not isinstance(value.value, str) or value.value != expected:
             errors.append("contract pin: adapt_project.py %s must be an exact string literal equal to %s" % (constant, expected))
     supported = declarations.get("SUPPORTED_CONTRACT_COMMITS")
-    # The reviewed immutable earlier revisions: DEC-0020 (df55c8c) and DEC-0019 (2ce3922).
+    # The reviewed immutable earlier revisions: DEC-0021, DEC-0020 and DEC-0019.
     if not (isinstance(supported, ast.Tuple) and len(supported.elts) == 1 + len(PIN_PREVIOUS_COMMITS)
             and isinstance(supported.elts[0], ast.Name) and supported.elts[0].id == "CONTRACT_COMMIT"
             and all(isinstance(e, ast.Constant) and e.value == v for e, v in zip(supported.elts[1:], PIN_PREVIOUS_COMMITS))):

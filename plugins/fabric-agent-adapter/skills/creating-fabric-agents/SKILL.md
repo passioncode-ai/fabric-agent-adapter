@@ -7,7 +7,7 @@ metadata:
   author: PassionCode.ai
   version: "0.8.0"
   contract-version: "0.1.0"
-  contract-commit: "9091d3d6606b0c4b5591a38c3674356a01fd7f55"
+  contract-commit: "23f9fda4c05f8a3852246ee98d4f2adf74ed0875"
 ---
 
 # Creating Fabric-compatible agents
@@ -119,7 +119,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri>
 ```
 
-Pin exactly contract `0.1.0` at commit `9091d3d6606b0c4b5591a38c3674356a01fd7f55` and
+Pin exactly contract `0.1.0` at commit `23f9fda4c05f8a3852246ee98d4f2adf74ed0875` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check

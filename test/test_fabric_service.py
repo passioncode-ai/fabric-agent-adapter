@@ -460,3 +460,31 @@ class UsageCheckTests(unittest.TestCase):
         r = self.report()
         r["days"].reverse()
         self.assertTrue(any("run forward" in p for p in check.usage_problems(r, "example-agent", "default")))
+
+
+class McpOwnAuthTests(unittest.TestCase):
+    """DEC-0024: with surfaces.mcp.auth own, the probe does not call MCP with the host's token as a
+    caller, and checks only that the surface refuses it."""
+
+    def probe(self, answer):
+        p = check.Probe.__new__(check.Probe)
+        p.results, p.d, p.token, p.events = [], {"id": "example-agent", "instance": "default"}, "tok", []
+        p.wk = {"surfaces": {"mcp": {"path": "/mcp", "transport": "streamable-http", "auth": "own"}, "events": {"path": "/e"}}}
+        p.load_manifest = lambda: (None, None, "the descriptor names no fabricManifest")
+        def call(method, params):
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+        p.mcp_call = call
+        p.interop_rules()
+        return {r["rule"]: r for r in p.results}
+
+    def test_a_refused_host_token_passes_and_the_caller_rules_are_not_run(self):
+        r = self.probe(OSError("HTTP 401 from /mcp"))
+        self.assertEqual(r["interop.mcp-own-auth"]["verdict"], "PASS")
+        self.assertEqual(r["interop.tools-match"]["verdict"], "NOT_RUN")
+        self.assertIn("DEC-0024", r["interop.tools-match"]["evidence"])
+
+    def test_an_accepted_host_token_fails(self):
+        r = self.probe({"result": {"tools": []}})
+        self.assertEqual(r["interop.mcp-own-auth"]["verdict"], "FAIL")
