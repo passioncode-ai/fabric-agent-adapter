@@ -303,7 +303,7 @@ if __name__ == "__main__":
 class McpStandardHeaderTests(unittest.TestCase):
     """MCP 2026-07-28 Streamable HTTP: Mcp-Method on every request, Mcp-Name on tools/call,
     prompts/get and resources/read; a server rejects a mismatch (the official server SDK answers
-    -32020, and Frame Agent's live server did on 2026-10-04 when the probe omitted them)."""
+    -32020, and a local agent's live server did on 2026-10-04 when the probe omitted them)."""
 
     CALL = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "sample.echo", "arguments": {}}}
 
