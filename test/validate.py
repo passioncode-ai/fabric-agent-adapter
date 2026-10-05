@@ -24,7 +24,7 @@ LICENSE_SPDX = "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial"
 FIRST_AGPL_VERSION = "0.5.3"
 TEMPLATE_SHA256 = {
     "LICENSE": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
-    "COMMERCIAL-LICENSE.md": "9bd2312a9dc20d13aab5af26d63d943aa03c304febf42a32160a205496a9155f",
+    "COMMERCIAL-LICENSE.md": "893b4bb9e4597b19b178ad69f56b799b4e5d468463ecb2d05ab05f0eee92804a",
     "CLA.md": "cf44ce2b052fd75e9ef48f8124fb6eed71513c9152aac90eede0a2132951e408",
 }
 EXPECTED_FILES = tuple(
@@ -581,7 +581,7 @@ def validate_repo() -> List[str]:
         errors.append("README.md still states the retired licence (source-available / MIT); it is AGPL-3.0 or commercial")
     license_section = readme_text.split("\n## License\n", 1)[1] if "\n## License\n" in readme_text else ""
     for needle in ("Open source under the [GNU AGPL-3.0](LICENSE)", "[commercial license](COMMERCIAL-LICENSE.md)",
-                   "contact@passioncode.ai", "Versions before %s were released under" % FIRST_AGPL_VERSION):
+                   "https://passioncode.ai/business/", "Versions before %s were released under" % FIRST_AGPL_VERSION):
         if needle not in license_section:
             errors.append("README.md ## License must carry the licensing wording: %r" % needle)
     pr_template = (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8")

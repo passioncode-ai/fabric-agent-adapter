@@ -224,7 +224,7 @@ on 2026-10-04 is 0.6.3. Source delivery does not update installed skills or live
 ## License
 
 Open source under the [GNU AGPL-3.0](LICENSE). A [commercial license](COMMERCIAL-LICENSE.md) is
-available for use that does not meet the AGPL's terms — contact@passioncode.ai.
+available for use that does not meet the AGPL's terms — [passioncode.ai/business](https://passioncode.ai/business/).
 Versions before 0.5.3 were released under PolyForm Noncommercial or Internal Use (v0.4.3 to
 v0.5.2) and MIT (v0.4.2 and earlier); each keeps the licence it was released under.
 Contributions are accepted under [CLA.md](CLA.md) ([CONTRIBUTING.md](CONTRIBUTING.md)).
