@@ -226,6 +226,37 @@ export class JobStore {
 export const NAMED_METHODS = { 'tools/call': 'name', 'prompts/get': 'name', 'resources/read': 'uri' };
 export const HEADER_MISMATCH = -32020; // the code the official 2026-07-28 server SDK answers a header/body mismatch with
 
+const SENTINEL = ['=?base64?', '?='];
+
+/**
+ * A body value as an HTTP header value, by MCP 2026-07-28 Streamable HTTP "Value Encoding": as it
+ * is when it is printable ASCII without leading or trailing whitespace, otherwise — and for a plain
+ * value that itself looks like the sentinel — `=?base64?<base64 of its UTF-8>?=`.
+ */
+export function encodeHeaderValue(value) {
+  const s = String(value);
+  const plain = /^[\x20-\x7e]*$/.test(s) && s === s.replace(/^ +| +$/g, '') && !(s.startsWith(SENTINEL[0]) && s.endsWith(SENTINEL[1]));
+  if (plain) return s;
+  let binary = '';
+  for (const byte of new TextEncoder().encode(s)) binary += String.fromCharCode(byte);
+  return SENTINEL[0] + btoa(binary) + SENTINEL[1];
+}
+
+/** The body value a header carries, decoding the Base64 sentinel; null for invalid characters or a
+ *  sentinel that is not valid Base64 of UTF-8 (a server rejects both). */
+export function decodeHeaderValue(value) {
+  const s = String(value);
+  if (s.startsWith(SENTINEL[0]) && s.endsWith(SENTINEL[1]) && s.length >= SENTINEL[0].length + SENTINEL[1].length) {
+    const body = s.slice(SENTINEL[0].length, -SENTINEL[1].length);
+    if (body.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(body)) return null;
+    try {
+      const bytes = Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch { return null; }
+  }
+  return /^[\x20-\x7e\t]*$/.test(s) ? s : null;
+}
+
 /**
  * MCP 2026-07-28 Streamable HTTP mirrors the body in `Mcp-Method` (every request and
  * notification) and `Mcp-Name` (`params.name` or `params.uri` of tools/call, prompts/get,
@@ -250,7 +281,11 @@ export function mcpHeaderProblem(message, headers) {
   if (field) {
     const named = header('Mcp-Name');
     if (named === null && declared) return `the body carries params.${field} but the required Mcp-Name header is absent`;
-    if (named !== null && named !== String(message.params?.[field])) return `Mcp-Name disagrees with the body's params.${field}`;
+    if (named !== null) {
+      const decoded = decodeHeaderValue(named);
+      if (decoded === null) return 'Mcp-Name is malformed: invalid characters or a broken =?base64?…?= value';
+      if (decoded !== String(message.params?.[field])) return `Mcp-Name disagrees with the body's params.${field}`;
+    }
   }
   return null;
 }
@@ -259,6 +294,6 @@ export function mcpHeaderProblem(message, headers) {
 export function mcpRequestHeaders(method, params = {}) {
   const out = { 'MCP-Protocol-Version': MCP_REVISION, 'Mcp-Method': method };
   const field = NAMED_METHODS[method];
-  if (field && params[field] !== undefined && params[field] !== null) out['Mcp-Name'] = String(params[field]);
+  if (field && params[field] !== undefined && params[field] !== null) out['Mcp-Name'] = encodeHeaderValue(params[field]);
   return out;
 }

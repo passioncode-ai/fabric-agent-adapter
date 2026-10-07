@@ -317,6 +317,25 @@ class McpStandardHeaderTests(unittest.TestCase):
         read = {"jsonrpc": "2.0", "id": 2, "method": "resources/read", "params": {"uri": "file:///a"}}
         self.assertIn("params.uri", fi.mcp_header_problem(read, {"Mcp-Method": "resources/read", "Mcp-Name": "file:///b"}))
 
+    # MCP 2026-07-28 Streamable HTTP, "Value Encoding": the spec's own examples.
+    SPEC_EXAMPLES = (("us-west1", "us-west1"), ("Hello, 世界", "=?base64?SGVsbG8sIOS4lueVjA==?="),
+                     (" padded ", "=?base64?IHBhZGRlZCA=?="), ("line1\nline2", "=?base64?bGluZTEKbGluZTI=?="),
+                     ("=?base64?literal?=", "=?base64?PT9iYXNlNjQ/bGl0ZXJhbD89?="))
+
+    def test_header_values_use_the_base64_sentinel_exactly_as_the_spec_shows(self):
+        for value, header in self.SPEC_EXAMPLES:
+            self.assertEqual(fi.encode_header_value(value), header, value)
+            self.assertEqual(fi.decode_header_value(header), value, value)
+
+    def test_a_name_outside_the_safe_set_is_sent_encoded_and_checked_decoded(self):
+        call = {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "погода", "arguments": {}}}
+        headers = fi.mcp_request_headers("tools/call", call["params"])
+        self.assertTrue(headers["Mcp-Name"].startswith("=?base64?"))
+        self.assertIsNone(fi.mcp_header_problem(call, headers), "a server decodes before comparing")
+        self.assertIn("disagrees", fi.mcp_header_problem(call, dict(headers, **{"Mcp-Name": fi.encode_header_value("другое")})))
+        self.assertIn("malformed", fi.mcp_header_problem(call, dict(headers, **{"Mcp-Name": "=?base64?***?="})))
+        self.assertIn("malformed", fi.mcp_header_problem(call, dict(headers, **{"Mcp-Name": "погода"})), "raw non-ASCII is invalid")
+
     def test_matching_headers_and_earlier_clients_pass(self):
         self.assertIsNone(fi.mcp_header_problem(self.CALL, fi.mcp_request_headers("tools/call", self.CALL["params"])))
         self.assertIsNone(fi.mcp_header_problem(self.CALL, {}), "an earlier revision may omit them")

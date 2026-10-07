@@ -17,6 +17,7 @@ Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016,
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 import re
@@ -386,6 +387,33 @@ NAMED_METHODS = {"tools/call": "name", "prompts/get": "name", "resources/read": 
 HEADER_MISMATCH = -32020  # the code the official 2026-07-28 server SDK answers a header/body mismatch with
 
 
+_SENTINEL = ("=?base64?", "?=")
+
+
+def encode_header_value(value: str) -> str:
+    """A body value as an HTTP header value, by MCP 2026-07-28 Streamable HTTP "Value Encoding": as
+    it is when it is printable ASCII without leading or trailing whitespace, otherwise — and for a
+    plain value that itself looks like the sentinel — `=?base64?<base64 of its UTF-8>?=`."""
+    plain = (all(0x20 <= ord(c) <= 0x7E for c in value) and value == value.strip(" ")
+             and not (value.startswith(_SENTINEL[0]) and value.endswith(_SENTINEL[1])))
+    if plain:
+        return value
+    return _SENTINEL[0] + base64.b64encode(value.encode("utf-8")).decode("ascii") + _SENTINEL[1]
+
+
+def decode_header_value(value: str) -> Optional[str]:
+    """The body value a header carries, decoding the Base64 sentinel; None for a header value with
+    invalid characters or a sentinel that is not valid Base64 of UTF-8 (a server rejects both)."""
+    if value.startswith(_SENTINEL[0]) and value.endswith(_SENTINEL[1]) and len(value) >= len(_SENTINEL[0]) + len(_SENTINEL[1]):
+        try:
+            return base64.b64decode(value[len(_SENTINEL[0]):-len(_SENTINEL[1])], validate=True).decode("utf-8")
+        except ValueError:  # binascii.Error and UnicodeDecodeError are both ValueErrors
+            return None
+    if any(not (0x20 <= ord(c) <= 0x7E or c == "\t") for c in value):
+        return None
+    return value
+
+
 def mcp_header_problem(message: Any, headers: Any) -> Optional[str]:
     """MCP 2026-07-28 Streamable HTTP mirrors the body in `Mcp-Method` (every request and
     notification) and `Mcp-Name` (`params.name` or `params.uri` of tools/call, prompts/get,
@@ -414,8 +442,12 @@ def mcp_header_problem(message: Any, headers: Any) -> Optional[str]:
         named = header("Mcp-Name")
         if named is None and declared:
             return "the body carries params.%s but the required Mcp-Name header is absent" % field
-        if named is not None and named != str(value):
-            return "Mcp-Name disagrees with the body's params.%s" % field
+        if named is not None:
+            decoded = decode_header_value(named)
+            if decoded is None:
+                return "Mcp-Name is malformed: invalid characters or a broken =?base64?…?= value"
+            if decoded != str(value):
+                return "Mcp-Name disagrees with the body's params.%s" % field
     return None
 
 
@@ -424,7 +456,7 @@ def mcp_request_headers(method: str, params: Dict[str, Any]) -> Dict[str, str]:
     out = {"MCP-Protocol-Version": MCP_REVISION, "Mcp-Method": method}
     field = NAMED_METHODS.get(method)
     if field and params.get(field) is not None:
-        out["Mcp-Name"] = str(params[field])
+        out["Mcp-Name"] = encode_header_value(str(params[field]))
     return out
 
 
