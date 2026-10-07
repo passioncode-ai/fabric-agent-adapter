@@ -91,3 +91,19 @@ test('mcpHeaderProblem refuses a declared request without Mcp-Method/Mcp-Name an
   assert.equal(i.mcpHeaderProblem(call, {}), null, 'an earlier revision may omit them');
   assert.deepEqual(i.mcpRequestHeaders('tools/list'), { 'MCP-Protocol-Version': i.MCP_REVISION, 'Mcp-Method': 'tools/list' });
 });
+
+// MCP 2026-07-28 Streamable HTTP, "Value Encoding": the spec's own examples, as fabric_interop.py.
+test('Mcp-Name values use the Base64 sentinel exactly as the spec shows, and a server compares them decoded', () => {
+  for (const [value, header] of [['us-west1', 'us-west1'], ['Hello, 世界', '=?base64?SGVsbG8sIOS4lueVjA==?='], [' padded ', '=?base64?IHBhZGRlZCA=?='],
+    ['line1\nline2', '=?base64?bGluZTEKbGluZTI=?='], ['=?base64?literal?=', '=?base64?PT9iYXNlNjQ/bGl0ZXJhbD89?=']]) {
+    assert.equal(i.encodeHeaderValue(value), header, value);
+    assert.equal(i.decodeHeaderValue(header), value, value);
+  }
+  const call = { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'погода', arguments: {} } };
+  const headers = i.mcpRequestHeaders('tools/call', call.params);
+  assert.ok(headers['Mcp-Name'].startsWith('=?base64?'));
+  assert.equal(i.mcpHeaderProblem(call, headers), null);
+  assert.match(i.mcpHeaderProblem(call, { ...headers, 'Mcp-Name': i.encodeHeaderValue('другое') }), /disagrees/);
+  assert.match(i.mcpHeaderProblem(call, { ...headers, 'Mcp-Name': '=?base64?***?=' }), /malformed/);
+  assert.match(i.mcpHeaderProblem(call, { ...headers, 'Mcp-Name': 'погода' }), /malformed/);
+});

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`Mcp-Name` values outside plain ASCII follow the spec's Base64 sentinel.** MCP 2026-07-28
+  Streamable HTTP ("Value Encoding") requires a name or URI with non-ASCII characters, control
+  characters, leading or trailing spaces, or the sentinel's own shape to travel as
+  `=?base64?<UTF-8 base64>?=`, and a server to decode it before comparing it with the body. Both kits
+  sent the raw value and compared the raw header, so such a call was refused by a conforming server
+  and a conforming client was refused by ours. `encode_header_value` / `encodeHeaderValue` and
+  `decode_header_value` / `decodeHeaderValue` now do both; a malformed sentinel or a raw non-ASCII
+  header is refused as `-32020`. Tested with the spec's own five examples in both kits. This is the
+  part of PR #24 that FAA-08 had not already shipped.
+
 ## 0.8.0 - 2026-10-04
 
 Agents report what they spend (Fabric Agent Contract DEC-0021), and a service may keep its MCP
