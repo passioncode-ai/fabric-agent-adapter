@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.8.1 - 2026-10-08
+
+The contract pin moves to Fabric Agent Contract `main` `623bf61` (DEC-0025 through DEC-0031); bundles issued
+under the DEC-0024, DEC-0021, DEC-0020 and DEC-0019 revisions stay valid. And a fix for `Mcp-Name` values outside
+plain ASCII.
+
+### Changed
+
+- **Default contract pin `23f9fda4` → `623bf61358c339cb10297807b3f024b5d9f1f327`** (FAA-14). `23f9fda4` (DEC-0024)
+  joins `SUPPORTED_CONTRACT_COMMITS`. The revisions between add only optional surfaces: settings backups and the
+  feed token header (DEC-0025), runner routes (DEC-0026, DEC-0029), spending limits in the usage report
+  (DEC-0027), activity telemetry (DEC-0030) and devices (DEC-0031). The kits emit none of them yet, which stays
+  valid; adopting DEC-0025 and DEC-0027 is FAA-13, runner routes FAA-11. Checked: `npm test`; both compiled-schema
+  arms against clean checkouts at `2ce3922` and `623bf61` (11/11); a kit usage report validates against the new
+  `service-usage.schema.json`.
 
 ### Fixed
 

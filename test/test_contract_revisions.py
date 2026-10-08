@@ -11,8 +11,9 @@ from unittest.mock import patch
 from test_adapt_project import ADAPTER, ROOT, scaffold_args
 
 OLD = '2ce392291c6668598d12cd38327e24696b5ca15c'
-NEW = '23f9fda4c05f8a3852246ee98d4f2adf74ed0875'
-PREVIOUS = '9091d3d6606b0c4b5591a38c3674356a01fd7f55'  # DEC-0021; bundles issued under it stay valid
+NEW = '623bf61358c339cb10297807b3f024b5d9f1f327'
+PREVIOUS = '23f9fda4c05f8a3852246ee98d4f2adf74ed0875'  # DEC-0024; bundles issued under it stay valid
+PRIOR = '9091d3d6606b0c4b5591a38c3674356a01fd7f55'  # DEC-0021
 EARLIER = 'df55c8c54a23251342a7ee57ba95642b7eb39e61'  # DEC-0020
 FIXTURES = ROOT / 'test/fixtures/contract-revisions/legacy'
 
@@ -20,7 +21,7 @@ FIXTURES = ROOT / 'test/fixtures/contract-revisions/legacy'
 class RevisionTests(unittest.TestCase):
     def test_default_is_new_and_supported_revisions_are_immutable(self):
         self.assertEqual(ADAPTER.CONTRACT_COMMIT, NEW)
-        self.assertEqual(ADAPTER.SUPPORTED_CONTRACT_COMMITS, (NEW, PREVIOUS, EARLIER, OLD))
+        self.assertEqual(ADAPTER.SUPPORTED_CONTRACT_COMMITS, (NEW, PREVIOUS, PRIOR, EARLIER, OLD))
 
     def test_complete_issued_legacy_bundles_remain_locally_valid(self):
         for profile in ('mcp', 'a2a', 'local-runner'):
