@@ -2,12 +2,13 @@
 
 ## 0.8.2 - 2026-10-10
 
-The Python service kit runs on Windows and Linux (contract DEC-0032), and the contract pin moves to its merge.
+The Python service kit runs on Windows and Linux (contract DEC-0032, DEC-0033), and the contract pin moves to the DEC-0033 merge.
 
 ### Changed
 
-- **Default contract pin → `31685033a5078dcaa6886091399a178f49d176ef`** (DEC-0032, FAA-15); the DEC-0031 merge
-  joins `SUPPORTED_CONTRACT_COMMITS`. DEC-0032 is additive: new managers, new optional fields, a wider path grammar.
+- **Default contract pin → `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5`** (DEC-0032, DEC-0033, FAA-15); the DEC-0031
+  merge joins `SUPPORTED_CONTRACT_COMMITS`. Both are additive: new managers, new optional fields, a wider path
+  grammar, and SYSTEM or Administrators admitted as a Windows token file's owner.
 
 ### Added
 
@@ -15,7 +16,8 @@ The Python service kit runs on Windows and Linux (contract DEC-0032), and the co
   and per-service folders under `%LOCALAPPDATA%`; the instance lock through `msvcrt.locking` on one byte far
   past the pid (released by the OS with the process); token files, descriptors and every kit write carry an
   explicit protected ACL (this user, SYSTEM, Administrators); `read_token` applies service.md "Windows token
-  files" — a regular file in the profile, owned by this user, every granting ACE on the allow-list, refusal by
+  files" — a regular file in the profile, owned by this user, SYSTEM or Administrators (DEC-0033: an elevated
+  administrator's files are owned by Administrators, as `windows-latest` showed), every granting ACE on the allow-list, refusal by
   SID; descriptors accept `systemd` (`unit`) and `task-scheduler` (`task`) with the contract's pairing rules,
   Windows paths, and refuse network shares; launchd helpers refuse off macOS instead of calling `os.getuid`;
   the kit's own log and ledger appends open in binary mode. `check_service.py` checks the lock and the

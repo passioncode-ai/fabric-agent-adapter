@@ -4,7 +4,7 @@
 |---|---|
 | Version | `0.8.2` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `31685033a5078dcaa6886091399a178f49d176ef` |
+| Contract | Fabric Agent Contract `0.1.0` at `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
 | Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base |
 | Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`) |
@@ -26,7 +26,7 @@ a provider because those actions require a real Fabric host/runtime.
 |---|---|
 | Version | `0.8.2` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `31685033a5078dcaa6886091399a178f49d176ef` |
+| Contract | Fabric Agent Contract `0.1.0` at `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
 | Inputs | capability, named consumer, workflow-or-agent decision, profile, effect and tenancy declarations, knowledge sources |
 | Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton, provider bundle via the sibling scaffolder, conformance report with the canary expectation |
@@ -48,7 +48,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 |---|---|
 | Version | `0.8.2` |
 | Plugin | `fabric-agent-adapter` |
-| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `31685033a5078dcaa6886091399a178f49d176ef`; the remote placement (DEC-0019) |
+| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5`; the remote placement (DEC-0019) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
 | Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, probe report |

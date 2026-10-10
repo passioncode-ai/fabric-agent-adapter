@@ -292,10 +292,11 @@ WINDOWS_TRUSTED = ("S-1-5-18", "S-1-5-32-544")
 
 def token_acl_problem(path: Path, owner: str, granting: Sequence[str], user: str) -> Optional[str]:
     """service.md "Windows token files", rules 2 and 3, on SIDs already read: the owner is the
-    current user, and every SID an allow ACE grants anything to is the user, SYSTEM or
-    Administrators. Deny ACEs are not passed in: they do not change the decision."""
-    if owner != user:
-        return "Token file %s is owned by %s, not by this user (%s)." % (path, owner or "nobody", user)
+    current user, SYSTEM or Administrators (DEC-0033: a file an elevated administrator creates is
+    owned by Administrators), and every SID an allow ACE grants anything to is one of those three.
+    Deny ACEs are not passed in: they do not change the decision."""
+    if owner != user and owner not in WINDOWS_TRUSTED:
+        return "Token file %s is owned by %s, not by this user (%s), SYSTEM or Administrators." % (path, owner or "nobody", user)
     for sid in granting:
         if sid != user and sid not in WINDOWS_TRUSTED:
             return "Token file %s grants access to %s; only this user, SYSTEM and Administrators may hold any." % (path, sid)
@@ -455,9 +456,9 @@ def ensure_token(path: Path) -> str:
 def read_token(path: Path) -> str:
     """Refuse a symlink, a file owned by someone else, or one others can read.
 
-    On Windows the rule is service.md "Windows token files" (DEC-0032): a regular file whose real
-    path is in the profile, owned by the current user, every granting ACE naming the current
-    user, SYSTEM or Administrators; a refusal names the SID, never the contents."""
+    On Windows the rule is service.md "Windows token files" (DEC-0032, DEC-0033): a regular file
+    whose real path is in the profile, owned by the current user, SYSTEM or Administrators, every
+    granting ACE naming one of those three; a refusal names the SID, never the contents."""
     path = Path(path)
     info = os.lstat(path)
     if stat.S_ISLNK(info.st_mode):

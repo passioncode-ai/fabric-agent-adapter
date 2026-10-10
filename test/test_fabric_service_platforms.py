@@ -130,8 +130,14 @@ class WindowsTokenRule(unittest.TestCase):
     def test_the_user_system_and_administrators_may_hold_access(self):
         self.assertIsNone(self.problem(self.USER, [self.USER, "S-1-5-18", "S-1-5-32-544"]))
 
+    def test_an_elevated_administrators_file_is_accepted(self):
+        # DEC-0033: what an elevated administrator creates is owned by BUILTIN\Administrators
+        # (measured on windows-latest, where the kit's own token came out that way).
+        self.assertIsNone(self.problem("S-1-5-32-544", [self.USER, "S-1-5-18", "S-1-5-32-544"]))
+        self.assertIsNone(self.problem("S-1-5-18", [self.USER]))
+
     def test_another_owner_is_refused_by_sid(self):
-        self.assertIn("S-1-5-32-544", self.problem("S-1-5-32-544", [self.USER]))
+        self.assertIn("S-1-5-21-9-9-9-1002", self.problem("S-1-5-21-9-9-9-1002", [self.USER]))
 
     def test_any_other_grant_is_refused_by_sid(self):
         for sid in ("S-1-1-0", "S-1-5-11", "S-1-5-32-545", "S-1-3-0", "S-1-5-21-9-9-9-1002"):
@@ -173,7 +179,7 @@ class Windows(unittest.TestCase):
         token = fs.ensure_token(path)
         self.assertEqual(fs.read_token(path), token)
         owner, granting = fs.windows_acl(path)
-        self.assertEqual(owner, fs.windows_user_sid())
+        self.assertIn(owner, {fs.windows_user_sid(), "S-1-5-18", "S-1-5-32-544"})
         self.assertTrue(set(granting) <= {fs.windows_user_sid(), "S-1-5-18", "S-1-5-32-544"}, granting)
         self.assertEqual(path.read_bytes(), token.encode())   # binary: no CRLF, no BOM
 
