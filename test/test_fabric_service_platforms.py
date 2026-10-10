@@ -111,13 +111,14 @@ class Folders(unittest.TestCase):
                     mock.patch.dict(os.environ, {"FABRIC_SERVICES_DIR": "/elsewhere"}):
                 self.assertEqual(fs.services_dir(), Path("/elsewhere"))
 
-    def test_launchd_is_asked_only_on_macos(self):
-        for platform, named in (("win32", "Task Scheduler"), ("linux", "systemd")):
-            with mock.patch.object(fs.sys, "platform", platform), \
-                    mock.patch.object(fs.os, "getuid", side_effect=AssertionError("getuid off macOS"), create=True):
-                with self.assertRaises(fs.ServiceError) as caught:
-                    fs.launchd_loaded("ai.passioncode.test")
-                self.assertIn(named, str(caught.exception))
+    def test_launchd_is_never_asked_on_windows(self):
+        # Windows has no uid: the launchd helpers say which supervisor it has instead. (Linux keeps
+        # them callable: the lifecycle tests drive them there against a fake launchctl.)
+        with mock.patch.object(fs.sys, "platform", "win32"), \
+                mock.patch.object(fs.os, "getuid", side_effect=AssertionError("getuid on Windows"), create=True):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_loaded("ai.passioncode.test")
+            self.assertIn("Task Scheduler", str(caught.exception))
 
 
 class WindowsTokenRule(unittest.TestCase):

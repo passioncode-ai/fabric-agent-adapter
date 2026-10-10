@@ -1340,10 +1340,9 @@ def _launchctl(*args: str, timeout: int = 30) -> subprocess.CompletedProcess:
 
 
 def _domain() -> str:
-    if sys.platform != "darwin":
-        # DEC-0032: launchd is macOS's supervisor; systemd and Task Scheduler are the hosts'.
-        raise ServiceError("launchd exists only on macOS; this system's supervisor is %s."
-                           % ("Task Scheduler" if sys.platform == "win32" else "systemd"))
+    if sys.platform == "win32":
+        # DEC-0032: launchd is macOS's supervisor; Windows has Task Scheduler, and no uid.
+        raise ServiceError("launchd exists only on macOS; this system's supervisor is Task Scheduler.")
     return "gui/%d" % os.getuid()
 
 
