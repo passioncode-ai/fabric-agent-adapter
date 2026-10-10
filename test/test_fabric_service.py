@@ -447,7 +447,7 @@ class UsageReportTests(unittest.TestCase):
             ledger = fs.JsonlUsageLedger(Path(tmp) / "usage" / "usage.jsonl")
             for r in self.case["receipts"]:
                 ledger.record(r)
-            self.assertEqual(os.stat(ledger.path).st_mode & 0o777, 0o600)
+            assert_private(self, ledger.path)
             with open(ledger.path, "a") as f:
                 f.write('{"torn":')
             self.assertEqual(len(ledger.receipts()), 5)
