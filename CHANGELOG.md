@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.8.3 - 2026-10-10
+
+The contract pin moves to Fabric Agent Contract `main` `52da526` (DEC-0034 and DEC-0035, the operator
+channel), so the operator channel proposal is normative under the pin. Bundles issued under the DEC-0033,
+DEC-0031, DEC-0024, DEC-0021, DEC-0020 and DEC-0019 revisions stay valid.
+
+### Changed
+
+- **Default contract pin `78b2da0` → `52da526d7cc1e063d74c5b520dbc03d0ace15246`** (FAA-15). `78b2da0`
+  (DEC-0033) joins `SUPPORTED_CONTRACT_COMMITS`. The revisions between add the `fabric-operator-channel/0.1`
+  profile (DEC-0034, OC-1…OC-13; DEC-0035, OC-14…OC-17 for shared groups), its status schema
+  `operator-channel-status.schema.json` and the optional well-known `surfaces.operatorChannel`. Nothing in the
+  provider manifest or the MCP, A2A and local-runner profiles changes, and every descriptor and well-known
+  document the kits write stays valid; the kits do not serve the channel yet. Checked: `npm test`; both
+  compiled-schema arms against clean checkouts at `2ce3922` and `52da526`; descriptors written by the sample
+  service (`none` and `launchd`) validate against the new `service-descriptor.schema.json`.
+- **The operator channel proposal is no longer "newer than the pin".** `creating-fabric-agents` step 6 and
+  `adapting-projects-to-fabric` step 8 cite DEC-0034 under the pin, show the recorded answer as `proposal` in
+  the channel status document when the agent serves `surfaces.operatorChannel`, check that document against
+  the pinned `operator-channel-status.schema.json`, and keep the channel's runtime rules `NOT_RUN` (the probe
+  has no rule for them). For a channel bound in a group shared with other bots they name OC-14…OC-17: silent
+  unless addressed; a bare `/command` in a group is not addressed. Scenario evals `operator-channel-proposal`
+  changed first.
+- **`references/protocol.md`** summarises what the pin carries: the Windows services folder, the `systemd`
+  and `task-scheduler` managers, Windows paths and token files (DEC-0032, DEC-0033), and
+  `surfaces.operatorChannel` (DEC-0034).
+
 ## 0.8.2 - 2026-10-10
 
 The Python service kit runs on Windows and Linux (contract DEC-0032, DEC-0033), and the contract pin moves to the DEC-0033 merge.

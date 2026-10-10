@@ -1,15 +1,17 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5`
-(`docs/specification/service.md`, DEC-0015; the usage report DEC-0021). The contract's schemas are normative;
+Pinned to `fabric-agent-contract` commit `52da526d7cc1e063d74c5b520dbc03d0ace15246`
+(`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
+DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
 ## Descriptor — written by the installer
 
 Directory: macOS `~/Library/Application Support/ai.passioncode.fabric/services/`,
-Linux `${XDG_DATA_HOME:-~/.local/share}/passioncode-fabric/services/`, or
-`FABRIC_SERVICES_DIR`. File `<id>.<instance>.json`, mode 0600, atomic.
+Linux `${XDG_DATA_HOME:-~/.local/share}/passioncode-fabric/services/`, Windows
+`%LOCALAPPDATA%\passioncode-fabric\services\` (DEC-0032), or `FABRIC_SERVICES_DIR`.
+File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 
 | Field | Rule |
 |---|---|
@@ -17,10 +19,10 @@ Linux `${XDG_DATA_HOME:-~/.local/share}/passioncode-fabric/services/`, or
 | `id`, `instance` | `^[a-z][a-z0-9-]{1,62}$`, `^[a-z][a-z0-9-]{0,31}$` (default `default`); the pair is unique per machine |
 | `name`, `summary` | ≤ 80 and ≤ 200 characters |
 | `origin` | `http://127.0.0.1:<port>`; the port is a machine-wide claim |
-| `auth` | `tokenFile` (0600); `header` default `Authorization` with `scheme` `Bearer`; any other header carries the raw token with `scheme: "none"` |
-| `lifecycle` | `manager` `launchd` (then `label` and `plist`) or `none` |
+| `auth` | `tokenFile` (0600; on Windows a protected ACL — owner and every granting entry the current user, SYSTEM or Administrators: service.md *Windows token files*, DEC-0032, DEC-0033); `header` default `Authorization` with `scheme` `Bearer`; any other header carries the raw token with `scheme: "none"` |
+| `lifecycle` | `manager` `launchd` (then `label` and `plist`), `systemd` (then `unit`, a `systemctl --user` unit), `task-scheduler` (then `task`, a per-user Scheduled Task) or `none`; `unit` and `task` are refused beside any other manager (DEC-0032). The Python kit and the probe accept all four; the Node kit still accepts only `launchd` and `none` (FAA-16) |
 | `paths` | `data` (required), `logs[]`, optional `config`, `cache` |
-| `commands` | only `doctor` and `update`, argument arrays whose first item is an absolute or `~/` path |
+| `commands` | only `doctor` and `update`, argument arrays whose first item is an absolute or `~/` path (Windows: also `C:\…`, `C:/…` or `~\…`, never a network share — DEC-0032) |
 | `source.repository`, `fabricManifest` | optional |
 | `installedAt`, `installedBy` | when and by which installer version |
 
@@ -48,7 +50,10 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
 - `build` needs `commit` or `digest` (`sha256:<64 hex>`).
 - `summary`: at most six tiles; `attention: true` counts toward the host's badge.
 - `surfaces.events` is required; `dashboard` and `mcp` when the service has them; `usage`
-  (DEC-0021) when the service reports its spend — see [the usage reference](usage.md).
+  (DEC-0021) when the service reports its spend — see [the usage reference](usage.md);
+  `operatorChannel.path` (DEC-0034) when the service has an operator channel — its status
+  document follows the contract's `operator-channel-status.schema.json` and is token-protected
+  like the events feed. The kits do not serve it yet.
 
 ## Events page — `GET /fabric/v1/events?after=<cursor>&limit=<n>`
 

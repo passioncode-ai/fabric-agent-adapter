@@ -16,10 +16,10 @@ from urllib.parse import urlparse
 
 CONTRACT_VERSION = "0.1.0"
 CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"
-CONTRACT_COMMIT = "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5"
+CONTRACT_COMMIT = "52da526d7cc1e063d74c5b520dbc03d0ace15246"
 # #region supported-contract-revisions — docs: README.md#contract-pin
 # Only this declaration may name a legacy revision in live files.
-SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
+SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5", "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
 # #endregion supported-contract-revisions
 INTEROP_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"

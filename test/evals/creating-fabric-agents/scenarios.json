@@ -100,8 +100,9 @@
       "expected": [
         "after the agent exists, proposes the operator channel to the operator exactly once, because it has human stops and notify events",
         "lists the four operator steps: create a bot with @BotFather, put the token into the secret store under a stated name, run the agent's link command, type the code in the chat",
-        "cites fabric-operator-channel/0.1 OC-11 (contract DEC-0034, docs/specification/operator-channel.md) and says it is newer than the default pin",
-        "records the answer as accepted, declined or later and does not ask again",
+        "cites fabric-operator-channel/0.1 OC-11 (contract DEC-0034, docs/specification/operator-channel.md) from the default contract pin, which carries it",
+        "if the operator will bind the channel in a group shared with other bots, says it follows OC-14…OC-17 (contract DEC-0035): silent unless addressed, and a bare /command in a group is not addressed",
+        "records the answer as accepted, declined or later (in the channel status document's proposal field when the agent serves surfaces.operatorChannel) and does not ask again",
         "does not create a bot, ask for or store a token value, or enable the channel itself"
       ]
     }
