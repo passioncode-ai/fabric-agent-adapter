@@ -127,6 +127,18 @@
         "rejects unknown locks and mismatched checkouts without automatic migration",
         "does not infer COM approval or runtime admission from a declared capability name"
       ]
+    },
+    {
+      "id": "operator-channel-proposal",
+      "trap": "an adapted agent with human stops never offers the operator channel, or the token is pasted into the bundle",
+      "request": "Adapt example-agent to Fabric; it already pauses for approval before paid renders.",
+      "expected": [
+        "after the bundle exists, proposes the operator channel once because the agent has human stops",
+        "lists the four operator steps and names the secret by name only",
+        "cites fabric-operator-channel/0.1 OC-11 (contract DEC-0034) and says it is newer than the default pin",
+        "records the answer as accepted, declined or later in the completion report",
+        "skips the proposal for an agent without human stops or notify events"
+      ]
     }
   ]
 }

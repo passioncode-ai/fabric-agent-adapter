@@ -92,6 +92,18 @@
         "otherwise report unavailable transport",
         "do not say a local custom scheme or localhost opens the workstation from the phone"
       ]
+    },
+    {
+      "id": "operator-channel-proposal",
+      "trap": "the agent ships with stops nobody sees, or the skill creates a bot and stores a token for the operator",
+      "request": "Create example-agent: it stops for my choice between variants and posts notify events when a render finishes.",
+      "expected": [
+        "after the agent exists, proposes the operator channel to the operator exactly once, because it has human stops and notify events",
+        "lists the four operator steps: create a bot with @BotFather, put the token into the secret store under a stated name, run the agent's link command, type the code in the chat",
+        "cites fabric-operator-channel/0.1 OC-11 (contract DEC-0034, docs/specification/operator-channel.md) and says it is newer than the default pin",
+        "records the answer as accepted, declined or later and does not ask again",
+        "does not create a bot, ask for or store a token value, or enable the channel itself"
+      ]
     }
   ]
 }

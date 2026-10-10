@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **The operator channel proposal (FAA-15).** `creating-fabric-agents` (step 6) and
+  `adapting-projects-to-fabric` (step 8) propose an agent's own messenger channel to its
+  operator once, when the agent has human stops or `notify: true` events. They list the
+  operator's four steps (a bot from @BotFather, its token in the secret store by name, the
+  agent's link command, the code typed in the chat), record the answer (`accepted`, `declined`
+  or `later`), and never create a bot, store a token or enable the channel themselves. This is
+  rule OC-11 of `fabric-operator-channel/0.1` (contract DEC-0034, contract PR #25). It is newer
+  than the default pin, so the skills cite it by path and keep channel conformance `NOT_RUN`
+  until the pin moves. New scenario evals: `operator-channel-proposal` in both skills.
+
 ## 0.8.1 - 2026-10-08
 
 The contract pin moves to Fabric Agent Contract `main` `623bf61` (DEC-0025 through DEC-0031); bundles issued

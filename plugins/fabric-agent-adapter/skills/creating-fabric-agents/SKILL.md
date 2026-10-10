@@ -164,13 +164,35 @@ purpose. Then record one expectation the report must carry:
 > checker on its output and a budget cap — regardless of who wrote it. Unsupervised
 > operation is a later, recorded promotion citing eval results and run history.
 
+## Step 6 — propose the operator channel
+
+If the agent has a human stop (a choice, an approval, a confirmation) or emits `notify: true`
+events, propose its **operator channel** to the operator once, now. The channel is the agent's
+own messenger channel, first Telegram, that sends those events and answers its stops with
+buttons: `fabric-operator-channel/0.1` (contract DEC-0034,
+`docs/specification/operator-channel.md`), whose rule OC-11 this step follows. Give the
+operator's four steps:
+
+1. create a bot with @BotFather;
+2. put its token into the secret store (Project Observatory) under the name the agent reads
+   (for example `EXAMPLE_AGENT_TELEGRAM_BOT_TOKEN`), never into a chat, a file or the bundle;
+3. run the agent's link command;
+4. type the code it shows in the chat with the bot.
+
+Record the answer — `accepted`, `declined` or `later` — in the agent's state and in the
+report, and do not ask again. Creating the bot, storing the token and enabling the channel are the
+operator's action: never create the bot, ask for or store the token's value, or enable the
+channel yourself. DEC-0034 is newer than the default pin: cite it by that path and id, and keep
+channel conformance `NOT_RUN` until the pin carries it. An agent with neither stops nor notify
+events skips this step.
+
 ## Completion format
 
 Report: capability, consumer, profile with the step-0 grill answers; the knowledge pack
 and which traps became fixtures; created files; contract version and commit; the gate
-table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`; remaining placeholders; and the
-exact next command. Never summarize the outcome as "Fabric-compatible" unless every
-required admission gate passed against the real provider.
+table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`; remaining placeholders; the
+operator channel answer (step 6); and the exact next command. Never summarize the outcome as
+"Fabric-compatible" unless every required admission gate passed against the real provider.
 
 ## Dashboard handoff — also for consumers
 
