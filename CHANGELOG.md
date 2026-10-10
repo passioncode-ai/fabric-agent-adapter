@@ -1,9 +1,27 @@
 # Changelog
 
-## Unreleased
+## 0.8.2 - 2026-10-10
+
+The Python service kit runs on Windows and Linux (contract DEC-0032, DEC-0033), and the contract pin moves to the DEC-0033 merge.
+
+### Changed
+
+- **Default contract pin → `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5`** (DEC-0032, DEC-0033, FAA-16); the DEC-0031
+  merge joins `SUPPORTED_CONTRACT_COMMITS`. Both are additive: new managers, new optional fields, a wider path
+  grammar, and SYSTEM or Administrators admitted as a Windows token file's owner.
 
 ### Added
 
+- **`fabric_service.py` on Windows** (DEC-0032): the services folder `%LOCALAPPDATA%\passioncode-fabric\services`
+  and per-service folders under `%LOCALAPPDATA%`; the instance lock through `msvcrt.locking` on one byte far
+  past the pid (released by the OS with the process); token files, descriptors and every kit write carry an
+  explicit protected ACL (this user, SYSTEM, Administrators); `read_token` applies service.md "Windows token
+  files" — a regular file in the profile, owned by this user, SYSTEM or Administrators (DEC-0033: an elevated
+  administrator's files are owned by Administrators, as `windows-latest` showed), every granting ACE on the allow-list, refusal by
+  SID; descriptors accept `systemd` (`unit`) and `task-scheduler` (`task`) with the contract's pairing rules,
+  Windows paths, and refuse network shares; launchd helpers refuse off macOS instead of calling `os.getuid`;
+  the kit's own log and ledger appends open in binary mode. `check_service.py` checks the lock and the
+  descriptor's privacy the Windows way.
 - **The operator channel proposal (FAA-15).** `creating-fabric-agents` (step 6) and
   `adapting-projects-to-fabric` (step 8) propose an agent's own messenger channel to its
   operator once, when the agent has human stops or `notify: true` events. They list the
@@ -13,6 +31,17 @@
   rule OC-11 of `fabric-operator-channel/0.1` (contract DEC-0034, contract PR #25). It is newer
   than the default pin, so the skills cite it by path and keep channel conformance `NOT_RUN`
   until the pin moves. New scenario evals: `operator-channel-proposal` in both skills.
+
+### Fixed
+
+- **Two calls that do not exist or mean something else on Windows**, found by the first Windows run: the usage
+  ledger read its last byte with `os.pread` (absent on Windows, so every `record` raised) — it seeks and reads
+  there now; and `check_service.py`'s "state inside a release" rule looked for `/releases/` in a path whose
+  separators are backslashes — it reads the path's POSIX form.
+
+### Added (tests)
+
+- **A `windows` job in `validate.yml`** (dispatch, like the others) runs the platform cases on `windows-latest`.
 
 ## 0.8.1 - 2026-10-08
 

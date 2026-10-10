@@ -32,3 +32,17 @@ jobs:
       - run: npm install --global @anthropic-ai/claude-code
       - run: claude plugin validate ./plugins/fabric-agent-adapter --strict
       - run: claude plugin validate . --strict
+
+  # DEC-0032: the service kit on Windows — the instance lock between two processes, a token file's
+  # ACL written and read back, the refusals the rule names. The Windows cases skip elsewhere.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: DEC-0032 platform cases (Windows ones run here)
+        run: python -m unittest discover -s test -p "test_fabric_service_platforms.py" -v
+      - name: The rest of the service kit's cases on Windows
+        run: python -m unittest discover -s test -p "test_fabric_service.py" -v

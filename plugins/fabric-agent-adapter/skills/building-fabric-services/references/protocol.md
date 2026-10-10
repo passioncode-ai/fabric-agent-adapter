@@ -1,6 +1,6 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `623bf61358c339cb10297807b3f024b5d9f1f327`
+Pinned to `fabric-agent-contract` commit `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.

@@ -29,6 +29,24 @@ fs = load("fabric_service")
 check = load("check_service")
 
 
+def open_to_others(path):
+    """What a careless copy does to a file: readable by every account (mode bits on POSIX, an
+    Everyone ACE on Windows, where chmod changes only the read-only flag)."""
+    if os.name == "nt":
+        subprocess.run(["icacls", str(path), "/grant", "*S-1-1-0:(R)"], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        os.chmod(path, 0o644)
+
+
+def assert_private(case, path):
+    if os.name == "nt":
+        owner, granting = fs.windows_acl(path)
+        case.assertIsNone(fs.token_acl_problem(path, owner, granting, fs.windows_user_sid()))
+    else:
+        case.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+
+
 def free_port():
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -109,7 +127,7 @@ class DescriptorTests(unittest.TestCase):
             fs.write_descriptor(descriptor(47195), root)
             path = fs.write_descriptor(descriptor(47195), root)
             self.assertEqual(path.name, "sample.default.json")
-            self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+            assert_private(self, path)
             self.assertTrue(fs.remove_descriptor("sample", "default", root))
 
     def test_invalid_descriptors_are_refused(self):
@@ -130,11 +148,14 @@ class TokenAndNetworkTests(unittest.TestCase):
             path = Path(temp) / "service.token"
             token = fs.ensure_token(path)
             self.assertEqual(fs.read_token(path), token)
-            os.chmod(path, 0o644)
+            open_to_others(path)
             with self.assertRaises(fs.ServiceError):
                 fs.read_token(path)
             link = Path(temp) / "link.token"
-            link.symlink_to(path)
+            try:
+                link.symlink_to(path)
+            except OSError as exc:   # Windows without the symlink privilege
+                self.skipTest(f"cannot create a symbolic link here: {exc}")
             with self.assertRaises(fs.ServiceError):
                 fs.read_token(link)
 
@@ -314,7 +335,7 @@ class LiveServiceTests(unittest.TestCase):
         self.assertEqual(out.returncode, 1)
 
     def test_planted_open_token_file_is_caught(self):
-        os.chmod(self.data / "service.token", 0o644)
+        open_to_others(self.data / "service.token")
         code, results = self.check()
         self.assertEqual(results["auth.token-file"]["verdict"], "FAIL")
         self.assertEqual(code, 1)
@@ -426,7 +447,7 @@ class UsageReportTests(unittest.TestCase):
             ledger = fs.JsonlUsageLedger(Path(tmp) / "usage" / "usage.jsonl")
             for r in self.case["receipts"]:
                 ledger.record(r)
-            self.assertEqual(os.stat(ledger.path).st_mode & 0o777, 0o600)
+            assert_private(self, ledger.path)
             with open(ledger.path, "a") as f:
                 f.write('{"torn":')
             self.assertEqual(len(ledger.receipts()), 5)
