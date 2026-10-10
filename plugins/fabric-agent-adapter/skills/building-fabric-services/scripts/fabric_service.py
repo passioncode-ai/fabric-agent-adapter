@@ -149,6 +149,15 @@ def service_dirs(service_id: str) -> Dict[str, Path]:
     return {"data": data, "logs": state / "logs", "cache": cache}
 
 
+def _read_at(fd: int, n: int, offset: int) -> bytes:
+    """`os.pread` where it exists; Windows has none, so seek and read (the descriptor's appends
+    still go to the end: O_APPEND moves to it before every write)."""
+    if hasattr(os, "pread"):
+        return os.pread(fd, n, offset)
+    os.lseek(fd, offset, os.SEEK_SET)
+    return os.read(fd, n)
+
+
 def _local_app_data() -> Path:
     value = os.environ.get("LOCALAPPDATA")
     return Path(value) if value else Path.home() / "AppData" / "Local"
@@ -929,7 +938,7 @@ class JsonlUsageLedger:
             fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT | os.O_APPEND | _O_BINARY, 0o600)
             try:
                 size = os.fstat(fd).st_size
-                if size and os.pread(fd, 1, size - 1) != b"\n":
+                if size and _read_at(fd, 1, size - 1) != b"\n":
                     line = "\n" + line  # a killed writer left a torn line: never glue a receipt to it
                 os.write(fd, line.encode("utf-8"))
             finally:

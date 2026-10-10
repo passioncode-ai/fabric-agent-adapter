@@ -629,7 +629,7 @@ class Probe:
         A repository that exists to version the data itself (a registry, a plan) is
         a store, not code; deleting the service's checkout does not touch it."""
         rule = "state.outside-code"
-        if "/releases/" in str(data):
+        if "/releases/" in data.as_posix():   # a Windows path's separators are backslashes
             self.add(rule, "FAIL", "%s is inside a release directory" % data)
             return
         if inside is None:

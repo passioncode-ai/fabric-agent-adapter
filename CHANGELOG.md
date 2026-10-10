@@ -22,6 +22,15 @@ The Python service kit runs on Windows and Linux (contract DEC-0032, DEC-0033), 
   Windows paths, and refuse network shares; launchd helpers refuse off macOS instead of calling `os.getuid`;
   the kit's own log and ledger appends open in binary mode. `check_service.py` checks the lock and the
   descriptor's privacy the Windows way.
+### Fixed
+
+- **Two calls that do not exist or mean something else on Windows**, found by the first Windows run: the usage
+  ledger read its last byte with `os.pread` (absent on Windows, so every `record` raised) — it seeks and reads
+  there now; and `check_service.py`'s "state inside a release" rule looked for `/releases/` in a path whose
+  separators are backslashes — it reads the path's POSIX form.
+
+### Added (tests)
+
 - **A `windows` job in `validate.yml`** (dispatch, like the others) runs the platform cases on `windows-latest`.
 
 ## 0.8.1 - 2026-10-08
