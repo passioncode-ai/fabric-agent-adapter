@@ -5,9 +5,9 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.8.2"
+  version: "0.8.3"
   contract-version: "0.1.0"
-  contract-commit: "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5"
+  contract-commit: "52da526d7cc1e063d74c5b520dbc03d0ace15246"
 ---
 
 # Creating Fabric-compatible agents
@@ -119,7 +119,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri>
 ```
 
-Pin exactly contract `0.1.0` at commit `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5` and
+Pin exactly contract `0.1.0` at commit `52da526d7cc1e063d74c5b520dbc03d0ace15246` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check
@@ -179,11 +179,18 @@ operator's four steps:
 3. run the agent's link command;
 4. type the code it shows in the chat with the bot.
 
+In a group shared with other bots the channel follows OC-14…OC-17 (DEC-0035): it stays silent
+unless addressed — `/command@ThisBot`, a reply to its own message or a press of its own button; a
+bare `/command` in a group is not addressed — and a channel nobody receives on is `degraded`
+(`receiver-missing`). Say so in the proposal when the operator means to bind a shared group.
+
 Record the answer — `accepted`, `declined` or `later` — in the agent's state and in the
-report, and do not ask again. Creating the bot, storing the token and enabling the channel are the
+report, and do not ask again; an agent that serves `surfaces.operatorChannel` also shows it as
+`proposal` in its status document. Creating the bot, storing the token and enabling the channel are the
 operator's action: never create the bot, ask for or store the token's value, or enable the
-channel yourself. DEC-0034 is newer than the default pin: cite it by that path and id, and keep
-channel conformance `NOT_RUN` until the pin carries it. An agent with neither stops nor notify
+channel yourself. The default pin carries DEC-0034 and DEC-0035: a served status document is checked against
+the pinned `schemas/operator-channel-status.schema.json`; the channel's runtime rules have no
+probe rule here yet, so report them `NOT_RUN`. An agent with neither stops nor notify
 events skips this step.
 
 ## Completion format

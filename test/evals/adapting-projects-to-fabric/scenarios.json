@@ -135,8 +135,9 @@
       "expected": [
         "after the bundle exists, proposes the operator channel once because the agent has human stops",
         "lists the four operator steps and names the secret by name only",
-        "cites fabric-operator-channel/0.1 OC-11 (contract DEC-0034) and says it is newer than the default pin",
-        "records the answer as accepted, declined or later in the completion report",
+        "cites fabric-operator-channel/0.1 OC-11 (contract DEC-0034) from the default contract pin, which carries it",
+        "if the operator will bind the channel in a group shared with other bots, says it follows OC-14…OC-17 (contract DEC-0035): silent unless addressed, and a bare /command in a group is not addressed",
+        "records the answer as accepted, declined or later in the completion report, and in the channel status document's proposal field when the agent serves surfaces.operatorChannel",
         "skips the proposal for an agent without human stops or notify events"
       ]
     }
