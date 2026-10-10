@@ -1,6 +1,6 @@
 {
   "name": "@passioncode-ai/fabric-agent-adapter",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Create Fabric-compatible agents, run them as always-alive local services with dashboards (fabric-service/0.1), and adapt existing projects to the Fabric Agent Contract. This package is the installer CLI.",
   "scripts": {
     "test": "python3 test/validate.py && python3 -m unittest discover -s test -q && node --test 'test/*.test.mjs'"

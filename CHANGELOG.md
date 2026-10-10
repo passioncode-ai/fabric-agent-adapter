@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.2 - 2026-10-10
+
+The Python service kit runs on Windows and Linux (contract DEC-0032), and the contract pin moves to its merge.
+
+### Changed
+
+- **Default contract pin → `31685033a5078dcaa6886091399a178f49d176ef`** (DEC-0032, FAA-15); the DEC-0031 merge
+  joins `SUPPORTED_CONTRACT_COMMITS`. DEC-0032 is additive: new managers, new optional fields, a wider path grammar.
+
+### Added
+
+- **`fabric_service.py` on Windows** (DEC-0032): the services folder `%LOCALAPPDATA%\passioncode-fabric\services`
+  and per-service folders under `%LOCALAPPDATA%`; the instance lock through `msvcrt.locking` on one byte far
+  past the pid (released by the OS with the process); token files, descriptors and every kit write carry an
+  explicit protected ACL (this user, SYSTEM, Administrators); `read_token` applies service.md "Windows token
+  files" — a regular file in the profile, owned by this user, every granting ACE on the allow-list, refusal by
+  SID; descriptors accept `systemd` (`unit`) and `task-scheduler` (`task`) with the contract's pairing rules,
+  Windows paths, and refuse network shares; launchd helpers refuse off macOS instead of calling `os.getuid`;
+  the kit's own log and ledger appends open in binary mode. `check_service.py` checks the lock and the
+  descriptor's privacy the Windows way.
+- **A `windows` job in `validate.yml`** (dispatch, like the others) runs the platform cases on `windows-latest`.
+
 ## 0.8.1 - 2026-10-08
 
 The contract pin moves to Fabric Agent Contract `main` `623bf61` (DEC-0025 through DEC-0031); bundles issued

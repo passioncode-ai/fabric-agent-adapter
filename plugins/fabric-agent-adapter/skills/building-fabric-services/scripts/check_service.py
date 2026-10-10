@@ -170,8 +170,14 @@ class Probe:
     def descriptor_rules(self) -> None:
         problems = fs.validate_descriptor(self.d)
         self.add("descriptor.valid", "FAIL" if problems else "PASS", "; ".join(problems) or str(self.path))
-        mode = stat.S_IMODE(os.stat(self.path).st_mode)
-        self.add("descriptor.private", "PASS" if mode & 0o077 == 0 else "FAIL", "mode %o" % mode)
+        if fs.WINDOWS:
+            # DEC-0032: on Windows the file's ACL is its privacy.
+            owner, granting = fs.windows_acl(self.path)
+            problem = fs.token_acl_problem(self.path, owner, granting, fs.windows_user_sid())
+            self.add("descriptor.private", "FAIL" if problem else "PASS", problem or "owner-only ACL")
+        else:
+            mode = stat.S_IMODE(os.stat(self.path).st_mode)
+            self.add("descriptor.private", "PASS" if mode & 0o077 == 0 else "FAIL", "mode %o" % mode)
         me = "%s.%s" % (self.d.get("id"), self.d.get("instance", "default"))
         clashes = []
         for path, other in fs.read_descriptors(self.dir):
@@ -602,7 +608,7 @@ class Probe:
         self.add("lifecycle.priority", "FAIL" if slow else "PASS",
                  "; ".join(slow) + " — macOS may starve the service under load and hosts then see an outage; use ProcessType Standard"
                  if slow else "%s: scheduled as a standard process" % plist_path.name)
-        if not shutil.which("launchctl"):
+        if sys.platform != "darwin" or not shutil.which("launchctl"):
             self.add("lifecycle.one-copy", "NOT_RUN", "launchctl is not available")
             return
         out = subprocess.run(["launchctl", "print", "gui/%d/%s" % (os.getuid(), life.get("label"))], capture_output=True, text=True)
@@ -646,6 +652,23 @@ class Probe:
         lock = data / "service.lock"
         if not lock.exists():
             self.add("lifecycle.instance-lock", "FAIL", "%s does not exist" % lock)
+            return
+        if fs.WINDOWS:
+            import msvcrt
+
+            # The kit locks one byte at InstanceLock.WINDOWS_LOCK_OFFSET; try the same byte.
+            fd = os.open(str(lock), os.O_RDWR | getattr(os, "O_BINARY", 0))
+            try:
+                os.lseek(fd, fs.InstanceLock.WINDOWS_LOCK_OFFSET, os.SEEK_SET)
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                except OSError:
+                    self.add("lifecycle.instance-lock", "PASS", "held by the running service")
+                else:
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    self.add("lifecycle.instance-lock", "FAIL", "%s exists but nobody holds it" % lock)
+            finally:
+                os.close(fd)
             return
         try:
             import fcntl

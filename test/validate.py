@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -55,6 +55,7 @@ STDLIB_IMPORTS = {
     "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets", "socketserver",
     "shutil", "signal", "socket", "ssl", "stat", "threading", "time",
     "random", "io", "contextlib", "textwrap", "traceback",
+    "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
 }
 
 
@@ -396,9 +397,9 @@ PIN_EXCLUDED = ("docs/evidence", "docs/handoffs", "test", "CHANGELOG.md", "fabri
 PIN_MENTION = re.compile(r"fabric[- ]agent[- ]contract|contract[-_ ]?(pin|commit|revision)|CONTRACT_COMMIT", re.IGNORECASE)
 PIN_HEX = re.compile(r"(?<![0-9a-zA-Z:])[0-9a-f]{7,40}(?![0-9a-zA-Z])")
 PIN_ADAPTER = "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_project.py"
-PIN_DEFAULT_COMMIT = "623bf61358c339cb10297807b3f024b5d9f1f327"
-PIN_PREVIOUS_COMMITS = ("23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
-PIN_SUPPORTED_DECLARATION = 'SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")'
+PIN_DEFAULT_COMMIT = "31685033a5078dcaa6886091399a178f49d176ef"
+PIN_PREVIOUS_COMMITS = ("623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
+PIN_SUPPORTED_DECLARATION = 'SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")'
 
 
 def contract_pin_drift(root: Path, commit: str) -> List[str]:

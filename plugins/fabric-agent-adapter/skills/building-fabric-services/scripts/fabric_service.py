@@ -74,6 +74,16 @@ PLACEMENTS = ("local", "remote")
 _CODE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
 _TRACE_ID = re.compile(r"^(?!0{32}$)[0-9a-f]{32}$")
 _SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
+# DEC-0032: a local path is POSIX (`/…`, `~/…`) or Windows (`C:\…`, `C:/…`, `~\…`); a network
+# share (`\\server\…`, `\\?\…`) is never a local path.
+_LOCAL_PATH = re.compile(r"^(~[\\/]|/(?!/)|[A-Za-z]:[\\/])")
+# DEC-0032: the supervisor per system and the field that names its job.
+MANAGERS = ("launchd", "systemd", "task-scheduler", "none")
+_UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$")
+_TASK = re.compile(r"^\\[A-Za-z0-9 ._\\-]{1,254}$")
+WINDOWS = os.name == "nt"
+# Without O_BINARY a Windows descriptor is in text mode and every LF written becomes CRLF.
+_O_BINARY = getattr(os, "O_BINARY", 0)
 
 
 class ServiceError(Exception):
@@ -93,7 +103,10 @@ def now_iso() -> str:
 
 
 def expand(path: str) -> Path:
-    """Paths in a descriptor may start with ~/; everything else must be absolute."""
+    """Paths in a descriptor may start with ~/ (or ~\\ on Windows); everything else must be
+    absolute, and a network share is never a local path (DEC-0032)."""
+    if not _LOCAL_PATH.match(str(path)):
+        raise ServiceError("Path %r must be absolute or start with ~/." % path)
     p = Path(os.path.expanduser(path))
     if not p.is_absolute():
         raise ServiceError("Path %r must be absolute or start with ~/." % path)
@@ -110,6 +123,9 @@ def services_dir() -> Path:
     home = Path.home()
     if sys.platform == "darwin":
         return home / "Library/Application Support/ai.passioncode.fabric/services"
+    if sys.platform == "win32":
+        # DEC-0032: LOCALAPPDATA, not APPDATA, so token files never roam with the profile.
+        return _local_app_data() / "passioncode-fabric" / "services"
     base = os.environ.get("XDG_DATA_HOME") or str(home / ".local/share")
     return Path(base) / "passioncode-fabric/services"
 
@@ -124,15 +140,26 @@ def service_dirs(service_id: str) -> Dict[str, Path]:
             "logs": home / "Library/Logs" / service_id,
             "cache": home / "Library/Caches" / service_id,
         }
+    if sys.platform == "win32":
+        data = _local_app_data() / service_id
+        return {"data": data, "logs": data / "Logs", "cache": data / "Cache"}
     data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local/share") / service_id
     state = Path(os.environ.get("XDG_STATE_HOME") or home / ".local/state") / service_id
     cache = Path(os.environ.get("XDG_CACHE_HOME") or home / ".cache") / service_id
     return {"data": data, "logs": state / "logs", "cache": cache}
 
 
+def _local_app_data() -> Path:
+    value = os.environ.get("LOCALAPPDATA")
+    return Path(value) if value else Path.home() / "AppData" / "Local"
+
+
 def ensure_private_dir(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
-    os.chmod(path, 0o700)
+    if WINDOWS:
+        _win_protect(path, folder=True)
+    else:
+        os.chmod(path, 0o700)
     return path
 
 
@@ -145,7 +172,12 @@ def atomic_write(path: Path, data: bytes, mode: int = 0o600) -> None:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        os.chmod(tmp, mode)
+        if WINDOWS:
+            # The file's ACL is its privacy (DEC-0032): set explicitly and protected, so it does
+            # not depend on what the folder hands down. A rename keeps it.
+            _win_protect(Path(tmp), folder=False)
+        else:
+            os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -169,16 +201,28 @@ class InstanceLock:
         self.path = Path(data_dir) / "service.lock"
         self._fd: Optional[int] = None
 
-    def acquire(self) -> "InstanceLock":
-        import fcntl
+    #: Windows locks a byte range, not the file: one byte far past the pid the file holds, so the
+    #: holder may rewrite the pid and another process may still read it (locking past the end of
+    #: a file is allowed there).
+    WINDOWS_LOCK_OFFSET = 1 << 30
 
+    def acquire(self) -> "InstanceLock":
         ensure_private_dir(self.path.parent)
-        fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT, 0o600)
+        fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT | _O_BINARY, 0o600)
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if WINDOWS:
+                import msvcrt
+
+                os.lseek(fd, self.WINDOWS_LOCK_OFFSET, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                os.lseek(fd, 0, os.SEEK_SET)
+            else:
+                import fcntl
+
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             os.close(fd)
-            if exc.errno in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES):
+            if exc.errno in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES, getattr(errno, "EDEADLOCK", -1)):
                 raise AlreadyRunning(_read_pid(self.path), self.path) from None
             raise
         os.ftruncate(fd, 0)
@@ -239,6 +283,162 @@ def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *
             delay = min(delay * 2, LOCK_BACKOFF_MAX_SECONDS)
 
 
+# --- Windows ACLs (DEC-0032) ---------------------------------------------------
+
+#: The trustees a token file may grant anything to besides the current user: LocalSystem and the
+#: Administrators group — the same trust as root reading a 0600 file on POSIX.
+WINDOWS_TRUSTED = ("S-1-5-18", "S-1-5-32-544")
+
+
+def token_acl_problem(path: Path, owner: str, granting: Sequence[str], user: str) -> Optional[str]:
+    """service.md "Windows token files", rules 2 and 3, on SIDs already read: the owner is the
+    current user, and every SID an allow ACE grants anything to is the user, SYSTEM or
+    Administrators. Deny ACEs are not passed in: they do not change the decision."""
+    if owner != user:
+        return "Token file %s is owned by %s, not by this user (%s)." % (path, owner or "nobody", user)
+    for sid in granting:
+        if sid != user and sid not in WINDOWS_TRUSTED:
+            return "Token file %s grants access to %s; only this user, SYSTEM and Administrators may hold any." % (path, sid)
+    return None
+
+
+if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
+    import ctypes
+    from ctypes import wintypes
+
+    _advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+    _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _PVOID = ctypes.c_void_p
+    _SE_FILE_OBJECT, _OWNER_INFO, _DACL_INFO, _PROTECTED_DACL = 1, 0x1, 0x4, 0x80000000
+    _REPARSE_POINT = 0x400
+    _advapi32.GetNamedSecurityInfoW.argtypes = [wintypes.LPCWSTR, ctypes.c_int, wintypes.DWORD] + [ctypes.POINTER(_PVOID)] * 5
+    _advapi32.GetNamedSecurityInfoW.restype = wintypes.DWORD
+    _advapi32.SetNamedSecurityInfoW.argtypes = [wintypes.LPWSTR, ctypes.c_int, wintypes.DWORD] + [_PVOID] * 4
+    _advapi32.SetNamedSecurityInfoW.restype = wintypes.DWORD
+    _advapi32.ConvertSecurityDescriptorToStringSecurityDescriptorW.argtypes = [
+        _PVOID, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(wintypes.LPWSTR), ctypes.POINTER(wintypes.ULONG)]
+    _advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(_PVOID), ctypes.POINTER(wintypes.ULONG)]
+    _advapi32.GetSecurityDescriptorDacl.argtypes = [_PVOID, ctypes.POINTER(wintypes.BOOL), ctypes.POINTER(_PVOID),
+                                                    ctypes.POINTER(wintypes.BOOL)]
+    _advapi32.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    _advapi32.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, _PVOID, wintypes.DWORD,
+                                              ctypes.POINTER(wintypes.DWORD)]
+    _advapi32.ConvertSidToStringSidW.argtypes = [_PVOID, ctypes.POINTER(wintypes.LPWSTR)]
+    _advapi32.ConvertStringSidToSidW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(_PVOID)]
+    _kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    _kernel32.LocalFree.argtypes = [_PVOID]
+    _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _ACE = re.compile(r"\(([^;()]*);([^;()]*);([^;()]*);([^;()]*);([^;()]*);([^;()]*)(?:;[^()]*)?\)")
+    _CANONICAL: Dict[str, str] = {}
+
+    def _win_error(what: str, code: Optional[int] = None) -> OSError:
+        code = ctypes.get_last_error() if code is None else code
+        return OSError(code, "%s: %s" % (what, ctypes.FormatError(code).strip()))
+
+    def _sid_text(sid: Any) -> str:
+        text = wintypes.LPWSTR()
+        if not _advapi32.ConvertSidToStringSidW(sid, ctypes.byref(text)):
+            raise _win_error("ConvertSidToStringSidW")
+        try:
+            return text.value
+        finally:
+            _kernel32.LocalFree(text)
+
+    def _canonical_sid(trustee: str) -> str:
+        """SDDL writes well-known accounts by alias (SY, BA, LA, OW); compare SIDs."""
+        if trustee not in _CANONICAL:
+            sid = _PVOID()
+            if _advapi32.ConvertStringSidToSidW(trustee, ctypes.byref(sid)):
+                try:
+                    _CANONICAL[trustee] = _sid_text(sid)
+                finally:
+                    _kernel32.LocalFree(sid)
+            else:
+                _CANONICAL[trustee] = trustee
+        return _CANONICAL[trustee]
+
+    def windows_user_sid() -> str:
+        token = wintypes.HANDLE()
+        if not _advapi32.OpenProcessToken(_kernel32.GetCurrentProcess(), 0x8, ctypes.byref(token)):
+            raise _win_error("OpenProcessToken")
+        try:
+            size = wintypes.DWORD()
+            _advapi32.GetTokenInformation(token, 1, None, 0, ctypes.byref(size))
+            buf = ctypes.create_string_buffer(size.value)
+            if not _advapi32.GetTokenInformation(token, 1, buf, size, ctypes.byref(size)):
+                raise _win_error("GetTokenInformation")
+            return _sid_text(ctypes.cast(buf, ctypes.POINTER(_PVOID))[0])
+        finally:
+            _kernel32.CloseHandle(token)
+
+    def _sddl(path: Path) -> str:
+        sd = _PVOID()
+        refs = [_PVOID() for _ in range(4)]
+        code = _advapi32.GetNamedSecurityInfoW(str(path), _SE_FILE_OBJECT, _OWNER_INFO | _DACL_INFO,
+                                               *[ctypes.byref(r) for r in refs], ctypes.byref(sd))
+        if code:
+            raise _win_error("GetNamedSecurityInfoW", code)
+        try:
+            text = wintypes.LPWSTR()
+            if not _advapi32.ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                    sd, 1, _OWNER_INFO | _DACL_INFO, ctypes.byref(text), None):
+                raise _win_error("ConvertSecurityDescriptorToStringSecurityDescriptorW")
+            try:
+                return text.value or ""
+            finally:
+                _kernel32.LocalFree(text)
+        finally:
+            _kernel32.LocalFree(sd)
+
+    def windows_acl(path: Path) -> Tuple[str, List[str]]:
+        """(owner SID, SIDs of every allow ACE on the object itself); a missing or NULL list grants
+        everyone everything, reported as Everyone (S-1-1-0)."""
+        text = _sddl(path)
+        owner = text.split("O:", 1)[1].split("G:", 1)[0].split("D:", 1)[0] if "O:" in text else ""
+        dacl = text.split("D:", 1)[1] if "D:" in text else ""
+        if not dacl or dacl.startswith("NO_ACCESS_CONTROL"):
+            return _canonical_sid(owner) if owner else "", ["S-1-1-0"]
+        granting = [_canonical_sid(trustee) for kind, flags, _r, _o, _i, trustee in _ACE.findall(dacl)
+                    if kind in ("A", "OA", "XA", "ZA") and "IO" not in flags]
+        return (_canonical_sid(owner) if owner else ""), granting
+
+    def _win_protect(path: Path, folder: bool) -> None:
+        """A protected list (inheritance off): this user, SYSTEM, Administrators, full control;
+        inherited by what a folder holds."""
+        inherit = "OICI" if folder else ""
+        sddl = "D:P" + "".join("(A;%s;FA;;;%s)" % (inherit, who) for who in (windows_user_sid(), "SY", "BA"))
+        sd = _PVOID()
+        if not _advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, ctypes.byref(sd), None):
+            raise _win_error("ConvertStringSecurityDescriptorToSecurityDescriptorW")
+        try:
+            present, defaulted, dacl = wintypes.BOOL(), wintypes.BOOL(), _PVOID()
+            if not _advapi32.GetSecurityDescriptorDacl(sd, ctypes.byref(present), ctypes.byref(dacl), ctypes.byref(defaulted)):
+                raise _win_error("GetSecurityDescriptorDacl")
+            code = _advapi32.SetNamedSecurityInfoW(str(path), _SE_FILE_OBJECT, _DACL_INFO | _PROTECTED_DACL,
+                                                   None, None, dacl, None)
+            if code:
+                raise _win_error("SetNamedSecurityInfoW", code)
+        finally:
+            _kernel32.LocalFree(sd)
+
+    def _win_token_problem(path: Path, info: os.stat_result) -> Optional[str]:
+        if getattr(info, "st_file_attributes", 0) & _REPARSE_POINT or not stat.S_ISREG(info.st_mode):
+            return "Token file %s is not a regular file (a link or junction); refusing it." % path
+        profile = os.path.normcase(os.path.realpath(os.environ.get("USERPROFILE") or str(Path.home())))
+        real = os.path.normcase(os.path.realpath(str(path)))
+        if os.path.commonpath([profile, real]) != profile:
+            return "Token file %s lies outside the user's profile; refusing it." % path
+        owner, granting = windows_acl(path)
+        return token_acl_problem(path, owner, granting, windows_user_sid())
+else:
+    def _win_protect(path: Path, folder: bool) -> None:  # noqa: ARG001 - POSIX uses modes
+        raise ServiceError("Windows ACLs exist only on Windows")
+
+    def _win_token_problem(path: Path, info: os.stat_result) -> Optional[str]:  # noqa: ARG001
+        raise ServiceError("Windows token rules apply only on Windows")
+
+
 # --- token -------------------------------------------------------------------
 
 def ensure_token(path: Path) -> str:
@@ -253,15 +453,24 @@ def ensure_token(path: Path) -> str:
 
 
 def read_token(path: Path) -> str:
-    """Refuse a symlink, a file owned by someone else, or one others can read."""
+    """Refuse a symlink, a file owned by someone else, or one others can read.
+
+    On Windows the rule is service.md "Windows token files" (DEC-0032): a regular file whose real
+    path is in the profile, owned by the current user, every granting ACE naming the current
+    user, SYSTEM or Administrators; a refusal names the SID, never the contents."""
     path = Path(path)
     info = os.lstat(path)
     if stat.S_ISLNK(info.st_mode):
         raise ServiceError("Token file %s is a symlink; refusing it." % path)
-    if info.st_uid != os.getuid():
-        raise ServiceError("Token file %s belongs to another user." % path)
-    if info.st_mode & 0o077:
-        raise ServiceError("Token file %s is readable by others; set mode 0600." % path)
+    if WINDOWS:
+        problem = _win_token_problem(path, info)
+        if problem:
+            raise ServiceError(problem)
+    else:
+        if info.st_uid != os.getuid():
+            raise ServiceError("Token file %s belongs to another user." % path)
+        if info.st_mode & 0o077:
+            raise ServiceError("Token file %s is readable by others; set mode 0600." % path)
     token = path.read_text().strip()
     if len(token) < 16:
         raise ServiceError("Token file %s holds no usable token." % path)
@@ -354,21 +563,38 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
     auth = descriptor.get("auth") or {}
     if "tokenFile" not in auth:
         problems.append("auth.tokenFile is required")
+    elif not _LOCAL_PATH.match(str(auth["tokenFile"])):
+        problems.append("auth.tokenFile must be a local path, never a network share")
+    paths = descriptor.get("paths") or {}
+    for value in ([paths["data"]] if "data" in paths else []) + list(paths.get("logs") or []):
+        if not _LOCAL_PATH.match(str(value)):
+            problems.append("paths must be local paths, never a network share: %r" % value)
     header = auth.get("header", "Authorization")
     scheme = auth.get("scheme", "Bearer")
     if header != "Authorization" and scheme != "none":
         problems.append("a custom auth header carries the raw token: scheme must be none")
     life = descriptor.get("lifecycle") or {}
-    if life.get("manager") not in ("launchd", "none"):
-        problems.append("lifecycle.manager must be launchd or none")
-    if life.get("manager") == "launchd" and not (life.get("label") and str(life.get("plist", "")).endswith(".plist")):
+    manager = life.get("manager")
+    if manager not in MANAGERS:
+        problems.append("lifecycle.manager must be launchd, systemd, task-scheduler or none")
+    if manager == "launchd" and not (life.get("label") and str(life.get("plist", "")).endswith(".plist")):
         problems.append("a launchd service declares label and plist")
+    if "plist" in life and not _LOCAL_PATH.match(str(life["plist"])):
+        problems.append("lifecycle.plist must be a local path")
+    # DEC-0032: `unit` goes with systemd and `task` with Task Scheduler, and with nothing else.
+    for field, owner, pattern in (("unit", "systemd", _UNIT), ("task", "task-scheduler", _TASK)):
+        if manager == owner and field not in life:
+            problems.append("a %s service declares %s" % (owner, field))
+        if field in life and manager != owner:
+            problems.append("lifecycle.%s belongs to manager %s only" % (field, owner))
+        if field in life and not pattern.match(str(life[field])):
+            problems.append("lifecycle.%s must match %s" % (field, pattern.pattern))
     if remote:
-        if life.get("manager") != "none":
+        if manager != "none":
             problems.append("a remote service is supervised by its platform: lifecycle.manager must be none")
-        for field in ("label", "plist"):
+        for field, of in (("label", "launchd"), ("plist", "launchd"), ("unit", "systemd"), ("task", "Task Scheduler")):
             if field in life:
-                problems.append("a remote service has no launchd %s" % field)
+                problems.append("a remote service has no %s %s" % (of, field))
         if "update" in (descriptor.get("commands") or {}):
             problems.append("a remote service declares no update command")
     for name, argv in (descriptor.get("commands") or {}).items():
@@ -376,7 +602,7 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("unknown command %s" % name)
         elif not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
             problems.append("command %s must be an argument array" % name)
-        elif not re.match(r"^(~/|/)", argv[0]):
+        elif not _LOCAL_PATH.match(argv[0]):
             problems.append("command %s must start with an absolute or ~/ executable" % name)
     return problems
 
@@ -699,7 +925,7 @@ class JsonlUsageLedger:
         line = json.dumps(receipt, separators=(",", ":")) + "\n"
         with self._lock:
             ensure_private_dir(self.path.parent)
-            fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o600)
+            fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT | os.O_APPEND | _O_BINARY, 0o600)
             try:
                 size = os.fstat(fd).st_size
                 if size and os.pread(fd, 1, size - 1) != b"\n":
@@ -779,7 +1005,7 @@ class RotatingLog:
                 size = 0
             if size and size + len(data) > self.max_bytes:
                 self._rotate()
-            fd = os.open(str(self.path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            fd = os.open(str(self.path), os.O_WRONLY | os.O_APPEND | os.O_CREAT | _O_BINARY, 0o600)
             try:
                 os.write(fd, data)
             finally:
@@ -1114,6 +1340,10 @@ def _launchctl(*args: str, timeout: int = 30) -> subprocess.CompletedProcess:
 
 
 def _domain() -> str:
+    if sys.platform != "darwin":
+        # DEC-0032: launchd is macOS's supervisor; systemd and Task Scheduler are the hosts'.
+        raise ServiceError("launchd exists only on macOS; this system's supervisor is %s."
+                           % ("Task Scheduler" if sys.platform == "win32" else "systemd"))
     return "gui/%d" % os.getuid()
 
 
