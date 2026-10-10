@@ -6,7 +6,7 @@ The Python service kit runs on Windows and Linux (contract DEC-0032, DEC-0033), 
 
 ### Changed
 
-- **Default contract pin → `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5`** (DEC-0032, DEC-0033, FAA-15); the DEC-0031
+- **Default contract pin → `78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5`** (DEC-0032, DEC-0033, FAA-16); the DEC-0031
   merge joins `SUPPORTED_CONTRACT_COMMITS`. Both are additive: new managers, new optional fields, a wider path
   grammar, and SYSTEM or Administrators admitted as a Windows token file's owner.
 
@@ -22,6 +22,16 @@ The Python service kit runs on Windows and Linux (contract DEC-0032, DEC-0033), 
   Windows paths, and refuse network shares; launchd helpers refuse off macOS instead of calling `os.getuid`;
   the kit's own log and ledger appends open in binary mode. `check_service.py` checks the lock and the
   descriptor's privacy the Windows way.
+- **The operator channel proposal (FAA-15).** `creating-fabric-agents` (step 6) and
+  `adapting-projects-to-fabric` (step 8) propose an agent's own messenger channel to its
+  operator once, when the agent has human stops or `notify: true` events. They list the
+  operator's four steps (a bot from @BotFather, its token in the secret store by name, the
+  agent's link command, the code typed in the chat), record the answer (`accepted`, `declined`
+  or `later`), and never create a bot, store a token or enable the channel themselves. This is
+  rule OC-11 of `fabric-operator-channel/0.1` (contract DEC-0034, contract PR #25). It is newer
+  than the default pin, so the skills cite it by path and keep channel conformance `NOT_RUN`
+  until the pin moves. New scenario evals: `operator-channel-proposal` in both skills.
+
 ### Fixed
 
 - **Two calls that do not exist or mean something else on Windows**, found by the first Windows run: the usage

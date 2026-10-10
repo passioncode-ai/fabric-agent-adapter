@@ -185,6 +185,28 @@ unverified surfaces. If live Fabric admission/runtime does not yet exist, the la
 remain `NOT VERIFIED`; the completed deliverable is an adaptation-ready provider bundle,
 not a connected provider.
 
+### 8. Propose the operator channel
+
+If the agent has a human stop (a choice, an approval, a confirmation) or emits `notify: true`
+events, propose its **operator channel** to the operator once, now. The channel is the agent's
+own messenger channel, first Telegram, that sends those events and answers its stops with
+buttons: `fabric-operator-channel/0.1` (contract DEC-0034,
+`docs/specification/operator-channel.md`), whose rule OC-11 this step follows. Give the
+operator's four steps:
+
+1. create a bot with @BotFather;
+2. put its token into the operator's secret store under the name the agent reads (for example
+   `EXAMPLE_AGENT_TELEGRAM_BOT_TOKEN`), never into a chat, a file or the bundle;
+3. run the agent's link command;
+4. type the code it shows in the chat with the bot.
+
+Record the answer — `accepted`, `declined` or `later` — in the agent's state and the
+conformance report, and do not ask again. Creating the bot, storing the token and enabling the
+channel are the operator's action: never create the bot, ask for or store the token's value, or
+enable the channel yourself. DEC-0034 is newer than the default pin: cite it by that path and id, and keep
+channel conformance `NOT_RUN` until the pin carries it. An agent with neither stops nor notify
+events skips this step.
+
 ## The repository around the provider
 
 **For a PassionCode.ai repository**, the adapted project's repository follows the organization's
@@ -215,6 +237,7 @@ Report:
 - contract version and commit;
 - gate table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`;
 - remaining placeholders and blockers;
+- the operator channel answer (step 8), or why it was skipped;
 - the exact next command or runtime action.
 
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates
