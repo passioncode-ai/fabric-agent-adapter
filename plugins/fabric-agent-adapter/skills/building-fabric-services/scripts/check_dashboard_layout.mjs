@@ -270,11 +270,15 @@ async function main(argv) {
     if (response && !response.ok()) {
       return notRun(`the page answered HTTP ${response.status()}`);
     }
+    // Measure a settled page: its own data requests done, so a header that grows when the data
+    // arrives is not caught between its new size and the script that reacts to it.
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     const widths = [...new Set([floor - 40, ...opts.widths])].filter((w) => w >= 200).sort((a, b) => a - b);
     for (const width of widths) {
       await page.setViewportSize({ width, height: opts.height });
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-      await page.waitForTimeout(150);
+      await page.waitForTimeout(250);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
       const m = await page.evaluate(measure, floor);
       rows.push(...verdicts(width, floor, m));
     }
