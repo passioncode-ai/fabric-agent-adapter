@@ -361,11 +361,14 @@ class JobStore:
 class CallContext:
     """What a tool handler gets: the child span it runs in, and a way to start a job."""
 
-    def __init__(self, server: "McpToolServer", tool: str, arguments: Any, traceparent: str):
+    def __init__(self, server: "McpToolServer", tool: str, arguments: Any, traceparent: str,
+                 delegation: Optional[Dict[str, Any]] = None):
         self.server = server
         self.tool = tool
         self.arguments = arguments
         self.traceparent = traceparent
+        # DEC-0039: the accepted delegation (principal, caller, chain, claims) when the server has a gate.
+        self.delegation = delegation
 
     def start_job(self, poll_interval_ms: Optional[int] = None) -> Dict[str, Any]:
         if self.server.jobs is None:
@@ -471,7 +474,12 @@ class McpToolServer:
 
     def __init__(self, name: str, version: str, jobs: Optional[JobStore] = None,
                  on_job_started: Optional[Callable[[str, CallContext], None]] = None,
-                 on_input: Optional[OnInput] = None):
+                 on_input: Optional[OnInput] = None,
+                 authorize: Optional[Callable[[str, Any], Dict[str, Any]]] = None):
+        # authorize(tool, headers) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
+        # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
+        # not gated: the contract does not yet say how a job read is scoped.
+        self._authorize = authorize
         self.info = {"name": name, "version": version}
         self.jobs = jobs
         self.tools: List[Dict[str, Any]] = []
@@ -544,8 +552,15 @@ class McpToolServer:
         handler = self.handlers.get(name)
         if handler is None:
             return self._error(rid, -32602, "Unknown tool: %s." % name)
+        delegation = None
+        if self._authorize is not None:
+            verdict = self._authorize(name, headers)
+            if not verdict.get("ok"):
+                import fabric_delegation as _fd  # noqa: E402 - only a gated server needs it
+                return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
+            delegation = verdict
         try:
-            structured = handler(arguments, CallContext(self, name, arguments, span))
+            structured = handler(arguments, CallContext(self, name, arguments, span, delegation))
         except InteropError as exc:
             return {"jsonrpc": "2.0", "id": rid, "result": tool_result({"error": {"code": "tool-error", "message": str(exc)}}, is_error=True, traceparent=span)}
         return {"jsonrpc": "2.0", "id": rid, "result": tool_result(structured, traceparent=span)}
