@@ -101,3 +101,13 @@ test('review findings: unreadable jti file, __proto__ as an id, a null header va
   assert.equal(proto.consume('__proto__', 1000, 20), false);
   assert.equal(d.readDelegationToken({ 'Fabric-Delegation': null, Authorization: `Bearer ${V.delegation[0].token}` }).via, 'authorization');
 });
+
+test('small-order keys are refused by the kit itself, whatever the Node version (Node 22 accepts the forgery)', () => {
+  const small = V.ed25519.filter((c) => c.kind === 'small-order key, forged');
+  assert.equal(small.length, 8);
+  for (const c of small) assert.equal(d.isSmallOrderKey(Buffer.from(c.pub, 'hex')), true, c.pub);
+  // Non-canonical encodings of the same points (y + p, the sign bit set) are refused too.
+  const pPlus = (n) => { const b = Buffer.alloc(32, 0xff); b[0] = 0xed + n; b[31] = 0x7f; return b; };
+  for (const b of [pPlus(0), pPlus(1), Buffer.from('0000000000000000000000000000000000000000000000000000000000000080', 'hex')]) assert.equal(d.isSmallOrderKey(b), true, b.toString('hex'));
+  for (const c of V.ed25519.filter((x) => x.kind === 'valid')) assert.equal(d.isSmallOrderKey(Buffer.from(c.pub, 'hex')), false);
+});

@@ -75,7 +75,8 @@ rest). `detail` is a short machine word; the token, the approval and the keys ne
 a minute (DL-15), and waits 10 s after a failed read before trying again; after 10 minutes without a successful read it answers nothing, and the verifier says
 `issuer-unavailable`. It reads https, http on loopback only, or a file; a URL with credentials is refused. The
 Python kit verifies Ed25519 itself (RFC 8032, standard library only, strict as OpenSSL: `S` below the group order,
-canonical points, no small-order key); it follows no redirect when it reads the key set; the Node kit uses `node:crypto`.
+canonical points, no small-order key); it follows no redirect when it reads the key set; the Node kit uses `node:crypto` and refuses small-order keys
+itself (`isSmallOrderKey`), because Node before 26 lets OpenSSL accept a signature under one.
 
 ## What the kit does not do
 
