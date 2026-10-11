@@ -63,6 +63,9 @@ DEFAULT_EXIT_TIMEOUT = 15
 LOG_MAX_BYTES = 5 * 1024 * 1024
 LOG_BACKUPS = 5
 LOGIN_CODE_TTL_SECONDS = 120
+# DEC-0039 (service.md "The session's lifetime"): the longest a service may keep an operator session.
+OPERATOR_SESSION_IDLE_SECONDS = 12 * 60 * 60
+OPERATOR_SESSION_MAX_SECONDS = 7 * 24 * 60 * 60
 EVENTS_DEFAULT_LIMIT = 50
 EVENTS_MAX_LIMIT = 200
 LEVELS = ("info", "notice", "warning", "error")
@@ -1203,17 +1206,31 @@ class Drain:
 # --- operator login ----------------------------------------------------------
 
 class LoginCodes:
-    """Single-use login codes (<=120 s), recorded as used BEFORE they are honoured,
-    and HMAC-signed session cookies revoked by rotating the key."""
+    """Single-use login codes (<=120 s), recorded as used BEFORE they are honoured, and operator
+    sessions with the DEC-0039 lifetime: a session ends 12 h after its last use, 7 days after the code
+    was redeemed, on logout, and when the descriptor token rotates. The server enforces all four: the
+    cookie carries a signed claim (session id, sign-in time, token revision) and the code store keeps a
+    record per session (last use, logout). Rotating the key with revoke_all() ends every session."""
 
     def __init__(self, state_dir: Optional[Path], ttl: int = LOGIN_CODE_TTL_SECONDS, *,
-                 store: Optional["MemoryCodeStore"] = None, key: Optional[bytes] = None):
-        # A local service keeps codes and the key in files. An online one (DEC-0019) usually has no
-        # durable disk: pass state_dir=None with store=MemoryCodeStore() (a restart forgets every
-        # code, so none can be replayed) and key= bytes from a platform secret (sessions survive a deploy).
+                 store: Optional["MemoryCodeStore"] = None, key: Optional[bytes] = None,
+                 token: "Optional[str | Callable[[], str]]" = None,
+                 idle_seconds: int = OPERATOR_SESSION_IDLE_SECONDS,
+                 max_seconds: int = OPERATOR_SESSION_MAX_SECONDS,
+                 clock: Callable[[], float] = time.time):
+        # A local service keeps codes, sessions and the key in files. An online one (DEC-0019) usually has
+        # no durable disk: pass state_dir=None with store=MemoryCodeStore() and key= bytes from a platform
+        # secret. A memory store forgets codes AND sessions on a restart, so a deploy signs the operator
+        # out (the host signs in again on the page's 401); pass a durable store to keep sessions.
+        # token= is the descriptor token, or a callable returning the current one: a session begun under
+        # one token is refused once it rotates. A service MAY shorten either bound, never lengthen one.
         self.ttl = min(ttl, LOGIN_CODE_TTL_SECONDS)
+        self.idle_seconds = min(int(idle_seconds), OPERATOR_SESSION_IDLE_SECONDS)
+        self.max_seconds = min(int(max_seconds), OPERATOR_SESSION_MAX_SECONDS)
         self._store = store
         self._fixed_key = key
+        self._token = token
+        self._clock = clock
         if state_dir is not None:
             self.dir = ensure_private_dir(Path(state_dir))
             self._key_path = self.dir / "session.key"
@@ -1239,7 +1256,7 @@ class LoginCodes:
             return {}
 
     def _save(self, codes: Dict[str, Any]) -> None:
-        horizon = time.time() - 3600
+        horizon = self._clock() - 3600
         codes = {k: v for k, v in codes.items() if v.get("expires", 0) > horizon}
         if self._store is not None:
             self._store.save(codes)
@@ -1248,7 +1265,7 @@ class LoginCodes:
 
     def issue(self) -> Dict[str, str]:
         code = secrets.token_urlsafe(24)
-        expires = time.time() + self.ttl
+        expires = self._clock() + self.ttl
         codes = self._load()
         codes[hashlib.sha256(code.encode()).hexdigest()] = {"expires": expires, "used": False}
         self._save(codes)
@@ -1266,20 +1283,76 @@ class LoginCodes:
             return None
         entry["used"] = True
         self._save(codes)
-        if entry.get("expires", 0) < time.time():
+        now = self._clock()
+        if entry.get("expires", 0) < now:
             return None
-        return self._sign(secrets.token_urlsafe(18))
-
-    def _sign(self, session_id: str) -> str:
-        mac = hmac.new(self._key(), session_id.encode(), hashlib.sha256).hexdigest()
-        return session_id + "." + mac
+        session_id = secrets.token_urlsafe(18)
+        signed_in = int(now)
+        codes[self._record_key(session_id)] = {"expires": signed_in + self.max_seconds,
+                                               "signedInAt": signed_in, "lastUsedAt": now}
+        self._save(codes)
+        claim = "v2.%s.%d.%s" % (session_id, signed_in, self._token_revision())
+        return claim + "." + self._mac(claim)
 
     def session_valid(self, cookie_value: Optional[str]) -> bool:
-        if not cookie_value or "." not in cookie_value:
+        """True while the session is live; a use within the bounds refreshes the idle bound."""
+        parsed = self._parse(cookie_value)
+        if parsed is None:
             return False
-        session_id, mac = cookie_value.rsplit(".", 1)
-        expected = hmac.new(self._key(), session_id.encode(), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(mac, expected)
+        session_id, signed_in = parsed
+        now = self._clock()
+        if now >= signed_in + self.max_seconds:
+            return False
+        codes = self._load()
+        record = codes.get(self._record_key(session_id))
+        if not record or record.get("signedInAt") != signed_in or record.get("loggedOutAt") is not None:
+            return False
+        last = float(record.get("lastUsedAt", 0))
+        if now >= last + self.idle_seconds:
+            return False
+        if now - last >= min(60, max(1, self.idle_seconds // 10)):
+            record["lastUsedAt"] = now
+            self._save(codes)
+        return True
+
+    def logout(self, cookie_value: Optional[str]) -> bool:
+        """End this session on the server: every copy of the cookie is refused from now on. Clear the
+        browser's copy with expired_session_cookie_header(). False when there was no live record."""
+        parsed = self._parse(cookie_value)
+        if parsed is None:
+            return False
+        codes = self._load()
+        record = codes.get(self._record_key(parsed[0]))
+        if not record or record.get("signedInAt") != parsed[1] or record.get("loggedOutAt") is not None:
+            return False
+        record["loggedOutAt"] = self._clock()
+        self._save(codes)
+        return True
+
+    def _parse(self, cookie_value: Optional[str]) -> Optional[Tuple[str, int]]:
+        """The signed claim of a cookie under the current key and token, or None."""
+        parts = (cookie_value or "").split(".")
+        if len(parts) != 5 or parts[0] != "v2" or not parts[1] or not parts[2].isdigit():
+            return None
+        claim, mac = ".".join(parts[:4]), parts[4]
+        if not hmac.compare_digest(mac, self._mac(claim)):
+            return None
+        if not hmac.compare_digest(parts[3], self._token_revision()):
+            return None
+        return parts[1], int(parts[2])
+
+    def _mac(self, claim: str) -> str:
+        return hmac.new(self._key(), claim.encode(), hashlib.sha256).hexdigest()
+
+    def _token_revision(self) -> str:
+        token = self._token() if callable(self._token) else self._token
+        if not token:
+            return "-"
+        return hmac.new(self._key(), b"token-revision\0" + token.encode(), hashlib.sha256).hexdigest()[:16]
+
+    @staticmethod
+    def _record_key(session_id: str) -> str:
+        return "s:" + hashlib.sha256(session_id.encode()).hexdigest()
 
     def revoke_all(self) -> None:
         if self._fixed_key is not None:
@@ -1304,13 +1377,19 @@ SESSION_COOKIE = "fabric_session"
 REMOTE_SESSION_COOKIE = "__Host-fabric_session"
 
 
-def session_cookie_header(value: str, max_age: int = 30 * 86400) -> str:
+def session_cookie_header(value: str, max_age: int = OPERATOR_SESSION_MAX_SECONDS) -> str:
+    """The cookie lives no longer than the absolute bound (DEC-0039); the server ends it sooner."""
     return "%s=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d" % (SESSION_COOKIE, value, max_age)
 
 
-def remote_session_cookie_header(value: str, max_age: int = 30 * 86400) -> str:
+def remote_session_cookie_header(value: str, max_age: int = OPERATOR_SESSION_MAX_SECONDS) -> str:
     """DEC-0019: the remote cookie — __Host- name, Secure, no Domain, Path=/."""
     return "%s=%s; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=%d" % (REMOTE_SESSION_COOKIE, value, max_age)
+
+
+def expired_session_cookie_header(remote: bool = False) -> str:
+    """The header that clears the browser's session cookie, sent with a logout."""
+    return (remote_session_cookie_header if remote else session_cookie_header)("", 0)
 
 
 def check_remote_request(origin: str, host: Optional[str], request_origin: Optional[str] = None,

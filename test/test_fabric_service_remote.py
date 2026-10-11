@@ -71,9 +71,15 @@ class RemotePlacement(unittest.TestCase):
         session = a.redeem(code)
         self.assertTrue(session and a.session_valid(session))
         self.assertIsNone(a.redeem(code))
+        # DEC-0039: the server keeps each session's record, so a deploy that forgets the memory store
+        # ends the sessions (the host signs in again on the page's 401); a durable store keeps them.
         b = fs.LoginCodes(None, store=fs.MemoryCodeStore(), key=key)
-        self.assertTrue(b.session_valid(session))
+        self.assertFalse(b.session_valid(session))
         self.assertIsNone(b.redeem(a.issue()["url"].split("=", 1)[1]))
+        durable = fs.MemoryCodeStore()
+        c = fs.LoginCodes(None, store=durable, key=key)
+        kept = c.redeem(c.issue()["url"].split("=", 1)[1])
+        self.assertTrue(fs.LoginCodes(None, store=durable, key=key).session_valid(kept))
         with self.assertRaises(fs.ServiceError):
             fs.LoginCodes(None)
 

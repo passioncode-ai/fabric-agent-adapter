@@ -193,6 +193,123 @@ class LoginCodeTests(unittest.TestCase):
             self.assertIsNone(codes.redeem(code))
 
 
+class OperatorSessionTests(unittest.TestCase):
+    """DEC-0039 (service.md "The session's lifetime"): 12 h after last use, 7 days after sign-in, logout,
+    token rotation — enforced by the server, not by the cookie's Max-Age."""
+
+    HOUR = 3600
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.now = [1_800_000_000.0]
+        self.token = ["t" * 43]
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def codes(self, **kwargs):
+        kwargs.setdefault("token", lambda: self.token[0])
+        return fs.LoginCodes(Path(self.temp.name), clock=lambda: self.now[0], **kwargs)
+
+    def sign_in(self, codes):
+        return codes.redeem(codes.issue()["url"].split("code=", 1)[1])
+
+    def test_idle_bound_ends_a_session_and_use_refreshes_it(self):
+        codes = self.codes()
+        session = self.sign_in(codes)
+        self.now[0] += 11 * self.HOUR
+        self.assertTrue(codes.session_valid(session))
+        self.now[0] += 11 * self.HOUR  # 22 h after sign-in, 11 h after the last use
+        self.assertTrue(codes.session_valid(session))
+        self.now[0] += 12 * self.HOUR + 1
+        self.assertFalse(codes.session_valid(session))
+
+    def test_absolute_bound_holds_however_often_it_is_used(self):
+        codes = self.codes()
+        session = self.sign_in(codes)
+        for _ in range(7 * 2):
+            self.now[0] += 12 * self.HOUR - 60
+            self.assertTrue(codes.session_valid(session))
+        self.now[0] = 1_800_000_000.0 + 7 * 24 * self.HOUR
+        self.assertFalse(codes.session_valid(session))
+
+    def test_logout_ends_the_session_for_every_copy_of_the_cookie(self):
+        codes = self.codes()
+        session = self.sign_in(codes)
+        self.assertTrue(codes.logout(session))
+        self.assertFalse(codes.session_valid(session))
+        self.assertFalse(self.codes().session_valid(session))
+        self.assertFalse(codes.logout(session))
+        self.assertFalse(codes.logout("junk"))
+
+    def test_token_rotation_ends_sessions_begun_under_the_old_token(self):
+        codes = self.codes()
+        session = self.sign_in(codes)
+        self.token[0] = "u" * 43
+        self.assertFalse(codes.session_valid(session))
+        self.assertTrue(codes.session_valid(self.sign_in(codes)))
+        self.assertNotIn("t" * 43, session)
+
+    def test_a_static_token_and_no_token_both_work(self):
+        static = self.codes(token="s" * 43)
+        self.assertTrue(static.session_valid(self.sign_in(static)))
+        bare = fs.LoginCodes(Path(self.temp.name) / "bare", clock=lambda: self.now[0])
+        self.assertTrue(bare.session_valid(self.sign_in(bare)))
+
+    def test_shorter_bounds_apply_and_longer_ones_are_clamped(self):
+        short = self.codes(idle_seconds=60, max_seconds=600)
+        session = self.sign_in(short)
+        self.now[0] += 61
+        self.assertFalse(short.session_valid(session))
+        long = self.codes(idle_seconds=10**9, max_seconds=10**9)
+        self.assertEqual((long.idle_seconds, long.max_seconds), (12 * self.HOUR, 7 * 24 * self.HOUR))
+
+    def test_forged_old_format_and_unrecorded_cookies_are_refused(self):
+        codes = self.codes()
+        session = self.sign_in(codes)
+        head, mac = session.rsplit(".", 1)
+        self.assertFalse(codes.session_valid(head + "." + ("0" if mac[0] != "0" else "1") + mac[1:]))
+        parts = session.split(".")
+        later = ".".join(parts[:2] + [str(int(parts[2]) + 7 * 24 * self.HOUR)] + parts[3:])
+        self.assertFalse(codes.session_valid(later))  # a moved sign-in time breaks the mac
+        sid = "abc"
+        import hmac as _hmac, hashlib as _hashlib
+        legacy = sid + "." + _hmac.new(codes._key(), sid.encode(), _hashlib.sha256).hexdigest()
+        self.assertFalse(codes.session_valid(legacy))
+        for bad in (None, "", "v2", "v2.a.b.c.d", "v2.a.notanumber.c." + "0" * 64):
+            self.assertFalse(codes.session_valid(bad))
+        (Path(self.temp.name) / "login-codes.json").unlink()
+        self.assertFalse(codes.session_valid(session))  # signed, but the server holds no record of it
+
+    def test_last_use_is_written_at_most_once_a_minute(self):
+        codes = self.codes()
+        session = self.sign_in(codes)
+        store = Path(self.temp.name) / "login-codes.json"
+        before = store.read_bytes()
+        self.now[0] += 30
+        self.assertTrue(codes.session_valid(session))
+        self.assertEqual(store.read_bytes(), before)
+        self.now[0] += 31
+        self.assertTrue(codes.session_valid(session))
+        self.assertNotEqual(store.read_bytes(), before)
+
+    def test_records_are_pruned_after_the_absolute_bound(self):
+        codes = self.codes()
+        self.sign_in(codes)
+        self.now[0] += 7 * 24 * self.HOUR + 2 * self.HOUR
+        self.sign_in(codes)
+        records = [k for k in json.loads((Path(self.temp.name) / "login-codes.json").read_text()) if k.startswith("s:")]
+        self.assertEqual(len(records), 1)
+
+    def test_cookie_headers_default_to_seven_days_and_can_be_cleared(self):
+        self.assertIn("Max-Age=604800", fs.session_cookie_header("v"))
+        self.assertIn("Max-Age=604800", fs.remote_session_cookie_header("v"))
+        cleared = fs.expired_session_cookie_header()
+        self.assertTrue(cleared.startswith("fabric_session=; ") and "Max-Age=0" in cleared)
+        remote = fs.expired_session_cookie_header(remote=True)
+        self.assertTrue(remote.startswith("__Host-fabric_session=; ") and "Secure" in remote and "Max-Age=0" in remote)
+
+
 class DocumentTests(unittest.TestCase):
     def test_ready_with_degraded_sources_is_reported_as_degraded(self):
         doc = fs.build_well_known(service_id="sample", instance="default", name="S", version="0.1.0",
