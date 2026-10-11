@@ -211,6 +211,28 @@
         "ships only theme ids it carries in both light and dark, each meeting WCAG 2.2 AA, and lists them in the declaration's themes",
         "never carries meaning by colour alone in any theme"
       ]
+    },
+    {
+      "id": "operator-session-lifetime",
+      "trap": "the service kept a 30-day cookie and checked only its signature, so a copied cookie stayed valid for a month after the operator stopped using the dashboard, survived a logout, and outlived a rotated service token",
+      "request": "Add an operator dashboard with sign-in to example-agent, built on the kit.",
+      "expected": [
+        "uses the kit's LoginCodes and passes token= (the descriptor token, or a function returning the current one), so a session begun under a rotated token is refused (DEC-0039)",
+        "relies on the server's bounds, not the cookie: a session ends 12 h after its last use and 7 days after sign-in, and a service may shorten either bound but never lengthen one",
+        "offers logout as a browser write that requires the custom request header, calls codes.logout and clears the cookie with the expired-cookie header",
+        "answers 401 on the dashboard page once the session has ended, so the host can sign in again",
+        "for an online service with a memory store, says a deploy signs the operator out unless a durable store is passed"
+      ]
+    },
+    {
+      "id": "mcp-auth-delegation",
+      "trap": "the service declared surfaces.mcp.auth delegation but no auth.delegation, and the host kept calling it with the descriptor token",
+      "request": "Make example-agent's MCP surface accept only the estate's delegation tokens.",
+      "expected": [
+        "declares surfaces.mcp.auth: \"delegation\" together with auth.delegation {issuer, jwks} in the well-known document (DL-16)",
+        "treats the descriptor token as no MCP credential: the probe checks that the surface refuses it and leaves the caller rules NOT_RUN, as with own",
+        "keeps verifying the delegation tokens themselves out of this step: the kit verifier is a later FAA-20 increment, so the service names what checks the token until then"
+      ]
     }
   ]
 }
