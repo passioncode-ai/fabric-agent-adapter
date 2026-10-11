@@ -410,9 +410,34 @@ class LiveServiceTests(unittest.TestCase):
         self.assertEqual(code, 0)
         for rule in ("well-known.identity", "network.host-check", "events.requires-token", "events.page",
                      "usage.requires-token", "usage.report",
-                     "login.single-use", "lifecycle.instance-lock", "descriptor.port-claim"):
+                     "login.single-use", "login.session-lifetime", "lifecycle.instance-lock", "descriptor.port-claim"):
             self.assertEqual(results[rule]["verdict"], "PASS", rule)
         self.assertEqual(results["lifecycle.launchd"]["verdict"], "NOT_RUN")
+
+    def test_logout_ends_the_session_and_clears_the_cookie(self):
+        """DEC-0039: logout ends the session on the server; a browser write needs the custom header."""
+        import http.client
+        token = (self.data / "service.token").read_text().strip()
+        def request(method, path, headers=None):
+            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+            conn.request(method, path, headers={"Host": "127.0.0.1:%d" % self.port, **(headers or {})})
+            res = conn.getresponse()
+            res.read()
+            conn.close()
+            return res.status, res.getheader("Set-Cookie") or ""
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("POST", "/fabric/v1/login-code", headers={"Authorization": "Bearer " + token, "Host": "127.0.0.1:%d" % self.port})
+        url = json.loads(conn.getresponse().read())["url"]
+        conn.close()
+        status, set_cookie = request("GET", url)
+        self.assertEqual(status, 302)
+        cookie = {"Cookie": set_cookie.split(";", 1)[0]}
+        self.assertEqual(request("GET", "/", cookie)[0], 200)
+        self.assertEqual(request("POST", "/logout", cookie)[0], 403)  # no X-Fabric-Request
+        status, cleared = request("POST", "/logout", {**cookie, "X-Fabric-Request": "1"})
+        self.assertEqual(status, 204)
+        self.assertIn("Max-Age=0", cleared)
+        self.assertEqual(request("GET", "/", cookie)[0], 401)
 
     def test_mcp_without_the_2026_standard_headers_is_a_400(self):
         """The sample checks Mcp-Method/Mcp-Name as MCP 2026-07-28 requires; the probe sends them."""
@@ -626,3 +651,62 @@ class McpOwnAuthTests(unittest.TestCase):
     def test_an_accepted_host_token_fails(self):
         r = self.probe({"result": {"tools": []}})
         self.assertEqual(r["interop.mcp-own-auth"]["verdict"], "FAIL")
+
+
+class McpDelegationAuthTests(unittest.TestCase):
+    """DEC-0039 DL-16: auth delegation is handled like own — the descriptor token is not an MCP credential —
+    and the well-known document must then declare auth.delegation {issuer, jwks}."""
+
+    def probe(self, answer, auth="delegation", declared=True):
+        p = check.Probe.__new__(check.Probe)
+        p.results, p.d, p.token, p.events = [], {"id": "example-agent", "instance": "default"}, "tok", []
+        p.wk = {"surfaces": {"mcp": {"path": "/mcp", "transport": "streamable-http", "auth": auth}, "events": {"path": "/e"}}}
+        if declared:
+            p.wk["auth"] = {"delegation": {"issuer": "https://hub.example", "jwks": "https://hub.example/.well-known/jwks.json"}}
+        p.load_manifest = lambda: (None, None, "the descriptor names no fabricManifest")
+        calls = []
+        def call(method, params):
+            calls.append(method)
+            if isinstance(answer, Exception):
+                raise answer
+            return answer
+        p.mcp_call = call
+        p.interop_rules()
+        self.calls = calls
+        return {r["rule"]: r for r in p.results}
+
+    def test_delegation_is_checked_like_own(self):
+        r = self.probe(OSError("HTTP 401 from /mcp"))
+        self.assertEqual(r["interop.mcp-own-auth"]["verdict"], "PASS")
+        self.assertIn("DL-16", r["interop.mcp-own-auth"]["evidence"])
+        for rule in ("interop.tools-match", "interop.job-tools", "interop.trace-propagation"):
+            self.assertEqual(r[rule]["verdict"], "NOT_RUN")
+            self.assertIn("DL-16", r[rule]["evidence"])
+        self.assertEqual(self.calls, ["tools/list"])  # one refusal check, never a caller
+
+    def test_delegation_accepting_the_host_token_fails(self):
+        r = self.probe({"result": {"tools": []}})
+        self.assertEqual(r["interop.mcp-own-auth"]["verdict"], "FAIL")
+
+    def test_delegation_must_be_declared(self):
+        self.assertEqual(self.probe(OSError("HTTP 401"))["auth.delegation-declared"]["verdict"], "PASS")
+        self.assertEqual(self.probe(OSError("HTTP 401"), declared=False)["auth.delegation-declared"]["verdict"], "FAIL")
+        self.assertEqual(self.probe(OSError("HTTP 401"), auth="own", declared=False)["auth.delegation-declared"]["verdict"], "NOT_RUN")
+        p = check.Probe.__new__(check.Probe)
+        p.wk = {"auth": {"delegation": {"issuer": "https://hub.example"}}}
+        p.results = []
+        p.delegation_declared_rule(None)
+        self.assertEqual(p.results[0]["verdict"], "FAIL")
+
+
+class SessionLifetimeRuleTests(unittest.TestCase):
+    """DEC-0039: the cookie set at sign-in does not outlive 7 days."""
+
+    def test_max_age_and_expires(self):
+        self.assertIsNone(check.session_lifetime_problem("fabric_session=v; Path=/; HttpOnly; Max-Age=604800"))
+        self.assertIsNone(check.session_lifetime_problem("fabric_session=v; Path=/; HttpOnly"))
+        self.assertIn("2592000", check.session_lifetime_problem("fabric_session=v; HttpOnly; Max-Age=2592000"))
+        far = "Wed, 01 Jan 2098 00:00:00 GMT"
+        self.assertIsNotNone(check.session_lifetime_problem("fabric_session=v; Expires=%s; HttpOnly" % far))
+        self.assertIsNone(check.session_lifetime_problem("fabric_session=v; Expires=%s; Max-Age=3600" % far))
+        self.assertIsNotNone(check.session_lifetime_problem("fabric_session=v; Max-Age=soon"))

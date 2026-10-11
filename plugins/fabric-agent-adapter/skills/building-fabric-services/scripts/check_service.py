@@ -24,6 +24,7 @@ exist. They never call a capability.
 from __future__ import annotations
 
 import argparse
+import email.utils
 import errno
 import http.client
 import json
@@ -416,6 +417,12 @@ class Probe:
                      "the session cookie is __Host-, Secure, Path=/, no Domain" if host_bound else "cookie: %s" % cookie.split(";", 1)[0].split("=")[0])
         self.add("login.single-use", "PASS" if ok else "FAIL",
                  "first redeem HTTP %d (%s), second HTTP %d" % (status1, "cookie ok" if "HttpOnly" in cookie else "no HttpOnly cookie", status2))
+        if cookie:
+            problem = session_lifetime_problem(cookie)
+            self.add("login.session-lifetime", "FAIL" if problem else "PASS",
+                     problem or "the session cookie lives at most 7 days (DEC-0039); the server's own bounds are not observable from here")
+        else:
+            self.add("login.session-lifetime", "NOT_RUN", "no session cookie was set")
 
     # interop (fabric-interop/0.1) ----------------------------------------------------
     # #region probe-interop — docs: plugins/fabric-agent-adapter/skills/building-fabric-services/references/interop.md#what-the-probe-checks
@@ -479,21 +486,25 @@ class Probe:
             extra = sorted(set(listed) - names)
             self.add("interop.well-known-capabilities", "FAIL" if extra else "PASS",
                      ("listed but not in the manifest: " + ", ".join(extra)) if extra else "%d listed, all in the manifest" % len(listed))
-        own = bool(mcp_surface) and mcp_surface.get("auth") == "own"
+        auth = (mcp_surface or {}).get("auth")
+        # DEC-0024 own, and DEC-0039 DL-16 delegation: the descriptor's token is not an MCP credential.
+        own = bool(mcp_surface) and auth in ("own", "delegation")
+        why = "DL-16, DEC-0039" if auth == "delegation" else "DEC-0024"
+        self.delegation_declared_rule(mcp_surface)
         if own and self.token:
-            # DEC-0024: the MCP surface has credentials of its own and must refuse the host's token.
+            # The MCP surface has credentials of its own and must refuse the host's token.
             try:
                 self.mcp_call("tools/list", {})
-                self.add("interop.mcp-own-auth", "FAIL", "surfaces.mcp.auth is own, yet the MCP surface accepted the descriptor's token")
+                self.add("interop.mcp-own-auth", "FAIL", "surfaces.mcp.auth is %s, yet the MCP surface accepted the descriptor's token (%s)" % (auth, why))
             except OSError as exc:
                 refused = any(code in str(exc) for code in ("HTTP 401", "HTTP 403"))
                 self.add("interop.mcp-own-auth", "PASS" if refused else "NOT_RUN",
-                         ("the MCP surface refuses the host's token (%s), as auth: own says" % exc) if refused else str(exc))
+                         ("the MCP surface refuses the host's token (%s), as auth: %s says (%s)" % (exc, auth, why)) if refused else str(exc))
             except ValueError as exc:
                 self.add("interop.mcp-own-auth", "NOT_RUN", str(exc))
         if not mcp_surface or not self.token or own:
             reason = ("no MCP surface" if not mcp_surface
-                      else "surfaces.mcp.auth is own: the MCP surface takes its callers' credentials, not the host's token (DEC-0024)" if own
+                      else "surfaces.mcp.auth is %s: the MCP surface takes its callers' credentials, not the host's token (%s)" % (auth, why) if own
                       else "no readable token")
             for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
                 self.add(rule, "NOT_RUN", reason)
@@ -512,6 +523,22 @@ class Probe:
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
         self.events_trace_rule(self.events)
+
+    def delegation_declared_rule(self, mcp_surface: Optional[Dict[str, Any]]) -> None:
+        """DL-16 (DEC-0039): a service that accepts delegation tokens names the issuer it trusts and its JWKS
+        in auth.delegation; with surfaces.mcp.auth delegation that declaration is required."""
+        declared = ((self.wk or {}).get("auth") or {}).get("delegation")
+        required = bool(mcp_surface) and mcp_surface.get("auth") == "delegation"
+        if declared is None and not required:
+            self.add("auth.delegation-declared", "NOT_RUN", "the service declares no delegation")
+            return
+        if not isinstance(declared, dict):
+            self.add("auth.delegation-declared", "FAIL", "surfaces.mcp.auth is delegation, yet auth.delegation is missing (DL-16)")
+            return
+        missing = [k for k in ("issuer", "jwks") if not isinstance(declared.get(k), str) or not declared.get(k)]
+        self.add("auth.delegation-declared", "FAIL" if missing else "PASS",
+                 ("auth.delegation lacks %s (DL-16)" % ", ".join(missing)) if missing
+                 else "auth.delegation names its issuer and JWKS (DL-16)")
 
     def object_root_rule(self, tools: Dict[str, Any]) -> None:
         """FAC-SEM-023 (DEC-0018): every listed tool's outputSchema, when present, has root type object —
@@ -726,6 +753,30 @@ class Probe:
             self.interop_rules()
         self.lifecycle_rules()
         return self.results
+
+
+def session_lifetime_problem(set_cookie: str, now: Optional[float] = None) -> Optional[str]:
+    """DEC-0039: a session cookie set at sign-in lives at most 7 days. Max-Age wins over Expires (RFC 6265
+    §5.3); a cookie with neither ends with the browser session. None when it is within the bound."""
+    attrs = {}
+    for part in set_cookie.split(";")[1:]:
+        name, _, value = part.strip().partition("=")
+        attrs[name.strip().lower()] = value.strip()
+    bound = fs.OPERATOR_SESSION_MAX_SECONDS
+    if "max-age" in attrs:
+        if not re.fullmatch(r"-?\d+", attrs["max-age"]):
+            return "the session cookie's Max-Age %r is not a number" % attrs["max-age"]
+        if int(attrs["max-age"]) > bound:
+            return "the session cookie's Max-Age %s outlives 7 days (%d s, DEC-0039)" % (attrs["max-age"], bound)
+        return None
+    if "expires" in attrs:
+        try:
+            at = email.utils.parsedate_to_datetime(attrs["expires"]).timestamp()
+        except (TypeError, ValueError, IndexError, OverflowError):
+            return "the session cookie's Expires %r is not a date" % attrs["expires"]
+        if at - (time.time() if now is None else now) > bound:
+            return "the session cookie's Expires %s outlives 7 days (DEC-0039)" % attrs["expires"]
+    return None
 
 
 def _semver(text: str) -> Tuple[int, int, int]:

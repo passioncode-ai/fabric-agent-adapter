@@ -27,7 +27,9 @@ if (!origin || k.remoteOriginProblems(origin).length) { console.error(`origin: $
 if (token.length < 16) { console.error('the service token is missing or shorter than 16 characters'); process.exit(2); }
 
 const startedAt = k.nowIso();
-const codes = new k.LoginCodes(null, 120, { store: new k.MemoryCodeStore(), key });
+// DEC-0039: sessions end 12 h after last use, 7 days after sign-in, on logout and when the token rotates.
+// The memory store forgets them on a deploy; the host signs in again on the page's 401.
+const codes = new k.LoginCodes(null, 120, { store: new k.MemoryCodeStore(), key, token });
 const events = [k.makeEvent('1', startedAt, 'service.started', 'info', 'The example agent started.')];
 const tlsSelf = Boolean(args['tls-cert']);
 
@@ -64,6 +66,12 @@ function handler(req, res) {
     const session = codes.redeem(url.searchParams.get('code'));
     if (!session) return send(res, 403, 'This login link has expired or was used. Open the dashboard from Fabric again.', { 'Content-Type': 'text/plain; charset=utf-8' });
     return send(res, 302, null, { Location: '/', 'Set-Cookie': k.remoteSessionCookieHeader(session) });
+  }
+  if (req.method === 'POST' && url.pathname === '/logout') {
+    // A browser write: the custom header keeps another site's form from signing the operator out.
+    if (req.headers['x-fabric-request'] !== '1') return send(res, 403, 'Missing request header.', { 'Content-Type': 'text/plain; charset=utf-8' });
+    codes.logout(k.cookieValue(req.headers.cookie, k.REMOTE_SESSION_COOKIE));
+    return send(res, 204, null, { 'Set-Cookie': k.expiredSessionCookieHeader(true) });
   }
   if (req.method === 'GET' && url.pathname === '/') {
     if (!codes.sessionValid(k.cookieValue(req.headers.cookie, k.REMOTE_SESSION_COOKIE))) return send(res, 401, 'Sign in from Fabric Dashboards.', { 'Content-Type': 'text/plain; charset=utf-8' });
