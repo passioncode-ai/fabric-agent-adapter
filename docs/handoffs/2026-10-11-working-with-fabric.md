@@ -1,6 +1,6 @@
 # Handoff — FAA-18: `working-with-fabric` and the Claude Code session hooks (0.10.0)
 
-Date: 2026-10-11. Branch `agent/working-with-fabric-20261011` from `origin/main` `7e45e6b`. Entry point: the
+Date: 2026-10-11. Branch `agent/working-with-fabric-20261011` from `origin/main` `7e45e6b`; [PR #53](https://github.com/passioncode-ai/fabric-agent-adapter/pull/53). Entry point: the
 [spec](../evidence/specs/2026-10-11-working-with-fabric.md).
 
 ## Objective
