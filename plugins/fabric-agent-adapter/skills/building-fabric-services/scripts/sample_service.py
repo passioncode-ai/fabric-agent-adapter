@@ -29,10 +29,21 @@ import fabric_service as fs  # noqa: E402
 import fabric_interop as fi  # noqa: E402
 
 VERSION = "0.1.0"
+# The dashboard is built from the dashboard kit (fabric-dashboard/0.1, DEC-0036) and declares it
+# in the well-known document only when the kit is there to serve.
+KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
+KIT_FILES = {"/kit/fabric-dashboard.css": ("fabric-dashboard.css", "text/css; charset=utf-8"),
+             "/kit/fabric-dashboard.js": ("fabric-dashboard.js", "text/javascript; charset=utf-8")}
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{name}</title>
-<style>body{{font:15px system-ui;margin:2rem;color:#e9e4ec;background:#0a070d}}li{{margin:.3rem 0}}</style>
-</head><body><h1>{name}</h1><p>Status: {status}</p><ul>{rows}</ul></body></html>"""
+<link rel="stylesheet" href="/kit/fabric-dashboard.css"><script src="/kit/fabric-dashboard.js" defer></script>
+</head><body><div class="fd-chrome"><header class="fd-header"><p class="fd-title">{name}</p>
+<span class="fd-chip fd-s-ok"><span class="fd-dot"></span>Status: {status}</span></header>
+<nav class="fd-nav" aria-label="Sections"><ul class="fd-nav-list"><li><a href="#events" aria-current="page">Events</a></li>
+<li><a href="#about">About</a></li></ul></nav></div>
+<main class="fd-page"><section id="events"><h2>Events</h2><ul>{rows}</ul></section>
+<section id="about"><h2>About</h2><p class="fd-hint">A sample fabric-service/0.1 service built on the kit.</p></section></main>
+</body></html>"""
 
 
 def _schema(name: str, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -130,6 +141,7 @@ class Service:
             surfaces={"dashboard": {"path": "/", "login": True}, "events": {"path": "/fabric/v1/events"},
                       "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]},
                       "usage": {"path": fs.USAGE_PATH}},
+            extensions=fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else None,
         )
 
 
@@ -148,7 +160,7 @@ def make_handler(svc: Service):
             self.send_response(status)
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; frame-ancestors 'self'")
             if body is not None:
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(payload)))
@@ -203,6 +215,12 @@ def make_handler(svc: Service):
                 if not cookie:
                     return self._send(403, "This sign-in link was already used or has expired.", content_type="text/plain")
                 return self._send(302, None, {"Location": "/", "Set-Cookie": fs.session_cookie_header(cookie)})
+            if url.path in KIT_FILES:
+                name, kind = KIT_FILES[url.path]
+                try:
+                    return self._send(200, (KIT_DIR / name).read_text(encoding="utf-8"), content_type=kind)
+                except OSError:
+                    return self._send(404, {"error": "Not found."})
             if url.path == "/":
                 if not self._session_ok():
                     return self._send(401, "Open this dashboard from Fabric Dashboards.", content_type="text/plain")

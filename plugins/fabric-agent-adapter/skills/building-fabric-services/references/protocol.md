@@ -1,8 +1,8 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `52da526d7cc1e063d74c5b520dbc03d0ace15246`
+Pinned to `fabric-agent-contract` commit `a83bec6b47776af688402c18efec507143061f68`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
-DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035). The contract's schemas are normative;
+DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
@@ -54,6 +54,11 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   `operatorChannel.path` (DEC-0034) when the service has an operator channel — its status
   document follows the contract's `operator-channel-status.schema.json` and is token-protected
   like the events feed. The kits do not serve it yet.
+- `extensions` MAY carry the embedded dashboard declaration under
+  `https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1` (`fabric-dashboard/0.1`,
+  ED-9): `minWidth` 360…1280 (required), `appearance` ⊆ `scheme`, `theme`, `themes`, `kit`
+  (`name@semver`), nothing else. The kits build it with `dashboard_extension()` /
+  `dashboardExtension()`; see [the dashboard kit reference](dashboard-kit.md).
 
 ## Events page — `GET /fabric/v1/events?after=<cursor>&limit=<n>`
 

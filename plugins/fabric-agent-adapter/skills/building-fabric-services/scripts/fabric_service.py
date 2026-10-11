@@ -40,6 +40,11 @@ import urllib.request
 
 PROTOCOL = "fabric-service/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/service/0.1"
+# The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
+# document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
+DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.0.0"
+REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 EXIT_ALREADY_RUNNING = 75
 # Lifecycle contract (fabric-workspace knowledge/lifecycle.md). A launchd-supervised copy that finds
 # the lock held backs off in-process for this long before its exit 75 (LC-03, F8): under KeepAlive
@@ -701,11 +706,63 @@ def build_info(repo_root: Optional[Path] = None, package_file: Optional[Path] = 
     return info
 
 
+_THEME_ID = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+_KIT_REF = re.compile(r"^[a-z][a-z0-9-]{0,63}@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$")
+
+
+def dashboard_extension_problems(value: Any) -> List[str]:
+    """What makes value not a valid ED-9 declaration (service-dashboard-extension.schema.json)."""
+    if not isinstance(value, dict):
+        return ["the declaration is not an object"]
+    out: List[str] = []
+    extra = sorted(set(value) - {"minWidth", "appearance", "themes", "kit"})
+    if extra:
+        out.append("unknown field(s): %s" % ", ".join(extra))
+    width = value.get("minWidth")
+    if isinstance(width, bool) or not isinstance(width, int):
+        out.append("minWidth is required and must be a whole number of CSS pixels")
+    elif not 360 <= width <= 1280:
+        out.append("minWidth %d is outside 360…1280" % width)
+    if "appearance" in value:
+        a = value["appearance"]
+        if not isinstance(a, list) or len(a) > 2 or len(set(map(str, a))) != len(a) or any(x not in ("scheme", "theme") for x in a):
+            out.append("appearance is a list of distinct fields from scheme, theme")
+    if "themes" in value:
+        t = value["themes"]
+        if not isinstance(t, list) or not 1 <= len(t) <= 32 or len(set(map(str, t))) != len(t) \
+                or any(not isinstance(x, str) or not _THEME_ID.match(x) for x in t):
+            out.append("themes is 1…32 distinct theme ids matching ^[a-z][a-z0-9-]{0,31}$")
+    if "kit" in value and not (isinstance(value["kit"], str) and _KIT_REF.match(value["kit"])):
+        out.append("kit is name@semver, for example %s" % DASHBOARD_KIT)
+    return out
+
+
+def dashboard_extension(min_width: int = 360, appearance: Sequence[str] = ("scheme", "theme"),
+                        themes: Optional[Sequence[str]] = REFERENCE_THEMES,
+                        kit: Optional[str] = DASHBOARD_KIT) -> Dict[str, Any]:
+    """The `extensions` entry a dashboard built from the kit declares (DEC-0036 ED-9). Declare it only
+    when the page meets ED-1…ED-6 — check_dashboard_layout.mjs measures that."""
+    value: Dict[str, Any] = {"minWidth": min_width}
+    if appearance:
+        value["appearance"] = list(appearance)
+    if themes:
+        value["themes"] = list(themes)
+    if kit:
+        value["kit"] = kit
+    problems = dashboard_extension_problems(value)
+    if problems:
+        raise ServiceError("Dashboard declaration: %s." % "; ".join(problems))
+    return {DASHBOARD_EXTENSION_KEY: value}
+
+
 def build_well_known(*, service_id: str, instance: str, name: str, version: str, build: Dict[str, Any],
                      started_at: str, status: str, degraded: Sequence[Dict[str, str]],
                      surfaces: Dict[str, Any], summary: Optional[Sequence[Dict[str, Any]]] = None,
-                     update_available: Optional[str] = None, pid: Optional[int] = None) -> Dict[str, Any]:
-    """The unauthenticated identity answer. `degraded` is always present; ready means empty."""
+                     update_available: Optional[str] = None, pid: Optional[int] = None,
+                     extensions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The unauthenticated identity answer. `degraded` is always present; ready means empty.
+    `extensions` is kept as given (a reader ignores keys it does not know); a dashboard declaration
+    in it must be valid (dashboard_extension builds one)."""
     if status not in STATUSES:
         raise ServiceError("status must be one of %s." % ", ".join(STATUSES))
     degraded = list(degraded)
@@ -724,6 +781,12 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
     }
     if summary:
         doc["summary"] = list(summary)[:6]
+    if extensions:
+        if DASHBOARD_EXTENSION_KEY in extensions:
+            problems = dashboard_extension_problems(extensions[DASHBOARD_EXTENSION_KEY])
+            if problems:
+                raise ServiceError("Dashboard declaration: %s." % "; ".join(problems))
+        doc["extensions"] = dict(extensions)
     return doc
 
 

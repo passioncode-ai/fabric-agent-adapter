@@ -366,6 +366,31 @@ class Probe:
         self.add("usage.report", "FAIL" if problems else "PASS",
                  "; ".join(problems[:5]) if problems else "%d day(s), unknown cost kept null" % len(days or []))
 
+    # dashboard (fabric-dashboard/0.1, DEC-0036) --------------------------------
+    def dashboard_rules(self) -> None:
+        wk = self.wk or {}
+        if not (wk.get("surfaces") or {}).get("dashboard"):
+            self.add("dashboard.declared", "NOT_RUN", "no surfaces.dashboard: nothing to declare")
+            return
+        extensions = wk.get("extensions") if isinstance(wk.get("extensions"), dict) else {}
+        if fs.DASHBOARD_EXTENSION_KEY not in extensions:
+            self.add("dashboard.declared", "NOT_RUN", "a legacy dashboard: no extensions dashboard/0.1 declaration (ED-9 SHOULD); "
+                     "a host still gives it 480 px (ED-7). Build it from the dashboard kit and declare it")
+            return
+        value = extensions[fs.DASHBOARD_EXTENSION_KEY]
+        problems = fs.dashboard_extension_problems(value)
+        if problems:
+            self.add("dashboard.declared", "FAIL", "; ".join(problems))
+            return
+        note = "minWidth %d, host floor %d" % (value["minWidth"], max(480, value["minWidth"]))
+        if value.get("kit"):
+            note += ", " + value["kit"]
+            name, _, version = str(value["kit"]).partition("@")
+            current = fs.DASHBOARD_KIT.partition("@")[2]
+            if name == fs.DASHBOARD_KIT.partition("@")[0] and _semver(version) < _semver(current):
+                note += " (kit %s is current: dashboard_kit.py status)" % current
+        self.add("dashboard.declared", "PASS", note + "; the page itself: check_dashboard_layout.mjs")
+
     def login_rules(self) -> None:
         dashboard = ((self.wk or {}).get("surfaces") or {}).get("dashboard")
         if not dashboard or not dashboard.get("login"):
@@ -696,10 +721,16 @@ class Probe:
             self.network_rules()
             self.auth_rules()
             self.usage_rules()
+            self.dashboard_rules()
             self.login_rules()
             self.interop_rules()
         self.lifecycle_rules()
         return self.results
+
+
+def _semver(text: str) -> Tuple[int, int, int]:
+    m = re.match(r"^(\d+)\.(\d+)\.(\d+)", text or "")
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (0, 0, 0)
 
 
 def usage_problems(report: Any, service_id: str, instance: str) -> List[str]:

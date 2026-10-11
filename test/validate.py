@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.8.3"
+VERSION = "0.9.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -395,11 +395,12 @@ def validate_skill(name: str, errors: List[str]) -> None:
 PIN_FILE = ROOT / "fabric-contract.lock.json"
 PIN_EXCLUDED = ("docs/evidence", "docs/handoffs", "test", "CHANGELOG.md", "fabric-contract.lock.json", "node_modules", ".agent-sync")
 PIN_MENTION = re.compile(r"fabric[- ]agent[- ]contract|contract[-_ ]?(pin|commit|revision)|CONTRACT_COMMIT", re.IGNORECASE)
+PIN_HANDOFF_LINK = re.compile(r"\]\((?:\.\./)*(?:docs/)?handoffs/[^)\s]*\)")
 PIN_HEX = re.compile(r"(?<![0-9a-zA-Z:])[0-9a-f]{7,40}(?![0-9a-zA-Z])")
 PIN_ADAPTER = "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_project.py"
-PIN_DEFAULT_COMMIT = "52da526d7cc1e063d74c5b520dbc03d0ace15246"
-PIN_PREVIOUS_COMMITS = ("78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5", "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
-PIN_SUPPORTED_DECLARATION = 'SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5", "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")'
+PIN_DEFAULT_COMMIT = "a83bec6b47776af688402c18efec507143061f68"
+PIN_PREVIOUS_COMMITS = ("52da526d7cc1e063d74c5b520dbc03d0ace15246", "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5", "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
+PIN_SUPPORTED_DECLARATION = 'SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "52da526d7cc1e063d74c5b520dbc03d0ace15246", "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5", "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")'
 
 
 def contract_pin_drift(root: Path, commit: str) -> List[str]:
@@ -414,6 +415,9 @@ def contract_pin_drift(root: Path, commit: str) -> List[str]:
         for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             if rel == PIN_ADAPTER and line == PIN_SUPPORTED_DECLARATION:
                 continue
+            # A link to a dated handoff names a historical file (docs/handoffs is itself excluded),
+            # not the pin: its target is not scanned.
+            line = PIN_HANDOFF_LINK.sub("]()", line)
             if re.match(r"^#{1,6}\s", line):
                 section = bool(PIN_MENTION.search(line))
             other_repo = "github.com/" in line and "fabric-agent-contract" not in line
@@ -476,7 +480,7 @@ def validate_contract_pin(errors: List[str], root: Path = ROOT) -> None:
         if not isinstance(value, ast.Constant) or not isinstance(value.value, str) or value.value != expected:
             errors.append("contract pin: adapt_project.py %s must be an exact string literal equal to %s" % (constant, expected))
     supported = declarations.get("SUPPORTED_CONTRACT_COMMITS")
-    # The reviewed immutable earlier revisions: DEC-0033, DEC-0031, DEC-0024, DEC-0021, DEC-0020 and DEC-0019.
+    # The reviewed immutable earlier revisions: DEC-0035, DEC-0033, DEC-0031, DEC-0024, DEC-0021, DEC-0020 and DEC-0019.
     if not (isinstance(supported, ast.Tuple) and len(supported.elts) == 1 + len(PIN_PREVIOUS_COMMITS)
             and isinstance(supported.elts[0], ast.Name) and supported.elts[0].id == "CONTRACT_COMMIT"
             and all(isinstance(e, ast.Constant) and e.value == v for e, v in zip(supported.elts[1:], PIN_PREVIOUS_COMMITS))):

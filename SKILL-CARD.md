@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.8.3` |
+| Version | `0.9.0` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `52da526d7cc1e063d74c5b520dbc03d0ace15246` |
+| Contract | Fabric Agent Contract `0.1.0` at `a83bec6b47776af688402c18efec507143061f68` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
 | Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base |
 | Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`) |
@@ -24,9 +24,9 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.8.3` |
+| Version | `0.9.0` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `52da526d7cc1e063d74c5b520dbc03d0ace15246` |
+| Contract | Fabric Agent Contract `0.1.0` at `a83bec6b47776af688402c18efec507143061f68` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
 | Inputs | capability, named consumer, workflow-or-agent decision, profile, effect and tenancy declarations, knowledge sources |
 | Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton, provider bundle via the sibling scaffolder, conformance report with the canary expectation |
@@ -46,14 +46,14 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.8.3` |
+| Version | `0.9.0` |
 | Plugin | `fabric-agent-adapter` |
-| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `52da526d7cc1e063d74c5b520dbc03d0ace15246`; the remote placement (DEC-0019) |
+| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `a83bec6b47776af688402c18efec507143061f68`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
-| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, probe report |
+| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, a dashboard built from the dashboard kit with its ED-9 declaration, probe and layout-probe reports |
 | Mutations | the target service's files; the plist in `~/Library/LaunchAgents`; one descriptor in the services directory |
-| Network | loopback only; the probe talks to `127.0.0.1:<port>`, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id |
+| Network | loopback only; the probe talks to `127.0.0.1:<port>`, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; the layout probe opens the dashboard in a local headless browser with a one-time login code |
 | Secrets | the service token is created 0600 and read, never printed |
 
 Triggers include making an agent a local service, an always-on dashboard, where an agent

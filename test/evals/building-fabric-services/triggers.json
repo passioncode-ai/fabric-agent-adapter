@@ -112,6 +112,14 @@
     {
       "query": "Пусть агент сам отдаёт свои расходы на модели по протоколу, чтобы дашборд их показал.",
       "shouldTrigger": true
+    },
+    {
+      "query": "Our agent's dashboard loses its tabs when Fabric Dashboards puts the console beside it; make it work in a narrow pane.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Дашборд агента ломается в узкой панели Fabric Dashboards рядом с консолью — поправь вёрстку и подключи темы.",
+      "shouldTrigger": true
     }
   ]
 }

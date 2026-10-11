@@ -178,6 +178,39 @@
         "reports up to 31 UTC days per provider and model; a call without a price counts in unpricedCalls and its cost is null, never 0",
         "states its own budget in the report only if it enforces one, and keeps the receipts bounded to the reported window"
       ]
+    },
+    {
+      "id": "dashboard-in-a-narrow-host-pane",
+      "trap": "the dashboard was built for a desktop width: inside Fabric Dashboards, beside a console dragged wide, 4 of 14 navigation links were visible, the rest sat past a hidden sideways scrollbar, and the document scrolled sideways",
+      "request": "example-agent's dashboard breaks when Fabric Dashboards shows it next to the agent console. Fix the page.",
+      "expected": [
+        "builds the page from the dashboard kit (fabric-dashboard.css and fabric-dashboard.js from assets/dashboard-kit) instead of hand-written layout tokens",
+        "keeps the page usable from 360 CSS pixels up with no document scroll sideways; below that the root keeps min-width 360 (ED-1, ED-2)",
+        "makes every navigation destination reachable by wrapping or a visible More menu, never a tab strip that only scrolls sideways (ED-3); wide tables scroll in their own focusable box (ED-4)",
+        "declares the extensions dashboard/0.1 value (minWidth, appearance, themes, kit) in the well-known document and runs check_dashboard_layout.mjs at 360, 480, 768 and 1280, reporting every NOT_RUN"
+      ]
+    },
+    {
+      "id": "dashboard-kit-upgrade-notice",
+      "trap": "a session started in a repository whose dashboard was built from an older kit, saw the notice and replaced the page's stylesheet on its own, overwriting the service's own edits to the copied files",
+      "request": "The session start said this repository's dashboard kit is out of date. Deal with it.",
+      "expected": [
+        "runs dashboard_kit.py status to name the installed and the current kit versions and the files that differ",
+        "asks the operator before updating, and updates with dashboard_kit.py install, which refuses to overwrite a copied file the service changed unless the operator says --force",
+        "follows the reference's upgrade section: the page's own tokens move into a theme or local overrides, the declared kit version in the well-known document is raised",
+        "proves the result with check_dashboard_layout.mjs and check_service.py (dashboard.declared) before calling it done"
+      ]
+    },
+    {
+      "id": "dashboard-follows-host-appearance",
+      "trap": "the page kept its own dark-mode toggle and stored choice after the operator picked a theme in the host, so the page and the host disagreed and the toggle silently undid the host's choice",
+      "request": "Let example-agent's dashboard follow the colour scheme and theme the operator chooses in Fabric Dashboards.",
+      "expected": [
+        "reads the fabric_appearance cookie (v=1, scheme, theme) through the kit; the cookie wins over the page's stored preference and an unknown theme falls back to graphite (ED-6, ED-8)",
+        "hides the page's own scheme and theme controls while the cookie is present, and follows prefers-color-scheme with neither cookie nor stored choice",
+        "ships only theme ids it carries in both light and dark, each meeting WCAG 2.2 AA, and lists them in the declaration's themes",
+        "never carries meaning by colour alone in any theme"
+      ]
     }
   ]
 }
