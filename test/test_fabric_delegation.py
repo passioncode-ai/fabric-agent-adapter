@@ -48,6 +48,9 @@ class Ed25519Tests(unittest.TestCase):
         self.assertFalse(dl.ed25519_verify(pub[:31], msg, sig))
         self.assertFalse(dl.ed25519_verify(pub, msg, sig[:63]))
         self.assertFalse(dl.ed25519_verify(b"\xff" * 32, msg, sig))  # y >= p is not a canonical point
+        # The identity point (0, 1) decodes; the same point written as y = p + 1 is not canonical and is refused.
+        self.assertIsNotNone(dl._decode_point((1).to_bytes(32, "little")))
+        self.assertIsNone(dl._decode_point((2 ** 255 - 19 + 1).to_bytes(32, "little")))
 
 
 class VerifierVectorTests(unittest.TestCase):

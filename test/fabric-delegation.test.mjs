@@ -1,0 +1,88 @@
+// The Node kit's delegation verifier (DEC-0039) against the shared vectors, whose expected answers come from the
+// contract's own verifier at the pin (test/fixtures/delegation/make_vectors.mjs).
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import * as d from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const V = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/delegation/vectors.json'), 'utf8'));
+const answer = (r) => (r.ok
+  ? Object.fromEntries(['ok', 'principal', 'caller', 'chain', 'kid', 'approver', 'method'].filter((k) => k in r).map((k) => [k, r[k]]))
+  : { ok: false, code: r.code, detail: r.detail, ...(r.data ? { data: r.data } : {}) });
+
+test('every delegation case answers as the contract does', () => {
+  assert.ok(V.delegation.length >= 60);
+  for (const c of V.delegation) assert.deepEqual(answer(d.verifyDelegation(c.token, c.options)), c.expected, c.name);
+});
+
+test('every approval case answers as the contract does', () => {
+  for (const c of V.approvals) {
+    const store = d.createMemoryJtiStore();
+    c.steps.forEach((step, i) => {
+      const options = { ...step.options, jtiStore: step.options.jtiStore === 'none' ? undefined : store };
+      assert.deepEqual(answer(d.verifyApproval(step.approval ?? undefined, options)), step.expected, `${c.name} #${i}`);
+    });
+  }
+});
+
+test('headers, canonical JSON and digests', () => {
+  for (const c of V.headers) assert.deepEqual(d.readDelegationToken(c.headers) ?? null, c.expected, JSON.stringify(c.headers));
+  assert.equal(d.readDelegationToken({ authorization: [`Bearer ${V.headers[0].headers['fabric-delegation']}`] }).via, 'authorization');
+  for (const c of V.jcs) assert.equal(d.jcs(JSON.parse(c.input)), c.expected);
+  for (const c of V.digests) assert.equal(d.actionDigest(JSON.parse(c.input)), c.expected);
+  for (const bad of [NaN, Infinity, '\ud800', new Date(0), new Map(), undefined, () => 1]) assert.throws(() => d.jcs(bad), TypeError);
+});
+
+test('jti stores: memory prunes, the file store survives a restart, the store is required', () => {
+  const mem = d.createMemoryJtiStore();
+  assert.equal(mem.consume('a', 100, 50), true);
+  assert.equal(mem.consume('a', 100, 60), false);
+  assert.equal(mem.consume('a', 300, 100 + d.LEEWAY_SECONDS + 1), true);
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jti-')), 'jti.json');
+  assert.equal(new d.FileJtiStore(file).consume('a', 1000, 10), true);
+  assert.equal(new d.FileJtiStore(file).consume('a', 1000, 20), false);
+  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  const step = V.approvals[0].steps[0];
+  assert.equal(d.verifyApproval(step.approval, { ...step.options, jtiStore: undefined }).code, 'unknown-state');
+  assert.equal(d.verifyApproval(step.approval, { ...step.options, jtiStore: d.UNSAFE_NO_JTI_STORE }).ok, true);
+});
+
+test('JwksCache follows DL-15: ten minutes, an unknown kid re-read at most once a minute, unreadable after that', async () => {
+  const now = [1000];
+  const calls = [];
+  let reply = V.jwks;
+  const cache = new d.JwksCache('https://hub.example/.well-known/jwks.json', { fetch: async () => { calls.push(now[0]); if (reply instanceof Error) throw reply; return reply; }, clock: () => now[0] });
+  assert.deepEqual(await cache.get('estate-new'), V.jwks);
+  await cache.get('estate-next'); assert.equal(calls.length, 2, 'an unknown kid re-reads');
+  now[0] += 30; await cache.get('estate-next'); assert.equal(calls.length, 2, 'not twice a minute');
+  now[0] += 31; await cache.get('estate-next'); assert.equal(calls.length, 3);
+  now[0] += 599; await cache.get('estate-new'); assert.equal(calls.length, 3);
+  now[0] += 2; reply = new Error('down'); assert.equal(await cache.get('estate-new'), null, 'older than ten minutes and unreadable');
+  for (const bad of ['http://hub.example/jwks.json', 'ftp://x/j', 'https://u:p@hub.example/j', '']) assert.throws(() => new d.JwksCache(bad), /key set/);
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jwks-')), 'jwks.json');
+  fs.writeFileSync(file, JSON.stringify(V.jwks));
+  assert.deepEqual(await new d.JwksCache(file).get('estate-new'), V.jwks);
+});
+
+test('the gate refuses in the DL-19 shape and never echoes the token', async () => {
+  const c = V.delegation[0];
+  const gate = d.delegationGate({ audience: c.options.audience, jwks: V.jwks, effects: { 'writer.write': 'draft', 'writer.publish': 'publish' }, issuer: 'urn:fabric:estate:example', clock: () => c.options.now });
+  const ok = await gate('writer.write', { Authorization: `Bearer ${c.token}` });
+  assert.equal(ok.ok, true); assert.equal(ok.caller, 'example-media');
+  assert.deepEqual([(await gate('writer.write', {})).detail, (await gate('writer.other', { Authorization: `Bearer ${c.token}` })).detail], ['no-token', 'no-declared-effect']);
+  assert.equal((await gate('writer.publish', { 'Fabric-Delegation': c.token })).code, 'scope-not-granted');
+  const refusal = await gate('writer.write', {});
+  const result = d.refusalToolResult(refusal);
+  assert.equal(result.isError, true);
+  assert.deepEqual(result.structuredContent.error.data, { detail: 'no-token' });
+  assert.ok(result.structuredContent.error.message);
+  const http = d.refusalHttp(refusal);
+  assert.equal(http.status, 401);
+  assert.equal(http.headers['WWW-Authenticate'], 'Bearer error="invalid_token"');
+  for (const code of V.constants.refusalCodes) assert.ok([401, 403, 503].includes(d.refusalHttp({ ok: false, code, detail: 'x' }).status));
+  assert.ok(!JSON.stringify(result).includes(c.token));
+});
