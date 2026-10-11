@@ -57,6 +57,7 @@ STDLIB_IMPORTS = {
     "random", "io", "contextlib", "textwrap", "traceback",
     "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
     "email",  # email.utils: the probe reads a cookie's Expires date (DEC-0039)
+    "ipaddress", "math",  # the delegation verifier: a loopback key-set URL, Ed25519 and claim checks (DEC-0039)
 }
 
 

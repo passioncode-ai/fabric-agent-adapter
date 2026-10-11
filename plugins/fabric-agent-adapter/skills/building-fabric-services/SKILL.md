@@ -80,7 +80,10 @@ each manifest capability is the tool of its name, long work is a job with a stab
 a question for a person is an elicitation, and every call carries one trace. Read
 [the interop reference](references/interop.md) before writing an MCP tool; the helpers
 are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
-[`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs).
+[`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs). When the callers are agents of the estate, the
+service checks each call's delegation token (DEC-0039): read [the delegation reference](references/delegation.md);
+the verifier is [`scripts/fabric_delegation.py`](scripts/fabric_delegation.py) /
+[`scripts/fabric-delegation.mjs`](scripts/fabric-delegation.mjs).
 
 ## Step 2 — the non-negotiables
 

@@ -72,7 +72,7 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   the MCP surface takes only the estate's delegation tokens, and the top-level
   `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's
   token is not an MCP credential: a host and the probe never call `/mcp` with it as a caller.
-  The kits do not verify delegation tokens yet (a later FAA-20 release).
+  The kits verify them with `fabric_delegation` / `fabric-delegation.mjs` ([delegation](delegation.md)).
 
 ## Events page — `GET /fabric/v1/events?after=<cursor>&limit=<n>`
 
