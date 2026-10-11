@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.12.0 - 2026-10-12
+
+The contract pin moves to Fabric Agent Contract `main` `2eb91c0` (the merge of contract PR #45: DEC-0041…DEC-0045).
+Bundles issued under the DEC-0039, DEC-0036, DEC-0035, DEC-0033, DEC-0031, DEC-0024, DEC-0021, DEC-0020 and DEC-0019
+revisions stay valid (FAA-24).
+
+### Changed
+
+- **Default contract pin `8e49fbd` → `2eb91c00e852d9c31d804310d38fad91589fcbac`.** `8e49fbd` (DEC-0039) joins
+  `SUPPORTED_CONTRACT_COMMITS`. The schemas between add only:
+  - `session-handoff/1` (DEC-0042);
+  - `degraded[].setup` on the well-known document and `run.mcp.stdio.scope` on the manifest and the provider entry
+    (DEC-0044);
+  - a tighter delegation token (DEC-0045).
+
+  The provider manifest and the MCP, A2A and local-runner profiles stay valid as written. The compiled-schema arms at
+  `2ce3922` and `2eb91c0` agree.
+- **The delegation verifiers follow DEC-0045** in both kits:
+  - The trusted `issuer` is required. Without it the answer is `issuer-unavailable` / `no-trusted-issuer`.
+  - Every published-key problem except an unknown `kid` is the issuer's, including `key-not-for-signing`. A
+    small-order key is refused as `issuer-unavailable` / `small-order-key` before any verification; 0.11.1 answered
+    `bad-signature`.
+  - DL-2's types are checked strictly: URIs, `AGENT_ID` actors, session and task ids, the `scope` and `jti`
+    grammar, exactly one grant, effects named once, the `spend` shape, and `nbf` checked with the types.
+    `approval.method: device` is removed.
+  - A signed token with no `act` is refused as `malformed-chain`. The contract's own verifier throws on it, and the
+    contract was told.
+- **Breaking for a caller of the gate:** `delegation_gate` / `delegationGate` require `issuer`, and
+  `verify_delegation` / `verify_approval` take it as a required argument.
+
+### Added
+
+- **Trust tiers (DL-25, DL-26):** `gate(tool, headers, tier="T2")` and `McpToolServer.handle(..., tier=)`. A T0 or T1
+  caller is never required to present a token; a present one is verified at every tier.
+- **`refusal_from_denial` / `refusalFromDenial`:** the callee's answer after the meter denies a grant check (DL-21
+  step 6).
+- **The contract's canonical vectors** (DEC-0043) run against both `jcs` ports from `test/fixtures/contract/canonical.json`.
+- **`fabric_provider.py` accepts `run.mcp.stdio.scope`** (`project` or `on-demand`) and refuses `session`
+  (FAC-SEM-056, LC-19). The writer does not set it until Fabric reads it.
+- `degraded[].setup` (DEC-0044) is documented in `references/protocol.md`. The kits pass entries through unchanged.
+- Scenario evals came first: `local-caller-needs-no-token` and `stdio-provider-scope`.
+
 ## 0.11.1 - 2026-10-12
 
 0.11.0 plus one fix. The `v0.11.0` tag was refused by the release's own validation and never published: on Node 22,
