@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.11.0 - 2026-10-12
+
+Contract DEC-0039, second part (FAA-20): a service built with the kit checks a delegation token and an operator's
+approval offline, in Python and in Node, with the same answers as the contract's own verifier at the pin
+(`8e49fbd`, unchanged).
+
+### Added
+
+- **`scripts/fabric_delegation.py` and `scripts/fabric-delegation.mjs`**: `verify_delegation` / `verifyDelegation`
+  (the eleven DL-13 checks in their order), `verify_approval` / `verifyApproval` (DL-18, the jti consumed last),
+  `read_delegation_token` / `readDelegationToken` (`Fabric-Delegation` first, then a delegation-typ Bearer),
+  `jcs` and `action_digest` / `actionDigest` (RFC 8785), the jti stores (`MemoryJtiStore` / `createMemoryJtiStore`,
+  `FileJtiStore`, `UNSAFE_NO_JTI_STORE`), `JwksCache` (DL-15: at most 10 minutes, an unknown `kid` re-read at most
+  once a minute, 10 s between failed reads, no redirects), `delegation_gate` / `delegationGate`, and the DL-19
+  refusal shapes `refusal_tool_result` / `refusalToolResult` and `refusal_http` / `refusalHttp`.
+- **The Python kit verifies Ed25519 itself** (standard library only): RFC 8032, cofactorless, and as strict as
+  OpenSSL. `S` must be below the group order, points must be canonical, and small-order keys are refused.
+- **`McpToolServer(authorize=)`**: the gate runs before every tool; `ctx.delegation` carries the principal, caller
+  and chain. A job records who started it, and `fabric.job.get` / `fabric.job.cancel` answer only that principal
+  and caller, with a token that still covers the job's capability.
+- **Shared vectors** `test/fixtures/delegation/vectors.json` (66 delegation, 15 approval, 8 header, 5 JCS, 2 digest
+  and 330 Ed25519 cases), produced by `make_vectors.mjs`. Every expected answer comes from the contract's verifier
+  or from OpenSSL. Both kits' tests run over them.
+- `references/delegation.md`; `surfaces-and-auth.md` and `protocol.md` no longer say the kits do not verify. Scenario
+  evals `mcp-auth-delegation` (updated) and `approval-before-an-external-effect` came first.
+
+### Security
+
+- An independent review of the port found, before release:
+  - The Python Ed25519 verifier accepted forged signatures under a small-order key.
+  - A nested token with a duplicate member crashed the gate on Python 3.9–3.11.
+  - An unreadable jti file allowed approvals to be replayed.
+  - The key-set fetch followed redirects.
+  - The job tools were ungated.
+
+  All are fixed, and each has a test that failed first. The small-order forgery is now in the shared vectors.
+
 ## 0.10.0 - 2026-10-11
 
 Contract DEC-0039, first part (FAA-20, issue #52): the operator's dashboard session now lives no longer than

@@ -15,8 +15,8 @@
 - **Delegation (DEC-0039, DL-16).** `surfaces.mcp.auth: "delegation"` means `/mcp` takes only
   the estate's delegation tokens; declare `auth.delegation {issuer, jwks}` in the well-known
   document. The probe treats it like `own` and checks the declaration
-  (`auth.delegation-declared`). The kits do not verify the tokens yet; until they do, name what
-  checks them.
+  (`auth.delegation-declared`). The kits verify the tokens: put `delegation_gate` /
+  `delegationGate` in front of the tools — see [the delegation reference](delegation.md).
 - Register it into a client config with the service's own command
   (`<tool> mcp-register`), which writes `{"type":"http","url":"http://127.0.0.1:<port>/mcp","headers":{...}}`
   atomically, aborts if the file changed meanwhile, and keeps one 0600 backup. The token

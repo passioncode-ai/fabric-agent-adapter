@@ -231,7 +231,18 @@
       "expected": [
         "declares surfaces.mcp.auth: \"delegation\" together with auth.delegation {issuer, jwks} in the well-known document (DL-16)",
         "treats the descriptor token as no MCP credential: the probe checks that the surface refuses it and leaves the caller rules NOT_RUN, as with own",
-        "keeps verifying the delegation tokens themselves out of this step: the kit verifier is a later FAA-20 increment, so the service names what checks the token until then"
+        "verifies every call with the kit's gate (fabric_delegation.delegation_gate / delegationGate) over a JwksCache of auth.delegation.jwks, with each tool's declared effect, and answers a refusal in the DL-19 shape; never accepts the descriptor token as a caller"
+      ]
+    },
+    {
+      "id": "approval-before-an-external-effect",
+      "trap": "the service took an action that publishes on the strength of a delegation token alone, and accepted the same approval twice because it kept consumed ids in memory across a restart",
+      "request": "example-agent's publish tool must only run with the operator's approval when another agent calls it.",
+      "expected": [
+        "checks the delegation token first, then the grant where there is one, then verify_approval / verifyApproval, which consumes the approval's jti last, then acts (DL-18)",
+        "computes the action digest with action_digest / actionDigest over the exact action it is about to take, and answers approval-required with that digest when no approval came",
+        "keeps consumed approval ids in FileJtiStore (or another store that survives a restart), never UNSAFE_NO_JTI_STORE unless replay is acceptable and said so",
+        "never logs or echoes the token or the approval"
       ]
     }
   ]
