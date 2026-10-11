@@ -126,10 +126,27 @@ function keyFor(jwks, kid) {
   if ((jwk.use !== undefined && jwk.use !== 'sig') || (jwk.alg !== undefined && jwk.alg !== 'EdDSA')) return { problem: 'key-not-for-signing' };
   if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || !isString(jwk.x) || jwk.d !== undefined) return { problem: 'unusable-key' };
   try {
-    return { key: crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, format: 'jwk' }) };
+    return { key: crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, format: 'jwk' }), raw: Buffer.from(jwk.x, 'base64url') };
   } catch {
     return { problem: 'unusable-key' };
   }
+}
+
+// The small-order points of edwards25519 and their non-canonical encodings, compared with the sign bit cleared
+// (libsodium's has_small_order list). Under such a key, R = [S]B verifies for a quarter or more of all messages, and
+// Node before 26 lets OpenSSL accept it: the kit refuses these keys itself rather than trust the runtime.
+const SMALL_ORDER = [
+  '0000000000000000000000000000000000000000000000000000000000000000', '0100000000000000000000000000000000000000000000000000000000000000',
+  '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05', 'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
+  'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f', 'edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+  'eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+];
+/** Whether a 32-byte Ed25519 public key is a point of small order (in any encoding). */
+export function isSmallOrderKey(key) {
+  if (!Buffer.isBuffer(key) || key.length !== 32) return false;
+  const cleared = Buffer.from(key);
+  cleared[31] &= 0x7f;
+  return SMALL_ORDER.includes(cleared.toString('hex'));
 }
 
 const hasKeys = (jwks) => isObject(jwks) && Array.isArray(jwks.keys) && jwks.keys.length > 0;
@@ -143,7 +160,7 @@ function authentic(token, jwks, typ) {
   const kid = compact.header.kid;
   const found = keyFor(jwks, kid);
   if ('problem' in found) return found.problem === 'unusable-key' || found.problem === 'duplicate-kid' ? { problem: found.problem, issuer: true } : { problem: found.problem };
-  if (compact.signature.length !== 64 || !crypto.verify(null, compact.signingInput, found.key, compact.signature)) return { problem: 'bad-signature' };
+  if (compact.signature.length !== 64 || isSmallOrderKey(found.raw) || !crypto.verify(null, compact.signingInput, found.key, compact.signature)) return { problem: 'bad-signature' };
   return { compact, kid };
 }
 

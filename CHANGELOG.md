@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.11.0 - 2026-10-12
+## 0.11.1 - 2026-10-12
+
+0.11.0 plus one fix. The `v0.11.0` tag was refused by the release's own validation and never published: on Node 22,
+the CI version, the Node kit accepted a forged delegation token signed "under" a small-order key. Node 26's
+`crypto.verify` refuses such keys, but Node 20 and 22 accept them with the same OpenSSL.
+
+### Security
+
+- **The Node kit refuses small-order Ed25519 keys itself** (`isSmallOrderKey`: libsodium's list, including the
+  non-canonical encodings, compared with the sign bit cleared), so `verifyDelegation` and `verifyApproval` no longer
+  depend on the Node version. Checked on Node 20, 22 and 26. The contract's own verifier uses `crypto.verify` the
+  same way and has the same exposure on Node before 26; the contract repository was told.
+
+## 0.11.0 - 2026-10-12 (tagged, never published; see 0.11.1)
 
 Contract DEC-0039, second part (FAA-20): a service built with the kit checks a delegation token and an operator's
 approval offline, in Python and in Node, with the same answers as the contract's own verifier at the pin
