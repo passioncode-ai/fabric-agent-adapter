@@ -84,7 +84,8 @@ class Service:
         self.log = fs.JsonlEventLog(self.data / "events.jsonl")
         self.usage = fs.JsonlUsageLedger(self.data / "usage.jsonl")  # DEC-0021
         self.usage.prune()
-        self.codes = fs.LoginCodes(self.data / "auth")
+        # DEC-0039: the token= revision ends sessions begun under a token that has since rotated.
+        self.codes = fs.LoginCodes(self.data / "auth", token=self.token)
         self.jobs = fi.JobStore(self.data / "jobs")
         self.mcp = fi.McpToolServer(self.id, VERSION, jobs=self.jobs, on_job_started=self.draft_started, on_input=self.draft_answered)
         for cap in CAPABILITIES:
@@ -255,6 +256,12 @@ def make_handler(svc: Service):
                 if not self._token_ok():
                     return
                 return self._send(200, svc.codes.issue())
+            if url.path == "/logout":
+                # A browser write: the custom header keeps another site's form from signing the operator out.
+                if self.headers.get("X-Fabric-Request") != "1":
+                    return self._send(403, {"error": "Missing request header."})
+                svc.codes.logout(fs.cookie_value(self.headers.get("Cookie")))
+                return self._send(204, None, {"Set-Cookie": fs.expired_session_cookie_header()})
             if url.path == "/api/emit":
                 if not (self._session_ok() or fs.token_matches(self.headers.get("Authorization"), svc.token)):
                     return self._send(401, {"error": "Sign in first."})

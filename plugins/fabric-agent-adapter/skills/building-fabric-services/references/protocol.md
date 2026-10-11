@@ -1,10 +1,19 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `a83bec6b47776af688402c18efec507143061f68`
+Pinned to `fabric-agent-contract` commit `8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
-DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036). The contract's schemas are normative;
+DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
+delegation and the operator session's lifetime DEC-0039). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
+
+## Contents
+
+- Descriptor — written by the installer
+- Well-known document
+- Events page
+- Login code and the operator session
+- Semantic rules a host applies
 
 ## Descriptor — written by the installer
 
@@ -59,6 +68,11 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   ED-9): `minWidth` 360…1280 (required), `appearance` ⊆ `scheme`, `theme`, `themes`, `kit`
   (`name@semver`), nothing else. The kits build it with `dashboard_extension()` /
   `dashboardExtension()`; see [the dashboard kit reference](dashboard-kit.md).
+- `surfaces.mcp.auth`: `descriptor` (default), `own` (DEC-0024) or `delegation` (DEC-0039, DL-16):
+  the MCP surface takes only the estate's delegation tokens, and the top-level
+  `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's
+  token is not an MCP credential: a host and the probe never call `/mcp` with it as a caller.
+  The kits do not verify delegation tokens yet (a later FAA-20 release).
 
 ## Events page — `GET /fabric/v1/events?after=<cursor>&limit=<n>`
 
@@ -78,11 +92,14 @@ empty, or `null` for an empty log. Retain at least seven days or 1000 events.
 path on the service origin, never an absolute URL. Optional SSE stream at
 `surfaces.events.stream` carrying the same objects.
 
-## Login code — `POST /fabric/v1/login-code`
+## Login code and the operator session — `POST /fabric/v1/login-code`
 
 Token required → `{ "url": "/fabric/v1/login?code=<16–256 url-safe chars>", "expiresAt": "…" }`,
 single use, at most 120 s, recorded as used before it is honoured. `GET` that URL →
 `Set-Cookie` `HttpOnly; SameSite=Strict`, `302` to `surfaces.dashboard.path`.
+The session it starts ends 12 h after its last use, 7 days after sign-in, on logout and when the
+descriptor token rotates (DEC-0039); a service may shorten either bound, never lengthen one. An
+ended session answers `401` on the dashboard page.
 
 ## Semantic rules a host applies
 

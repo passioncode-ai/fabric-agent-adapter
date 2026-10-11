@@ -707,15 +707,41 @@ export function pruneReleases(releasesDir, { keep = 2, current } = {}) {
 
 // --- operator login -------------------------------------------------------------------
 
+/** DEC-0039 (service.md "The session's lifetime"): the longest a service may keep an operator session. */
+export const OPERATOR_SESSION_IDLE_SECONDS = 12 * 60 * 60;
+export const OPERATOR_SESSION_MAX_SECONDS = 7 * 24 * 60 * 60;
+
+// Compare bytes, not UTF-16 units: a non-ASCII value of the right length must be a refusal, not a RangeError.
+const safeEqual = (a, b) => {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
+const sessionBound = (value, longest) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new ServiceError('a session bound must be a finite number of seconds.');
+  return Math.min(Math.trunc(value), longest);
+};
+
+// Single-use login codes, and operator sessions with the DEC-0039 lifetime: a session ends 12 h after its
+// last use, 7 days after the code was redeemed, on logout, and when the descriptor token rotates. The server
+// enforces all four: the cookie carries a signed claim (session id, sign-in time, token revision) and the
+// code store keeps a record per session (last use, logout). Rotating the key with revokeAll() ends every one.
 export class LoginCodes {
-  // `stateDir` — a local service keeps codes and the session key in files. An online service
-  // (DEC-0019) usually has no durable disk: pass `stateDir = null` with `{ store, key }` — `store`
-  // like `new MemoryCodeStore()` (a restart forgets every code, so none can be replayed) and
-  // `key` a Buffer from a platform secret, so sessions survive a deploy.
-  constructor(stateDir, ttlSeconds = 120, { store = null, key = null } = {}) {
+  // `stateDir` — a local service keeps codes, sessions and the session key in files. An online service
+  // (DEC-0019) usually has no durable disk: pass `stateDir = null` with `{ store, key }` — `store` like
+  // `new MemoryCodeStore()` and `key` a Buffer from a platform secret. A memory store forgets codes AND
+  // sessions on a restart, so a deploy signs the operator out (the host signs in again on the page's 401);
+  // pass a durable store to keep sessions. `token` is the descriptor token, or a function returning the
+  // current one: a session begun under one token is refused once it rotates. A service MAY shorten
+  // `idleSeconds` or `maxSeconds`, never lengthen them.
+  constructor(stateDir, ttlSeconds = 120, { store = null, key = null, token = null,
+    idleSeconds = OPERATOR_SESSION_IDLE_SECONDS, maxSeconds = OPERATOR_SESSION_MAX_SECONDS, clock = () => Date.now() / 1000 } = {}) {
     this.ttl = Math.min(ttlSeconds, 120);
+    this.idleSeconds = sessionBound(idleSeconds, OPERATOR_SESSION_IDLE_SECONDS);
+    this.maxSeconds = sessionBound(maxSeconds, OPERATOR_SESSION_MAX_SECONDS);
     this.store = store;
     this.fixedKey = key;
+    this.token = token;
+    this.clock = clock;
     if (stateDir) {
       this.dir = ensurePrivateDir(stateDir);
       this.keyPath = path.join(this.dir, 'session.key');
@@ -738,7 +764,7 @@ export class LoginCodes {
   }
 
   save(codes) {
-    const horizon = Date.now() / 1000 - 3600;
+    const horizon = this.clock() - 3600;
     const kept = Object.fromEntries(Object.entries(codes).filter(([, v]) => (v.expires ?? 0) > horizon));
     if (this.store) { this.store.save(kept); return; }
     atomicWrite(this.codesPath, JSON.stringify(kept), 0o600);
@@ -746,7 +772,7 @@ export class LoginCodes {
 
   issue() {
     const code = crypto.randomBytes(24).toString('base64url');
-    const expires = Date.now() / 1000 + this.ttl;
+    const expires = this.clock() + this.ttl;
     const codes = this.load();
     codes[crypto.createHash('sha256').update(code).digest('hex')] = { expires, used: false };
     this.save(codes);
@@ -762,18 +788,65 @@ export class LoginCodes {
     if (!entry || entry.used) return null;
     entry.used = true;
     this.save(codes);
-    if (entry.expires < Date.now() / 1000) return null;
+    const now = this.clock();
+    if (entry.expires < now) return null;
     const session = crypto.randomBytes(18).toString('base64url');
-    return `${session}.${crypto.createHmac('sha256', this.key()).update(session).digest('hex')}`;
+    const signedInAt = Math.trunc(now);
+    codes[LoginCodes.recordKey(session)] = { expires: signedInAt + this.maxSeconds, signedInAt, lastUsedAt: now };
+    this.save(codes);
+    const claim = `v2.${session}.${signedInAt}.${this.tokenRevision()}`;
+    return `${claim}.${this.mac(claim)}`;
   }
 
+  /** True while the session is live; a use within the bounds refreshes the idle bound. */
   sessionValid(value) {
-    if (!value || !value.includes('.')) return false;
-    const i = value.lastIndexOf('.');
-    const expected = crypto.createHmac('sha256', this.key()).update(value.slice(0, i)).digest('hex');
-    const mac = value.slice(i + 1);
-    return mac.length === expected.length && crypto.timingSafeEqual(Buffer.from(mac), Buffer.from(expected));
+    const parsed = this.parse(value);
+    if (!parsed) return false;
+    const [session, signedInAt] = parsed;
+    const now = this.clock();
+    if (now >= signedInAt + this.maxSeconds) return false;
+    const codes = this.load();
+    const record = codes[LoginCodes.recordKey(session)];
+    if (!record || record.signedInAt !== signedInAt || record.loggedOutAt != null) return false;
+    const last = Number(record.lastUsedAt ?? 0);
+    if (now >= last + this.idleSeconds) return false;
+    if (now - last >= Math.min(60, Math.max(1, Math.trunc(this.idleSeconds / 10)))) {
+      record.lastUsedAt = now;
+      this.save(codes);
+    }
+    return true;
   }
+
+  /** End this session on the server; clear the browser's copy with expiredSessionCookieHeader(). */
+  logout(value) {
+    const parsed = this.parse(value);
+    if (!parsed) return false;
+    const codes = this.load();
+    const record = codes[LoginCodes.recordKey(parsed[0])];
+    if (!record || record.signedInAt !== parsed[1] || record.loggedOutAt != null) return false;
+    record.loggedOutAt = this.clock();
+    this.save(codes);
+    return true;
+  }
+
+  parse(value) {
+    if (typeof value !== 'string' || !/^[\x21-\x7e]*$/.test(value)) return null;
+    const parts = value.split('.');
+    if (parts.length !== 5 || parts[0] !== 'v2' || !parts[1] || !/^\d+$/.test(parts[2])) return null;
+    if (!safeEqual(parts[4], this.mac(parts.slice(0, 4).join('.')))) return null;
+    if (!safeEqual(parts[3], this.tokenRevision())) return null;
+    return [parts[1], Number(parts[2])];
+  }
+
+  mac(claim) { return crypto.createHmac('sha256', this.key()).update(claim).digest('hex'); }
+
+  tokenRevision() {
+    const token = typeof this.token === 'function' ? this.token() : this.token;
+    if (!token) return '-';
+    return crypto.createHmac('sha256', this.key()).update(`token-revision\0${token}`).digest('hex').slice(0, 16);
+  }
+
+  static recordKey(session) { return `s:${crypto.createHash('sha256').update(session).digest('hex')}`; }
 
   revokeAll() {
     if (this.fixedKey) throw new ServiceError('a platform-held session key is rotated on the platform, not here.');
@@ -788,9 +861,12 @@ export class MemoryCodeStore {
   save(codes) { this.codes = JSON.parse(JSON.stringify(codes)); }
 }
 
-export const sessionCookieHeader = (value, maxAge = 30 * 86400) => `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+/** The cookie lives no longer than the absolute bound (DEC-0039); the server ends it sooner. */
+export const sessionCookieHeader = (value, maxAge = OPERATOR_SESSION_MAX_SECONDS) => `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
 /** DEC-0019: the remote cookie — `__Host-` name, Secure, no Domain, Path=/. */
-export const remoteSessionCookieHeader = (value, maxAge = 30 * 86400) => `${REMOTE_SESSION_COOKIE}=${value}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+export const remoteSessionCookieHeader = (value, maxAge = OPERATOR_SESSION_MAX_SECONDS) => `${REMOTE_SESSION_COOKIE}=${value}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`;
+/** The header that clears the browser's session cookie, sent with a logout. */
+export const expiredSessionCookieHeader = (remote = false) => (remote ? remoteSessionCookieHeader : sessionCookieHeader)('', 0);
 
 /**
  * DEC-0019: the request guard of an online service. `origin` is the service's own origin

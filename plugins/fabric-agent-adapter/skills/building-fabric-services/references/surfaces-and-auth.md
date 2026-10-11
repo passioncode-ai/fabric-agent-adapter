@@ -12,6 +12,11 @@
   for agents, `host.token` named by the descriptor), declare `surfaces.mcp.auth: "own"`, and
   make `/mcp` refuse the host's token. `check_service.py` then checks only that refusal
   (`interop.mcp-own-auth`) and leaves the caller rules NOT_RUN.
+- **Delegation (DEC-0039, DL-16).** `surfaces.mcp.auth: "delegation"` means `/mcp` takes only
+  the estate's delegation tokens; declare `auth.delegation {issuer, jwks}` in the well-known
+  document. The probe treats it like `own` and checks the declaration
+  (`auth.delegation-declared`). The kits do not verify the tokens yet; until they do, name what
+  checks them.
 - Register it into a client config with the service's own command
   (`<tool> mcp-register`), which writes `{"type":"http","url":"http://127.0.0.1:<port>/mcp","headers":{...}}`
   atomically, aborts if the file changed meanwhile, and keeps one 0600 backup. The token
@@ -50,8 +55,20 @@ else will notice it expire.
 - `POST /fabric/v1/login-code` (token) → single-use code, at most 120 s, persisted as
   used before it is honoured, burned even when expired.
 - `GET /fabric/v1/login?code=` → `HttpOnly; SameSite=Strict` cookie, 302 to the
-  dashboard. Sessions are HMAC-signed; `revoke_all` rotates the key and ends every
-  session at once.
+  dashboard. `revoke_all` rotates the session key and ends every session at once.
+- **The session's lifetime (DEC-0039).** A session ends 12 h after its last use, 7 days after
+  the code was redeemed however often it is used, on logout, and when the descriptor token
+  rotates. The server enforces all four, not the cookie: `LoginCodes` signs a claim (session
+  id, sign-in time, token revision) into the cookie and keeps a record per session (last use,
+  logout) in its code store; `session_valid` refuses a session past either bound and refreshes
+  the 12 hours on use (at most one write a minute). Pass `token=` (the descriptor token, or a
+  callable returning the current one), or a rotation goes unseen. `idle_seconds` and
+  `max_seconds` may shorten the bounds; longer values are clamped. The cookie headers default to
+  `Max-Age` 7 days, and the probe's `login.session-lifetime` fails a longer one.
+- **Logout** is the service's own route and a browser write (the custom header below):
+  `codes.logout(cookie)` ends the session for every copy of the cookie, and
+  `expired_session_cookie_header()` (`expiredSessionCookieHeader()`) clears the browser's copy.
+- An ended session answers `401` on the dashboard page itself, so the host can sign in again.
 - Browser writes need the cookie **and** a custom header such as `X-<Tool>-Request: 1`,
   which forces a preflight the service never answers.
 - A dashboard that is deliberately read-open to local pages declares

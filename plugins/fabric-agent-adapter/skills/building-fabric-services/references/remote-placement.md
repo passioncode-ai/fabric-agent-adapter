@@ -36,9 +36,11 @@ same objects — well-known document, events feed, login code — at the same pa
 - **Token**: a random value of at least 16 characters (32 bytes recommended), set as a secret;
   the same value is written on the operator's computer by `registerRemote`. Compare in constant
   time (`tokenMatches`).
-- **Session key**: 32 random bytes, a separate secret. With it, sessions survive a deploy; without
-  it, every deploy signs the operator out.
-- **Codes**: `MemoryCodeStore` — a restart forgets every outstanding code, so none can be replayed.
+- **Session key**: 32 random bytes, a separate secret; rotating it signs every operator out.
+- **Codes and sessions**: `MemoryCodeStore` — a restart forgets every outstanding code, so none
+  can be replayed, and every session record, so a deploy signs the operator out (DEC-0039: the
+  server keeps each session's last use and logout). The host signs in again on the page's `401`.
+  To keep sessions across a deploy, pass a durable store (any object with `load()` and `save()`).
   Several processes behind one origin need a shared store (a database row with the same
   "used before honoured" write); memory works for one process.
 - **Behind a router**: check the platform-set forwarded scheme; `Host` is preserved by common
@@ -68,4 +70,5 @@ reach the service, and still need its own `403`.
 
 Rotate the token by setting the new value on the platform and re-running `registerRemote` on the
 operator's computer with it; the old token stops working the moment the platform restarts with the
-new value. Rotate the session key on the platform to sign every operator out.
+new value, and so does every session begun under it when `LoginCodes` has `token=`. Rotate the
+session key on the platform to sign every operator out.

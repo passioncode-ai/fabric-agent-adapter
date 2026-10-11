@@ -61,7 +61,7 @@ test('the well-known document of a remote service is behind the token', () => {
   assert.equal(k.wellKnownAllowed('remote', `Bearer ${token}`, token), true);
 });
 
-test('login codes in memory with a platform key: single use, sessions survive a restart, codes do not', () => {
+test('login codes in memory with a platform key: single use; a restart forgets codes and sessions, a durable store keeps sessions', () => {
   const key = Buffer.alloc(32, 7);
   const a = new k.LoginCodes(null, 120, { store: new k.MemoryCodeStore(), key });
   const code = new URL(a.issue().url, 'https://x.example.com').searchParams.get('code');
@@ -69,7 +69,11 @@ test('login codes in memory with a platform key: single use, sessions survive a 
   assert.ok(session && a.sessionValid(session));
   assert.equal(a.redeem(code), null, 'a code is single-use');
   const b = new k.LoginCodes(null, 120, { store: new k.MemoryCodeStore(), key });
-  assert.ok(b.sessionValid(session), 'the platform key keeps sessions across a deploy');
+  assert.ok(!b.sessionValid(session), 'DEC-0039: the server keeps each session; a deploy that forgets the memory store ends it');
+  const durable = new k.MemoryCodeStore();
+  const d = new k.LoginCodes(null, 120, { store: durable, key });
+  const kept = d.redeem(d.issue().url.split('=')[1]);
+  assert.ok(new k.LoginCodes(null, 120, { store: durable, key }).sessionValid(kept), 'a durable store keeps sessions');
   const c = a.issue().url.split('=')[1];
   assert.equal(b.redeem(c), null, 'a restart forgets codes, so none can be replayed');
   assert.throws(() => new k.LoginCodes(null, 120, { store: new k.MemoryCodeStore(), key: Buffer.alloc(8) }), /32 bytes/);
@@ -145,6 +149,13 @@ test('the sample online service over real TLS, met the way a host meets it', { s
     assert.equal((await ask('GET', loginPath)).status, 403, 'the login link is single-use');
     assert.equal((await ask('GET', '/', { Cookie: cookie.split(';')[0] })).status, 200);
     assert.equal((await ask('GET', '/')).status, 401);
+    assert.match(cookie, /Max-Age=604800/, 'DEC-0039: the cookie lives at most 7 days');
+    const session = { Cookie: cookie.split(';')[0] };
+    assert.equal((await ask('POST', '/logout', session)).status, 403, 'a browser write needs the custom header');
+    const out2 = await ask('POST', '/logout', { ...session, 'X-Fabric-Request': '1' });
+    assert.equal(out2.status, 204);
+    assert.match(out2.headers['set-cookie'][0], /^__Host-fabric_session=; .*Max-Age=0/);
+    assert.equal((await ask('GET', '/', session)).status, 401, 'logout ends the session on the server');
   } finally {
     child.kill('SIGTERM');
   }

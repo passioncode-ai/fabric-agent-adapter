@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.10.0 - 2026-10-11
+
+Contract DEC-0039, first part (FAA-20, issue #52): the operator's dashboard session now lives no longer than
+the contract allows, and the server enforces it; the probe treats `surfaces.mcp.auth: "delegation"` like `own`.
+The contract pin moves to Fabric Agent Contract `main` `8e49fbd` (the DEC-0039 merge, contract PR #30). Bundles
+issued under the DEC-0036, DEC-0035, DEC-0033, DEC-0031, DEC-0024, DEC-0021, DEC-0020 and DEC-0019 revisions
+stay valid.
+
+### Security
+
+- **Operator sessions end on the server (DEC-0039).** Until now `LoginCodes.session_valid` checked only an HMAC
+  and the cookie lived 30 days, so a copied cookie stayed valid until the session key was rotated. Now a
+  session ends 12 h after its last use, 7 days after the login code was redeemed however often it is used, on
+  `logout`, and when the descriptor token rotates. The cookie carries a signed claim (session id, sign-in time,
+  token revision); the code store keeps a record per session (last use, logout), so a cookie with no record is
+  refused. Both kits, the same behaviour.
+
+### Changed
+
+- **Every operator signs in once more after the upgrade**: a cookie of the old format is refused. The host does
+  it on the page's `401`.
+- **A remote service with `MemoryCodeStore` loses its sessions on a deploy** (it already lost its login codes):
+  the store now holds the session records. Pass a durable store to keep them.
+- **`session_cookie_header` / `remote_session_cookie_header`** (and the Node `sessionCookieHeader` /
+  `remoteSessionCookieHeader`) default to `Max-Age` 604800 (7 days), not 30 days.
+- **Default contract pin `a83bec6` → `8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5`.** `a83bec6` (DEC-0036) joins
+  `SUPPORTED_CONTRACT_COMMITS`. The revisions between (DEC-0037 spend policy, DEC-0038 grant windows,
+  DEC-0039 delegation, DEC-0040 Fabric's button) add schemas and optional properties only: the provider
+  manifest gains optional cost presets, the governance grant's `effects` may be omitted by a delegation grant,
+  and the well-known document gains `auth.delegation` and the `delegation` value of `surfaces.mcp.auth`.
+  Every descriptor, well-known document and bundle the kits wrote before stays valid.
+
+### Added
+
+- **`LoginCodes(..., token=, idle_seconds=, max_seconds=, clock=)`** (`{ token, idleSeconds, maxSeconds, clock }`
+  in Node): `token` is the descriptor token or a callable returning the current one; the bounds may be
+  shortened, and longer values are clamped. **`logout(cookie)`** and **`expired_session_cookie_header(remote=)`**
+  (`logout`, `expiredSessionCookieHeader`); `OPERATOR_SESSION_IDLE_SECONDS`, `OPERATOR_SESSION_MAX_SECONDS`.
+- **`check_service.py`**: `surfaces.mcp.auth: "delegation"` is checked like `own` — the MCP surface must refuse
+  the descriptor token, and the caller rules are `NOT_RUN` (DL-16); rule **`auth.delegation-declared`** (with
+  `delegation`, the well-known document names `auth.delegation {issuer, jwks}`); rule
+  **`login.session-lifetime`** (the cookie set at sign-in does not outlive 7 days).
+- **The sample services** pass `token=` and serve `POST /logout` (a browser write: it needs `X-Fabric-Request`).
+- `references/surfaces-and-auth.md`, `remote-placement.md` and `protocol.md` describe the lifetime, logout and
+  DL-16. Scenario evals `operator-session-lifetime` and `mcp-auth-delegation` came first.
+
+### Not yet
+
+- Verifying delegation tokens and approvals in the kits (`verifyDelegation` / `verifyApproval`) and Fabric's
+  button in the dashboard kit (FB-7) follow in a later release (FAA-20 stays open).
+
 ## 0.9.0 - 2026-10-11
 
 The dashboard kit (`fabric-dashboard/0.1`, contract DEC-0036): a Fabric service's dashboard holds inside a
