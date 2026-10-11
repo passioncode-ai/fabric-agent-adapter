@@ -58,6 +58,12 @@ Notice latency on this machine (load average ≈ 50): median 294–443 ms; in-pr
    another session's worktree `../fabric-dashboards-host-floor` (local commit `bb13b1c`, not pushed).
 4. The brand board adopts the kit (sshlg-brand-agent, its handoff step 4).
 
+## Follow-up (same day)
+
+The brand board, built on the kit, was measured live: 21 rules, 0 FAIL at 360–1440 px. One run caught the
+board mid-load (its header grew when data arrived, a false ED-5 at 360); `check_dashboard_layout.mjs`
+now waits for network idle and lets each width settle (branch `agent/faa-17-probe-settle`), in 0.9.0.
+
 ## Next task
 
-Merge this PR after its checks, then (operator) push tag `v0.9.0`; then the launcher re-pin.
+(Operator) tag `v0.9.0` on `main` after the follow-up merge; then the launcher re-pin.

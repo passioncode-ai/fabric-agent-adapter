@@ -23,7 +23,10 @@ DEC-0020 and DEC-0019 revisions stay valid.
   service changed without `--force`; `build` regenerates the themes from `themes.json`.
 - **`scripts/check_dashboard_layout.mjs`**: renders a page in WebKit (or `--browser chromium|firefox`) at the
   floor minus 40 and 360, 480, 768, 1280 px and reports ED-1…ED-5; `--service <id>` signs in with a login
-  code and reads the declared `minWidth`. Without Playwright every rule is `NOT_RUN`.
+  code and reads the declared `minWidth`. Without Playwright every rule is `NOT_RUN`. It measures a settled
+  page: after the load it waits for the page's own requests to finish, and at each width for two frames,
+  250 ms and two more frames, so a header that grows when its data arrives is not measured between its new
+  size and the kit's reaction to it (seen once on the brand board at 360 px: a false ED-5).
 - **`check_service.py` rule `dashboard.declared`** (ED-9): PASS for a valid declaration (and names a newer
   kit), FAIL for an invalid one, NOT_RUN for no dashboard or a legacy one.
 - **`dashboard_extension()` / `dashboardExtension()`** in both kits, and `extensions` in `build_well_known` /
