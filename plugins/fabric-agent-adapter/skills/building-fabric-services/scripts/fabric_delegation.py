@@ -77,7 +77,34 @@ REFUSAL_MESSAGES = {
 }
 
 _B64URL = re.compile(r"^[A-Za-z0-9_-]+$")
+# DL-2's grammar, as the contract's verifier types the claims (DEC-0045): an agent id, an opaque session or task id,
+# a URI, a jti and a scope.
+AGENT_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}(\.[a-z][a-z0-9-]{0,31})?$")
+OPAQUE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:\S+$")
+_JTI = re.compile(r"^[A-Za-z0-9._~-]{16,128}$")
+_SCOPE = re.compile(r"^[a-z][a-z0-9._-]{1,127}( [a-z][a-z0-9._-]{1,127})*$")
+_SPEND_WINDOWS = ("total", "task", "project", "day", "week", "month")
+# The small-order points of edwards25519 and their non-canonical encodings, sign bit cleared (the contract's
+# src/ed25519.ts; libsodium's has_small_order list).
+SMALL_ORDER_ENCODINGS = (
+    "0000000000000000000000000000000000000000000000000000000000000000", "0100000000000000000000000000000000000000000000000000000000000000",
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+)
 _MISSING = object()
+
+
+def is_small_order_key(raw: bytes) -> bool:
+    """Whether a 32-byte Ed25519 public key is a point of small order, in any encoding (CT-29)."""
+    if len(raw) != 32:
+        return True
+    return (raw[:31] + bytes([raw[31] & 0x7F])).hex() in SMALL_ORDER_ENCODINGS
+
+
+def _full(pattern: "re.Pattern[str]", value: Any) -> bool:
+    return isinstance(value, str) and pattern.fullmatch(value) is not None
 
 
 def _refuse(code: str, detail: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -280,6 +307,8 @@ def _key_for(jwks: Dict[str, Any], kid: str) -> Dict[str, Any]:
         return {"problem": "unusable-key"}
     if len(raw) != 32:
         return {"problem": "unusable-key"}
+    if is_small_order_key(raw):
+        return {"problem": "small-order-key"}  # refused before any verification (DEC-0045, CT-29)
     return {"key": raw}
 
 
@@ -298,7 +327,8 @@ def _authentic(token: Any, jwks: Dict[str, Any], typ: str) -> Dict[str, Any]:
     kid = compact["header"]["kid"]
     found = _key_for(jwks, kid)
     if "problem" in found:
-        return {"problem": found["problem"], "issuer": found["problem"] in ("unusable-key", "duplicate-kid")}
+        # Only an unknown kid is the token's fault; a published key that cannot be used is the issuer's (DL-13 row 3).
+        return {"problem": found["problem"], "issuer": found["problem"] != "unknown-key"}
     if len(compact["signature"]) != 64 or not ed25519_verify(found["key"], compact["signing_input"], compact["signature"]):
         return {"problem": "bad-signature"}
     return {"compact": compact, "kid": kid}
@@ -341,17 +371,57 @@ def effect_within(effect: str, ceiling: List[str]) -> bool:
     return effect in effect_closure(ceiling)
 
 
-def _delegation_shape(payload: Dict[str, Any]) -> bool:
-    if not all(_is_string(payload.get(k)) for k in ("iss", "sub", "aud", "scope", "jti")):
+def _actor_chain_depth(act: Any) -> Optional[int]:
+    """The chain's depth when every actor is DL-2's (an agent id `sub`, an optional session id), else None. A token
+    with no `act` has no caller, so it is no chain either."""
+    if act is _MISSING:
+        return None
+    depth = 0
+    node = act
+    while node is not _MISSING:
+        if not isinstance(node, dict) or not _full(AGENT_ID, node.get("sub")):
+            return None
+        if "session" in node and not _full(OPAQUE_ID, node["session"]):
+            return None
+        depth += 1
+        node = node.get("act", _MISSING)
+    return depth
+
+
+def _is_amount(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
+def _spend_shaped(spend: Any) -> bool:
+    if not isinstance(spend, dict):
         return False
-    if not _is_time(payload.get("iat")) or not _is_time(payload.get("exp")):
+    if spend.get("mode") == "unlimited":
+        return True
+    remaining = spend.get("remaining")
+    if spend.get("mode") != "limited" or not isinstance(remaining, list) or not 1 <= len(remaining) <= 6:
         return False
+    if not all(isinstance(e, dict) and e.get("window") in _SPEND_WINDOWS and _is_amount(e.get("remainingUsd")) for e in remaining):
+        return False
+    return "perCallMaxUsd" not in spend or _is_amount(spend["perCallMaxUsd"])
+
+
+def _delegation_shape(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[int]]:
+    """DL-13 row 5 as DEC-0045 types it: (problem, depth). A claim the profile does not know is ignored."""
+    depth = _actor_chain_depth(payload.get("act", _MISSING))
+    if depth is None:
+        return "malformed-chain", None
     effect, grant = payload.get("effect"), payload.get("grant")
-    if not isinstance(effect, list) or not effect or not all(isinstance(e, str) and e in EFFECT_CLASSES for e in effect):
-        return False
-    if not isinstance(grant, list) or not grant or not all(_is_string(g) for g in grant):
-        return False
-    return isinstance(payload.get("act"), dict)
+    typed = (_full(_URI, payload.get("iss")) and _full(_URI, payload.get("sub")) and _full(AGENT_ID, payload.get("aud"))
+             and isinstance(payload.get("scope"), str) and len(payload["scope"]) <= 4096 and _full(_SCOPE, payload["scope"])
+             and isinstance(effect, list) and len(effect) > 0 and all(isinstance(e, str) and e in EFFECT_CLASSES for e in effect)
+             and len(set(effect)) == len(effect)
+             and isinstance(grant, list) and len(grant) == 1 and isinstance(grant[0], str) and 1 <= _utf16_length(grant[0]) <= 256
+             and ("spend" not in payload or _spend_shaped(payload["spend"]))
+             and ("project" not in payload or _full(_URI, payload["project"]))
+             and ("task" not in payload or _full(OPAQUE_ID, payload["task"]))
+             and _is_time(payload.get("iat")) and _is_time(payload.get("exp"))
+             and ("nbf" not in payload or _is_time(payload["nbf"])) and _full(_JTI, payload.get("jti")))
+    return (None, depth) if typed else ("malformed-claims", None)
 
 
 def _approval_shape(payload: Dict[str, Any]) -> bool:
@@ -359,37 +429,37 @@ def _approval_shape(payload: Dict[str, Any]) -> bool:
         return False
     if not _is_time(payload.get("iat")) or not _is_time(payload.get("exp")):
         return False
-    return payload.get("method") in ("prompt", "operator-channel", "device")
+    return payload.get("method") in ("prompt", "operator-channel")  # DEC-0045: `device` is removed
 
 
 def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capability: str, effect: str,
-                      issuer: Optional[str] = None, read_only: bool = False) -> Dict[str, Any]:
+                      issuer: Optional[str], read_only: bool = False) -> Dict[str, Any]:
     """DL-13, in its fixed order: nothing about a token is believed before its signature is.
     `now` is seconds since the epoch. Returns {ok: True, claims, principal, caller, chain, kid} or a refusal
-    {ok: False, code, detail[, data]} whose detail is a short machine word, never the token."""
+    {ok: False, code, detail[, data]} whose detail is a short machine word, never the token. `issuer` is required."""
+    if not _is_string(issuer):
+        return _refuse("issuer-unavailable", "no-trusted-issuer")
     if not _has_keys(jwks):
         return _refuse("issuer-unavailable", "no-published-keys")
     checked = _authentic(token, jwks, DELEGATION_TYP)
     if "problem" in checked:
         return _refuse("issuer-unavailable" if checked.get("issuer") else "unauthenticated", checked["problem"])
     claims = checked["compact"]["payload"]
-    if not _delegation_shape(claims):
-        return _refuse("unauthenticated", "malformed-claims")
-    if issuer is not None and claims["iss"] != issuer:
+    problem, depth = _delegation_shape(claims)
+    if problem:
+        return _refuse("unauthenticated", problem)
+    if claims["iss"] != issuer:
         return _refuse("unauthenticated", "wrong-issuer")
     if claims["exp"] <= claims["iat"] or claims["exp"] - claims["iat"] > MAX_DELEGATION_LIFETIME_SECONDS:
         return _refuse("unauthenticated", "lifetime-above-profile")
     if claims["iat"] > now + LEEWAY_SECONDS:
         return _refuse("unauthenticated", "issued-in-future")
-    if "nbf" in claims and (not _is_time(claims["nbf"]) or claims["nbf"] > now + LEEWAY_SECONDS):
+    if "nbf" in claims and claims["nbf"] > now + LEEWAY_SECONDS:
         return _refuse("unauthenticated", "not-yet-valid")
     if now > claims["exp"] + LEEWAY_SECONDS:
         return _refuse("token-expired", "expired")
     if claims["aud"] != audience:
         return _refuse("wrong-audience", "audience-mismatch")
-    depth = chain_depth(claims["act"])
-    if not math.isfinite(depth):
-        return _refuse("unauthenticated", "malformed-chain")
     if depth > MAX_CHAIN_DEPTH:
         return _refuse("chain-too-deep", "depth-%d" % depth)
     if capability not in claims["scope"].split(" "):
@@ -473,13 +543,15 @@ UNSAFE_NO_JTI_STORE = _NoReplayProtection()
 
 
 def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: float, action_digest: str,
-                    jti_store: Any, issuer: Optional[str] = None) -> Dict[str, Any]:
+                    jti_store: Any, issuer: Optional[str]) -> Dict[str, Any]:
     """DL-18: a missing approval is approval-required carrying the action digest; any fault of the document is
     approval-invalid; a second use is approval-reused. The jti is consumed last."""
     if approval is None or approval == "":
         return _refuse("approval-required", "no-approval", {"actionDigest": action_digest})
     if jti_store is None or not callable(getattr(jti_store, "consume", None)):
         return _refuse("unknown-state", "no-jti-store")
+    if not _is_string(issuer):
+        return _refuse("issuer-unavailable", "no-trusted-issuer")
     if not _has_keys(jwks):
         return _refuse("issuer-unavailable", "no-published-keys")
     checked = _authentic(approval, jwks, APPROVAL_TYP)
@@ -488,7 +560,7 @@ def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: f
     claims = checked["compact"]["payload"]
     if not _approval_shape(claims):
         return _refuse("approval-invalid", "malformed-claims")
-    if issuer is not None and claims["iss"] != issuer:
+    if claims["iss"] != issuer:
         return _refuse("approval-invalid", "wrong-issuer")
     if claims["exp"] <= claims["iat"] or claims["exp"] - claims["iat"] > MAX_APPROVAL_LIFETIME_SECONDS:
         return _refuse("approval-invalid", "lifetime-above-profile")
@@ -654,8 +726,12 @@ _OPENER = urllib.request.build_opener(_NoRedirect)
 def _fetch(source: str) -> Any:
     if source.startswith(("https://", "http://")):
         request = urllib.request.Request(source, headers={"Accept": "application/json"})
-        with _OPENER.open(request, timeout=5) as response:  # https or loopback http only, no redirect
-            return json.loads(response.read(65537)[:65536])
+        try:
+            with _OPENER.open(request, timeout=5) as response:  # https or loopback http only, no redirect
+                return json.loads(response.read(65537)[:65536])
+        except urllib.error.HTTPError as exc:
+            exc.close()
+            raise
     return json.loads(Path(source).expanduser().read_text())
 
 
@@ -715,24 +791,52 @@ def _kid_of(token: str) -> Optional[str]:
 
 # --- the gate in front of a service's tools ------------------------------------------------------------------
 
-def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], issuer: Optional[str] = None,
-                    read_only: bool = False, clock: Callable[[], float] = time.time) -> Callable[[str, Any], Dict[str, Any]]:
-    """A check for one tools/call: `gate(tool, headers)` answers the accepted delegation or a DL-19 refusal.
-    `effects` maps each tool to its declared effect class (its manifest entry); a tool with none is refused
-    rather than guessed. `jwks` is a JwksCache or a key set."""
+TIERS = ("T0", "T1", "T2")
 
-    def gate(tool: str, headers: Any) -> Dict[str, Any]:
+
+def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], issuer: str,
+                    read_only: bool = False, clock: Callable[[], float] = time.time) -> Callable[..., Dict[str, Any]]:
+    """A check for one tools/call: `gate(tool, headers, tier="T2")` answers the accepted delegation or a DL-19
+    refusal. `effects` maps each tool to its declared effect class (its manifest entry); a tool with none is
+    refused rather than guessed. `jwks` is a JwksCache or a key set; `issuer` (auth.delegation.issuer) is required.
+
+    DL-25, DL-26: `tier` is the caller's origin. T0 is a loopback caller under the owner's account that the service's
+    own local floor has authenticated; T1 an enrolled machine of the same owner; T2 everything else, and any call
+    relayed from off the machine. A T0 or T1 caller is never required to present a token: with none, the call
+    passes with no delegation ({ok: True, tier, principal: None, ...}). A present token is verified at every tier
+    and refused when invalid. Unknown tiers count as T2."""
+    if not _is_string(issuer):
+        raise ValueError("the gate needs the issuer it trusts (auth.delegation.issuer)")
+
+    def gate(tool: str, headers: Any, tier: str = "T2") -> Dict[str, Any]:
         effect = effects.get(tool)
         if effect not in EFFECT_CLASSES:
             return _refuse("unknown-state", "no-declared-effect")
         carried = read_delegation_token(headers)
         if carried is None:
+            if tier in ("T0", "T1"):
+                return {"ok": True, "tier": tier, "principal": None, "caller": None, "chain": [], "claims": None, "kid": None}
             return _refuse("unauthenticated", "no-token")
         keys = jwks.get(_kid_of(carried["token"])) if isinstance(jwks, JwksCache) else jwks
-        return verify_delegation(carried["token"], audience=audience, jwks=keys, now=clock(), capability=tool,
-                                 effect=effect, issuer=issuer, read_only=read_only)
+        verdict = verify_delegation(carried["token"], audience=audience, jwks=keys, now=clock(), capability=tool,
+                                    effect=effect, issuer=issuer, read_only=read_only)
+        if verdict["ok"]:
+            verdict["tier"] = tier if tier in TIERS else "T2"
+        return verdict
 
     return gate
+
+
+def refusal_from_denial(denial: Dict[str, Any]) -> Dict[str, Any]:
+    """DL-21 step 6 (DEC-0045): the refusal a callee answers after the meter denied a grant check. The meter's code
+    goes unchanged into error.code; its window, level (when set) and approvalRequest into error.data."""
+    data = {k: denial[k] for k in ("window", "approvalRequest") if denial.get(k) is not None}
+    if denial.get("level") is not None:
+        data["level"] = denial["level"]
+    error: Dict[str, Any] = {"code": denial["code"], "message": ("the meter denied the spend: %s" % denial.get("reason", ""))[:500]}
+    if data:
+        error["data"] = data
+    return {"error": error}
 
 
 def refusal_error(refusal: Dict[str, Any]) -> Dict[str, Any]:

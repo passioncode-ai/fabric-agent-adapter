@@ -202,7 +202,7 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 The default pin for new bundles is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5`
+- commit: `2eb91c00e852d9c31d804310d38fad91589fcbac`
 
 Every other mention of the default contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree

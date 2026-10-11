@@ -32,7 +32,10 @@ python3 scripts/fabric_provider.py validate ~/Library/Application\ Support/ai.pa
 python3 scripts/fabric_provider.py remove example-agent      # the uninstaller
 ```
 
-`--stdio` takes the rest of the line as the argument array; there is no shell string.
+`--stdio` takes the rest of the line as the argument array; there is no shell string. An entry may carry
+`run.mcp.stdio.scope` (DEC-0044): `project` (started for the sessions of a project that binds it) or `on-demand`;
+`session` — a server in every coding session — is refused (FAC-SEM-056, LC-19). The validator accepts the field; the
+writer does not set it until Fabric reads it.
 
 It refuses, with one sentence that never quotes a value:
 

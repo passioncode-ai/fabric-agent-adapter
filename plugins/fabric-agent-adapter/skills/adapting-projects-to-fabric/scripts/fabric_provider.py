@@ -116,8 +116,11 @@ def _run_problems(run: Any) -> List[str]:
         return [] if match and 1 <= int(match.group(1)) <= 65535 else ["run.mcp.url is http://127.0.0.1:<port>/mcp"]
     stdio = mcp["stdio"]
     problems: List[str] = []
-    if not isinstance(stdio, dict) or not set(stdio) <= {"command", "env"} or "command" not in stdio:
-        return ["run.mcp.stdio is {command, env?}"]
+    if not isinstance(stdio, dict) or not set(stdio) <= {"command", "env", "scope"} or "command" not in stdio:
+        return ["run.mcp.stdio is {command, env?, scope?}"]
+    # DEC-0044, LC-19: where a host starts the server. A server started in every session is refused (FAC-SEM-056).
+    if "scope" in stdio and stdio["scope"] not in ("project", "on-demand"):
+        problems.append("run.mcp.stdio.scope is project or on-demand; a stdio server started in every session is refused (FAC-SEM-056, LC-19)")
     command = stdio["command"]
     if not isinstance(command, list) or not 1 <= len(command) <= 32 or not all(isinstance(a, str) and a for a in command):
         problems.append("run.mcp.stdio.command is an argument array, never a shell string")

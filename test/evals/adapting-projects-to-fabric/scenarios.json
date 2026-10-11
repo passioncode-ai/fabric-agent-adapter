@@ -140,6 +140,15 @@
         "records the answer as accepted, declined or later in the completion report, and in the channel status document's proposal field when the agent serves surfaces.operatorChannel",
         "skips the proposal for an agent without human stops or notify events"
       ]
+    },
+    {
+      "id": "stdio-provider-scope",
+      "trap": "the provider entry left a stdio MCP server to be started in every coding session, so thirty sessions ran thirty copies",
+      "request": "Write the provider entry for example-agent, which serves MCP over stdio.",
+      "expected": [
+        "sets run.mcp.stdio.scope to project (started for the sessions of a project that binds it) or on-demand, never session (DEC-0044, FAC-SEM-056, LC-19)",
+        "keeps the command an argument array and every env value a secret reference"
+      ]
     }
   ]
 }

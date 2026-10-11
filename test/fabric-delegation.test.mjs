@@ -16,7 +16,11 @@ const answer = (r) => (r.ok
 
 test('every delegation case answers as the contract does', () => {
   assert.ok(V.delegation.length >= 60);
-  for (const c of V.delegation) assert.deepEqual(answer(d.verifyDelegation(c.token, c.options)), c.expected, c.name);
+  for (const c of V.delegation) {
+    const got = answer(d.verifyDelegation(c.token, c.options));
+    // A case the contract's verifier throws on (a signed token with no actor chain): DL-2 requires `act`.
+    assert.deepEqual(got, c.contractThrew ? { ok: false, code: 'unauthenticated', detail: 'malformed-chain' } : c.expected, c.name);
+  }
 });
 
 test('every approval case answers as the contract does', () => {
@@ -35,6 +39,18 @@ test('headers, canonical JSON and digests', () => {
   for (const c of V.jcs) assert.equal(d.jcs(JSON.parse(c.input)), c.expected);
   for (const c of V.digests) assert.equal(d.actionDigest(JSON.parse(c.input)), c.expected);
   for (const bad of [NaN, Infinity, '\ud800', new Date(0), new Map(), undefined, () => 1]) assert.throws(() => d.jcs(bad), TypeError);
+});
+
+test("the contract's canonical vectors (DEC-0043)", () => {
+  const doc = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/canonical.json'), 'utf8')).rfc8785;
+  const double = (hex) => Buffer.from(hex, 'hex').readDoubleBE(0);
+  for (const v of doc.vectors) {
+    const value = 'inputJson' in v ? JSON.parse(v.inputJson) : v.input;
+    assert.equal(d.jcs(value), v.expected, v.name);
+    if (v.utf8Hex) assert.equal(Buffer.from(d.jcs(value), 'utf8').toString('hex'), v.utf8Hex);
+  }
+  for (const v of doc.numbers) assert.equal(d.jcs(double(v.ieee754)), v.expected, v.note ?? v.ieee754);
+  for (const v of doc.refuses) assert.throws(() => d.jcs('inputJson' in v ? JSON.parse(v.inputJson) : double(v.ieee754)), TypeError, v.name);
 });
 
 test('jti stores: memory prunes, the file store survives a restart, the store is required', () => {
@@ -87,6 +103,17 @@ test('the gate refuses in the DL-19 shape and never echoes the token', async () 
   assert.equal(http.headers['WWW-Authenticate'], 'Bearer error="invalid_token"');
   for (const code of V.constants.refusalCodes) assert.ok([401, 403, 503].includes(d.refusalHttp({ ok: false, code, detail: 'x' }).status));
   assert.ok(!JSON.stringify(result).includes(c.token));
+  // DL-26: a T0 or T1 caller is never required to present a token; a present one is verified at every tier.
+  for (const tier of ['T0', 'T1']) {
+    const passed = await gate('writer.write', {}, tier);
+    assert.deepEqual([passed.ok, passed.tier, passed.principal], [true, tier, null]);
+    assert.equal((await gate('writer.write', { 'Fabric-Delegation': 'junk' }, tier)).code, 'unauthenticated');
+    assert.equal((await gate('writer.write', { Authorization: `Bearer ${c.token}` }, tier)).caller, 'example-media');
+  }
+  assert.equal((await gate('writer.write', {}, 'T9')).code, 'unauthenticated');
+  assert.throws(() => d.delegationGate({ audience: 'a', jwks: V.jwks, effects: {}, issuer: '' }), /issuer/);
+  assert.deepEqual(d.refusalFromDenial({ decision: 'denied', level: 'L1', code: 'limit-reached', reason: 'the day window is spent', checkedAt: 't', window: 'day' }),
+    { error: { code: 'limit-reached', message: 'the meter denied the spend: the day window is spent', data: { window: 'day', level: 'L1' } } });
 });
 
 test('review findings: unreadable jti file, __proto__ as an id, a null header value', () => {

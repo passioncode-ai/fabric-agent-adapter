@@ -112,7 +112,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -144,7 +145,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -159,7 +161,8 @@
     "audience": "example-writer",
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -177,7 +180,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -205,7 +209,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -240,7 +245,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -267,11 +273,12 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
-    "code": "unauthenticated",
+    "code": "issuer-unavailable",
     "detail": "key-not-for-signing"
    }
   },
@@ -294,11 +301,12 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
-    "code": "unauthenticated",
+    "code": "issuer-unavailable",
     "detail": "key-not-for-signing"
    }
   },
@@ -321,7 +329,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -348,7 +357,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -383,7 +393,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -418,7 +429,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -453,7 +465,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -488,7 +501,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -523,7 +537,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -558,7 +573,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -593,7 +609,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -628,7 +645,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -663,7 +681,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -698,7 +717,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -733,7 +753,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -768,7 +789,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -803,7 +825,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -838,7 +861,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -873,7 +897,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -908,7 +933,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -943,7 +969,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -978,7 +1005,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1013,7 +1041,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -1053,7 +1082,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1088,7 +1118,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1123,7 +1154,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1158,7 +1190,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1193,7 +1226,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1228,7 +1262,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1263,7 +1298,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1298,13 +1334,47 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
     "code": "unauthenticated",
-    "detail": "malformed-claims"
+    "detail": "malformed-chain"
    }
+  },
+  {
+   "name": "no act claim",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImF1ZCI6ImV4YW1wbGUtd3JpdGVyIiwic2NvcGUiOiJ3cml0ZXIud3JpdGUgd3JpdGVyLmNoZWNrIiwiZWZmZWN0IjpbImRyYWZ0Il0sImdyYW50IjpbInVybjpncmFudDpwcm9qZWN0LWE6ZXhhbXBsZS1tZWRpYS13cml0ZXIjMyJdLCJzcGVuZCI6eyJtb2RlIjoibGltaXRlZCIsInJlbWFpbmluZyI6W3sid2luZG93IjoidGFzayIsInJlbWFpbmluZ1VzZCI6MS41fSx7IndpbmRvdyI6ImRheSIsInJlbWFpbmluZ1VzZCI6NC4yfSx7IndpbmRvdyI6Im1vbnRoIiwicmVtYWluaW5nVXNkIjozOH1dLCJwZXJDYWxsTWF4VXNkIjowLjV9LCJwcm9qZWN0IjoidXJuOnByb2plY3Q6YSIsImlhdCI6MTc5MTcyMDAwMCwiZXhwIjoxNzkxNzIwNjAwLCJqdGkiOiIwMUpBN1k1UTNDMks5TThONFA2UjBTMVQyViJ9.3M4KwZ1NDCR2xrgyK1I6qBUqQ9jJ5_SwCVn9TidJH1C93yxK4p5e9hSBTQ3576e8NDDfqVVANsqIJljWW3u0Cg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": null,
+   "contractThrew": "Cannot read properties of undefined (reading 'sub')"
   },
   {
    "name": "wrong issuer",
@@ -1343,6 +1413,555 @@
    }
   },
   {
+   "name": "no trusted issuer",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.LZ-qHB9-dLYnTDi8wSZPx6x50p3IgtJivgY3O4Q29Ka7hIPvRZxwjgxxIrtIftI1iV2fjcMPXnOvW7_oX3Y6Bg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft"
+   },
+   "expected": {
+    "ok": false,
+    "code": "issuer-unavailable",
+    "detail": "no-trusted-issuer"
+   }
+  },
+  {
+   "name": "two grants",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiLCJ1cm46Z3JhbnQ6cHJvamVjdC1hOm90aGVyIzEiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.WKrcKwW1tmtmmXK-BI-hcYm9m0z_Q1qq9i56MIvJ6CvyoBqHLIKJpbOvQE6T6VImBhNph9Z1htQL0MZZIguHBg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "effect named twice",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCIsImRyYWZ0Il0sImdyYW50IjpbInVybjpncmFudDpwcm9qZWN0LWE6ZXhhbXBsZS1tZWRpYS13cml0ZXIjMyJdLCJzcGVuZCI6eyJtb2RlIjoibGltaXRlZCIsInJlbWFpbmluZyI6W3sid2luZG93IjoidGFzayIsInJlbWFpbmluZ1VzZCI6MS41fSx7IndpbmRvdyI6ImRheSIsInJlbWFpbmluZ1VzZCI6NC4yfSx7IndpbmRvdyI6Im1vbnRoIiwicmVtYWluaW5nVXNkIjozOH1dLCJwZXJDYWxsTWF4VXNkIjowLjV9LCJwcm9qZWN0IjoidXJuOnByb2plY3Q6YSIsImlhdCI6MTc5MTcyMDAwMCwiZXhwIjoxNzkxNzIwNjAwLCJqdGkiOiIwMUpBN1k1UTNDMks5TThONFA2UjBTMVQyViJ9.es86b5Ncy35S-uuY4aHZqbASrQgcsG3byHT-HbBOdmtTvv1X1QWONNwcJjkJeEQ1JTZWE-yrC0QR5F2LyxKKCA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "scope with an upper-case name",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoiV3JpdGVyLndyaXRlIiwiZWZmZWN0IjpbImRyYWZ0Il0sImdyYW50IjpbInVybjpncmFudDpwcm9qZWN0LWE6ZXhhbXBsZS1tZWRpYS13cml0ZXIjMyJdLCJzcGVuZCI6eyJtb2RlIjoibGltaXRlZCIsInJlbWFpbmluZyI6W3sid2luZG93IjoidGFzayIsInJlbWFpbmluZ1VzZCI6MS41fSx7IndpbmRvdyI6ImRheSIsInJlbWFpbmluZ1VzZCI6NC4yfSx7IndpbmRvdyI6Im1vbnRoIiwicmVtYWluaW5nVXNkIjozOH1dLCJwZXJDYWxsTWF4VXNkIjowLjV9LCJwcm9qZWN0IjoidXJuOnByb2plY3Q6YSIsImlhdCI6MTc5MTcyMDAwMCwiZXhwIjoxNzkxNzIwNjAwLCJqdGkiOiIwMUpBN1k1UTNDMks5TThONFA2UjBTMVQyViJ9.s_1DchWf2AmR8YwjW2qF6o2G47l0gsdeEgBIQbWKtdUqXvIhXF-PcKhnU8vsjJahpRLV5msIPqApiKo3fr2uBA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "Writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "scope with a double space",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlICB3cml0ZXIuY2hlY2siLCJlZmZlY3QiOlsiZHJhZnQiXSwiZ3JhbnQiOlsidXJuOmdyYW50OnByb2plY3QtYTpleGFtcGxlLW1lZGlhLXdyaXRlciMzIl0sInNwZW5kIjp7Im1vZGUiOiJsaW1pdGVkIiwicmVtYWluaW5nIjpbeyJ3aW5kb3ciOiJ0YXNrIiwicmVtYWluaW5nVXNkIjoxLjV9LHsid2luZG93IjoiZGF5IiwicmVtYWluaW5nVXNkIjo0LjJ9LHsid2luZG93IjoibW9udGgiLCJyZW1haW5pbmdVc2QiOjM4fV0sInBlckNhbGxNYXhVc2QiOjAuNX0sInByb2plY3QiOiJ1cm46cHJvamVjdDphIiwiaWF0IjoxNzkxNzIwMDAwLCJleHAiOjE3OTE3MjA2MDAsImp0aSI6IjAxSkE3WTVRM0MySzlNOE40UDZSMFMxVDJWIn0.6yVDSw46eWR58qcCvmOidDwxijWb_rorPkjECWIe3ggXXGrVnud66h5dUhYhAWWwpqoxMP-fz3HA38RUvrPaAQ",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "sub not a URI",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoib3BlcmF0b3IiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1tZWRpYSIsInNlc3Npb24iOiJydW4tMjAyNi0xMC0xMS0wMDQyIiwiYWN0Ijp7InN1YiI6ImV4YW1wbGUtYWdlbnQuZGVmYXVsdCJ9fSwiYXVkIjoiZXhhbXBsZS13cml0ZXIiLCJzY29wZSI6IndyaXRlci53cml0ZSB3cml0ZXIuY2hlY2siLCJlZmZlY3QiOlsiZHJhZnQiXSwiZ3JhbnQiOlsidXJuOmdyYW50OnByb2plY3QtYTpleGFtcGxlLW1lZGlhLXdyaXRlciMzIl0sInNwZW5kIjp7Im1vZGUiOiJsaW1pdGVkIiwicmVtYWluaW5nIjpbeyJ3aW5kb3ciOiJ0YXNrIiwicmVtYWluaW5nVXNkIjoxLjV9LHsid2luZG93IjoiZGF5IiwicmVtYWluaW5nVXNkIjo0LjJ9LHsid2luZG93IjoibW9udGgiLCJyZW1haW5pbmdVc2QiOjM4fV0sInBlckNhbGxNYXhVc2QiOjAuNX0sInByb2plY3QiOiJ1cm46cHJvamVjdDphIiwiaWF0IjoxNzkxNzIwMDAwLCJleHAiOjE3OTE3MjA2MDAsImp0aSI6IjAxSkE3WTVRM0MySzlNOE40UDZSMFMxVDJWIn0._f5wNTtcHlM1lg66q9GUU_xNySeNCreiANgvP__HjgEV5QFhrsR0Wtg26zTRZYvdj8zUBE4Y6Ca9A8UcFDSdCg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "aud not an agent id",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJFeGFtcGxlIFdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.V9nYXEbRK93BiS9_ufx-jFr-Q4C40KSc0pudjMgWCfA60e78iQikmMC3uibWb9h_Z7NFAl93m-Y26B8PGHmBAw",
+   "options": {
+    "audience": "Example Writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "actor sub not an agent id",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJFeGFtcGxlIE1lZGlhIn0sImF1ZCI6ImV4YW1wbGUtd3JpdGVyIiwic2NvcGUiOiJ3cml0ZXIud3JpdGUgd3JpdGVyLmNoZWNrIiwiZWZmZWN0IjpbImRyYWZ0Il0sImdyYW50IjpbInVybjpncmFudDpwcm9qZWN0LWE6ZXhhbXBsZS1tZWRpYS13cml0ZXIjMyJdLCJzcGVuZCI6eyJtb2RlIjoibGltaXRlZCIsInJlbWFpbmluZyI6W3sid2luZG93IjoidGFzayIsInJlbWFpbmluZ1VzZCI6MS41fSx7IndpbmRvdyI6ImRheSIsInJlbWFpbmluZ1VzZCI6NC4yfSx7IndpbmRvdyI6Im1vbnRoIiwicmVtYWluaW5nVXNkIjozOH1dLCJwZXJDYWxsTWF4VXNkIjowLjV9LCJwcm9qZWN0IjoidXJuOnByb2plY3Q6YSIsImlhdCI6MTc5MTcyMDAwMCwiZXhwIjoxNzkxNzIwNjAwLCJqdGkiOiIwMUpBN1k1UTNDMks5TThONFA2UjBTMVQyViJ9.7Ic5rauPb8RZm3grLGLetdKMecDc59jjicgnqx9CiXPvnVRsb1l2KPdVn3O4w1VePEfEms34keITl9bxcs5ZCg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-chain"
+   }
+  },
+  {
+   "name": "actor session not an opaque id",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6ImhhcyBzcGFjZSJ9LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.YY7U-4-6cV5uOL-uQOBA8R6yfSGN0mjVKLrNgbyU0gFxQkEyHtX4dDsoffiXPSUKKB3gsHAwnLT0vosAdKBUCA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-chain"
+   }
+  },
+  {
+   "name": "task claim",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYiLCJ0YXNrIjoidGFzay00MiJ9.WRwlqHb0eXfvHJ_NoIyf64zHdFOrVn-i44Ex1HC_TclzRBah5OvAhfsWmyO28Jy-BRbZZOd8lJXk7vvXk-adAQ",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": true,
+    "principal": "urn:person:operator",
+    "caller": "example-media",
+    "chain": [
+     "example-media",
+     "example-agent.default"
+    ],
+    "kid": "estate-new"
+   }
+  },
+  {
+   "name": "task not an opaque id",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYiLCJ0YXNrIjoiYSBiIn0.2oeldosc2Ar1fc0kw8nxH0dPnQO-N_5FKMDTJg5FGuVNdlal2nTPPZcjbEByEAd2wpwoCk8Lezw21N7NeAZGAw",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "spend limited with no window",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOltdfSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.DziTyiZi48PQHXKkVn0OCeWmQtuPzcKhZLZkAtJpGw9uXAY09mww2wayBJABy66cQO082JSrj8YbJ06JThgtCw",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "spend unlimited",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6InVubGltaXRlZCJ9LCJwcm9qZWN0IjoidXJuOnByb2plY3Q6YSIsImlhdCI6MTc5MTcyMDAwMCwiZXhwIjoxNzkxNzIwNjAwLCJqdGkiOiIwMUpBN1k1UTNDMks5TThONFA2UjBTMVQyViJ9.21F4JbNbikDlLedNyklDuCYjNyc0Jl1V2Uyq2XQlZyIA1J_9WpUYIacGE_aWFSFqv9nrwcFj1DUPoyn-5BjzCA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": true,
+    "principal": "urn:person:operator",
+    "caller": "example-media",
+    "chain": [
+     "example-media",
+     "example-agent.default"
+    ],
+    "kid": "estate-new"
+   }
+  },
+  {
+   "name": "jti too short",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoic2hvcnQifQ.SXGXGuga_nY85YPAK5HR4lulVuU3cFIlmM_JH337wTRNhJRIgJSFIKovEVlpXWr6kkWAgeUZFkJztvOv0FAUDg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "project not a URI",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InByb2plY3QgYSIsImlhdCI6MTc5MTcyMDAwMCwiZXhwIjoxNzkxNzIwNjAwLCJqdGkiOiIwMUpBN1k1UTNDMks5TThONFA2UjBTMVQyViJ9.YUrXj4ZDiGNHmJbMsah2wkGJgU1179BTiL1BQYxB0jP6ljFDtZKpe8KjVwkdugA2-7ta-VnAYh-4ZovkkDjzCA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
    "name": "lifetime above 600 s",
    "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMSwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.D3NNLG01kFwv0MkG0pXdzDfDd0mg6jr1i1Ae3FmIkT-S46KkKyjUrrPYOGrKRKJYbluYf8-0U5fU2oDxtChXBw",
    "options": {
@@ -1369,7 +1988,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1404,7 +2024,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1439,7 +2060,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1474,7 +2096,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -1514,7 +2137,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1549,12 +2173,13 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
     "code": "unauthenticated",
-    "detail": "not-yet-valid"
+    "detail": "malformed-claims"
    }
   },
   {
@@ -1584,7 +2209,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -1624,7 +2250,8 @@
     },
     "now": 1791720661,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1659,7 +2286,8 @@
     },
     "now": 1791720660,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -1699,7 +2327,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1734,7 +2363,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -1776,7 +2406,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1811,7 +2442,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1846,7 +2478,8 @@
     },
     "now": 1791720030,
     "capability": "writer.delete",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1881,7 +2514,8 @@
     },
     "now": 1791720030,
     "capability": "writer",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -1916,7 +2550,8 @@
     },
     "now": 1791720030,
     "capability": "writer.check",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -1956,7 +2591,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "none"
+    "effect": "none",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -1996,7 +2632,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "publish"
+    "effect": "publish",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -2031,7 +2668,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -2071,7 +2709,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "charge"
+    "effect": "charge",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -2106,7 +2745,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "none"
+    "effect": "none",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": true,
@@ -2146,7 +2786,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -2182,6 +2823,7 @@
     "now": 1791720030,
     "capability": "writer.write",
     "effect": "draft",
+    "issuer": "urn:fabric:estate:example",
     "readOnly": true
    },
    "expected": {
@@ -2218,6 +2860,7 @@
     "now": 1791720030,
     "capability": "writer.write",
     "effect": "none",
+    "issuer": "urn:fabric:estate:example",
     "readOnly": true
    },
    "expected": {
@@ -2258,7 +2901,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -2293,7 +2937,8 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
@@ -2336,12 +2981,13 @@
     },
     "now": 1791720030,
     "capability": "writer.write",
-    "effect": "draft"
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
    },
    "expected": {
     "ok": false,
-    "code": "unauthenticated",
-    "detail": "bad-signature"
+    "code": "issuer-unavailable",
+    "detail": "small-order-key"
    }
   }
  ],
@@ -2375,6 +3021,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2410,6 +3057,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2449,6 +3097,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2484,6 +3133,7 @@
       },
       "now": 1791723660,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2523,6 +3173,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2565,6 +3216,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2607,6 +3259,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "none"
      },
      "expected": {
@@ -2626,6 +3279,7 @@
       "audience": "example-publisher",
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2665,6 +3319,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:acc76c28e51566f67b00ee2c841b8d8a8ddf35be0f01b6f01fdbccdad3526cc6",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2707,6 +3362,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2746,6 +3402,7 @@
       },
       "now": 1791723661,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2785,6 +3442,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2824,6 +3482,7 @@
       },
       "now": 1791719939,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2863,6 +3522,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2902,6 +3562,7 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
@@ -2941,12 +3602,92 @@
       },
       "now": 1791720060,
       "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
       "jtiStore": "shared"
      },
      "expected": {
       "ok": false,
       "code": "approval-invalid",
       "detail": "malformed-claims"
+     }
+    }
+   ]
+  },
+  {
+   "name": "method device, removed by DEC-0045",
+   "steps": [
+    {
+     "approval": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1hcHByb3ZhbCtqd3QiLCJraWQiOiJlc3RhdGUtbmV3In0.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwiYWN0aW9uRGlnZXN0Ijoic2hhMjU2OjkyMWQ2YWZhZTZlMTE5ZDRiMGMyZDJlNjlhNWNiMDI5ODQ4OWQ0ZmYxNzVlMGUxNzAyNWNkYjJiNWIwOWVhZTQiLCJhdWQiOiJleGFtcGxlLXB1Ymxpc2hlciIsImFwcHJvdmVyIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsIm1ldGhvZCI6ImRldmljZSIsImlhdCI6MTc5MTcyMDAwMCwiZXhwIjoxNzkxNzIzNjAwLCJqdGkiOiIwMUpBN1k3QzlFNEc2SDhKMEsyTDRNNk44UCJ9.Ll6tMe4GgKBJUy0P9RDYz37RUrHXOID8-xiwL0pqNtyCbQXBqDjwNUI7K__-c72eGJKOQbNpZysYw_9IGbxJDg",
+     "options": {
+      "audience": "example-publisher",
+      "jwks": {
+       "keys": [
+        {
+         "kty": "OKP",
+         "crv": "Ed25519",
+         "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+         "kid": "estate-new",
+         "use": "sig",
+         "alg": "EdDSA"
+        },
+        {
+         "kty": "OKP",
+         "crv": "Ed25519",
+         "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+         "kid": "estate-old",
+         "use": "sig",
+         "alg": "EdDSA"
+        }
+       ]
+      },
+      "now": 1791720060,
+      "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "issuer": "urn:fabric:estate:example",
+      "jtiStore": "shared"
+     },
+     "expected": {
+      "ok": false,
+      "code": "approval-invalid",
+      "detail": "malformed-claims"
+     }
+    }
+   ]
+  },
+  {
+   "name": "no trusted issuer",
+   "steps": [
+    {
+     "approval": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1hcHByb3ZhbCtqd3QiLCJraWQiOiJlc3RhdGUtbmV3In0.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwiYWN0aW9uRGlnZXN0Ijoic2hhMjU2OjkyMWQ2YWZhZTZlMTE5ZDRiMGMyZDJlNjlhNWNiMDI5ODQ4OWQ0ZmYxNzVlMGUxNzAyNWNkYjJiNWIwOWVhZTQiLCJhdWQiOiJleGFtcGxlLXB1Ymxpc2hlciIsImFwcHJvdmVyIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsIm1ldGhvZCI6Im9wZXJhdG9yLWNoYW5uZWwiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMzYwMCwianRpIjoiMDFKQTdZN0M5RTRHNkg4SjBLMkw0TTZOOFAifQ.b7k9FfTGvR9aZnY1XantPFhXQ3W8tb4KVltkz71MBO5tjI6mzpcmq1jAKIEurDKggWvi0O-HBWVohLAAzIerAQ",
+     "options": {
+      "audience": "example-publisher",
+      "jwks": {
+       "keys": [
+        {
+         "kty": "OKP",
+         "crv": "Ed25519",
+         "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+         "kid": "estate-new",
+         "use": "sig",
+         "alg": "EdDSA"
+        },
+        {
+         "kty": "OKP",
+         "crv": "Ed25519",
+         "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+         "kid": "estate-old",
+         "use": "sig",
+         "alg": "EdDSA"
+        }
+       ]
+      },
+      "now": 1791720060,
+      "actionDigest": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4",
+      "jtiStore": "shared"
+     },
+     "expected": {
+      "ok": false,
+      "code": "issuer-unavailable",
+      "detail": "no-trusted-issuer"
      }
     }
    ]

@@ -479,7 +479,7 @@ class McpToolServer:
                  on_job_started: Optional[Callable[[str, CallContext], None]] = None,
                  on_input: Optional[OnInput] = None,
                  authorize: Optional[Callable[[str, Any], Dict[str, Any]]] = None):
-        # authorize(tool, headers) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
+        # authorize(tool, headers, tier=) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
         # gated by the job's own capability, and answered only for the principal and caller that started it.
         self._authorize = authorize
@@ -517,10 +517,12 @@ class McpToolServer:
     def _error(rid: Any, code: int, message: str) -> Dict[str, Any]:
         return {"jsonrpc": "2.0", "id": rid, "error": {"code": code, "message": message}}
 
-    def handle(self, message: Any, headers: Any = None) -> Optional[Dict[str, Any]]:
+    def handle(self, message: Any, headers: Any = None, tier: str = "T2") -> Optional[Dict[str, Any]]:
         """One JSON-RPC message. Pass the HTTP request headers so the 2026-07-28 standard headers
         are checked (`mcp_header_problem`); a mismatch answers HEADER_MISMATCH even for a
-        notification, so the transport can return HTTP 400."""
+        notification, so the transport can return HTTP 400. `tier` is the caller's origin for the
+        authorize gate (DL-25: T0 local and authenticated by the service's floor, T1 an enrolled
+        machine of the owner, T2 anything else); a gate never requires a token from T0 or T1."""
         if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
             return self._error(message.get("id") if isinstance(message, dict) else None, -32600, "Invalid request.")
         problem = mcp_header_problem(message, headers)
@@ -558,7 +560,7 @@ class McpToolServer:
                     private = self.jobs.private(job_id)
                 except UnknownJob:
                     return {"jsonrpc": "2.0", "id": rid, "result": unknown_job_result(job_id, traceparent=span)}
-                verdict = self._authorize(private["capability"], headers)
+                verdict = self._authorize(private["capability"], headers, tier=tier)
                 owner = private.get("delegation")
                 if verdict.get("ok") and owner and (owner.get("principal"), owner.get("caller")) != (verdict.get("principal"), verdict.get("caller")):
                     verdict = {"ok": False, "code": "scope-not-granted", "detail": "job-of-another-caller"}
@@ -571,7 +573,7 @@ class McpToolServer:
             return self._error(rid, -32602, "Unknown tool: %s." % name)
         delegation = None
         if self._authorize is not None:
-            verdict = self._authorize(name, headers)
+            verdict = self._authorize(name, headers, tier=tier)
             if not verdict.get("ok"):
                 import fabric_delegation as _fd  # noqa: E402 - only a gated server needs it
                 return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
