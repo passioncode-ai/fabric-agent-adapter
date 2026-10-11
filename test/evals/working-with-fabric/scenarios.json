@@ -1,0 +1,72 @@
+{
+  "skill": "working-with-fabric",
+  "scenarios": [
+    {
+      "id": "fabric-down-uses-the-broker",
+      "request": "Report this task's progress to Fabric. (hub.json is absent: Fabric is not running.)",
+      "expected": [
+        "reads hub.json in Fabric's folder for this OS and checks its pid before deciding",
+        "asks the lifecycle broker: lifecycle_list, then lifecycle_ensure_running with a fresh requestId, then polls lifecycle_operation_get to a final state",
+        "never launches, opens or kills Fabric itself (no open -a, osascript or pkill)",
+        "without the broker says Fabric is not running and asks the person to open it; does not claim the report was made"
+      ]
+    },
+    {
+      "id": "register-once-without-a-secret",
+      "request": "Set up Fabric's MCP in Claude Code and Codex on this Mac.",
+      "expected": [
+        "uses claude mcp add --scope user fabric -- \"<Fabric>/bin/fabric-mcp\" --runner claude-code and codex mcp add fabric -- \"<Fabric>/bin/fabric-mcp\" --runner codex",
+        "takes <Fabric>/bin from the OS table (macOS Fabric.app/Contents/Resources/bin) and checks the file exists",
+        "puts no token, header or environment secret in the registration",
+        "proves it with a fabric_whoami call and reports its actual answer"
+      ]
+    },
+    {
+      "id": "whoami-first-and-states",
+      "request": "Start working on the board's top task through Fabric.",
+      "expected": [
+        "calls fabric_whoami before any other Fabric tool",
+        "on a waiting answer tells the person the consent prompt is on their screen and does not loop",
+        "on a denied answer stops and names Agent access as where the denial is cleared",
+        "on no-project names opening the folder as a project; never pretends to be connected"
+      ]
+    },
+    {
+      "id": "coordinate-before-work",
+      "request": "Implement backlog row FAA-18 of passioncode-ai/fabric-agent-adapter (docs/backlog.md) through Fabric.",
+      "expected": [
+        "calls fabric_work_list before starting (Fabric 0.4.0), or fabric_tasks_list and fabric_leases_list on an older Fabric",
+        "claims with fabric_work_claim naming source {repository, path, id} and what it will touch",
+        "on refused-held names the holder and offers hand-over, another task or a linked one; does not start the same task",
+        "on a related-work warning tells the person who holds what and chooses coordinate or continue out loud"
+      ]
+    },
+    {
+      "id": "link-dont-copy",
+      "request": "File the backlog row FAA-18 as a Fabric task.",
+      "expected": [
+        "calls fabric_task_create with source {repository: \"passioncode-ai/fabric-agent-adapter\", path: \"docs/backlog.md\", id: \"FAA-18\"}",
+        "does not paste the row's status or text into a second editable task",
+        "keeps the backlog row as the status source"
+      ]
+    },
+    {
+      "id": "unknown-outcome-checks-first",
+      "request": "fabric_work_claim answered: failed in the client before its answer arrived; the outcome is unknown.",
+      "expected": [
+        "reads fabric_work_list before claiming again",
+        "repeats the claim only with the same idempotency key, never a new one",
+        "does not tell the person the claim failed or succeeded"
+      ]
+    },
+    {
+      "id": "end-of-work-release",
+      "request": "I'm done for today; wrap up in Fabric.",
+      "expected": [
+        "writes a stage report and a task note with what was done and what remains",
+        "hands over with fabric_task_handoff when a follower exists",
+        "releases with fabric_work_release naming how it ended (done, handed over or let go)"
+      ]
+    }
+  ]
+}

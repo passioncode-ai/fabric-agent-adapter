@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.22.0 - 2026-10-12
+
+`working-with-fabric`, the fourth skill, and the plugin's Claude Code session hooks: a coding agent opened in a
+terminal works in a project through Fabric the way a session Fabric launched does (Fabric 0.4.0 REQ-07, plan canvas
+C4; COM-04). The contract pin does not move.
+
+### Added
+
+- **`skills/working-with-fabric/`** (FAA-18): find Fabric (`hub.json` in Fabric's folder per OS, its `pid` alive),
+  have the machine's lifecycle broker start it (`lifecycle_list` → `lifecycle_ensure_running` →
+  `lifecycle_operation_get`; never launch it), register `fabric-mcp` once with no secret (`claude mcp add --scope
+  user fabric -- "<Fabric>/bin/fabric-mcp" --runner claude-code`, `codex mcp add fabric -- … --runner codex`, the
+  per-OS `<Fabric>/bin` of Fabric ADR-0134 amendment 2), `fabric_whoami` first and what each of its waiting answers
+  means, `fabric_work_list` and `fabric_work_claim` before work and `fabric_work_release` at the end (Fabric 0.4.0,
+  REQ-38; the `fabric_task_*` fallback on an older Fabric), stage reports, notes, handoffs, tasks linked to backlog
+  rows by `source: {repository, path, id}`, and the refusals (needs-grant, held, another project, denied, outcome
+  unknown). Trigger evals in English and Russian and seven scenario evals came first.
+- **`scripts/fabric_session.py`**: `status` (Fabric, `fabric-mcp`, the Claude Code and Codex registrations, whether
+  the session hooks are active, one next action; reads no token) and the hooks.
+- **Three hooks** in `hooks/hooks.json`: SessionStart adds the preamble when Claude Code has the MCP server `fabric`
+  and Fabric runs (one line pointing at the broker when Fabric is down; nothing when unregistered); Stop records
+  the turn's facts — HEAD, files changed, lines added and removed, never content — and SessionEnd releases what the
+  session left claimed and records its end, both through `fabric-mcp --rejoin-only` in a detached worker with a 10 s
+  deadline, and only when the running Fabric advertises `session-hooks/1` in `hub.json`. Until then they stay inert
+  and write nothing (`status` says "Session hooks: inert"): a hook that started its own `fabric-mcp` would enroll a session each turn, and
+  Fabric ends a binding's oldest live session past eight — the agent's own. The Fabric side they need (D1–D5) is in
+  `references/session-hooks.md` and the [spec](docs/evidence/specs/2026-10-11-working-with-fabric.md).
+- `test/test_fabric_session.py`: 29 tests with fixtures — a temporary HOME, fake `hub.json` files with live and dead
+  pids, a fake `fabric-mcp` on stdio that records argv, environment and calls.
+
+### Changed
+
+- `test/validate.py` checks four skills; the repository-standard rule applies to the three that build an agent's
+  repository. `test_dashboard_kit.py` finds its own SessionStart entry among several.
+
 ## 0.21.0 - 2026-10-12
 
 The estate record (contract DEC-0055, `estate-record/1`; contract backlog CT-18, CT-20) in both kits, and the pin

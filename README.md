@@ -8,7 +8,7 @@
 
 **Fabric Agent Adapter** makes any agent Fabric-compatible. Fabric is PassionCode.ai's
 product, the CEO AI agent: you talk to Fabric, and it chooses, binds and runs the agents that
-do the work. This adapter is how an agent becomes one Fabric can bind — three Agent Skills,
+do the work. This adapter is how an agent becomes one Fabric can bind — four Agent Skills,
 Python and Node reference kits and a live conformance probe for the
 [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract). It also works
 on its own: the skills, kits and probe need no Fabric install.
@@ -17,8 +17,26 @@ on its own: the skills, kits and probe need no Fabric install.
 [![validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml/badge.svg)](https://github.com/passioncode-ai/fabric-agent-adapter/actions/workflows/validate.yml)
 [![license](https://img.shields.io/badge/license-AGPL--3.0%20or%20commercial-blue.svg)](LICENSE)
 
-The skills are `adapting-projects-to-fabric`, `creating-fabric-agents` and
-`building-fabric-services`.
+The skills are `adapting-projects-to-fabric`, `creating-fabric-agents`,
+`building-fabric-services` and `working-with-fabric`.
+
+`working-with-fabric` is for the other side: a coding agent (Claude Code, Codex, Kilo, Hermes) opened in a
+terminal that works in a project through Fabric. It finds Fabric (`hub.json`, its `pid`), has the machine's
+lifecycle broker start it when it is down, registers `fabric-mcp` once with no secret, calls `fabric_whoami`
+first, asks who is working on what and claims its task before it starts (`fabric_work_list`,
+`fabric_work_claim`, Fabric 0.4.0), links tasks to backlog rows instead of copying them, and releases at the end
+(`fabric_work_release`). `scripts/fabric_session.py status` prints where Fabric stands and one next action:
+
+```bash
+python3 plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py status
+```
+
+In Claude Code the plugin adds three session hooks: SessionStart puts that preamble into the session when the MCP
+server `fabric` is registered and Fabric runs; Stop records each turn's facts (HEAD, files changed, lines added and
+removed — never content) and SessionEnd releases what the session left claimed, both through Fabric and only when
+the running Fabric advertises `session-hooks/1`. They never block the session, read no token and always exit 0;
+the [hooks reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/session-hooks.md) lists
+what they need from Fabric. Codex gets the MCP entry and first-prompt advice; its hooks are not verified.
 
 `building-fabric-services` makes an agent a long-lived local service with a dashboard
 that is always alive, runs as one copy, keeps its state through a reinstall and appears
@@ -40,12 +58,12 @@ box, sticky chrome at most 120 px — with seven WCAG AA themes (light and dark)
 `fabric_appearance` cookie. `scripts/dashboard_kit.py install|status` copies and checks it,
 `scripts/check_dashboard_layout.mjs` measures a rendered page in WebKit at 360, 480, 768 and 1280 px
 (Playwright; `NOT_RUN` without it), and the probe's `dashboard.declared` checks the declaration. The
-plugin's one hook (SessionStart) prints a single line in a repository whose dashboard has no kit or an
+plugin's dashboard-kit hook (SessionStart) prints a single line in a repository whose dashboard has no kit or an
 older one, and nothing anywhere else; the [kit reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-kit.md)
 has the upgrade steps, taken only with the operator's go-ahead.
 
 Dashboard handoffs use the host-generated `open_link` as the primary action. The
-three skills carry the same [consumer procedure](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-links.md)
+three builder skills carry the same [consumer procedure](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-links.md)
 and a portable `scripts/check_dashboard_link.py` gate for generated renderers.
 It rejects primary HTTP when the host is available, failed-host browser fallback,
 and local links addressed to another device. A skill install alone does not filter
@@ -98,6 +116,7 @@ Generic Agent Skills clients:
 npx skills add passioncode-ai/fabric-agent-adapter --skill adapting-projects-to-fabric
 npx skills add passioncode-ai/fabric-agent-adapter --skill creating-fabric-agents
 npx skills add passioncode-ai/fabric-agent-adapter --skill building-fabric-services
+npx skills add passioncode-ai/fabric-agent-adapter --skill working-with-fabric
 ```
 
 ### Configure
@@ -176,6 +195,12 @@ Or, for an agent that does not exist yet:
 
 ```text
 Create a new fabric-compatible agent for <capability>; its consumer is <who calls it>.
+```
+
+Or, in a coding agent opened in a project folder:
+
+```text
+Work on backlog row FAA-18 through Fabric: check who is working here, claim it, and release it when done.
 ```
 
 Or run the deterministic helper directly:

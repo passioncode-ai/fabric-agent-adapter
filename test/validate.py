@@ -15,9 +15,12 @@ from typing import Any, Dict, List, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
-SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
+SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents", "working-with-fabric")
+# The skills that BUILD an agent's repository carry the repository-standard rule; working-with-fabric builds
+# nothing, it teaches a coding agent to work through Fabric.
+BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.21.0"
+VERSION = "0.22.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -360,10 +363,11 @@ def validate_skill(name: str, errors: List[str]) -> None:
     # The repository the skill builds follows the PassionCode.ai standard when it is one; an agent
     # someone builds for themselves is outside the organization and its licence is its owner's.
     flat = " ".join(body.split())
-    if "For a PassionCode.ai repository" not in flat or "knowledge/repository-standard.md" not in flat:
+    if name in BUILDER_SKILLS and ("For a PassionCode.ai repository" not in flat
+                                   or "knowledge/repository-standard.md" not in flat):
         errors.append("%s: SKILL.md must send a PassionCode.ai repository to the repository standard "
                       "(knowledge/repository-standard.md)" % name)
-    if "builds for themselves" not in flat or "its owner's choice" not in flat:
+    if name in BUILDER_SKILLS and ("builds for themselves" not in flat or "its owner's choice" not in flat):
         errors.append("%s: SKILL.md must say an agent someone builds for themselves is outside the standard "
                       "and its licence is its owner's choice" % name)
 

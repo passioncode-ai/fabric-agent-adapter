@@ -1,0 +1,28 @@
+# 2026-10-11 — each defect planted in fabric_session.py as valid code that behaves like the defect, the suite run, the file restored
+== plant 1: Stop/SessionEnd run without session-hooks/1 (the eviction hazard)
+FAIL: test_without_the_feature_nothing_runs_and_nothing_is_written (test_fabric_session.StopAndEndInert.test_without_the_feature_nothing_runs_and_nothing_is_written)
+Ran 29 tests in 7.179s
+FAILED (failures=1)
+== plant 2: the turn observation carries the folder path
+FAIL: test_a_turn_and_the_end_reach_fabric_with_facts_only (test_fabric_session.StopAndEndActive.test_a_turn_and_the_end_reach_fabric_with_facts_only)
+Ran 29 tests in 10.005s
+FAILED (failures=1)
+== plant 3: a refusal's text reaches the log
+FAIL: test_a_refusal_is_logged_by_its_code_never_its_text (test_fabric_session.StopAndEndActive.test_a_refusal_is_logged_by_its_code_never_its_text)
+Ran 29 tests in 8.059s
+FAILED (failures=1)
+== plant 4: the hook calls Fabric inline instead of a detached worker
+ERROR: test_a_refusal_is_logged_by_its_code_never_its_text (test_fabric_session.StopAndEndActive.test_a_refusal_is_logged_by_its_code_never_its_text)
+ERROR: test_a_session_that_never_joins_ends_at_the_deadline (test_fabric_session.StopAndEndActive.test_a_session_that_never_joins_ends_at_the_deadline)
+ERROR: test_a_turn_and_the_end_reach_fabric_with_facts_only (test_fabric_session.StopAndEndActive.test_a_turn_and_the_end_reach_fabric_with_facts_only)
+ERROR: test_an_older_fabric_without_the_tools_degrades_to_a_log_line (test_fabric_session.StopAndEndActive.test_an_older_fabric_without_the_tools_degrades_to_a_log_line)
+ERROR: test_fabric_gone_before_delivery_drops_the_spool (test_fabric_session.StopAndEndActive.test_fabric_gone_before_delivery_drops_the_spool)
+FAIL: test_one_worker_per_session_and_the_end_always_starts_one (test_fabric_session.StopAndEndActive.test_one_worker_per_session_and_the_end_always_starts_one)
+Ran 29 tests in 18.535s
+FAILED (failures=1, errors=5)
+== plant 5: the preamble is injected while Fabric is down
+FAIL: test_one_line_when_registered_and_down (test_fabric_session.SessionStart.test_one_line_when_registered_and_down)
+Ran 29 tests in 6.795s
+FAILED (failures=1)
+== restored
+OK
