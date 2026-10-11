@@ -527,7 +527,8 @@ class Probe:
     def delegation_declared_rule(self, mcp_surface: Optional[Dict[str, Any]]) -> None:
         """DL-16 (DEC-0039): a service that accepts delegation tokens names the issuer it trusts and its JWKS
         in auth.delegation; with surfaces.mcp.auth delegation that declaration is required."""
-        declared = ((self.wk or {}).get("auth") or {}).get("delegation")
+        auth = (self.wk or {}).get("auth")
+        declared = auth.get("delegation") if isinstance(auth, dict) else None
         required = bool(mcp_surface) and mcp_surface.get("auth") == "delegation"
         if declared is None and not required:
             self.add("auth.delegation-declared", "NOT_RUN", "the service declares no delegation")

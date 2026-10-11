@@ -1225,8 +1225,12 @@ class LoginCodes:
         # token= is the descriptor token, or a callable returning the current one: a session begun under
         # one token is refused once it rotates. A service MAY shorten either bound, never lengthen one.
         self.ttl = min(ttl, LOGIN_CODE_TTL_SECONDS)
-        self.idle_seconds = min(int(idle_seconds), OPERATOR_SESSION_IDLE_SECONDS)
-        self.max_seconds = min(int(max_seconds), OPERATOR_SESSION_MAX_SECONDS)
+        self.idle_seconds = _session_bound(idle_seconds, OPERATOR_SESSION_IDLE_SECONDS)
+        self.max_seconds = _session_bound(max_seconds, OPERATOR_SESSION_MAX_SECONDS)
+        # One lock around every load-modify-save, so a concurrent refresh never saves over a logout or a
+        # burned code (a threading server checks sessions on several threads; the instance lock keeps
+        # other processes out of the state directory).
+        self._lock = threading.RLock()
         self._store = store
         self._fixed_key = key
         self._token = token
@@ -1264,74 +1268,80 @@ class LoginCodes:
         atomic_write(self._codes_path, json.dumps(codes).encode(), 0o600)
 
     def issue(self) -> Dict[str, str]:
-        code = secrets.token_urlsafe(24)
-        expires = self._clock() + self.ttl
-        codes = self._load()
-        codes[hashlib.sha256(code.encode()).hexdigest()] = {"expires": expires, "used": False}
-        self._save(codes)
-        at = _dt.datetime.fromtimestamp(expires, _dt.timezone.utc).replace(microsecond=0)
-        return {"url": "/fabric/v1/login?code=" + code, "expiresAt": at.isoformat().replace("+00:00", "Z")}
+        with self._lock:
+            code = secrets.token_urlsafe(24)
+            expires = self._clock() + self.ttl
+            codes = self._load()
+            codes[hashlib.sha256(code.encode()).hexdigest()] = {"expires": expires, "used": False}
+            self._save(codes)
+            at = _dt.datetime.fromtimestamp(expires, _dt.timezone.utc).replace(microsecond=0)
+            return {"url": "/fabric/v1/login?code=" + code, "expiresAt": at.isoformat().replace("+00:00", "Z")}
 
     def redeem(self, code: Optional[str]) -> Optional[str]:
         """Return a session cookie value, or None. The code is burned even when it has expired."""
-        if not code or not _CODE.match(code):
-            return None
-        digest = hashlib.sha256(code.encode()).hexdigest()
-        codes = self._load()
-        entry = codes.get(digest)
-        if not entry or entry.get("used"):
-            return None
-        entry["used"] = True
-        self._save(codes)
-        now = self._clock()
-        if entry.get("expires", 0) < now:
-            return None
-        session_id = secrets.token_urlsafe(18)
-        signed_in = int(now)
-        codes[self._record_key(session_id)] = {"expires": signed_in + self.max_seconds,
-                                               "signedInAt": signed_in, "lastUsedAt": now}
-        self._save(codes)
-        claim = "v2.%s.%d.%s" % (session_id, signed_in, self._token_revision())
-        return claim + "." + self._mac(claim)
+        with self._lock:
+            if not code or not _CODE.match(code):
+                return None
+            digest = hashlib.sha256(code.encode()).hexdigest()
+            codes = self._load()
+            entry = codes.get(digest)
+            if not entry or entry.get("used"):
+                return None
+            entry["used"] = True
+            self._save(codes)
+            now = self._clock()
+            if entry.get("expires", 0) < now:
+                return None
+            session_id = secrets.token_urlsafe(18)
+            signed_in = int(now)
+            codes[self._record_key(session_id)] = {"expires": signed_in + self.max_seconds,
+                                                   "signedInAt": signed_in, "lastUsedAt": now}
+            self._save(codes)
+            claim = "v2.%s.%d.%s" % (session_id, signed_in, self._token_revision())
+            return claim + "." + self._mac(claim)
 
     def session_valid(self, cookie_value: Optional[str]) -> bool:
         """True while the session is live; a use within the bounds refreshes the idle bound."""
-        parsed = self._parse(cookie_value)
-        if parsed is None:
-            return False
-        session_id, signed_in = parsed
-        now = self._clock()
-        if now >= signed_in + self.max_seconds:
-            return False
-        codes = self._load()
-        record = codes.get(self._record_key(session_id))
-        if not record or record.get("signedInAt") != signed_in or record.get("loggedOutAt") is not None:
-            return False
-        last = float(record.get("lastUsedAt", 0))
-        if now >= last + self.idle_seconds:
-            return False
-        if now - last >= min(60, max(1, self.idle_seconds // 10)):
-            record["lastUsedAt"] = now
-            self._save(codes)
-        return True
+        with self._lock:
+            parsed = self._parse(cookie_value)
+            if parsed is None:
+                return False
+            session_id, signed_in = parsed
+            now = self._clock()
+            if now >= signed_in + self.max_seconds:
+                return False
+            codes = self._load()
+            record = codes.get(self._record_key(session_id))
+            if not record or record.get("signedInAt") != signed_in or record.get("loggedOutAt") is not None:
+                return False
+            last = float(record.get("lastUsedAt", 0))
+            if now >= last + self.idle_seconds:
+                return False
+            if now - last >= min(60, max(1, self.idle_seconds // 10)):
+                record["lastUsedAt"] = now
+                self._save(codes)
+            return True
 
     def logout(self, cookie_value: Optional[str]) -> bool:
         """End this session on the server: every copy of the cookie is refused from now on. Clear the
         browser's copy with expired_session_cookie_header(). False when there was no live record."""
-        parsed = self._parse(cookie_value)
-        if parsed is None:
-            return False
-        codes = self._load()
-        record = codes.get(self._record_key(parsed[0]))
-        if not record or record.get("signedInAt") != parsed[1] or record.get("loggedOutAt") is not None:
-            return False
-        record["loggedOutAt"] = self._clock()
-        self._save(codes)
-        return True
+        with self._lock:
+            parsed = self._parse(cookie_value)
+            if parsed is None:
+                return False
+            codes = self._load()
+            record = codes.get(self._record_key(parsed[0]))
+            if not record or record.get("signedInAt") != parsed[1] or record.get("loggedOutAt") is not None:
+                return False
+            record["loggedOutAt"] = self._clock()
+            self._save(codes)
+            return True
 
     def _parse(self, cookie_value: Optional[str]) -> Optional[Tuple[str, int]]:
         """The signed claim of a cookie under the current key and token, or None."""
-        parts = (cookie_value or "").split(".")
+        if not isinstance(cookie_value, str) or not cookie_value.isascii():
+            return None
+        parts = cookie_value.split(".")
         if len(parts) != 5 or parts[0] != "v2" or not parts[1] or not parts[2].isdigit():
             return None
         claim, mac = ".".join(parts[:4]), parts[4]
@@ -1358,6 +1368,13 @@ class LoginCodes:
         if self._fixed_key is not None:
             raise ServiceError("a platform-held session key is rotated on the platform, not here.")
         atomic_write(self._key_path, secrets.token_bytes(32), 0o600)
+
+
+def _session_bound(value: Any, longest: int) -> int:
+    """A session bound in seconds: a finite number, never longer than the contract's (DEC-0039)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value or value in (float("inf"), float("-inf")):
+        raise ServiceError("a session bound must be a finite number of seconds.")
+    return min(int(value), longest)
 
 
 class MemoryCodeStore:

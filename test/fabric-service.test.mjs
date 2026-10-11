@@ -141,6 +141,18 @@ test('operator sessions follow DEC-0039: idle, absolute, logout, rotation, clamp
   now[0] += 7 * 24 * HOUR + 2 * HOUR; signIn(codes);
   assert.equal(Object.keys(JSON.parse(fs.readFileSync(store, 'utf8'))).filter((key) => key.startsWith('s:')).length, 1, 'records pruned');
 
+  for (const bad of [`v2.x.1.y.${'\u00e9'.repeat(64)}`, `v2.\u00e9.1.-.${'0'.repeat(64)}`, `v2.x.1.\u00e9.${'0'.repeat(64)}`]) {
+    assert.equal(codes.sessionValid(bad), false, 'review S2: a non-ASCII cookie is refused, never thrown');
+    assert.equal(codes.logout(bad), false);
+  }
+  for (const bound of [{ idleSeconds: NaN }, { maxSeconds: Infinity }, { idleSeconds: '12h' }]) {
+    assert.throws(() => make(bound), /finite number/, 'review S4: a bound must be a finite number');
+  }
+  session = signIn(codes);
+  const records = JSON.parse(fs.readFileSync(store, 'utf8'));
+  for (const record of Object.values(records)) if (record.signedInAt !== undefined) record.loggedOutAt = null;
+  fs.writeFileSync(store, JSON.stringify(records));
+  assert.ok(codes.sessionValid(session), 'review P1: loggedOutAt null is not a logout, as in Python');
   assert.ok(k.sessionCookieHeader('v').includes('Max-Age=604800'));
   assert.ok(k.remoteSessionCookieHeader('v').includes('Max-Age=604800'));
   assert.match(k.expiredSessionCookieHeader(), /^fabric_session=; .*Max-Age=0/);

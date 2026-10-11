@@ -711,7 +711,15 @@ export function pruneReleases(releasesDir, { keep = 2, current } = {}) {
 export const OPERATOR_SESSION_IDLE_SECONDS = 12 * 60 * 60;
 export const OPERATOR_SESSION_MAX_SECONDS = 7 * 24 * 60 * 60;
 
-const safeEqual = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+// Compare bytes, not UTF-16 units: a non-ASCII value of the right length must be a refusal, not a RangeError.
+const safeEqual = (a, b) => {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
+const sessionBound = (value, longest) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw new ServiceError('a session bound must be a finite number of seconds.');
+  return Math.min(Math.trunc(value), longest);
+};
 
 // Single-use login codes, and operator sessions with the DEC-0039 lifetime: a session ends 12 h after its
 // last use, 7 days after the code was redeemed, on logout, and when the descriptor token rotates. The server
@@ -728,8 +736,8 @@ export class LoginCodes {
   constructor(stateDir, ttlSeconds = 120, { store = null, key = null, token = null,
     idleSeconds = OPERATOR_SESSION_IDLE_SECONDS, maxSeconds = OPERATOR_SESSION_MAX_SECONDS, clock = () => Date.now() / 1000 } = {}) {
     this.ttl = Math.min(ttlSeconds, 120);
-    this.idleSeconds = Math.min(Math.trunc(idleSeconds), OPERATOR_SESSION_IDLE_SECONDS);
-    this.maxSeconds = Math.min(Math.trunc(maxSeconds), OPERATOR_SESSION_MAX_SECONDS);
+    this.idleSeconds = sessionBound(idleSeconds, OPERATOR_SESSION_IDLE_SECONDS);
+    this.maxSeconds = sessionBound(maxSeconds, OPERATOR_SESSION_MAX_SECONDS);
     this.store = store;
     this.fixedKey = key;
     this.token = token;
@@ -799,7 +807,7 @@ export class LoginCodes {
     if (now >= signedInAt + this.maxSeconds) return false;
     const codes = this.load();
     const record = codes[LoginCodes.recordKey(session)];
-    if (!record || record.signedInAt !== signedInAt || record.loggedOutAt !== undefined) return false;
+    if (!record || record.signedInAt !== signedInAt || record.loggedOutAt != null) return false;
     const last = Number(record.lastUsedAt ?? 0);
     if (now >= last + this.idleSeconds) return false;
     if (now - last >= Math.min(60, Math.max(1, Math.trunc(this.idleSeconds / 10)))) {
@@ -815,14 +823,15 @@ export class LoginCodes {
     if (!parsed) return false;
     const codes = this.load();
     const record = codes[LoginCodes.recordKey(parsed[0])];
-    if (!record || record.signedInAt !== parsed[1] || record.loggedOutAt !== undefined) return false;
+    if (!record || record.signedInAt !== parsed[1] || record.loggedOutAt != null) return false;
     record.loggedOutAt = this.clock();
     this.save(codes);
     return true;
   }
 
   parse(value) {
-    const parts = String(value ?? '').split('.');
+    if (typeof value !== 'string' || !/^[\x21-\x7e]*$/.test(value)) return null;
+    const parts = value.split('.');
     if (parts.length !== 5 || parts[0] !== 'v2' || !parts[1] || !/^\d+$/.test(parts[2])) return null;
     if (!safeEqual(parts[4], this.mac(parts.slice(0, 4).join('.')))) return null;
     if (!safeEqual(parts[3], this.tokenRevision())) return null;

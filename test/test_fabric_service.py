@@ -301,6 +301,36 @@ class OperatorSessionTests(unittest.TestCase):
         records = [k for k in json.loads((Path(self.temp.name) / "login-codes.json").read_text()) if k.startswith("s:")]
         self.assertEqual(len(records), 1)
 
+    def test_a_logout_is_not_lost_to_a_concurrent_refresh(self):
+        """Review S1: a refresh that loaded the store before a logout must not save over it."""
+        import threading
+        codes = self.codes()
+        session = self.sign_in(codes)
+        self.now[0] += 120  # the next check refreshes lastUsedAt, so it saves
+        real_save = codes._save
+        other = threading.Thread(target=codes.logout, args=(session,))
+        def save_while_logging_out(data):
+            if not other.is_alive() and other.ident is None:
+                other.start()
+                other.join(0.3)  # with the lock held, the logout waits for this save
+            real_save(data)
+        codes._save = save_while_logging_out
+        self.assertTrue(codes.session_valid(session))
+        codes._save = real_save
+        other.join(5)
+        self.assertFalse(codes.session_valid(session))
+
+    def test_non_ascii_and_bad_bounds_are_refused_without_raising(self):
+        """Review S3, S4: a hostile cookie is a refusal, not an exception; a bound must be a number."""
+        codes = self.codes()
+        self.sign_in(codes)
+        for bad in ("v2.x.1.y." + "\u00e9" * 64, "v2.\u00e9.1.-." + "0" * 64, "v2.x.1.\u00e9." + "0" * 64):
+            self.assertFalse(codes.session_valid(bad))
+            self.assertFalse(codes.logout(bad))
+        for bound in ({"idle_seconds": float("nan")}, {"max_seconds": float("inf")}, {"idle_seconds": "12h"}):
+            with self.assertRaises(fs.ServiceError):
+                self.codes(**bound)
+
     def test_cookie_headers_default_to_seven_days_and_can_be_cleared(self):
         self.assertIn("Max-Age=604800", fs.session_cookie_header("v"))
         self.assertIn("Max-Age=604800", fs.remote_session_cookie_header("v"))
@@ -697,6 +727,9 @@ class McpDelegationAuthTests(unittest.TestCase):
         p.results = []
         p.delegation_declared_rule(None)
         self.assertEqual(p.results[0]["verdict"], "FAIL")
+        p.wk, p.results = {"auth": "x"}, []
+        p.delegation_declared_rule({"path": "/mcp", "auth": "delegation"})
+        self.assertEqual(p.results[0]["verdict"], "FAIL")  # review Q1: a malformed auth is a finding, not a crash
 
 
 class SessionLifetimeRuleTests(unittest.TestCase):
