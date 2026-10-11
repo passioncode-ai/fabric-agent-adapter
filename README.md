@@ -33,6 +33,17 @@ complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live pro
 python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py example-agent
 ```
 
+The dashboard itself is built from the **dashboard kit** (`assets/dashboard-kit/`, `fabric-dashboard/0.1`,
+contract DEC-0036): one stylesheet and one script that keep the page usable from 360 CSS px inside a host
+pane beside the agent console — navigation that folds into a More menu, wide tables in their own scroll
+box, sticky chrome at most 120 px — with seven WCAG AA themes (light and dark) that follow the host's
+`fabric_appearance` cookie. `scripts/dashboard_kit.py install|status` copies and checks it,
+`scripts/check_dashboard_layout.mjs` measures a rendered page in WebKit at 360, 480, 768 and 1280 px
+(Playwright; `NOT_RUN` without it), and the probe's `dashboard.declared` checks the declaration. The
+plugin's one hook (SessionStart) prints a single line in a repository whose dashboard has no kit or an
+older one, and nothing anywhere else; the [kit reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-kit.md)
+has the upgrade steps, taken only with the operator's go-ahead.
+
 Dashboard handoffs use the host-generated `open_link` as the primary action. The
 three skills carry the same [consumer procedure](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-links.md)
 and a portable `scripts/check_dashboard_link.py` gate for generated renderers.
@@ -191,7 +202,7 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 The default pin for new bundles is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `52da526d7cc1e063d74c5b520dbc03d0ace15246`
+- commit: `a83bec6b47776af688402c18efec507143061f68`
 
 Every other mention of the default contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree
@@ -218,8 +229,8 @@ FABRIC_CONTRACT_OLD=/path/to/legacy-contract FABRIC_CONTRACT_NEW=/path/to/curren
 ```
 
 Without both environment variables, those tests explicitly skip as `NOT_RUN`.
-This source checkout is 0.8.3. 0.8.2 is the latest published GitHub/npm release (2026-10-10; 0.7.0 was never
-released); 0.8.3 is published by its `v0.8.3` tag. Source delivery does not update installed skills or live sessions.
+This source checkout is 0.9.0. 0.8.3 is the latest published GitHub/npm release (2026-10-10; 0.7.0 was never
+released); 0.9.0 is published by its `v0.9.0` tag. Source delivery does not update installed skills or live sessions.
 
 ## License
 

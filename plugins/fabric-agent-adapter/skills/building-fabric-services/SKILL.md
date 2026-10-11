@@ -9,17 +9,17 @@ description: >-
   на модели». Covers
   fabric-service/0.1: surfaces, token and one-time login, state, one copy, launchd, descriptor,
   well-known document, events, the usage report (spend per model); online: the https guard, the token-gated well-known document, the
-  __Host- cookie, registering it on the operator's computer; ships Python and Node kits, a TLS
-  sample and a live probe. NOT for a one-off script or cron job, a hosted product with no agent
+  __Host- cookie, registering it on the operator's computer; Python, Node and dashboard
+  kits, a TLS sample, live and layout probes. NOT for a one-off script or cron job, a hosted product with no agent
   behind it, the provider manifest (adapting-projects-to-fabric), or building Fabric Dashboards.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.8.3"
+  version: "0.9.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "52da526d7cc1e063d74c5b520dbc03d0ace15246"
+  extension-commit: "a83bec6b47776af688402c18efec507143061f68"
 ---
 
 # Building Fabric services
@@ -198,6 +198,17 @@ while the operator types or a dialog is open, one panel's failure never blanks t
 others, and every error is a sentence with the next action. Read
 [the dashboard reference](references/dashboard.md) before building the page.
 
+The host shows the page in a pane beside the agent console that the operator can drag wide, so
+the page must hold from **360 CSS px** up: no sideways document scroll, navigation that wraps or
+folds into a More menu (never a tab strip that only scrolls sideways), wide tables and logs in
+their own focusable scroll box, sticky chrome at most 120 px, and the host's colour scheme and
+theme followed (`fabric-dashboard/0.1`, contract DEC-0036). **Build it from the dashboard kit**
+(`assets/dashboard-kit/`: `dashboard_kit.py install <static dir>`, seven AA themes, light and dark)
+and declare it with `extensions=fs.dashboard_extension()`. Read
+[the dashboard kit reference](references/dashboard-kit.md) for the markup, the themes, the
+declaration and how to upgrade a dashboard built before the kit — only with the operator's
+go-ahead, which the plugin's session-start notice reminds you of.
+
 The events feed is a **view over the log you already keep** — a jobs table, a JSONL
 journal — not a second store. Each event is one sentence a person reads; set
 `notify: true` only when the operator must decide, or something failed or degrades their
@@ -224,10 +235,12 @@ python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,
-launchd pid equals answering pid, and the `interop.*` rules: manifest link, capability
-list, tools equal to the manifest, job tools, unknown job, trace propagation, event
-trace pairs) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass —
-name it in the report.
+launchd pid equals answering pid, `dashboard.declared` (ED-9), and the `interop.*` rules:
+manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
+propagation, event trace pairs) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass —
+name it in the report. A service with a dashboard also runs the layout probe,
+`node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
+and 1280 px; needs Playwright, else `NOT_RUN`).
 
 Then prove the lock: start a second copy by hand against the same data directory; it
 must exit 75 while the first keeps serving. Prove recovery: `kill -9` the launchd pid;

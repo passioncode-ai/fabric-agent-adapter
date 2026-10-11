@@ -11,6 +11,11 @@ import path from 'node:path';
 
 export const PROTOCOL = 'fabric-service/0.1';
 export const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/service/0.1';
+// The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
+// document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
+export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
+export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.0.0';
+export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 export const EXIT_ALREADY_RUNNING = 75;
 // Lifecycle contract (fabric-workspace knowledge/lifecycle.md), the same values as fabric_service.py.
 // A launchd-supervised copy that finds the lock held backs off in-process before its exit 75 (LC-03).
@@ -339,7 +344,45 @@ export function removeDescriptor(id, instance = 'default', dir = servicesDir()) 
 
 // --- well-known and events ------------------------------------------------------------
 
-export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid }) {
+const THEME_ID = /^[a-z][a-z0-9-]{0,31}$/;
+const KIT_REF = /^[a-z][a-z0-9-]{0,63}@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/;
+
+// What makes value not a valid ED-9 declaration (service-dashboard-extension.schema.json).
+export function dashboardExtensionProblems(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ['the declaration is not an object'];
+  const out = [];
+  const extra = Object.keys(value).filter((k) => !['minWidth', 'appearance', 'themes', 'kit'].includes(k)).sort();
+  if (extra.length) out.push(`unknown field(s): ${extra.join(', ')}`);
+  const w = value.minWidth;
+  if (!Number.isInteger(w)) out.push('minWidth is required and must be a whole number of CSS pixels');
+  else if (w < 360 || w > 1280) out.push(`minWidth ${w} is outside 360…1280`);
+  if ('appearance' in value) {
+    const a = value.appearance;
+    if (!Array.isArray(a) || a.length > 2 || new Set(a).size !== a.length || a.some((x) => x !== 'scheme' && x !== 'theme')) out.push('appearance is a list of distinct fields from scheme, theme');
+  }
+  if ('themes' in value) {
+    const t = value.themes;
+    if (!Array.isArray(t) || t.length < 1 || t.length > 32 || new Set(t).size !== t.length || t.some((x) => typeof x !== 'string' || !THEME_ID.test(x))) out.push('themes is 1…32 distinct theme ids matching ^[a-z][a-z0-9-]{0,31}$');
+  }
+  if ('kit' in value && !(typeof value.kit === 'string' && KIT_REF.test(value.kit))) out.push(`kit is name@semver, for example ${DASHBOARD_KIT}`);
+  return out;
+}
+
+// The `extensions` entry a dashboard built from the kit declares (DEC-0036 ED-9). Declare it only
+// when the page meets ED-1…ED-6 — check_dashboard_layout.mjs measures that.
+export function dashboardExtension({ minWidth = 360, appearance = ['scheme', 'theme'], themes = REFERENCE_THEMES, kit = DASHBOARD_KIT } = {}) {
+  const value = { minWidth };
+  if (appearance?.length) value.appearance = [...appearance];
+  if (themes?.length) value.themes = [...themes];
+  if (kit) value.kit = kit;
+  const problems = dashboardExtensionProblems(value);
+  if (problems.length) throw new ServiceError(`Dashboard declaration: ${problems.join('; ')}.`);
+  return { [DASHBOARD_EXTENSION_KEY]: value };
+}
+
+// `extensions` is kept as given (a reader ignores keys it does not know); a dashboard declaration in
+// it must be valid (dashboardExtension builds one).
+export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions }) {
   if (!STATUSES.includes(status)) throw new ServiceError(`status must be one of ${STATUSES.join(', ')}.`);
   if (!surfaces?.events) throw new ServiceError('surfaces.events is required.');
   if (!(build?.commit || build?.digest)) throw new ServiceError('build needs a commit or a digest.');
@@ -353,6 +396,13 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
     update: { available: updateAvailable },
   };
   if (summary?.length) doc.summary = summary.slice(0, 6);
+  if (extensions && Object.keys(extensions).length) {
+    if (DASHBOARD_EXTENSION_KEY in extensions) {
+      const problems = dashboardExtensionProblems(extensions[DASHBOARD_EXTENSION_KEY]);
+      if (problems.length) throw new ServiceError(`Dashboard declaration: ${problems.join('; ')}.`);
+    }
+    doc.extensions = { ...extensions };
+  }
   return doc;
 }
 

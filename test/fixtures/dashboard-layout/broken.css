@@ -1,0 +1,9 @@
+body { margin: 0; font: 13px/1.5 system-ui, sans-serif; }
+.top { position: sticky; top: 0; height: 200px; background: #eee; }
+.tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.tabs a { padding: 4px 24px; white-space: nowrap; }
+.fixed { width: 410px; }
+.wide td { padding: 4px 40px; white-space: nowrap; }
+section { min-height: 400px; }
+.pane { height: 100vh; overflow-y: auto; }
+.tall { height: 3000px; }

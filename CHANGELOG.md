@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.9.0 - 2026-10-11
+
+The dashboard kit (`fabric-dashboard/0.1`, contract DEC-0036): a Fabric service's dashboard holds inside a
+host pane beside the agent console from 360 CSS px up, follows the host's colour scheme and theme, and says
+so in its well-known document. The contract pin moves to Fabric Agent Contract `main` `a83bec6` (the
+DEC-0036 merge, contract PR #27). Bundles issued under the DEC-0035, DEC-0033, DEC-0031, DEC-0024, DEC-0021,
+DEC-0020 and DEC-0019 revisions stay valid.
+
+### Added
+
+- **`building-fabric-services/assets/dashboard-kit/`** (FAA-17): `fabric-dashboard.css` (the workbench token
+  layer plus `--edge`; root `min-width: 360px`; fluid grids; navigation that wraps, or folds into a More menu
+  with the script; `.fd-scroll` boxes with edge shades, a visible scrollbar and keyboard focus; sticky chrome
+  kept within min(120 px, a quarter of the height) by letting the header scroll away), `fabric-dashboard.js`
+  (applies the `fabric_appearance` cookie, hides the page's own appearance controls while the host owns
+  them, re-applies on cookie change and visibility, folds navigation, names scroll boxes, measures the chrome
+  for anchors; CSP-clean), seven reference themes in `themes.json` (graphite, fabric, paper, forest, ocean,
+  ember, contrast; light and dark; every pair WCAG 2.2 AA, measured by `test/test_dashboard_kit.py`),
+  `kit.json` (version, theme ids, file digests and per-version history) and `demo.html`.
+- **`scripts/dashboard_kit.py`** `status | install | build | notice`: `install` never overwrites a copy the
+  service changed without `--force`; `build` regenerates the themes from `themes.json`.
+- **`scripts/check_dashboard_layout.mjs`**: renders a page in WebKit (or `--browser chromium|firefox`) at the
+  floor minus 40 and 360, 480, 768, 1280 px and reports ED-1…ED-5; `--service <id>` signs in with a login
+  code and reads the declared `minWidth`. Without Playwright every rule is `NOT_RUN`.
+- **`check_service.py` rule `dashboard.declared`** (ED-9): PASS for a valid declaration (and names a newer
+  kit), FAIL for an invalid one, NOT_RUN for no dashboard or a legacy one.
+- **`dashboard_extension()` / `dashboardExtension()`** in both kits, and `extensions` in `build_well_known` /
+  `buildWellKnown` (a dashboard declaration in it is validated). The sample service's dashboard is built on
+  the kit and declares it.
+- **The plugin's first hook**: `SessionStart` runs `dashboard_kit.py notice`, which prints one line in a
+  repository whose dashboard has no kit or an older one and nothing elsewhere; it writes nothing and always
+  exits 0. `AGENTS.md` Lifecycle (LC-09) declares it.
+- **`references/dashboard-kit.md`**: the rules, the markup, the themes, the declaration, the probes and
+  "Upgrading an existing dashboard" (only with the operator's go-ahead). Scenario evals
+  `dashboard-in-a-narrow-host-pane`, `dashboard-kit-upgrade-notice`, `dashboard-follows-host-appearance`
+  and two trigger queries came first.
+
+### Changed
+
+- **Default contract pin `52da526` → `a83bec6b47776af688402c18efec507143061f68`.** `52da526` (DEC-0035) joins
+  `SUPPORTED_CONTRACT_COMMITS`. The revisions between add only the `fabric-dashboard/0.1` profile and
+  `service-dashboard-extension.schema.json`; the provider manifest and the MCP, A2A and local-runner
+  profiles do not change, and every descriptor and well-known document the kits wrote before stays valid.
+- `references/dashboard.md` point 8 sends the page to the kit; `references/protocol.md` names the
+  `extensions` dashboard declaration.
+
 ## 0.8.3 - 2026-10-10
 
 The contract pin moves to Fabric Agent Contract `main` `52da526` (DEC-0034 and DEC-0035, the operator

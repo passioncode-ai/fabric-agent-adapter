@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en" data-fd-appearance="scheme theme">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Example agent · dashboard kit demo</title>
+  <link rel="stylesheet" href="fabric-dashboard.css">
+  <script src="fabric-dashboard.js" defer></script>
+</head>
+<body>
+  <a class="fd-skip" href="#overview">Skip to content</a>
+  <div class="fd-chrome">
+    <header class="fd-header">
+      <div>
+        <p class="fd-title">Example agent</p>
+        <span class="fd-chip fd-s-ok"><span class="fd-dot"></span>Ready</span>
+      </div>
+      <div class="fd-actions">
+        <label class="fd-sr-only" for="theme">Theme</label>
+        <select id="theme" class="fd-select" data-fd-theme-picker></select>
+        <label class="fd-sr-only" for="scheme">Colour scheme</label>
+        <select id="scheme" class="fd-select" data-fd-scheme-picker></select>
+        <button class="fd-btn fd-btn--primary" type="button">Run now</button>
+      </div>
+    </header>
+    <nav class="fd-nav" aria-label="Sections">
+      <ul class="fd-nav-list">
+        <li><a href="#overview" aria-current="page">Overview</a></li>
+        <li><a href="#jobs">Jobs</a></li>
+        <li><a href="#approvals">Approvals</a></li>
+        <li><a href="#calendar">Calendar</a></li>
+        <li><a href="#channels">Channels</a></li>
+        <li><a href="#budget">Budget</a></li>
+        <li><a href="#journal">Journal</a></li>
+        <li><a href="#inbox">Inbox</a></li>
+        <li><a href="#cases">Cases</a></li>
+        <li><a href="#playbooks">Playbooks</a></li>
+        <li><a href="#reports">Reports</a></li>
+        <li><a href="#log">Log</a></li>
+        <li><a href="#settings">Settings</a></li>
+        <li><a href="#help">Help</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <main class="fd-page">
+    <section id="overview">
+      <h2>Overview</h2>
+      <div class="fd-grid fd-grid--tiles">
+        <div class="fd-tile"><div class="fd-label">Jobs today</div><div class="fd-value">128</div></div>
+        <div class="fd-tile"><div class="fd-label">Waiting for you</div><div class="fd-value">3</div></div>
+        <div class="fd-tile"><div class="fd-label">Spend, 7 days</div><div class="fd-value">$4.21</div></div>
+        <div class="fd-tile"><div class="fd-label">Last run</div><div class="fd-value"><time>17:02</time></div></div>
+      </div>
+    </section>
+
+    <section id="jobs">
+      <h2>Jobs</h2>
+      <div class="fd-scroll" data-fd-label="Jobs table">
+        <table class="fd-table">
+          <caption class="fd-sr-only">Recent jobs</caption>
+          <thead><tr><th>Job</th><th>Capability</th><th>State</th><th>Started</th><th class="fd-num">Tokens</th><th class="fd-num">Cost</th><th>Trace</th></tr></thead>
+          <tbody>
+            <tr><td class="fd-mono">job-7f3a91</td><td>example.summarize</td><td><span class="fd-chip fd-s-info"><span class="fd-dot"></span>Running</span></td><td><time>2026-10-11 17:02</time></td><td class="fd-num">12 480</td><td class="fd-num">$0.031</td><td class="fd-mono">4bf92f3577b34da6a3ce929d0e0e4736</td></tr>
+            <tr><td class="fd-mono">job-7f3a90</td><td>example.translate</td><td><span class="fd-chip fd-s-ok"><span class="fd-dot"></span>Done</span></td><td><time>2026-10-11 16:40</time></td><td class="fd-num">8 002</td><td class="fd-num">$0.019</td><td class="fd-mono">00f067aa0ba902b74bf92f3577b34da6</td></tr>
+            <tr><td class="fd-mono">job-7f3a8f</td><td>example.review</td><td><span class="fd-chip fd-s-warn"><span class="fd-dot"></span>Needs you</span></td><td><time>2026-10-11 15:12</time></td><td class="fd-num">2 210</td><td class="fd-num">—</td><td class="fd-mono">a3ce929d0e0e47364bf92f3577b34da6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="approvals">
+      <h2>Approvals</h2>
+      <div class="fd-grid">
+        <article class="fd-card fd-stack">
+          <h3>Publish the weekly report <span class="fd-chip fd-s-warn"><span class="fd-dot"></span>Waiting</span></h3>
+          <p class="fd-hint">Before → after and the hash the service checks when it applies the change.</p>
+          <pre class="fd-scroll" data-fd-label="Change preview">- status: draft
++ status: published   sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08</pre>
+          <div class="fd-row"><button class="fd-btn fd-btn--primary" type="button">Approve</button><button class="fd-btn" type="button">Reject</button></div>
+        </article>
+        <article class="fd-card">
+          <h3>Service</h3>
+          <dl class="fd-pairs">
+            <div><dt>Build</dt><dd class="fd-mono">3537587</dd></div>
+            <div><dt>Started</dt><dd><time>2026-10-11 09:00</time></dd></div>
+            <div><dt>Port</dt><dd class="fd-mono">8710</dd></div>
+            <div><dt>Instance</dt><dd class="fd-mono">default</dd></div>
+          </dl>
+        </article>
+      </div>
+    </section>
+
+    <section id="calendar"><h2>Calendar</h2><p class="fd-empty">Nothing is scheduled this week. <a href="#jobs">See the jobs</a></p></section>
+    <section id="channels"><h2>Channels</h2><div class="fd-banner fd-s-danger"><span class="fd-dot fd-s-danger"></span><span>Channel push failed: the provider rejected the key. Settings → Keys</span></div></section>
+    <section id="budget"><h2>Budget</h2><p>$4.21 of $100 this month.</p></section>
+    <section id="journal"><h2>Journal</h2><p>No decisions recorded today.</p></section>
+    <section id="inbox"><h2>Inbox</h2><p class="fd-empty">No comments waiting.</p></section>
+    <section id="cases"><h2>Cases</h2><p>Two candidates from yesterday's work log.</p></section>
+    <section id="playbooks"><h2>Playbooks</h2><p>All playbooks reviewed this month.</p></section>
+    <section id="reports"><h2>Reports</h2><p>The weekly report is due Monday.</p></section>
+    <section id="log"><h2>Log</h2><pre class="fd-scroll" data-fd-label="Service log">2026-10-11T17:02:11Z info  job.started   job-7f3a91 example.summarize trace=4bf92f3577b34da6a3ce929d0e0e4736 span=00f067aa0ba902b7
+2026-10-11T16:40:57Z info  job.finished  job-7f3a90 example.translate tokens=8002 cost=0.019</pre></section>
+    <section id="settings"><h2>Settings</h2><label for="name">Display name</label> <input id="name" class="fd-input" value="Example agent"></section>
+    <section id="help"><h2>Help</h2><p>Every error is a sentence and the next action.</p></section>
+  </main>
+  <footer class="fd-foot">fabric-dashboard-kit demo · fabric-dashboard/0.1</footer>
+</body>
+</html>

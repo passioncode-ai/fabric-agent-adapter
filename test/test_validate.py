@@ -462,6 +462,18 @@ class PinTests(unittest.TestCase):
         self.assertEqual(code, 1, out)
         self.assertIn('immutable declaration', out)
 
+    def test_a_link_to_a_dated_handoff_is_not_a_pin_but_the_same_hash_in_prose_is(self):
+        import tempfile
+        old = "52da526d7cc1e063d74c5b520dbc03d0ace15246"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "docs").mkdir()
+            (root / "docs/backlog.md").write_text("| FAA-x | the contract pin moved | [handoff](handoffs/2026-10-10-contract-pin-52da526.md) |\n")
+            self.assertEqual(validate.contract_pin_drift(root, "a" * 40), [])
+            (root / "docs/backlog.md").write_text("| FAA-x | the contract pin moved to `52da526` | [handoff](handoffs/x.md) |\n")
+            self.assertEqual(len(validate.contract_pin_drift(root, "a" * 40)), 1)
+            self.assertEqual(validate.contract_pin_drift(root, old), [])
+
     def test_exact_source_literals_match_runtime_and_default_bundle(self):
         from test_adapt_project import ADAPTER, scaffold_args
         import tempfile

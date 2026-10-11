@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planted defects for check_dashboard_layout.mjs</title>
+  <link rel="stylesheet" href="broken.css">
+</head>
+<body>
+  <!-- ED-5: a 200 px sticky header. ED-3: a tab strip that only scrolls sideways. -->
+  <header class="top">Example agent</header>
+  <nav class="tabs" aria-label="Sections">
+    <a href="#a">Overview</a><a href="#b">Jobs</a><a href="#c">Approvals</a><a href="#d">Calendar</a><a href="#e">Channels</a>
+    <a href="#f">Budget</a><a href="#g">Journal</a><a href="#h">Inbox</a><a href="#i">Cases</a><a href="#j">Playbooks</a>
+  </nav>
+  <!-- ED-1: a fixed 410 px block. ED-4: a wide table straight in the document. -->
+  <main>
+    <section id="a"><div class="fixed">A block that assumed a desktop width.</div></section>
+    <section id="b"><table class="wide"><tr><td>job-7f3a91</td><td>example.summarize</td><td>running</td><td>4bf92f3577b34da6a3ce929d0e0e4736</td></tr></table></section>
+    <section id="c">Approvals</section>
+  </main>
+  <!-- ED-5: a nested scroller that takes the whole height. -->
+  <div class="pane"><div class="tall">Log</div></div>
+</body>
+</html>

@@ -23,9 +23,10 @@ service are not.
    when it returns.
 7. **Approvals show the diff and its hash.** Any write the operator approves shows
    before → after and the hash the service will verify at apply time.
-8. **Theme.** Follow the operator's product design system (PassionCode.ai tokens for
-   Fabric-family services); respect `prefers-color-scheme` unless the product fixes a
-   theme; never encode meaning by colour alone.
+8. **Theme and width.** Build the page from the dashboard kit: its seven AA themes, light and
+   dark, follow `prefers-color-scheme` and the host's `fabric_appearance` cookie, and its layout
+   holds from 360 CSS px inside a host pane (`fabric-dashboard/0.1`, DEC-0036;
+   [the dashboard kit reference](dashboard-kit.md)). Never encode meaning by colour alone.
 9. **Links into the page are stable.** Event `link`s point at hash routes that survive
    a reload (`/dashboard#/approvals/77`) so a notification opens the exact item.
 10. **No second browser tab required.** With Fabric Dashboards installed, the page is

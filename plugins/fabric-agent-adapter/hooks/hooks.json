@@ -1,0 +1,17 @@
+{
+  "description": "One line at session start in a repository whose Fabric dashboard has no dashboard kit or an older one (fabric-dashboard/0.1, DEC-0036). Silent everywhere else; reads only, never writes, always exits 0.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -S \"${CLAUDE_PLUGIN_ROOT}/skills/building-fabric-services/scripts/dashboard_kit.py\" notice",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

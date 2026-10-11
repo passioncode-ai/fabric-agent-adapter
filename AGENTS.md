@@ -102,14 +102,20 @@ The org contract is [knowledge/lifecycle.md](https://github.com/passioncode-ai/f
 this repository both obeys it and ships its service layer
 ([`references/lifecycle.md`](plugins/fabric-agent-adapter/skills/building-fabric-services/references/lifecycle.md)).
 
-**Background footprint (LC-09): none.** The plugin is skills only — no hooks, no `.mcp.json`,
-no launchd job, no port, no per-session server, no login item. Nothing runs without a window
-and nothing idles; there is nothing to stop. `install.sh` and `bin/fabric-agent-adapter.js` run
-once when a person calls them and exit.
+**Background footprint (LC-09): one session-start hook, nothing resident.** The plugin is skills
+plus one `SessionStart` hook (`plugins/fabric-agent-adapter/hooks/hooks.json`, matcher
+`startup|resume`): `dashboard_kit.py notice` reads the repository (`git rev-parse`, `git ls-files`,
+`git grep`) and the services directory, prints one line when the repository's dashboard has no
+dashboard kit or an older one, and exits 0 — always, within its 5 s timeout; it writes nothing.
+Measured on this machine under a load average of about 50: median 294–443 ms per session start
+(Python start-up about 45 ms; each repository step 15–46 ms in-process). No `.mcp.json`, no launchd
+job, no port, no per-session server, no login item. Nothing idles; there is nothing to stop.
+`install.sh` and `bin/fabric-agent-adapter.js` run once when a person calls them and exit.
 
 | What | Started by | Cadence | With no window | Stopped by | Idle budget |
 |---|---|---|---|---|---|
 | `install.sh`, `npx @passioncode-ai/fabric-agent-adapter` | a person | on demand | nothing | exits when done | 0 |
+| `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or resume | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
 | Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`) | resident | the service | `launchctl bootout` + `disable`, or `launchd_uninstall` | declared by each service in its own `AGENTS.md` |
 | Test suites (`npm test`) | a person or CI | on demand | nothing | exit; the lifecycle tests kill their own children in `finally` | 0 |
 
