@@ -9,3 +9,6 @@ dist/
 # agent-sync: local state and the credentials file are never committed
 .env.agent-sync
 .agent-sync/
+
+# local git worktrees of this repository
+.worktrees/
