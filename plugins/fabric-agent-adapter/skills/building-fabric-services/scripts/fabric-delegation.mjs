@@ -31,6 +31,8 @@ export const LEEWAY_SECONDS = 60;
 /** DL-15: cache the key set at most 10 minutes; re-read it at most once a minute for an unknown kid. */
 export const JWKS_MAX_AGE_SECONDS = 600;
 export const JWKS_REREAD_SECONDS = 60;
+/** After a failed read, wait this long before trying again. */
+export const JWKS_RETRY_SECONDS = 10;
 
 const REFUSAL_STATUS = { unauthenticated: 401, 'token-expired': 401, 'principal-unproven': 401, 'issuer-unavailable': 503, 'unknown-state': 503 };
 export const REFUSAL_MESSAGES = Object.freeze({
@@ -231,7 +233,9 @@ export function verifyApproval(approval, { audience, jwks, now, actionDigest: ex
   if (now > claims.exp + LEEWAY_SECONDS) return refuse('approval-invalid', 'expired');
   if (claims.aud !== audience) return refuse('approval-invalid', 'audience-mismatch');
   if (claims.actionDigest !== expected) return refuse('approval-invalid', 'digest-mismatch', { actionDigest: expected });
-  if (!jtiStore.consume(claims.jti, claims.exp, now)) return refuse('approval-reused', 'jti-consumed');
+  let fresh;
+  try { fresh = jtiStore.consume(claims.jti, claims.exp, now); } catch { return refuse('unknown-state', 'jti-store-failed'); }
+  if (!fresh) return refuse('approval-reused', 'jti-consumed');
   return { ok: true, claims, approver: claims.approver, method: claims.method, kid: checked.kid };
 }
 
@@ -248,20 +252,31 @@ export function createMemoryJtiStore() {
   };
 }
 
-/** Consumed approval ids in a 0600 JSON file, so a second use is refused across a restart (DL-18). */
+/** A jti store that cannot tell whether an id was consumed; the verifier answers unknown-state. */
+export class JtiStoreError extends Error {}
+
+/**
+ * Consumed approval ids in a 0600 JSON file, so a second use is refused across a restart (DL-18). A file that
+ * cannot be read throws JtiStoreError: forgetting every consumed id would let each approval be replayed.
+ */
 export class FileJtiStore {
   constructor(file) { this.file = file; }
 
   consume(jti, expiresAt, now) {
-    let seen = {};
-    try { const read = JSON.parse(fs.readFileSync(this.file, 'utf8')); if (isObject(read)) seen = read; } catch { seen = {}; }
-    seen = Object.fromEntries(Object.entries(seen).filter(([, until]) => typeof until === 'number' && until + LEEWAY_SECONDS >= now));
-    if (Object.hasOwn(seen, jti)) return false;
-    seen[jti] = expiresAt;
+    let read = {};
+    try {
+      read = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw new JtiStoreError(`the consumed-approval file cannot be read: ${error?.code ?? error?.name}`);
+    }
+    if (!isObject(read)) throw new JtiStoreError('the consumed-approval file is not a JSON object');
+    const seen = new Map(Object.entries(read).filter(([, until]) => typeof until === 'number' && until + LEEWAY_SECONDS >= now));
+    if (seen.has(jti)) return false;
+    seen.set(jti, expiresAt);
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     const temp = path.join(path.dirname(this.file), `.${path.basename(this.file)}.${crypto.randomBytes(4).toString('hex')}.tmp`);
     const fd = fs.openSync(temp, 'wx', 0o600);
-    try { fs.writeSync(fd, JSON.stringify(seen)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    try { fs.writeSync(fd, JSON.stringify(Object.fromEntries(seen))); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     fs.renameSync(temp, this.file);
     return true;
   }
@@ -274,6 +289,7 @@ function header(headers, name) {
   if (!headers) return undefined;
   if (typeof headers.get === 'function' && !(headers instanceof Map)) { const v = headers.get(name); return v === null ? undefined : v; }
   const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === name.toLowerCase())?.[1];
+  if (entry === null || entry === undefined) return undefined;
   return Array.isArray(entry) ? (entry[0] ?? '') : entry;
 }
 
@@ -317,6 +333,7 @@ async function defaultFetch(source) {
   if (/^https?:\/\//.test(source)) {
     const response = await fetch(source, { headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (Number(response.headers.get('content-length') ?? 0) > 65536) throw new Error('the key set is too large');
     const text = await response.text();
     if (text.length > 65536) throw new Error('the key set is too large');
     return JSON.parse(text);
@@ -338,10 +355,11 @@ export class JwksCache {
     } else if (source.includes('://')) {
       throw new Error('a key set is an https URL, a loopback http URL or a file path');
     }
-    Object.assign(this, { source, fetcher, clock, keys: null, readAt: -Infinity, rereadAt: -Infinity, pending: null });
+    Object.assign(this, { source, fetcher, clock, keys: null, readAt: -Infinity, triedAt: -Infinity, rereadAt: -Infinity, pending: null });
   }
 
   async read(now) {
+    this.triedAt = now;
     try {
       const value = await this.fetcher(this.source);
       if (hasKeys(value)) { this.keys = value; this.readAt = now; }
@@ -352,7 +370,7 @@ export class JwksCache {
     const now = this.clock();
     const fresh = now - this.readAt < JWKS_MAX_AGE_SECONDS;
     const known = this.keys !== null && (kid === undefined || kid === null || this.keys.keys.some((k) => isObject(k) && k.kid === kid));
-    if (!fresh) await (this.pending ??= this.read(now).finally(() => { this.pending = null; }));
+    if (!fresh) { if (now - this.triedAt >= JWKS_RETRY_SECONDS) await (this.pending ??= this.read(now).finally(() => { this.pending = null; })); }
     else if (!known && now - this.rereadAt >= JWKS_REREAD_SECONDS) { this.rereadAt = now; await (this.pending ??= this.read(now).finally(() => { this.pending = null; })); }
     return this.clock() - this.readAt < JWKS_MAX_AGE_SECONDS ? this.keys : null;
   }

@@ -62,6 +62,8 @@ test('JwksCache follows DL-15: ten minutes, an unknown kid re-read at most once 
   now[0] += 31; await cache.get('estate-next'); assert.equal(calls.length, 3);
   now[0] += 599; await cache.get('estate-new'); assert.equal(calls.length, 3);
   now[0] += 2; reply = new Error('down'); assert.equal(await cache.get('estate-new'), null, 'older than ten minutes and unreadable');
+  const before = calls.length; await cache.get('estate-new'); assert.equal(calls.length, before, 'a failed read waits before the next try');
+  now[0] += d.JWKS_RETRY_SECONDS; await cache.get('estate-new'); assert.equal(calls.length, before + 1);
   for (const bad of ['http://hub.example/jwks.json', 'ftp://x/j', 'https://u:p@hub.example/j', '']) assert.throws(() => new d.JwksCache(bad), /key set/);
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jwks-')), 'jwks.json');
   fs.writeFileSync(file, JSON.stringify(V.jwks));
@@ -85,4 +87,17 @@ test('the gate refuses in the DL-19 shape and never echoes the token', async () 
   assert.equal(http.headers['WWW-Authenticate'], 'Bearer error="invalid_token"');
   for (const code of V.constants.refusalCodes) assert.ok([401, 403, 503].includes(d.refusalHttp({ ok: false, code, detail: 'x' }).status));
   assert.ok(!JSON.stringify(result).includes(c.token));
+});
+
+test('review findings: unreadable jti file, __proto__ as an id, a null header value', () => {
+  const step = V.approvals[0].steps[0];
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jti-')), 'jti.json');
+  const store = new d.FileJtiStore(file);
+  assert.equal(d.verifyApproval(step.approval, { ...step.options, jtiStore: store }).ok, true);
+  fs.writeFileSync(file, '{');
+  assert.equal(d.verifyApproval(step.approval, { ...step.options, jtiStore: store }).code, 'unknown-state');
+  const proto = new d.FileJtiStore(path.join(path.dirname(file), 'p.json'));
+  assert.equal(proto.consume('__proto__', 1000, 10), true);
+  assert.equal(proto.consume('__proto__', 1000, 20), false);
+  assert.equal(d.readDelegationToken({ 'Fabric-Delegation': null, Authorization: `Bearer ${V.delegation[0].token}` }).via, 'authorization');
 });

@@ -279,14 +279,17 @@ class JobStore:
         return dict(record["job"])
 
     def create(self, capability: str, arguments: Any, traceparent: Optional[str] = None,
-               poll_interval_ms: Optional[int] = None) -> Dict[str, Any]:
+               poll_interval_ms: Optional[int] = None, delegation: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Start a job; returns the handle a job-capable tool puts in structuredContent."""
         job_id = "job_" + secrets.token_hex(12)
         job: Dict[str, Any] = {"id": job_id, "status": "working"}
         if poll_interval_ms:
             job["pollIntervalMs"] = int(poll_interval_ms)
-        self._save({"job": job, "private": {"capability": capability, "input": arguments,
-                                            "traceparent": traceparent if parse_traceparent(traceparent) else None}})
+        private: Dict[str, Any] = {"capability": capability, "input": arguments,
+                                   "traceparent": traceparent if parse_traceparent(traceparent) else None}
+        if delegation:  # DEC-0039: who started it; only they read, cancel or answer it
+            private["delegation"] = {"principal": delegation.get("principal"), "caller": delegation.get("caller")}
+        self._save({"job": job, "private": private})
         return {"job": {"id": job_id, "status": "working"}}
 
     def get(self, job_id: str) -> Dict[str, Any]:
@@ -373,7 +376,7 @@ class CallContext:
     def start_job(self, poll_interval_ms: Optional[int] = None) -> Dict[str, Any]:
         if self.server.jobs is None:
             raise InteropError("This server has no job store.")
-        handle = self.server.jobs.create(self.tool, self.arguments, self.traceparent, poll_interval_ms)
+        handle = self.server.jobs.create(self.tool, self.arguments, self.traceparent, poll_interval_ms, self.delegation)
         self.server.job_started(handle["job"]["id"], self)
         return handle
 
@@ -478,7 +481,7 @@ class McpToolServer:
                  authorize: Optional[Callable[[str, Any], Dict[str, Any]]] = None):
         # authorize(tool, headers) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
-        # not gated: the contract does not yet say how a job read is scoped.
+        # gated by the job's own capability, and answered only for the principal and caller that started it.
         self._authorize = authorize
         self.info = {"name": name, "version": version}
         self.jobs = jobs
@@ -548,7 +551,21 @@ class McpToolServer:
         name = params.get("name")
         arguments = params.get("arguments") or {}
         if name in ("fabric.job.get", "fabric.job.cancel") and self.jobs is not None:
-            return {"jsonrpc": "2.0", "id": rid, "result": self._job_call(name, arguments, span)}
+            verdict = None
+            if self._authorize is not None:
+                job_id = str(arguments.get("id", ""))
+                try:
+                    private = self.jobs.private(job_id)
+                except UnknownJob:
+                    return {"jsonrpc": "2.0", "id": rid, "result": unknown_job_result(job_id, traceparent=span)}
+                verdict = self._authorize(private["capability"], headers)
+                owner = private.get("delegation")
+                if verdict.get("ok") and owner and (owner.get("principal"), owner.get("caller")) != (verdict.get("principal"), verdict.get("caller")):
+                    verdict = {"ok": False, "code": "scope-not-granted", "detail": "job-of-another-caller"}
+                if not verdict.get("ok"):
+                    import fabric_delegation as _fd  # noqa: E402 - only a gated server needs it
+                    return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
+            return {"jsonrpc": "2.0", "id": rid, "result": self._job_call(name, arguments, span, verdict)}
         handler = self.handlers.get(name)
         if handler is None:
             return self._error(rid, -32602, "Unknown tool: %s." % name)
@@ -565,7 +582,8 @@ class McpToolServer:
             return {"jsonrpc": "2.0", "id": rid, "result": tool_result({"error": {"code": "tool-error", "message": str(exc)}}, is_error=True, traceparent=span)}
         return {"jsonrpc": "2.0", "id": rid, "result": tool_result(structured, traceparent=span)}
 
-    def _job_call(self, name: str, arguments: Dict[str, Any], span: str) -> Dict[str, Any]:
+    def _job_call(self, name: str, arguments: Dict[str, Any], span: str,
+                  delegation: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         job_id = str(arguments.get("id", ""))
         try:
             job_span = self.jobs.traceparent(job_id) or span
@@ -581,7 +599,7 @@ class McpToolServer:
                 matched = self.jobs.answer(job_id, responses)
                 if matched and self._on_input:
                     private = self.jobs.private(job_id)
-                    self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span))
+                    self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span, delegation))
             return tool_result({"job": self.jobs.get(job_id)}, traceparent=job_span)
         except UnknownJob:
             return unknown_job_result(job_id, traceparent=span)

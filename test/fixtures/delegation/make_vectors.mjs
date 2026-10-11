@@ -48,6 +48,7 @@ const NOW = claims.iat + 30;
 const call = { audience: 'example-writer', jwks, now: NOW, capability: 'writer.write', effect: 'draft' };
 const token = (overrides = {}, options = {}) => sign({ ...claims, ...overrides }, options);
 const nest = (n) => { let act; for (let i = n; i >= 1; i--) act = act ? { sub: `agent-${i}`, act } : { sub: `agent-${i}` }; return act; };
+const leInt = (buf) => { let n = 0n; for (let i = buf.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(buf[i]); return n; };
 const L = (1n << 252n) + 27742317777372353535851937790883648493n;
 const malleate = (jwt) => {
   const [h, p, s] = jwt.split('.');
@@ -126,6 +127,15 @@ const delegation = [
   ['read-only door serves a read', token(), { readOnly: true, effect: 'none' }],
   ['an approval presented as a token', sign(load('approval-claims.json'), { typ: contract.APPROVAL_TYP }), {}],
   ['not a string', 42, {}],
+  ['forged under a small-order placeholder key', (() => {
+    const zero = Buffer.alloc(32);
+    const h = b64(JSON.stringify({ alg: 'EdDSA', typ: contract.DELEGATION_TYP, kid: 'estate-zero' }));
+    for (let i = 0; ; i++) {
+      const p = b64(JSON.stringify({ ...claims, jti: `forged-${i}` }));
+      const k = leInt(crypto.createHash('sha512').update(Buffer.concat([Buffer.from('5866666666666666666666666666666666666666666666666666666666666666', 'hex'), zero, Buffer.from(`${h}.${p}`)])).digest()) % L;
+      if (k % 4n === 0n) return `${h}.${p}.${Buffer.concat([Buffer.from('5866666666666666666666666666666666666666666666666666666666666666', 'hex'), Buffer.from([1]), Buffer.alloc(31)]).toString('base64url')}`;
+    }
+  })(), { jwks: { keys: [...jwks.keys, { kty: 'OKP', crv: 'Ed25519', x: Buffer.alloc(32).toString('base64url'), kid: 'estate-zero', use: 'sig', alg: 'EdDSA' }] } }],
 ].map(([name, tok, overrides]) => {
   const options = { ...call, ...overrides };
   if (options.jwks === null) delete options.jwks;
@@ -209,6 +219,21 @@ for (let i = 0; i < 64; i++) {
     try { valid = crypto.verify(null, m, crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: k.toString('base64url') }, format: 'jwk' }), s); } catch { valid = false; }
     ed25519.push({ kind, pub: k.toString('hex'), msg: m.toString('hex'), sig: s.toString('hex'), valid });
   }
+}
+// Small-order public keys: R = B, S = 1 satisfies the cofactorless equation whenever k = H(R||A||M) is a multiple
+// of the key's order, so a verifier that does not refuse such keys accepts a signature nobody made. OpenSSL refuses.
+const SMALL_ORDER = ['0100000000000000000000000000000000000000000000000000000000000000', 'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+  '0000000000000000000000000000000000000000000000000000000000000080', '0000000000000000000000000000000000000000000000000000000000000000',
+  'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a', 'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa',
+  '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05', '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85'];
+const BASE = Buffer.from('5866666666666666666666666666666666666666666666666666666666666666', 'hex');
+const ONE = Buffer.concat([Buffer.from([1]), Buffer.alloc(31)]);
+const kOf = (pub, msg) => leInt(crypto.createHash('sha512').update(Buffer.concat([BASE, pub, msg])).digest()) % L;
+for (const hex of SMALL_ORDER) {
+  const pub = Buffer.from(hex, 'hex');
+  let msg; for (let i = 0; ; i++) { msg = Buffer.from(`forged ${i}`); if (kOf(pub, msg) % 8n === 0n) break; }
+  let valid; try { valid = crypto.verify(null, msg, crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: pub.toString('base64url') }, format: 'jwk' }), Buffer.concat([BASE, ONE])); } catch { valid = false; }
+  ed25519.push({ kind: 'small-order key, forged', pub: hex, msg: msg.toString('hex'), sig: Buffer.concat([BASE, ONE]).toString('hex'), valid });
 }
 // RFC 8032 §7.1 TEST 1 and TEST 2, checked here by OpenSSL too.
 for (const [pub, msg, sig] of [

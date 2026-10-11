@@ -2300,6 +2300,49 @@
     "code": "unauthenticated",
     "detail": "malformed"
    }
+  },
+  {
+   "name": "forged under a small-order placeholder key",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS16ZXJvIn0.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiZm9yZ2VkLTUifQ.WGZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmYBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+       "kid": "estate-zero",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "bad-signature"
+   }
   }
  ],
  "approvals": [
@@ -5281,6 +5324,62 @@
    "pub": "98eaea5136f4813b3327f5be7b2f259f81a9d02fabc2e3f2227d119140bd546f",
    "msg": "f1f3f78fcc7e9d7627b2445009830bd2883fccd9e54890960aaed7c466741906db9b33066c3688759f7a2081a5ffa8c9188e5b1b1344ce1401755ab5c57114",
    "sig": "2c6c6b5fea8376215b96f448461e1606ac0ca4d2edfbe636ab194446f164f01dc668f661a94496b160cb9da784dfa7ae8320f2dd0bc36b376144c3183471860a",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "0100000000000000000000000000000000000000000000000000000000000000",
+   "msg": "666f72676564203131",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+   "msg": "666f726765642030",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "0000000000000000000000000000000000000000000000000000000000000080",
+   "msg": "666f72676564203231",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "0000000000000000000000000000000000000000000000000000000000000000",
+   "msg": "666f72676564203235",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+   "msg": "666f726765642039",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+   "msg": "666f726765642034",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+   "msg": "666f726765642033",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
+   "valid": false
+  },
+  {
+   "kind": "small-order key, forged",
+   "pub": "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85",
+   "msg": "666f726765642031",
+   "sig": "58666666666666666666666666666666666666666666666666666666666666660100000000000000000000000000000000000000000000000000000000000000",
    "valid": false
   },
   {

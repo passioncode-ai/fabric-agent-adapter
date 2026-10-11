@@ -250,5 +250,111 @@ class GateTests(unittest.TestCase):
         self.assertEqual(plain.handle(call)["result"]["structuredContent"], {"d": None})
 
 
+class ReviewRegressionTests(unittest.TestCase):
+    """Findings of the independent review of the port, each a test that failed first."""
+
+    def test_a_deeply_nested_duplicate_is_a_refusal_not_a_crash(self):
+        import base64 as b64
+        deep = '{"x":{"a":1,"a":2},"y":' + "[" * 5000 + "]" * 5000 + "}"
+        seg = b64.urlsafe_b64encode(deep.encode()).decode().rstrip("=")
+        token = seg + "." + seg + ".AAAA"
+        self.assertEqual(dl.verify_delegation(token, audience="a", jwks=VECTORS["jwks"], now=0, capability="c", effect="none")["code"], "unauthenticated")
+        self.assertIsNone(dl.read_delegation_token({"Authorization": "Bearer " + token}))
+
+    def test_an_unreadable_jti_file_refuses_instead_of_forgetting(self):
+        import os
+        step = VECTORS["approvals"][0]["steps"][0]
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "jti.json"
+            store = dl.FileJtiStore(path)
+            o = options(step["options"], store)
+            self.assertTrue(dl.verify_approval(step["approval"], **o)["ok"])
+            path.write_text("{")  # truncated
+            self.assertEqual(dl.verify_approval(step["approval"], **o)["code"], "unknown-state")
+            path.write_text("{}")
+            if os.geteuid() != 0:
+                os.chmod(path, 0)
+                try:
+                    self.assertEqual(dl.verify_approval(step["approval"], **o)["code"], "unknown-state")
+                finally:
+                    os.chmod(path, 0o600)
+
+    def test_the_key_set_fetch_follows_no_redirect(self):
+        import http.server
+        class Redirect(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                if self.path == "/real":
+                    body = json.dumps(VECTORS["jwks"]).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                self.send_response(302)
+                self.send_header("Location", "http://127.0.0.1:%d/real" % self.server.server_address[1])
+                self.end_headers()
+            def log_message(self, *args):
+                pass
+        server = http.server.HTTPServer(("127.0.0.1", 0), Redirect)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            self.assertIsNone(dl.JwksCache("http://127.0.0.1:%d/jwks" % server.server_address[1]).get("estate-new"))
+        finally:
+            server.shutdown()
+
+    def test_a_failed_read_is_not_retried_on_every_call(self):
+        now, calls = [1000.0], []
+        def fetch(source):
+            calls.append(now[0])
+            raise OSError("down")
+        cache = dl.JwksCache("https://hub.example/j", fetch=fetch, clock=lambda: now[0])
+        cache.get("k"); cache.get("k")
+        self.assertEqual(len(calls), 1)
+        now[0] += dl.JWKS_RETRY_SECONDS
+        cache.get("k")
+        self.assertEqual(len(calls), 2)
+
+    def test_header_trimming_follows_javascript(self):
+        token = VECTORS["delegation"][0]["token"]
+        self.assertEqual(dl.read_delegation_token({"Fabric-Delegation": "\x1c" + token})["token"], "\x1c" + token)
+        self.assertEqual(dl.read_delegation_token({"Fabric-Delegation": "\ufeff " + token + "\n"})["token"], token)
+        with self.assertRaises(TypeError):
+            dl.jcs(10 ** 400)
+
+
+class GatedJobTests(unittest.TestCase):
+    """Review finding: a job started under a delegation is read, cancelled and answered only by the same
+    principal and caller, with a token that still covers the job's capability."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.case = VECTORS["delegation"][0]
+        self.other = next(c for c in VECTORS["delegation"] if c["name"] == "chain of four")
+        o = self.case["options"]
+        gate = dl.delegation_gate(audience=o["audience"], jwks=VECTORS["jwks"], effects={"writer.write": "draft"}, clock=lambda: o["now"])
+        self.answered = []
+        self.server = fi.McpToolServer("example-writer", "0.1.0", jobs=fi.JobStore(Path(self.temp.name)), authorize=gate,
+                                       on_input=lambda job_id, matched, ctx: self.answered.append(ctx.delegation and ctx.delegation["caller"]))
+        self.server.add_tool({"name": "writer.write", "inputSchema": {"type": "object"}}, lambda args, ctx: ctx.start_job())
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def call(self, name, arguments, token=None):
+        headers = {"Mcp-Method": "tools/call", "Mcp-Name": name}
+        if token:
+            headers["Authorization"] = "Bearer " + token
+        return self.server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": name, "arguments": arguments}}, headers)["result"]
+
+    def test_job_tools_are_gated_by_the_job_owner(self):
+        job = self.call("writer.write", {}, self.case["token"])["structuredContent"]["job"]["id"]
+        self.assertEqual(self.call("fabric.job.get", {"id": job})["structuredContent"]["error"]["code"], "unauthenticated")
+        self.assertEqual(self.call("fabric.job.get", {"id": job}, self.other["token"])["structuredContent"]["error"]["code"], "scope-not-granted")
+        self.assertEqual(self.call("fabric.job.cancel", {"id": job}, self.other["token"])["structuredContent"]["error"]["code"], "scope-not-granted")
+        self.assertEqual(self.call("fabric.job.get", {"id": job}, self.case["token"])["structuredContent"]["job"]["id"], job)
+        self.assertTrue(self.call("fabric.job.get", {"id": "job_" + "0" * 24}, self.case["token"])["isError"])
+
+
 if __name__ == "__main__":
     unittest.main()

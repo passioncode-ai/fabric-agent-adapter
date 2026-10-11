@@ -28,6 +28,7 @@ import secrets
 import threading
 import time
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -47,6 +48,10 @@ LEEWAY_SECONDS = 60
 # DL-15: a callee caches the key set at most 10 minutes and re-reads it at most once a minute for an unknown kid.
 JWKS_MAX_AGE_SECONDS = 600
 JWKS_REREAD_SECONDS = 60
+# After a failed read, wait this long before trying again, so a down issuer does not cost every call a fetch.
+JWKS_RETRY_SECONDS = 10
+# JavaScript's String.prototype.trim set, so a header is trimmed as the contract's verifier trims it.
+_JS_WHITESPACE = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
 # DL-19: the HTTP status of each refusal, and the sentence that goes in error.message.
 REFUSAL_STATUS = {"unauthenticated": 401, "token-expired": 401, "principal-unproven": 401,
@@ -154,6 +159,7 @@ def _encode_point(point: Tuple[int, int, int, int]) -> bytes:
 
 
 _G = _decode_point(bytes.fromhex("5866666666666666666666666666666666666666666666666666666666666666"))
+_IDENTITY = (1).to_bytes(32, "little")
 
 
 def ed25519_verify(public_key: bytes, message: bytes, signature: bytes) -> bool:
@@ -164,8 +170,8 @@ def ed25519_verify(public_key: bytes, message: bytes, signature: bytes) -> bool:
     if s >= _L:
         return False
     a = _decode_point(public_key)
-    if a is None:
-        return False
+    if a is None or _encode_point(_mul(8, a)) == _IDENTITY:
+        return False  # a small-order key would accept R = [S]B for a quarter or more of all messages; OpenSSL refuses it
     k = int.from_bytes(hashlib.sha512(signature[:32] + public_key + message).digest(), "little") % _L
     neg_a = ((-a[0]) % _P, a[1], a[2], (-a[3]) % _P)
     return secrets.compare_digest(_encode_point(_add(_mul(s, _G), _mul(k, neg_a))), signature[:32])
@@ -206,7 +212,7 @@ def _decode_segment(segment: str) -> Tuple[Optional[Dict[str, Any]], Optional[st
     except _Duplicate:
         try:
             value = json.loads(text, parse_constant=_no_constant)
-        except ValueError:
+        except (ValueError, RecursionError):
             return None, "malformed"
         return (None, "duplicate-member") if isinstance(value, dict) else (None, "malformed")
     except (ValueError, TypeError, RecursionError):
@@ -414,6 +420,10 @@ class MemoryJtiStore:
             return True
 
 
+class JtiStoreError(RuntimeError):
+    """A jti store that cannot tell whether an id was consumed; the verifier answers unknown-state."""
+
+
 class FileJtiStore:
     """Consumed approval ids in a 0600 JSON file, so a second use is refused across a restart (DL-18). One
     service instance writes it (the kit's instance lock keeps other processes out); threads are serialised."""
@@ -427,13 +437,17 @@ class FileJtiStore:
             self._lock = FileJtiStore._locks.setdefault(str(self.path.resolve()), threading.Lock())
 
     def consume(self, jti: str, expires_at: float, now: float) -> bool:
+        """True the first time; False for a used id. Raises JtiStoreError when the file cannot be read: forgetting
+        every consumed id would let each approval be replayed."""
         with self._lock:
             try:
                 seen = json.loads(self.path.read_text())
-                if not isinstance(seen, dict):
-                    seen = {}
-            except (OSError, ValueError):
+            except FileNotFoundError:
                 seen = {}
+            except (OSError, ValueError) as exc:
+                raise JtiStoreError("the consumed-approval file cannot be read: %s" % exc.__class__.__name__) from None
+            if not isinstance(seen, dict):
+                raise JtiStoreError("the consumed-approval file is not a JSON object")
             seen = {k: v for k, v in seen.items() if isinstance(v, (int, float)) and v + LEEWAY_SECONDS >= now}
             if jti in seen:
                 return False
@@ -486,7 +500,11 @@ def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: f
         return _refuse("approval-invalid", "audience-mismatch")
     if claims["actionDigest"] != action_digest:
         return _refuse("approval-invalid", "digest-mismatch", {"actionDigest": action_digest})
-    if not jti_store.consume(claims["jti"], claims["exp"], now):
+    try:
+        fresh = jti_store.consume(claims["jti"], claims["exp"], now)
+    except Exception:  # a store that cannot answer is an unknown state, never a pass (DL-19)
+        return _refuse("unknown-state", "jti-store-failed")
+    if not fresh:
         return _refuse("approval-reused", "jti-consumed")
     return {"ok": True, "claims": claims, "approver": claims["approver"], "method": claims["method"], "kid": checked["kid"]}
 
@@ -511,7 +529,7 @@ def read_delegation_token(headers: Any) -> Optional[Dict[str, str]]:
     later, never a fall-through), then a delegation-typ JWT in Authorization: Bearer."""
     forwarded = _header(headers, DELEGATION_HEADER)
     if forwarded is not None:
-        return {"token": forwarded.strip(), "via": "fabric-delegation"}
+        return {"token": forwarded.strip(_JS_WHITESPACE), "via": "fabric-delegation"}
     match = re.fullmatch(r"Bearer\s+(\S+)", _header(headers, "Authorization") or "", re.IGNORECASE)
     if match:
         parsed = _parse_compact(match.group(1))
@@ -585,7 +603,12 @@ def jcs(value: Any) -> str:
     if value is False:
         return "false"
     if isinstance(value, int):
-        return str(value) if abs(value) < 2 ** 53 else _number(float(value))
+        if abs(value) < 2 ** 53:
+            return str(value)
+        try:
+            return _number(float(value))
+        except OverflowError:
+            raise TypeError("a number beyond a double has no canonical form") from None
     if isinstance(value, float):
         if not math.isfinite(value):
             raise TypeError("a non-finite number has no canonical form")
@@ -618,10 +641,20 @@ def _loopback(host: str) -> bool:
         return False
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect could leave https or loopback for any scheme or host: none is followed."""
+
+    def redirect_request(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _fetch(source: str) -> Any:
     if source.startswith(("https://", "http://")):
         request = urllib.request.Request(source, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310 - https or loopback http only
+        with _OPENER.open(request, timeout=5) as response:  # https or loopback http only, no redirect
             return json.loads(response.read(65537)[:65536])
     return json.loads(Path(source).expanduser().read_text())
 
@@ -666,7 +699,8 @@ class JwksCache:
             fresh = now - self._read_at < JWKS_MAX_AGE_SECONDS
             known = self._keys is not None and (kid is None or any(isinstance(k, dict) and k.get("kid") == kid for k in self._keys["keys"]))
             if not fresh:
-                self._read(now)
+                if now - self._tried_at >= JWKS_RETRY_SECONDS:
+                    self._read(now)
             elif not known and now - self._reread_at >= JWKS_REREAD_SECONDS:
                 self._reread_at = now
                 self._read(now)
