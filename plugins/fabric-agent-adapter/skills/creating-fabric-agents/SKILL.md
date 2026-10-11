@@ -5,9 +5,9 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.11.1"
+  version: "0.12.0"
   contract-version: "0.1.0"
-  contract-commit: "8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5"
+  contract-commit: "2eb91c00e852d9c31d804310d38fad91589fcbac"
 ---
 
 # Creating Fabric-compatible agents
@@ -119,7 +119,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri>
 ```
 
-Pin exactly contract `0.1.0` at commit `8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5` and
+Pin exactly contract `0.1.0` at commit `2eb91c00e852d9c31d804310d38fad91589fcbac` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check

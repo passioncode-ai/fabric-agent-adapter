@@ -1,9 +1,11 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5`
+Pinned to `fabric-agent-contract` commit `2eb91c00e852d9c31d804310d38fad91589fcbac`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
-delegation and the operator session's lifetime DEC-0039). The contract's schemas are normative;
+delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
+canonical forms DEC-0043; `degraded[].setup` and `run.mcp.stdio.scope` DEC-0044; delegation sealed and trust tiers
+DEC-0045). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
@@ -56,6 +58,9 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
 ```
 
 - `status`: `starting | ready | degraded | stopping`. No answer means `down`.
+- A `degraded[]` entry may carry `setup: true` (DEC-0044): the source waits for a person to finish setting it up
+  (a key not entered, a model not chosen). It is not an outage, and a watcher does not alert on it. The kits pass
+  entries through unchanged.
 - `build` needs `commit` or `digest` (`sha256:<64 hex>`).
 - `summary`: at most six tiles; `attention: true` counts toward the host's badge.
 - `surfaces.events` is required; `dashboard` and `mcp` when the service has them; `usage`

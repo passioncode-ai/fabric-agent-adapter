@@ -57,7 +57,14 @@ class VerifierVectorTests(unittest.TestCase):
     def test_every_delegation_case_answers_as_the_contract_does(self):
         for case in VECTORS["delegation"]:
             with self.subTest(case["name"]):
-                got = dl.verify_delegation(case["token"], **options(case["options"]))
+                o = options(case["options"])
+                o.setdefault("issuer", None)
+                got = dl.verify_delegation(case["token"], **o)
+                if case.get("contractThrew"):
+                    # The contract's verifier throws here (a signed token with no actor chain); DL-2 requires `act`,
+                    # so the kits refuse it as a malformed chain. The contract was told.
+                    self.assertEqual(answer(got), {"ok": False, "code": "unauthenticated", "detail": "malformed-chain"})
+                    continue
                 self.assertEqual(answer(got), case["expected"])
         self.assertGreaterEqual(len(VECTORS["delegation"]), 60)
 
@@ -66,7 +73,9 @@ class VerifierVectorTests(unittest.TestCase):
             store = dl.MemoryJtiStore()
             for i, step in enumerate(case["steps"]):
                 with self.subTest(case["name"], step=i):
-                    got = dl.verify_approval(step["approval"], **options(step["options"], store))
+                    o = options(step["options"], store)
+                    o.setdefault("issuer", None)
+                    got = dl.verify_approval(step["approval"], **o)
                     self.assertEqual(answer(got), step["expected"])
 
     def test_headers(self):
@@ -86,6 +95,23 @@ class CanonicalJsonTests(unittest.TestCase):
                 self.assertEqual(dl.jcs(json.loads(case["input"])), case["expected"])
         for case in VECTORS["digests"]:
             self.assertEqual(dl.action_digest(json.loads(case["input"])), case["expected"])
+
+    def test_the_contracts_canonical_vectors(self):
+        """DEC-0043: fixtures/vectors/canonical.json at the pin, copied to test/fixtures/contract/."""
+        import struct
+        doc = json.loads((Path(__file__).resolve().parent / "fixtures/contract/canonical.json").read_text())["rfc8785"]
+        for v in doc["vectors"]:
+            value = json.loads(v["inputJson"]) if "inputJson" in v else v["input"]
+            with self.subTest(v["name"]):
+                self.assertEqual(dl.jcs(value), v["expected"])
+                if "utf8Hex" in v:
+                    self.assertEqual(dl.jcs(value).encode("utf-8").hex(), v["utf8Hex"])
+        for v in doc["numbers"]:
+            with self.subTest(v.get("note", v["ieee754"])):
+                self.assertEqual(dl.jcs(struct.unpack(">d", bytes.fromhex(v["ieee754"]))[0]), v["expected"])
+        for v in doc["refuses"]:
+            with self.subTest(v["name"]), self.assertRaises(TypeError):
+                dl.jcs(json.loads(v["inputJson"]) if "inputJson" in v else struct.unpack(">d", bytes.fromhex(v["ieee754"]))[0])
 
     def test_refuses_what_has_no_canonical_form(self):
         for bad in (float("nan"), float("inf"), "\ud800", {1: "x"}, object(), b"bytes", (1, 2)):
@@ -178,7 +204,7 @@ class JwksCacheTests(unittest.TestCase):
         self.now[0] += 601
         self.assertIsNone(c.get("estate-new"))
         self.assertEqual(dl.verify_delegation(VECTORS["delegation"][0]["token"], audience="example-writer", jwks=c.get("estate-new"),
-                                              now=1, capability="writer.write", effect="draft")["code"], "issuer-unavailable")
+                                              now=1, capability="writer.write", effect="draft", issuer="urn:fabric:estate:example")["code"], "issuer-unavailable")
 
     def test_sources(self):
         for bad in ("http://hub.example/jwks.json", "ftp://x/jwks.json", "https://user:pw@hub.example/j", ""):
@@ -216,6 +242,28 @@ class GateTests(unittest.TestCase):
         empty = self.gate("writer.write", {"Fabric-Delegation": ""})
         self.assertEqual(empty["code"], "unauthenticated")
 
+    def test_tiers_dl_26(self):
+        """A T0 or T1 caller is never required to present a token; a present one is verified at every tier."""
+        token = self.case["token"]
+        for tier in ("T0", "T1"):
+            passed = self.gate("writer.write", {}, tier=tier)
+            self.assertEqual((passed["ok"], passed["tier"], passed["principal"]), (True, tier, None))
+            self.assertEqual(self.gate("writer.write", {"Fabric-Delegation": "junk"}, tier=tier)["code"], "unauthenticated")
+            self.assertEqual(self.gate("writer.write", {"Authorization": "Bearer " + token}, tier=tier)["caller"], "example-media")
+        self.assertEqual(self.gate("writer.write", {}, tier="T9")["code"], "unauthenticated")
+        self.assertEqual(self.gate("writer.write", {})["detail"], "no-token")
+        self.assertEqual(self.gate("writer.other", {}, tier="T0")["detail"], "no-declared-effect")
+        with self.assertRaises(ValueError):
+            dl.delegation_gate(audience="a", jwks=VECTORS["jwks"], effects={}, issuer="")
+
+    def test_refusal_from_a_meter_denial(self):
+        doc = dl.refusal_from_denial({"decision": "denied", "level": "L1", "code": "limit-reached", "reason": "the day window is spent",
+                                      "checkedAt": "2026-10-12T00:00:00Z", "window": "day"})
+        self.assertEqual(doc, {"error": {"code": "limit-reached", "message": "the meter denied the spend: the day window is spent",
+                                         "data": {"window": "day", "level": "L1"}}})
+        bare = dl.refusal_from_denial({"decision": "denied", "level": None, "code": "no-grant", "reason": "x", "checkedAt": "t"})
+        self.assertNotIn("data", bare["error"])
+
     def test_refusal_shapes(self):
         refusal = self.gate("writer.write", {})
         result = dl.refusal_tool_result(refusal)
@@ -245,6 +293,16 @@ class GateTests(unittest.TestCase):
         accepted = server.handle(call, {"Mcp-Method": "tools/call", "Mcp-Name": "writer.write", "Authorization": "Bearer " + self.case["token"]})
         self.assertFalse(accepted["result"]["isError"])
         self.assertEqual(seen, ["example-media"])
+        seen.clear()
+        server.add_tool({"name": "writer.local", "inputSchema": {"type": "object"}}, lambda args, ctx: seen.append(ctx.delegation["tier"]) or {"ok": True})
+        local = server.handle({"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "writer.local", "arguments": {}}},
+                              {"Mcp-Method": "tools/call", "Mcp-Name": "writer.local"}, tier="T0")
+        self.assertTrue(local["result"]["isError"])  # writer.local has no declared effect in this gate
+        passed = server.handle({"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "writer.write", "arguments": {}}},
+                               {"Mcp-Method": "tools/call", "Mcp-Name": "writer.write"}, tier="T0")
+        self.assertFalse(passed["result"]["isError"])  # DL-26: a local caller needs no token
+        self.assertEqual(seen, [None])  # the handler ran, and a T0 call without a token names no caller
+
         plain = fi.McpToolServer("x", "0.1.0")
         plain.add_tool({"name": "writer.write", "inputSchema": {"type": "object"}}, lambda args, ctx: {"d": ctx.delegation})
         self.assertEqual(plain.handle(call)["result"]["structuredContent"], {"d": None})
@@ -258,7 +316,8 @@ class ReviewRegressionTests(unittest.TestCase):
         deep = '{"x":{"a":1,"a":2},"y":' + "[" * 5000 + "]" * 5000 + "}"
         seg = b64.urlsafe_b64encode(deep.encode()).decode().rstrip("=")
         token = seg + "." + seg + ".AAAA"
-        self.assertEqual(dl.verify_delegation(token, audience="a", jwks=VECTORS["jwks"], now=0, capability="c", effect="none")["code"], "unauthenticated")
+        self.assertEqual(dl.verify_delegation(token, audience="a", jwks=VECTORS["jwks"], now=0, capability="c", effect="none",
+                                              issuer="urn:fabric:estate:example")["code"], "unauthenticated")
         self.assertIsNone(dl.read_delegation_token({"Authorization": "Bearer " + token}))
 
     def test_an_unreadable_jti_file_refuses_instead_of_forgetting(self):
@@ -332,7 +391,8 @@ class GatedJobTests(unittest.TestCase):
         self.case = VECTORS["delegation"][0]
         self.other = next(c for c in VECTORS["delegation"] if c["name"] == "chain of four")
         o = self.case["options"]
-        gate = dl.delegation_gate(audience=o["audience"], jwks=VECTORS["jwks"], effects={"writer.write": "draft"}, clock=lambda: o["now"])
+        gate = dl.delegation_gate(audience=o["audience"], jwks=VECTORS["jwks"], effects={"writer.write": "draft"},
+                                  issuer="urn:fabric:estate:example", clock=lambda: o["now"])
         self.answered = []
         self.server = fi.McpToolServer("example-writer", "0.1.0", jobs=fi.JobStore(Path(self.temp.name)), authorize=gate,
                                        on_input=lambda job_id, matched, ctx: self.answered.append(ctx.delegation and ctx.delegation["caller"]))

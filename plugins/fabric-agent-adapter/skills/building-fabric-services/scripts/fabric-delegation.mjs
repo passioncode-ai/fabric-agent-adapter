@@ -57,6 +57,15 @@ export const REFUSAL_MESSAGES = Object.freeze({
 
 const refuse = (code, detail, data) => (data ? { ok: false, code, detail, data } : { ok: false, code, detail });
 const B64URL = /^[A-Za-z0-9_-]+$/;
+/** DL-2's grammar, as the contract's verifier types the claims (DEC-0045). */
+export const AGENT_ID = /^[a-z][a-z0-9-]{1,62}(\.[a-z][a-z0-9-]{0,31})?$/;
+export const OPAQUE_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+const URI = /^[A-Za-z][A-Za-z0-9+.-]*:\S+$/;
+const JTI = /^[A-Za-z0-9._~-]{16,128}$/;
+const SCOPE = /^[a-z][a-z0-9._-]{1,127}( [a-z][a-z0-9._-]{1,127})*$/;
+const SPEND_WINDOWS = ['total', 'task', 'project', 'day', 'week', 'month'];
+const isUri = (value) => typeof value === 'string' && URI.test(value);
+const isAmount = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isString = (value) => typeof value === 'string' && value.length > 0;
 const isTime = (value) => typeof value === 'number' && Number.isInteger(value) && value >= 0;
@@ -125,8 +134,11 @@ function keyFor(jwks, kid) {
   // A key published for another use or algorithm is never a candidate (RFC 7517 §4.2, §4.4).
   if ((jwk.use !== undefined && jwk.use !== 'sig') || (jwk.alg !== undefined && jwk.alg !== 'EdDSA')) return { problem: 'key-not-for-signing' };
   if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || !isString(jwk.x) || jwk.d !== undefined) return { problem: 'unusable-key' };
+  const raw = Buffer.from(jwk.x, 'base64url');
+  if (raw.length !== 32) return { problem: 'unusable-key' };
+  if (isSmallOrderKey(raw)) return { problem: 'small-order-key' }; // before any verification (DEC-0045, CT-29)
   try {
-    return { key: crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, format: 'jwk' }), raw: Buffer.from(jwk.x, 'base64url') };
+    return { key: crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, format: 'jwk' }), raw };
   } catch {
     return { problem: 'unusable-key' };
   }
@@ -159,7 +171,8 @@ function authentic(token, jwks, typ) {
   if (header) return { problem: header };
   const kid = compact.header.kid;
   const found = keyFor(jwks, kid);
-  if ('problem' in found) return found.problem === 'unusable-key' || found.problem === 'duplicate-kid' ? { problem: found.problem, issuer: true } : { problem: found.problem };
+  // Only an unknown kid is the token's fault; a published key that cannot be used is the issuer's (DL-13 row 3).
+  if ('problem' in found) return found.problem === 'unknown-key' ? { problem: found.problem } : { problem: found.problem, issuer: true };
   if (compact.signature.length !== 64 || isSmallOrderKey(found.raw) || !crypto.verify(null, compact.signingInput, found.key, compact.signature)) return { problem: 'bad-signature' };
   return { compact, kid };
 }
@@ -193,19 +206,45 @@ export function effectClosure(ceiling) {
 
 export const effectWithin = (effect, ceiling) => effectClosure(ceiling).has(effect);
 
+/** The chain's depth when every actor is DL-2's (agent id `sub`, optional session id), else undefined. No `act`, no chain. */
+function actorChainDepth(act) {
+  if (act === undefined) return undefined;
+  let depth = 0;
+  for (let node = act; node !== undefined; node = node.act) {
+    if (!isObject(node) || typeof node.sub !== 'string' || !AGENT_ID.test(node.sub)) return undefined;
+    if (node.session !== undefined && !(typeof node.session === 'string' && OPAQUE_ID.test(node.session))) return undefined;
+    depth += 1;
+  }
+  return depth;
+}
+
+function spendShaped(spend) {
+  if (!isObject(spend)) return false;
+  if (spend.mode === 'unlimited') return true;
+  if (spend.mode !== 'limited' || !Array.isArray(spend.remaining) || spend.remaining.length === 0 || spend.remaining.length > 6) return false;
+  if (!spend.remaining.every((entry) => isObject(entry) && SPEND_WINDOWS.includes(entry.window) && isAmount(entry.remainingUsd))) return false;
+  return spend.perCallMaxUsd === undefined || isAmount(spend.perCallMaxUsd);
+}
+
+/** DL-13 row 5 as DEC-0045 types it: {claims, depth} or {problem}. A claim the profile does not know is ignored. */
 function delegationShape(payload) {
-  const { iss, sub, act, aud, scope, effect, grant, iat, exp, jti } = payload;
-  if (!isString(iss) || !isString(sub) || !isString(aud) || !isString(scope) || !isString(jti) || !isTime(iat) || !isTime(exp)) return undefined;
-  if (!Array.isArray(effect) || effect.length === 0 || !effect.every((e) => EFFECT_CLASSES.includes(e))) return undefined;
-  if (!Array.isArray(grant) || grant.length === 0 || !grant.every(isString)) return undefined;
-  if (!isObject(act)) return undefined;
-  return payload;
+  const { iss, sub, act, aud, scope, effect, grant, spend, project, task, iat, exp, nbf, jti } = payload;
+  const depth = actorChainDepth(act);
+  if (depth === undefined) return { problem: 'malformed-chain' };
+  const typed = isUri(iss) && isUri(sub) && typeof aud === 'string' && AGENT_ID.test(aud)
+    && typeof scope === 'string' && scope.length <= 4096 && SCOPE.test(scope)
+    && Array.isArray(effect) && effect.length > 0 && new Set(effect).size === effect.length && effect.every((e) => EFFECT_CLASSES.includes(e))
+    && Array.isArray(grant) && grant.length === 1 && typeof grant[0] === 'string' && grant[0].length >= 1 && grant[0].length <= 256
+    && (spend === undefined || spendShaped(spend)) && (project === undefined || isUri(project))
+    && (task === undefined || (typeof task === 'string' && OPAQUE_ID.test(task)))
+    && isTime(iat) && isTime(exp) && (nbf === undefined || isTime(nbf)) && typeof jti === 'string' && JTI.test(jti);
+  return typed ? { claims: payload, depth } : { problem: 'malformed-claims' };
 }
 
 function approvalShape(payload) {
   const { iss, actionDigest: digest, aud, approver, method, iat, exp, jti } = payload;
   if (!isString(iss) || !isString(digest) || !isString(aud) || !isString(approver) || !isString(jti) || !isTime(iat) || !isTime(exp)) return undefined;
-  if (method !== 'prompt' && method !== 'operator-channel' && method !== 'device') return undefined;
+  if (method !== 'prompt' && method !== 'operator-channel') return undefined; // DEC-0045: `device` is removed
   return payload;
 }
 
@@ -214,20 +253,20 @@ function approvalShape(payload) {
  * the epoch. Answers {ok: true, claims, principal, caller, chain, kid} or {ok: false, code, detail}.
  */
 export function verifyDelegation(token, { audience, jwks, now, capability, effect, issuer, readOnly } = {}) {
+  if (!isString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
   if (!hasKeys(jwks)) return refuse('issuer-unavailable', 'no-published-keys');
   const checked = authentic(token, jwks, DELEGATION_TYP);
   if ('problem' in checked) return refuse(checked.issuer ? 'issuer-unavailable' : 'unauthenticated', checked.problem);
-  const claims = delegationShape(checked.compact.payload);
-  if (!claims) return refuse('unauthenticated', 'malformed-claims');
-  if (issuer !== undefined && claims.iss !== issuer) return refuse('unauthenticated', 'wrong-issuer');
+  const shaped = delegationShape(checked.compact.payload);
+  if ('problem' in shaped) return refuse('unauthenticated', shaped.problem);
+  const { claims, depth } = shaped;
+  if (claims.iss !== issuer) return refuse('unauthenticated', 'wrong-issuer');
   if (claims.exp <= claims.iat || claims.exp - claims.iat > MAX_DELEGATION_LIFETIME_SECONDS) return refuse('unauthenticated', 'lifetime-above-profile');
   if (claims.iat > now + LEEWAY_SECONDS) return refuse('unauthenticated', 'issued-in-future');
   const { nbf } = checked.compact.payload;
-  if (nbf !== undefined && (!isTime(nbf) || nbf > now + LEEWAY_SECONDS)) return refuse('unauthenticated', 'not-yet-valid');
+  if (nbf !== undefined && nbf > now + LEEWAY_SECONDS) return refuse('unauthenticated', 'not-yet-valid');
   if (now > claims.exp + LEEWAY_SECONDS) return refuse('token-expired', 'expired');
   if (claims.aud !== audience) return refuse('wrong-audience', 'audience-mismatch');
-  const depth = chainDepth(claims.act);
-  if (!Number.isFinite(depth)) return refuse('unauthenticated', 'malformed-chain');
   if (depth > MAX_CHAIN_DEPTH) return refuse('chain-too-deep', `depth-${depth}`);
   if (!claims.scope.split(' ').includes(capability)) return refuse('scope-not-granted', 'capability-not-in-scope');
   if (readOnly && effect !== 'none') return refuse('effect-above-ceiling', 'read-only-door');
@@ -239,12 +278,13 @@ export function verifyDelegation(token, { audience, jwks, now, capability, effec
 export function verifyApproval(approval, { audience, jwks, now, actionDigest: expected, issuer, jtiStore } = {}) {
   if (approval === undefined || approval === null || approval === '') return refuse('approval-required', 'no-approval', { actionDigest: expected });
   if (!isObject(jtiStore) || typeof jtiStore.consume !== 'function') return refuse('unknown-state', 'no-jti-store');
+  if (!isString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
   if (!hasKeys(jwks)) return refuse('issuer-unavailable', 'no-published-keys');
   const checked = authentic(approval, jwks, APPROVAL_TYP);
   if ('problem' in checked) return refuse(checked.issuer ? 'issuer-unavailable' : 'approval-invalid', checked.problem);
   const claims = approvalShape(checked.compact.payload);
   if (!claims) return refuse('approval-invalid', 'malformed-claims');
-  if (issuer !== undefined && claims.iss !== issuer) return refuse('approval-invalid', 'wrong-issuer');
+  if (claims.iss !== issuer) return refuse('approval-invalid', 'wrong-issuer');
   if (claims.exp <= claims.iat || claims.exp - claims.iat > MAX_APPROVAL_LIFETIME_SECONDS) return refuse('approval-invalid', 'lifetime-above-profile');
   if (claims.iat > now + LEEWAY_SECONDS) return refuse('approval-invalid', 'issued-in-future');
   if (now > claims.exp + LEEWAY_SECONDS) return refuse('approval-invalid', 'expired');
@@ -399,15 +439,40 @@ const kidOf = (token) => { const parsed = parseCompact(token); return 'problem' 
  * A check for one tools/call: `await gate(tool, headers)` answers the accepted delegation or a DL-19 refusal.
  * `effects` maps each tool to its declared effect class; a tool with none is refused rather than guessed.
  */
+export const TIERS = Object.freeze(['T0', 'T1', 'T2']);
+
+/**
+ * `await gate(tool, headers, tier = 'T2')`. DL-25, DL-26: T0 is a loopback caller under the owner's account that the
+ * service's own local floor authenticated, T1 an enrolled machine of the same owner, T2 everything else (and any call
+ * relayed from off the machine). A T0 or T1 caller is never required to present a token: with none, the call passes
+ * with no delegation. A present token is verified at every tier. `issuer` (auth.delegation.issuer) is required.
+ */
 export function delegationGate({ audience, jwks, effects, issuer, readOnly = false, clock = () => Date.now() / 1000 }) {
-  return async (tool, headers) => {
+  if (!isString(issuer)) throw new Error('the gate needs the issuer it trusts (auth.delegation.issuer)');
+  return async (tool, headers, tier = 'T2') => {
     const effect = effects?.[tool];
     if (!EFFECT_CLASSES.includes(effect)) return refuse('unknown-state', 'no-declared-effect');
     const carried = readDelegationToken(headers);
-    if (!carried) return refuse('unauthenticated', 'no-token');
+    if (!carried) {
+      if (tier === 'T0' || tier === 'T1') return { ok: true, tier, principal: null, caller: null, chain: [], claims: null, kid: null };
+      return refuse('unauthenticated', 'no-token');
+    }
     const keys = jwks instanceof JwksCache ? await jwks.get(kidOf(carried.token)) : jwks;
-    return verifyDelegation(carried.token, { audience, jwks: keys, now: clock(), capability: tool, effect, readOnly, ...(issuer === undefined ? {} : { issuer }) });
+    const verdict = verifyDelegation(carried.token, { audience, jwks: keys, now: clock(), capability: tool, effect, readOnly, issuer });
+    if (verdict.ok) verdict.tier = TIERS.includes(tier) ? tier : 'T2';
+    return verdict;
   };
+}
+
+/** DL-21 step 6 (DEC-0045): the refusal a callee answers after the meter denied a grant check, the meter's code unchanged. */
+export function refusalFromDenial(denial) {
+  const data = {
+    ...(denial.window === undefined ? {} : { window: denial.window }),
+    ...(denial.level === null || denial.level === undefined ? {} : { level: denial.level }),
+    ...(denial.approvalRequest === undefined ? {} : { approvalRequest: denial.approvalRequest }),
+  };
+  const message = `the meter denied the spend: ${denial.reason ?? ''}`.slice(0, 500);
+  return { error: { code: denial.code, message, ...(Object.keys(data).length > 0 ? { data } : {}) } };
 }
 
 /** The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key. */

@@ -47,6 +47,8 @@ class ValidationTests(unittest.TestCase):
             "lan url": entry(run={"mcp": {"url": "http://192.168.1.2:47201/mcp"}}),
             "not /mcp": entry(run={"mcp": {"url": "http://127.0.0.1:47201/api"}}),
             "both transports": entry(run={"mcp": {"url": "http://127.0.0.1:47201/mcp", "stdio": {"command": ["/bin/x"]}}}),
+            "a stdio server started in every session (FAC-SEM-056, LC-19)": entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "scope": "session"}}}),
+            "an unknown stdio scope": entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "scope": "always"}}}),
             "bad id": entry(provider_id="Example_Agent"),
             "manifest is not fabric-agent.json": entry(manifest="~/x/manifest.json"),
             "relative manifest": entry(manifest="fabric-agent.json"),
@@ -58,6 +60,11 @@ class ValidationTests(unittest.TestCase):
         }
         for label, value in cases.items():
             self.assertNotEqual(fp.validate_provider_entry(value), [], label)
+
+    def test_a_stdio_scope_of_project_or_on_demand_is_accepted(self):
+        """DEC-0044: run.mcp.stdio.scope is optional; project and on-demand are the two a host may use."""
+        for scope in ("project", "on-demand"):
+            self.assertEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "scope": scope}}})), [])
 
     def test_problems_never_quote_an_env_value(self):
         problems = fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "env": {"K": FAKE_GITHUB}}}}))

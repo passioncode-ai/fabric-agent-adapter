@@ -15,6 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+// The raw Ed25519 truth comes from crypto.verify, which accepts small-order forgeries before Node 24 (CT-29).
+if (Number(process.versions.node.split('.')[0]) < 24) { console.error('run make_vectors.mjs on Node 24 or later'); process.exit(2); }
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => (a.startsWith('--') ? [...acc, [a.slice(2), all[i + 1]]] : acc), []));
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = args.out ?? path.join(here, 'vectors.json');
@@ -45,7 +47,9 @@ function sign(payload, { header = {}, key = current.privateKey, typ = contract.D
 // --- delegation cases (mirroring the contract's test/delegation.test.ts) ----------------------------------
 const claims = load('delegation-token-claims.json');
 const NOW = claims.iat + 30;
-const call = { audience: 'example-writer', jwks, now: NOW, capability: 'writer.write', effect: 'draft' };
+const ISSUER = 'urn:fabric:estate:example';
+const call = { audience: 'example-writer', jwks, now: NOW, capability: 'writer.write', effect: 'draft', issuer: ISSUER };
+const dropNulls = (o) => { for (const k of Object.keys(o)) if (o[k] === null) delete o[k]; return o; };
 const token = (overrides = {}, options = {}) => sign({ ...claims, ...overrides }, options);
 const nest = (n) => { let act; for (let i = n; i >= 1; i--) act = act ? { sub: `agent-${i}`, act } : { sub: `agent-${i}` }; return act; };
 const leInt = (buf) => { let n = 0n; for (let i = buf.length - 1; i >= 0; i--) n = (n << 8n) | BigInt(buf[i]); return n; };
@@ -100,7 +104,23 @@ const delegation = [
   ['effect unknown class', token({ effect: ['launch'] }), {}],
   ['grant empty', token({ grant: [] }), {}],
   ['act not an object', token({ act: 'example-media' }), {}],
+  ['no act claim', token({ act: undefined }), {}],
   ['wrong issuer', token(), { issuer: 'urn:fabric:estate:other' }],
+  ['no trusted issuer', token(), { issuer: null }],
+  ['two grants', token({ grant: [...claims.grant, 'urn:grant:project-a:other#1'] }), {}],
+  ['effect named twice', token({ effect: ['draft', 'draft'] }), {}],
+  ['scope with an upper-case name', token({ scope: 'Writer.write' }), { capability: 'Writer.write' }],
+  ['scope with a double space', token({ scope: 'writer.write  writer.check' }), {}],
+  ['sub not a URI', token({ sub: 'operator' }), {}],
+  ['aud not an agent id', token({ aud: 'Example Writer' }), { audience: 'Example Writer' }],
+  ['actor sub not an agent id', token({ act: { sub: 'Example Media' } }), {}],
+  ['actor session not an opaque id', token({ act: { sub: 'example-media', session: 'has space' } }), {}],
+  ['task claim', token({ task: 'task-42' }), {}],
+  ['task not an opaque id', token({ task: 'a b' }), {}],
+  ['spend limited with no window', token({ spend: { mode: 'limited', remaining: [] } }), {}],
+  ['spend unlimited', token({ spend: { mode: 'unlimited' } }), {}],
+  ['jti too short', token({ jti: 'short' }), {}],
+  ['project not a URI', token({ project: 'project a' }), {}],
   ['lifetime above 600 s', token({ exp: claims.iat + 601 }), {}],
   ['exp equals iat', token({ exp: claims.iat }), {}],
   ['issued more than 60 s in the future', token({ iat: NOW + 61, exp: NOW + 600 }), {}],
@@ -137,16 +157,18 @@ const delegation = [
     }
   })(), { jwks: { keys: [...jwks.keys, { kty: 'OKP', crv: 'Ed25519', x: Buffer.alloc(32).toString('base64url'), kid: 'estate-zero', use: 'sig', alg: 'EdDSA' }] } }],
 ].map(([name, tok, overrides]) => {
-  const options = { ...call, ...overrides };
-  if (options.jwks === null) delete options.jwks;
-  const result = contract.verifyDelegation(tok, options);
+  const options = dropNulls({ ...call, ...overrides });
+  let result;
+  // A case the contract's verifier throws on is kept, marked, with no expected answer: the kits refuse it
+  // (the test names the refusal), and the contract is told. Nothing here is written by hand.
+  try { result = contract.verifyDelegation(tok, options); } catch (error) { return { name, token: tok, options, expected: null, contractThrew: String(error.message).slice(0, 120) }; }
   return { name, token: tok, options, expected: result.ok ? { ok: true, principal: result.principal, caller: result.caller, chain: result.chain, kid: result.kid } : { ok: false, code: result.code, detail: result.detail } };
 });
 
 // --- approval cases --------------------------------------------------------------------------------------
 const approvalClaims = load('approval-claims.json');
 const action = { capability: 'publisher.push', input: { app: 'example-app', hash: `sha256:${'ab'.repeat(32)}`, store: 'app-store' } };
-const aOptions = { audience: 'example-publisher', jwks, now: approvalClaims.iat + 60, actionDigest: approvalClaims.actionDigest };
+const aOptions = { audience: 'example-publisher', jwks, now: approvalClaims.iat + 60, actionDigest: approvalClaims.actionDigest, issuer: ISSUER };
 const approval = (overrides = {}, options = {}) => sign({ ...approvalClaims, ...overrides }, { typ: contract.APPROVAL_TYP, ...options });
 const approvals = [
   ['accepted once, refused the second time', [approval(), approval()], {}],
@@ -163,12 +185,13 @@ const approvals = [
   ['signed by a stranger', [approval({}, { key: stranger.privateKey })], {}],
   ['a delegation token presented as an approval', [sign(approvalClaims)], {}],
   ['unknown method', [approval({ method: 'chat-message' })], {}],
+  ['method device, removed by DEC-0045', [approval({ method: 'device' })], {}],
+  ['no trusted issuer', [approval()], { issuer: null }],
   ['wrong issuer', [approval()], { issuer: 'urn:fabric:estate:other' }],
 ].map(([name, documents, overrides, offsets = [0, 0]]) => {
   const store = contract.createMemoryJtiStore();
   const steps = documents.map((doc, i) => {
-    const options = { ...aOptions, jtiStore: store, ...overrides, now: (overrides.now ?? aOptions.now) + (offsets[i] ?? 0) };
-    if (options.jwks === null) delete options.jwks;
+    const options = dropNulls({ ...aOptions, jtiStore: store, ...overrides, now: (overrides.now ?? aOptions.now) + (offsets[i] ?? 0) });
     const contractOptions = { ...options, jtiStore: options.jtiStore === 'none' ? undefined : options.jtiStore };
     const result = contract.verifyApproval(doc ?? undefined, contractOptions);
     const { jtiStore, ...wire } = options;
