@@ -1,33 +1,38 @@
-# FAA-20 part two — delegation verifiers (work in progress)
+# FAA-20 part two — delegation verifiers in both kits (0.11.0)
 
-Branch `agent/faa-20-verifiers`, not merged, not released. Spec and REQ table:
-[2026-10-12-faa-20-verifiers](../evidence/specs/2026-10-12-faa-20-verifiers.md).
+Branch `agent/faa-20-verifiers`. Spec and REQ table: [2026-10-12-faa-20-verifiers](../evidence/specs/2026-10-12-faa-20-verifiers.md).
 
-## Done (REQ-01…REQ-08, Python)
+## Completed
 
-- `test/fixtures/delegation/make_vectors.mjs` → `vectors.json`: 65 delegation, 15 approval, 8 header, 5 jcs,
-  2 digest and 322 Ed25519 cases. Expected answers come from the contract's `src/delegation.ts` at the pin; the
-  Ed25519 cases are checked by OpenSSL. To regenerate: copy the contract's `src/delegation.ts` and
-  `src/findings.ts` at the pin into a directory, change `./findings.js` to `./findings.ts`, then run
-  `node test/fixtures/delegation/make_vectors.mjs --contract-src <dir> --claims <contract>/fixtures/positive`
-  (Node 23.6+).
-- `building-fabric-services/scripts/fabric_delegation.py`: Ed25519 in pure Python (RFC 8032, strict), `verify_delegation`,
-  `verify_approval`, `read_delegation_token`, `jcs`, `action_digest`, `MemoryJtiStore`, `FileJtiStore`,
-  `UNSAFE_NO_JTI_STORE`, `JwksCache` (DL-15), `delegation_gate`, `refusal_tool_result`, `refusal_http`.
-- `fabric_interop.McpToolServer(authorize=)`: the gate runs before each handler, and `CallContext.delegation`
-  carries the accepted delegation. Built-in job tools are not gated.
-- `test/test_fabric_delegation.py`: 18 tests, all OK (`cd test && python3 -m unittest test_fabric_delegation`).
+- `building-fabric-services/scripts/fabric_delegation.py` (standard library only, Ed25519 per RFC 8032, as strict as
+  OpenSSL) and `fabric-delegation.mjs` (node:crypto) each provide:
+  - the verifiers and token reading: `verify_delegation`, `verify_approval`, `read_delegation_token`;
+  - canonical JSON and digests: `jcs`, `action_digest`;
+  - replay stores: memory, file, and `UNSAFE_NO_JTI_STORE`;
+  - `JwksCache` (DL-15);
+  - the gate and the DL-19 refusal shapes.
+  Names are camelCase in Node.
+- `fabric_interop.McpToolServer(authorize=)` gates every tool. Job tools are gated by the job's owner.
+- Shared vectors: `test/fixtures/delegation/vectors.json`. Expected answers come from the contract's verifier and from OpenSSL.
+- An independent review found seven defects, among them a small-order key forgery in the Python verifier. All are fixed, each with a regression test that failed first.
+- Docs: `references/delegation.md`, plus `surfaces-and-auth.md`, `protocol.md` and a pointer in SKILL.md. Evals were written first. CHANGELOG 0.11.0.
 
-## Open, in this order
+## Regenerating the vectors
 
-1. Node: `fabric-delegation.mjs` with the same API in camelCase (Node `crypto` for Ed25519), and
-   `test/fabric-delegation.test.mjs` over the same `vectors.json`.
-2. Run the full `npm test` (the `McpToolServer` change touches existing interop tests), plus
-   `claude plugin validate --strict` ×2.
-3. Scenario eval first, then docs: a new `references/delegation.md`; drop "not yet" from `surfaces-and-auth.md`
-   and `protocol.md`; mention it in the SKILL.md references index.
-4. An independent review (security: the Ed25519 port and the JSON parsing differences from the contract), then
-   the version (next minor after `main`; PR #53 may hold 0.11.0), CHANGELOG, backlog FAA-20, PR, merge, tag and
-   release. Re-pin the launcher (passioncode `family.json`, as PC-17 did), then update locally with
-   `npx @passioncode-ai/passioncode@latest update`.
-5. FAA-20 part three: Fabric's button (FB-7) in the dashboard kit.
+1. Copy the contract's `src/delegation.ts` and `src/findings.ts` at the pin into a directory.
+2. In that copy, rewrite `./findings.js` to `./findings.ts`.
+3. Run `node test/fixtures/delegation/make_vectors.mjs --contract-src <dir> --claims <contract>/fixtures/positive` (Node 23.6+).
+
+## Open
+
+- FAA-20 part four: Fabric's button (FB-7) in the dashboard kit.
+- After a repin past the DEC-0039 merge:
+  - DEC-0043 canonical vectors for the `jcs` ports;
+  - DEC-0044 `run.mcp.stdio.scope` (FAA-22);
+  - `secret-shape.ts` and FAC-SEM-057 (FAA-23).
+- PR #53 (FAA-18) also claimed this minor version; it moves to the next one.
+
+## Next task
+
+Release 0.11.0 (tag after the merge), re-pin the passioncode launcher to `v0.11.0` as PC-17 did, update locally.
+Then FAA-20 part four (FB-7).
