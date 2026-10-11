@@ -1,0 +1,19 @@
+# 2026-10-11 — what a Claude Code MCP stdio server receives in its environment
+# claude --version: 2.1.296 (Claude Code)
+# command: claude -p 'Reply with the single word ok.' --model haiku --strict-mcp-config --mcp-config cfg.json --output-format json
+# the probe server (srv.py) dumps the names of CLAUDE* variables, values only for CLAUDE_CODE_SESSION_ID and CLAUDE_PID
+# session_id in the JSON result: 3bdea652-86ec-487f-b7c0-d8c28241c49a
+# server environment:
+{
+    "CLAUDE_CODE_ENTRYPOINT": "<set>",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "<set>",
+    "CLAUDE_CODE_EXECPATH": "<set>",
+    "CLAUDE_CODE_SESSION_ATTENDED": "<set>",
+    "CLAUDE_PID": "55714",
+    "CLAUDE_EFFORT": "<set>",
+    "CLAUDE_CODE_MESSAGING_SOCKET": "<set>",
+    "CLAUDE_CODE_MESSAGING_TOKEN": "<set>",
+    "CLAUDE_PROJECT_DIR": "<set>",
+    "CLAUDE_CODE_SESSION_ID": "3bdea652-86ec-487f-b7c0-d8c28241c49a",
+    "CLAUDECODE": "<set>"
+}

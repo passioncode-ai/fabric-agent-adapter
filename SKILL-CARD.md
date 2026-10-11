@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.9.0` |
+| Version | `0.10.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `a83bec6b47776af688402c18efec507143061f68` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -24,7 +24,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.9.0` |
+| Version | `0.10.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `a83bec6b47776af688402c18efec507143061f68` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
@@ -46,7 +46,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.9.0` |
+| Version | `0.10.0` |
 | Plugin | `fabric-agent-adapter` |
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `a83bec6b47776af688402c18efec507143061f68`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
@@ -60,3 +60,22 @@ Triggers include making an agent a local service, an always-on dashboard, where 
 stores settings, connecting a service to Fabric Dashboards, and migrating or checking a
 service against `fabric-service/0.1`. It does not trigger for cron jobs, hosted SaaS, the
 provider manifest (the adapting skill) or the Fabric Dashboards app.
+
+# Skill card: working-with-fabric
+
+| Field | Value |
+|---|---|
+| Version | `0.10.0` |
+| Plugin | `fabric-agent-adapter` |
+| Fabric | the desktop app 0.4.0 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
+| Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, coordinate, report, link backlog rows, release |
+| Inputs | the agent's folder; Fabric's `hub.json`; the agent's MCP configuration (read, not written, by the status script) |
+| Outputs | `fabric_session.py status`: Fabric's state, the registrations and one next action |
+| Mutations | none by the status script; the hooks write only their own log and spool in the user's cache folder |
+| Hooks | SessionStart (preamble, when `fabric` is registered and Fabric runs), Stop and SessionEnd (facts only, through Fabric, only when Fabric advertises `session-hooks/1`); never block, always exit 0 |
+| Network | none of its own; Fabric is reached only through `fabric-mcp` |
+| Secrets | never read: the door token and credentials stay with `fabric-mcp`; nothing secret in argv or logs |
+
+Triggers include connecting a coding agent to Fabric, registering `fabric-mcp`, claiming or releasing work, and
+reading a `fabric_whoami` or refusal answer. It does not trigger for building or adapting agents to the Fabric
+contract, Fabric's own code, or agent-sync leases.

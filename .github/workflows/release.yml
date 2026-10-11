@@ -124,6 +124,8 @@ jobs:
           test -d "$HOME/.agents/skills/adapting-projects-to-fabric/references"
           test -f "$HOME/.agents/skills/building-fabric-services/SKILL.md"
           test -f "$HOME/.agents/skills/creating-fabric-agents/SKILL.md"
+          test -f "$HOME/.agents/skills/working-with-fabric/SKILL.md"
+          test -f "$HOME/.agents/skills/working-with-fabric/scripts/fabric_session.py"
           test -f "$HOME/.agents/skills/building-fabric-services/scripts/fabric_interop.py"
           test -f "$HOME/.agents/skills/adapting-projects-to-fabric/scripts/fabric_provider.py"
           test ! -e "$HOME/.claude/skills"
