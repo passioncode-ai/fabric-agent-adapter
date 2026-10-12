@@ -1,0 +1,7 @@
+# 2026-10-12, this Mac: the plugin's services line against the machine's ~/.local/bin/fabric-session-note.sh
+# (the services folder path is replaced by <services dir>; nothing else is edited)
+$ echo '{"session_id":"x","cwd":"/tmp"}' | python3 -S fabric_session.py hook session-start   # additionalContext
+Fabric on this machine: 22 service descriptors in <services dir> (13 local on 127.0.0.1), protocol fabric-service/0.1 — probe GET <origin>/.well-known/fabric-service, or call the fabric-dashboards MCP list_services if connected. Never kill these services directly; their supervisor owns them.
+$ fabric-session-note.sh
+Fabric on this machine: 22 service descriptors in <services dir> (13 local on 127.0.0.1), protocol fabric-service/0.1 — probe GET <origin>/.well-known/fabric-service, or call the fabric-dashboards MCP list_services if connected. Never kill these services directly; their supervisor owns them.
+# identical

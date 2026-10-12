@@ -68,14 +68,14 @@ provider manifest (the adapting skill) or the Fabric Dashboards app.
 | Version | `0.22.0` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | the desktop app 0.4.0 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
-| Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, coordinate, report, link backlog rows, release |
+| Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, coordinate, report, link backlog rows, release |
 | Inputs | the agent's folder; Fabric's `hub.json`; the agent's MCP configuration (read, not written, by the status script) |
-| Outputs | `fabric_session.py status`: Fabric's state, the registrations and one next action |
-| Mutations | none by the status script; the hooks write only their own log and spool in the user's cache folder |
-| Hooks | SessionStart (preamble, when `fabric` is registered and Fabric runs), Stop and SessionEnd (facts only, through Fabric, only when Fabric advertises `session-hooks/1`); never block, always exit 0 |
+| Outputs | `fabric_session.py status`: Fabric's state, the registrations and one next action; `watch-mail`: one line each time the board's unread count rises |
+| Mutations | none by `status` or `watch-mail`; the hooks write only their own log and spool in the user's cache folder; `install-host-hooks --apply` edits Codex's `hooks.json` or Kimi Code's `config.toml` after a backup, only on the person's go-ahead |
+| Hooks | Claude Code: SessionStart (preamble when `fabric` is registered, the Fabric-service count), Stop (turn facts and the unread count), UserPromptSubmit (one line when the count rose), SessionEnd (release), the last three only when Fabric advertises `session-hooks/1`; Codex and Kimi Code: the SessionStart preamble only. Silent in a session Fabric launched; never block, always exit 0 |
 | Network | none of its own; Fabric is reached only through `fabric-mcp` |
 | Secrets | never read: the door token and credentials stay with `fabric-mcp`; nothing secret in argv or logs |
 
-Triggers include connecting a coding agent to Fabric, registering `fabric-mcp`, claiming or releasing work, and
-reading a `fabric_whoami` or refusal answer. It does not trigger for building or adapting agents to the Fabric
+Triggers include connecting a coding agent to Fabric, registering `fabric-mcp`, the project board (unread mail, asking
+another project, replying), claiming or releasing work, and reading a `fabric_whoami` or refusal answer. It does not trigger for building or adapting agents to the Fabric
 contract, Fabric's own code, or agent-sync leases.

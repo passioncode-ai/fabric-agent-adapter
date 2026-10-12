@@ -58,6 +58,7 @@ and releases what the session left claimed at its end — without ever blocking 
 | D3 | the feature flag | `hub.json` gains `"features": ["session-hooks/1"]` once D1, D2, D4 and D5 ship; the hooks stay inert without it |
 | D4 | `fabric_session_observe` | `{event: "turn"\|"end", runtime: "claude-code", runtimeSessionId, observedAt (ISO 8601), head (40 hex or null), filesChanged (int or null), linesAdded (int or null), linesRemoved (int or null), reason (end only: Claude Code's SessionEnd reason), idempotencyKey}` → journals `session.turn.observed@1` / `session.ended@1`; the same key twice is one event |
 | D5 | `fabric_work_release` for a whole session | `{claims: "session", outcome: "let-go", reason: "the Claude Code session ended (<reason>)", idempotencyKey}` releases every claim the calling session holds; `claims` may otherwise name claim ids (REQ-38) |
+| D6 | a launched-session marker (FAA-12a) | every session Fabric launches carries `FABRIC_LAUNCHED_SESSION=1` in its environment, whatever its adapter (`mcp-config-flag`, `config-content-env`, `acp-session`, `codex-config-home`), so a hook knows Fabric already briefed it; until then the hooks infer it from what `sessionBundle.ts` already gives (variable names only, never a value) |
 
 ## REQ table
 

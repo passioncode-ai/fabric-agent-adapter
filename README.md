@@ -20,23 +20,30 @@ on its own: the skills, kits and probe need no Fabric install.
 The skills are `adapting-projects-to-fabric`, `creating-fabric-agents`,
 `building-fabric-services` and `working-with-fabric`.
 
-`working-with-fabric` is for the other side: a coding agent (Claude Code, Codex, Kilo, Hermes) opened in a
-terminal that works in a project through Fabric. It finds Fabric (`hub.json`, its `pid`), has the machine's
+`working-with-fabric` is for the other side: a coding agent (Claude Code, Codex, Kimi Code, Kilo, Hermes) opened in
+a terminal that works in a project through Fabric. It finds Fabric (`hub.json`, its `pid`), has the machine's
 lifecycle broker start it when it is down, registers `fabric-mcp` once with no secret, calls `fabric_whoami`
-first, asks who is working on what and claims its task before it starts (`fabric_work_list`,
-`fabric_work_claim`, Fabric 0.4.0), links tasks to backlog rows instead of copying them, and releases at the end
-(`fabric_work_release`). `scripts/fabric_session.py status` prints where Fabric stands and one next action:
+first, reads the project board (`com.status`, `com.list`, `com.read_ack` only what was read) and asks other
+Projects only through `com.submit`, asks who is working on what and claims its task before it starts
+(`fabric_work_list`, `fabric_work_claim`, Fabric 0.4.0), links tasks to backlog rows instead of copying them, and
+releases at the end (`fabric_work_release`). `scripts/fabric_session.py status` prints where Fabric stands and one
+next action:
 
 ```bash
 python3 plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py status
 ```
 
-In Claude Code the plugin adds three session hooks: SessionStart puts that preamble into the session when the MCP
-server `fabric` is registered and Fabric runs; Stop records each turn's facts (HEAD, files changed, lines added and
-removed — never content) and SessionEnd releases what the session left claimed, both through Fabric and only when
-the running Fabric advertises `session-hooks/1`. They never block the session, read no token and always exit 0;
-the [hooks reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/session-hooks.md) lists
-what they need from Fabric. Codex gets the MCP entry and first-prompt advice; its hooks are not verified.
+In Claude Code the plugin adds four session hooks: SessionStart puts that preamble into the session when the MCP
+server `fabric` is registered (one line pointing at the broker when Fabric is down), with the machine's
+Fabric-service count; Stop records each turn's facts (HEAD, files changed, lines added and removed — never content)
+and the board's unread count; UserPromptSubmit adds one line only when that count rose; SessionEnd releases what the
+session left claimed. Stop, UserPromptSubmit and SessionEnd act only when the running Fabric advertises
+`session-hooks/1`. All are silent in a session Fabric launched, never block the session, read no token and always
+exit 0. `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks
+--host codex|kimi` adds the session-start preamble to Codex or Kimi Code (a dry run unless `--apply`). The
+[hooks reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/session-hooks.md) lists what
+they need from Fabric; the [board reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/project-board.md)
+is the board-first workflow.
 
 `building-fabric-services` makes an agent a long-lived local service with a dashboard
 that is always alive, runs as one copy, keeps its state through a reinstall and appears
