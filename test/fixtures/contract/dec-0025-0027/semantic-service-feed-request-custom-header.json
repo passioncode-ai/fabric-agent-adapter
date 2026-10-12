@@ -1,0 +1,33 @@
+{
+  "description": "A feed client sends the token in the header the descriptor declares, in the declared form: X-Example-Token carries the raw token because the scheme is none (FAC-SEM-036).",
+  "descriptor": {
+    "protocol": "fabric-service/0.1",
+    "id": "example-agent",
+    "instance": "default",
+    "name": "Example Agent",
+    "origin": "http://127.0.0.1:47195",
+    "auth": {
+      "tokenFile": "~/.config/example-agent/service.token",
+      "header": "X-Example-Token",
+      "scheme": "none"
+    },
+    "lifecycle": {
+      "manager": "none"
+    },
+    "paths": {
+      "data": "~/Library/Application Support/example-agent",
+      "logs": []
+    },
+    "installedAt": "2026-10-05T08:00:00Z",
+    "installedBy": "example-agent service install 0.4.0"
+  },
+  "token": "example-token-not-a-secret",
+  "request": {
+    "method": "GET",
+    "path": "/fabric/v1/events?after=4214&limit=50",
+    "headers": {
+      "X-Example-Token": "example-token-not-a-secret",
+      "Accept": "application/json"
+    }
+  }
+}

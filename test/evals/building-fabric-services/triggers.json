@@ -128,6 +128,14 @@
     {
       "query": "Поставь example-agent как сервис Fabric на Linux через systemd и на Windows через планировщик задач, чтобы он поднимался после входа.",
       "shouldTrigger": true
+    },
+    {
+      "query": "A reinstall of example-agent wiped which projects it serves and their key slots; make it keep backups of the operator's settings and restore them.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "В отчёте о расходах example-agent видно только месячный бюджет, а он ещё режет заказы дороже $2 и проекты по $5 в день — покажи все лимиты.",
+      "shouldTrigger": true
     }
   ]
 }
