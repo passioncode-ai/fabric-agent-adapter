@@ -189,7 +189,8 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" scaffold /path/to/project \
   --provider-name "Demo provider" \
   --capability-id https://agents.example/capabilities/demo \
   --capability-name demo.run \
-  --schema-base https://agents.example/fabric
+  --schema-base https://agents.example/fabric \
+  --effect none
 python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
   --contract /path/to/fabric-agent-contract --json
 ```

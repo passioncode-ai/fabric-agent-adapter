@@ -96,14 +96,21 @@ python3 <skill-dir>/scripts/adapt_project.py scaffold <project-root> \
   --provider-name "Example provider" \
   --capability-id https://agents.example/capabilities/example \
   --capability-name example.run \
-  --schema-base https://agents.example/fabric
+  --schema-base https://agents.example/fabric \
+  --effect draft
 ```
 
 Valid profiles are `mcp`, `a2a`, and `local-runner`. For `mcp` the capability is served
 as the MCP tool of its own name (`requiredFeatures: ["tool:<capability>"]`, contract
 `fabric-interop/0.1`); add `--job` when its work may outlive one request, which writes
 `"job": true` in the capability's interop block. The helper creates only the locked
-target paths. It refuses any collision. Do not use `--force` unless the user explicitly
+target paths. It refuses any collision.
+
+`--effect` is required and never defaulted: the capability's class (`none`, `draft`, `publish`, `send`, `reply`,
+`charge`, `delete`, `merge`, `deploy`, `change-policy`), read from what the code does or asked of the author. Choose
+`--idempotency required|supported|none` for an external effect on purpose. When a run's cost varies, give the
+launcher fixed options (DEC-0037): `--cost-preset ID MAX_USD LABEL` per option and `--default-cost-preset ID`; the
+amounts come from the author or measured runs, never invented. Do not use `--force` unless the user explicitly
 authorizes replacement after the exact conflicting files and diff are shown.
 
 The generated zero hash, `.invalid` endpoints, `replace-me` values, generic schemas, and

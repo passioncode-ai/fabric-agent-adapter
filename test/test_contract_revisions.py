@@ -102,6 +102,15 @@ class CompiledRevisionTests(unittest.TestCase):
                     ADAPTER.scaffold_project(Path(temp), args)
                     self.assertShape(Path(temp), self.new, 'PASS')
 
+    def test_declared_effects_and_cost_presets_meet_the_pinned_schema(self):
+        """FAA-25: what the scaffolder now writes (effect, idempotency, costPresets) is valid under the pin."""
+        for effect in ('none', 'publish', 'charge'):
+            with self.subTest(effect=effect), tempfile.TemporaryDirectory() as temp:
+                args = scaffold_args('mcp'); args.effect = effect; args.idempotency = 'required'
+                args.cost_preset = [['quick', '0.5', 'Quick'], ['deep', '3', 'Deep']]; args.default_cost_preset = 'quick'
+                ADAPTER.scaffold_project(Path(temp), args)
+                self.assertShape(Path(temp), self.new, 'PASS')
+
     def test_revision_mismatch_cannot_upgrade_or_downgrade(self):
         self.assertShape(FIXTURES / 'mcp', self.new, 'FAIL')
         with tempfile.TemporaryDirectory() as temp:

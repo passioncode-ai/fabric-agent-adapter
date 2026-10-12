@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import math
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -208,6 +210,7 @@ def _json_text(value: Any) -> str:
 
 
 def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
+    effect, idempotency = _declared_effect(args)
     for value, label in (
         (args.provider_id, "provider ID"),
         (args.capability_id, "capability ID"),
@@ -250,8 +253,8 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
                 "name": args.capability_name,
                 "inputSchema": _schema_uri(args.schema_base, "schemas/capability-input.schema.json"),
                 "outputSchema": _schema_uri(args.schema_base, "schemas/capability-output.schema.json"),
-                "effect": "none",
-                "idempotency": "none",
+                "effect": effect,
+                "idempotency": idempotency,
                 "dataClasses": ["public"],
                 "profile": _profile(args, args.schema_base),
             }
@@ -259,6 +262,9 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
     }
     if getattr(args, "job", False):
         manifest["capabilities"][0]["extensions"] = {INTEROP_KEY: {"job": True}}
+    presets = _cost_presets(args)
+    if presets:
+        manifest["costPresets"] = presets
     lock = {
         "contract": "fabric-agent-contract",
         "version": CONTRACT_VERSION,
@@ -318,6 +324,51 @@ placeholders. Scaffolding is not admission and must not be presented as compatib
         "fabric/probes/assertions.md": assertions,
         "fabric/FABRIC-CONFORMANCE.md": conformance,
     }
+
+
+EFFECT_CLASSES = ("none", "draft", "publish", "send", "reply", "charge", "delete", "merge", "deploy", "change-policy")
+IDEMPOTENCY = ("required", "supported", "none")
+_PRESET_ID = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
+
+
+def _cost_presets(args: argparse.Namespace) -> List[Dict[str, Any]]:
+    """DEC-0037: the fixed options a launcher offers for a task whose cost varies, each for this capability."""
+    presets: List[Dict[str, Any]] = []
+    seen = set()
+    for raw in getattr(args, "cost_preset", None) or []:
+        preset_id, max_usd, label = (list(raw) + ["", "", ""])[:3]
+        if not _PRESET_ID.match(preset_id or ""):
+            raise AdaptationError("cost preset id %r must match ^[a-z][a-z0-9-]{0,39}$" % preset_id)
+        if preset_id in seen:
+            raise AdaptationError("cost preset %s is named twice" % preset_id)
+        try:
+            amount = float(max_usd)
+        except ValueError:
+            raise AdaptationError("cost preset %s: maxUsd %r is not a number" % (preset_id, max_usd)) from None
+        if not math.isfinite(amount) or amount < 0:
+            raise AdaptationError("cost preset %s: maxUsd must be a finite amount of at least 0" % preset_id)
+        if not label.strip():
+            raise AdaptationError("cost preset %s needs a label a person reads at launch" % preset_id)
+        seen.add(preset_id)
+        presets.append({"id": preset_id, "capability": args.capability_name, "label": label.strip(), "maxUsd": amount})
+    default = getattr(args, "default_cost_preset", None)
+    if default:
+        if default not in seen:
+            raise AdaptationError("--default-cost-preset %s names no --cost-preset" % default)
+        next(p for p in presets if p["id"] == default)["default"] = True
+    return presets
+
+
+def _declared_effect(args: argparse.Namespace) -> Tuple[str, str]:
+    """The capability's effect class is declared by the author, never defaulted (target architecture v4, Stage 0)."""
+    effect = getattr(args, "effect", None)
+    if effect not in EFFECT_CLASSES:
+        raise AdaptationError("declare the capability's effect with --effect (%s); it is never defaulted"
+                              % ", ".join(EFFECT_CLASSES) if not effect else "unknown effect class %r (%s)" % (effect, ", ".join(EFFECT_CLASSES)))
+    idempotency = getattr(args, "idempotency", None) or "none"
+    if idempotency not in IDEMPOTENCY:
+        raise AdaptationError("unknown idempotency %r (%s)" % (idempotency, ", ".join(IDEMPOTENCY)))
+    return effect, idempotency
 
 
 def scaffold_project(root: Path, args: argparse.Namespace) -> Dict[str, Any]:
@@ -544,6 +595,12 @@ def build_parser() -> argparse.ArgumentParser:
     scaffold.add_argument("--runner-kind", default="replace-me")
     scaffold.add_argument("--executable-ref", default="urn:executable:replace-me")
     scaffold.add_argument("--runtime-arg", action="append", default=[])
+    scaffold.add_argument("--effect", required=True, choices=EFFECT_CLASSES,
+                          help="the capability's effect class (governance): what it does outside itself; never defaulted")
+    scaffold.add_argument("--idempotency", choices=IDEMPOTENCY, default="none")
+    scaffold.add_argument("--cost-preset", nargs=3, action="append", default=[], metavar=("ID", "MAX_USD", "LABEL"),
+                          help="a fixed cost option a launcher offers (DEC-0037 costPresets); repeat for each")
+    scaffold.add_argument("--default-cost-preset", metavar="ID", help="the preset preselected at launch")
     scaffold.add_argument("--job", action="store_true", help="the capability's work may outlive one request (fabric-interop/0.1 job)")
     scaffold.add_argument("--force", action="store_true")
     scaffold.add_argument("--json", action="store_true")

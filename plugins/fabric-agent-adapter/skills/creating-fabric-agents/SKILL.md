@@ -116,8 +116,12 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   scaffold <project-root> --profile <mcp|a2a|local-runner> \
   --provider-id <stable-uri> --provider-name "<name>" \
   --capability-id <stable-uri> --capability-name <domain.action> \
-  --schema-base <immutable-base-uri>
+  --schema-base <immutable-base-uri> --effect <class> \
+  [--idempotency required|supported|none] [--cost-preset <id> <max-usd> "<label>" ... --default-cost-preset <id>]
 ```
+
+The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
+does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
 
 Pin exactly contract `0.1.0` at commit `2eb91c00e852d9c31d804310d38fad91589fcbac` and
 read the pinned guide before implementing protocol details. If this skill is installed
