@@ -1,0 +1,22 @@
+{
+  "task": "\\PassionCode\\faa38-receipt-398761ae",
+  "python": "C:\\hostedtoolcache\\windows\\Python\\3.13.15\\x64\\python.exe",
+  "waitSeconds": 260,
+  "settings": {
+    "RestartOnFailure": "PT1M x 999",
+    "MultipleInstancesPolicy": "IgnoreNew",
+    "LogonType": "InteractiveToken"
+  },
+  "installed": true,
+  "starts": 1,
+  "startOffsetsSeconds": [
+    0
+  ],
+  "argv": [
+    "serve --fabric-supervisor task-scheduler"
+  ],
+  "lastResult": "75",
+  "status": "Ready",
+  "removed": true,
+  "answer": "does-not-restart"
+}
