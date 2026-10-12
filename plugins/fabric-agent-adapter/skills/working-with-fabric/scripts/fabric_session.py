@@ -302,7 +302,8 @@ def services_line(env: Optional[Dict[str, str]] = None, platform: str = sys.plat
     """One line when the machine has service descriptors, else None. Reads descriptors as text, never a token file."""
     directory = services_dir(platform, env)
     try:
-        names = sorted(p for p in os.listdir(str(directory)) if p.endswith(".json"))
+        # the shell glob `*.json` of the machine note: a hidden file is not a descriptor
+        names = sorted(p for p in os.listdir(str(directory)) if p.endswith(".json") and not p.startswith("."))
     except OSError:
         return None
     if not names:
@@ -713,17 +714,19 @@ def _answer_said(result: Dict[str, Any]) -> str:
 
 
 def board_unread(result: Dict[str, Any]) -> Tuple[Optional[int], str]:
-    """`com.status` (comms-status.schema.json) → (the unread count, a log-safe word). A board that is not ready, or
-    an answer without a count, is None: "cannot be read" is never reported as zero."""
+    """`com.status` (comms-status.schema.json) → (the unread count, a log-safe word). A board that is `unavailable`,
+    or an answer without a count, is None: "cannot be read" is never reported as zero. A `degraded` board that still
+    gives the reader's count is read (unread counts belong to the reader: the contract's project-comms.md)."""
     said = _answer_said(result)
     if said != "ok":
         return None, "answer=" + said
     doc = _answer_json(result)
     board = doc.get("board") if isinstance(doc.get("board"), dict) else {}
     unread = doc.get("unread")
-    if board.get("state") != "ready" or not isinstance(unread, int) or isinstance(unread, bool) or unread < 0:
+    state = board.get("state")
+    if state not in ("ready", "degraded") or not isinstance(unread, int) or isinstance(unread, bool) or unread < 0:
         return None, "board=unavailable"
-    return unread, "answer=ok unread=%d" % unread
+    return unread, "answer=ok unread=%d%s" % (unread, " board=degraded" if state == "degraded" else "")
 
 
 def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: float = WORKER_DEADLINE_S) -> List[str]:

@@ -1,7 +1,7 @@
-"""working-with-fabric: fabric_session.py — where Fabric is, the registrations, and the Claude Code session hooks
-(SessionStart preamble, Stop turn observation, SessionEnd release). Hooks are driven with fixtures: a temporary
-HOME, a fake hub.json with a live or dead pid, and a fake fabric-mcp that speaks MCP on stdio and records what it
-was asked."""
+"""working-with-fabric: fabric_session.py — where Fabric is, the registrations, the Claude Code session hooks
+(SessionStart preamble, Stop turn observation and unread count, SessionEnd release, UserPromptSubmit unread line),
+watch-mail and install-host-hooks. Hooks are driven with fixtures: a temporary HOME, a fake hub.json with a live or
+dead pid, and a fake fabric-mcp that speaks MCP on stdio and records what it was asked."""
 
 import importlib.util
 import json
@@ -72,6 +72,10 @@ FAKE_MCP = textwrap.dedent('''\
                 if said == "refuse":
                     answer = {{"isError": True, "content": [{{"type": "text", "text": json.dumps({{"error": {{
                         "code": "not_authorized", "message": "secret /private/path", "retryable": False}}}})}}]}}
+                elif said.startswith("degraded"):
+                    answer = {{"content": [{{"type": "text", "text": json.dumps({{"protocol": "fabric-project-comms/0.1",
+                        "board": {{"state": "degraded", "reason": "Telegram is off."}}, "project": "p1", "responders": [],
+                        "unread": int(said.split(":")[1])}})}}]}}
                 elif said == "unavailable":
                     answer = {{"content": [{{"type": "text", "text": json.dumps({{"protocol": "fabric-project-comms/0.1",
                         "board": {{"state": "unavailable", "reason": "The board could not be read."}}, "project": "p1",
@@ -486,6 +490,14 @@ class BoardUnread(Active):
         self.assertIn("answer=refused:not_authorized", log)
         self.assertNotIn("/private/path", log)
 
+    def test_a_degraded_board_that_gives_a_count_is_read(self):
+        self.unread("degraded:2")
+        directory = self.turn()
+        self.assertEqual(json.loads((directory / "board.json").read_text())["unread"], 2)
+        self.assertIn("answer=ok unread=2 board=degraded", self.log_text())
+        self.assertEqual(fs.board_unread({"structuredContent": {"board": {"state": "degraded"}}})[0], None,
+                         "degraded and no count: still no count")
+
     def test_the_end_of_a_session_asks_no_board_status(self):
         self.unread(2)
         spawned = []
@@ -593,6 +605,7 @@ class WatchMail(Active):
         proc.stdin.close()
         self.assertEqual(proc.wait(timeout=10), 0)
         self.assertLess(time.perf_counter() - started, 8.0)
+        proc.stdout.close()
 
     def test_the_cli_exits_on_a_signal(self):
         import signal
@@ -605,6 +618,7 @@ class WatchMail(Active):
         self.assertIsNone(proc.poll(), "stdin from /dev/null is not a closed pipe: keep watching")
         proc.send_signal(signal.SIGTERM)
         self.assertEqual(proc.wait(timeout=10), 0)
+        proc.stdout.close()
 
 
 class LaunchedByFabric(Active):
@@ -658,6 +672,7 @@ class ServicesLine(Base):
         (directory / "b.default.json").write_text('{"origin": "http://localhost:4200"}')
         (directory / "c.default.json").write_text('{"origin": "https://example.invalid"}')
         (directory / "notes.txt").write_text("not a descriptor")
+        (directory / ".a.default.json.tmp.json").write_text('{"origin": "http://127.0.0.1:1"}')  # hidden: not counted
         self.env["FABRIC_SERVICES_DIR"] = str(directory)
         return directory
 
@@ -742,6 +757,17 @@ class InstallHostHooks(Base):
         self.assertIn(str(path), out)
         self.assertEqual(path.read_bytes(), before)
         self.assertEqual(list(path.parent.glob("*.bak")), [])
+
+    def test_the_dry_run_prints_no_value_from_the_file(self):
+        self.codex_file({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "timeout": 5,
+                                                              "command": "env TOKEN=VALUE-SENTINEL other"}]}]}})
+        code, out, _ = self.install("codex")
+        self.assertEqual(code, 0)
+        self.assertNotIn("VALUE-SENTINEL", out)
+        self.kimi_file('[providers.x]\napi_key = "VALUE-SENTINEL"\n')
+        code, out, _ = self.install("kimi")
+        self.assertEqual(code, 0)
+        self.assertNotIn("VALUE-SENTINEL", out)
 
     def test_apply_backs_up_adds_one_entry_and_keeps_the_rest(self):
         original = {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "other", "timeout": 5}]}],

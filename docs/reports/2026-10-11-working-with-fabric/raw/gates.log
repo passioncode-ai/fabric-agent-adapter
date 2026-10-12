@@ -14,12 +14,12 @@ $ node --test 'test/*.test.mjs'
 ℹ skipped 0
 exit 0
 $ claude plugin validate ./plugins/fabric-agent-adapter --strict
-Validating plugin manifest: /Users/sshlg/DATA/fabric-agent-adapter/.worktrees/working-with-fabric/plugins/fabric-agent-adapter/.claude-plugin/plugin.json
+Validating plugin manifest: <checkout>/plugins/fabric-agent-adapter/.claude-plugin/plugin.json
 
 ✔ Validation passed
 exit 0
 $ claude plugin validate . --strict
-Validating marketplace manifest: /Users/sshlg/DATA/fabric-agent-adapter/.worktrees/working-with-fabric/.claude-plugin/marketplace.json
+Validating marketplace manifest: <checkout>/.claude-plugin/marketplace.json
 
 ✔ Validation passed
 exit 0

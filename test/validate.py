@@ -64,6 +64,7 @@ STDLIB_IMPORTS = {
     "xml",  # the supervisor tests read the Task Scheduler XML back (FAA-21)
     "ntpath", "posixpath",  # the lock name the Node kit holds, computed for either system (FAA-21)
     "ipaddress", "math", "struct",  # the delegation verifier: a loopback key-set URL, Ed25519 and claim checks (DEC-0039)
+    "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
 }
 
 
