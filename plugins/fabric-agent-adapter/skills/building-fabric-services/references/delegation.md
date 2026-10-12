@@ -16,6 +16,7 @@ contract's own verifier does.
 - Approvals
 - What a refusal looks like
 - Keys and the cache
+- Keys the estate record certifies
 - What the kit does not do
 
 ## Declaring it
@@ -91,6 +92,19 @@ a minute (DL-15), and waits 10 s after a failed read before trying again; after 
 Python kit verifies Ed25519 itself (RFC 8032, standard library only, strict as OpenSSL: `S` below the group order,
 canonical points, no small-order key); it follows no redirect when it reads the key set; the Node kit uses `node:crypto` and refuses small-order keys
 itself (`isSmallOrderKey`), because Node before 26 lets OpenSSL accept a signature under one.
+
+## Keys the estate record certifies
+
+A verifier that also reads the estate's record (DEC-0055, [the estate record reference](estate-record.md)) trusts a
+`kid` only while a current revision certifies it for a machine and does not revoke it (DL-14). Pass the current
+verified revision as `estate=` / `{ estate }`, as a value or as a function returning it, to `delegation_gate`,
+`verify_delegation` or `verify_approval`.
+- An uncertified `kid` is refused `unauthenticated` (`approval-invalid` for an approval), with detail
+  `kid-not-certified`.
+- An unreadable record is refused `issuer-unavailable`, with detail `estate-unreadable`.
+- Without `estate`, nothing changes.
+- Pass only a revision `verify_estate_record` accepted, and the highest one the machine has applied. The rule trusts
+  what it is given, so an unverified or older revision would certify a key the current one revoked.
 
 ## What the kit does not do
 

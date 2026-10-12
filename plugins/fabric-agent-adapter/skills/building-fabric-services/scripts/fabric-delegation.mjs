@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { hubKeyCertified } from './fabric-estate.mjs';
 
 export const REFUSAL_CODES = Object.freeze([
   'unauthenticated', 'token-expired', 'wrong-audience', 'scope-not-granted', 'effect-above-ceiling', 'no-grant',
@@ -252,11 +253,30 @@ function approvalShape(payload) {
  * DL-13, in its fixed order: nothing about a token is believed before its signature is. `now` is seconds since
  * the epoch. Answers {ok: true, claims, principal, caller, chain, kid} or {ok: false, code, detail}.
  */
-export function verifyDelegation(token, { audience, jwks, now, capability, effect, issuer, readOnly } = {}) {
+/**
+ * DL-14 with DEC-0055: a verifier that reads the estate record trusts a kid only while a current revision certifies it
+ * for a machine and does not revoke it. `estate` is a revision the caller verified (fabric-estate.mjs
+ * verifyEstateRecord) or a function returning the current one; undefined skips the rule. `[kind, detail]` or null.
+ */
+function estateProblem(estate, jwks, kid, now) {
+  if (estate === undefined || estate === null) return null;
+  let record;
+  try {
+    record = typeof estate === 'function' ? estate() : estate;
+  } catch {
+    return ['issuer', 'estate-unreadable']; // an unreadable record certifies nothing; it is never a pass
+  }
+  const jwk = jwks.keys.find((candidate) => isObject(candidate) && candidate.kid === kid) ?? {};
+  return hubKeyCertified(record, kid, jwk.x, now) ? null : ['token', 'kid-not-certified'];
+}
+
+export function verifyDelegation(token, { audience, jwks, now, capability, effect, issuer, readOnly, estate } = {}) {
   if (!isString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
   if (!hasKeys(jwks)) return refuse('issuer-unavailable', 'no-published-keys');
   const checked = authentic(token, jwks, DELEGATION_TYP);
   if ('problem' in checked) return refuse(checked.issuer ? 'issuer-unavailable' : 'unauthenticated', checked.problem);
+  const uncertified = estateProblem(estate, jwks, checked.kid, now);
+  if (uncertified) return refuse(uncertified[0] === 'issuer' ? 'issuer-unavailable' : 'unauthenticated', uncertified[1]);
   const shaped = delegationShape(checked.compact.payload);
   if ('problem' in shaped) return refuse('unauthenticated', shaped.problem);
   const { claims, depth } = shaped;
@@ -275,13 +295,15 @@ export function verifyDelegation(token, { audience, jwks, now, capability, effec
 }
 
 /** DL-18: approval-required carries the digest; any fault is approval-invalid; the jti is consumed last. */
-export function verifyApproval(approval, { audience, jwks, now, actionDigest: expected, issuer, jtiStore } = {}) {
+export function verifyApproval(approval, { audience, jwks, now, actionDigest: expected, issuer, jtiStore, estate } = {}) {
   if (approval === undefined || approval === null || approval === '') return refuse('approval-required', 'no-approval', { actionDigest: expected });
   if (!isObject(jtiStore) || typeof jtiStore.consume !== 'function') return refuse('unknown-state', 'no-jti-store');
   if (!isString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
   if (!hasKeys(jwks)) return refuse('issuer-unavailable', 'no-published-keys');
   const checked = authentic(approval, jwks, APPROVAL_TYP);
   if ('problem' in checked) return refuse(checked.issuer ? 'issuer-unavailable' : 'approval-invalid', checked.problem);
+  const uncertified = estateProblem(estate, jwks, checked.kid, now);
+  if (uncertified) return refuse(uncertified[0] === 'issuer' ? 'issuer-unavailable' : 'approval-invalid', uncertified[1]);
   const claims = approvalShape(checked.compact.payload);
   if (!claims) return refuse('approval-invalid', 'malformed-claims');
   if (claims.iss !== issuer) return refuse('approval-invalid', 'wrong-issuer');
@@ -447,7 +469,7 @@ export const TIERS = Object.freeze(['T0', 'T1', 'T2']);
  * relayed from off the machine). A T0 or T1 caller is never required to present a token: with none, the call passes
  * with no delegation. A present token is verified at every tier. `issuer` (auth.delegation.issuer) is required.
  */
-export function delegationGate({ audience, jwks, effects, issuer, readOnly = false, clock = () => Date.now() / 1000 }) {
+export function delegationGate({ audience, jwks, effects, issuer, readOnly = false, clock = () => Date.now() / 1000, estate }) {
   if (!isString(issuer)) throw new Error('the gate needs the issuer it trusts (auth.delegation.issuer)');
   return async (tool, headers, tier = 'T2') => {
     const effect = effects?.[tool];
@@ -458,7 +480,7 @@ export function delegationGate({ audience, jwks, effects, issuer, readOnly = fal
       return refuse('unauthenticated', 'no-token');
     }
     const keys = jwks instanceof JwksCache ? await jwks.get(kidOf(carried.token)) : jwks;
-    const verdict = verifyDelegation(carried.token, { audience, jwks: keys, now: clock(), capability: tool, effect, readOnly, issuer });
+    const verdict = verifyDelegation(carried.token, { audience, jwks: keys, now: clock(), capability: tool, effect, readOnly, issuer, estate });
     if (verdict.ok) verdict.tier = TIERS.includes(tier) ? tier : 'T2';
     return verdict;
   };

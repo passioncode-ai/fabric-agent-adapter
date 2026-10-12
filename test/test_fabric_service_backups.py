@@ -47,6 +47,14 @@ class CanonicalForm(unittest.TestCase):
                 ran += 1
         self.assertGreater(ran, 2)
 
+    def test_the_contract_refusals(self):
+        refuses = json.loads((HERE / "fixtures/contract/canonical.json").read_text(encoding="utf-8"))["settings"]["refuses"]
+        self.assertGreaterEqual(len(refuses), 7)
+        for v in refuses:
+            value = json.loads(v["inputJson"]) if "inputJson" in v else v.get("input")
+            with self.subTest(v["name"]), self.assertRaises(fs.ServiceError):
+                fs.settings_canonical_json(value)
+
     def test_what_has_no_canonical_form_is_refused(self):
         for value in (0.5, 2 ** 53, -(2 ** 53), float("nan"), {"a": object()}):
             with self.subTest(value=value), self.assertRaises(fs.ServiceError):

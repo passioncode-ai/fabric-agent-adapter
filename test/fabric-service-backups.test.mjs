@@ -32,6 +32,9 @@ test('the canonical form matches the contract vectors and refuses what has none'
   }
   assert.ok(ran > 2);
   for (const value of [0.5, 2 ** 53, -(2 ** 53), Number.NaN, { a: undefined }, new Date(0)]) assert.throws(() => k.settingsCanonicalJson(value), k.ServiceError);
+  const refuses = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/canonical.json'), 'utf8')).settings.refuses;
+  assert.ok(refuses.length >= 7);
+  for (const v of refuses) assert.throws(() => k.settingsCanonicalJson('inputJson' in v ? JSON.parse(v.inputJson) : v.input), k.ServiceError, v.name);
   const positive = fixture('positive-settings-backup');
   assert.equal(k.settingsBackupDigest(positive.tables), positive.sha256);
 });

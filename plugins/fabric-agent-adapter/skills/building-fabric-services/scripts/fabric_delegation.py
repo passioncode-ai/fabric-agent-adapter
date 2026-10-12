@@ -432,11 +432,30 @@ def _approval_shape(payload: Dict[str, Any]) -> bool:
     return payload.get("method") in ("prompt", "operator-channel")  # DEC-0045: `device` is removed
 
 
+def _estate_problem(estate: Any, jwks: Dict[str, Any], kid: str, now: float) -> Optional[Tuple[str, str]]:
+    """DL-14 with DEC-0055: a verifier that reads the estate record trusts a kid only while a current revision certifies
+    it for a machine and does not revoke it. `estate` is a revision the caller verified (fabric_estate.
+    verify_estate_record) or a callable returning the current one; None skips the rule. (refusal kind, detail) or None."""
+    if estate is None:
+        return None
+    try:
+        record = estate() if callable(estate) else estate
+    except Exception:  # an unreadable record certifies nothing; it is never a pass
+        return ("issuer", "estate-unreadable")
+    import fabric_estate  # beside this file; imported here, since fabric_estate imports this module
+    jwk = next((k for k in jwks["keys"] if isinstance(k, dict) and k.get("kid") == kid), {})
+    if not fabric_estate.hub_key_certified(record, kid, jwk.get("x"), now):
+        return ("token", "kid-not-certified")
+    return None
+
+
 def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capability: str, effect: str,
-                      issuer: Optional[str], read_only: bool = False) -> Dict[str, Any]:
+                      issuer: Optional[str], read_only: bool = False, estate: Any = None) -> Dict[str, Any]:
     """DL-13, in its fixed order: nothing about a token is believed before its signature is.
     `now` is seconds since the epoch. Returns {ok: True, claims, principal, caller, chain, kid} or a refusal
-    {ok: False, code, detail[, data]} whose detail is a short machine word, never the token. `issuer` is required."""
+    {ok: False, code, detail[, data]} whose detail is a short machine word, never the token. `issuer` is required.
+    With `estate` (a verified estate revision, or a callable returning the current one), the token's kid must be one
+    the revision certifies for a machine (DL-14, DEC-0055)."""
     if not _is_string(issuer):
         return _refuse("issuer-unavailable", "no-trusted-issuer")
     if not _has_keys(jwks):
@@ -444,6 +463,9 @@ def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capab
     checked = _authentic(token, jwks, DELEGATION_TYP)
     if "problem" in checked:
         return _refuse("issuer-unavailable" if checked.get("issuer") else "unauthenticated", checked["problem"])
+    uncertified = _estate_problem(estate, jwks, checked["kid"], now)
+    if uncertified:
+        return _refuse("issuer-unavailable" if uncertified[0] == "issuer" else "unauthenticated", uncertified[1])
     claims = checked["compact"]["payload"]
     problem, depth = _delegation_shape(claims)
     if problem:
@@ -543,7 +565,7 @@ UNSAFE_NO_JTI_STORE = _NoReplayProtection()
 
 
 def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: float, action_digest: str,
-                    jti_store: Any, issuer: Optional[str]) -> Dict[str, Any]:
+                    jti_store: Any, issuer: Optional[str], estate: Any = None) -> Dict[str, Any]:
     """DL-18: a missing approval is approval-required carrying the action digest; any fault of the document is
     approval-invalid; a second use is approval-reused. The jti is consumed last."""
     if approval is None or approval == "":
@@ -557,6 +579,9 @@ def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: f
     checked = _authentic(approval, jwks, APPROVAL_TYP)
     if "problem" in checked:
         return _refuse("issuer-unavailable" if checked.get("issuer") else "approval-invalid", checked["problem"])
+    uncertified = _estate_problem(estate, jwks, checked["kid"], now)
+    if uncertified:
+        return _refuse("issuer-unavailable" if uncertified[0] == "issuer" else "approval-invalid", uncertified[1])
     claims = checked["compact"]["payload"]
     if not _approval_shape(claims):
         return _refuse("approval-invalid", "malformed-claims")
@@ -795,7 +820,7 @@ TIERS = ("T0", "T1", "T2")
 
 
 def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], issuer: str,
-                    read_only: bool = False, clock: Callable[[], float] = time.time) -> Callable[..., Dict[str, Any]]:
+                    read_only: bool = False, clock: Callable[[], float] = time.time, estate: Any = None) -> Callable[..., Dict[str, Any]]:
     """A check for one tools/call: `gate(tool, headers, tier="T2")` answers the accepted delegation or a DL-19
     refusal. `effects` maps each tool to its declared effect class (its manifest entry); a tool with none is
     refused rather than guessed. `jwks` is a JwksCache or a key set; `issuer` (auth.delegation.issuer) is required.
@@ -804,7 +829,8 @@ def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], iss
     own local floor has authenticated; T1 an enrolled machine of the same owner; T2 everything else, and any call
     relayed from off the machine. A T0 or T1 caller is never required to present a token: with none, the call
     passes with no delegation ({ok: True, tier, principal: None, ...}). A present token is verified at every tier
-    and refused when invalid. Unknown tiers count as T2."""
+    and refused when invalid. Unknown tiers count as T2. `estate` (a callable returning the current verified estate
+    revision) makes the gate trust only kids that revision certifies (DL-14, DEC-0055)."""
     if not _is_string(issuer):
         raise ValueError("the gate needs the issuer it trusts (auth.delegation.issuer)")
 
@@ -819,7 +845,7 @@ def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], iss
             return _refuse("unauthenticated", "no-token")
         keys = jwks.get(_kid_of(carried["token"])) if isinstance(jwks, JwksCache) else jwks
         verdict = verify_delegation(carried["token"], audience=audience, jwks=keys, now=clock(), capability=tool,
-                                    effect=effect, issuer=issuer, read_only=read_only)
+                                    effect=effect, issuer=issuer, read_only=read_only, estate=estate)
         if verdict["ok"]:
             verdict["tier"] = tier if tier in TIERS else "T2"
         return verdict

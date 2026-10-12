@@ -314,6 +314,18 @@
         "checks every route event: it names this route, its candidates by position, probes every candidate above the selection in order (all for an exhausted walk), and obeys the session, hold and recovery policy (FAC-SEM-034)",
         "never appends runners the route does not name and never invents a probe result outside the closed list"
       ]
+    },
+    {
+      "id": "estate-record-and-certified-keys",
+      "trap": "the service applied an estate revision it had only parsed — a signer the parent had revoked, a validUntil 90 days out, a hub key of small order — and its delegation gate kept trusting a hub key the newest revision no longer certified",
+      "request": "example-agent runs on several of the operator's machines; apply only estate revisions the operator signed, and trust a delegation token only under a hub key the current revision certifies.",
+      "expected": [
+        "checks a revision against estate-record.schema.json, then verify_estate_record / verifyEstateRecord with the verified parent (or, for revision 1, the passkeys pinned at enrollment) and the machine's clock; applies it only on ok",
+        "names the refusal by the verifier's problem: no-clock, digest-mismatch, broken-chain, unknown- or revoked-authority, an assertion problem (WebAuthn Level 3, offline), too-long-lived, not-yet-valid, expired, rule-violation with its FAC-SEM codes",
+        "passes the current verified revision to the delegation gate (`estate=` / `{estate}`), so a token's kid is trusted only while that revision certifies it for a machine and does not revoke it (DL-14); an unreadable record certifies nothing",
+        "checks records it produces with estate_record_rules / estateRecordRules (FAC-SEM-072…076): keys usable and named once, placements under pinned publisher keys, secrets by reference, grants external, nothing listed that is revoked",
+        "keeps no private key or passkey secret in the service: the kit verifies and never signs"
+      ]
     }
   ]
 }
