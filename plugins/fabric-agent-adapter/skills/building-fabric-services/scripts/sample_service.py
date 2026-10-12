@@ -350,7 +350,8 @@ def register(args: argparse.Namespace) -> int:
         else {"manager": "none"},
         "paths": {"data": str(data), "logs": []},
         "fabricManifest": str(manifest),
-        "installedAt": fs.now_iso(), "installedBy": "sample_service.py register",
+        # DEC-0061: who installed it, by role and never by name — a person runs this register command.
+        "installedAt": fs.now_iso(), "installedBy": {"by": "person", "role": "operator", "tool": "sample_service.py register %s" % VERSION},
     }
     try:
         path = fs.write_descriptor(descriptor, Path(args.services_dir) if args.services_dir else None)

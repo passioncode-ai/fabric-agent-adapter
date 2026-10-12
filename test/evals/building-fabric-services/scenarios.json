@@ -338,6 +338,18 @@
         "adds the flag to the service's own argument parser in both spellings (add_supervisor_argument for argparse) so the parser does not exit 2 on it",
         "a supervised copy waits for the lock at most 300 s touching nothing; a copy started by hand tries once; a holder whose pid cannot be read is named unknown (FAC-SEM-078)"
       ]
+    },
+    {
+      "id": "app-descriptor-and-listing",
+      "trap": "a desktop app wrote a descriptor that claimed a port it changes on every start, its installer string as installedBy, and a dashboard showed Fabric's button although Fabric had been uninstalled; a cloud agent offered to colleagues declared no runner and ran on the owner's subscription",
+      "request": "example-app is a desktop app with no installer, and example-inbox is offered to the organization's members; register both so hosts list them correctly, and show Fabric's button only when Fabric is installed.",
+      "expected": [
+        "writes the app's descriptor with lifecycle.manager person, lifecycle.app the installed app, installedBy {by: person, role, tool} and no origin; rewrites it only when app_descriptor_action / appDescriptorAction says write (no descriptor, another version or path), never from an App Translocation path",
+        "keeps the app's live origin and process id in its own liveness file, and a caller that sends anything reads that file and checks the process; the descriptor claims no port",
+        "registers the offered service with register_remote / registerRemote passing runner {credentialKind} (never subscription, never a credential's value) and peer {endpoint, custody, residency, maxDataClass}, and installedBy by role, never a person's name",
+        "a host routes a request from anyone but the operator only when peer_refusal / peerRefusal answers null: never above maxDataClass, an unknown class refused first",
+        "sets data-fabric=\"absent\" on Fabric's button unless fabric_button_presence / fabricButtonPresence answers present (Fabric's own descriptor registered and, for an app's, its app still installed)"
+      ]
     }
   ]
 }

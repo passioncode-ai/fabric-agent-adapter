@@ -1,0 +1,365 @@
+{
+  "about": "A service offered to others (service.md Offered to others, DEC-0061), for ports: peerRefusal in src/descriptor-rules.ts runs the cases — the host's check before it routes a request from anyone but the operator to a service. The classes are the organization edition's four, least sensitive first, compared exactly as written; anything else is unknown and refused before any comparison. residency lists the codes the descriptor schema's peer.residency item pattern accepts and refuses: two upper-case letters, never a user-assigned code (AA, QM–QZ, XA–XZ, ZZ). It checks the shape only, so an unassigned code such as AB passes at the boundary; whether a code is assigned is not checked here (DEC-0061, Not decided).",
+  "dataClasses": [
+    "public",
+    "internal",
+    "confidential",
+    "restricted"
+  ],
+  "refusals": [
+    "not-offered",
+    "peer-invalid",
+    "data-class-unknown",
+    "above-max-data-class"
+  ],
+  "cases": [
+    {
+      "name": "public to a restricted peer",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": "public",
+      "refusal": null
+    },
+    {
+      "name": "restricted to a restricted peer: equal classes pass",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": "restricted",
+      "refusal": null
+    },
+    {
+      "name": "internal to an internal peer: the boundary",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "internal"
+        }
+      },
+      "dataClass": "internal",
+      "refusal": null
+    },
+    {
+      "name": "confidential to an internal peer: one above the boundary",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "internal"
+        }
+      },
+      "dataClass": "confidential",
+      "refusal": "above-max-data-class"
+    },
+    {
+      "name": "public to an internal peer",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "internal"
+        }
+      },
+      "dataClass": "public",
+      "refusal": null
+    },
+    {
+      "name": "restricted to a confidential peer",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        }
+      },
+      "dataClass": "restricted",
+      "refusal": "above-max-data-class"
+    },
+    {
+      "name": "internal to a public peer",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "public"
+        }
+      },
+      "dataClass": "internal",
+      "refusal": "above-max-data-class"
+    },
+    {
+      "name": "public to a public peer",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "public"
+        }
+      },
+      "dataClass": "public",
+      "refusal": null
+    },
+    {
+      "name": "Confidential in another case is unknown, never compared",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": "Confidential",
+      "refusal": "data-class-unknown"
+    },
+    {
+      "name": "the contract's own project-internal is another vocabulary",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": "project-internal",
+      "refusal": "data-class-unknown"
+    },
+    {
+      "name": "personal is a scope, not a class (v4 V2-19)",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": "personal",
+      "refusal": "data-class-unknown"
+    },
+    {
+      "name": "a class given by its index is unknown: a port that indexes the list would read 2 as confidential",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": 2,
+      "refusal": "data-class-unknown"
+    },
+    {
+      "name": "no class at all",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": null,
+      "refusal": "data-class-unknown"
+    },
+    {
+      "name": "__proto__ is not a class",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": "__proto__",
+      "refusal": "data-class-unknown"
+    },
+    {
+      "name": "constructor is not a class",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "restricted"
+        }
+      },
+      "dataClass": "constructor",
+      "refusal": "data-class-unknown"
+    },
+    {
+      "name": "a descriptor without peer is its operator's only",
+      "descriptor": {
+        "lifecycle": {
+          "manager": "node"
+        }
+      },
+      "dataClass": "public",
+      "refusal": "not-offered"
+    },
+    {
+      "name": "a peer that is a list is not a peer",
+      "descriptor": {
+        "peer": [
+          {
+            "endpoint": "https://agents.example.com/mcp",
+            "custody": "organization-managed",
+            "residency": [
+              "DE"
+            ],
+            "maxDataClass": "restricted"
+          }
+        ]
+      },
+      "dataClass": "public",
+      "refusal": "not-offered"
+    },
+    {
+      "name": "no descriptor",
+      "descriptor": null,
+      "dataClass": "public",
+      "refusal": "not-offered"
+    },
+    {
+      "name": "a peer whose maximum is unknown compares nothing",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "secret"
+        }
+      },
+      "dataClass": "public",
+      "refusal": "peer-invalid"
+    },
+    {
+      "name": "a peer whose maximum is upper case compares nothing",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "PUBLIC"
+        }
+      },
+      "dataClass": "public",
+      "refusal": "peer-invalid"
+    },
+    {
+      "name": "a peer whose maximum is __proto__ compares nothing",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "__proto__"
+        }
+      },
+      "dataClass": "public",
+      "refusal": "peer-invalid"
+    },
+    {
+      "name": "a peer without a maximum compares nothing",
+      "descriptor": {
+        "peer": {
+          "endpoint": "https://agents.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ]
+        }
+      },
+      "dataClass": "public",
+      "refusal": "peer-invalid"
+    }
+  ],
+  "residency": {
+    "accepted": [
+      "DE",
+      "EU",
+      "US",
+      "QA",
+      "QL",
+      "AB",
+      "ZW",
+      "ZY",
+      "YE"
+    ],
+    "refused": [
+      "de",
+      "Eu",
+      "AA",
+      "QM",
+      "QZ",
+      "XA",
+      "XK",
+      "XZ",
+      "ZZ",
+      "D",
+      "DEU",
+      "EU ",
+      " EU",
+      "D1",
+      "ÄÖ"
+    ]
+  },
+  "source": "fixtures/vectors/service-peer.json"
+}

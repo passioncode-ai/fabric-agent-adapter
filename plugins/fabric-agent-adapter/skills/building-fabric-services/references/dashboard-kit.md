@@ -100,10 +100,13 @@ service. Load it after the stylesheet, with ids only:
   — or one shaped like a credential — means no button, never a bad link. A press opens a view in Fabric and starts
   nothing (FB-8).
 - **The host (FB-6):** when the host's `fabric_button` cookie says `owner=host`, the page hides its own button.
-- **Fabric absent (FB-5):** when the cookie says `fabric=absent`, or `data-fabric="absent"` (a local service whose
-  server checked for Fabric's hub document), or when the page is still visible and focused 1.5 s after a link was
-  followed, the menu says "Fabric is not installed — get it at passioncode.ai/fabric". Nothing downloads, nothing
-  retries.
+- **Fabric absent (FB-5):** when the cookie says `fabric=absent`, or `data-fabric="absent"`, or when the page is still
+  visible and focused 1.5 s after a link was followed, the menu says "Fabric is not installed — get it at
+  passioncode.ai/fabric". Nothing downloads, nothing retries. A local service's server decides `data-fabric` with
+  `fabric_button_presence()` / `fabricButtonPresence()`: `present` while Fabric's own descriptor
+  (`services/fabric.default.json`, Fabric ADR-0139) is registered and, for an app's descriptor (`manager: "person"`,
+  DEC-0069), its app is still installed; `absent` otherwise. A press only follows a link, so the button never reads
+  Fabric's liveness file; a caller that sends Fabric anything reads that file and checks the process first.
 
 `window.FabricButton` exposes `buildFabricLink`, `parseFabricLink` and `parseButtonCookie` for a page that needs
 them. The button is optional: a page without the script has no button.

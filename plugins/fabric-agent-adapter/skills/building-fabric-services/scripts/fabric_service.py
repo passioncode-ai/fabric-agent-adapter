@@ -90,7 +90,11 @@ _SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
 # DEC-0057: `//server/…` and `/\\server…` are shares on Windows too, so a leading slash is followed by neither.
 _LOCAL_PATH = re.compile(r"^(~[\\/]|/(?![\\/])|[A-Za-z]:[\\/])")
 # DEC-0032: the supervisor per system and the field that names its job.
-MANAGERS = ("launchd", "systemd", "task-scheduler", "none")
+# DEC-0061: `node` (Project Observatory's node supervises its children, no supervisor file); DEC-0069: `person` (an app
+# a person installs and starts; its descriptor says it is installed, never that it runs).
+MANAGERS = ("launchd", "systemd", "task-scheduler", "node", "person", "none")
+#: Managers that write no launchd label or plist (DEC-0057, DEC-0061, DEC-0069).
+_NOT_LAUNCHD = ("systemd", "task-scheduler", "node", "person")
 _AUTH_HEADER = re.compile(r"[A-Za-z][A-Za-z0-9-]{0,63}")
 _UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$")
 _TASK = re.compile(r"^\\[A-Za-z0-9 ._\\-]{1,254}$")
@@ -886,7 +890,10 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
     remote = placement_of(descriptor) == "remote"
     if "placement" in descriptor and descriptor["placement"] not in PLACEMENTS:
         problems.append("placement must be local or remote")
-    required = ("protocol", "id", "instance", "name", "origin", "auth", "lifecycle", "installedAt", "installedBy")
+    life_in = descriptor.get("lifecycle") if isinstance(descriptor.get("lifecycle"), dict) else {}
+    app = life_in.get("manager") == "person"
+    # DEC-0069: an app's descriptor says it is installed, never that it runs; its live origin is in its own liveness file.
+    required = ("protocol", "id", "instance", "name", "auth", "lifecycle", "installedAt", "installedBy") + (() if app else ("origin",))
     if not remote:
         required = required + ("paths",)
     for key in required:
@@ -902,7 +909,7 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         problems.append("instance must match %s" % _INSTANCE.pattern)
     if remote:
         problems.extend(remote_origin_problems(descriptor["origin"]))
-    elif not _ORIGIN.match(str(descriptor["origin"])):
+    elif "origin" in descriptor and not _ORIGIN.match(str(descriptor["origin"])):
         problems.append("origin must be http://127.0.0.1:<port>")
     auth = descriptor.get("auth") or {}
     if "tokenFile" not in auth:
@@ -924,14 +931,21 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
     life = descriptor.get("lifecycle") or {}
     manager = life.get("manager")
     if manager not in MANAGERS:
-        problems.append("lifecycle.manager must be launchd, systemd, task-scheduler or none")
+        problems.append("lifecycle.manager must be launchd, systemd, task-scheduler, node, person or none")
+    # DEC-0069: `app` is the installed app of a person's descriptor, and nothing else's.
+    if manager == "person" and "app" not in life:
+        problems.append("a person's app declares lifecycle.app, the installed app")
+    if "app" in life and manager != "person":
+        problems.append("lifecycle.app belongs to manager person only")
+    if "app" in life and not _LOCAL_PATH.match(str(life["app"])):
+        problems.append("lifecycle.app must be a local path")
     if manager == "launchd" and not (life.get("label") and str(life.get("plist", "")).endswith(".plist")):
         problems.append("a launchd service declares label and plist")
     if "plist" in life and not _LOCAL_PATH.match(str(life["plist"])):
         problems.append("lifecycle.plist must be a local path")
-    # DEC-0057: a descriptor names one supervisor; launchd's label and plist never sit beside another.
+    # DEC-0057, DEC-0061, DEC-0069: a descriptor names one supervisor; launchd's label and plist never sit beside another.
     for field in ("label", "plist"):
-        if field in life and manager in ("systemd", "task-scheduler"):
+        if field in life and manager in _NOT_LAUNCHD:
             problems.append("lifecycle.%s belongs to launchd, not to %s" % (field, manager))
     # DEC-0032: `unit` goes with systemd and `task` with Task Scheduler, and with nothing else.
     for field, owner, pattern in (("unit", "systemd", _UNIT), ("task", "task-scheduler", _TASK)):
@@ -949,6 +963,7 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
                 problems.append("a remote service has no %s %s" % (of, field))
         if "update" in (descriptor.get("commands") or {}):
             problems.append("a remote service declares no update command")
+    problems.extend(descriptor_member_problems(descriptor))
     for name, argv in (descriptor.get("commands") or {}).items():
         if name not in ("doctor", "update"):
             problems.append("unknown command %s" % name)
@@ -957,6 +972,166 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         elif not _LOCAL_PATH.match(argv[0]):
             problems.append("command %s must start with an absolute or ~/ executable" % name)
     return problems
+
+
+# --- DEC-0061 and DEC-0069: who installed it, how its model calls sign in, offered to others, an app's own descriptor ---
+
+#: The organization edition's data classes, least sensitive first (DEC-0061, DEC-0053).
+PEER_DATA_CLASSES = ("public", "internal", "confidential", "restricted")
+#: The kind of a runner's sign-in, never a credential's value (DEC-0061).
+CREDENTIAL_KINDS = ("subscription", "key", "platform-metered", "none")
+#: A subscription runs only in its vendor's runner (DEC-0046): runner kind → login.
+SUBSCRIPTION_RUNNERS = {"claude-code": "claude", "kimi-code": "kimi", "codex": "chatgpt"}
+_PEER_ENDPOINT = re.compile(r"^https://(?P<host>([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?$", re.ASCII)
+_RESIDENCY = re.compile(r"^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$", re.ASCII)
+_RUNNER_KIND_NAME = re.compile(r"^[a-z][a-z0-9-]{1,62}$", re.ASCII)
+
+
+def _pointer(name: str) -> str:
+    """A JSON Pointer token (RFC 6901 §4)."""
+    return str(name).replace("~", "~0").replace("/", "~1")
+
+
+def _text(value: Any, low: int = 1, high: int = 200) -> bool:
+    return isinstance(value, str) and low <= len(value) <= high
+
+
+def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
+    """DEC-0061 and DEC-0069 on a descriptor's `installedBy`, `runner` and `peer`, as the schema shapes them, with
+    FAC-SEM-085 (a peer on a reserved name) and FAC-SEM-086 (a credential-shaped value in `runner` or `installedBy`,
+    named by its place, never its value)."""
+    import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
+    problems: List[str] = []
+    life = descriptor.get("lifecycle") if isinstance(descriptor.get("lifecycle"), dict) else {}
+    by = descriptor.get("installedBy")
+    places: List[Tuple[str, Any]] = []
+    if isinstance(by, str):
+        if not _text(by):
+            problems.append("installedBy is the installer and its version, 1 to 200 characters")
+        places.append(("/installedBy", by))
+    elif isinstance(by, dict):
+        problems += ["installedBy has no member %s" % k for k in by if k not in ("by", "role", "tool")]
+        if by.get("by") not in ("person", "node", "organization"):
+            problems.append("installedBy.by is person, node or organization")
+        if by.get("by") == "person" and by.get("role") not in ("operator", "administrator"):
+            problems.append("installedBy.role is operator or administrator for a person")
+        if by.get("by") != "person" and "role" in by:
+            problems.append("installedBy.role belongs to a person only")
+        if not _text(by.get("tool")):
+            problems.append("installedBy.tool is the installer and its version, 1 to 200 characters")
+        places += [("/installedBy/%s" % _pointer(k), v) for k, v in by.items()]
+    else:
+        problems.append("installedBy is the installer's name or {by, role?, tool}")
+    if life.get("manager") == "person" and not (isinstance(by, dict) and by.get("by") == "person"):
+        problems.append("an app's descriptor names who installed it as a person: installedBy {by: person, role, tool} (DEC-0069)")
+    runner = descriptor.get("runner")
+    if "runner" in descriptor:
+        if not isinstance(runner, dict):
+            problems.append("runner is {kind?, credentialKind}")
+            runner = {}
+        problems += ["runner has no member %s" % k for k in runner if k not in ("kind", "credentialKind")]
+        if runner.get("credentialKind") not in CREDENTIAL_KINDS:
+            problems.append("runner.credentialKind is subscription, key, platform-metered or none")
+        if "kind" in runner and not (isinstance(runner["kind"], str) and _RUNNER_KIND_NAME.match(runner["kind"])):
+            problems.append("runner.kind is a runner kind's name")
+        if runner.get("credentialKind") == "subscription" and runner.get("kind") not in SUBSCRIPTION_RUNNERS:
+            problems.append("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex")
+        places += [("/runner/%s" % _pointer(k), v) for k, v in runner.items()]
+    if "peer" in descriptor:
+        peer = descriptor.get("peer")
+        if not isinstance(peer, dict):
+            problems.append("peer is {endpoint, custody, residency, maxDataClass}")
+            peer = {}
+        problems += ["peer has no member %s" % k for k in peer if k not in ("endpoint", "custody", "residency", "maxDataClass")]
+        endpoint = peer.get("endpoint")
+        match = _PEER_ENDPOINT.match(endpoint) if isinstance(endpoint, str) and len(endpoint) <= 2048 else None
+        if not match:
+            problems.append("peer.endpoint is https://<dns-name>[:<port>][/<path>], no query, fragment, userinfo or IP literal")
+        elif _RESERVED_HOST.search(match.group("host")):
+            problems.append("FAC-SEM-085: a service offered to others cannot be reached at the reserved name %s" % match.group("host"))
+        if peer.get("custody") not in ("organization-managed", "personal"):
+            problems.append("peer.custody is organization-managed or personal")
+        residency = peer.get("residency")
+        if (not isinstance(residency, list) or not 1 <= len(residency) <= 32 or len(set(map(json.dumps, residency))) != len(residency)
+                or not all(isinstance(r, str) and _RESIDENCY.match(r) for r in residency)):
+            problems.append("peer.residency is 1 to 32 distinct ISO 3166-1 alpha-2 codes in upper case, EU admitted, no user-assigned code")
+        if peer.get("maxDataClass") not in PEER_DATA_CLASSES:
+            problems.append("peer.maxDataClass is public, internal, confidential or restricted")
+        if "runner" not in descriptor:
+            problems.append("a service offered to others declares runner (DEC-0061)")
+        elif isinstance(runner, dict) and runner.get("credentialKind") == "subscription":
+            problems.append("a service offered to others never runs on a subscription (DEC-0061)")
+    for place, value in places:
+        if isinstance(value, str) and fabric_secrets.secret_argument(value):
+            problems.append("FAC-SEM-086: %s holds a value shaped like a credential; it names a kind, a role or an installer" % place)
+    return problems
+
+
+def peer_refusal(descriptor: Any, data_class: Any) -> Optional[str]:
+    """The host's check before it routes a request from anyone but the service's operator (DEC-0061, FAC-SEM-088):
+    `not-offered` (no `peer`), `peer-invalid` (its maximum is not one of the four classes), `data-class-unknown` (the
+    request's class is not one of them, exactly as written) or `above-max-data-class`; None when it may. The contract's
+    `peerRefusal`."""
+    if not isinstance(descriptor, dict) or not isinstance(descriptor.get("peer"), dict):
+        return "not-offered"
+    ceiling = descriptor["peer"].get("maxDataClass")
+    if not isinstance(ceiling, str) or ceiling not in PEER_DATA_CLASSES:
+        return "peer-invalid"
+    if not isinstance(data_class, str) or data_class not in PEER_DATA_CLASSES:
+        return "data-class-unknown"
+    return "above-max-data-class" if PEER_DATA_CLASSES.index(data_class) > PEER_DATA_CLASSES.index(ceiling) else None
+
+
+def app_descriptor_action(existing: Any, tool: str, app_path: str) -> str:
+    """What an app that writes its own descriptor does with it on a start (DEC-0069): `keep` when it runs from a
+    translocated copy (macOS App Translocation); otherwise `write` when there is none, when it is not an app's descriptor,
+    when its version (`installedBy.tool`) or its path (`lifecycle.app`) differs; `keep` otherwise. The contract's
+    `appDescriptorAction`."""
+    if "/AppTranslocation/" in app_path:
+        return "keep"
+    if not isinstance(existing, dict) or not isinstance(existing.get("installedBy"), dict):
+        return "write"
+    recorded = existing["lifecycle"].get("app", _MISSING_APP) if isinstance(existing.get("lifecycle"), dict) else _MISSING_APP
+    return "keep" if existing["installedBy"].get("tool", _MISSING_APP) == tool and recorded == app_path else "write"
+
+
+_MISSING_APP = object()
+
+
+def app_descriptor_stale(descriptor: Any, app_present: bool) -> bool:
+    """Whether a reader treats a descriptor as stale (DEC-0069): an app's descriptor whose installed app it did not find.
+    A supervised service's descriptor is never stale by this test. The contract's `appDescriptorStale`."""
+    life = descriptor.get("lifecycle") if isinstance(descriptor, dict) else None
+    return isinstance(life, dict) and life.get("manager") == "person" and not app_present
+
+
+def app_present(descriptor: Dict[str, Any]) -> bool:
+    """Whether `lifecycle.app` of an app's descriptor exists on this machine (a bundle is a folder, an executable a file)."""
+    life = descriptor.get("lifecycle") if isinstance(descriptor.get("lifecycle"), dict) else {}
+    app = life.get("app")
+    try:
+        return isinstance(app, str) and expand(app).exists()
+    except ServiceError:  # not a local path: nothing installed there
+        return False
+
+
+#: Fabric's own descriptor (Fabric ADR-0139): `services/fabric.default.json`.
+FABRIC_SERVICE = ("fabric", "default")
+
+
+def fabric_button_presence(directory: Optional[Path] = None) -> str:
+    """`present` or `absent` for Fabric's button (DEC-0040 FB-5, DEC-0069, Fabric SCN-142): present when Fabric's own
+    descriptor is registered and, for an app's descriptor, its app is still installed. A server sets
+    `data-fabric="absent"` on the button's script otherwise. The button only follows a link, so the liveness file is
+    not read here; a caller that sends anything reads it."""
+    path = descriptor_path(*FABRIC_SERVICE, directory=directory)
+    try:
+        found = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "absent"
+    if not isinstance(found, dict) or validate_descriptor(found):
+        return "absent"
+    return "absent" if app_descriptor_stale(found, app_present(found)) else "present"
 
 
 def placement_of(descriptor: Dict[str, Any]) -> str:
@@ -990,11 +1165,11 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
     root = directory or services_dir()
     me = "%s.%s" % (descriptor["id"], descriptor["instance"])
-    # DEC-0019: only a local placement claims a port on this computer.
-    port = None if placement_of(descriptor) == "remote" else port_of(descriptor["origin"])
+    # DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
+    port = None if placement_of(descriptor) == "remote" or "origin" not in descriptor else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):
         key = "%s.%s" % (other.get("id"), other.get("instance", "default"))
-        if key == me or port is None:  # a remote origin's port is another computer's
+        if key == me or port is None:  # a remote origin's port is another computer's; an app claims none
             continue
         try:
             other_port = port_of(str(other.get("origin", "")))
@@ -1096,6 +1271,8 @@ _PROFILE_ID = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 _RUNNER_KIND = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
 _MODEL_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}/[a-z0-9][a-z0-9._:-]{0,127}$")
 ROUTES = ("subscription", "key")
+#: A usage row's route (DEC-0046, DEC-0061): beside a configuration's two, the hosting platform's own metered models.
+USAGE_ROUTES = ROUTES + ("platform-metered",)
 
 
 def configuration_problems(doc: Any) -> List[str]:
@@ -1289,12 +1466,12 @@ def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_t
     basis = cost_basis or ("unknown" if cost_usd is None else "provider")
     if basis not in COST_BASES or (cost_usd is None) != (basis == "unknown"):
         raise ServiceError("cost_basis is provider or price-list with a cost, unknown without one.")
-    if route is not None and route not in ROUTES:
-        raise ServiceError("route is subscription or key (DEC-0046).")
+    if route is not None and route not in USAGE_ROUTES:
+        raise ServiceError("route is subscription, key or platform-metered (DEC-0046, DEC-0061).")
     receipt = {"at": at or now_iso(), "provider": provider, "model": model, **counts,
                "costUsd": None if cost_usd is None else float(cost_usd), "costBasis": basis}
     if route is not None:
-        receipt["route"] = route  # the operator's own login in its vendor's runner, or an issued key
+        receipt["route"] = route  # the operator's own login in its vendor's runner, an issued key, or the platform's metered models
     return receipt
 
 
@@ -2346,18 +2523,30 @@ def remote_token_file(service_id: str, instance: str = "default", directory: Opt
 
 def register_remote(*, service_id: str, name: str, origin: str, token: str, instance: str = "default",
                     summary: Optional[str] = None, doctor: Optional[List[str]] = None,
-                    directory: Optional[Path] = None, installed_by: str = "fabric-service register-remote") -> Path:
+                    directory: Optional[Path] = None, installed_by: Any = None,
+                    runner: Optional[Dict[str, str]] = None, peer: Optional[Dict[str, Any]] = None) -> Path:
     """DEC-0019, installer side: register an online service on THIS computer — the token file
-    (0600, never printed) and the descriptor. The same token is set on the platform as a secret."""
+    (0600, never printed) and the descriptor. The same token is set on the platform as a secret.
+
+    DEC-0061: ``installed_by`` defaults to ``{"by": "person", "role": "operator", "tool": "fabric-service
+    register-remote"}`` (a person runs this); pass ``role: "administrator"`` for an organization's administrator, or a
+    string as before. ``runner`` (``{kind?, credentialKind}``) says how its model calls sign in, as a kind and never a
+    credential; ``peer`` (``{endpoint, custody, residency, maxDataClass}``) offers it to others and needs ``runner``."""
     if not token or len(token.strip()) < 16:
         raise ServiceError("the service token must be at least 16 characters.")
     root = directory or services_dir()
     token_file = remote_token_file(service_id, instance, root)
     descriptor: Dict[str, Any] = {"protocol": PROTOCOL, "id": service_id, "instance": instance, "name": name,
                                   "placement": "remote", "origin": origin, "auth": {"tokenFile": str(token_file)},
-                                  "lifecycle": {"manager": "none"}, "installedAt": now_iso(), "installedBy": installed_by}
+                                  "lifecycle": {"manager": "none"}, "installedAt": now_iso(),
+                                  "installedBy": installed_by if installed_by is not None else
+                                  {"by": "person", "role": "operator", "tool": "fabric-service register-remote"}}
     if summary:
         descriptor["summary"] = summary
+    if runner is not None:
+        descriptor["runner"] = dict(runner)
+    if peer is not None:
+        descriptor["peer"] = dict(peer)
     if doctor:
         descriptor["commands"] = {"doctor": list(doctor)}
     problems = validate_descriptor(descriptor)

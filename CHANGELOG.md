@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.24.0 - 2026-10-13
+
+An app's own descriptor (contract DEC-0069) and the descriptor for listings (DEC-0061) in both kits (FAA-34). The contract
+pin does not move: both decisions are at `fe55fc6`.
+
+### Added
+
+- **`lifecycle.manager` `node` and `person`.** `node`: Project Observatory's node supervises the service as its child,
+  with no supervisor file, so `label`, `plist`, `unit` and `task` are refused beside it. `person`: an app a person
+  installs and starts — `lifecycle.app` is required, `origin` is optional (its live origin is in the app's own liveness
+  file), and `installedBy` is `{by: "person", role, tool}`. `write_descriptor` / `writeDescriptor` claim no port for
+  it, and `check_service.py` reads it as installed, never running: `descriptor.app-installed`, no port claim, and the
+  well-known document `NOT_RUN`.
+- **`installedBy` by role, `runner` and `peer`.**
+  - `installedBy` is a string or `{by, role?, tool}`.
+  - `runner` is `{kind?, credentialKind}`, a kind and never a credential.
+  - `peer` is `{endpoint, custody, residency, maxDataClass}`. An offer needs `runner` and never a subscription.
+  - FAC-SEM-085 refuses a peer on a reserved name. FAC-SEM-086 refuses a value shaped like a credential in `runner` or
+    `installedBy`, naming its place.
+- **Ports held to the contract's vectors:** `peer_refusal` / `peerRefusal` (`service-peer.json`),
+  `app_descriptor_action` / `appDescriptorAction` and `app_descriptor_stale` / `appDescriptorStale`
+  (`app-descriptor.json`).
+- **`fabric_button_presence` / `fabricButtonPresence`** answer whether Fabric's button may show. The answer is
+  `present` only while Fabric's own descriptor (`fabric.default.json`) is registered and, for an app's descriptor,
+  its app is still installed. A server sets `data-fabric="absent"` otherwise.
+- **Usage:** `make_usage_receipt` / `makeUsageReceipt` accept `route: "platform-metered"`. A configuration's route
+  stays `subscription` or `key`.
+
+### Changed
+
+- `register_remote` / `registerRemote` and the sample's `register` write `installedBy` in its object form
+  (`{by: "person", role: "operator", tool}`). `register_remote` / `registerRemote` also take `runner` and `peer`.
+
+### Fixed
+
+- `check_service.py` reported two descriptors without an origin as claiming the same port.
+- `write_descriptor` / `writeDescriptor` failed on a descriptor without one.
+
+### Evidence
+
+- Every service-descriptor fixture of the contract at `fe55fc6` is held through both validators: 10 valid accepted;
+  every invalid one refused except the six local-channel negatives (DEC-0075, not a kit surface), a set the tests pin.
+- The FAC-SEM-085/086 semantic fixtures answer at the contract's places.
+- 32 planted defects, all caught.
+- The scenario eval `app-descriptor-and-listing` was written before the prose.
+
 ## 0.23.0 - 2026-10-13
 
 The contract pin moves from `b291bf0` (DEC-0055) to contract `main` `fe55fc6`, and both kits follow every rule in that

@@ -1,0 +1,2898 @@
+{
+  "about": "Every service-descriptor fixture of the contract at the pin, valid or not as fixtures/catalogue.json says, and the FAC-SEM-085/086 semantic fixtures with the findings descriptorPeerRules gives them.",
+  "source": "fixtures/catalogue.json, fixtures/semantic/service-*",
+  "descriptors": [
+    {
+      "name": "service-descriptor-unmanaged",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "runner",
+        "instance": "dev",
+        "name": "Runner",
+        "origin": "http://127.0.0.1:47210",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/runner/service.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/runner",
+          "logs": []
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "runner service register"
+      }
+    },
+    {
+      "name": "service-descriptor-person-app",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-app",
+        "instance": "default",
+        "name": "Example App",
+        "summary": "A desktop app a person installs and starts.",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/example-app/service.token"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-app",
+          "logs": [
+            "~/Library/Logs/example-app/app.log"
+          ]
+        },
+        "installedAt": "2026-10-12T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.0"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-person-with-plist",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-app",
+        "instance": "default",
+        "name": "Example App",
+        "summary": "A desktop app a person installs and starts.",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/example-app/service.token"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app",
+          "plist": "~/Library/LaunchAgents/com.example.example-app.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-app",
+          "logs": [
+            "~/Library/Logs/example-app/app.log"
+          ]
+        },
+        "installedAt": "2026-10-12T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.0"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-person-installed-by-string",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-app",
+        "instance": "default",
+        "name": "Example App",
+        "summary": "A desktop app a person installs and starts.",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/example-app/service.token"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-app",
+          "logs": [
+            "~/Library/Logs/example-app/app.log"
+          ]
+        },
+        "installedAt": "2026-10-12T18:00:00Z",
+        "installedBy": "Example App 0.4.0"
+      }
+    },
+    {
+      "name": "service-descriptor-person-installed-by-node",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-app",
+        "instance": "default",
+        "name": "Example App",
+        "summary": "A desktop app a person installs and starts.",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/example-app/service.token"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-app",
+          "logs": [
+            "~/Library/Logs/example-app/app.log"
+          ]
+        },
+        "installedAt": "2026-10-12T18:00:00Z",
+        "installedBy": {
+          "by": "node",
+          "tool": "Example App 0.4.0"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-person-without-app",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-app",
+        "instance": "default",
+        "name": "Example App",
+        "summary": "A desktop app a person installs and starts.",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/example-app/service.token"
+        },
+        "lifecycle": {
+          "manager": "person"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-app",
+          "logs": [
+            "~/Library/Logs/example-app/app.log"
+          ]
+        },
+        "installedAt": "2026-10-12T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.0"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-without-origin",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-app-beside-launchd",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist",
+          "app": "/Applications/X.app"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-local-channel-home",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "channels": {
+          "local": {
+            "protocol": "fabric-local-channel/0.1",
+            "path": "~/run/node.sock"
+          }
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-local-channel-bad-sid",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "channels": {
+          "local": {
+            "protocol": "fabric-local-channel/0.1",
+            "pipe": "\\\\.\\pipe\\example-node-S-1-----"
+          }
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-remote-with-channel",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "https://agent.example.com",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)",
+        "channels": {
+          "local": {
+            "protocol": "fabric-local-channel/0.1",
+            "path": "/run/user/1000/example-node/node.sock"
+          }
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-channels-without-local",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "channels": {},
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-local-channel-multibyte",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "channels": {
+          "local": {
+            "protocol": "fabric-local-channel/0.1",
+            "path": "/run/дддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддддд"
+          }
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-local-channel",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "channels": {
+          "local": {
+            "protocol": "fabric-local-channel/0.1",
+            "path": "/run/user/1000/example-node/node.sock"
+          }
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-local-channel-both",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "channels": {
+          "local": {
+            "protocol": "fabric-local-channel/0.1",
+            "path": "/run/user/1000/example-node/node.sock",
+            "pipe": "\\\\.\\pipe\\example-node-S-1-5-21-1-2-3-1001"
+          }
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-lan-origin",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "stray",
+        "instance": "default",
+        "name": "Stray server",
+        "origin": "http://0.0.0.0:47166",
+        "auth": {
+          "tokenFile": "~/stray.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/stray",
+          "logs": []
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "by hand"
+      }
+    },
+    {
+      "name": "service-descriptor-shell-command",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "plan-board",
+        "instance": "default",
+        "name": "Plan Board",
+        "origin": "http://127.0.0.1:47110",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/plan-board/service.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/plan-board",
+          "logs": []
+        },
+        "commands": {
+          "doctor": "example-agent check && echo ok"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent install"
+      }
+    },
+    {
+      "name": "service-descriptor-launchd-without-label",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "maker",
+        "instance": "default",
+        "name": "Maker",
+        "origin": "http://127.0.0.1:47187",
+        "auth": {
+          "tokenFile": "~/.config/maker/services/47187/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "plist": "~/Library/LaunchAgents/com.example.maker.plist"
+        },
+        "paths": {
+          "data": "~/Code/maker/store",
+          "logs": []
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "maker service start"
+      }
+    },
+    {
+      "name": "service-descriptor-bearer-on-custom-header",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "maker",
+        "instance": "default",
+        "name": "Maker",
+        "origin": "http://127.0.0.1:47187",
+        "auth": {
+          "tokenFile": "~/.config/maker/services/47187/service.token",
+          "header": "X-Example-Token",
+          "scheme": "Bearer"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/maker",
+          "logs": []
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "maker service start"
+      }
+    },
+    {
+      "name": "service-descriptor-remote",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "https://agent.example.com",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-systemd",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.local/share/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "systemd",
+          "unit": "example-agent.default.service"
+        },
+        "paths": {
+          "data": "~/.local/share/example-agent",
+          "logs": [
+            "~/.local/state/example-agent/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/.local/share/example-agent/bin/example-agent",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-task-scheduler",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~\\AppData\\Local\\example-agent\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler",
+          "task": "\\PassionCode\\example-agent.default"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-systemd-without-unit",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "systemd"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-task-scheduler-without-task",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-unit-without-systemd",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "none",
+          "unit": "example-agent.default.service"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-unc-token",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "\\\\server\\share\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-task-without-task-scheduler",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.local/share/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "none",
+          "task": "\\PassionCode\\example-agent.default"
+        },
+        "paths": {
+          "data": "~/.local/share/example-agent",
+          "logs": [
+            "~/.local/state/example-agent/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/.local/share/example-agent/bin/example-agent",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-bad-unit",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.local/share/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "systemd",
+          "unit": "example-agent.default"
+        },
+        "paths": {
+          "data": "~/.local/share/example-agent",
+          "logs": [
+            "~/.local/state/example-agent/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/.local/share/example-agent/bin/example-agent",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-bad-task",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~\\AppData\\Local\\example-agent\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler",
+          "task": "PassionCode\\example-agent.default"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-windows-service-manager",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~\\AppData\\Local\\example-agent\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "windows-service"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-systemd-with-plist",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.local/share/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "systemd",
+          "unit": "example-agent.default.service",
+          "plist": "~/.config/example-agent/example-agent.plist"
+        },
+        "paths": {
+          "data": "~/.local/share/example-agent",
+          "logs": [
+            "~/.local/state/example-agent/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/.local/share/example-agent/bin/example-agent",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-task-scheduler-with-label",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~\\AppData\\Local\\example-agent\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler",
+          "task": "\\PassionCode\\example-agent.default",
+          "label": "com.example.example-agent"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-unc-forward-slash",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "//server/share/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler",
+          "task": "\\PassionCode\\example-agent.default"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "service-descriptor-remote-http",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "http://agent.example.com",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-remote-launchd",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "https://agent.example.com",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.agent",
+          "plist": "~/Library/LaunchAgents/com.example.agent.plist"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-remote-ip-literal",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "https://203.0.113.7",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-remote-path",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "https://agent.example.com/dashboard",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-remote-update",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "https://agent.example.com",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)",
+        "commands": {
+          "update": [
+            "/usr/local/bin/example-agent",
+            "update"
+          ]
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-https-without-placement",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "origin": "https://agent.example.com",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)",
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": []
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-local-without-paths",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "local",
+        "origin": "http://127.0.0.1:47290",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-remote-loopback",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "http://127.0.0.1:47291",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-node",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report; installed and supervised by the machine's node.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "node",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-remote",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-inbox",
+        "instance": "default",
+        "name": "Example Inbox",
+        "summary": "A mail agent in the organization's own cloud account, offered to its members.",
+        "placement": "remote",
+        "origin": "https://inbox.example.com",
+        "peer": {
+          "endpoint": "https://inbox.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "EU"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-inbox.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "runner": {
+          "credentialKind": "platform-metered"
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "administrator",
+          "tool": "example-inbox register-remote 1.0.0"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-subscription",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "example-agent service install 0.2.0"
+        },
+        "runner": {
+          "kind": "claude-code",
+          "credentialKind": "subscription"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-node-with-label",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report; installed and supervised by the machine's node.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node",
+          "label": "com.example.report-writer"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "node",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-node-with-unit",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report; installed and supervised by the machine's node.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node",
+          "unit": "report-writer.service"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "node",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-remote-under-node",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "An online agent with a dashboard, hosted outside this computer.",
+        "placement": "remote",
+        "origin": "https://agent.example.com",
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "installedAt": "2026-10-02T18:00:00Z",
+        "installedBy": "fabric-service register-remote (example)"
+      }
+    },
+    {
+      "name": "service-descriptor-peer-subscription",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "subscription"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-without-runner",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-endpoint-http",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "http://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-endpoint-ip",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://192.0.2.10/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-endpoint-query",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp?tenant=example",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-endpoint-userinfo",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://operator@agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-endpoint-fragment",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp#part",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-endpoint-port",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com:65536/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-without-endpoint",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-without-custody",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-without-residency",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-residency-lowercase",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "de"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-residency-user-assigned",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "XK"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-residency-empty",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-residency-repeated",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE",
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-data-class-contract-vocabulary",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "project-internal"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-custody-unknown",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "shared",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-without-max-data-class",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ]
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-peer-extra-member",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential",
+          "owner": "the organization"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-runner-subscription-wrong-runner",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "example-agent service install 0.2.0"
+        },
+        "runner": {
+          "kind": "opencode",
+          "credentialKind": "subscription"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-runner-subscription-without-kind",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "example-agent service install 0.2.0"
+        },
+        "runner": {
+          "credentialKind": "subscription"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-runner-credential-kind-unknown",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "example-agent service install 0.2.0"
+        },
+        "runner": {
+          "kind": "claude-code",
+          "credentialKind": "api-org"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-runner-without-credential-kind",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "example-agent service install 0.2.0"
+        },
+        "runner": {
+          "kind": "claude-code"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-runner-extra-member",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-inbox",
+        "instance": "default",
+        "name": "Example Inbox",
+        "summary": "A mail agent in the organization's own cloud account, offered to its members.",
+        "placement": "remote",
+        "origin": "https://inbox.example.com",
+        "peer": {
+          "endpoint": "https://inbox.example.com/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "EU"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "auth": {
+          "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-inbox.default.token"
+        },
+        "lifecycle": {
+          "manager": "none"
+        },
+        "runner": {
+          "credentialKind": "platform-metered",
+          "account": "example"
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "role": "administrator",
+          "tool": "example-inbox register-remote 1.0.0"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-installed-by-person-without-role",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": {
+          "by": "person",
+          "tool": "example-agent service install 0.2.0"
+        },
+        "runner": {
+          "kind": "claude-code",
+          "credentialKind": "subscription"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-installed-by-node-with-role",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report; installed and supervised by the machine's node.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "node",
+          "role": "operator",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-installed-by-unknown",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report; installed and supervised by the machine's node.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "vendor",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-installed-by-without-tool",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report; installed and supervised by the machine's node.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "node"
+        }
+      }
+    },
+    {
+      "name": "service-descriptor-installed-by-extra-member",
+      "valid": false,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report; installed and supervised by the machine's node.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "node",
+          "tool": "node.lifecycle install 0.1.0 (example)",
+          "machine": "render-pc"
+        }
+      }
+    }
+  ],
+  "semantic": [
+    {
+      "name": "service-descriptor-credential-in-installed-by",
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.config/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "launchd",
+          "label": "com.example.example-agent",
+          "plist": "~/Library/LaunchAgents/com.example.example-agent.plist"
+        },
+        "paths": {
+          "data": "~/Library/Application Support/example-agent",
+          "logs": [
+            "~/Library/Application Support/example-agent/logs/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/Code/example-agent/.venv/bin/publisher",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0 Ex4mpleN0tARealKeyButShapedLikeOneAbCdEf012345",
+        "runner": {
+          "kind": "claude-code",
+          "credentialKind": "subscription"
+        }
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-086",
+          "instancePath": "/installedBy"
+        }
+      ]
+    },
+    {
+      "name": "service-descriptor-credential-in-runner",
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "Ex4mpleN0tARealKeyButShapedLikeOneAbCdEf012345"
+        }
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-086",
+          "instancePath": "/runner/credentialKind"
+        }
+      ]
+    },
+    {
+      "name": "service-peer-endpoint-reserved",
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.corp.internal/report-writer/mcp",
+          "custody": "organization-managed",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-085",
+          "instancePath": "/peer/endpoint"
+        }
+      ]
+    }
+  ]
+}

@@ -43,7 +43,7 @@ test('a manager without its job, a job beside another manager, an unknown manage
   assert.ok(has(k.validateDescriptor(changed(TASK, { manager: 'task-scheduler' })), 'declares task'));
   assert.ok(has(k.validateDescriptor(changed(SYSTEMD, { manager: 'none', unit: 'example-agent.service' })), 'unit belongs to manager systemd'));
   assert.ok(has(k.validateDescriptor(changed(TASK, { manager: 'systemd', unit: 'x.service', task: '\\PassionCode\\x' })), 'task belongs to manager task-scheduler'));
-  assert.ok(has(k.validateDescriptor(changed(TASK, { manager: 'windows-service' })), 'launchd, systemd, task-scheduler or none'));
+  assert.ok(has(k.validateDescriptor(changed(TASK, { manager: 'windows-service' })), 'launchd, systemd, task-scheduler, node, person or none'));
   assert.ok(has(k.validateDescriptor(changed(SYSTEMD, { manager: 'systemd', unit: 'no-suffix' })), 'lifecycle.unit must match'));
 });
 
