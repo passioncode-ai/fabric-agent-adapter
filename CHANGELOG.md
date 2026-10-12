@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.15.0 - 2026-10-12
+
+Fabric's button in the dashboard kit (contract DEC-0040, FB-7). With it, FAA-20 is complete. The contract pin is
+unchanged (`0cacd08`).
+
+### Added
+
+- **`assets/dashboard-kit/fabric-button.js`** (kit `fabric-dashboard-kit` 1.1.0) is one floating menu button that
+  opens Fabric on the service. It is driven by `data-service`, `data-service-name`, `data-project`,
+  `data-project-name` and `data-runner`, and implements FB-1 to FB-6:
+  - **Menu (FB-4):** "Chat with Fabric about …", plus "Open a coding session in …" when the page knows its project.
+    Arrow keys, Home, End and Escape work.
+  - **Placement (FB-2):** bottom-right, or bottom-left right-to-left, 16 px plus the safe area. The page keeps the
+    button's height plus 16 px free at the end of its scroll.
+  - **Look (FB-3):** the mark alone below 480 px. The accessible name is always "Open Fabric". Colours are `--ink`
+    on `--panel` with an `--edge` boundary, the pairs the themes are already measured on.
+  - **Host button (FB-6):** the page hides its own button under the host's `fabric_button` cookie `owner=host`.
+  - **Fabric absent (FB-5):** "Fabric is not installed — get it at passioncode.ai/fabric" shows when the cookie or
+    the server says Fabric is absent, or when the page is still visible and focused 1.5 s after a link was followed.
+
+  Links are built with a port of the contract's `buildFabricLink` and `parseFabricLink`, with the FL-4 credential
+  detector. A value the grammar refuses means no button, never a bad link. A press only opens a view (FB-8). The
+  script is CSP-clean, and the only address it names is passioncode.ai/fabric.
+- `test/fixtures/contract/fabric-links.json` holds 42 parse and 9 build cases. Every expected answer comes from the
+  contract's own functions at the pin, through `make_link_vectors.mjs`.
+- `test/fabric-button.test.mjs` covers:
+  - the grammar against those vectors;
+  - the cookie and the menu items;
+  - the CSP check;
+  - the behaviour in WebKit through Playwright: placement, size, scroll clearance, keyboard, right-to-left, the
+    host cookie, Fabric absent, and the 1.5 s test. These are skipped when Playwright is absent.
+
+  Eight planted defects were each caught.
+- The sample service's dashboard shows the button. The layout probe passes all 17 rules on it in WebKit.
+- `references/dashboard-kit.md` has a "Fabric's button" section. The scenario eval `fabric-button-on-a-dashboard`
+  came first.
+
+### Changed
+
+- The dashboard kit is 1.1.0. `dashboard_kit.py install` also copies `fabric-button.js`, and `build` digests every
+  copied file. `DASHBOARD_KIT` in both service kits names `fabric-dashboard-kit@1.1.0`.
+
 ## 0.14.0 - 2026-10-12
 
 The contract pin moves to Fabric Agent Contract `main` `0cacd08`, which includes PR #46 (DEC-0046, runner and model
