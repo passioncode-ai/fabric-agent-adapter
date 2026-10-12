@@ -90,18 +90,28 @@ test('the Windows folders are under LOCALAPPDATA; the override wins everywhere',
   }
 });
 
-test('the Windows token rule: the user, SYSTEM and Administrators only, refused by SID', () => {
-  const user = 'S-1-5-21-1-2-3-1001';
-  const problem = (owner, granting) => k.tokenAclProblem('C:/t', owner, granting, user);
-  assert.equal(problem(user, [user, 'S-1-5-18', 'S-1-5-32-544']), null);
-  assert.equal(problem('S-1-5-32-544', [user]), null); // DEC-0033: an elevated administrator's file
-  assert.match(problem('S-1-5-21-9-9-9-1002', [user]), /S-1-5-21-9-9-9-1002/);
-  assert.match(problem(user, [user, 'S-1-1-0']), /grants access to S-1-1-0/);
+test('the Windows token rule (DEC-0057, FAC-SEM-079): every windows-token.json case answers as the contract does', () => {
+  const W = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/windows-token-vectors.json', import.meta.url), 'utf8'));
+  assert.equal(W.cases.length, 30);
+  for (const c of W.cases) {
+    const got = k.windowsTokenAclProblem(c.file, W.currentUserSid);
+    if (c.problem === null) { assert.equal(got, null, c.name); continue; }
+    assert.equal(got?.problem, c.problem, c.name);
+    if (c.at !== undefined) assert.equal(got.at, c.at, c.name);
+    if (c.sid !== undefined) assert.equal(got.sid, c.sid, c.name);
+  }
 });
 
-test('the ACL report: a missing list grants everyone, one grant is still a list', () => {
-  assert.deepEqual(k.parseAclReport('{"owner":"S-1-5-21-1","granting":"S-1-5-21-1","nullDacl":false,"user":"S-1-5-21-1"}').granting, ['S-1-5-21-1']);
-  assert.deepEqual(k.parseAclReport('{"owner":"S-1-5-21-1","granting":[],"nullDacl":true,"user":"S-1-5-21-1"}').granting, ['S-1-1-0']);
+test('the ACL report: ACE types, the unsigned mask, a NULL list grants everyone, one ACE is still a list', () => {
+  const user = 'S-1-5-21-1-2-3-1001';
+  const report = (aces, nullDacl = false) => k.parseAclReport(JSON.stringify({ owner: user, aces, nullDacl, user }));
+  assert.deepEqual(report({ type: 'AccessAllowed', sid: user, mask: 2032127 }).aces, [{ type: 'allow', sid: user, mask: 2032127 }]);
+  assert.deepEqual(report([{ type: 'AccessAllowed', sid: 'S-1-1-0', mask: -2147483648 }]).aces[0].mask, 0x80000000, 'GENERIC_READ arrives signed');
+  assert.deepEqual(report([{ type: 'AccessDenied', sid: 'S-1-1-0', mask: 1 }, { type: 'AccessAllowedCallbackObject', sid: user, mask: 1 }]).aces.map((a) => a.type), ['deny', 'allow-object-callback']);
+  assert.deepEqual(report([], true).aces, [{ type: 'allow', sid: 'S-1-1-0', mask: 0x1f01ff }]);
+  const file = (aces) => ({ isRegularFile: true, isReparsePoint: false, realPathInProfile: true, ownerSid: user, aces });
+  assert.equal(k.windowsTokenAclProblem(file(report([{ type: 'AccessAllowedCallback', sid: user, mask: 1 }]).aces), user).problem, 'ace-type');
+  assert.match(k.tokenFileProblem('C:/t', file(report([{ type: 'AccessAllowed', sid: 'S-1-1-0', mask: 1 }]).aces), user), /S-1-1-0/);
 });
 
 test('the lock name: an abstract socket on Linux, a named pipe on Windows, none on macOS', () => {
@@ -176,9 +186,10 @@ test('Windows: a token written by the kit reads back, protected to the user, SYS
   const file = path.join(temp(), 'svc', 'service.token');
   const token = k.ensureToken(file);
   assert.equal(k.readToken(file), token);
-  const { owner, granting, user } = k.windowsAcl(file);
+  const { owner, aces, user } = k.windowsAcl(file);
   const allowed = new Set([user, ...k.WINDOWS_TRUSTED]);
   assert.ok(allowed.has(owner), owner);
+  const granting = aces.filter((a) => a.type === 'allow' && a.mask).map((a) => a.sid);
   assert.ok(granting.every((sid) => allowed.has(sid)), granting.join(','));
   assert.equal(user, k.windowsUserSid());
   assert.equal(fs.readFileSync(file, 'utf8'), token);
@@ -195,8 +206,9 @@ test('Windows: protecting a file drops an explicit grant it already carried', { 
   const file = path.join(temp(), 'carried.token');
   fs.writeFileSync(file, 'x'.repeat(32));
   assert.equal(spawnSync('icacls.exe', [file, '/grant', '*S-1-1-0:(R)']).status, 0);
-  assert.ok(k.windowsAcl(file).granting.includes('S-1-1-0'));
+  const granting = (acl) => acl.aces.filter((a) => a.type === 'allow' && a.mask).map((a) => a.sid);
+  assert.ok(granting(k.windowsAcl(file)).includes('S-1-1-0'));
   k.windowsProtect(file, { folder: false });
-  const { granting, user } = k.windowsAcl(file);
-  assert.deepEqual(granting.filter((sid) => sid !== user && !k.WINDOWS_TRUSTED.includes(sid)), []);
+  const acl = k.windowsAcl(file);
+  assert.deepEqual(granting(acl).filter((sid) => sid !== acl.user && !k.WINDOWS_TRUSTED.includes(sid)), []);
 });

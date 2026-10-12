@@ -1,0 +1,611 @@
+{
+  "about": "The supervisor marker of service.md One copy (DEC-0057, CT-01), for the kits' ports: how a copy reads FABRIC_SERVICE_SUPERVISOR=<manager> from its environment or --fabric-supervisor <manager> from its argument vector, and how long it may wait for a held lock. supervisorMarker and lockWaitBudgetMs in src/service-supervisor.ts run these; argv[0] is the executable. An argument with no value (followed by nothing, by -- or by another --… flag, which it does not consume) or an empty one is a marker that names no manager, so beside a variable it is a conflict; only an empty variable counts as absent.",
+  "managers": [
+    "launchd",
+    "systemd",
+    "task-scheduler",
+    "node"
+  ],
+  "lockWaitMaxMs": 300000,
+  "exitStatus": 75,
+  "cases": [
+    {
+      "name": "no marker: started by hand",
+      "env": {},
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "environment, launchd (the plist's EnvironmentVariables)",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "launchd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "supervised",
+        "manager": "launchd"
+      },
+      "waitBudgetMs": 300000
+    },
+    {
+      "name": "environment, systemd (the unit's Environment=)",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "systemd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "supervised",
+        "manager": "systemd"
+      },
+      "waitBudgetMs": 300000
+    },
+    {
+      "name": "environment, node (Project Observatory's node.lifecycle)",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "node"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "supervised",
+        "manager": "node"
+      },
+      "waitBudgetMs": 300000
+    },
+    {
+      "name": "argument, task-scheduler (the task's Arguments)",
+      "env": {},
+      "argv": [
+        "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+        "serve",
+        "--fabric-supervisor",
+        "task-scheduler"
+      ],
+      "marker": {
+        "kind": "supervised",
+        "manager": "task-scheduler"
+      },
+      "waitBudgetMs": 300000
+    },
+    {
+      "name": "argument with =, task-scheduler",
+      "env": {},
+      "argv": [
+        "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+        "--fabric-supervisor=task-scheduler",
+        "serve"
+      ],
+      "marker": {
+        "kind": "supervised",
+        "manager": "task-scheduler"
+      },
+      "waitBudgetMs": 300000
+    },
+    {
+      "name": "both forms, the same manager",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "systemd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "--fabric-supervisor",
+        "systemd",
+        "serve"
+      ],
+      "marker": {
+        "kind": "supervised",
+        "manager": "systemd"
+      },
+      "waitBudgetMs": 300000
+    },
+    {
+      "name": "both forms, different managers: a conflict, exit 75 at once",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "launchd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "--fabric-supervisor",
+        "task-scheduler"
+      ],
+      "marker": {
+        "kind": "conflict"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "two arguments, different managers: a conflict",
+      "env": {},
+      "argv": [
+        "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+        "--fabric-supervisor",
+        "task-scheduler",
+        "--fabric-supervisor=node"
+      ],
+      "marker": {
+        "kind": "conflict"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "environment set, argument without a value: a conflict",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "systemd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve",
+        "--fabric-supervisor"
+      ],
+      "marker": {
+        "kind": "conflict"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "an unknown manager: unsupervised",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "cron"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "none is not a supervisor",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "none"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "the manager is case-sensitive",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "Launchd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "an empty environment value is no marker",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": ""
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "an empty variable beside the argument: the argument decides",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": ""
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve",
+        "--fabric-supervisor",
+        "systemd"
+      ],
+      "marker": {
+        "kind": "supervised",
+        "manager": "systemd"
+      },
+      "waitBudgetMs": 300000
+    },
+    {
+      "name": "an argument without a value names no manager",
+      "env": {},
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve",
+        "--fabric-supervisor"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "a bare argument before --: an empty value, and -- still ends the scan",
+      "env": {},
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve",
+        "--fabric-supervisor",
+        "--",
+        "--fabric-supervisor",
+        "systemd"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "a bare argument before another flag: an empty value, the flag is not consumed",
+      "env": {},
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "--fabric-supervisor",
+        "--verbose",
+        "serve"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "a bare argument before another flag, beside a variable: a conflict",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "systemd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "--fabric-supervisor",
+        "--verbose"
+      ],
+      "marker": {
+        "kind": "conflict"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "an empty = argument beside a variable: a conflict",
+      "env": {
+        "FABRIC_SERVICE_SUPERVISOR": "launchd"
+      },
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "--fabric-supervisor=",
+        "serve"
+      ],
+      "marker": {
+        "kind": "conflict"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "after -- the argument belongs to the program, not the marker",
+      "env": {},
+      "argv": [
+        "/opt/example-agent/bin/example-agent",
+        "serve",
+        "--",
+        "--fabric-supervisor",
+        "systemd"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    },
+    {
+      "name": "the executable itself is not read",
+      "env": {},
+      "argv": [
+        "--fabric-supervisor",
+        "systemd"
+      ],
+      "marker": {
+        "kind": "manual"
+      },
+      "waitBudgetMs": 0
+    }
+  ],
+  "lockRecords": [
+    {
+      "name": "service-lock-conflict-waited",
+      "description": "Markers that disagree, yet the copy waited and took the lock: a conflict exits 75 at once (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {
+            "FABRIC_SERVICE_SUPERVISOR": "systemd"
+          },
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve",
+            "--fabric-supervisor=launchd"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 3,
+        "waitedMs": 4000,
+        "sideEffects": [],
+        "outcome": {
+          "acquired": true
+        }
+      },
+      "codes": [
+        "/attempts",
+        "/waitedMs",
+        "/outcome/acquired"
+      ]
+    },
+    {
+      "name": "service-lock-conflict",
+      "description": "The environment says launchd and the argument says task-scheduler: the copy is unsupervised and exits 75 at once naming both markers, without trying the lock: conforming (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {
+            "FABRIC_SERVICE_SUPERVISOR": "launchd"
+          },
+          "argv": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "serve",
+            "--fabric-supervisor",
+            "task-scheduler"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 0,
+        "waitedMs": 0,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "FABRIC_SERVICE_SUPERVISOR says launchd but --fabric-supervisor says task-scheduler; not starting."
+        }
+      },
+      "codes": []
+    },
+    {
+      "name": "service-lock-holder-unknown",
+      "description": "A copy started by hand finds the lock held but cannot read the holder's pid (the lock records none yet); it tries once and exits 75 saying the holder is unknown: conforming (FAC-SEM-078, DEC-0057).",
+      "record": {
+        "start": {
+          "env": {},
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": null,
+        "attempts": 1,
+        "waitedMs": 0,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "Example Agent is already running; the holder's pid is unknown."
+        }
+      },
+      "codes": []
+    },
+    {
+      "name": "service-lock-manual-waited",
+      "description": "A copy started by hand waited 3 s for the lock: only a supervised copy waits (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {},
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 3,
+        "waitedMs": 3000,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "Example Agent is already running (pid 4242)."
+        }
+      },
+      "codes": [
+        "/attempts",
+        "/waitedMs"
+      ]
+    },
+    {
+      "name": "service-lock-manual",
+      "description": "A copy started by hand finds the lock held, tries once and exits 75 at once naming the holder: conforming (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {},
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 1,
+        "waitedMs": 0,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "Example Agent is already running (pid 4242)."
+        }
+      },
+      "codes": []
+    },
+    {
+      "name": "service-lock-over-limit",
+      "description": "A supervised copy waited 300.001 s, past the 300 s limit (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {
+            "FABRIC_SERVICE_SUPERVISOR": "launchd"
+          },
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 14,
+        "waitedMs": 300001,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "Example Agent is already running (pid 4242)."
+        }
+      },
+      "codes": [
+        "/waitedMs"
+      ]
+    },
+    {
+      "name": "service-lock-side-effect",
+      "description": "A supervised copy bound its port and resumed a job while it waited for the lock: a copy touches nothing without the lock (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {
+            "FABRIC_SERVICE_SUPERVISOR": "systemd"
+          },
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 6,
+        "waitedMs": 30000,
+        "sideEffects": [
+          "bound its port",
+          "resumed job j-17"
+        ],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "Example Agent is already running (pid 4242)."
+        }
+      },
+      "codes": [
+        "/sideEffects/0",
+        "/sideEffects/1"
+      ]
+    },
+    {
+      "name": "service-lock-supervised-took-over",
+      "description": "A copy systemd started waits 7.5 s and takes the lock when the holder leaves: conforming (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {
+            "FABRIC_SERVICE_SUPERVISOR": "systemd"
+          },
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 5,
+        "waitedMs": 7500,
+        "sideEffects": [],
+        "outcome": {
+          "acquired": true
+        }
+      },
+      "codes": []
+    },
+    {
+      "name": "service-lock-supervised-waited",
+      "description": "A copy launchd started (the plist sets the marker) finds the lock held, waits the full 300 s touching nothing, and exits 75 naming the holder: conforming (FAC-SEM-078, DEC-0057).",
+      "record": {
+        "start": {
+          "env": {
+            "FABRIC_SERVICE_SUPERVISOR": "launchd"
+          },
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 14,
+        "waitedMs": 300000,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "Example Agent is already running (pid 4242). Waited 300 s for it to exit."
+        }
+      },
+      "codes": []
+    },
+    {
+      "name": "service-lock-task-argument",
+      "description": "A copy the Task Scheduler started carries the marker as an argument, because a task's action has no environment; it waits and exits 75: conforming (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {},
+          "argv": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "serve",
+            "--fabric-supervisor",
+            "task-scheduler"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 12,
+        "waitedMs": 240000,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 75,
+          "message": "Example Agent is already running (pid 4242)."
+        }
+      },
+      "codes": []
+    },
+    {
+      "name": "service-lock-wrong-exit",
+      "description": "A copy that did not get the lock exited 1 with a sentence that does not name the holder (FAC-SEM-078).",
+      "record": {
+        "start": {
+          "env": {},
+          "argv": [
+            "/opt/example-agent/bin/example-agent",
+            "serve"
+          ]
+        },
+        "holderPid": 4242,
+        "attempts": 1,
+        "waitedMs": 0,
+        "sideEffects": [],
+        "outcome": {
+          "exitStatus": 1,
+          "message": "Another copy is running."
+        }
+      },
+      "codes": [
+        "/outcome/exitStatus",
+        "/outcome/message"
+      ]
+    }
+  ],
+  "source": "fixtures/vectors/service-supervisor.json, fixtures/semantic/service-lock-*.json"
+}

@@ -17,6 +17,8 @@ import { secretValue } from './fabric-secrets.mjs';
 export const ESTATE_RECORD_SCHEMA = 'estate-record/1';
 export const ESTATE_CHALLENGE_TYPE = 'estate-revision/1';
 export const MAX_VALIDITY_SECONDS = 30 * 24 * 60 * 60;
+/** How far ahead of the verifier's clock a signed `issuedAt` may be before it is `not-yet-valid` (DEC-0066). */
+export const CLOCK_SKEW_SECONDS = 60;
 export const ASSERTION_ALGORITHMS = Object.freeze(['ES256', 'EdDSA']);
 export const FLAGS = Object.freeze({ UP: 0x01, UV: 0x04, BE: 0x08, BS: 0x10, AT: 0x40, ED: 0x80 });
 
@@ -153,6 +155,34 @@ export function estateTime(value) {
   if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59) return Number.NaN;
   return Date.parse(value);
 }
+const LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
+/** `sign.` and at least two more labels, lower case: a signing RP ID is never a bare `sign.<tld>` (DEC-0063). */
+const SIGNING_RP = new RegExp(`^sign(?:\\.${LABEL}){2,}$`);
+
+/**
+ * Whether an RP ID is a dedicated signing RP (v4 §7, DEC-0063): first label `sign`, then the organization's or
+ * PassionCode's domain, lower case. A credential under any other RP ID is a sign-in credential and never signs.
+ */
+export const isSigningRpId = (rpId) => isString(rpId) && rpId.length <= 253 && SIGNING_RP.test(rpId);
+
+/** Whether a pinned origin may run a signing ceremony for `rpId`: https, no port, no path, the RP ID or a host under it. */
+export function originWithin(origin, rpId) {
+  const host = isString(origin) ? /^https:\/\/([a-z0-9.-]{1,253})$/.exec(origin)?.[1] : undefined;
+  return host !== undefined && (host === rpId || host.endsWith(`.${rpId}`));
+}
+
+/** FAC-SEM-092 on one signing credential: a signing RP ID, and every pinned origin within it. */
+function signingCredential(credential, path, flag) {
+  const value = isObject(credential) ? credential : {};
+  if (!isSigningRpId(value.rpId)) {
+    flag(`${path}/rpId`, 'a passkey signs only under a dedicated signing RP, sign.<domain>, never under the RP ID it signs in with');
+    return;
+  }
+  (Array.isArray(value.origins) ? value.origins : []).forEach((origin, index) => {
+    if (!originWithin(origin, value.rpId)) flag(`${path}/origins/${index}`, `a signing ceremony runs only on ${value.rpId} or a host under it, over https without a port`);
+  });
+}
+
 const revocationKey = (entry) => `${String(entry.kind)} ${String(entry.ref)}`;
 const clockOf = (at) => (at instanceof Date ? at.getTime() : (typeof at === 'number' && Number.isFinite(at) ? at * 1000 : Number.NaN));
 
@@ -206,13 +236,18 @@ export function verifyEstateRecord(record, trust) {
     credentialId: String(authority.credentialId), alg: String(authority.alg), publicKey: isObject(authority.publicKey) ? authority.publicKey : {},
     rpId: String(authority.rpId), origins: Array.isArray(authority.origins) ? authority.origins.filter(isString) : [],
   };
+  // DEC-0063: the estate passkey is a signing credential. An RP ID that is not sign.<domain> is wrong-rp before the
+  // assertion is read; an origin outside the RP ID is not pinned, so a ceremony that ran there is wrong-origin.
+  if (!isSigningRpId(authority.rpId)) return { ok: false, problem: 'wrong-rp' };
+  credential.origins = credential.origins.filter((origin) => originWithin(origin, credential.rpId));
   const assertion = verifyAssertion(signature, credential, estateChallenge(digest));
   if (!assertion.ok) return { ok: false, problem: assertion.problem };
 
   const issuedAt = estateTime(record.issuedAt);
   const validUntil = estateTime(record.validUntil);
   if (!Number.isFinite(issuedAt) || !Number.isFinite(validUntil) || validUntil <= issuedAt || validUntil - issuedAt > MAX_VALIDITY_SECONDS * 1000) return { ok: false, problem: 'too-long-lived' };
-  if (at < issuedAt) return { ok: false, problem: 'not-yet-valid' };
+  // A revision issued a moment ahead of this clock is admitted within the skew every relay time allows (DEC-0066).
+  if (at < issuedAt - CLOCK_SKEW_SECONDS * 1000) return { ok: false, problem: 'not-yet-valid' };
   if (at > validUntil) return { ok: false, problem: 'expired' };
   const codes = [...new Set(recordFindings(record).map((finding) => finding.code))];
   if (codes.length > 0) return { ok: false, problem: 'rule-violation', codes };
@@ -227,19 +262,50 @@ export function placementTrust(record, machineId, agentRef) {
   return { publisher: list(record.publisherKeys).filter((key) => key.kid === placement.publisherKid) };
 }
 
+const MAX_WINDOW_MS = MAX_VALIDITY_SECONDS * 1000;
+const isRevision = (value) => Number.isSafeInteger(value) && value >= 1;
+const refused = (fault, detail) => ({ certified: false, fault, detail });
+
 /**
- * DL-14 with DEC-0055: trust a token's `kid` only while a current revision certifies it for a machine and does not revoke
- * it. `record` is a revision the caller verified; `x` the key the published key set gives for `kid`; `at` the clock.
+ * DL-14 (DEC-0055, DEC-0060): whether `record` certifies the delegation key `kid` with the published key's `x` at `at`
+ * (a Date or epoch seconds), for a verifier whose machine applied `applied` (`{revision, digest?}`). `extraRevocations`
+ * are the revocation delta's entries applied since the revision (DEC-0054). The contract's `hubKeyCertified`, in its
+ * order; never throws. Answers `{certified: true, machine, revision}` or `{certified: false, fault, detail}`: fault
+ * `token` (`kid-not-certified`), `estate` (`estate-unreadable`, `estate-outside-window`, `estate-rolled-back`,
+ * `estate-forked`) or `clock` (`no-clock`).
  */
-export function hubKeyCertified(record, kid, x, at) {
+export function hubKeyCertified(record, kid, x, at, applied, options) {
   const now = clockOf(at);
-  if (!isObject(record) || !Number.isFinite(now)) return false;
+  if (Number.isNaN(now)) return refused('clock', 'no-clock');
+  if (!isObject(record) || !isRevision(record.revision) || !isString(record.digest) || !Array.isArray(record.machines)) return refused('estate', 'estate-unreadable');
+  if (record.revocations !== undefined && !Array.isArray(record.revocations)) return refused('estate', 'estate-unreadable');
+  const extra = options?.extraRevocations;
+  if (extra !== undefined && !Array.isArray(extra)) return refused('estate', 'estate-unreadable');
   const issuedAt = estateTime(record.issuedAt);
   const validUntil = estateTime(record.validUntil);
-  if (!(Number.isFinite(issuedAt) && Number.isFinite(validUntil) && issuedAt <= now && now <= validUntil)) return false;
-  const revoked = new Set(list(record.revocations).map(revocationKey));
-  return list(record.machines).some((machine) => isObject(machine.hubKey) && machine.hubKey.kid === kid && machine.hubKey.x === x
-    && !revoked.has(`hub-key ${kid}`) && !revoked.has(`machine ${String(machine.id)}`));
+  // A window that is not a time, not positive or longer than 30 days is no window: NaN fails every comparison below.
+  if (Number.isNaN(issuedAt) || Number.isNaN(validUntil) || validUntil <= issuedAt || validUntil - issuedAt > MAX_WINDOW_MS) return refused('estate', 'estate-unreadable');
+  if (applied !== undefined) {
+    if (!isObject(applied) || !isRevision(applied.revision) || (applied.digest !== undefined && !isString(applied.digest))) return refused('estate', 'estate-unreadable');
+    // An older revision may still be inside its window and list a key the applied one revokes (a rollback).
+    if (record.revision < applied.revision) return refused('estate', 'estate-rolled-back');
+    if (record.revision === applied.revision && applied.digest !== undefined && record.digest !== applied.digest) return refused('estate', 'estate-forked');
+  }
+  // The window verifyEstateRecord admits the revision in: from 60 s before issuedAt to validUntil (DEC-0066).
+  if (now < issuedAt - CLOCK_SKEW_SECONDS * 1000 || now > validUntil) return refused('estate', 'estate-outside-window');
+
+  const revocations = [...(record.revocations ?? []), ...(extra ?? [])];
+  // A ref is compared exactly, never as a string conversion.
+  const revokes = (kind, ref) => revocations.some((entry) => isObject(entry) && entry.kind === kind && entry.ref === ref);
+  if (!isString(kid) || revokes('hub-key', kid)) return refused('token', 'kid-not-certified');
+  const holders = record.machines.filter((machine) => isObject(machine) && isObject(machine.hubKey) && machine.hubKey.kid === kid);
+  // Two machines under one kid break FAC-SEM-073; such a revision certifies neither.
+  if (holders.length !== 1) return refused('token', 'kid-not-certified');
+  const [machine] = holders;
+  // A missing x never equals a missing x: the published key must be the certified one.
+  if (!isString(x) || machine.hubKey.x !== x) return refused('token', 'kid-not-certified');
+  if (revokes('machine', machine.id)) return refused('token', 'kid-not-certified');
+  return { certified: true, machine: String(machine.id), revision: record.revision };
 }
 
 // ---- FAC-SEM-072…076 ----
@@ -396,6 +462,8 @@ function recordFindings(value) {
   placements(value, flagger(findings, 'FAC-SEM-074'));
   secretReferences(value, flagger(findings, 'FAC-SEM-075'));
   grantsAndRevocations(value, flagger(findings, 'FAC-SEM-076'));
+  // FAC-SEM-092 (DEC-0063) on each passkey the record lists.
+  list(value.authorities).forEach((authority, index) => signingCredential(authority, `/authorities/${index}`, flagger(findings, 'FAC-SEM-092')));
   return findings;
 }
 

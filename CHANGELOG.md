@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.23.0 - 2026-10-13
+
+The contract pin moves from `b291bf0` (DEC-0055) to contract `main` `fe55fc6`, and both kits follow every rule in that
+range that touches what they already do (FAA-32; the contract's hand-over of 2026-10-12, its CT-18 row). `b291bf0`
+joins the supported revisions. What the range adds beyond that is its own row: FAA-33…37.
+
+### Changed
+
+- **The supervisor marker comes as an argument too** (DEC-0057, CT-01, P4-01): `supervisor_marker` /
+  `supervisorMarker` read `FABRIC_SERVICE_SUPERVISOR=<manager>` and `--fabric-supervisor <manager>` /
+  `--fabric-supervisor=<manager>` (after the executable, before `--`; a bare flag consumes no `--…` token), with `node`
+  among the managers. Markers that disagree — the two forms, the argument twice, a bare or empty argument beside the
+  variable — exit 75 at once, before the lock, naming both. `supervised()` and `supervised_by_launchd()` take the
+  marker; `hold_single_instance` / `holdSingleInstance` take `env` and `argv`. A holder whose pid cannot be read is
+  named unknown (`FAC-SEM-078`).
+- **Writers:** `task_xml` / `taskXml` write `--fabric-supervisor task-scheduler` in the task's `Arguments`, before any
+  `--` (a task's action carries no environment, so a Task Scheduler copy now waits like one under launchd);
+  `systemd_unit` / `systemdUnit` set the variable unconditionally; every writer refuses a marker in the program
+  arguments. `add_supervisor_argument(parser)` lets a service's argparse accept the flag; the sample service uses it.
+- **DL-HUBKEY** (DEC-0060): `hub_key_certified` / `hubKeyCertified(record, kid, x, at, applied, extra)` answer the
+  contract's verdict — `{certified, machine, revision}` or `{certified: false, fault, detail}` — instead of a boolean.
+  A revision outside its window, unreadable, lower than the applied one or forking it is the trust source's fault
+  (`issuer-unavailable`: `estate-outside-window`, `estate-unreadable`, `estate-rolled-back`, `estate-forked`); a `kid`
+  on two machines, a missing `x` and a numeric `kid` never certify; revocation refs compare exactly. The verifiers
+  take `estate_applied` / `estateApplied` and `estate_revocations` / `estateRevocations`; in the Node kit only an
+  absent `estate` skips the check (`null` is an unreadable source). Every verifier refuses a clock that is not a number
+  of seconds `unknown-state` `no-clock` before row 1.
+- **The estate record** (DEC-0063, DEC-0066): `verify_estate_record` / `verifyEstateRecord` admit `issuedAt` up to 60 s
+  ahead (`CLOCK_SKEW_SECONDS`); the signing passkey must be under a `sign.<domain>` RP (`wrong-rp`) and its origins
+  within it (`wrong-origin`); the record's rules add `FAC-SEM-092`.
+- **The Windows token-file reader** (DEC-0057, `FAC-SEM-079`): `windows_token_acl_problem` /
+  `windowsTokenAclProblem` decide over the file's flags, owner and ACEs `{type, sid, mask}`: an object or callback ACE
+  is refused, an allow with an empty mask and every deny grant nothing, SIDs compare case-insensitively, anything
+  unreadable is refused. The Python kit reads the ACEs from SDDL (`acl_from_sddl`), the Node kit through .NET's raw
+  descriptor with the mask read unsigned. `windows_acl` / `windowsAcl` now answer ACEs; `token_acl_problem` /
+  `tokenAclProblem` are replaced by `token_file_problem` / `tokenFileProblem`.
+- **The descriptor** (DEC-0057 item 5): `label` and `plist` are refused beside `systemd` and `task-scheduler`; a
+  `localPath` starting `//` or `/\` is a share and refused.
+
+### Evidence
+
+- Vendored from the contract at `fe55fc6` and re-answered by its own functions (`test/fixtures/contract/vendor_vectors.mjs`):
+  `hub-key-vectors.json` (51 cases, 14 verifier answers; the hub seeds dropped), `supervisor-vectors.json` (22 marker
+  cases, 11 `FAC-SEM-078` records), `windows-token-vectors.json` (30 cases), `descriptor-negatives.json` (DEC-0057's
+  seven); `estate-vectors.json` regenerated (49 verify cases). Both kits answer every case as the contract does.
+- The kits' own starts against a held lock — by hand, the node, a task, an unknown holder, three conflicts — are
+  recorded and read by a port of `lockOutcomeRules` that itself reads the contract's 11 records as it does.
+- The sample service, started with `--fabric-supervisor=node`, serves a well-known document, usage report and events
+  page valid under the `fe55fc6` schemas; the descriptors the kit writes under every manager are valid too.
+- 34 planted defects, all caught.
+- The `--fabric-supervisor` scenario eval (`supervised-by-argument`) was written before the prose.
+
 ## 0.22.0 - 2026-10-12
 
 `working-with-fabric`, the fourth skill, the plugin's session hooks, and coding agents as participants of Fabric's

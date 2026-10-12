@@ -1,9 +1,10 @@
 """`estate-record/1` (contract DEC-0055) in the Python kit (FAA-31); the twin of fabric-estate.test.mjs.
 
 Every answer here was given by the contract's own functions at the pin (test/fixtures/contract/estate-vectors.json,
-made by make_estate_vectors.mjs): verifyEstateRecord's 45 cases, estateRecordRules over the contract's semantic
-fixtures, the digest and challenge, P-256 keys and passkey keys. The last class holds the delegation verifier to DL-14:
-with an estate record, a token's kid is trusted only while a current revision certifies it (CT-20)."""
+made by make_estate_vectors.mjs): verifyEstateRecord's 49 cases (DEC-0063's signing RP and DEC-0066's skew among them), estateRecordRules over the contract's semantic
+fixtures, the digest and challenge, P-256 keys and passkey keys. The last classes hold the delegation verifier to DL-14:
+with an estate record, a token's kid is trusted only while a current revision certifies it (CT-20), and to DEC-0060's
+`hubKeyCertified` (test/fixtures/contract/hub-key-vectors.json, vendor_vectors.mjs)."""
 import copy
 import datetime as dt
 import json
@@ -17,6 +18,7 @@ dl = load("fabric_delegation")
 HERE = Path(__file__).resolve().parent
 V = json.loads((HERE / "fixtures/contract/estate-vectors.json").read_text(encoding="utf-8"))
 DELEGATION = json.loads((HERE / "fixtures/delegation/vectors.json").read_text(encoding="utf-8"))
+HUB = json.loads((HERE / "fixtures/contract/hub-key-vectors.json").read_text(encoding="utf-8"))
 
 
 def der_of(r, s, pad_r=False, trailing=False, pad_s=False):
@@ -42,7 +44,7 @@ def clock(text):
 
 class ContractVectors(unittest.TestCase):
     def test_every_verify_case_answers_as_the_contract_does(self):
-        self.assertEqual(len(V["verify"]), 45)
+        self.assertEqual(len(V["verify"]), 49)
         problems = set()
         for case in V["verify"]:
             trust = case["trust"]
@@ -188,7 +190,8 @@ class HubKeyCertified(unittest.TestCase):
                                     effect=o["effect"], issuer=o["issuer"], read_only=o.get("readOnly", False), estate=estate)
 
     def test_a_certified_kid_is_trusted_and_no_record_changes_nothing(self):
-        self.assertTrue(fe.hub_key_certified(self.record, self.kid, self.x, self.now))
+        self.assertEqual(fe.hub_key_certified(self.record, self.kid, self.x, self.now),
+                         {"certified": True, "machine": self.record["machines"][0]["id"], "revision": self.record["revision"]})
         self.assertTrue(self.verify(None)["ok"])
         self.assertTrue(self.verify(self.record)["ok"])
         self.assertTrue(self.verify(lambda: self.record)["ok"], "a callable gives the current revision")
@@ -200,12 +203,15 @@ class HubKeyCertified(unittest.TestCase):
         moved["machines"][0]["hubKey"]["x"] = "B" * 43
         revoked = copy.deepcopy(self.record)
         revoked["revocations"] = list(revoked.get("revocations") or []) + [{"kind": "hub-key", "ref": self.kid}]
-        stale = copy.deepcopy(self.record)
-        stale["validUntil"] = stale["issuedAt"]
-        for name, record in (("another kid", other), ("another key under the kid", moved), ("revoked", revoked), ("outside its window", stale)):
+        for name, record in (("another kid", other), ("another key under the kid", moved), ("revoked", revoked)):
             with self.subTest(name):
                 verdict = self.verify(record)
                 self.assertEqual((verdict["ok"], verdict.get("code"), verdict.get("detail")), (False, "unauthenticated", "kid-not-certified"))
+        # DEC-0060: a revision whose window cannot hold the clock is the trust source's fault, not the token's.
+        stale = copy.deepcopy(self.record)
+        stale["validUntil"] = stale["issuedAt"]
+        verdict = self.verify(stale)
+        self.assertEqual((verdict["ok"], verdict.get("code"), verdict.get("detail")), (False, "issuer-unavailable", "estate-unreadable"))
 
     def test_an_unreadable_record_certifies_nothing(self):
         def broken():
@@ -235,7 +241,108 @@ class HubKeyCertified(unittest.TestCase):
         gate = dl.delegation_gate(audience=o["audience"], jwks=self.jwks, effects={o["capability"]: o["effect"]},
                                   issuer=o["issuer"], clock=lambda: self.now, estate=lambda: {})
         refused = gate(o["capability"], {"Fabric-Delegation": self.token})
-        self.assertEqual(refused.get("detail"), "kid-not-certified")
+        self.assertEqual((refused.get("code"), refused.get("detail")), ("issuer-unavailable", "estate-unreadable"))
+        gate = dl.delegation_gate(audience=o["audience"], jwks=self.jwks, effects={o["capability"]: o["effect"]},
+                                  issuer=o["issuer"], clock=lambda: self.now, estate=lambda: self.record,
+                                  estate_applied={"revision": self.record["revision"] + 1})
+        refused = gate(o["capability"], {"Fabric-Delegation": self.token})
+        self.assertEqual((refused.get("code"), refused.get("detail")), ("issuer-unavailable", "estate-rolled-back"))
+
+
+class HubKeyVectors(unittest.TestCase):
+    """DEC-0060: `hubKeyCertified` and the verifiers' row 4a, held to the contract's own answers."""
+
+    def test_every_hub_key_case_answers_as_the_contract_does(self):
+        self.assertEqual(len(HUB["cases"]), 51)
+        details = set()
+        for case in HUB["cases"]:
+            extra = case["extraRevocations"] if "extraRevocations" in case else fe._MISSING
+            with self.subTest(case["name"]):
+                got = fe.hub_key_certified(case["record"], case["kid"], case.get("x", fe._MISSING), case["at"], case.get("applied"), extra)
+                self.assertEqual(got, case["expected"])
+                details.add(got.get("detail", "certified"))
+        self.assertEqual(details, {"certified", "kid-not-certified", "estate-unreadable", "estate-outside-window",
+                                   "estate-rolled-back", "estate-forked", "no-clock"})
+
+    def test_every_verifier_answer_matches(self):
+        self.assertEqual(len(HUB["verifier"]), 14)
+        for case in HUB["verifier"]:
+            kwargs = {"audience": "example-media", "jwks": HUB["jwks"], "now": case["now"], "issuer": HUB["issuer"]}
+            if "estate" in case:
+                source = case["estate"]
+                if source.get("throws"):
+                    def broken():
+                        raise OSError("the record store is down")
+                    kwargs["estate"] = broken
+                elif source["record"] is None:
+                    kwargs["estate"] = lambda: None   # a null source, as the vectors' `about` says a port without undefined passes it
+                else:
+                    kwargs["estate"] = source["record"]
+            if "estateApplied" in case:
+                kwargs["estate_applied"] = case["estateApplied"]
+            with self.subTest(case["name"]):
+                if case["document"] == "approval":
+                    got = dl.verify_approval(case["token"], action_digest=HUB["actionDigest"], jti_store=dl.MemoryJtiStore(), **kwargs)
+                else:
+                    got = dl.verify_delegation(case["token"], capability="media.render", effect="draft", **kwargs)
+                want = case["expected"]
+                self.assertEqual(got["ok"], want["ok"])
+                if not want["ok"]:
+                    self.assertEqual((got["code"], got["detail"]), (want["code"], want["detail"]))
+
+    def test_a_revocation_ref_is_compared_exactly(self):
+        """DEC-0060 (i): a ref is compared as it is, never after a string conversion."""
+        case = HUB["cases"][0]
+        record = copy.deepcopy(case["record"])
+        record["machines"][0]["id"] = 7
+        record["revocations"] = [{"kind": "machine", "ref": "7", "revokedAt": "2026-10-21T09:00:00Z"}]
+        self.assertTrue(fe.hub_key_certified(record, case["kid"], case["x"], case["at"])["certified"])
+        record["revocations"][0]["ref"] = 7
+        self.assertEqual(fe.hub_key_certified(record, case["kid"], case["x"], case["at"])["detail"], "kid-not-certified")
+
+    def test_an_unreadable_clock_is_refused_first(self):
+        o = HUB["verifier"][0]
+        for now in (float("nan"), float("inf"), "1792918830", True, 8.64e12 + 1, None):
+            with self.subTest(now=now):
+                got = dl.verify_delegation(o["token"], audience="example-media", jwks=HUB["jwks"], now=now, capability="media.render",
+                                           effect="draft", issuer=None)
+                self.assertEqual((got["code"], got["detail"]), ("unknown-state", "no-clock"))
+        got = dl.verify_approval("x.y.z", audience="example-media", jwks=HUB["jwks"], now=float("nan"), action_digest=HUB["actionDigest"],
+                                 jti_store=dl.MemoryJtiStore(), issuer=HUB["issuer"])
+        self.assertEqual((got["code"], got["detail"]), ("unknown-state", "no-clock"))
+
+    def test_the_delta_revocations_pass_through_the_verifier(self):
+        case = HUB["verifier"][0]
+        record = case["estate"]["record"]
+        for extra in ([{"kind": "hub-key", "ref": "hub-m-4c1e-1", "revokedAt": "2026-10-21T09:00:00Z"}],
+                      lambda: [{"kind": "machine", "ref": "m-4c1e", "revokedAt": "2026-10-21T09:00:00Z"}]):
+            got = dl.verify_delegation(case["token"], audience="example-media", jwks=HUB["jwks"], now=case["now"], capability="media.render",
+                                       effect="draft", issuer=HUB["issuer"], estate=record, estate_revocations=extra)
+            self.assertEqual((got["code"], got["detail"]), ("unauthenticated", "kid-not-certified"))
+
+
+class SigningRp(unittest.TestCase):
+    """DEC-0063: the estate passkey is a signing credential (FAC-SEM-092)."""
+
+    def test_signing_rp_ids_and_origins(self):
+        for rp, ok in (("sign.example.org", True), ("sign.a.b.c", True), ("sign.org", False), ("example.org", False),
+                       ("SIGN.example.org", False), ("sign.example.org.", False), (None, False), ("sign." + "a" * 63 + ".org", True), ("sign." + "a" * 64 + ".org", False)):
+            with self.subTest(rp=rp):
+                self.assertEqual(fe.is_signing_rp_id(rp), ok)
+        for origin, ok in (("https://sign.example.org", True), ("https://x.sign.example.org", True), ("https://sign.example.org:443", False),
+                           ("http://sign.example.org", False), ("https://evilsign.example.org", False), ("https://sign.example.org/", False)):
+            with self.subTest(origin=origin):
+                self.assertEqual(fe.origin_within(origin, "sign.example.org"), ok)
+
+    def test_the_record_rules_flag_a_sign_in_credential(self):
+        record = copy.deepcopy(V["digests"][0]["record"])
+        record["authorities"][0]["rpId"] = "example.org"
+        codes = [f for f in fe._record_findings(record) if f["code"] == "FAC-SEM-092"]
+        self.assertEqual([f["instancePath"] for f in codes], ["/authorities/0/rpId"])
+        record["authorities"][0]["rpId"] = "sign.example.org"
+        record["authorities"][0]["origins"] = ["https://sign.example.org", "https://example.org"]
+        codes = [f for f in fe._record_findings(record) if f["code"] == "FAC-SEM-092"]
+        self.assertEqual([f["instancePath"] for f in codes], ["/authorities/0/origins/1"])
 
 
 if __name__ == "__main__":

@@ -124,26 +124,42 @@ class Folders(unittest.TestCase):
 
 
 class WindowsTokenRule(unittest.TestCase):
-    USER = "S-1-5-21-1-2-3-1001"
+    """DEC-0057 (FAC-SEM-079): the token-file reader rule, held to the contract's windows-token.json; and the SDDL the
+    Windows reader turns into what the rule reads."""
+    W = json.loads((Path(__file__).resolve().parent / "fixtures/contract/windows-token-vectors.json").read_text(encoding="utf-8"))
 
-    def problem(self, owner, granting):
-        return fs.token_acl_problem(Path("C:/t"), owner, granting, self.USER)
+    def test_every_case_answers_as_the_contract_does(self):
+        self.assertEqual(len(self.W["cases"]), 30)
+        for case in self.W["cases"]:
+            with self.subTest(case["name"]):
+                got = fs.windows_token_acl_problem(case["file"], self.W["currentUserSid"])
+                if case["problem"] is None:
+                    self.assertIsNone(got)
+                    continue
+                self.assertEqual(got["problem"], case["problem"])
+                for key in ("at", "sid"):
+                    if key in case:
+                        self.assertEqual(got.get(key), case[key])
+                self.assertNotIn("token", got["message"].lower().replace("token file", ""))
 
-    def test_the_user_system_and_administrators_may_hold_access(self):
-        self.assertIsNone(self.problem(self.USER, [self.USER, "S-1-5-18", "S-1-5-32-544"]))
-
-    def test_an_elevated_administrators_file_is_accepted(self):
-        # DEC-0033: what an elevated administrator creates is owned by BUILTIN\Administrators
-        # (measured on windows-latest, where the kit's own token came out that way).
-        self.assertIsNone(self.problem("S-1-5-32-544", [self.USER, "S-1-5-18", "S-1-5-32-544"]))
-        self.assertIsNone(self.problem("S-1-5-18", [self.USER]))
-
-    def test_another_owner_is_refused_by_sid(self):
-        self.assertIn("S-1-5-21-9-9-9-1002", self.problem("S-1-5-21-9-9-9-1002", [self.USER]))
-
-    def test_any_other_grant_is_refused_by_sid(self):
-        for sid in ("S-1-1-0", "S-1-5-11", "S-1-5-32-545", "S-1-3-0", "S-1-5-21-9-9-9-1002"):
-            self.assertIn(sid, self.problem(self.USER, [self.USER, sid]))
+    def test_the_sddl_reader(self):
+        user = "S-1-5-21-1-2-3-1001"
+        alias = {"SY": "S-1-5-18", "BA": "S-1-5-32-544", "WD": "S-1-1-0"}.get
+        canonical = lambda sid: alias(sid) or sid  # noqa: E731
+        owner, aces = fs.acl_from_sddl("O:%sG:SYD:P(A;;FA;;;%s)(A;;FA;;;SY)(A;;FA;;;BA)" % (user, user), canonical)
+        self.assertEqual(owner, user)
+        self.assertEqual(aces, [{"type": "allow", "sid": s, "mask": 0x1F01FF} for s in (user, "S-1-5-18", "S-1-5-32-544")])
+        file = {"isRegularFile": True, "isReparsePoint": False, "realPathInProfile": True, "ownerSid": owner, "aces": aces}
+        self.assertIsNone(fs.windows_token_acl_problem(file, user))
+        _, aces = fs.acl_from_sddl("O:BAD:(D;;FA;;;WD)(A;OICIIO;FA;;;WD)(A;;0x80000000;;;%s)(A;;;;;WD)" % user, canonical)
+        self.assertEqual(aces, [{"type": "deny", "sid": "S-1-1-0", "mask": 0x1F01FF}, {"type": "allow", "sid": user, "mask": 0x80000000},
+                                {"type": "allow", "sid": "S-1-1-0", "mask": 0}], "inherit-only is left out; an empty mask is 0")
+        _, aces = fs.acl_from_sddl("O:BAD:(XA;;FA;;;%s;(Member_of {SID(BA)}))(A;;QQ;;;%s)" % (user, user), canonical)
+        self.assertEqual([a["type"] for a in aces], ["allow-callback", "allow"])
+        self.assertIsNone(aces[1]["mask"], "an unknown rights alias is unreadable")
+        self.assertEqual(fs.windows_token_acl_problem({**file, "aces": aces}, user)["problem"], "ace-type")
+        self.assertEqual(fs.acl_from_sddl("O:BAD:NO_ACCESS_CONTROL", canonical)[1], [{"type": "allow", "sid": "S-1-1-0", "mask": 0x1F01FF}])
+        self.assertIn("S-1-1-0", fs.token_file_problem(Path("C:/t"), {**file, "aces": [{"type": "allow", "sid": "S-1-1-0", "mask": 1}]}, user))
 
 
 class LockName(unittest.TestCase):
@@ -232,9 +248,10 @@ class Windows(unittest.TestCase):
         path = self.dir / "svc" / "service.token"
         token = fs.ensure_token(path)
         self.assertEqual(fs.read_token(path), token)
-        owner, granting = fs.windows_acl(path)
+        owner, aces = fs.windows_acl(path)
         self.assertIn(owner, {fs.windows_user_sid(), "S-1-5-18", "S-1-5-32-544"})
-        self.assertTrue(set(granting) <= {fs.windows_user_sid(), "S-1-5-18", "S-1-5-32-544"}, granting)
+        granting = {a["sid"] for a in aces if a["type"] == "allow" and a["mask"]}
+        self.assertTrue(granting <= {fs.windows_user_sid(), "S-1-5-18", "S-1-5-32-544"}, granting)
         self.assertEqual(path.read_bytes(), token.encode())   # binary: no CRLF, no BOM
 
     def test_a_token_shared_with_everyone_is_refused_by_sid(self):

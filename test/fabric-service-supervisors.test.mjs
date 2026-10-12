@@ -112,14 +112,15 @@ test('the task carries the contract settings', () => {
   assert.equal(element(text, 'Interval'), 'PT1M');
   assert.equal(element(text, 'MultipleInstancesPolicy'), 'IgnoreNew');
   assert.equal(element(text, 'Command'), 'C:\\Program Files\\nodejs\\node.exe');
-  assert.equal(element(text, 'Arguments'), '&quot;C:\\Example App\\serve.mjs&quot; --port 47201'); // the raw XML: quotes escaped
+  // the raw XML: quotes escaped. DEC-0057: a task's action has no environment, so the marker is an argument.
+  assert.equal(element(text, 'Arguments'), '&quot;C:\\Example App\\serve.mjs&quot; --port 47201 --fabric-supervisor task-scheduler');
   assert.equal(element(text, 'WorkingDirectory'), 'C:\\Example App');
 });
 
 test('the task XML is escaped', () => {
   const text = k.taskXml('\\PassionCode\\x', ['C:\\x.exe', 'a<b&c'], { workingDirectory: 'C:\\w', description: 'A & <B>', user: 'H\\u' });
   assert.equal(element(text, 'Description'), 'A &amp; &lt;B&gt;');
-  assert.equal(element(text, 'Arguments'), 'a&lt;b&amp;c');
+  assert.equal(element(text, 'Arguments'), 'a&lt;b&amp;c --fabric-supervisor task-scheduler');
 });
 
 test('the task refuses what it cannot carry', () => {
@@ -219,4 +220,132 @@ test('a copy systemd restarts backs off on a held lock; a hand start does not', 
   holder.release();
   assert.deepEqual(exits, [k.EXIT_ALREADY_RUNNING]);
   assert.equal(slept.length, waited, 'a hand start never waits');
+});
+
+// ---- DEC-0057 (CT-01, FAA-32): the supervisor marker, held to the contract's service-supervisor.json ----
+
+const SUP = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/supervisor-vectors.json', import.meta.url), 'utf8'));
+
+/** FAC-SEM-078 (the contract's lockOutcomeRules, ported for this test): the instance paths a record of a start breaks. */
+function lockOutcomeFindings(record) {
+  const out = [];
+  const marker = k.supervisorMarker({ env: record.start.env ?? {}, argv: record.start.argv ?? [] });
+  if (record.sideEffects !== undefined && !Array.isArray(record.sideEffects)) out.push('/sideEffects');
+  (Array.isArray(record.sideEffects) ? record.sideEffects : []).forEach((_, i) => out.push(`/sideEffects/${i}`));
+  const count = (v, integer) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && (!integer || Number.isInteger(v));
+  const attemptsOk = count(record.attempts, true);
+  const waitedOk = count(record.waitedMs, false);
+  if (!attemptsOk) out.push('/attempts');
+  if (!waitedOk) out.push('/waitedMs');
+  if (marker.kind === 'conflict') {
+    if (attemptsOk && record.attempts !== 0) out.push('/attempts');
+    if (waitedOk && record.waitedMs !== 0) out.push('/waitedMs');
+  } else if (marker.kind === 'manual') {
+    if (attemptsOk && record.attempts !== 1) out.push('/attempts');
+    if (waitedOk && record.waitedMs !== 0) out.push('/waitedMs');
+  } else {
+    if (attemptsOk && record.attempts < 1) out.push('/attempts');
+    if (waitedOk && record.waitedMs > SUP.lockWaitMaxMs) out.push('/waitedMs');
+  }
+  const outcome = record.outcome;
+  if (typeof outcome !== 'object' || outcome === null) return [...out, '/outcome'];
+  if (outcome.acquired === true) return marker.kind === 'conflict' ? [...out, '/outcome/acquired'] : out;
+  if (outcome.exitStatus !== SUP.exitStatus) out.push('/outcome/exitStatus');
+  const message = typeof outcome.message === 'string' ? outcome.message : '';
+  if (marker.kind === 'conflict') {
+    const names = { environment: k.SUPERVISOR_ENV, argument: k.SUPERVISOR_ARG };
+    if (!marker.forms.every((f) => message.includes(names[f]))) out.push('/outcome/message');
+  } else if (record.holderPid === null) {
+    if (!/\bunknown\b/i.test(message)) out.push('/outcome/message');
+  } else if (!new RegExp(`(?<!\\d)${record.holderPid}(?!\\d)`).test(message)) out.push('/outcome/message');
+  return out;
+}
+
+test('every marker case answers as the contract does', () => {
+  assert.equal(SUP.cases.length, 22);
+  assert.deepEqual([...k.SUPERVISORS], SUP.managers);
+  for (const c of SUP.cases) {
+    const marker = k.supervisorMarker({ env: c.env, argv: c.argv });
+    assert.deepEqual(marker.kind === 'supervised' ? { kind: marker.kind, manager: marker.manager } : { kind: marker.kind }, c.marker, c.name);
+    assert.equal(k.lockWaitBudgetSeconds(marker) * 1000, c.waitBudgetMs, c.name);
+  }
+});
+
+test('the rule port reads the contract\'s FAC-SEM-078 records as it does', () => {
+  assert.equal(SUP.lockRecords.length, 11);
+  for (const item of SUP.lockRecords) assert.deepEqual(lockOutcomeFindings(item.record), item.codes, item.name);
+});
+
+async function startAgainstHeldLock(env, argv, { holderPidKnown = true } = {}) {
+  const dir = temp();
+  const holder = await new k.InstanceLock(dir).acquire();
+  if (!holderPidKnown) fs.writeFileSync(path.join(dir, 'service.lock'), '');
+  const before = fs.readdirSync(dir).sort();
+  let attempts = 0;
+  let now = 0;
+  const real = k.InstanceLock.prototype.acquire;
+  k.InstanceLock.prototype.acquire = function counting() { attempts += 1; return real.call(this); };
+  const written = [];
+  const write = process.stderr.write;
+  process.stderr.write = (chunk) => { written.push(String(chunk)); return true; };
+  let outcome;
+  try {
+    const exits = [];
+    const lock = await k.holdSingleInstance(dir, { sleep: async (s) => { now += s; }, clock: () => now, exit: (code) => exits.push(code), env, argv });
+    if (exits.length) outcome = { exitStatus: exits[0], message: written.join('').trim().split('\n').at(-1) };
+    else { lock.release(); outcome = { acquired: true }; }
+  } finally {
+    k.InstanceLock.prototype.acquire = real;
+    process.stderr.write = write;
+    holder.release();
+  }
+  const after = fs.readdirSync(dir).sort();
+  return { start: { env, argv }, holderPid: holderPidKnown ? process.pid : null, attempts, waitedMs: now * 1000,
+    sideEffects: after.filter((name) => !before.includes(name)), outcome };
+}
+
+test('the kit\'s starts against a held lock conform (FAC-SEM-078)', async () => {
+  const exe = '/opt/example-agent/bin/example-agent';
+  const starts = [
+    ['by hand', {}, [exe, 'serve'], true],
+    ['the node, by the variable', { [k.SUPERVISOR_ENV]: 'node' }, [exe, 'serve'], true],
+    ['a task, by the argument', {}, [exe, 'serve', '--fabric-supervisor', 'task-scheduler'], true],
+    ['the holder unknown', {}, [exe, 'serve'], false],
+    ['markers that disagree', { [k.SUPERVISOR_ENV]: 'launchd' }, [exe, '--fabric-supervisor=task-scheduler'], true],
+    ['two arguments that disagree', {}, [exe, '--fabric-supervisor', 'systemd', '--fabric-supervisor=node'], true],
+    ['a bare argument beside the variable', { [k.SUPERVISOR_ENV]: 'systemd' }, [exe, '--fabric-supervisor', '--verbose'], true],
+  ];
+  for (const [name, env, argv, known] of starts) {
+    const record = await startAgainstHeldLock(env, argv, { holderPidKnown: known });
+    assert.deepEqual(lockOutcomeFindings(record), [], `${name}: ${JSON.stringify(record)}`);
+    assert.equal(record.outcome.exitStatus, 75, name);
+    const kind = k.supervisorMarker({ env, argv }).kind;
+    if (kind === 'conflict') assert.equal(record.attempts, 0, name);
+    if (kind === 'manual') assert.equal(record.attempts, 1, name);
+    if (kind === 'supervised') {
+      assert.equal(record.waitedMs, k.LOCK_WAIT_SUPERVISED_SECONDS * 1000, name);
+      assert.ok(record.attempts > 1, name);
+    }
+  }
+});
+
+test('the writers carry the marker and refuse one passed in', () => {
+  const text = k.taskXml('\\PassionCode\\x', ['C:\\x.exe', 'serve', '--', '--fabric-supervisor', 'systemd'], { workingDirectory: 'C:\\w', user: 'H\\u' });
+  assert.equal(element(text, 'Arguments'), 'serve --fabric-supervisor task-scheduler -- --fabric-supervisor systemd', 'before any --');
+  for (const writer of [
+    (argv) => k.taskXml('\\PassionCode\\x', ['C:\\x.exe', ...argv], { workingDirectory: 'C:\\w', user: 'H\\u' }),
+    (argv) => k.systemdUnit('x.service', ['/bin/x', ...argv], { workingDirectory: '/w' }),
+  ]) {
+    for (const argv of [['--fabric-supervisor', 'node'], ['--fabric-supervisor=launchd'], ['--fabric-supervisor']]) assert.throws(() => writer(argv), /written by the supervisor file's writer/, argv.join(' '));
+  }
+  const unit = k.systemdUnit('x.service', ['/bin/x'], { workingDirectory: '/w', environment: { [k.SUPERVISOR_ENV]: 'launchd' } });
+  assert.match(unit.replace(/"/g, ''), new RegExp(`Environment=${k.SUPERVISOR_ENV}=systemd`));
+  assert.doesNotMatch(unit, /launchd/, "the unit's writer assigns the marker unconditionally");
+});
+
+test('DEC-0057: the descriptor names one supervisor and never a share; every killing fixture is refused for its reason', () => {
+  const reasons = {"bad-task": "lifecycle.task must match", "bad-unit": "lifecycle.unit must match", "systemd-with-plist": "plist belongs to launchd", "task-scheduler-with-label": "label belongs to launchd", "task-without-task-scheduler": "lifecycle.task belongs to", "unc-forward-slash": "never a network share", "windows-service-manager": "lifecycle.manager must be"};
+  const { negatives } = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/descriptor-negatives.json', import.meta.url), 'utf8'));
+  assert.deepEqual(negatives.map((n) => n.name).sort(), Object.keys(reasons).sort());
+  for (const item of negatives) assert.ok(k.validateDescriptor(item.descriptor).join(' ').includes(reasons[item.name]), item.name);
 });

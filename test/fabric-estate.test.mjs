@@ -13,10 +13,11 @@ import * as dl from '../plugins/fabric-agent-adapter/skills/building-fabric-serv
 const here = path.dirname(fileURLToPath(import.meta.url));
 const V = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/estate-vectors.json'), 'utf8'));
 const D = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/delegation/vectors.json'), 'utf8'));
+const HUB = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/hub-key-vectors.json'), 'utf8'));
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null));
 
 test('every verify case answers as the contract does', () => {
-  assert.equal(V.verify.length, 45);
+  assert.equal(V.verify.length, 49);
   for (const c of V.verify) {
     const trust = { ...c.trust, at: c.trust.at === undefined || c.trust.at === null ? c.trust.at : new Date(c.trust.at) };
     assert.deepEqual(plain(e.verifyEstateRecord(c.record, trust)), c.expected, c.name);
@@ -70,7 +71,8 @@ const certifying = (forKid = kid, forX = x, now = o.now) => {
 const verify = (estate) => dl.verifyDelegation(tokenCase.token, { audience: o.audience, jwks, now: o.now, capability: o.capability, effect: o.effect, issuer: o.issuer, readOnly: o.readOnly ?? false, estate });
 
 test('a certified kid is trusted; no record changes nothing', () => {
-  assert.equal(e.hubKeyCertified(certifying(), kid, x, o.now), true);
+  const record = certifying();
+  assert.deepEqual(e.hubKeyCertified(record, kid, x, o.now), { certified: true, machine: record.machines[0].id, revision: record.revision });
   assert.equal(verify(undefined).ok, true);
   assert.equal(verify(certifying()).ok, true);
   assert.equal(verify(() => certifying()).ok, true, 'a function gives the current revision');
@@ -79,12 +81,15 @@ test('a certified kid is trusted; no record changes nothing', () => {
 test('an uncertified, revoked or stale kid is refused; an unreadable record certifies nothing', () => {
   const revoked = certifying();
   revoked.revocations = [...(revoked.revocations ?? []), { kind: 'hub-key', ref: kid }];
-  const stale = certifying();
-  stale.validUntil = stale.issuedAt;
-  for (const [name, record] of [['another kid', certifying('another-kid')], ['another key', certifying(kid, 'B'.repeat(43))], ['revoked', revoked], ['stale', stale]]) {
+  for (const [name, record] of [['another kid', certifying('another-kid')], ['another key', certifying(kid, 'B'.repeat(43))], ['revoked', revoked]]) {
     const verdict = verify(record);
     assert.deepEqual([verdict.ok, verdict.code, verdict.detail], [false, 'unauthenticated', 'kid-not-certified'], name);
   }
+  // DEC-0060: a revision whose window cannot hold the clock is the trust source's fault, not the token's.
+  const stale = certifying();
+  stale.validUntil = stale.issuedAt;
+  assert.deepEqual([verify(stale).code, verify(stale).detail], ['issuer-unavailable', 'estate-unreadable']);
+  assert.deepEqual([verify(null).code, verify(null).detail], ['issuer-unavailable', 'estate-unreadable'], 'only an absent estate skips the check');
   const broken = verify(() => { throw new Error('the record store is down'); });
   assert.deepEqual([broken.ok, broken.code, broken.detail], [false, 'issuer-unavailable', 'estate-unreadable']);
 });
@@ -99,7 +104,77 @@ test('approvals and the gate follow the record', async () => {
   record.machines[0].hubKey.kid = 'another-kid';
   assert.deepEqual([approve(record).code, approve(record).detail], ['approval-invalid', 'kid-not-certified']);
   const gate = dl.delegationGate({ audience: o.audience, jwks, effects: { [o.capability]: o.effect }, issuer: o.issuer, clock: () => o.now, estate: () => ({}) });
-  assert.equal((await gate(o.capability, { 'Fabric-Delegation': tokenCase.token })).detail, 'kid-not-certified');
+  const refused = await gate(o.capability, { 'Fabric-Delegation': tokenCase.token });
+  assert.deepEqual([refused.code, refused.detail], ['issuer-unavailable', 'estate-unreadable']);
+  const rolled = dl.delegationGate({ audience: o.audience, jwks, effects: { [o.capability]: o.effect }, issuer: o.issuer, clock: () => o.now, estate: () => certifying(), estateApplied: { revision: certifying().revision + 1 } });
+  const back = await rolled(o.capability, { 'Fabric-Delegation': tokenCase.token });
+  assert.deepEqual([back.code, back.detail], ['issuer-unavailable', 'estate-rolled-back']);
+});
+
+// ---- DEC-0060: hubKeyCertified and the verifiers' row 4a, held to the contract's own answers ----
+
+test('every hub-key case answers as the contract does', () => {
+  assert.equal(HUB.cases.length, 51);
+  const details = new Set();
+  for (const c of HUB.cases) {
+    const got = e.hubKeyCertified(c.record, c.kid, c.x, c.at, c.applied, c.extraRevocations === undefined ? undefined : { extraRevocations: c.extraRevocations });
+    assert.deepEqual(got, c.expected, c.name);
+    details.add(got.detail ?? 'certified');
+  }
+  assert.deepEqual([...details].sort(), ['certified', 'estate-forked', 'estate-outside-window', 'estate-rolled-back', 'estate-unreadable', 'kid-not-certified', 'no-clock']);
+});
+
+test('every verifier answer matches', () => {
+  assert.equal(HUB.verifier.length, 14);
+  for (const c of HUB.verifier) {
+    const options = { audience: 'example-media', jwks: HUB.jwks, now: c.now, issuer: HUB.issuer, estateApplied: c.estateApplied };
+    if (c.estate) options.estate = c.estate.throws ? () => { throw new Error('the record store is down'); } : c.estate.record;
+    const got = c.document === 'approval'
+      ? dl.verifyApproval(c.token, { ...options, actionDigest: HUB.actionDigest, jtiStore: dl.createMemoryJtiStore() })
+      : dl.verifyDelegation(c.token, { ...options, capability: 'media.render', effect: 'draft' });
+    assert.equal(got.ok, c.expected.ok, c.name);
+    if (!c.expected.ok) assert.deepEqual([got.code, got.detail], [c.expected.code, c.expected.detail], c.name);
+  }
+});
+
+test('a revocation ref is compared exactly, never after String() (DEC-0060 (i))', () => {
+  const c = HUB.cases[0];
+  const record = structuredClone(c.record);
+  record.machines[0].id = 7;
+  record.revocations = [{ kind: 'machine', ref: '7', revokedAt: '2026-10-21T09:00:00Z' }];
+  assert.equal(e.hubKeyCertified(record, c.kid, c.x, c.at).certified, true);
+  record.revocations[0].ref = 7;
+  assert.equal(e.hubKeyCertified(record, c.kid, c.x, c.at).detail, 'kid-not-certified');
+});
+
+test('an unreadable clock is refused first; the delta revocations pass through', () => {
+  const c = HUB.verifier[0];
+  for (const now of [NaN, Infinity, '1792918830', true, 8.64e12 + 1, null, undefined]) {
+    const got = dl.verifyDelegation(c.token, { audience: 'example-media', jwks: HUB.jwks, now, capability: 'media.render', effect: 'draft' });
+    assert.deepEqual([got.code, got.detail], ['unknown-state', 'no-clock'], String(now));
+  }
+  const approval = dl.verifyApproval('x.y.z', { audience: 'example-media', jwks: HUB.jwks, now: NaN, actionDigest: HUB.actionDigest, issuer: HUB.issuer, jtiStore: dl.createMemoryJtiStore() });
+  assert.deepEqual([approval.code, approval.detail], ['unknown-state', 'no-clock']);
+  for (const extra of [[{ kind: 'hub-key', ref: 'hub-m-4c1e-1', revokedAt: '2026-10-21T09:00:00Z' }], () => [{ kind: 'machine', ref: 'm-4c1e', revokedAt: '2026-10-21T09:00:00Z' }]]) {
+    const got = dl.verifyDelegation(c.token, { audience: 'example-media', jwks: HUB.jwks, now: c.now, capability: 'media.render', effect: 'draft', issuer: HUB.issuer, estate: c.estate.record, estateRevocations: extra });
+    assert.deepEqual([got.code, got.detail], ['unauthenticated', 'kid-not-certified']);
+  }
+});
+
+// ---- DEC-0063: the estate passkey is a signing credential (FAC-SEM-092) ----
+
+test('signing RP IDs and origins; the record rules flag a sign-in credential', () => {
+  for (const [rp, ok] of [['sign.example.org', true], ['sign.a.b.c', true], ['sign.org', false], ['example.org', false], ['SIGN.example.org', false],
+    ['sign.example.org.', false], [null, false], [`sign.${'a'.repeat(63)}.org`, true], [`sign.${'a'.repeat(64)}.org`, false]]) assert.equal(e.isSigningRpId(rp), ok, String(rp));
+  for (const [origin, ok] of [['https://sign.example.org', true], ['https://x.sign.example.org', true], ['https://sign.example.org:443', false],
+    ['http://sign.example.org', false], ['https://evilsign.example.org', false], ['https://sign.example.org/', false]]) assert.equal(e.originWithin(origin, 'sign.example.org'), ok, origin);
+  const record = structuredClone(V.digests[0].record);
+  record.authorities[0].rpId = 'example.org';
+  const flagged = (r) => e.estateRecordRules('estate-record', r).filter((f) => f.code === 'FAC-SEM-092').map((f) => f.instancePath);
+  assert.deepEqual(flagged(record), ['/authorities/0/rpId']);
+  record.authorities[0].rpId = 'sign.example.org';
+  record.authorities[0].origins = ['https://sign.example.org', 'https://example.org'];
+  assert.deepEqual(flagged(record), ['/authorities/0/origins/1']);
 });
 
 test('ES256 through OpenSSL refuses a malleated, padded or trailing signature; a coordinate is below p', async () => {

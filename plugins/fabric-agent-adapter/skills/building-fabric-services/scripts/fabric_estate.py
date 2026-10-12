@@ -36,6 +36,9 @@ import fabric_secrets as _secrets  # noqa: E402 - beside this file: the contract
 ESTATE_RECORD_SCHEMA = "estate-record/1"
 ESTATE_CHALLENGE_TYPE = "estate-revision/1"
 MAX_VALIDITY_SECONDS = 30 * 24 * 60 * 60
+#: How far ahead of the verifier's clock a signed `issuedAt` may be before it is `not-yet-valid` (DEC-0066): the one
+#: skew of the relay family's and the estate record's times (`CLOCK_SKEW_SECONDS` in the contract's `src/rfc3339.ts`).
+CLOCK_SKEW_SECONDS = 60
 ASSERTION_ALGORITHMS = ("ES256", "EdDSA")
 FLAGS = {"UP": 0x01, "UV": 0x04, "BE": 0x08, "BS": 0x10, "AT": 0x40, "ED": 0x80}
 _MISSING = object()
@@ -479,6 +482,37 @@ def _clock(at: Any) -> float:
     return math.nan
 
 
+_LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+#: `sign.` and at least two more labels, lower case: a signing RP ID is never a bare `sign.<tld>` (DEC-0063).
+_SIGNING_RP = re.compile(r"sign(?:\.%s){2,}" % _LABEL, re.ASCII)
+_HTTPS_HOST = re.compile(r"https://([a-z0-9.-]{1,253})", re.ASCII)
+
+
+def is_signing_rp_id(rp_id: Any) -> bool:
+    """Whether an RP ID is a dedicated signing RP (v4 §7, DEC-0063): first label `sign`, then the organization's or
+    PassionCode's domain, lower case. A credential under any other RP ID is a sign-in credential and never signs."""
+    return isinstance(rp_id, str) and len(rp_id) <= 253 and _SIGNING_RP.fullmatch(rp_id) is not None
+
+
+def origin_within(origin: Any, rp_id: str) -> bool:
+    """Whether a pinned origin may run a signing ceremony for ``rp_id``: `https://`, no port, no path, its host the RP
+    ID or a subdomain of it, lower case. Related origins are never used for signing."""
+    match = _HTTPS_HOST.fullmatch(origin) if isinstance(origin, str) else None
+    return match is not None and (match.group(1) == rp_id or match.group(1).endswith("." + rp_id))
+
+
+def _signing_credential(credential: Any, path: str, flag) -> None:
+    """FAC-SEM-092 on one signing credential: a signing RP ID, and every pinned origin within it."""
+    value = credential if isinstance(credential, dict) else {}
+    if not is_signing_rp_id(_get(value, "rpId")):
+        flag("%s/rpId" % path, "a passkey signs only under a dedicated signing RP, sign.<domain>, never under the RP ID it signs in with")
+        return
+    origins = _get(value, "origins")
+    for index, origin in enumerate(origins if isinstance(origins, list) else []):
+        if not origin_within(origin, value["rpId"]):
+            flag("%s/origins/%d" % (path, index), "a signing ceremony runs only on %s or a host under it, over https without a port" % value["rpId"])
+
+
 def _revocation_key(entry: Dict[str, Any]) -> str:
     return "%s %s" % (_s(entry, "kind"), _s(entry, "ref"))
 
@@ -548,6 +582,11 @@ def verify_estate_record(record: Any, *, at: Any, parent: Any = _MISSING, author
     credential = {"credentialId": _s(authority, "credentialId"), "alg": _s(authority, "alg"),
                   "publicKey": authority["publicKey"] if isinstance(_get(authority, "publicKey"), dict) else {},
                   "rpId": _s(authority, "rpId"), "origins": [o for o in origins if isinstance(o, str)] if isinstance(origins, list) else []}
+    # DEC-0063: the estate passkey is a signing credential. An RP ID that is not sign.<domain> is wrong-rp before the
+    # assertion is read; an origin outside the RP ID is not pinned, so a ceremony that ran there is wrong-origin.
+    if not is_signing_rp_id(_get(authority, "rpId")):
+        return {"ok": False, "problem": "wrong-rp"}
+    credential["origins"] = [o for o in credential["origins"] if origin_within(o, credential["rpId"])]
     assertion = verify_assertion(signature, credential, estate_challenge(digest))
     if not assertion["ok"]:
         return {"ok": False, "problem": assertion["problem"]}
@@ -557,7 +596,8 @@ def verify_estate_record(record: Any, *, at: Any, parent: Any = _MISSING, author
     if (not math.isfinite(issued_at) or not math.isfinite(valid_until) or valid_until <= issued_at
             or valid_until - issued_at > MAX_VALIDITY_SECONDS * 1000):
         return {"ok": False, "problem": "too-long-lived"}
-    if now < issued_at:
+    # A revision issued a moment ahead of this clock is admitted within the skew every relay time allows (DEC-0066).
+    if now < issued_at - CLOCK_SKEW_SECONDS * 1000:
         return {"ok": False, "problem": "not-yet-valid"}
     if now > valid_until:
         return {"ok": False, "problem": "expired"}
@@ -580,23 +620,72 @@ def placement_trust(record: Dict[str, Any], machine_id: str, agent_ref: str) -> 
     return {"publisher": [k for k in _list(_get(record, "publisherKeys")) if _same(_get(k, "kid"), _get(placement, "publisherKid"))]}
 
 
-def hub_key_certified(record: Any, kid: str, x: str, at: Any) -> bool:
-    """DL-14 with DEC-0055: a delegation verifier that reads the estate record trusts a token's `kid` only while a
-    current revision certifies it for a machine and does not revoke it. ``record`` is a revision the caller verified
-    (verify_estate_record); ``x`` is the key the published key set gives for ``kid``; ``at`` is the clock."""
+#: v4 §7, Freshness: an estate revision's window is at most 30 days (DEC-0055 item 2).
+_MAX_WINDOW_MS = MAX_VALIDITY_SECONDS * 1000
+
+
+def _refused(fault: str, detail: str) -> Dict[str, Any]:
+    return {"certified": False, "fault": fault, "detail": detail}
+
+
+def _revision_number(value: Any) -> bool:
+    return _safe_integer(value) and value >= 1
+
+
+def hub_key_certified(record: Any, kid: Any, x: Any, at: Any, applied: Any = None,
+                      extra_revocations: Any = _MISSING) -> Dict[str, Any]:
+    """DL-14 (DEC-0055, DEC-0060): whether ``record`` certifies the delegation key ``kid`` with the published key's ``x``
+    at ``at`` (an aware datetime or epoch seconds), for a verifier whose machine applied ``applied``
+    (``{"revision", "digest"?}``). ``extra_revocations`` are the revocation delta's entries applied since the revision
+    (DEC-0054). The contract's ``hubKeyCertified``, in its order; never raises. Answers ``{"certified": True, "machine",
+    "revision"}`` or ``{"certified": False, "fault": "token"|"estate"|"clock", "detail"}`` with detail
+    ``kid-not-certified`` (the token's fault), ``estate-unreadable``, ``estate-outside-window``, ``estate-rolled-back``,
+    ``estate-forked`` (the trust source's) or ``no-clock``."""
     now = _clock(at)
-    if not isinstance(record, dict) or not math.isfinite(now):
-        return False
+    if math.isnan(now):
+        return _refused("clock", "no-clock")
+    if (not isinstance(record, dict) or not _revision_number(_get(record, "revision"))
+            or not isinstance(_get(record, "digest"), str) or not isinstance(_get(record, "machines"), list)):
+        return _refused("estate", "estate-unreadable")
+    revocations = _get(record, "revocations")
+    if revocations is not _MISSING and not isinstance(revocations, list):
+        return _refused("estate", "estate-unreadable")
+    if extra_revocations is not _MISSING and not isinstance(extra_revocations, list):
+        return _refused("estate", "estate-unreadable")
     issued_at, valid_until = estate_time(_get(record, "issuedAt")), estate_time(_get(record, "validUntil"))
-    if not (math.isfinite(issued_at) and math.isfinite(valid_until) and issued_at <= now <= valid_until):
-        return False
-    revoked = {_revocation_key(e) for e in _list(_get(record, "revocations"))}
-    for machine in _list(_get(record, "machines")):
-        hub = _get(machine, "hubKey")
-        if (isinstance(hub, dict) and _same(_get(hub, "kid"), kid) and _same(_get(hub, "x"), x)
-                and "hub-key %s" % kid not in revoked and "machine %s" % _s(machine, "id") not in revoked):
-            return True
-    return False
+    # A window that is not a time, not positive or longer than 30 days is no window: NaN fails every comparison below.
+    if math.isnan(issued_at) or math.isnan(valid_until) or valid_until <= issued_at or valid_until - issued_at > _MAX_WINDOW_MS:
+        return _refused("estate", "estate-unreadable")
+    if applied is not None:
+        if (not isinstance(applied, dict) or not _revision_number(_get(applied, "revision"))
+                or (_get(applied, "digest") is not _MISSING and not isinstance(_get(applied, "digest"), str))):
+            return _refused("estate", "estate-unreadable")
+        # An older revision may still be inside its window and list a key the applied one revokes (a rollback).
+        if record["revision"] < applied["revision"]:
+            return _refused("estate", "estate-rolled-back")
+        if (record["revision"] == applied["revision"] and _get(applied, "digest") is not _MISSING
+                and record["digest"] != applied["digest"]):
+            return _refused("estate", "estate-forked")
+    # The window verify_estate_record admits the revision in: from 60 s before issuedAt to validUntil (DEC-0066).
+    if now < issued_at - CLOCK_SKEW_SECONDS * 1000 or now > valid_until:
+        return _refused("estate", "estate-outside-window")
+
+    entries = list(revocations if isinstance(revocations, list) else []) + list(extra_revocations if isinstance(extra_revocations, list) else [])
+
+    def revokes(kind: str, ref: Any) -> bool:  # a ref is compared exactly, never as a string conversion
+        return any(isinstance(e, dict) and _same(_get(e, "kind"), kind) and _same(_get(e, "ref"), ref) for e in entries)
+
+    if not isinstance(kid, str) or revokes("hub-key", kid):
+        return _refused("token", "kid-not-certified")
+    holders = [m for m in record["machines"] if isinstance(m, dict) and isinstance(_get(m, "hubKey"), dict) and _same(_get(m["hubKey"], "kid"), kid)]
+    if len(holders) != 1:  # two machines under one kid break FAC-SEM-073; such a revision certifies neither
+        return _refused("token", "kid-not-certified")
+    machine = holders[0]
+    if not isinstance(x, str) or not _same(_get(machine["hubKey"], "x"), x):  # a missing x never equals a missing x
+        return _refused("token", "kid-not-certified")
+    if revokes("machine", _get(machine, "id")):
+        return _refused("token", "kid-not-certified")
+    return {"certified": True, "machine": _s(machine, "id"), "revision": record["revision"]}
 
 
 # --- FAC-SEM-072…076 ------------------------------------------------------------------------------------------------
@@ -773,6 +862,8 @@ def _record_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
     _placements(value, _finding(findings, "FAC-SEM-074"))
     _secret_references(value, _finding(findings, "FAC-SEM-075"))
     _grants_and_revocations(value, _finding(findings, "FAC-SEM-076"))
+    for index, authority in enumerate(_list(_get(value, "authorities"))):  # FAC-SEM-092 (DEC-0063)
+        _signing_credential(authority, "/authorities/%d" % index, _finding(findings, "FAC-SEM-092"))
     return findings
 
 

@@ -172,8 +172,11 @@ class Probe:
         self.add("descriptor.valid", "FAIL" if problems else "PASS", "; ".join(problems) or str(self.path))
         if fs.WINDOWS:
             # DEC-0032: on Windows the file's ACL is its privacy.
-            owner, granting = fs.windows_acl(self.path)
-            problem = fs.token_acl_problem(self.path, owner, granting, fs.windows_user_sid())
+            owner, aces = fs.windows_acl(self.path)
+            info = os.lstat(self.path)
+            problem = fs.windows_token_acl_problem({"isRegularFile": stat.S_ISREG(info.st_mode), "isReparsePoint": stat.S_ISLNK(info.st_mode),
+                                                    "realPathInProfile": True, "ownerSid": owner, "aces": aces}, fs.windows_user_sid())
+            problem = problem and problem["message"]
             self.add("descriptor.private", "FAIL" if problem else "PASS", problem or "owner-only ACL")
         else:
             mode = stat.S_IMODE(os.stat(self.path).st_mode)

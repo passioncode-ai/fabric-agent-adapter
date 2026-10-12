@@ -52,7 +52,8 @@ const TRACE_ID = /^(?!0{32}$)[0-9a-f]{32}$/;
 const SPAN_ID = /^(?!0{16}$)[0-9a-f]{16}$/;
 const O_EXLOCK = 0x20; // BSD/macOS: open(2) takes flock(LOCK_EX); absent from fs.constants
 // DEC-0032: a local path starts with ~/ (or ~\ on Windows), / (never //) or a drive letter; a network share never does.
-const LOCAL_PATH = /^(~[\\/]|\/(?!\/)|[A-Za-z]:[\\/])/;
+// DEC-0057: `//server/…` and `/\\server…` are shares on Windows too, so a leading slash is followed by neither.
+const LOCAL_PATH = /^(~[\\/]|\/(?![\\/])|[A-Za-z]:[\\/])/;
 export const MANAGERS = Object.freeze(['launchd', 'systemd', 'task-scheduler', 'none']);
 const AUTH_HEADER = /^[A-Za-z][A-Za-z0-9-]{0,63}$/;
 const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$/;
@@ -63,7 +64,8 @@ export const DEFAULT_EXIT_TIMEOUT = 15;
 export class ServiceError extends Error {}
 export class AlreadyRunning extends ServiceError {
   constructor(holderPid, lockPath) {
-    super(`Another copy is already running (${holderPid ? `process ${holderPid}` : 'another process'} holds ${lockPath}).`);
+    // FAC-SEM-078: a copy that cannot learn the holder's pid says the holder is unknown.
+    super(`Another copy is already running (${holderPid ? `process ${holderPid}` : 'an unknown process'} holds ${lockPath}).`);
     this.holderPid = holderPid;
     this.lockPath = lockPath;
   }
@@ -209,25 +211,92 @@ function readPid(file) {
   }
 }
 
+/** The managers a supervisor marker may name (DEC-0057): the three systems' supervisors and Project Observatory's node. */
+export const SUPERVISORS = Object.freeze(['launchd', 'systemd', 'task-scheduler', 'node']);
+/** The argument form of the marker, for a supervisor whose start carries no environment (a Scheduled Task's action). */
+export const SUPERVISOR_ARG = '--fabric-supervisor';
+
+/**
+ * The marker values an argument vector carries after the executable and before `--`. A bare `--fabric-supervisor`
+ * followed by nothing, by `--` or by another `--…` flag is a marker with an empty value and consumes nothing.
+ */
+function markerArguments(argv) {
+  const values = [];
+  if (!Array.isArray(argv)) return values;
+  for (let index = 1; index < argv.length; index += 1) {
+    const item = argv[index];
+    if (item === '--') break;
+    if (item === SUPERVISOR_ARG) {
+      const next = argv[index + 1];
+      if (typeof next === 'string' && !next.startsWith('--')) {
+        values.push(next);
+        index += 1;
+      } else {
+        values.push('');
+      }
+    } else if (typeof item === 'string' && item.startsWith(`${SUPERVISOR_ARG}=`)) {
+      values.push(item.slice(SUPERVISOR_ARG.length + 1));
+    }
+  }
+  return values;
+}
+
+/**
+ * How this copy was started (DEC-0057), from `FABRIC_SERVICE_SUPERVISOR=<manager>` and `--fabric-supervisor <manager>` /
+ * `--fabric-supervisor=<manager>` (`env` and `argv` default to this process's; `argv[0]` is the executable or script):
+ * `{kind: 'supervised', manager, forms}` when every marker present names the same manager of SUPERVISORS;
+ * `{kind: 'conflict', values, forms}` when they disagree (an empty or bare argument beside a variable disagrees with it):
+ * the copy exits 75 at once, before it takes the lock; `{kind: 'manual', forms, unreadable?}` with no marker (only an
+ * empty variable counts as none) or one that names no manager. Never inferred from the parent process. The contract's
+ * `supervisorMarker`.
+ */
+export function supervisorMarker({ env = process.env, argv = process.argv.slice(1) } = {}) {
+  const variable = env?.[SUPERVISOR_ENV];
+  const fromEnv = typeof variable === 'string' && variable !== '' ? [variable] : [];
+  const fromArgs = markerArguments(argv);
+  const forms = [...(fromEnv.length ? ['environment'] : []), ...(fromArgs.length ? ['argument'] : [])];
+  const values = [...new Set([...fromEnv, ...fromArgs])];
+  if (values.length > 1) return { kind: 'conflict', values, forms };
+  if (values.length === 0) return { kind: 'manual', forms };
+  return SUPERVISORS.includes(values[0]) ? { kind: 'supervised', manager: values[0], forms } : { kind: 'manual', unreadable: values[0], forms };
+}
+
+/** How long a copy started so may wait for the lock, in seconds: 300 when supervised, else not at all. */
+export const lockWaitBudgetSeconds = (marker) => (marker?.kind === 'supervised' ? LOCK_WAIT_SUPERVISED_SECONDS : 0);
+
+/** The one sentence a copy whose markers disagree exits with, naming the markers present. */
+export function markerConflictMessage(marker) {
+  const shown = marker.values.map((v) => JSON.stringify(v)).join(', ');
+  return marker.forms.length === 2
+    ? `${SUPERVISOR_ENV} and ${SUPERVISOR_ARG} disagree (${shown}); not starting unsupervised.`
+    : `${SUPERVISOR_ARG} is given with different values (${shown}); not starting unsupervised.`;
+}
+
+/** True when a supervisor that restarts on exit started this process and said so with the marker. */
+export const supervised = (start) => supervisorMarker(start).kind === 'supervised';
 /** True when launchd started this process from a plist that says so (FABRIC_SERVICE_SUPERVISOR=launchd). */
-export const supervisedByLaunchd = () => process.env[SUPERVISOR_ENV] === 'launchd';
-export const SUPERVISORS = Object.freeze(['launchd', 'systemd', 'task-scheduler']);
-/** True when a supervisor that restarts on exit started this process and said so (launchd, systemd). */
-export const supervised = () => SUPERVISORS.includes(process.env[SUPERVISOR_ENV]);
+export const supervisedByLaunchd = (start) => supervisorMarker(start).manager === 'launchd';
 
 const sleepSeconds = (s) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
 /**
- * Take the lock or exit 75 with one sentence naming the holder. Started by hand, a held lock exits
- * 75 at once. Under launchd (KeepAlive) an immediate exit is a respawn every ThrottleInterval,
+ * Take the lock or exit 75 with one sentence naming the holder (DEC-0057, FAC-SEM-078). Markers that
+ * disagree exit 75 before the lock. Started by hand, a held lock exits 75 at once. Under a
+ * supervisor that restarts on exit (launchd's KeepAlive) an immediate exit is a respawn every ThrottleInterval,
  * forever; so a supervised copy first backs off in-process (0.5 s doubling to 30 s,
  * LOCK_WAIT_SUPERVISED_SECONDS in all), takes over if the holder leaves, and exits 75 only when
  * the wait runs out. `waitSeconds` overrides the choice (0 = never wait).
  */
 export async function holdSingleInstance(dataDir, {
-  waitSeconds, sleep = sleepSeconds, clock = () => performance.now() / 1000, exit = (code) => process.exit(code),
+  waitSeconds, sleep = sleepSeconds, clock = () => performance.now() / 1000, exit = (code) => process.exit(code), env, argv,
 } = {}) {
-  const wait = waitSeconds ?? (supervised() ? LOCK_WAIT_SUPERVISED_SECONDS : 0);
+  // DEC-0057: markers that disagree exit 75 at once, before the lock, naming them.
+  const marker = supervisorMarker({ ...(env === undefined ? {} : { env }), ...(argv === undefined ? {} : { argv }) });
+  if (marker.kind === 'conflict') {
+    process.stderr.write(`${markerConflictMessage(marker)}\n`);
+    return exit(EXIT_ALREADY_RUNNING);
+  }
+  const wait = waitSeconds ?? lockWaitBudgetSeconds(marker);
   const deadline = clock() + Math.max(0, wait);
   let delay = LOCK_BACKOFF_FIRST_SECONDS;
   let announced = false;
@@ -263,9 +332,8 @@ export function ensureToken(file) {
 
 /**
  * Refuse a symlink, a file owned by someone else, or one others can read. On Windows the rule is
- * service.md "Windows token files" (DEC-0032, DEC-0033): a regular file whose real path is in the
- * profile, owned by the current user, SYSTEM or Administrators, every granting ACE naming one of
- * those three; a refusal names the SID, never the contents.
+ * service.md "Windows token files" (DEC-0032, DEC-0033, DEC-0057): windowsTokenAclProblem over the
+ * file's flags, owner and ACEs; a refusal names the SID, never the contents.
  */
 export function readToken(file) {
   const info = fs.lstatSync(file);
@@ -286,30 +354,68 @@ export function readToken(file) {
 // Node has no ACL API. Windows PowerShell (5.1, present on every Windows) reads the list through .NET
 // and icacls writes it; both get the path through the environment, never argv, and print no contents.
 
+export const SYSTEM_SID = 'S-1-5-18';
+export const ADMINISTRATORS_SID = 'S-1-5-32-544';
+/** A string SID: revision 1, an identifier authority and up to 15 sub-authorities of 32 bits each. */
+const SID_TEXT = /^S-1-\d{1,15}(-\d{1,10}){0,15}$/i;
+/** A readable SID in upper case (SIDs compare case-insensitively on their S), or undefined. */
+const sidOf = (value) => (typeof value === 'string' && SID_TEXT.test(value) && value.split('-').slice(3).every((part) => Number(part) <= 0xffffffff) ? value.toUpperCase() : undefined);
+
 /**
- * service.md "Windows token files", rules 2 and 3, on SIDs already read: the owner is the current
- * user, SYSTEM or Administrators (DEC-0033), and every SID an allow ACE grants anything to is one of
- * those three. Deny ACEs are not passed in: they do not change the decision.
+ * service.md "Windows token files" (DEC-0032, DEC-0033, DEC-0057, FAC-SEM-079) on what a reader has read: `file` is
+ * `{isRegularFile, isReparsePoint, realPathInProfile, ownerSid, aces: [{type, sid, mask}]}`, the mask the ACE's unsigned
+ * 32-bit access mask. The first refusal `{problem, at, sid?, message}`, or null when the file may be read: a regular
+ * file, not a reparse point, inside the profile; owned by the user, SYSTEM or Administrators; every allow ACE with a
+ * non-zero mask naming one of those three; deny ACEs ignored; any other ACE type refused; anything unreadable refused.
+ * The contract's `windowsTokenAclProblem`; a refusal names the SID, never the contents.
  */
-export function tokenAclProblem(file, owner, granting, user) {
-  if (owner !== user && !WINDOWS_TRUSTED.includes(owner)) {
-    return `Token file ${file} is owned by ${owner || 'nobody'}, not by this user (${user}), SYSTEM or Administrators.`;
+export function windowsTokenAclProblem(file, currentUserSid) {
+  const refuse = (problem, at, message, sid) => (sid === undefined ? { problem, at, message } : { problem, at, sid, message });
+  const user = sidOf(currentUserSid);
+  if (user === undefined) return refuse('unreadable', '/currentUserSid', "the current user's SID is unreadable");
+  if (typeof file !== 'object' || file === null || Array.isArray(file)) return refuse('unreadable', '/file', "the token file's metadata is unreadable");
+  for (const flag of ['isRegularFile', 'isReparsePoint', 'realPathInProfile']) {
+    if (typeof file[flag] !== 'boolean') return refuse('unreadable', `/file/${flag}`, `${flag} is unreadable`);
   }
-  for (const sid of granting) {
-    if (sid !== user && !WINDOWS_TRUSTED.includes(sid)) return `Token file ${file} grants access to ${sid}; only this user, SYSTEM and Administrators may hold any.`;
+  if (file.isReparsePoint) return refuse('reparse-point', '/file/isReparsePoint', 'the token file is a reparse point (a symlink or a junction)');
+  if (!file.isRegularFile) return refuse('not-regular-file', '/file/isRegularFile', 'the token file is not a regular file');
+  if (!file.realPathInProfile) return refuse('outside-profile', '/file/realPathInProfile', "the token file's real path lies outside the user's profile");
+  const trusted = new Set([user, SYSTEM_SID, ADMINISTRATORS_SID]);
+  const owner = sidOf(file.ownerSid);
+  if (owner === undefined) return refuse('unreadable', '/file/ownerSid', 'the owner SID is unreadable');
+  if (!trusted.has(owner)) return refuse('owner', '/file/ownerSid', `the token file is owned by ${owner}, not by the current user, SYSTEM or Administrators`, owner);
+  if (!Array.isArray(file.aces)) return refuse('unreadable', '/file/aces', 'the ACL is unreadable');
+  for (const [index, ace] of file.aces.entries()) {
+    const at = `/file/aces/${index}`;
+    if (typeof ace !== 'object' || ace === null || Array.isArray(ace)) return refuse('unreadable', at, `ACE ${index} is unreadable`);
+    if (typeof ace.type !== 'string') return refuse('unreadable', `${at}/type`, `ACE ${index} has an unreadable type`);
+    const trustee = sidOf(ace.sid);
+    if (trustee === undefined) return refuse('unreadable', `${at}/sid`, `ACE ${index} names an unreadable SID`);
+    if (typeof ace.mask !== 'number' || !Number.isInteger(ace.mask) || ace.mask < 0 || ace.mask > 0xffffffff) return refuse('unreadable', `${at}/mask`, `ACE ${index} has an unreadable access mask`);
+    if (ace.type === 'deny') continue;
+    if (ace.type !== 'allow') return refuse('ace-type', `${at}/type`, `ACE ${index} for ${trustee} is of a type the rule does not read`, trustee);
+    if (ace.mask === 0) continue;
+    if (!trusted.has(trustee)) return refuse('ace-sid', `${at}/sid`, `the token file grants access to ${trustee}; only the current user, SYSTEM and Administrators may hold any`, trustee);
   }
   return null;
 }
 
+/** windowsTokenAclProblem as one sentence naming the file and the refusal, or null. */
+export function tokenFileProblem(file, metadata, user) {
+  const problem = windowsTokenAclProblem(metadata, user);
+  return problem ? `Token file ${file} refused: ${problem.message}.` : null;
+}
+
+// The raw descriptor, through .NET: every ACE's type, its trustee's SID and its access mask as read (a signed int;
+// parseAclReport converts it to the unsigned mask). An inherit-only ACE applies to children only and is left out.
 const ACL_SCRIPT = [
   "$ErrorActionPreference = 'Stop'",
-  '$sid = [System.Security.Principal.SecurityIdentifier]',
   '$acl = [System.IO.File]::GetAccessControl($env:FABRIC_ACL_PATH)',
-  "$null_dacl = $acl.GetSecurityDescriptorSddlForm('Access') -match 'NO_ACCESS_CONTROL' -or $acl.GetSecurityDescriptorSddlForm('Access') -eq ''",
-  // InheritOnly (2) applies to children, not to the file itself.
-  "$granting = @($acl.GetAccessRules($true, $true, $sid) | Where-Object { $_.AccessControlType -eq 'Allow' -and -not ([int]$_.PropagationFlags -band 2) } | ForEach-Object { $_.IdentityReference.Value })",
+  "$raw = New-Object System.Security.AccessControl.RawSecurityDescriptor($acl.GetSecurityDescriptorSddlForm('Owner, Access'))",
+  '$dacl = $raw.DiscretionaryAcl',
+  "$aces = @(if ($dacl) { $dacl | Where-Object { -not ([int]$_.AceFlags -band 8) } | ForEach-Object { @{ type = [string]$_.AceType; sid = $(if ($_.SecurityIdentifier) { $_.SecurityIdentifier.Value } else { '' }); mask = [int64]$_.AccessMask } } })",
   '$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value',
-  '[Console]::Out.Write((ConvertTo-Json -Compress @{ owner = $acl.GetOwner($sid).Value; granting = $granting; nullDacl = [bool]$null_dacl; user = $user }))',
+  '[Console]::Out.Write((ConvertTo-Json -Compress -Depth 4 @{ owner = $raw.Owner.Value; aces = $aces; nullDacl = [bool](-not $dacl); user = $user }))',
 ].join('; ');
 
 function windowsHelper(command, args, extraEnv = {}) {
@@ -323,14 +429,24 @@ function windowsHelper(command, args, extraEnv = {}) {
   return result.stdout;
 }
 
-/** The ACL report PowerShell prints, reduced to (owner, granting SIDs, current user). */
+/** .NET's AceType names as the rule's ACE type: allow and deny are read, every other type is refused (DEC-0057). */
+const ACE_TYPES = { AccessAllowed: 'allow', AccessDenied: 'deny', AccessAllowedObject: 'allow-object', AccessDeniedObject: 'deny-object',
+  AccessAllowedCallback: 'allow-callback', AccessDeniedCallback: 'deny-callback', AccessAllowedCallbackObject: 'allow-object-callback',
+  AccessDeniedCallbackObject: 'deny-object-callback' };
+
+/**
+ * The ACL report PowerShell prints, as (owner SID, ACEs `{type, sid, mask}`, current user). The mask arrives signed
+ * (GENERIC_READ 0x80000000 is negative in .NET) and is read as the unsigned 32-bit mask; a NULL DACL grants everyone
+ * everything and is read as an allow ACE for Everyone (S-1-1-0).
+ */
 export function parseAclReport(text) {
   const report = JSON.parse(text);
-  const granting = report.nullDacl ? ['S-1-1-0'] : [].concat(report.granting ?? []);
-  return { owner: report.owner ?? '', granting, user: report.user };
+  const aces = report.nullDacl ? [{ type: 'allow', sid: 'S-1-1-0', mask: 0x1f01ff }]
+    : [].concat(report.aces ?? []).map((ace) => ({ type: ACE_TYPES[ace.type] ?? String(ace.type), sid: ace.sid, mask: Number.isInteger(ace.mask) ? ace.mask >>> 0 : ace.mask }));
+  return { owner: report.owner ?? '', aces, user: report.user };
 }
 
-/** (owner SID, SIDs of every allow ACE on the file itself, the current user's SID). */
+/** (owner SID, the ACEs on the file itself, the current user's SID). */
 export function windowsAcl(file) {
   return parseAclReport(windowsHelper('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT], { FABRIC_ACL_PATH: file }));
 }
@@ -356,13 +472,14 @@ export function windowsProtect(target, { folder }) {
 }
 
 function windowsTokenProblem(file, info) {
-  if (!info.isFile()) return `Token file ${file} is not a regular file (a link or junction); refusing it.`;
   const profile = fs.realpathSync.native(process.env.USERPROFILE || os.homedir()).toLowerCase();
   const real = fs.realpathSync.native(file).toLowerCase();
   const inside = path.win32.relative(profile, real);
-  if (!inside || inside.startsWith('..') || path.win32.isAbsolute(inside)) return `Token file ${file} lies outside the user's profile; refusing it.`;
-  const { owner, granting, user } = windowsAcl(file);
-  return tokenAclProblem(file, owner, granting, user);
+  const { owner, aces, user } = windowsAcl(file);
+  return tokenFileProblem(file, {
+    isRegularFile: info.isFile(), isReparsePoint: info.isSymbolicLink(),
+    realPathInProfile: Boolean(inside) && !inside.startsWith('..') && !path.win32.isAbsolute(inside), ownerSid: owner, aces,
+  }, user);
 }
 
 export function tokenMatches(presented, token, scheme = 'Bearer') {
@@ -431,6 +548,10 @@ export function validateDescriptor(d) {
     problems.push('a launchd service declares label and plist');
   }
   if (life.plist !== undefined && !LOCAL_PATH.test(String(life.plist))) problems.push('lifecycle.plist must be a local path');
+  // DEC-0057: a descriptor names one supervisor; launchd's label and plist never sit beside another.
+  for (const field of ['label', 'plist']) {
+    if (life[field] !== undefined && ['systemd', 'task-scheduler'].includes(manager)) problems.push(`lifecycle.${field} belongs to launchd, not to ${manager}`);
+  }
   // DEC-0032: `unit` goes with systemd and `task` with Task Scheduler, and with nothing else.
   for (const [field, owner, pattern] of [['unit', 'systemd', UNIT], ['task', 'task-scheduler', TASK]]) {
     if (manager === owner && life[field] === undefined) problems.push(`a ${owner} service declares ${field}`);
@@ -1564,6 +1685,11 @@ function plain(value, what) {
   return value;
 }
 
+/** The supervisor file's writer writes the marker itself; one already in the arguments could only disagree with it. */
+function noMarkerArgument(argv) {
+  if (markerArguments(argv).length) throw new ServiceError(`${SUPERVISOR_ARG} is written by the supervisor file's writer; leave it out of the program arguments.`);
+}
+
 function noSecretInSupervisorFile(argv, environment) {
   // No supervisor file carries a secret (service.md): not in an argument, an environment name or its value.
   for (const arg of argv) {
@@ -1592,7 +1718,8 @@ export function systemdUnit(unit, programArguments, { workingDirectory, environm
   const env = { ...environment };
   for (const name of Object.keys(env)) if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new ServiceError(`Environment name ${JSON.stringify(name)} is not a variable name.`);
   noSecretInSupervisorFile(argv, env);
-  env[SUPERVISOR_ENV] ??= 'systemd';
+  noMarkerArgument(programArguments.map(String));
+  env[SUPERVISOR_ENV] = 'systemd'; // the unit's writer writes the marker, whatever the caller passed
   const cwd = plain(String(workingDirectory), 'The working directory');
   if (!cwd.startsWith('/')) throw new ServiceError("A systemd unit's working directory is absolute.");
   return [
@@ -1666,6 +1793,10 @@ export function taskXml(task, programArguments, { workingDirectory, description,
   plain(String(workingDirectory), 'The working directory');
   plain(description ?? task, 'The description');
   noSecretInSupervisorFile(argv, {});
+  noMarkerArgument(argv);
+  // A task's Exec action carries no environment, so the marker is an argument (DEC-0057), before any `--`.
+  const cut = argv.includes('--') ? argv.indexOf('--') : argv.length;
+  argv.splice(cut, 0, SUPERVISOR_ARG, 'task-scheduler');
   const who = user ?? (process.env.USERNAME ? `${process.env.USERDOMAIN ?? ''}\\${process.env.USERNAME}` : '');
   if (!who) throw new ServiceError('Name the user the task runs as (DOMAIN\\user); USERNAME is not set.');
   plain(who, 'The user');

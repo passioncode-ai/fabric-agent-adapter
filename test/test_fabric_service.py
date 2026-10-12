@@ -41,8 +41,9 @@ def open_to_others(path):
 
 def assert_private(case, path):
     if os.name == "nt":
-        owner, granting = fs.windows_acl(path)
-        case.assertIsNone(fs.token_acl_problem(path, owner, granting, fs.windows_user_sid()))
+        owner, aces = fs.windows_acl(path)
+        file = {"isRegularFile": True, "isReparsePoint": False, "realPathInProfile": True, "ownerSid": owner, "aces": aces}
+        case.assertIsNone(fs.windows_token_acl_problem(file, fs.windows_user_sid()))
     else:
         case.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
 

@@ -1,0 +1,667 @@
+{
+  "about": "The Windows token-file reader rule of service.md Windows token files (DEC-0032, DEC-0033, DEC-0057, FAC-SEM-079) on what a reader has already read, for the kits' ports. windowsTokenAclProblem in src/windows-token.ts runs these; problem null means the reader may read the file, otherwise the first refusal and the SID it names. Masks are FILE_ALL_ACCESS (2032127) and FILE_GENERIC_READ (1179785); the user SIDs are examples. mask is the ACE's unsigned 32-bit access mask: a reader that reads it signed (.NET FileSystemRights, where GENERIC_READ 0x80000000 arrives negative) converts it first (>>> 0, (uint)). A sub-authority is at most 4294967295; a SID compares case-insensitively on its S; at, where given, is the instance path of the refusal.",
+  "currentUserSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+  "cases": [
+    {
+      "name": "the writer's protected ACL, owned by the user",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "owned by Administrators: an elevated administrator wrote it (DEC-0033)",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-32-544",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "owned by SYSTEM",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-18",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "only the user's ACE",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "a deny ACE for Everyone is ignored",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "deny",
+            "sid": "S-1-1-0",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "an allow ACE with an empty mask grants nothing",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-11",
+            "mask": 0
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "SIDs compare case-insensitively on the S",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "s-1-5-32-544",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "an Everyone ACE is refused",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-1-0",
+            "mask": 1179785
+          }
+        ]
+      },
+      "problem": "ace-sid",
+      "sid": "S-1-1-0"
+    },
+    {
+      "name": "an Authenticated Users ACE is refused",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-11",
+            "mask": 1179785
+          }
+        ]
+      },
+      "problem": "ace-sid",
+      "sid": "S-1-5-11"
+    },
+    {
+      "name": "a BUILTIN\\Users ACE is refused",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-545",
+            "mask": 1179785
+          }
+        ]
+      },
+      "problem": "ace-sid",
+      "sid": "S-1-5-32-545"
+    },
+    {
+      "name": "a left-behind CREATOR OWNER ACE is refused",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-3-0",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "ace-sid",
+      "sid": "S-1-3-0"
+    },
+    {
+      "name": "another user's ACE is refused",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1002",
+            "mask": 1179785
+          }
+        ]
+      },
+      "problem": "ace-sid",
+      "sid": "S-1-5-21-1004336348-1177238915-682003330-1002"
+    },
+    {
+      "name": "owned by another user",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1002",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "owner",
+      "sid": "S-1-5-21-1004336348-1177238915-682003330-1002"
+    },
+    {
+      "name": "owned by Everyone",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-1-0",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "owner",
+      "sid": "S-1-1-0"
+    },
+    {
+      "name": "an ACE of a type the rule does not read",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow-callback",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "ace-type",
+      "sid": "S-1-5-21-1004336348-1177238915-682003330-1001"
+    },
+    {
+      "name": "a reparse point (a symlink or a junction)",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": true,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "reparse-point"
+    },
+    {
+      "name": "a directory",
+      "file": {
+        "isRegularFile": false,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "not-regular-file"
+    },
+    {
+      "name": "a real path outside the profile",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": false,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "outside-profile"
+    },
+    {
+      "name": "an unreadable owner",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "BUILTIN\\Administrators",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "unreadable"
+    },
+    {
+      "name": "an unreadable trustee",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "Everyone",
+            "mask": 1179785
+          }
+        ]
+      },
+      "problem": "unreadable"
+    },
+    {
+      "name": "an unreadable mask",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": -1
+          }
+        ]
+      },
+      "problem": "unreadable"
+    },
+    {
+      "name": "a mask above 32 bits",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 4294967296
+          }
+        ]
+      },
+      "problem": "unreadable"
+    },
+    {
+      "name": "no ACL read",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": "D:P(A;;FA;;;SY)"
+      },
+      "problem": "unreadable"
+    },
+    {
+      "name": "GENERIC_READ (2147483648, unsigned) for Everyone is refused",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-1-0",
+            "mask": 2147483648
+          }
+        ]
+      },
+      "problem": "ace-sid",
+      "sid": "S-1-1-0"
+    },
+    {
+      "name": "GENERIC_READ (2147483648, unsigned) for the user is accepted",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2147483648
+          }
+        ]
+      },
+      "problem": null
+    },
+    {
+      "name": "a deny ACE naming an unreadable SID",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "deny",
+            "sid": "S-1-5-32-abc",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "unreadable"
+    },
+    {
+      "name": "an owner whose sub-authority exceeds 32 bits",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-4294967296",
+        "aces": [
+          {
+            "type": "allow",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-18",
+            "mask": 2032127
+          },
+          {
+            "type": "allow",
+            "sid": "S-1-5-32-544",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "unreadable"
+    },
+    {
+      "name": "an ACE without a type",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "unreadable",
+      "at": "/file/aces/0/type"
+    },
+    {
+      "name": "an ACE whose type is not a string",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": 0,
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "unreadable",
+      "at": "/file/aces/0/type"
+    },
+    {
+      "name": "an object callback ACE (OA/XA) is refused",
+      "file": {
+        "isRegularFile": true,
+        "isReparsePoint": false,
+        "realPathInProfile": true,
+        "ownerSid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+        "aces": [
+          {
+            "type": "allow-object-callback",
+            "sid": "S-1-5-21-1004336348-1177238915-682003330-1001",
+            "mask": 2032127
+          }
+        ]
+      },
+      "problem": "ace-type",
+      "sid": "S-1-5-21-1004336348-1177238915-682003330-1001"
+    }
+  ],
+  "source": "fixtures/vectors/windows-token.json"
+}

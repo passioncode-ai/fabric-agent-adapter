@@ -95,16 +95,19 @@ itself (`isSmallOrderKey`), because Node before 26 lets OpenSSL accept a signatu
 
 ## Keys the estate record certifies
 
-A verifier that also reads the estate's record (DEC-0055, [the estate record reference](estate-record.md)) trusts a
-`kid` only while a current revision certifies it for a machine and does not revoke it (DL-14). Pass the current
-verified revision as `estate=` / `{ estate }`, as a value or as a function returning it, to `delegation_gate`,
+A verifier that also reads the estate's record (DEC-0055, DEC-0060, [the estate record reference](estate-record.md))
+trusts a `kid` only while the revision it reads certifies it (DL-14, row 4a, right after the signature). Pass the
+current verified revision as `estate=` / `{ estate }`, as a value or as a function returning it, with
+`estate_applied` / `estateApplied` and `estate_revocations` / `estateRevocations`, to `delegation_gate`,
 `verify_delegation` or `verify_approval`.
-- An uncertified `kid` is refused `unauthenticated` (`approval-invalid` for an approval), with detail
+- An uncertified `kid` is the token's fault: `unauthenticated` (`approval-invalid` for an approval), detail
   `kid-not-certified`.
-- An unreadable record is refused `issuer-unavailable`, with detail `estate-unreadable`.
+- A revision that cannot be read, is outside its window, is lower than the applied one or forks it is the trust
+  source's fault: `issuer-unavailable`, detail `estate-unreadable`, `estate-outside-window`, `estate-rolled-back` or
+  `estate-forked`.
 - Without `estate`, nothing changes.
-- Pass only a revision `verify_estate_record` accepted, and the highest one the machine has applied. The rule trusts
-  what it is given, so an unverified or older revision would certify a key the current one revoked.
+- Every verifier refuses a clock that is not a number of seconds `unknown-state` `no-clock` before row 1: a NaN clock
+  would make every time row false and pass an expired token.
 
 ## What the kit does not do
 
