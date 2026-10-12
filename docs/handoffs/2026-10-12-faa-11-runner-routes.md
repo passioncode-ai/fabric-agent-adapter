@@ -28,8 +28,9 @@ The pin part was done by FAA-14.
   - Both kits match code, path and message.
 - Mutation testing: 23 planted defects, all caught. One more mutant survived at first; the vector "a fractional index
   beside the kind at its floor" was added for it, and it is now caught.
-- The full suites, `test/validate.py` and both strict plugin validations pass. The validate run covers Linux and
-  Windows.
+- `npm test` passes on macOS (401 Python, 105 Node), as do `test/validate.py` and both strict plugin validations.
+- Validate run [38203497306](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/38203497306) is green
+  on Linux, Windows and the plugin job.
 
 **Decisions.**
 
