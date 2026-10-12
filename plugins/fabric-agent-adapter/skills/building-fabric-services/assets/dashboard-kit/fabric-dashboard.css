@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.0.0 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
+/* fabric-dashboard-kit@1.1.0 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
    A Fabric service dashboard shown inside a host pane: usable from 360 CSS px up, navigation always
    reachable, wide content in its own scroll box, one vertical scroller, appearance from the host.
    Copy this file next to fabric-dashboard.js; do not edit it in place. Put the page's own rules in
@@ -196,3 +196,32 @@ pre.fd-scroll, .fd-scroll pre { margin: 0; padding: var(--space-3); font: var(--
 
 /* ---- appearance owned by the host (ED-6) ---- */
 html[data-fd-host-appearance] [data-fd-appearance-control] { display: none !important; }
+
+/* ---- Fabric's button (DEC-0040, FB-1…FB-6; fabric-button.js) ---- */
+/* FB-2: fixed to the bottom-right (bottom-left right-to-left), 16 px plus the safe area; above the content and the
+   sticky chrome (z 10), below the page's dialogs. The page keeps the button's height plus 16 px free at the end. */
+:root { --fd-fb-size: 44px; }
+html.fd-has-fabric-button body { padding-bottom: calc(var(--fd-fb-size) + 2 * var(--space-4) + env(safe-area-inset-bottom, 0px)); }
+.fd-fabric-button-wrap { position: fixed; z-index: 15; bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  right: calc(var(--space-4) + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+[dir="rtl"] .fd-fabric-button-wrap { right: auto; left: calc(var(--space-4) + env(safe-area-inset-left, 0px)); align-items: flex-start; }
+/* FB-3: the mark and the word, 44 × 44 at least; colours from the theme: --ink on --panel (AA), an --edge boundary (3:1). */
+.fd-fabric-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-width: var(--fd-fb-size);
+  min-height: var(--fd-fb-size); padding: 0 var(--space-3); font: 600 var(--t-body) var(--font-ui); color: var(--ink); background: var(--panel);
+  border: 2px solid var(--edge); border-radius: var(--r-pill); cursor: pointer;
+  transition: background-color var(--dur-hover) var(--motion-ease); }
+.fd-fabric-button:hover { background: var(--panel-2); }
+.fd-fabric-button:focus-visible, .fd-fabric-button-item:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.fd-fabric-button-mark { width: 20px; height: 20px; flex: none; }
+@media (max-width: 479.98px) { .fd-fabric-button-label { display: none; } .fd-fabric-button { padding: 0; } }
+/* FB-4: the menu; FB-5: the note when Fabric is absent. */
+.fd-fabric-button-menu { min-width: 240px; max-width: min(360px, calc(100vw - 2 * var(--space-4))); padding: var(--space-1); background: var(--panel);
+  color: var(--ink); border: 1px solid var(--edge); border-radius: var(--r-card); }
+.fd-fabric-button-menu[hidden] { display: none; }
+.fd-fabric-button-item { display: block; padding: var(--space-2) var(--space-3); min-height: var(--fd-fb-size); box-sizing: border-box;
+  color: var(--ink); text-decoration: none; border-radius: var(--r-control); font: var(--t-body)/1.5 var(--font-ui); overflow-wrap: anywhere; }
+.fd-fabric-button-item:hover, .fd-fabric-button-item:focus { background: var(--panel-2); }
+.fd-fabric-button-note { margin: var(--space-1) 0 0; padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border-strong);
+  font: var(--t-body)/1.5 var(--font-ui); color: var(--ink); }
+.fd-fabric-button-note[hidden] { display: none; }
+.fd-fabric-button-get { color: var(--ink); text-decoration: underline; }

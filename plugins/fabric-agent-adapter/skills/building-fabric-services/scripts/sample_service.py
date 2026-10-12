@@ -33,10 +33,12 @@ VERSION = "0.1.0"
 # in the well-known document only when the kit is there to serve.
 KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
 KIT_FILES = {"/kit/fabric-dashboard.css": ("fabric-dashboard.css", "text/css; charset=utf-8"),
-             "/kit/fabric-dashboard.js": ("fabric-dashboard.js", "text/javascript; charset=utf-8")}
+             "/kit/fabric-dashboard.js": ("fabric-dashboard.js", "text/javascript; charset=utf-8"),
+             "/kit/fabric-button.js": ("fabric-button.js", "text/javascript; charset=utf-8")}  # DEC-0040, FB-7
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>{name}</title>
 <link rel="stylesheet" href="/kit/fabric-dashboard.css"><script src="/kit/fabric-dashboard.js" defer></script>
+<script src="/kit/fabric-button.js" defer data-service="{agent}" data-service-name="{name}"></script>
 </head><body><div class="fd-chrome"><header class="fd-header"><p class="fd-title">{name}</p>
 <span class="fd-chip fd-s-ok"><span class="fd-dot"></span>Status: {status}</span></header>
 <nav class="fd-nav" aria-label="Sections"><ul class="fd-nav-list"><li><a href="#events" aria-current="page">Events</a></li>
@@ -227,7 +229,7 @@ def make_handler(svc: Service):
                     return self._send(401, "Open this dashboard from Fabric Dashboards.", content_type="text/plain")
                 rows = "".join("<li>%s — %s</li>" % (html.escape(e["at"]), html.escape(e["text"]))
                                for e in reversed(svc.log.fetch(None, 20)))
-                return self._send(200, PAGE.format(name=html.escape(svc.name), status="ready", rows=rows),
+                return self._send(200, PAGE.format(name=html.escape(svc.name), agent=html.escape("%s.%s" % (svc.id, svc.instance)), status="ready", rows=rows),
                                   content_type="text/html; charset=utf-8")
             self._send(404, {"error": "Not found."})
 

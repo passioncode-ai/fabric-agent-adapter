@@ -1,0 +1,489 @@
+{
+ "about": "fabric:// link cases; expected answers from the contract's parseFabricLink and buildFabricLink at the pin (make_link_vectors.mjs). Do not edit by hand.",
+ "parse": [
+  {
+   "url": "fabric://chat?service=example-agent.default&project=project-a",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "service": "example-agent.default",
+     "project": "project-a"
+    },
+    "ignored": []
+   }
+  },
+  {
+   "url": "fabric://chat?project=urn%3Aproject%3Aa",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "project": "urn:project:a"
+    },
+    "ignored": []
+   }
+  },
+  {
+   "url": "fabric://CHAT?service=example-agent",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "not fabric://chat or fabric://session/new"
+    ]
+   }
+  },
+  {
+   "url": "FABRIC://chat?service=example-agent",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "service": "example-agent"
+    },
+    "ignored": []
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&access_token=abc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter access_token could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&note=Bearer%20abc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter note could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&service=other-agent",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "service is given 2 times"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&session_id=abc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter session_id could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&token=abc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter token could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&zipcode=1",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "service": "example-agent"
+    },
+    "ignored": [
+     "zipcode"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=Example%20Agent",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "service is not a valid agent id"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "a chat link names a service, a project or both"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat/?project=project-a&utm_source=dashboard&theme=ocean#top",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "project": "project-a"
+    },
+    "ignored": [
+     "utm_source",
+     "theme"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=..%2Fetc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "project is not a valid project id or slug"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=a",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "session.new",
+     "project": "a"
+    },
+    "ignored": []
+   }
+  },
+  {
+   "url": "fabric://session/new?project=a&api_key=abc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter api_key could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=a&code=f3a9c1",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter code could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=a&runner=Claude",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "runner is not a valid runner kind"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=urn%3Aproject%3Aa&runner=claude-code",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "session.new",
+     "project": "urn:project:a",
+     "runner": "claude-code"
+    },
+    "ignored": []
+   }
+  },
+  {
+   "url": "fabric://session/new?runner=codex",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "a session link names its project"
+    ]
+   }
+  },
+  {
+   "url": "fabric://tasks/new?project=a",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "not fabric://chat or fabric://session/new"
+    ]
+   }
+  },
+  {
+   "url": "fabric://user@chat?service=example-agent",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "not fabric://chat or fabric://session/new"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&ref=eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJl",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter ref could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&x=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "a link is at most 2048 characters"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&refreshToken=x",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter refreshToken could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&apiKeys=x",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter apiKeys could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&initialPrompt=hello",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter initialPrompt carries words to act on; a link carries ids only"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent#access_token=abc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the fragment could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent#auth-settings",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "service": "example-agent"
+    },
+    "ignored": []
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&ref=Zk9y+ZXRUaGlzSXNBU2VjcmV0S2V5MTIzNDU2Nzg5MA+abc",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter ref could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&commit=0123456789abcdef0123456789abcdef01234567",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "service": "example-agent"
+    },
+    "ignored": [
+     "commit"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&key=",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter key could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=project-a&runner=claude-code&runner=codex",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "runner is given 2 times"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=Example%20Agent&project=project-a",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "service is not a valid agent id"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=project-a&authToken=abc123",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter authToken could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent#eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ4In0.c2ln",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the fragment could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&themeCode=ocean&sortKey=updated&countryCode=PL&primaryKey=7&tokenizer=bpe#auth-settings",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "service": "example-agent"
+    },
+    "ignored": [
+     "themeCode",
+     "sortKey",
+     "countryCode",
+     "primaryKey",
+     "tokenizer"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&ref=see.eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJ4In0.c2ln",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter ref could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&ref=Zk9yZ2V0VGhpc0lzQVNlY3JldEtleTEyMzQ1Njc4OTA",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter ref could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent.default&project=project-a&utm_source=dashboard",
+   "expected": {
+    "ok": true,
+    "link": {
+     "action": "chat",
+     "service": "example-agent.default",
+     "project": "project-a"
+    },
+    "ignored": [
+     "utm_source"
+    ]
+   }
+  },
+  {
+   "url": "fabric://session/new?project=project-a&code=f3a9c1",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter code could carry a credential; a link never does"
+    ]
+   }
+  },
+  {
+   "url": "fabric://chat?service=example-agent&prompt=Delete%20every%20draft",
+   "expected": {
+    "ok": false,
+    "problems": [
+     "the parameter prompt carries words to act on; a link carries ids only"
+    ]
+   }
+  }
+ ],
+ "build": [
+  {
+   "link": {
+    "action": "chat",
+    "service": "example-agent.default",
+    "project": "project-a"
+   },
+   "expected": "fabric://chat?service=example-agent.default&project=project-a"
+  },
+  {
+   "link": {
+    "action": "chat",
+    "service": "example-agent"
+   },
+   "expected": "fabric://chat?service=example-agent"
+  },
+  {
+   "link": {
+    "action": "chat",
+    "project": "urn:project:a"
+   },
+   "expected": "fabric://chat?project=urn%3Aproject%3Aa"
+  },
+  {
+   "link": {
+    "action": "session.new",
+    "project": "project-a",
+    "runner": "claude-code"
+   },
+   "expected": "fabric://session/new?project=project-a&runner=claude-code"
+  },
+  {
+   "link": {
+    "action": "session.new",
+    "project": "project-a"
+   },
+   "expected": "fabric://session/new?project=project-a"
+  },
+  {
+   "link": {
+    "action": "chat"
+   },
+   "throws": true
+  },
+  {
+   "link": {
+    "action": "chat",
+    "service": "Example Agent"
+   },
+   "throws": true
+  },
+  {
+   "link": {
+    "action": "session.new",
+    "project": "a b"
+   },
+   "throws": true
+  },
+  {
+   "link": {
+    "action": "session.new",
+    "project": "Zk9yZ2V0VGhpc0lzQVNlY3JldEtleTEyMzQ1Njc4OTA"
+   },
+   "throws": true
+  }
+ ]
+}

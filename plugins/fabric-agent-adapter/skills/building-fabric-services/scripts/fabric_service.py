@@ -43,7 +43,7 @@ EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/service
 # The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
 # document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
-DASHBOARD_KIT = "fabric-dashboard-kit@1.0.0"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.0"
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 EXIT_ALREADY_RUNNING = 75
 # Lifecycle contract (fabric-workspace knowledge/lifecycle.md). A launchd-supervised copy that finds

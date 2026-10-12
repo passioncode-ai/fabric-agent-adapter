@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
 KIT_NAME = "fabric-dashboard-kit"
-COPIED = ("fabric-dashboard.css", "fabric-dashboard.js")
+COPIED = ("fabric-dashboard.css", "fabric-dashboard.js", "fabric-button.js")  # fabric-button.js: DEC-0040, FB-7
 MARKER = re.compile(r"fabric-dashboard-kit@(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?")
 CSS_BEGIN, CSS_END = "/* fabric-dashboard-kit:themes:begin */", "/* fabric-dashboard-kit:themes:end */"
 JS_BEGIN, JS_END = "/* fabric-dashboard-kit:theme-ids:begin */", "/* fabric-dashboard-kit:theme-ids:end */"
@@ -125,7 +125,10 @@ def build(kit_dir: Path = KIT_DIR, check: bool = False) -> List[str]:
     new_js = replace_between(js, JS_BEGIN, JS_END, "  var THEMES = %s;" % json.dumps(ids).replace('"', "'"), js_path.name)
     manifest = load_manifest(kit_dir)
     version = manifest["version"]
-    for text, name in ((new_css, css_path.name), (new_js, js_path.name)):
+    built = {css_path.name: new_css, js_path.name: new_js}
+    for name in COPIED:
+        built.setdefault(name, (kit_dir / name).read_text(encoding="utf-8"))
+    for name, text in built.items():
         if claimed_version_text(text) != version:
             raise KitError("%s says %s, kit.json says %s; raise them together." % (name, claimed_version_text(text), version))
     import hashlib
@@ -135,7 +138,7 @@ def build(kit_dir: Path = KIT_DIR, check: bool = False) -> List[str]:
             changed.append(path.name)
             if not check:
                 atomic_write(path, text)
-    digest = {name: hashlib.sha256((new_css if name.endswith(".css") else new_js).encode("utf-8")).hexdigest() for name in COPIED}
+    digest = {name: hashlib.sha256(built[name].encode("utf-8")).hexdigest() for name in COPIED}
     digest["themes.json"] = sha256(kit_dir / "themes.json")
     new_manifest = dict(manifest)
     new_manifest["themes"] = ids
@@ -199,7 +202,7 @@ def repo_root(start: Path) -> Optional[Path]:
 
 def find_copies(repo: Path) -> List[Path]:
     listed = git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--",
-                 "*fabric-dashboard.css", "*fabric-dashboard.js")
+                 "*fabric-dashboard.css", "*fabric-dashboard.js", "*fabric-button.js")
     if listed is not None:
         paths = [repo / p for p in listed.split("\0") if p]
     else:
