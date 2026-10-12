@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.17.0 - 2026-10-12
+
+The organisation's lifecycle rules LC-19 and LC-21 apply to what the adapter ships and checks (FAA-22, FAA-23):
+no plugin starts a stdio MCP server in every session, and no credential travels in argv or a URL query.
+
+### Added
+
+- **`adapt_project.py check`** refuses:
+  - **LC-19:** a Claude Code plugin in the project that declares a stdio MCP server, whether in its `.mcp.json` or in
+    `plugin.json` `mcpServers`, because it starts in every session that enables the plugin. An HTTP entry to a
+    resident service passes.
+  - **LC-21:** a launch argument or a URL that carries a credential, in the manifest's connections and in the plugin
+    servers' argv, URL and env.
+
+  `scaffold` refuses a runtime argument that carries a credential.
+- **`fabric_provider.py`** refuses a credential in `run.mcp.stdio.command` (LC-21, FAC-SEM-057). The key goes in
+  `env` as a secret reference.
+- **`test/validate.py` gate:** the adapter's own plugin declares no MCP server and no hook command carries a
+  credential.
+- The detector is the contract's (`fabric_secrets`, 0.16.0). The adapting skill carries an identical copy, so it
+  works installed alone, and a test keeps the two copies byte-identical.
+- Docs: the adapting skill's check step, `provider-entry.md`, and `surfaces-and-auth.md` (an HTTP registration
+  starts nothing per session). The scenario eval `plugin-and-argv-hygiene` came first. Five planted defects were
+  each caught.
+
 ## 0.16.0 - 2026-10-12
 
 Runner and model profiles in both kits (contract DEC-0046, Fabric ADR-0147; FAA-19). The contract's credential

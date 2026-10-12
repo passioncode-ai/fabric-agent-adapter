@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.16.0"
+  version: "0.17.0"
   contract-version: "0.1.0"
   contract-commit: "0cacd08b0e95b6abf131eae1206b60792138bc3c"
 ---
@@ -172,6 +172,12 @@ When the exact contract checkout and dependencies are available, run:
 python3 <skill-dir>/scripts/adapt_project.py check <project-root> \
   --contract /path/to/fabric-agent-contract --json
 ```
+
+The local check also refuses two lifecycle faults (LC-19, LC-21): a Claude Code plugin in
+the project that declares a stdio MCP server — it starts in every session that enables the
+plugin; serve it over HTTP from one resident process or register it at project scope — and a
+credential in a launch argument or a URL query, where every process and every log can read it.
+Fix both at their cause; never weaken the check.
 
 Load [verification](references/verification.md) before interpreting or publishing the
 result. Fix every local error. Fix every placeholder warning or record why the bundle is

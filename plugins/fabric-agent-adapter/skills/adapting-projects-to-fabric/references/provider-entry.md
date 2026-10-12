@@ -35,7 +35,8 @@ python3 scripts/fabric_provider.py remove example-agent      # the uninstaller
 `--stdio` takes the rest of the line as the argument array; there is no shell string. An entry may carry
 `run.mcp.stdio.scope` (DEC-0044): `project` (started for the sessions of a project that binds it) or `on-demand`;
 `session` — a server in every coding session — is refused (FAC-SEM-056, LC-19). The validator accepts the field; the
-writer does not set it until Fabric reads it.
+writer does not set it until Fabric reads it. An argument that carries a credential is refused
+(LC-21, FAC-SEM-057): a key goes in `env` as a `secret-ref:<name>`, never in argv.
 
 It refuses, with one sentence that never quotes a value:
 
