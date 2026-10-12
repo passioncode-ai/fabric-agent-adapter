@@ -1,0 +1,6 @@
+# 2026-10-11, this Mac, the operator's real ~/.claude.json (310413 bytes; fabric not registered), Fabric 0.3.x running (hub.json with no features)
+# load average at the start: 218 220 191
+python3 -S -c pass (the floor): median 65 ms
+hook session-start: median 282 ms, max 418 ms, exit 0, no output (10 runs)
+hook stop: median 271 ms, max 673 ms, exit 0, no output (10 runs)
+hook session-end: median 329 ms, max 414 ms, exit 0, no output (10 runs)

@@ -1,0 +1,38 @@
+{
+  "skill": "working-with-fabric",
+  "queries": [
+    {"query": "Connect this Claude Code session to Fabric and claim my task before I start.", "shouldTrigger": true},
+    {"query": "How do I register fabric-mcp in Codex?", "shouldTrigger": true},
+    {"query": "fabric_whoami says it is waiting for the operator — what now?", "shouldTrigger": true},
+    {"query": "Fabric is not running; start it and then report my progress to it.", "shouldTrigger": true},
+    {"query": "Before touching this repo, ask Fabric who else is working on it.", "shouldTrigger": true},
+    {"query": "fabric_work_claim refused: held by another agent. How should I proceed?", "shouldTrigger": true},
+    {"query": "Create a Fabric task for backlog row FAA-18 without copying the row.", "shouldTrigger": true},
+    {"query": "Release my Fabric claim and hand the work over at the end of this session.", "shouldTrigger": true},
+    {"query": "Подключи этого агента к Fabric и возьми задачу через fabric_work_claim.", "shouldTrigger": true},
+    {"query": "Работай через Fabric: сначала fabric_whoami, потом отчёт по этапам.", "shouldTrigger": true},
+    {"query": "Зарегистрируй fabric-mcp в Claude Code без секрета.", "shouldTrigger": true},
+    {"query": "Фабрика не запущена — подними её через брокер и продолжай.", "shouldTrigger": true},
+    {"query": "Check the Fabric project board for unread messages before you start.", "shouldTrigger": true},
+    {"query": "Ask the project that owns the analytics service, through Fabric, whether its retention numbers are final.", "shouldTrigger": true},
+    {"query": "Reply to the board message the other project sent us in Fabric.", "shouldTrigger": true},
+    {"query": "I'm waiting for an answer on the project board — tell me when mail arrives.", "shouldTrigger": true},
+    {"query": "Проверь доску проекта в Fabric: есть ли непрочитанные сообщения?", "shouldTrigger": true},
+    {"query": "Спроси другой проект через доску Fabric (com.submit), готов ли их API.", "shouldTrigger": true},
+
+    {"query": "Adapt this existing MCP server to the Fabric Agent Contract.", "shouldTrigger": false},
+    {"query": "Create a new Fabric-compatible agent from scratch.", "shouldTrigger": false},
+    {"query": "Turn this agent into an always-on Fabric service with a dashboard.", "shouldTrigger": false},
+    {"query": "Fix the enrollment bug in Fabric's sessionEnroll.ts.", "shouldTrigger": false},
+    {"query": "Add the Notion MCP server to my Claude Code config.", "shouldTrigger": false},
+    {"query": "Take a lease on CHANGELOG.md with agent-sync before editing it.", "shouldTrigger": false},
+    {"query": "Сделай существующего агента совместимым с Fabric.", "shouldTrigger": false},
+    {"query": "Напиши Stop-хук для Claude Code, который форматирует код.", "shouldTrigger": false},
+    {"query": "Explain what the Fabric Agent Contract's provider manifest contains.", "shouldTrigger": false},
+    {"query": "Restart the Copylot app through the lifecycle broker.", "shouldTrigger": false},
+    {"query": "Build a responder service that answers com.submit requests for my project.", "shouldTrigger": false},
+    {"query": "Implement com.reply in Fabric's boardService.ts.", "shouldTrigger": false},
+    {"query": "Send the operator a Telegram message that the release is out.", "shouldTrigger": false},
+    {"query": "Напиши коллеге в Slack, что ревью готово.", "shouldTrigger": false}
+  ]
+}

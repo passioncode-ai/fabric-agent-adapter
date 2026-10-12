@@ -1,5 +1,5 @@
 {
-  "description": "One line at session start in a repository whose Fabric dashboard has no dashboard kit or an older one (fabric-dashboard/0.1, DEC-0036). Silent everywhere else; reads only, never writes, always exits 0.",
+  "description": "Two silent-unless-relevant hook sets. The dashboard-kit notice: one line at session start in a repository whose Fabric dashboard has no kit or an older one (fabric-dashboard/0.1, DEC-0036). The Fabric session hooks (working-with-fabric, COM-04, FAA-12a): at session start the preamble when Claude Code has the MCP server `fabric` (fabric_whoami, then the project board through com.status and com.list, claim and release), and the machine's Fabric-service count; each turn's facts (HEAD, files changed, lines added and removed, never content), the board's unread count and the session's end through Fabric, only when the running Fabric advertises session-hooks/1; at each prompt one line only when the unread count rose. All silent in a session Fabric launched. Every hook reads no token, prints at most one block, always exits 0, and hands any Fabric call to a detached worker with a 10 s deadline.",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,48 @@
           {
             "type": "command",
             "command": "python3 -S \"${CLAUDE_PLUGIN_ROOT}/skills/building-fabric-services/scripts/dashboard_kit.py\" notice",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -S \"${CLAUDE_PLUGIN_ROOT}/skills/working-with-fabric/scripts/fabric_session.py\" hook session-start",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -S \"${CLAUDE_PLUGIN_ROOT}/skills/working-with-fabric/scripts/fabric_session.py\" hook stop",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -S \"${CLAUDE_PLUGIN_ROOT}/skills/working-with-fabric/scripts/fabric_session.py\" hook session-end",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -S \"${CLAUDE_PLUGIN_ROOT}/skills/working-with-fabric/scripts/fabric_session.py\" hook user-prompt-submit",
             "timeout": 5
           }
         ]

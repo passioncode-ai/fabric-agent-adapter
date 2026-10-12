@@ -393,7 +393,7 @@ class Cli(unittest.TestCase):
 
     def test_the_plugin_hook_runs_the_notice(self):
         hooks = json.loads(HOOKS.read_text(encoding="utf-8"))
-        (entry,) = hooks["hooks"]["SessionStart"]
+        (entry,) = [e for e in hooks["hooks"]["SessionStart"] if "dashboard_kit.py" in e["hooks"][0]["command"]]
         (hook,) = entry["hooks"]
         self.assertEqual(hook["type"], "command")
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/building-fabric-services/scripts/dashboard_kit.py", hook["command"])

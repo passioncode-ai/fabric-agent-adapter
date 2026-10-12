@@ -1,0 +1,7 @@
+# 2026-10-12, this Mac, the operator's real HOME (fabric not registered in Claude Code; Fabric not running: no hub.json)
+# load average at the start: 380 320 273
+python3 -S -c pass (the floor): median 38 ms
+hook session-start: median 205 ms, max 369 ms, exit [0], output yes — the services line only (10 runs)
+hook user-prompt-submit: median 57 ms, max 133 ms, exit [0], output none (10 runs)
+hook stop: median 54 ms, max 105 ms, exit [0], output none (10 runs)
+hook user-prompt-submit, a rising count spooled (throwaway HOME): median 55 ms, max 105 ms, exit 0, one line each (10 runs)

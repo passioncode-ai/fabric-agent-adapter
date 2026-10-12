@@ -19,12 +19,14 @@
 Fabric Agent Adapter: makes any agent or existing project Fabric-compatible (a Provider under
 the Fabric Agent Contract) — Agent Skills, reference kits and a conformance probe. It is how an
 agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm installer (`@passioncode-ai/fabric-agent-adapter`). It
-carries three skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
+carries four skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
 and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service
 that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`).
 Agents that are not services get a `fabric-provider/0.1` entry from
-`adapting-projects-to-fabric/scripts/fabric_provider.py`.
+`adapting-projects-to-fabric/scripts/fabric_provider.py`. The fourth, `working-with-fabric`, is the
+other side: a coding agent opened outside Fabric working in a project through it (Fabric 0.4.0 REQ-07),
+with the plugin's Claude Code session hooks (`scripts/fabric_session.py`, COM-04).
 
 ## Commands
 
@@ -49,7 +51,7 @@ with `--strict-mcp-config` and a temporary config.
 
 ## Where things live
 
-- `plugins/fabric-agent-adapter/`: the plugin and its three skills. `.claude-plugin/marketplace.json`
+- `plugins/fabric-agent-adapter/`: the plugin, its four skills and `hooks/hooks.json`. `.claude-plugin/marketplace.json`
   holds the marketplace entry.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
   `test/evals/<skill>/`.
@@ -102,20 +104,39 @@ The org contract is [knowledge/lifecycle.md](https://github.com/passioncode-ai/f
 this repository both obeys it and ships its service layer
 ([`references/lifecycle.md`](plugins/fabric-agent-adapter/skills/building-fabric-services/references/lifecycle.md)).
 
-**Background footprint (LC-09): one session-start hook, nothing resident.** The plugin is skills
-plus one `SessionStart` hook (`plugins/fabric-agent-adapter/hooks/hooks.json`, matcher
-`startup|resume`): `dashboard_kit.py notice` reads the repository (`git rev-parse`, `git ls-files`,
-`git grep`) and the services directory, prints one line when the repository's dashboard has no
-dashboard kit or an older one, and exits 0 — always, within its 5 s timeout; it writes nothing.
-Measured on this machine under a load average of about 50: median 294–443 ms per session start
-(Python start-up about 45 ms; each repository step 15–46 ms in-process). No `.mcp.json`, no launchd
-job, no port, no per-session server, no login item. Nothing idles; there is nothing to stop.
-`install.sh` and `bin/fabric-agent-adapter.js` run once when a person calls them and exit.
+**Background footprint (LC-09): five session hooks, nothing resident.** The plugin is skills plus
+`plugins/fabric-agent-adapter/hooks/hooks.json`:
+
+- `SessionStart` (matcher `startup|resume`): `dashboard_kit.py notice` reads the repository (`git rev-parse`,
+  `git ls-files`, `git grep`) and the services directory, prints one line when the repository's dashboard has no
+  dashboard kit or an older one, and exits 0 — always, within its 5 s timeout; it writes nothing. Measured under a
+  load average of about 50: median 294–443 ms per session start.
+- `SessionStart`, `Stop`, `UserPromptSubmit`, `SessionEnd`: `fabric_session.py hook …` (working-with-fabric). Session
+  start reads `~/.claude.json`, Fabric's `hub.json` and the services directory, and prints the preamble only when
+  `fabric` is registered (plus one line when the machine has Fabric service descriptors). Stop and SessionEnd read
+  `hub.json` first and return, writing nothing, unless the running Fabric advertises `session-hooks/1`; then they
+  write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**
+  (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` with a 10 s deadline, reads the board's unread
+  count (`com.status`) after a turn, and exits. UserPromptSubmit reads two small files in that spool and calls
+  nothing. Every one is silent in a session Fabric launched. Measured 2026-10-11 under a load average of about 220,
+  with the feature absent: medians 282 / 271 / 329 ms for start / stop / end, of which 65 ms is Python's own start
+  ([raw](docs/reports/2026-10-11-working-with-fabric/raw/hook-timing.log)); the prompt hook is measured in
+  [FAA-12a's raw](docs/reports/2026-10-12-faa-12a-board-participants/raw/hook-timing.log).
+- Codex and Kimi Code: `fabric_session.py hook session-start --host codex|kimi`, only where the person added it with
+  `install-host-hooks --apply`; it prints the preamble and exits.
+
+No `.mcp.json`, no launchd job, no port, no per-session server, no login item. Nothing idles on its own; the one
+long-lived process, `watch-mail`, runs only while an agent waits on the board, under that agent's watcher. `install.sh` and `bin/fabric-agent-adapter.js` run once when a person calls them and exit.
 
 | What | Started by | Cadence | With no window | Stopped by | Idle budget |
 |---|---|---|---|---|---|
 | `install.sh`, `npx @passioncode-ai/fabric-agent-adapter` | a person | on demand | nothing | exits when done | 0 |
 | `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or resume | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
+| `fabric_session.py hook session-start\|stop\|session-end` (plugin hooks) | Claude Code | per session start, per turn, per session end | nothing | exits when done (≤ 5 s timeout) | 0 |
+| `fabric_session.py hook user-prompt-submit` (plugin hook) | Claude Code | per prompt | nothing | exits when done (≤ 5 s timeout) | 0 |
+| `fabric_session.py hook session-start --host codex\|kimi` | Codex / Kimi Code, only after `install-host-hooks --apply` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
+| `fabric_session.py watch-mail` | a Claude Code agent, under its own background watcher, while it waits on the board | one look per interval (≥ 10 s, default 60 s ± 20 %; backoff to 15 min while Fabric is down) | nothing | its stdin's end, SIGTERM/SIGINT/SIGHUP, or its parent gone | 0 between looks (a sleeping process; each look one `fabric-mcp --rejoin-only` with a 10 s deadline) |
+| `fabric_session.py deliver` (detached worker) | the Stop / SessionEnd hook, only when Fabric advertises `session-hooks/1` | per turn, one per session at a time | finishes its spool | its own 10 s deadline; closes `fabric-mcp`'s stdin, then kills it | 0 |
 | Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`), a systemd user unit (`Restart=always`) or a per-user Scheduled Task (logon trigger) | resident | the service | `launchctl bootout` + `disable` or `launchd_uninstall`; `systemctl --user disable --now` or `systemd_uninstall`; `schtasks /End` + `/Change /DISABLE` or `task_uninstall` | declared by each service in its own `AGENTS.md` |
 | Test suites (`npm test`) | a person or CI | on demand | nothing | exit; the lifecycle tests kill their own children in `finally` | 0 |
 

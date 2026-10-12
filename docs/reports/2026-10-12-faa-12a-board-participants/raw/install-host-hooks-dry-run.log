@@ -1,0 +1,33 @@
+# 2026-10-12 — install-host-hooks dry runs against this Mac's real files (HOME shown as ~; nothing written)
+$ fabric_session.py install-host-hooks --host codex --dry-run
+install-host-hooks: dry run, nothing is written.
+file: $CODEX_HOME/hooks.json (CODEX_HOME was set in this shell; the script follows it)
+sha256: 59671997f6d79f5eae7132d6c26f0043ee2781ae1c0ecb89475bc19086785075
+would add to hooks.SessionStart:
+{
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python3 -S <checkout>/plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py hook session-start --host codex",
+      "timeout": 5
+    }
+  ]
+}
+Apply it, on the person's go-ahead: fabric_session.py install-host-hooks --host codex --apply --expect-sha256 59671997f6d79f5eae7132d6c26f0043ee2781ae1c0ecb89475bc19086785075
+The hook only prints the preamble at session start (no turn observation, no unread count: Codex cannot rejoin its Fabric session yet). It is silent in a session Fabric launched. Codex may ask you to trust the new hook (/hooks) before it runs.
+exit=0
+$ fabric_session.py install-host-hooks --host kimi --dry-run
+install-host-hooks: dry run, nothing is written.
+file: ~/.kimi-code/config.toml
+sha256: 50579dac74b8ad6c6a3254ed2008bfc16a6fc706aea02c7ca5d35332914d5eca
+would append to:
+# fabric-agent-adapter (working-with-fabric): the Fabric session-start preamble. Remove it with
+# fabric_session.py install-host-hooks --host kimi --remove
+[[hooks]]
+event = "SessionStart"
+command = "python3 -S <checkout>/plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py hook session-start --host kimi"
+timeout = 5
+Apply it, on the person's go-ahead: fabric_session.py install-host-hooks --host kimi --apply --expect-sha256 50579dac74b8ad6c6a3254ed2008bfc16a6fc706aea02c7ca5d35332914d5eca
+The hook only prints the preamble at session start (no turn observation, no unread count: Kimi Code cannot rejoin its Fabric session yet). It is silent in a session Fabric launched.
+exit=0
+# both files byte-identical before and after (sha256 compared)

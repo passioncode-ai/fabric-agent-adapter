@@ -1,0 +1,25 @@
+# gates, 2026-10-11, branch agent/working-with-fabric-20261011 on 7e45e6b + this change, Python 3.14.7, node v26.10.0, 2.1.296 (Claude Code)
+$ python3 test/validate.py
+OK: Fabric Agent Adapter distribution is valid
+exit 0
+$ python3 -m unittest discover -s test -q
+Ran 308 tests in 127.182s
+
+OK (skipped=16)
+exit 0
+$ node --test 'test/*.test.mjs'
+ℹ tests 47
+ℹ pass 47
+ℹ fail 0
+ℹ skipped 0
+exit 0
+$ claude plugin validate ./plugins/fabric-agent-adapter --strict
+Validating plugin manifest: <checkout>/plugins/fabric-agent-adapter/.claude-plugin/plugin.json
+
+✔ Validation passed
+exit 0
+$ claude plugin validate . --strict
+Validating marketplace manifest: <checkout>/.claude-plugin/marketplace.json
+
+✔ Validation passed
+exit 0
