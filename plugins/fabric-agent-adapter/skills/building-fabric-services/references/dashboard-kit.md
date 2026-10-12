@@ -11,6 +11,7 @@ promises so a service does not re-derive them.
 - The rules the page keeps
 - Using the kit
 - Themes and the host's appearance
+- Fabric's button
 - Declaring it
 - Proving it
 - Upgrading an existing dashboard
@@ -79,6 +80,34 @@ controls while it is present; an unknown `theme` is `graphite`. `data-fd-appeara
 what the page applies (declare the same in `appearance`). The page re-reads the cookie when it
 changes (`cookieStore`) and when it becomes visible again.
 
+## Fabric's button
+
+The kit ships Fabric's button (contract DEC-0040, FB-7): one floating menu button that opens Fabric on this
+service. Load it after the stylesheet, with ids only:
+
+```html
+<script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
+        data-project="project-a" data-project-name="Project A"></script>
+```
+
+- **The menu (FB-4):** "Chat with Fabric about *Example Agent*" always; "Open a coding session in *Project A*" when
+  the page knows its project (`data-runner` picks the runner kind). Arrows move, Escape closes and returns focus.
+- **Placement and look (FB-2, FB-3):** bottom-right (bottom-left right-to-left), 16 px off and clear of the safe
+  area, above the sticky chrome and below dialogs; the page keeps its height plus 16 px free at the end of the
+  scroll. The mark and the word *Fabric*, the mark alone below 480 px; the accessible name is always *Open Fabric*;
+  `--ink` on `--panel` with an `--edge` boundary, the pairs the themes are measured on.
+- **Links (FL-1…FL-6):** built with the kit's port of the contract's `buildFabricLink`; a value outside the grammar
+  — or one shaped like a credential — means no button, never a bad link. A press opens a view in Fabric and starts
+  nothing (FB-8).
+- **The host (FB-6):** when the host's `fabric_button` cookie says `owner=host`, the page hides its own button.
+- **Fabric absent (FB-5):** when the cookie says `fabric=absent`, or `data-fabric="absent"` (a local service whose
+  server checked for Fabric's hub document), or when the page is still visible and focused 1.5 s after a link was
+  followed, the menu says "Fabric is not installed — get it at passioncode.ai/fabric". Nothing downloads, nothing
+  retries.
+
+`window.FabricButton` exposes `buildFabricLink`, `parseFabricLink` and `parseButtonCookie` for a page that needs
+them. The button is optional: a page without the script has no button.
+
 ## Declaring it
 
 When the page meets ED-1…ED-6, say so in the well-known document (ED-9):
@@ -125,9 +154,9 @@ operator and update only with their go-ahead** — the page is theirs and may be
 
 ## When something is missing
 
-- **No Python for the CLI:** copy the two files from `assets/dashboard-kit/` by hand and compare the
+- **No Python for the CLI:** copy the files from `assets/dashboard-kit/` by hand and compare the
   first line's version with `kit.json`.
-- **The page is built by a framework:** import the two files as static assets; keep them unbundled
+- **The page is built by a framework:** import the files as static assets; keep them unbundled
   or keep the version marker comment, so `status` can still read the version.
 - **The page needs a fixed width:** not decided by the profile; declare the `minWidth` it needs
   (up to 1280) and say why in the README.

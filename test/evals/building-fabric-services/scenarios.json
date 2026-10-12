@@ -255,6 +255,17 @@
         "keeps money limits and human gates at every tier",
         "requires the trusted issuer (auth.delegation.issuer) in the gate"
       ]
+    },
+    {
+      "id": "fabric-button-on-a-dashboard",
+      "trap": "the page drew its own Fabric button with a hand-written fabric:// link that carried a session token, kept showing it inside Fabric Dashboards beside the host's button, and said nothing when Fabric was not installed",
+      "request": "Add Fabric's button to example-agent's dashboard so the operator can talk to Fabric about this service and its project.",
+      "expected": [
+        "uses the kit's fabric-button.js (FB-7) with data-service, data-service-name and, when the page knows it, data-project and data-project-name; never a hand-built link",
+        "links carry ids only (FL-4): no token, login code, prompt or message; a value the grammar refuses means no button, not a bad link",
+        "hides its own button when the host's fabric_button cookie says owner=host, and shows 'Fabric is not installed — get it at passioncode.ai/fabric' when Fabric is absent (FB-5, FB-6)",
+        "a press opens a view in Fabric and starts nothing by itself (FB-8)"
+      ]
     }
   ]
 }

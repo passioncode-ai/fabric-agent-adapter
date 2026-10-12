@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services"
 SCRIPTS = SKILL / "scripts"
 KIT = SKILL / "assets/dashboard-kit"
+CURRENT = json.loads((KIT / "kit.json").read_text(encoding="utf-8"))["version"]
 HOOKS = ROOT / "plugins/fabric-agent-adapter/hooks/hooks.json"
 KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
 
@@ -159,6 +160,15 @@ class KitFiles(unittest.TestCase):
         self.assertEqual(re.findall(r"#[0-9a-fA-F]{3,8}\b", outside), [])
         self.assertNotIn("@import", self.css)
         self.assertNotRegex(self.css, r"url\(\s*['\"]?https?:")
+
+    def test_fabric_button_colours_are_the_checked_pairs(self):
+        """FB-3: the button's text is --ink on --panel or --panel-2 (4.5:1) and its boundary --edge (3:1), the pairs
+        test_every_theme_meets_aa measures in every theme and scheme; no other colour is used."""
+        block = self.css[self.css.index("/* ---- Fabric's button"):]
+        colours = set(re.findall(r"(?:color|background|border(?:-top)?|outline):[^;]*?var\(--([a-z0-9-]+)\)", block))
+        self.assertTrue(colours)
+        self.assertLessEqual(colours, {"ink", "panel", "panel-2", "edge", "border-strong", "accent"})
+        self.assertIn("edge", colours)
 
     def test_js_is_csp_clean(self):
         for banned in ("eval(", "new Function", "innerHTML", "document.write", "http://", "https://"):
@@ -300,11 +310,11 @@ class Cli(unittest.TestCase):
         target.mkdir()
         (target / "fabric-dashboard.css").write_text(old)
         planned = dk.install(target, dry_run=True, kit_dir=kit)
-        self.assertIn("would be replaced fabric-dashboard.css 0.9.0 with 1.0.0", planned)
+        self.assertIn("would be replaced fabric-dashboard.css 0.9.0 with %s" % CURRENT, planned)
         self.assertEqual((target / "fabric-dashboard.css").read_text(), old)
         self.assertFalse((target / "fabric-dashboard.js").exists())
         done = dk.install(target, kit_dir=kit)
-        self.assertIn("replaced fabric-dashboard.css 0.9.0 with 1.0.0", done)
+        self.assertIn("replaced fabric-dashboard.css 0.9.0 with %s" % CURRENT, done)
         self.assertEqual((target / "fabric-dashboard.css").read_bytes(), (kit / "fabric-dashboard.css").read_bytes())
 
     def test_install_refuses_an_unmarked_file(self):
@@ -354,7 +364,7 @@ class Cli(unittest.TestCase):
         done, elapsed = self.notice(repo, self.base / "none")
         self.assertEqual(done.returncode, 0)
         self.assertEqual(len(done.stdout.strip().splitlines()), 1)
-        self.assertIn("fabric-dashboard-kit 0.9.0; 1.0.0 is current", done.stdout)
+        self.assertIn("fabric-dashboard-kit 0.9.0; %s is current" % CURRENT, done.stdout)
         self.assertIn("tell the operator", done.stdout)
         self.assertLess(elapsed, 2.0)
         (repo / "web/fabric-dashboard.css").write_bytes((KIT / "fabric-dashboard.css").read_bytes())
