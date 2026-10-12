@@ -189,7 +189,8 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" scaffold /path/to/project \
   --provider-name "Demo provider" \
   --capability-id https://agents.example/capabilities/demo \
   --capability-name demo.run \
-  --schema-base https://agents.example/fabric
+  --schema-base https://agents.example/fabric \
+  --effect none
 python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
   --contract /path/to/fabric-agent-contract --json
 ```
@@ -229,8 +230,8 @@ FABRIC_CONTRACT_OLD=/path/to/legacy-contract FABRIC_CONTRACT_NEW=/path/to/curren
 ```
 
 Without both environment variables, those tests explicitly skip as `NOT_RUN`.
-This source checkout is 0.12.0. 0.11.1 is the latest published GitHub/npm release (2026-10-12; 0.7.0 and 0.11.0
-were never released); 0.12.0 is published by its `v0.12.0` tag. Source delivery does not update installed skills or live sessions.
+This source checkout is 0.13.0. 0.12.0 is the latest published GitHub/npm release (2026-10-12; 0.7.0 and 0.11.0
+were never released); 0.13.0 is published by its `v0.13.0` tag. Source delivery does not update installed skills or live sessions.
 
 ## License
 

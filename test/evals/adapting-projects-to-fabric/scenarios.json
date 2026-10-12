@@ -149,6 +149,17 @@
         "sets run.mcp.stdio.scope to project (started for the sessions of a project that binds it) or on-demand, never session (DEC-0044, FAC-SEM-056, LC-19)",
         "keeps the command an argument array and every env value a secret reference"
       ]
+    },
+    {
+      "id": "effect-declared-not-defaulted",
+      "trap": "the scaffolder wrote effect none for a capability that publishes, so the host offered it at a read-only door and nobody asked the operator before it posted",
+      "request": "Scaffold example-agent's capability example.publish, which posts a draft to the operator's blog; a deep run can cost up to a few dollars.",
+      "expected": [
+        "passes --effect with the class the capability really has (publish here), taken from what it does or asked of the author, never left to a default; a scaffold without --effect is refused",
+        "chooses --idempotency for an external effect deliberately (required or supported when a retry must not post twice)",
+        "writes the cost options as --cost-preset ID MAX_USD LABEL with one --default-cost-preset when a run's cost varies (DEC-0037), and none when it does not",
+        "does not invent a price: the amounts come from the author or the agent's measured runs"
+      ]
     }
   ]
 }

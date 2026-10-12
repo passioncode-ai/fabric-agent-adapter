@@ -30,6 +30,10 @@ def scaffold_args(profile: str, force: bool = False) -> argparse.Namespace:
         runtime_arg=[],
         force=force,
         job=False,
+        effect="none",
+        idempotency="none",
+        cost_preset=[],
+        default_cost_preset=None,
     )
 
 
@@ -166,3 +170,68 @@ class CheckTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EffectAndCostTests(unittest.TestCase):
+    """FAA-25 (target architecture v4, Stage 0): every capability's effect is declared, never defaulted, and the
+    manifest carries the costPresets the author gives (DEC-0037)."""
+
+    def manifest(self, **overrides):
+        args = scaffold_args("mcp")
+        for key, value in overrides.items():
+            setattr(args, key, value)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ADAPTER.scaffold_project(root, args)
+            return json.loads((root / "fabric-agent.json").read_text())
+
+    def test_the_declared_effect_and_idempotency_are_written(self):
+        cap = self.manifest(effect="publish", idempotency="required")["capabilities"][0]
+        self.assertEqual((cap["effect"], cap["idempotency"]), ("publish", "required"))
+
+    def test_a_missing_or_unknown_effect_is_refused_never_defaulted(self):
+        for effect in (None, "", "launch"):
+            with self.subTest(effect=effect), self.assertRaises(ADAPTER.AdaptationError):
+                self.manifest(effect=effect)
+        args = scaffold_args("mcp")
+        del args.effect
+        with tempfile.TemporaryDirectory() as temp, self.assertRaises(ADAPTER.AdaptationError):
+            ADAPTER.scaffold_project(Path(temp), args)
+
+    def test_cost_presets_are_written_for_the_capability(self):
+        manifest = self.manifest(cost_preset=[["quick", "0.5", "Quick draft"], ["deep", "3", "Deep research"]], default_cost_preset="quick")
+        self.assertEqual(manifest["costPresets"], [
+            {"id": "quick", "capability": "demo.run", "label": "Quick draft", "maxUsd": 0.5, "default": True},
+            {"id": "deep", "capability": "demo.run", "label": "Deep research", "maxUsd": 3.0},
+        ])
+        self.assertNotIn("costPresets", self.manifest())
+
+    def test_bad_cost_presets_are_refused(self):
+        cases = {
+            "bad id": [["Quick", "1", "x"]],
+            "negative": [["quick", "-1", "x"]],
+            "not a number": [["quick", "lots", "x"]],
+            "not finite": [["quick", "inf", "x"]],
+            "empty label": [["quick", "1", ""]],
+            "duplicate id": [["quick", "1", "a"], ["quick", "2", "b"]],
+        }
+        for name, presets in cases.items():
+            with self.subTest(name), self.assertRaises(ADAPTER.AdaptationError):
+                self.manifest(cost_preset=presets)
+        with self.assertRaises(ADAPTER.AdaptationError):
+            self.manifest(cost_preset=[["quick", "1", "a"]], default_cost_preset="deep")
+        with self.assertRaises(ADAPTER.AdaptationError):
+            self.manifest(default_cost_preset="quick")
+
+    def test_the_cli_requires_effect(self):
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as temp:
+            argv = ["scaffold", temp, "--profile", "mcp", "--provider-id", "https://agents.example/p", "--capability-id",
+                    "https://agents.example/c", "--capability-name", "demo.run", "--schema-base", "https://agents.example/fabric"]
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as stop:
+                ADAPTER.main(argv)
+            self.assertEqual(stop.exception.code, 2)
+            self.assertEqual(ADAPTER.main(argv + ["--effect", "draft", "--cost-preset", "quick", "0.25", "Quick", "--json"]), 0)
+            manifest = json.loads((Path(temp) / "fabric-agent.json").read_text())
+            self.assertEqual((manifest["capabilities"][0]["effect"], manifest["costPresets"][0]["maxUsd"]), ("draft", 0.25))

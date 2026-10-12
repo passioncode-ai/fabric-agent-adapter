@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.13.0 - 2026-10-12
+
+The scaffolder writes what a capability does outside itself, and what a run may cost (FAA-25; target architecture v4,
+Stage 0). The contract pin is unchanged (`2eb91c0`).
+
+### Changed
+
+- **`adapt_project.py scaffold` requires `--effect`.** It takes the capability's effect class (`none`, `draft`,
+  `publish`, `send`, `reply`, `charge`, `delete`, `merge`, `deploy`, `change-policy`) and writes it to the manifest.
+  Before, every capability was written as `effect: "none"`. A scaffold without an effect is refused: the class is
+  never defaulted. **This breaks every script that calls the scaffolder without `--effect`.**
+
+### Added
+
+- **`--idempotency required|supported|none`**, written to the capability.
+- **`--cost-preset ID MAX_USD LABEL`** (repeatable) and **`--default-cost-preset ID`** write the manifest's
+  `costPresets` (DEC-0037): fixed options a launcher offers for a run whose cost varies. The id grammar, the
+  amounts, the labels, duplicates and the default are checked.
+- `adapting-projects-to-fabric` and `creating-fabric-agents` show the flags and say the effect is read from the code
+  or asked of the author, and amounts are never invented. Scenario evals `effect-declared-not-defaulted` came first
+  in both skills.
+- A compiled-schema test shows the written effect, idempotency and presets are valid under the pin.
+
 ## 0.12.0 - 2026-10-12
 
 The contract pin moves to Fabric Agent Contract `main` `2eb91c0` (the merge of contract PR #45: DEC-0041…DEC-0045).
