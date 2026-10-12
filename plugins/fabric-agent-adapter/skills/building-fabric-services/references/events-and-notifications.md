@@ -11,6 +11,15 @@
 
 The feed is a view: never copy rows into a second store that can drift from the first.
 
+## Reading a feed (FAC-SEM-036)
+
+A client of `GET /fabric/v1/events` — or of any token-protected route — sends the token in the
+header the descriptor's `auth.header` names, in the form `auth.scheme` names: the raw token for
+`none`, `Bearer <token>` for `Bearer`. Never assume `Authorization: Bearer`: a client that did
+was refused on every poll and silently dropped every notify event. `token_header(auth, token)` /
+`tokenHeader(auth, token)` gives the one header; the token never travels in another header or
+in the URL.
+
 ## Writing an event
 
 - `kind`: dotted, stable, past tense or state (`job.failed`, `job.awaiting_choice`,

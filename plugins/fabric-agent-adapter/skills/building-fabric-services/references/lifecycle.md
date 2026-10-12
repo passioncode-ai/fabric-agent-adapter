@@ -88,6 +88,7 @@ remove; the back-off only stops the loop from costing the machine.
 | logs | `~/Library/Logs/<id>/` | `${XDG_STATE_HOME:-~/.local/state}/<id>/logs/` | `%LOCALAPPDATA%\<id>\Logs\` |
 | cache (deletable any time) | `~/Library/Caches/<id>/` | `${XDG_CACHE_HOME:-~/.cache}/<id>/` | `%LOCALAPPDATA%\<id>\Cache\` |
 | code | `~/.local/share/<id>/releases/…` | same | under `%LOCALAPPDATA%` too, never a network share |
+| settings backups ([DEC-0025](settings-backups.md)) | `~/Library/Application Support/PassionCode/settings-backups/<id>/<instance>/` | `${XDG_CONFIG_HOME:-~/.config}/PassionCode/settings-backups/…` | `%APPDATA%\PassionCode\settings-backups\…` |
 
 A repository that versions the data itself (a registry, a plan) may hold the data; the
 service's own code checkout and its releases may not. Directories 0700, secret files 0600. A store carries a schema version and the service

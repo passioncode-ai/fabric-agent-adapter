@@ -16,7 +16,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.18.0"
+  version: "0.19.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "0cacd08b0e95b6abf131eae1206b60792138bc3c"
@@ -228,8 +228,12 @@ log, retention and notification policy.
 
 An agent that calls paid models reports **what it spent**: one receipt per call from the
 provider's own usage numbers, served behind the token at `surfaces.usage` as the DEC-0021 usage
-report. An unknown cost is null, never 0. Read [the usage reference](references/usage.md)
-before wiring it.
+report. An unknown cost is null, never 0. It lists **every** spending limit the service applies
+in `budgets`, enforced or not. Read [the usage reference](references/usage.md) before wiring it.
+
+A service whose store holds what the operator decided keeps **settings backups** outside its data
+directory, restores only on a fresh database and never overwrites. Read
+[the settings backups reference](references/settings-backups.md).
 
 ## Step 6 — verify
 

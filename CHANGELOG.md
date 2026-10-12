@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.19.0 - 2026-10-12
+
+Settings backups, every spending limit and the feed client's token header in both kits. These are the
+service-side surfaces the pinned contract already carries: DEC-0025 and DEC-0027 (FAA-13).
+
+### Added
+
+- **Settings backups (`fabric-settings-backup/1`, FAC-SEM-035).** Each function exists in both kits.
+  - **Location.** Snapshots live under `<root>/settings-backups/<id>/<instance>/`, outside the data directory.
+    `<root>` is per system: `~/Library/Application Support/PassionCode`, `%APPDATA%\PassionCode` or
+    `$XDG_CONFIG_HOME/PassionCode`.
+  - **Writing.** `make_settings_backup` builds a snapshot from allow-listed tables of JSON scalars. It refuses
+    secret tables, credential columns and fractions.
+  - `write_settings_backup` writes atomically, 0600 in a 0700 folder.
+    - It does not rewrite an unchanged snapshot.
+    - It removes a temporary file an interrupted write left behind.
+    - It keeps the 14 newest snapshots.
+  - `backup_due` decides when the next snapshot is due.
+  - **Reading.** `read_settings_backup` refuses a damaged file and names why.
+  - `newest_intact_backup` skips damaged files and empty snapshots.
+  - `restore_plan` adds rows and never overwrites them. It names what it drops, leaves to defaults or refuses.
+  - **The checksum** uses the settings canonical form: `settings_canonical_json` and `settings_backup_digest`.
+    They are checked against the contract's vectors.
+  - **Parity.** Both kits write byte-identical files.
+- **Every spending limit (DEC-0027, FAC-SEM-031).**
+  - `usage_report` and `usageReport` take a `budgets` list.
+  - A machine day or month limit is counted from the receipts, so it always agrees with `budget`.
+  - A per-order limit gets `spentUsd: null`.
+  - The report is refused when its limits break FAC-SEM-031.
+  - `usage_limit_problems` and `usageLimitProblems` check a report.
+- **The feed client (FAC-SEM-036).** `token_header` and `tokenHeader` give the one header the descriptor
+  declares. `check_service.py` now sends its token through it.
+- **Tests.**
+  - The contract's fixtures at the pin are copied to `test/fixtures/contract/dec-0025-0027/`.
+  - The Windows CI job runs both kits' new cases.
+  - Mutation testing: 49 planted defects, all caught.
+- **Docs.**
+  - `references/settings-backups.md` is new.
+  - `usage.md` covers every limit.
+  - `events-and-notifications.md` covers reading a feed.
+  - Updated: `SKILL.md` step 5 and the lifecycle reference's directory table.
+  - The scenario eval `settings-backups-and-every-limit` and two triggers came first.
+
 ## 0.18.0 - 2026-10-12
 
 Services on Linux and Windows in both kits (contract DEC-0032, DEC-0033; FAA-21): the supervisor files the

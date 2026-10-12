@@ -50,6 +50,29 @@ left out.
 **Budget.** Pass `budget` only if the service **enforces** that limit itself. The report states
 it, and the host only shows it.
 
+**Every limit (DEC-0027).** Pass `budgets` to list every spending limit the service applies,
+enforced or not, so the spend view shows all of them — the operator asked for that on 2026-10-07:
+
+```python
+ledger.report(service_id=ID, budget={"period": "month", "limitUsd": 100}, budgets=[
+    {"id": "machine.monthly", "scope": "machine", "kind": "monthly", "period": "month", "limitUsd": 100, "enforced": True},
+    {"id": "project.demo.daily", "scope": "project", "subject": "demo", "kind": "daily", "windowSeconds": 86400,
+     "limitUsd": 5, "spentUsd": 0.31, "enforced": True},
+    {"id": "job.cap", "scope": "job", "kind": "per_job", "limitUsd": 2, "enforced": True},
+])
+```
+
+- A machine limit with a `period` and no `spentUsd` is counted by the kit from the receipts, the
+  way `budget` is, so `budget` and its twin in `budgets` never disagree. A per-order limit
+  (`per_job`, `approval`) gets `spentUsd: null`. Every other limit states its own spend.
+- `scope` is `machine`, `project`, `pool` or `job`; a `project` or `pool` limit names its
+  `subject`. A limit has at most one window — `period`, `windowSeconds` or `since` — and it agrees
+  with the kind (`daily`: the day or 86400 s; `monthly`: the month or 28–31 days; `velocity`: a
+  rolling window). `tripped: true` (work stopped by it now) needs `enforced: true`. An unknown
+  kind is shown generically, never refused.
+- The kits refuse a report that breaks these (`usage_limit_problems` / `usageLimitProblems`,
+  `FAC-SEM-031`). A breach is not refused: the report shows it, and the host shows it first.
+
 Call `ledger.prune()` at start (or daily) to keep the file at the reported window (LC-12).
 
 `JsonlUsageLedger` appends 0600 JSON lines. A line torn by a killed writer is skipped, and the
