@@ -5,7 +5,7 @@ recording stand-in for systemctl and schtasks, never the real ones (LC-14)."""
 import os
 import shutil
 import subprocess
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import tempfile
 import unittest
 from unittest import mock
@@ -78,6 +78,9 @@ class SystemdUnitTests(unittest.TestCase):
         text = fs.systemd_unit("x.service", ["/bin/x"], working_directory=Path("/srv/100% x"), description="at 100% %h")
         self.assertIn("WorkingDirectory=/srv/100%% x\n", text)
         self.assertIn("Description=at 100%% %%h\n", text)
+        # A unit is a Linux file: a Path built on Windows still names a POSIX directory.
+        text = fs.systemd_unit("x.service", ["/bin/x"], working_directory=PureWindowsPath("/opt/a b"))
+        self.assertIn("WorkingDirectory=/opt/a b\n", text)
 
     @unittest.skipUnless(shutil.which("systemd-analyze"), "needs systemd-analyze (the Linux CI job)")
     def test_systemd_accepts_the_unit(self):

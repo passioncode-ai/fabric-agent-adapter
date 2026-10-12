@@ -20,7 +20,7 @@ import http.server
 import json
 import ntpath
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import plistlib
 import posixpath
 import re
@@ -1677,7 +1677,9 @@ def systemd_unit(unit: str, program_arguments: Sequence[str], *, working_directo
     env = dict(environment or {})
     _no_secret_in_supervisor_file(argv, env)
     env.setdefault(SUPERVISOR_ENV, "systemd")
-    cwd = _plain(str(working_directory), "the working directory")
+    # A unit is a Linux file: a Path built anywhere (a test on Windows, an installer's planner) names a POSIX path.
+    cwd = _plain(working_directory.as_posix() if isinstance(working_directory, PurePath) else str(working_directory),
+                 "the working directory")
     if not cwd.startswith("/"):
         raise ServiceError("a systemd unit's working directory is absolute")
     lines = ["[Unit]", "Description=%s" % _plain(description or unit, "the description").replace("%", "%%"), "",

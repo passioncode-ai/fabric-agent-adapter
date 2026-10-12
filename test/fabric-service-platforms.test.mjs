@@ -80,8 +80,10 @@ test('the Windows folders are under LOCALAPPDATA; the override wins everywhere',
     assert.equal(k.servicesDir('win32'), path.join('/fake/Local', 'passioncode-fabric', 'services'));
     assert.deepEqual(k.serviceDirs('example-agent', 'win32'),
       { data: path.join('/fake/Local/example-agent'), logs: path.join('/fake/Local/example-agent/Logs'), cache: path.join('/fake/Local/example-agent/Cache') });
-    process.env.FABRIC_SERVICES_DIR = '/elsewhere';
-    for (const platform of ['win32', 'linux', 'darwin']) assert.equal(k.servicesDir(platform), '/elsewhere');
+    // The override is a path on the system the test runs on (expand checks it there).
+    const elsewhere = process.platform === 'win32' ? 'C:\\elsewhere' : '/elsewhere';
+    process.env.FABRIC_SERVICES_DIR = elsewhere;
+    for (const platform of ['win32', 'linux', 'darwin']) assert.equal(k.servicesDir(platform), elsewhere);
   } finally {
     for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
     Object.assign(process.env, saved);
