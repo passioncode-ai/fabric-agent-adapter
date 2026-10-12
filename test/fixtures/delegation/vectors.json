@@ -1373,8 +1373,11 @@
     "effect": "draft",
     "issuer": "urn:fabric:estate:example"
    },
-   "expected": null,
-   "contractThrew": "Cannot read properties of undefined (reading 'sub')"
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-chain"
+   }
   },
   {
    "name": "wrong issuer",

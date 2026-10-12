@@ -203,7 +203,7 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 The default pin for new bundles is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `2eb91c00e852d9c31d804310d38fad91589fcbac`
+- commit: `0cacd08b0e95b6abf131eae1206b60792138bc3c`
 
 Every other mention of the default contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree
@@ -230,8 +230,8 @@ FABRIC_CONTRACT_OLD=/path/to/legacy-contract FABRIC_CONTRACT_NEW=/path/to/curren
 ```
 
 Without both environment variables, those tests explicitly skip as `NOT_RUN`.
-This source checkout is 0.13.0. 0.12.0 is the latest published GitHub/npm release (2026-10-12; 0.7.0 and 0.11.0
-were never released); 0.13.0 is published by its `v0.13.0` tag. Source delivery does not update installed skills or live sessions.
+This source checkout is 0.14.0. 0.13.0 is the latest published GitHub/npm release (2026-10-12; 0.7.0 and 0.11.0
+were never released); 0.14.0 is published by its `v0.14.0` tag. Source delivery does not update installed skills or live sessions.
 
 ## License
 
