@@ -309,7 +309,7 @@ def _key_for(jwks: Dict[str, Any], kid: str) -> Dict[str, Any]:
         return {"problem": "unusable-key"}
     if is_small_order_key(raw):
         return {"problem": "small-order-key"}  # refused before any verification (DEC-0045, CT-29)
-    return {"key": raw}
+    return {"key": raw, "x": jwk["x"]}
 
 
 def _has_keys(jwks: Any) -> bool:
@@ -331,7 +331,7 @@ def _authentic(token: Any, jwks: Dict[str, Any], typ: str) -> Dict[str, Any]:
         return {"problem": found["problem"], "issuer": found["problem"] != "unknown-key"}
     if len(compact["signature"]) != 64 or not ed25519_verify(found["key"], compact["signing_input"], compact["signature"]):
         return {"problem": "bad-signature"}
-    return {"compact": compact, "kid": kid}
+    return {"compact": compact, "kid": kid, "x": found["x"]}
 
 
 def chain_depth(act: Any) -> float:
@@ -432,30 +432,58 @@ def _approval_shape(payload: Dict[str, Any]) -> bool:
     return payload.get("method") in ("prompt", "operator-channel")  # DEC-0045: `device` is removed
 
 
-def _estate_problem(estate: Any, jwks: Dict[str, Any], kid: str, now: float) -> Optional[Tuple[str, str]]:
-    """DL-14 with DEC-0055: a verifier that reads the estate record trusts a kid only while a current revision certifies
-    it for a machine and does not revoke it. `estate` is a revision the caller verified (fabric_estate.
-    verify_estate_record) or a callable returning the current one; None skips the rule. (refusal kind, detail) or None."""
+#: ECMAScript's time range in seconds (±8.64e15 ms): a NumericDate outside it is no instant a Date can hold.
+MAX_CLOCK_SECONDS = 8.64e12
+
+
+def _readable_clock(now: Any) -> bool:
+    """A clock the time rows can compare: a finite number of seconds within a Date's range (DEC-0060). NaN or text
+    would make every time row false and let an expired token through."""
+    if not isinstance(now, (int, float)) or isinstance(now, bool):
+        return False
+    try:
+        return math.isfinite(now) and abs(now) <= MAX_CLOCK_SECONDS
+    except OverflowError:
+        return False
+
+
+def _estate_problem(estate: Any, kid: str, x: str, now: float, applied: Any = None,
+                    revocations: Any = None) -> Optional[Tuple[str, str]]:
+    """DL-14 row 4a (DEC-0055, DEC-0060), right after the signature: when the callee reads the estate record, the
+    token's kid and the published key must be certified by that revision. `estate` is a revision the caller verified
+    (fabric_estate.verify_estate_record) and its machine applied, or a callable returning it; None skips the rule (a
+    callable returning None is an unreadable source). `applied` is the highest revision the machine applied
+    (`{"revision", "digest"?}`); `revocations` the revocation delta's entries applied since (a list or a callable). A
+    source that raises is unreadable, never a pass. Returns ("token" | "issuer", detail) or None."""
     if estate is None:
         return None
     try:
         record = estate() if callable(estate) else estate
-    except Exception:  # an unreadable record certifies nothing; it is never a pass
+        extra = revocations() if callable(revocations) else revocations
+    except Exception:
         return ("issuer", "estate-unreadable")
     import fabric_estate  # beside this file; imported here, since fabric_estate imports this module
-    jwk = next((k for k in jwks["keys"] if isinstance(k, dict) and k.get("kid") == kid), {})
-    if not fabric_estate.hub_key_certified(record, kid, jwk.get("x"), now):
-        return ("token", "kid-not-certified")
-    return None
+    verdict = fabric_estate.hub_key_certified(record, kid, x, now, applied,
+                                              fabric_estate._MISSING if extra is None else extra)
+    if verdict["certified"]:
+        return None
+    # The clock was refused before row 1, so a verdict here is the token's or the trust source's.
+    return ("token" if verdict["fault"] == "token" else "issuer", verdict["detail"])
 
 
 def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capability: str, effect: str,
-                      issuer: Optional[str], read_only: bool = False, estate: Any = None) -> Dict[str, Any]:
+                      issuer: Optional[str], read_only: bool = False, estate: Any = None,
+                      estate_applied: Any = None, estate_revocations: Any = None) -> Dict[str, Any]:
     """DL-13, in its fixed order: nothing about a token is believed before its signature is.
     `now` is seconds since the epoch. Returns {ok: True, claims, principal, caller, chain, kid} or a refusal
     {ok: False, code, detail[, data]} whose detail is a short machine word, never the token. `issuer` is required.
     With `estate` (a verified estate revision, or a callable returning the current one), the token's kid must be one
-    the revision certifies for a machine (DL-14, DEC-0055)."""
+    the revision certifies for a machine (DL-14, DEC-0055, DEC-0060); `estate_applied` is the highest revision the
+    machine applied and `estate_revocations` the revocation delta's entries since. A clock that is not a number of
+    seconds is refused `unknown-state` `no-clock` before row 1."""
+    # Before row 1: every time row compares against the clock, and a comparison with NaN is always false.
+    if not _readable_clock(now):
+        return _refuse("unknown-state", "no-clock")
     if not _is_string(issuer):
         return _refuse("issuer-unavailable", "no-trusted-issuer")
     if not _has_keys(jwks):
@@ -463,7 +491,7 @@ def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capab
     checked = _authentic(token, jwks, DELEGATION_TYP)
     if "problem" in checked:
         return _refuse("issuer-unavailable" if checked.get("issuer") else "unauthenticated", checked["problem"])
-    uncertified = _estate_problem(estate, jwks, checked["kid"], now)
+    uncertified = _estate_problem(estate, checked["kid"], checked["x"], now, estate_applied, estate_revocations)
     if uncertified:
         return _refuse("issuer-unavailable" if uncertified[0] == "issuer" else "unauthenticated", uncertified[1])
     claims = checked["compact"]["payload"]
@@ -565,13 +593,16 @@ UNSAFE_NO_JTI_STORE = _NoReplayProtection()
 
 
 def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: float, action_digest: str,
-                    jti_store: Any, issuer: Optional[str], estate: Any = None) -> Dict[str, Any]:
+                    jti_store: Any, issuer: Optional[str], estate: Any = None, estate_applied: Any = None,
+                    estate_revocations: Any = None) -> Dict[str, Any]:
     """DL-18: a missing approval is approval-required carrying the action digest; any fault of the document is
     approval-invalid; a second use is approval-reused. The jti is consumed last."""
     if approval is None or approval == "":
         return _refuse("approval-required", "no-approval", {"actionDigest": action_digest})
     if jti_store is None or not callable(getattr(jti_store, "consume", None)):
         return _refuse("unknown-state", "no-jti-store")
+    if not _readable_clock(now):
+        return _refuse("unknown-state", "no-clock")
     if not _is_string(issuer):
         return _refuse("issuer-unavailable", "no-trusted-issuer")
     if not _has_keys(jwks):
@@ -579,7 +610,7 @@ def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: f
     checked = _authentic(approval, jwks, APPROVAL_TYP)
     if "problem" in checked:
         return _refuse("issuer-unavailable" if checked.get("issuer") else "approval-invalid", checked["problem"])
-    uncertified = _estate_problem(estate, jwks, checked["kid"], now)
+    uncertified = _estate_problem(estate, checked["kid"], checked["x"], now, estate_applied, estate_revocations)
     if uncertified:
         return _refuse("issuer-unavailable" if uncertified[0] == "issuer" else "approval-invalid", uncertified[1])
     claims = checked["compact"]["payload"]
@@ -820,7 +851,8 @@ TIERS = ("T0", "T1", "T2")
 
 
 def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], issuer: str,
-                    read_only: bool = False, clock: Callable[[], float] = time.time, estate: Any = None) -> Callable[..., Dict[str, Any]]:
+                    read_only: bool = False, clock: Callable[[], float] = time.time, estate: Any = None,
+                    estate_applied: Any = None, estate_revocations: Any = None) -> Callable[..., Dict[str, Any]]:
     """A check for one tools/call: `gate(tool, headers, tier="T2")` answers the accepted delegation or a DL-19
     refusal. `effects` maps each tool to its declared effect class (its manifest entry); a tool with none is
     refused rather than guessed. `jwks` is a JwksCache or a key set; `issuer` (auth.delegation.issuer) is required.
@@ -830,7 +862,8 @@ def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], iss
     relayed from off the machine. A T0 or T1 caller is never required to present a token: with none, the call
     passes with no delegation ({ok: True, tier, principal: None, ...}). A present token is verified at every tier
     and refused when invalid. Unknown tiers count as T2. `estate` (a callable returning the current verified estate
-    revision) makes the gate trust only kids that revision certifies (DL-14, DEC-0055)."""
+    revision) makes the gate trust only kids that revision certifies (DL-14, DEC-0055, DEC-0060); `estate_applied` and
+    `estate_revocations` pass the applied mark and the revocation delta's entries through."""
     if not _is_string(issuer):
         raise ValueError("the gate needs the issuer it trusts (auth.delegation.issuer)")
 
@@ -845,7 +878,8 @@ def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], iss
             return _refuse("unauthenticated", "no-token")
         keys = jwks.get(_kid_of(carried["token"])) if isinstance(jwks, JwksCache) else jwks
         verdict = verify_delegation(carried["token"], audience=audience, jwks=keys, now=clock(), capability=tool,
-                                    effect=effect, issuer=issuer, read_only=read_only, estate=estate)
+                                    effect=effect, issuer=issuer, read_only=read_only, estate=estate,
+                                    estate_applied=estate_applied, estate_revocations=estate_revocations)
         if verdict["ok"]:
             verdict["tier"] = tier if tier in TIERS else "T2"
         return verdict

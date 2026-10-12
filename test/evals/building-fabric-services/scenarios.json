@@ -321,10 +321,22 @@
       "request": "example-agent runs on several of the operator's machines; apply only estate revisions the operator signed, and trust a delegation token only under a hub key the current revision certifies.",
       "expected": [
         "checks a revision against estate-record.schema.json, then verify_estate_record / verifyEstateRecord with the verified parent (or, for revision 1, the passkeys pinned at enrollment) and the machine's clock; applies it only on ok",
-        "names the refusal by the verifier's problem: no-clock, digest-mismatch, broken-chain, unknown- or revoked-authority, an assertion problem (WebAuthn Level 3, offline), too-long-lived, not-yet-valid, expired, rule-violation with its FAC-SEM codes",
-        "passes the current verified revision to the delegation gate (`estate=` / `{estate}`), so a token's kid is trusted only while that revision certifies it for a machine and does not revoke it (DL-14); an unreadable record certifies nothing",
+        "names the refusal by the verifier's problem: no-clock, digest-mismatch, broken-chain, unknown- or revoked-authority, an assertion problem (WebAuthn Level 3, offline), wrong-rp (a passkey not under a sign.<domain> RP, DEC-0063), too-long-lived, not-yet-valid (more than 60 s before issuedAt, DEC-0066), expired, rule-violation with its FAC-SEM codes",
+        "passes the current verified revision to the delegation gate (`estate=` / `{estate}`), with `estate_applied` / `estateApplied` (the highest revision its machine applied) and the revocation delta's entries, so a token's kid is trusted only while that revision certifies it (DL-14, DEC-0060): kid-not-certified is the token's fault (unauthenticated); estate-unreadable, estate-outside-window, estate-rolled-back and estate-forked are the trust source's (issuer-unavailable); an unreadable clock is unknown-state no-clock before row 1",
         "checks records it produces with estate_record_rules / estateRecordRules (FAC-SEM-072…076): keys usable and named once, placements under pinned publisher keys, secrets by reference, grants external, nothing listed that is revoked",
         "keeps no private key or passkey secret in the service: the kit verifies and never signs"
+      ]
+    },
+    {
+      "id": "supervised-by-argument",
+      "trap": "the service was installed as a Windows Scheduled Task and by the node; the kit read only FABRIC_SERVICE_SUPERVISOR, which a task's action cannot carry, so every restart exited 75 at once against the old copy's lock, and the service's own argparse exited 2 on --fabric-supervisor",
+      "request": "Make example-agent wait for its old copy under every supervisor — launchd, systemd, the Task Scheduler and the node — and never under a start by hand.",
+      "expected": [
+        "lets the kit's writers write the marker: launchd_plist and systemd_unit set FABRIC_SERVICE_SUPERVISOR unconditionally, task_xml / taskXml put --fabric-supervisor task-scheduler in the task's Arguments before any --; the node sets either form",
+        "reads the marker with supervisor_marker / supervisorMarker: both forms, the managers launchd, systemd, task-scheduler and node, the = spelling, a bare flag that consumes no --… token and stops at --; never infers it from the parent process",
+        "exits 75 at once, before the lock, naming both markers when they disagree (the variable and the argument, or the argument twice, or an empty argument beside the variable)",
+        "adds the flag to the service's own argument parser in both spellings (add_supervisor_argument for argparse) so the parser does not exit 2 on it",
+        "a supervised copy waits for the lock at most 300 s touching nothing; a copy started by hand tries once; a holder whose pid cannot be read is named unknown (FAC-SEM-078)"
       ]
     }
   ]

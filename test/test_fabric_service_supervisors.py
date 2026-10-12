@@ -147,14 +147,15 @@ class TaskSchedulerTests(unittest.TestCase):
         self.assertEqual(g("t:Settings/t:RestartOnFailure/t:Interval").text, "PT1M")
         self.assertEqual(g("t:Settings/t:MultipleInstancesPolicy").text, "IgnoreNew")
         self.assertEqual(g("t:Actions/t:Exec/t:Command").text, r"C:\Program Files\Example\python.exe")
-        self.assertEqual(g("t:Actions/t:Exec/t:Arguments").text, '"C:\\Example App\\serve.py" --port 47201')
+        # DEC-0057: a task's action has no environment, so the marker is an argument.
+        self.assertEqual(g("t:Actions/t:Exec/t:Arguments").text, '"C:\\Example App\\serve.py" --port 47201 --fabric-supervisor task-scheduler')
         self.assertEqual(g("t:Actions/t:Exec/t:WorkingDirectory").text, r"C:\Example App")
 
     def test_xml_is_escaped(self):
         text = fs.task_xml("\\PassionCode\\x", [r"C:\x.exe", "a<b&c"], working_directory=r"C:\w", description="A & <B>", user="H\\u")
         doc = ET.fromstring(text.split("\n", 1)[1])
         self.assertEqual(doc.find("t:RegistrationInfo/t:Description", NS).text, "A & <B>")
-        self.assertEqual(doc.find("t:Actions/t:Exec/t:Arguments", NS).text, "a<b&c")
+        self.assertEqual(doc.find("t:Actions/t:Exec/t:Arguments", NS).text, "a<b&c --fabric-supervisor task-scheduler")
 
     def test_refusals(self):
         for bad in (dict(task="no-leading-backslash"), dict(argv=["relative.exe"]), dict(argv=[r"C:\x.exe", "--token=" + "s" + "k-" + "w" * 24]),
@@ -250,6 +251,181 @@ class SupervisedBackOff(unittest.TestCase):
             finally:
                 holder.release()
             self.assertEqual(len(slept), 1)
+
+
+SUP = __import__("json").loads((Path(__file__).resolve().parent / "fixtures/contract/supervisor-vectors.json").read_text(encoding="utf-8"))
+
+
+def lock_outcome_findings(record):
+    """FAC-SEM-078 (the contract's lockOutcomeRules, ported for this test): the instance paths a record of a start
+    against a held lock breaks."""
+    out = []
+    marker = fs.supervisor_marker(record["start"].get("env", {}), record["start"].get("argv", []))
+    side = record.get("sideEffects")
+    if side is not None and not isinstance(side, list):
+        out.append("/sideEffects")
+    out += ["/sideEffects/%d" % i for i, _ in enumerate(side if isinstance(side, list) else [])]
+    count = lambda v, integer: isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0 and (not integer or float(v).is_integer())  # noqa: E731
+    attempts_ok, waited_ok = count(record.get("attempts"), True), count(record.get("waitedMs"), False)
+    if not attempts_ok:
+        out.append("/attempts")
+    if not waited_ok:
+        out.append("/waitedMs")
+    attempts, waited = record.get("attempts"), record.get("waitedMs")
+    if marker["kind"] == "conflict":
+        if attempts_ok and attempts != 0:
+            out.append("/attempts")
+        if waited_ok and waited != 0:
+            out.append("/waitedMs")
+    elif marker["kind"] == "manual":
+        if attempts_ok and attempts != 1:
+            out.append("/attempts")
+        if waited_ok and waited != 0:
+            out.append("/waitedMs")
+    else:
+        if attempts_ok and attempts < 1:
+            out.append("/attempts")
+        if waited_ok and waited > SUP["lockWaitMaxMs"]:
+            out.append("/waitedMs")
+    outcome = record.get("outcome")
+    if not isinstance(outcome, dict):
+        return out + ["/outcome"]
+    if outcome.get("acquired") is True:
+        return out + (["/outcome/acquired"] if marker["kind"] == "conflict" else [])
+    if outcome.get("exitStatus") != SUP["exitStatus"]:
+        out.append("/outcome/exitStatus")
+    message = outcome.get("message") if isinstance(outcome.get("message"), str) else ""
+    if marker["kind"] == "conflict":
+        names = {"environment": fs.SUPERVISOR_ENV, "argument": fs.SUPERVISOR_ARG}
+        if not all(names[f] in message for f in marker["forms"]):
+            out.append("/outcome/message")
+    elif record.get("holderPid") is None:
+        if not __import__("re").search(r"\bunknown\b", message, __import__("re").I):
+            out.append("/outcome/message")
+    elif not __import__("re").search(r"(?<!\d)%d(?!\d)" % record["holderPid"], message):
+        out.append("/outcome/message")
+    return out
+
+
+class SupervisorMarker(unittest.TestCase):
+    """DEC-0057 (CT-01, FAA-32): the marker in both forms, held to the contract's service-supervisor.json; what a copy
+    does against a held lock, recorded and read as FAC-SEM-078 reads it; the writers and the sample's parser."""
+
+    def test_every_marker_case_answers_as_the_contract_does(self):
+        self.assertEqual(len(SUP["cases"]), 22)
+        self.assertEqual(list(fs.SUPERVISORS), SUP["managers"])
+        for case in SUP["cases"]:
+            with self.subTest(case["name"]):
+                marker = fs.supervisor_marker(case["env"], case["argv"])
+                got = {"kind": marker["kind"], **({"manager": marker["manager"]} if marker["kind"] == "supervised" else {})}
+                self.assertEqual(got, case["marker"])
+                self.assertEqual(fs.lock_wait_budget_seconds(marker) * 1000, case["waitBudgetMs"])
+
+    def test_the_rule_port_reads_the_contracts_records_as_it_does(self):
+        self.assertEqual(len(SUP["lockRecords"]), 11)
+        for item in SUP["lockRecords"]:
+            with self.subTest(item["name"]):
+                self.assertEqual(lock_outcome_findings(item["record"]), item["codes"])
+
+    def start(self, env, argv, *, holder_pid_known=True):
+        """One start against a held lock, recorded as FAC-SEM-078 reads it."""
+        with tempfile.TemporaryDirectory() as temp:
+            data = Path(temp)
+            holder = fs.InstanceLock(data).acquire()
+            if not holder_pid_known:
+                (data / "service.lock").write_text("")
+            before = sorted(p.name for p in data.iterdir())
+            attempts, now = [0], [0.0]
+            real = fs.InstanceLock.acquire
+
+            def counting(self_):
+                attempts[0] += 1
+                return real(self_)
+
+            def sleep(seconds):
+                now[0] += seconds
+
+            err = __import__("io").StringIO()
+            outcome = {}
+            try:
+                with mock.patch.object(fs.InstanceLock, "acquire", counting), mock.patch("sys.stderr", err):
+                    fs.hold_single_instance(data, sleep=sleep, clock=lambda: now[0], env=env, argv=argv).release()
+                outcome = {"acquired": True}
+            except SystemExit as exc:
+                outcome = {"exitStatus": exc.code, "message": err.getvalue().strip().splitlines()[-1]}
+            finally:
+                holder.release()
+            after = sorted(p.name for p in data.iterdir())
+            return {"start": {"env": env, "argv": argv}, "holderPid": os.getpid() if holder_pid_known else None,
+                    "attempts": attempts[0], "waitedMs": now[0] * 1000,
+                    "sideEffects": [name for name in after if name not in before], "outcome": outcome}
+
+    def test_the_kits_starts_against_a_held_lock_conform(self):
+        exe = "/opt/example-agent/bin/example-agent"
+        starts = {
+            "by hand": ({}, [exe, "serve"], True),
+            "the node, by the variable": ({fs.SUPERVISOR_ENV: "node"}, [exe, "serve"], True),
+            "a task, by the argument": ({}, [exe, "serve", "--fabric-supervisor", "task-scheduler"], True),
+            "the holder unknown": ({}, [exe, "serve"], False),
+            "markers that disagree": ({fs.SUPERVISOR_ENV: "launchd"}, [exe, "--fabric-supervisor=task-scheduler"], True),
+            "two arguments that disagree": ({}, [exe, "--fabric-supervisor", "systemd", "--fabric-supervisor=node"], True),
+            "a bare argument beside the variable": ({fs.SUPERVISOR_ENV: "systemd"}, [exe, "--fabric-supervisor", "--verbose"], True),
+        }
+        for name, (env, argv, known) in starts.items():
+            with self.subTest(name):
+                record = self.start(env, argv, holder_pid_known=known)
+                self.assertEqual(lock_outcome_findings(record), [], record)
+                self.assertEqual(record["outcome"].get("exitStatus"), 75)
+                marker = fs.supervisor_marker(env, argv)["kind"]
+                self.assertEqual(record["attempts"], {"conflict": 0, "manual": 1}.get(marker, record["attempts"]))
+                if marker == "supervised":
+                    self.assertEqual(record["waitedMs"], fs.LOCK_WAIT_SUPERVISED_SECONDS * 1000)
+                    self.assertGreater(record["attempts"], 1)
+
+    def test_writers_carry_the_marker_and_refuse_one_passed_in(self):
+        text = fs.task_xml("\\PassionCode\\x", [r"C:\x.exe", "serve", "--", "--fabric-supervisor", "systemd"],
+                           working_directory=r"C:\w", user="H\\u")
+        args = ET.fromstring(text.split("\n", 1)[1]).find("t:Actions/t:Exec/t:Arguments", NS).text
+        self.assertEqual(args, "serve --fabric-supervisor task-scheduler -- --fabric-supervisor systemd", "before any --")
+        self.assertEqual(fs.supervisor_marker({}, [r"C:\x.exe"] + args.split())["manager"], "task-scheduler")
+        for writer in (lambda argv: fs.task_xml("\\PassionCode\\x", [r"C:\x.exe"] + argv, working_directory=r"C:\w", user="H\\u"),
+                       lambda argv: fs.systemd_unit("x.service", ["/bin/x"] + argv, working_directory=Path("/w")),
+                       lambda argv: fs.launchd_plist("ai.x", ["/bin/x"] + argv, working_directory=Path("/w"), stdout_path=Path("/w/o"))):
+            for argv in (["--fabric-supervisor", "node"], ["--fabric-supervisor=launchd"], ["--fabric-supervisor"]):
+                with self.subTest(argv=argv), self.assertRaises(fs.ServiceError):
+                    writer(argv)
+        unit = fs.systemd_unit("x.service", ["/bin/x"], working_directory=Path("/w"), environment={fs.SUPERVISOR_ENV: "launchd"})
+        self.assertIn("Environment=%s=systemd" % fs.SUPERVISOR_ENV, unit.replace('"', ""))
+        self.assertNotIn("launchd", unit, "the unit's writer assigns the marker unconditionally")
+
+    def test_the_samples_parser_accepts_the_marker_in_both_spellings(self):
+        sample = load("sample_service")
+        parser = sample.build_parser()
+        for argv in (["--fabric-supervisor", "node", "serve"], ["--fabric-supervisor=node", "serve"],
+                     ["serve", "--fabric-supervisor", "task-scheduler"], ["serve", "--fabric-supervisor=systemd"],
+                     ["serve", "--fabric-supervisor"]):  # bare only at the end, before -- or another --flag, as the contract reads it
+            with self.subTest(argv=argv):
+                args = parser.parse_args(argv + ["--port", "1", "--data-dir", "/tmp/x"])
+                self.assertEqual(args.command, "serve")
+
+
+class DescriptorHygiene(unittest.TestCase):
+    """DEC-0057 item 5: one supervisor per descriptor, and a share in either slash is never local; the contract's seven
+    killing fixtures (descriptor-negatives.json), each refused for its own reason."""
+    REASONS = {'bad-task': 'lifecycle.task must match', 'bad-unit': 'lifecycle.unit must match', 'systemd-with-plist': 'plist belongs to launchd', 'task-scheduler-with-label': 'label belongs to launchd', 'task-without-task-scheduler': 'lifecycle.task belongs to', 'unc-forward-slash': 'never a network share', 'windows-service-manager': 'lifecycle.manager must be'}
+
+    def test_every_killing_fixture_is_refused_for_its_reason(self):
+        negatives = __import__("json").loads((Path(__file__).resolve().parent / "fixtures/contract/descriptor-negatives.json").read_text(encoding="utf-8"))["negatives"]
+        self.assertEqual(sorted(n["name"] for n in negatives), sorted(self.REASONS))
+        for item in negatives:
+            with self.subTest(item["name"]):
+                self.assertIn(self.REASONS[item["name"]], " ".join(fs.validate_descriptor(item["descriptor"])))
+
+    def test_local_paths(self):
+        for path, ok in (("/a", True), ("~/a", True), ("~\\a", True), ("C:/a", True), ("C:\\a", True), ("//srv/a", False),
+                         ("/\\srv", False), ("\\\\srv\\a", False), ("a", False)):
+            with self.subTest(path=path):
+                self.assertEqual(bool(fs._LOCAL_PATH.match(path)), ok)
 
 
 if __name__ == "__main__":

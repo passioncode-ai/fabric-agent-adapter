@@ -87,7 +87,8 @@ _TRACE_ID = re.compile(r"^(?!0{32}$)[0-9a-f]{32}$")
 _SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
 # DEC-0032: a local path is POSIX (`/…`, `~/…`) or Windows (`C:\…`, `C:/…`, `~\…`); a network
 # share (`\\server\…`, `\\?\…`) is never a local path.
-_LOCAL_PATH = re.compile(r"^(~[\\/]|/(?!/)|[A-Za-z]:[\\/])")
+# DEC-0057: `//server/…` and `/\\server…` are shares on Windows too, so a leading slash is followed by neither.
+_LOCAL_PATH = re.compile(r"^(~[\\/]|/(?![\\/])|[A-Za-z]:[\\/])")
 # DEC-0032: the supervisor per system and the field that names its job.
 MANAGERS = ("launchd", "systemd", "task-scheduler", "none")
 _AUTH_HEADER = re.compile(r"[A-Za-z][A-Za-z0-9-]{0,63}")
@@ -106,7 +107,8 @@ class AlreadyRunning(ServiceError):
     def __init__(self, holder_pid: Optional[int], lock_path: Path):
         self.holder_pid = holder_pid
         self.lock_path = lock_path
-        who = "process %d" % holder_pid if holder_pid else "another process"
+        # FAC-SEM-078: a copy that cannot learn the holder's pid says the holder is unknown.
+        who = "process %d" % holder_pid if holder_pid else "an unknown process"
         super().__init__("Another copy is already running (%s holds %s)." % (who, lock_path))
 
 
@@ -336,35 +338,118 @@ def _read_pid(path: Path) -> Optional[int]:
         return None
 
 
-SUPERVISORS = ("launchd", "systemd", "task-scheduler")
+#: The managers a supervisor marker may name (DEC-0057): the three systems' supervisors and Project Observatory's node.
+SUPERVISORS = ("launchd", "systemd", "task-scheduler", "node")
+#: The argument form of the marker, for a supervisor whose start carries no environment (a Scheduled Task's action).
+SUPERVISOR_ARG = "--fabric-supervisor"
 
 
-def supervised() -> bool:
-    """True when a supervisor that restarts on exit started this process and said so in
-    ``FABRIC_SERVICE_SUPERVISOR`` (``launchd_plist`` and ``systemd_unit`` set it)."""
-    return os.environ.get(SUPERVISOR_ENV) in SUPERVISORS
+def _marker_arguments(argv: Sequence[Any]) -> List[str]:
+    """The marker values an argument vector carries after the executable and before ``--``. A bare
+    ``--fabric-supervisor`` followed by nothing, by ``--`` or by another ``--…`` flag is a marker with an empty value
+    and consumes nothing."""
+    values: List[str] = []
+    index = 1
+    while index < len(argv):
+        item = argv[index]
+        if item == "--":
+            break
+        if item == SUPERVISOR_ARG:
+            following = argv[index + 1] if index + 1 < len(argv) else None
+            if isinstance(following, str) and not following.startswith("--"):
+                values.append(following)
+                index += 1
+            else:
+                values.append("")
+        elif isinstance(item, str) and item.startswith(SUPERVISOR_ARG + "="):
+            values.append(item[len(SUPERVISOR_ARG) + 1:])
+        index += 1
+    return values
 
 
-def supervised_by_launchd() -> bool:
+def supervisor_marker(env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+    """How this copy was started (DEC-0057), from ``FABRIC_SERVICE_SUPERVISOR=<manager>`` and
+    ``--fabric-supervisor <manager>`` / ``--fabric-supervisor=<manager>`` (``env`` and ``argv`` default to this process's):
+
+    - ``{"kind": "supervised", "manager", "forms"}`` — every marker present names the same manager of SUPERVISORS;
+    - ``{"kind": "conflict", "values", "forms"}`` — the markers disagree: the copy is unsupervised and exits 75 at once,
+      before it takes the lock (an empty or bare argument beside a variable disagrees with it);
+    - ``{"kind": "manual", "forms", "unreadable"?}`` — no marker (only an empty variable counts as none), or one that
+      names no manager.
+
+    A copy never infers supervision from its parent process. The contract's ``supervisorMarker``."""
+    env = os.environ if env is None else env
+    argv = sys.argv if argv is None else argv
+    variable = env.get(SUPERVISOR_ENV) if isinstance(env, dict) or hasattr(env, "get") else None
+    from_env = [variable] if isinstance(variable, str) and variable != "" else []
+    from_args = _marker_arguments(list(argv) if isinstance(argv, (list, tuple)) else [])
+    forms = (["environment"] if from_env else []) + (["argument"] if from_args else [])
+    values: List[str] = []
+    for value in from_env + from_args:
+        if value not in values:
+            values.append(value)
+    if len(values) > 1:
+        return {"kind": "conflict", "values": values, "forms": forms}
+    if not values:
+        return {"kind": "manual", "forms": forms}
+    if values[0] in SUPERVISORS:
+        return {"kind": "supervised", "manager": values[0], "forms": forms}
+    return {"kind": "manual", "unreadable": values[0], "forms": forms}
+
+
+def lock_wait_budget_seconds(marker: Dict[str, Any]) -> float:
+    """How long a copy started so may wait for the lock: 300 s when supervised, else not at all."""
+    return LOCK_WAIT_SUPERVISED_SECONDS if marker.get("kind") == "supervised" else 0.0
+
+
+def marker_conflict_message(marker: Dict[str, Any]) -> str:
+    """The one sentence a copy whose markers disagree exits with, naming the markers present."""
+    shown = ", ".join(repr(v) for v in marker["values"])
+    if marker["forms"] == ["environment", "argument"]:
+        return "%s and %s disagree (%s); not starting unsupervised." % (SUPERVISOR_ENV, SUPERVISOR_ARG, shown)
+    return "%s is given with different values (%s); not starting unsupervised." % (SUPERVISOR_ARG, shown)
+
+
+def supervised(env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None) -> bool:
+    """True when a supervisor that restarts on exit started this process and said so with the marker
+    (``launchd_plist`` and ``systemd_unit`` set the variable, ``task_xml`` writes the argument, a node sets either)."""
+    return supervisor_marker(env, argv)["kind"] == "supervised"
+
+
+def supervised_by_launchd(env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None) -> bool:
     """True when launchd started this process from a plist written by ``launchd_plist``.
 
     The plist says so explicitly (``FABRIC_SERVICE_SUPERVISOR=launchd``); the parent process or
     ``XPC_SERVICE_NAME`` is not evidence — a terminal inside an app carries one too."""
-    return os.environ.get(SUPERVISOR_ENV) == "launchd"
+    return supervisor_marker(env, argv).get("manager") == "launchd"
+
+
+def add_supervisor_argument(parser: Any) -> Any:
+    """Let a service's own argparse parser accept the marker in both spellings, and a bare one, and ignore it
+    (DEC-0057: argparse exits 2 on an unknown flag). The kit reads the marker from ``sys.argv`` itself."""
+    import argparse
+    parser.add_argument(SUPERVISOR_ARG, nargs="?", const="", default=None, help=argparse.SUPPRESS)
+    return parser
 
 
 def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *,
                          sleep: Callable[[float], None] = time.sleep,
-                         clock: Callable[[], float] = time.monotonic) -> InstanceLock:
-    """Take the lock or exit 75 with one sentence naming the holder.
+                         clock: Callable[[], float] = time.monotonic,
+                         env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None) -> InstanceLock:
+    """Take the lock or exit 75 with one sentence naming the holder (DEC-0057, FAC-SEM-078).
 
-    Started by hand, a held lock exits 75 at once. Under launchd (KeepAlive) an immediate exit
-    is a respawn every ThrottleInterval, forever; so a supervised copy first backs off in-process
+    Markers that disagree exit 75 at once, before the lock, naming them. Started by hand (no
+    marker), a held lock exits 75 at once. Under a supervisor that restarts on exit an immediate
+    exit is a respawn every few seconds, forever; so a supervised copy first backs off in-process
     (0.5 s doubling to 30 s, ``LOCK_WAIT_SUPERVISED_SECONDS`` in all), takes over if the holder
     leaves, and exits 75 only when the wait runs out. Nothing has been touched while it waits.
-    ``wait_seconds`` overrides the choice (0 = never wait)."""
+    ``wait_seconds`` overrides the choice (0 = never wait); ``env`` and ``argv`` default to this process's."""
+    marker = supervisor_marker(env, argv)
+    if marker["kind"] == "conflict":
+        print(marker_conflict_message(marker), file=sys.stderr)
+        raise SystemExit(EXIT_ALREADY_RUNNING)
     if wait_seconds is None:
-        wait_seconds = LOCK_WAIT_SUPERVISED_SECONDS if supervised() else 0.0
+        wait_seconds = lock_wait_budget_seconds(marker)
     deadline = clock() + max(0.0, wait_seconds)
     delay = LOCK_BACKOFF_FIRST_SECONDS
     announced = False
@@ -390,17 +475,144 @@ def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *
 WINDOWS_TRUSTED = ("S-1-5-18", "S-1-5-32-544")
 
 
-def token_acl_problem(path: Path, owner: str, granting: Sequence[str], user: str) -> Optional[str]:
-    """service.md "Windows token files", rules 2 and 3, on SIDs already read: the owner is the
-    current user, SYSTEM or Administrators (DEC-0033: a file an elevated administrator creates is
-    owned by Administrators), and every SID an allow ACE grants anything to is one of those three.
-    Deny ACEs are not passed in: they do not change the decision."""
-    if owner != user and owner not in WINDOWS_TRUSTED:
-        return "Token file %s is owned by %s, not by this user (%s), SYSTEM or Administrators." % (path, owner or "nobody", user)
-    for sid in granting:
-        if sid != user and sid not in WINDOWS_TRUSTED:
-            return "Token file %s grants access to %s; only this user, SYSTEM and Administrators may hold any." % (path, sid)
+def token_file_problem(path: Path, file: Dict[str, Any], user: str) -> Optional[str]:
+    """windows_token_acl_problem as one sentence naming the file and the refusal, or None."""
+    problem = windows_token_acl_problem(file, user)
+    return None if problem is None else "Token file %s refused: %s." % (path, problem["message"])
+
+
+SYSTEM_SID = "S-1-5-18"
+ADMINISTRATORS_SID = "S-1-5-32-544"
+#: A string SID: revision 1, an identifier authority and up to 15 sub-authorities of 32 bits each.
+_SID_TEXT = re.compile(r"S-1-[0-9]{1,15}(?:-[0-9]{1,10}){0,15}", re.IGNORECASE | re.ASCII)
+
+
+def _sid(value: Any) -> Optional[str]:
+    """A readable SID in upper case (SIDs compare case-insensitively on their S), or None."""
+    if not isinstance(value, str) or not _SID_TEXT.fullmatch(value):
+        return None
+    return value.upper() if all(int(part) <= 0xFFFFFFFF for part in value.split("-")[3:]) else None
+
+
+def windows_token_acl_problem(file: Any, current_user_sid: Any) -> Optional[Dict[str, Any]]:
+    """service.md "Windows token files" (DEC-0032, DEC-0033, DEC-0057, FAC-SEM-079) on what a reader has read:
+    ``file`` is ``{isRegularFile, isReparsePoint, realPathInProfile, ownerSid, aces: [{type, sid, mask}]}``, the mask
+    the ACE's unsigned 32-bit access mask. The first refusal ``{problem, at, sid?, message}``, or None when the file may
+    be read: a regular file, not a reparse point, inside the profile; owned by the user, SYSTEM or Administrators; every
+    allow ACE with a non-zero mask naming one of those three; deny ACEs ignored; any other ACE type refused; anything
+    unreadable refused. The contract's ``windowsTokenAclProblem``; a refusal names the SID, never the contents."""
+    def refuse(problem: str, at: str, message: str, sid: Optional[str] = None) -> Dict[str, Any]:
+        out = {"problem": problem, "at": at, "message": message}
+        if sid is not None:
+            out["sid"] = sid
+        return out
+    user = _sid(current_user_sid)
+    if user is None:
+        return refuse("unreadable", "/currentUserSid", "the current user's SID is unreadable")
+    if not isinstance(file, dict):
+        return refuse("unreadable", "/file", "the token file's metadata is unreadable")
+    for flag in ("isRegularFile", "isReparsePoint", "realPathInProfile"):
+        if not isinstance(file.get(flag), bool):
+            return refuse("unreadable", "/file/" + flag, flag + " is unreadable")
+    if file["isReparsePoint"]:
+        return refuse("reparse-point", "/file/isReparsePoint", "the token file is a reparse point (a symlink or a junction)")
+    if not file["isRegularFile"]:
+        return refuse("not-regular-file", "/file/isRegularFile", "the token file is not a regular file")
+    if not file["realPathInProfile"]:
+        return refuse("outside-profile", "/file/realPathInProfile", "the token file's real path lies outside the user's profile")
+    trusted = {user, SYSTEM_SID, ADMINISTRATORS_SID}
+    owner = _sid(file.get("ownerSid"))
+    if owner is None:
+        return refuse("unreadable", "/file/ownerSid", "the owner SID is unreadable")
+    if owner not in trusted:
+        return refuse("owner", "/file/ownerSid", "the token file is owned by %s, not by the current user, SYSTEM or Administrators" % owner, owner)
+    aces = file.get("aces")
+    if not isinstance(aces, list):
+        return refuse("unreadable", "/file/aces", "the ACL is unreadable")
+    for index, ace in enumerate(aces):
+        at = "/file/aces/%d" % index
+        if not isinstance(ace, dict):
+            return refuse("unreadable", at, "ACE %d is unreadable" % index)
+        if not isinstance(ace.get("type"), str):
+            return refuse("unreadable", at + "/type", "ACE %d has an unreadable type" % index)
+        trustee = _sid(ace.get("sid"))
+        if trustee is None:
+            return refuse("unreadable", at + "/sid", "ACE %d names an unreadable SID" % index)
+        mask = ace.get("mask")
+        if (not isinstance(mask, (int, float)) or isinstance(mask, bool) or (isinstance(mask, float) and not mask.is_integer())
+                or not 0 <= mask <= 0xFFFFFFFF):
+            return refuse("unreadable", at + "/mask", "ACE %d has an unreadable access mask" % index)
+        if ace["type"] == "deny":
+            continue
+        if ace["type"] != "allow":
+            return refuse("ace-type", at + "/type", "ACE %d for %s is of a type the rule does not read" % (index, trustee), trustee)
+        if mask == 0:
+            continue
+        if trustee not in trusted:
+            return refuse("ace-sid", at + "/sid", "the token file grants access to %s; only the current user, SYSTEM and Administrators may hold any" % trustee, trustee)
     return None
+
+
+#: SDDL ACE types (MS-DTYP §2.5.1.1) as the rule's ACE type: allow and deny are read, every other type is refused.
+_SDDL_ACE_TYPES = {"A": "allow", "D": "deny", "OA": "allow-object", "OD": "deny-object", "XA": "allow-callback",
+                   "XD": "deny-callback", "ZA": "allow-object-callback"}
+#: SDDL access-right aliases (MS-DTYP §2.5.1.1, "ace_rights") and their masks.
+_SDDL_RIGHTS = {"GA": 0x10000000, "GR": 0x80000000, "GW": 0x40000000, "GX": 0x20000000, "RC": 0x20000, "SD": 0x10000,
+                "WD": 0x40000, "WO": 0x80000, "RP": 0x10, "WP": 0x20, "CC": 0x1, "DC": 0x2, "LC": 0x4, "SW": 0x8,
+                "LO": 0x80, "DT": 0x40, "CR": 0x100, "FA": 0x1F01FF, "FR": 0x120089, "FW": 0x120116, "FX": 0x1200A0,
+                "KA": 0xF003F, "KR": 0x20019, "KX": 0x20019, "KW": 0x20006}
+
+
+def _sddl_ace_strings(dacl: str) -> List[str]:
+    """The top-level parenthesized ACE strings of an SDDL DACL; a callback ACE's conditional expression may nest."""
+    aces, depth, start = [], 0, 0
+    for index, char in enumerate(dacl):
+        if char == "(":
+            if depth == 0:
+                start = index + 1
+            depth += 1
+        elif char == ")" and depth:
+            depth -= 1
+            if depth == 0:
+                aces.append(dacl[start:index])
+    return aces
+
+
+def _sddl_mask(rights: str) -> Optional[int]:
+    """An SDDL rights field as the unsigned 32-bit mask, or None when it cannot be read."""
+    if re.fullmatch(r"0[xX][0-9a-fA-F]{1,8}", rights):
+        return int(rights, 16)
+    if len(rights) % 2:
+        return None
+    mask = 0
+    for i in range(0, len(rights), 2):
+        if rights[i:i + 2] not in _SDDL_RIGHTS:
+            return None
+        mask |= _SDDL_RIGHTS[rights[i:i + 2]]
+    return mask
+
+
+def acl_from_sddl(sddl: str, canonical: Callable[[str], str] = lambda sid: sid) -> Tuple[str, List[Dict[str, Any]]]:
+    """(owner SID, the ACEs that apply to the object itself as ``{type, sid, mask}``) from an SDDL owner-and-DACL
+    string. ``canonical`` turns an SDDL alias (SY, BA, WD…) into its SID. A missing or NULL DACL grants everyone
+    everything and is read as an allow ACE for Everyone (S-1-1-0); an inherit-only ACE (flag IO) applies to children
+    only and is not read; an unreadable rights field gives mask None, which the rule refuses."""
+    owner = sddl.split("O:", 1)[1].split("G:", 1)[0].split("D:", 1)[0] if "O:" in sddl else ""
+    dacl = sddl.split("D:", 1)[1] if "D:" in sddl else ""
+    owner_sid = canonical(owner) if owner else ""
+    if not dacl or dacl.startswith("NO_ACCESS_CONTROL"):
+        return owner_sid, [{"type": "allow", "sid": "S-1-1-0", "mask": 0x1F01FF}]
+    aces = []
+    for text in _sddl_ace_strings(dacl):
+        fields = text.split(";", 6)
+        if len(fields) < 6:  # unreadable: the rule refuses it
+            aces.append({"type": None, "sid": None, "mask": None})
+            continue
+        kind, flags, rights, trustee = fields[0], fields[1], fields[2], fields[5]
+        if "IO" in [flags[i:i + 2] for i in range(0, len(flags), 2)]:
+            continue
+        aces.append({"type": _SDDL_ACE_TYPES.get(kind, kind), "sid": canonical(trustee), "mask": _sddl_mask(rights)})
+    return owner_sid, aces
 
 
 if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
@@ -430,7 +642,6 @@ if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
     _kernel32.GetCurrentProcess.restype = wintypes.HANDLE
     _kernel32.LocalFree.argtypes = [_PVOID]
     _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-    _ACE = re.compile(r"\(([^;()]*);([^;()]*);([^;()]*);([^;()]*);([^;()]*);([^;()]*)(?:;[^()]*)?\)")
     _CANONICAL: Dict[str, str] = {}
 
     def _win_error(what: str, code: Optional[int] = None) -> OSError:
@@ -492,17 +703,9 @@ if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
         finally:
             _kernel32.LocalFree(sd)
 
-    def windows_acl(path: Path) -> Tuple[str, List[str]]:
-        """(owner SID, SIDs of every allow ACE on the object itself); a missing or NULL list grants
-        everyone everything, reported as Everyone (S-1-1-0)."""
-        text = _sddl(path)
-        owner = text.split("O:", 1)[1].split("G:", 1)[0].split("D:", 1)[0] if "O:" in text else ""
-        dacl = text.split("D:", 1)[1] if "D:" in text else ""
-        if not dacl or dacl.startswith("NO_ACCESS_CONTROL"):
-            return _canonical_sid(owner) if owner else "", ["S-1-1-0"]
-        granting = [_canonical_sid(trustee) for kind, flags, _r, _o, _i, trustee in _ACE.findall(dacl)
-                    if kind in ("A", "OA", "XA", "ZA") and "IO" not in flags]
-        return (_canonical_sid(owner) if owner else ""), granting
+    def windows_acl(path: Path) -> Tuple[str, List[Dict[str, Any]]]:
+        """(owner SID, the ACEs on the object itself as ``{type, sid, mask}``), read from its SDDL (acl_from_sddl)."""
+        return acl_from_sddl(_sddl(path), _canonical_sid)
 
     def _win_protect(path: Path, folder: bool) -> None:
         """A protected list (inheritance off): this user, SYSTEM, Administrators, full control;
@@ -553,14 +756,16 @@ if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
         return ctypes.get_last_error() != 2
 
     def _win_token_problem(path: Path, info: os.stat_result) -> Optional[str]:
-        if getattr(info, "st_file_attributes", 0) & _REPARSE_POINT or not stat.S_ISREG(info.st_mode):
-            return "Token file %s is not a regular file (a link or junction); refusing it." % path
         profile = os.path.normcase(os.path.realpath(os.environ.get("USERPROFILE") or str(Path.home())))
         real = os.path.normcase(os.path.realpath(str(path)))
-        if os.path.commonpath([profile, real]) != profile:
-            return "Token file %s lies outside the user's profile; refusing it." % path
-        owner, granting = windows_acl(path)
-        return token_acl_problem(path, owner, granting, windows_user_sid())
+        try:
+            inside = os.path.commonpath([profile, real]) == profile
+        except ValueError:  # another drive
+            inside = False
+        owner, aces = windows_acl(path)
+        file = {"isRegularFile": stat.S_ISREG(info.st_mode), "isReparsePoint": bool(getattr(info, "st_file_attributes", 0) & _REPARSE_POINT),
+                "realPathInProfile": inside, "ownerSid": owner, "aces": aces}
+        return token_file_problem(path, file, windows_user_sid())
 else:
     def _create_first_pipe(name: str) -> Any:  # noqa: ARG001
         raise ServiceError("named pipes exist only on Windows")
@@ -594,9 +799,9 @@ def ensure_token(path: Path) -> str:
 def read_token(path: Path) -> str:
     """Refuse a symlink, a file owned by someone else, or one others can read.
 
-    On Windows the rule is service.md "Windows token files" (DEC-0032, DEC-0033): a regular file
-    whose real path is in the profile, owned by the current user, SYSTEM or Administrators, every
-    granting ACE naming one of those three; a refusal names the SID, never the contents."""
+    On Windows the rule is service.md "Windows token files" (DEC-0032, DEC-0033, DEC-0057):
+    windows_token_acl_problem over the file's flags, owner and ACEs; a refusal names the SID,
+    never the contents."""
     path = Path(path)
     info = os.lstat(path)
     if stat.S_ISLNK(info.st_mode):
@@ -724,6 +929,10 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         problems.append("a launchd service declares label and plist")
     if "plist" in life and not _LOCAL_PATH.match(str(life["plist"])):
         problems.append("lifecycle.plist must be a local path")
+    # DEC-0057: a descriptor names one supervisor; launchd's label and plist never sit beside another.
+    for field in ("label", "plist"):
+        if field in life and manager in ("systemd", "task-scheduler"):
+            problems.append("lifecycle.%s belongs to launchd, not to %s" % (field, manager))
     # DEC-0032: `unit` goes with systemd and `task` with Task Scheduler, and with nothing else.
     for field, owner, pattern in (("unit", "systemd", _UNIT), ("task", "task-scheduler", _TASK)):
         if manager == owner and field not in life:
@@ -2171,6 +2380,12 @@ def cookie_value(cookie_header: Optional[str], name: str = SESSION_COOKIE) -> Op
 
 # --- systemd and Task Scheduler (DEC-0032, service.md "Supervisor") ------------------
 
+def _no_marker_argument(argv: Sequence[str]) -> None:
+    """The supervisor file's writer writes the marker itself; one already in the arguments could only disagree with it."""
+    if _marker_arguments(list(argv)):
+        raise ServiceError("%s is written by the supervisor file's writer; leave it out of the program arguments" % SUPERVISOR_ARG)
+
+
 def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dict[str, str]]) -> None:
     """No supervisor file carries a secret (service.md): not in an argument, an environment name or its value."""
     import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
@@ -2209,7 +2424,8 @@ def systemd_unit(unit: str, program_arguments: Sequence[str], *, working_directo
         raise ServiceError("TimeoutStopSec must outlast the %d s drain" % DRAIN_SECONDS)
     env = dict(environment or {})
     _no_secret_in_supervisor_file(argv, env)
-    env.setdefault(SUPERVISOR_ENV, "systemd")
+    _no_marker_argument(argv)
+    env[SUPERVISOR_ENV] = "systemd"  # the unit's writer writes the marker, whatever the caller passed
     # A unit is a Linux file: a Path built anywhere (a test on Windows, an installer's planner) names a POSIX path.
     cwd = _plain(working_directory.as_posix() if isinstance(working_directory, PurePath) else str(working_directory),
                  "the working directory")
@@ -2291,6 +2507,10 @@ def task_xml(task: str, program_arguments: Sequence[str], *, working_directory: 
                                                            (description or task, "the description")]:
         _plain(value, what)
     _no_secret_in_supervisor_file(argv, None)
+    _no_marker_argument(argv)
+    # A task's Exec action carries no environment, so the marker is an argument (DEC-0057), before any `--`.
+    cut = argv.index("--") if "--" in argv else len(argv)
+    argv = argv[:cut] + [SUPERVISOR_ARG, "task-scheduler"] + argv[cut:]
     who = user or ("%s\\%s" % (os.environ.get("USERDOMAIN", ""), os.environ["USERNAME"]) if os.environ.get("USERNAME") else "")
     if not who:
         raise ServiceError("name the user the task runs as (DOMAIN\\user); USERNAME is not set")
@@ -2363,6 +2583,7 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
         if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)$", key) and not key.endswith("_FILE"):
             raise ServiceError("Environment variable %s looks like a secret; pass a *_FILE path instead." % key)
     env.setdefault("PATH", "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")
+    _no_marker_argument([str(a) for a in program_arguments])
     env[SUPERVISOR_ENV] = "launchd"
     plist = {
         "Label": label,

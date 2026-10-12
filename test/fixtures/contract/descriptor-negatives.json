@@ -1,0 +1,273 @@
+{
+  "about": "DEC-0057's killing fixtures for the service descriptor, which the kits' validate_descriptor/validateDescriptor refuse.",
+  "source": "fixtures/negative/service-descriptor-*.json",
+  "negatives": [
+    {
+      "name": "bad-task",
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~\\AppData\\Local\\example-agent\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler",
+          "task": "PassionCode\\example-agent.default"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "bad-unit",
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.local/share/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "systemd",
+          "unit": "example-agent.default"
+        },
+        "paths": {
+          "data": "~/.local/share/example-agent",
+          "logs": [
+            "~/.local/state/example-agent/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/.local/share/example-agent/bin/example-agent",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "systemd-with-plist",
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.local/share/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "systemd",
+          "unit": "example-agent.default.service",
+          "plist": "~/.config/example-agent/example-agent.plist"
+        },
+        "paths": {
+          "data": "~/.local/share/example-agent",
+          "logs": [
+            "~/.local/state/example-agent/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/.local/share/example-agent/bin/example-agent",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "task-scheduler-with-label",
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~\\AppData\\Local\\example-agent\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler",
+          "task": "\\PassionCode\\example-agent.default",
+          "label": "com.example.example-agent"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "task-without-task-scheduler",
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~/.local/share/example-agent/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "none",
+          "task": "\\PassionCode\\example-agent.default"
+        },
+        "paths": {
+          "data": "~/.local/share/example-agent",
+          "logs": [
+            "~/.local/state/example-agent/service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "~/.local/share/example-agent/bin/example-agent",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "unc-forward-slash",
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "//server/share/service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "task-scheduler",
+          "task": "\\PassionCode\\example-agent.default"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    },
+    {
+      "name": "windows-service-manager",
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "example-agent",
+        "instance": "default",
+        "name": "Example Agent",
+        "summary": "Drafts and files reports for its operator.",
+        "origin": "http://127.0.0.1:47195",
+        "auth": {
+          "tokenFile": "~\\AppData\\Local\\example-agent\\service.token",
+          "header": "X-Example-Token",
+          "scheme": "none"
+        },
+        "lifecycle": {
+          "manager": "windows-service"
+        },
+        "paths": {
+          "data": "C:\\Users\\example\\AppData\\Local\\example-agent",
+          "logs": [
+            "C:\\Users\\example\\AppData\\Local\\example-agent\\Logs\\service.log"
+          ]
+        },
+        "commands": {
+          "doctor": [
+            "C:\\Users\\example\\AppData\\Local\\Programs\\example-agent\\example-agent.exe",
+            "doctor",
+            "--json"
+          ]
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-28T18:00:00Z",
+        "installedBy": "example-agent service install 0.2.0"
+      }
+    }
+  ]
+}

@@ -43,12 +43,16 @@ It checks, in the order of the ER table:
    parent, and no revocation dropped.
 5. **The signer.** The signing passkey must be among the trusted ones and not revoked by the parent. A revision may
    revoke its own signer: that is rotation.
-6. **The assertion.**
+6. **The assertion.** The passkey is a signing credential (DEC-0063): an RP ID that is not a dedicated signing RP,
+   `sign.<domain>` in lower case, is `wrong-rp` before the assertion is read, and an origin outside the RP ID is not
+   pinned, so a ceremony that ran there is `wrong-origin`.
    - Client data: type, challenge, origin, no cross-origin use.
    - The RP ID hash, and the user-presence and user-verification flags.
    - The signature: ES256 or EdDSA, under a key validated first (a valid P-256 point; an Ed25519 key of full order).
-7. **The window.** At most 30 days.
-8. **The record's own rules.** A violation is `rule-violation` with its `codes`.
+7. **The window.** At most 30 days. A revision may be issued up to 60 s ahead of the verifier's clock (DEC-0066,
+   `CLOCK_SKEW_SECONDS`); earlier than that it is `not-yet-valid`.
+8. **The record's own rules.** A violation is `rule-violation` with its `codes`, `FAC-SEM-072…076` and `FAC-SEM-092`
+   (each passkey the record lists is a signing credential, its origins within its RP ID).
 
 Dates are strict RFC 3339: a `T`, an offset, and a day that exists. `:60` and a space are refused. Passkey JWK `x`
 and `y` must be canonical base64url. The Python kit verifies ES256 in pure Python (P-256, strict DER), and the Node
@@ -56,22 +60,35 @@ kit through `node:crypto`.
 
 ## Trusting a delegation key
 
-A delegation verifier that reads the estate record trusts a token's `kid` only while a current revision certifies it
-for a machine and does not revoke it (DL-14, contract CT-20). Give the gate the current verified revision, or a
-function that returns it:
+A delegation verifier that reads the estate record trusts a token's `kid` only while the revision it reads certifies
+it (DL-14, contract DEC-0060): exactly one machine's `hubKey` has that `kid` and the published key's `x`, the clock is
+inside the revision's window (from 60 s before `issuedAt`, DEC-0066, to `validUntil`), and neither the revision nor the
+revocation delta's entries applied since it revoke `hub-key <kid>` or `machine <id>`. It is checked right after the
+signature (DL-13 row 4a). Give the gate the current verified revision, or a function that returns it, the highest
+revision the machine applied, and the delta's revocations:
 
 ```python
-gate = fd.delegation_gate(audience=..., jwks=keys, issuer=..., effects=..., estate=lambda: current)
+gate = fd.delegation_gate(audience=..., jwks=keys, issuer=..., effects=..., estate=lambda: current,
+                          estate_applied={"revision": applied_number, "digest": applied_digest},
+                          estate_revocations=lambda: delta_entries)
 ```
 
-- A `kid` the record does not certify is refused like an unknown key: `unauthenticated` (for an approval,
-  `approval-invalid`) with detail `kid-not-certified`. The same holds when the record names another key under that
-  kid, revokes it, or is outside its window.
-- A record that cannot be read certifies nothing: `issuer-unavailable` with detail `estate-unreadable`.
-- **What you pass in.** Pass only a revision that `verify_estate_record` accepted, and the highest revision the
-  machine has applied. The rule trusts the record it is given. A record nobody verified, or an older revision still
-  inside its window, would certify a key the current revision revoked (a rollback).
-- `hub_key_certified(record, kid, x, at)` / `hubKeyCertified(...)` answers the question on its own.
+- **The token's fault** — no such certification, another key under that `kid`, a `kid` on two machines, a revoked hub
+  key or machine — is `unauthenticated` (for an approval, `approval-invalid`) with detail `kid-not-certified`.
+- **The trust source's fault** is `issuer-unavailable`: `estate-unreadable` (a source that throws or answers nothing
+  readable, a revision without a number or digest, a window of zero or over 30 days, dates read strictly, `machines` or
+  `revocations` not arrays), `estate-outside-window`, `estate-rolled-back` (lower than the applied revision) and
+  `estate-forked` (the applied number with another digest). A caller cannot cure these by minting again.
+- An unreadable clock — not a finite number of seconds a `Date` can hold — is refused `unknown-state` `no-clock`
+  before row 1, in every verifier.
+- Only an absent `estate` skips the check. In the Node kit `null` is an unreadable source; in Python, where `None` is
+  the absent value, pass a function returning `None` for a source that has nothing.
+- **What you pass in.** Pass only a revision that `verify_estate_record` accepted and whose number is not lower than
+  the highest the machine applied; a higher one only when you verified its chain from the applied revision.
+- `hub_key_certified(record, kid, x, at, applied, extra_revocations)` /
+  `hubKeyCertified(record, kid, x, at, applied, {extraRevocations})` answers the question on its own:
+  `{certified: true, machine, revision}` or `{certified: false, fault, detail}`. Both kits are held to the contract's
+  `fixtures/vectors/hub-key.json` (`test/fixtures/contract/hub-key-vectors.json`).
 
 ## Checking a record you produce
 

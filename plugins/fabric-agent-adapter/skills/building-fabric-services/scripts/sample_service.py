@@ -361,11 +361,13 @@ def register(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: Optional[list] = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    fs.add_supervisor_argument(parser)  # the marker a supervisor passes (DEC-0057), before or after the command
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("serve", "register"):
         p = sub.add_parser(name)
+        fs.add_supervisor_argument(p)
         p.add_argument("--port", type=int, required=True)
         p.add_argument("--data-dir", required=True)
         p.add_argument("--token-file")
@@ -378,7 +380,11 @@ def main(argv: Optional[list] = None) -> int:
             p.add_argument("--services-dir")
             p.add_argument("--label")
             p.add_argument("--plist")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: Optional[list] = None) -> int:
+    args = build_parser().parse_args(argv)
     return serve(args) if args.command == "serve" else register(args)
 
 

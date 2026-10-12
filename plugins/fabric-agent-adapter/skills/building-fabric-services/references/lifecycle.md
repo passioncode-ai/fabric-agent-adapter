@@ -73,12 +73,36 @@ operator's real jobs.
 ## One copy under a supervisor
 
 Started by hand, a copy that finds `service.lock` held prints one sentence naming the
-holder and exits 75 at once. Under launchd that exit is a respawn every `ThrottleInterval`
-(10 s), forever, and under systemd one every `RestartSec`. So a copy whose plist or unit
-carries `FABRIC_SERVICE_SUPERVISOR=launchd` (or `systemd`) backs off in-process — 0.5 s doubling to 30 s, 300 s in all — takes over if the holder leaves,
-and exits 75 only when the wait runs out: a few starts an hour instead of 360. It touches
-nothing while it waits. Two installs sharing one data directory are still the defect to
-remove; the back-off only stops the loop from costing the machine.
+holder (or saying the holder is unknown, when its pid cannot be read) and exits 75 at once.
+Under launchd that exit is a respawn every `ThrottleInterval` (10 s), forever, and under
+systemd one every `RestartSec`. So a copy its supervisor started, and that says so with the
+**supervisor marker**, backs off in-process — 0.5 s doubling to 30 s, 300 s in all — takes over
+if the holder leaves, and exits 75 only when the wait runs out: a few starts an hour instead of
+360. It touches nothing while it waits. Two installs sharing one data directory are still the
+defect to remove; the back-off only stops the loop from costing the machine.
+
+The marker (contract DEC-0057, CT-01) is the variable `FABRIC_SERVICE_SUPERVISOR=<manager>` or
+the argument `--fabric-supervisor <manager>` (also `--fabric-supervisor=<manager>`), after the
+executable and before any `--`; `<manager>` is `launchd`, `systemd`, `task-scheduler` or `node`
+(Project Observatory's node, which supervises the services it starts). The writer of the
+supervisor file writes it: `launchd_plist` and `systemd_unit` / `systemdUnit` set the variable,
+always; `task_xml` / `taskXml` put the argument in the task's `Arguments`, because a task's action
+carries no environment. Each writer refuses a marker already in the program arguments. A copy
+never infers supervision from its parent process.
+
+- `supervisor_marker(env, argv)` / `supervisorMarker({env, argv})` reads both forms and answers
+  `supervised` (with the manager), `manual` or `conflict`. Only an empty variable counts as no
+  marker; a bare `--fabric-supervisor` (followed by nothing, by `--` or by another `--…` flag,
+  none of which it consumes) names no manager.
+- Markers that disagree — the variable and the argument with different values, the argument
+  twice, or a bare or empty argument beside the variable — exit 75 at once, before the lock and
+  whether or not it is held, naming both markers.
+- A service's own argument parser accepts the flag in both spellings and ignores it: in Python,
+  `add_supervisor_argument(parser)` (argparse otherwise exits 2 on an unknown flag); the sample
+  service adds it to the parser and to each command.
+- The kits are held to the contract's `fixtures/vectors/service-supervisor.json`, and their
+  starts against a held lock are recorded and read as `FAC-SEM-078` reads them
+  (`test/*supervisors*`).
 
 ## Directories
 
@@ -151,7 +175,7 @@ control character (a line break would end a unit line early).
 **Linux — a systemd user unit.** `systemd_unit(unit, argv, working_directory=…)` /
 `systemdUnit(unit, argv, {workingDirectory})` writes `Restart=always`, `RestartSec=10`,
 `TimeoutStopSec` above the drain (15 s default), `KillMode=mixed`, `WantedBy=default.target`
-and `FABRIC_SERVICE_SUPERVISOR=systemd`, quoting every argument (`%` → `%%`, `$` → `$$`).
+and `FABRIC_SERVICE_SUPERVISOR=systemd` (always, whatever the caller passed), quoting every argument (`%` → `%%`, `$` → `$$`).
 `WorkingDirectory=` is written unquoted: systemd reads it as the rest of the line, so quotes would
 become part of the path and the unit would be refused (`systemd-analyze verify` checks it in CI). The
 descriptor says `"lifecycle": {"manager": "systemd", "unit": "<id>.<instance>.service"}`.
@@ -179,9 +203,10 @@ CI job has the real `schtasks` create, read back and delete such a task. The des
 | stop, keep off | `schtasks /End /TN <task>`, then `schtasks /Change /TN <task> /DISABLE` |
 | uninstall | `task_uninstall` / `taskUninstall`: `/End`, then `/Delete /F` |
 
-A task cannot set an environment variable, so a copy Task Scheduler restarts does not back off
-in-process; `IgnoreNew` keeps the scheduler from starting a second copy, and a hand-started copy
-holding the lock makes the scheduled one exit 75 once a minute until it leaves.
+A task cannot set an environment variable, so `task_xml` / `taskXml` write the marker as an
+argument, `--fabric-supervisor task-scheduler`, before any `--`: a copy the Task Scheduler starts
+backs off in-process like one under launchd or systemd. `IgnoreNew` keeps the scheduler from
+starting a second copy.
 
 **One copy on each system.** The Python kit takes `flock` (Linux) or a locked byte
 (Windows); the Node kit cannot, so it holds a name instead — an abstract unix socket on Linux,
@@ -192,7 +217,14 @@ holds the same name beside its file lock, so the two kits exclude each other eve
 
 **Token files on Windows.** The privacy of `service.token` is its ACL (service.md *Windows
 token files*): the kits write a protected list — the user, SYSTEM and Administrators, set before the
-token's bytes go in, any entry already there dropped — and refuse
-on read a link, a file outside the profile, another owner, or any other granted SID, naming the
-SID. The Node kit reads the list with Windows PowerShell 5.1 (.NET, no modules) and writes it
-with `icacls`; the path goes through the environment, never a command line.
+token's bytes go in, any entry already there dropped. On read, `windows_token_acl_problem` /
+`windowsTokenAclProblem` decide over what was read — the file's flags, its owner SID and each ACE
+as `{type, sid, mask}` (DEC-0057, `FAC-SEM-079`, held to the contract's
+`fixtures/vectors/windows-token.json`): a reparse point, a directory, a real path outside the
+profile, another owner, an allow ACE with a non-zero mask for any other SID, an ACE of another type
+than allow or deny (an object or callback ACE), or anything unreadable is refused, naming the SID;
+deny ACEs and an allow with an empty mask grant nothing; SIDs compare case-insensitively. The Python
+kit reads the ACEs from the file's SDDL (`acl_from_sddl`); the Node kit reads them with Windows
+PowerShell 5.1 (.NET's raw descriptor, no modules), converting .NET's signed mask to the unsigned
+one, and writes the list with `icacls`; the path goes through the environment, never a command line.
+An inherit-only ACE applies to children, not to the file, and is not read.
