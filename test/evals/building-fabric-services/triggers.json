@@ -120,6 +120,14 @@
     {
       "query": "Дашборд агента ломается в узкой панели Fabric Dashboards рядом с консолью — поправь вёрстку и подключи темы.",
       "shouldTrigger": true
+    },
+    {
+      "query": "example-agent runs as a local Fabric service on my Mac; install it on our Linux box so it comes back after a reboot, and on the Windows laptop too.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Поставь example-agent как сервис Fabric на Linux через systemd и на Windows через планировщик задач, чтобы он поднимался после входа.",
+      "shouldTrigger": true
     }
   ]
 }

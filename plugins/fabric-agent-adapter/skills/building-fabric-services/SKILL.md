@@ -13,10 +13,10 @@ description: >-
   kits, a TLS sample, live and layout probes. NOT for a one-off script or cron job, a hosted product with no agent
   behind it, the provider manifest (adapting-projects-to-fabric), or building Fabric Dashboards.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
-compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
+compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.17.0"
+  version: "0.18.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "0cacd08b0e95b6abf131eae1206b60792138bc3c"
@@ -190,10 +190,14 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
 4. After an upgrade, `prune_releases(releases_dir, current=…)` keeps the running release
    and the one before it.
 
+On Linux the supervisor is a systemd user unit (`systemd_unit` + `systemd_install`), on
+Windows a per-user Scheduled Task (`task_xml` + `task_install`); the Node kit has the same
+writers (`systemdUnit`, `taskXml`, …) and both kits write identical files.
+
 Code runs from an immutable release directory; an upgrade writes a new release,
 rewrites the plist and restarts. Read [the lifecycle reference](references/lifecycle.md)
 for the plist fields, the release layout, log rotation, behaving under a host lifecycle broker
-and the Linux case.
+and the Linux and Windows supervisors.
 
 ## Step 5 — the dashboard and the events
 

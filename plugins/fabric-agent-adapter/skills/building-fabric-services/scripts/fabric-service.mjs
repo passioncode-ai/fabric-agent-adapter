@@ -3,11 +3,13 @@
 // Normative source: fabric-agent-contract docs/specification/service.md (DEC-0015; the remote
 // placement — an online agent or dashboard at an https origin — DEC-0019; the usage report DEC-0021).
 
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { credentialName, secretArgument, secretValue } from './fabric-secrets.mjs';
 
 export const PROTOCOL = 'fabric-service/0.1';
 export const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/service/0.1';
@@ -49,6 +51,13 @@ const CODE = /^[A-Za-z0-9_-]{16,256}$/;
 const TRACE_ID = /^(?!0{32}$)[0-9a-f]{32}$/;
 const SPAN_ID = /^(?!0{16}$)[0-9a-f]{16}$/;
 const O_EXLOCK = 0x20; // BSD/macOS: open(2) takes flock(LOCK_EX); absent from fs.constants
+// DEC-0032: a local path starts with ~/ (or ~\ on Windows), / (never //) or a drive letter; a network share never does.
+const LOCAL_PATH = /^(~[\\/]|\/(?!\/)|[A-Za-z]:[\\/])/;
+export const MANAGERS = Object.freeze(['launchd', 'systemd', 'task-scheduler', 'none']);
+const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$/;
+const TASK = /^\\[A-Za-z0-9 ._\\-]{1,254}$/;
+export const WINDOWS_TRUSTED = Object.freeze(['S-1-5-18', 'S-1-5-32-544']);
+export const DEFAULT_EXIT_TIMEOUT = 15;
 
 export class ServiceError extends Error {}
 export class AlreadyRunning extends ServiceError {
@@ -61,28 +70,41 @@ export class AlreadyRunning extends ServiceError {
 
 export const nowIso = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-export function expand(p) {
-  const out = p.startsWith('~/') ? path.join(os.homedir(), p.slice(2)) : p;
-  if (!path.isAbsolute(out)) throw new ServiceError(`Path ${p} must be absolute or start with ~/.`);
+/** Paths in a descriptor may start with ~/ (or ~\\ on Windows); everything else must be absolute,
+ * and a network share is never a local path (DEC-0032). */
+export function expand(p, platform = process.platform) {
+  if (!LOCAL_PATH.test(String(p))) throw new ServiceError(`Path ${p} must be absolute or start with ~/.`);
+  const out = /^~[\\/]/.test(p) ? path.join(os.homedir(), p.slice(2)) : p;
+  // On Windows an absolute path names its drive: `/x` is relative to the current drive (the Python kit refuses it too).
+  const absolute = platform === 'win32' ? /^[A-Za-z]:[\\/]/.test(out) : path.posix.isAbsolute(out);
+  if (!absolute) throw new ServiceError(`Path ${p} must be absolute or start with ~/.`);
   return out;
 }
 
-export function servicesDir() {
+// DEC-0032: LOCALAPPDATA, not APPDATA, so token files never roam with the profile.
+const localAppData = () => process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+
+export function servicesDir(platform = process.platform) {
   if (process.env.FABRIC_SERVICES_DIR) return expand(process.env.FABRIC_SERVICES_DIR);
   const home = os.homedir();
-  if (process.platform === 'darwin') return path.join(home, 'Library/Application Support/ai.passioncode.fabric/services');
+  if (platform === 'darwin') return path.join(home, 'Library/Application Support/ai.passioncode.fabric/services');
+  if (platform === 'win32') return path.join(localAppData(), 'passioncode-fabric', 'services');
   return path.join(process.env.XDG_DATA_HOME || path.join(home, '.local/share'), 'passioncode-fabric/services');
 }
 
-export function serviceDirs(id) {
+export function serviceDirs(id, platform = process.platform) {
   if (!ID.test(id)) throw new ServiceError(`Service id ${id} must match ${ID}.`);
   const home = os.homedir();
-  if (process.platform === 'darwin') {
+  if (platform === 'darwin') {
     return {
       data: path.join(home, 'Library/Application Support', id),
       logs: path.join(home, 'Library/Logs', id),
       cache: path.join(home, 'Library/Caches', id),
     };
+  }
+  if (platform === 'win32') {
+    const data = path.join(localAppData(), id);
+    return { data, logs: path.join(data, 'Logs'), cache: path.join(data, 'Cache') };
   }
   return {
     data: path.join(process.env.XDG_DATA_HOME || path.join(home, '.local/share'), id),
@@ -93,7 +115,8 @@ export function serviceDirs(id) {
 
 export function ensurePrivateDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
-  fs.chmodSync(dir, 0o700);
+  if (process.platform === 'win32') windowsProtect(dir, { folder: true });
+  else fs.chmodSync(dir, 0o700);
   return dir;
 }
 
@@ -102,13 +125,16 @@ export function atomicWrite(file, data, mode = 0o600) {
   const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(4).toString('hex')}`);
   const fd = fs.openSync(tmp, 'wx', mode);
   try {
+    // On Windows the file's ACL is its privacy (DEC-0032): set explicitly and protected — before the bytes go in —
+    // so it does not depend on what the folder hands down. A rename keeps it.
+    if (process.platform === 'win32') windowsProtect(tmp, { folder: false });
     fs.writeSync(fd, data);
     fs.fsyncSync(fd);
   } finally {
     fs.closeSync(fd);
   }
   try {
-    fs.chmodSync(tmp, mode);
+    if (process.platform !== 'win32') fs.chmodSync(tmp, mode);
     fs.renameSync(tmp, file);
   } catch (error) {
     fs.rmSync(tmp, { force: true });
@@ -140,11 +166,15 @@ export class InstanceLock {
       fs.fsyncSync(this.fd);
       return this;
     }
-    // Linux: an abstract unix socket is exclusive, has no file, and dies with the process.
-    const name = `\0fabric-service-${crypto.createHash('sha256').update(path.resolve(this.path)).digest('hex').slice(0, 32)}`;
+    // Linux: an abstract unix socket; Windows: a named pipe. Each is exclusive, has no file, and dies
+    // with the process. The Python kit holds the same name beside its file lock (fabric_service.lock_name).
+    const name = lockName(this.path);
+    if (!name) throw new ServiceError(`No instance lock on ${process.platform}: the kit supports macOS, Linux and Windows.`);
     this.server = net.createServer();
     await new Promise((resolve, reject) => {
-      this.server.once('error', (error) => reject(error.code === 'EADDRINUSE' ? new AlreadyRunning(readPid(this.path), this.path) : error));
+      // Windows reports a held pipe as EADDRINUSE (access denied) or, when its holder capped the instances, EBUSY.
+      const held = (code) => code === 'EADDRINUSE' || (process.platform === 'win32' && code === 'EBUSY');
+      this.server.once('error', (error) => reject(held(error.code) ? new AlreadyRunning(readPid(this.path), this.path) : error));
       this.server.listen(name, resolve);
     });
     this.server.unref();
@@ -160,6 +190,15 @@ export class InstanceLock {
   }
 }
 
+/** The name the lock is held under on Linux (abstract socket) and Windows (named pipe); null on macOS. */
+export function lockName(lockPath, platform = process.platform) {
+  const digest = (text) => crypto.createHash('sha256').update(text).digest('hex').slice(0, 32);
+  if (platform === 'linux') return `\0fabric-service-${digest(path.posix.resolve(lockPath))}`;
+  // Windows paths compare without case: C:\Users and c:\users are one lock.
+  if (platform === 'win32') return `\\\\.\\pipe\\fabric-service-${digest(path.win32.resolve(lockPath).toLowerCase())}`;
+  return null;
+}
+
 function readPid(file) {
   try {
     const text = fs.readFileSync(file, 'utf8').trim();
@@ -171,6 +210,9 @@ function readPid(file) {
 
 /** True when launchd started this process from a plist that says so (FABRIC_SERVICE_SUPERVISOR=launchd). */
 export const supervisedByLaunchd = () => process.env[SUPERVISOR_ENV] === 'launchd';
+export const SUPERVISORS = Object.freeze(['launchd', 'systemd', 'task-scheduler']);
+/** True when a supervisor that restarts on exit started this process and said so (launchd, systemd). */
+export const supervised = () => SUPERVISORS.includes(process.env[SUPERVISOR_ENV]);
 
 const sleepSeconds = (s) => new Promise((resolve) => setTimeout(resolve, s * 1000));
 
@@ -184,7 +226,7 @@ const sleepSeconds = (s) => new Promise((resolve) => setTimeout(resolve, s * 100
 export async function holdSingleInstance(dataDir, {
   waitSeconds, sleep = sleepSeconds, clock = () => performance.now() / 1000, exit = (code) => process.exit(code),
 } = {}) {
-  const wait = waitSeconds ?? (supervisedByLaunchd() ? LOCK_WAIT_SUPERVISED_SECONDS : 0);
+  const wait = waitSeconds ?? (supervised() ? LOCK_WAIT_SUPERVISED_SECONDS : 0);
   const deadline = clock() + Math.max(0, wait);
   let delay = LOCK_BACKOFF_FIRST_SECONDS;
   let announced = false;
@@ -218,14 +260,108 @@ export function ensureToken(file) {
   return token;
 }
 
+/**
+ * Refuse a symlink, a file owned by someone else, or one others can read. On Windows the rule is
+ * service.md "Windows token files" (DEC-0032, DEC-0033): a regular file whose real path is in the
+ * profile, owned by the current user, SYSTEM or Administrators, every granting ACE naming one of
+ * those three; a refusal names the SID, never the contents.
+ */
 export function readToken(file) {
   const info = fs.lstatSync(file);
   if (info.isSymbolicLink()) throw new ServiceError(`Token file ${file} is a symlink; refusing it.`);
-  if (typeof process.getuid === 'function' && info.uid !== process.getuid()) throw new ServiceError(`Token file ${file} belongs to another user.`);
-  if (info.mode & 0o077) throw new ServiceError(`Token file ${file} is readable by others; set mode 0600.`);
+  if (process.platform === 'win32') {
+    const problem = windowsTokenProblem(file, info);
+    if (problem) throw new ServiceError(problem);
+  } else {
+    if (typeof process.getuid === 'function' && info.uid !== process.getuid()) throw new ServiceError(`Token file ${file} belongs to another user.`);
+    if (info.mode & 0o077) throw new ServiceError(`Token file ${file} is readable by others; set mode 0600.`);
+  }
   const token = fs.readFileSync(file, 'utf8').trim();
   if (token.length < 16) throw new ServiceError(`Token file ${file} holds no usable token.`);
   return token;
+}
+
+// --- Windows ACLs (DEC-0032) ------------------------------------------------------
+// Node has no ACL API. Windows PowerShell (5.1, present on every Windows) reads the list through .NET
+// and icacls writes it; both get the path through the environment, never argv, and print no contents.
+
+/**
+ * service.md "Windows token files", rules 2 and 3, on SIDs already read: the owner is the current
+ * user, SYSTEM or Administrators (DEC-0033), and every SID an allow ACE grants anything to is one of
+ * those three. Deny ACEs are not passed in: they do not change the decision.
+ */
+export function tokenAclProblem(file, owner, granting, user) {
+  if (owner !== user && !WINDOWS_TRUSTED.includes(owner)) {
+    return `Token file ${file} is owned by ${owner || 'nobody'}, not by this user (${user}), SYSTEM or Administrators.`;
+  }
+  for (const sid of granting) {
+    if (sid !== user && !WINDOWS_TRUSTED.includes(sid)) return `Token file ${file} grants access to ${sid}; only this user, SYSTEM and Administrators may hold any.`;
+  }
+  return null;
+}
+
+const ACL_SCRIPT = [
+  "$ErrorActionPreference = 'Stop'",
+  '$sid = [System.Security.Principal.SecurityIdentifier]',
+  '$acl = [System.IO.File]::GetAccessControl($env:FABRIC_ACL_PATH)',
+  "$null_dacl = $acl.GetSecurityDescriptorSddlForm('Access') -match 'NO_ACCESS_CONTROL' -or $acl.GetSecurityDescriptorSddlForm('Access') -eq ''",
+  // InheritOnly (2) applies to children, not to the file itself.
+  "$granting = @($acl.GetAccessRules($true, $true, $sid) | Where-Object { $_.AccessControlType -eq 'Allow' -and -not ([int]$_.PropagationFlags -band 2) } | ForEach-Object { $_.IdentityReference.Value })",
+  '$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value',
+  '[Console]::Out.Write((ConvertTo-Json -Compress @{ owner = $acl.GetOwner($sid).Value; granting = $granting; nullDacl = [bool]$null_dacl; user = $user }))',
+].join('; ');
+
+function windowsHelper(command, args, extraEnv = {}) {
+  // No PSModulePath: the script uses .NET only, and a module path inherited from PowerShell 7 makes
+  // Windows PowerShell load the wrong modules.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toLowerCase() !== 'psmodulepath'));
+  const result = spawnSync(command, args, { env: { ...env, ...extraEnv }, encoding: 'utf8', windowsHide: true, timeout: 30_000 });
+  if (result.error || result.status !== 0) {
+    throw new ServiceError(`${command} failed: ${(result.error?.message || result.stderr || result.stdout || '').trim().slice(0, 200)}`);
+  }
+  return result.stdout;
+}
+
+/** The ACL report PowerShell prints, reduced to (owner, granting SIDs, current user). */
+export function parseAclReport(text) {
+  const report = JSON.parse(text);
+  const granting = report.nullDacl ? ['S-1-1-0'] : [].concat(report.granting ?? []);
+  return { owner: report.owner ?? '', granting, user: report.user };
+}
+
+/** (owner SID, SIDs of every allow ACE on the file itself, the current user's SID). */
+export function windowsAcl(file) {
+  return parseAclReport(windowsHelper('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT], { FABRIC_ACL_PATH: file }));
+}
+
+let userSid = null;
+export function windowsUserSid() {
+  if (!userSid) {
+    const line = windowsHelper('whoami.exe', ['/user', '/fo', 'csv', '/nh']).trim();
+    userSid = (line.match(/"(S-1-[0-9-]+)"\s*$/) ?? [])[1];
+    if (!userSid) throw new ServiceError('whoami /user printed no SID.');
+  }
+  return userSid;
+}
+
+/**
+ * A protected list (inheritance off): this user, SYSTEM, Administrators, full control; a folder hands it down.
+ * `/reset` first drops any explicit entry already there (`/inheritance:r` keeps those), so the three are all that remain.
+ */
+export function windowsProtect(target, { folder }) {
+  const grant = folder ? '(OI)(CI)F' : 'F';
+  windowsHelper('icacls.exe', [target, '/reset']);
+  windowsHelper('icacls.exe', [target, '/inheritance:r', '/grant:r', ...[windowsUserSid(), ...WINDOWS_TRUSTED].map((sid) => `*${sid}:${grant}`)]);
+}
+
+function windowsTokenProblem(file, info) {
+  if (!info.isFile()) return `Token file ${file} is not a regular file (a link or junction); refusing it.`;
+  const profile = fs.realpathSync.native(process.env.USERPROFILE || os.homedir()).toLowerCase();
+  const real = fs.realpathSync.native(file).toLowerCase();
+  const inside = path.win32.relative(profile, real);
+  if (!inside || inside.startsWith('..') || path.win32.isAbsolute(inside)) return `Token file ${file} lies outside the user's profile; refusing it.`;
+  const { owner, granting, user } = windowsAcl(file);
+  return tokenAclProblem(file, owner, granting, user);
 }
 
 export function tokenMatches(presented, token, scheme = 'Bearer') {
@@ -278,22 +414,37 @@ export function validateDescriptor(d) {
   if (remote) problems.push(...remoteOriginProblems(d.origin));
   else if (!ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
   if (!d.auth?.tokenFile) problems.push('auth.tokenFile is required');
+  else if (!LOCAL_PATH.test(String(d.auth.tokenFile))) problems.push('auth.tokenFile must be a local path, never a network share');
+  for (const value of [...(d.paths?.data !== undefined ? [d.paths.data] : []), ...(d.paths?.logs ?? [])]) {
+    if (!LOCAL_PATH.test(String(value))) problems.push(`paths must be local paths, never a network share: ${JSON.stringify(value)}`);
+  }
   if ((d.auth?.header ?? 'Authorization') !== 'Authorization' && (d.auth?.scheme ?? 'Bearer') !== 'none') {
     problems.push('a custom auth header carries the raw token: scheme must be none');
   }
-  if (!['launchd', 'none'].includes(d.lifecycle?.manager)) problems.push('lifecycle.manager must be launchd or none');
-  if (d.lifecycle?.manager === 'launchd' && !(d.lifecycle.label && String(d.lifecycle.plist ?? '').endsWith('.plist'))) {
+  const life = d.lifecycle ?? {};
+  const manager = life.manager;
+  if (!MANAGERS.includes(manager)) problems.push('lifecycle.manager must be launchd, systemd, task-scheduler or none');
+  if (manager === 'launchd' && !(life.label && String(life.plist ?? '').endsWith('.plist'))) {
     problems.push('a launchd service declares label and plist');
   }
+  if (life.plist !== undefined && !LOCAL_PATH.test(String(life.plist))) problems.push('lifecycle.plist must be a local path');
+  // DEC-0032: `unit` goes with systemd and `task` with Task Scheduler, and with nothing else.
+  for (const [field, owner, pattern] of [['unit', 'systemd', UNIT], ['task', 'task-scheduler', TASK]]) {
+    if (manager === owner && life[field] === undefined) problems.push(`a ${owner} service declares ${field}`);
+    if (life[field] !== undefined && manager !== owner) problems.push(`lifecycle.${field} belongs to manager ${owner} only`);
+    if (life[field] !== undefined && !pattern.test(String(life[field]))) problems.push(`lifecycle.${field} must match ${pattern.source}`);
+  }
   if (remote) {
-    if (d.lifecycle?.manager !== 'none') problems.push('a remote service is supervised by its platform: lifecycle.manager must be none');
-    for (const field of ['label', 'plist']) if (d.lifecycle?.[field] !== undefined) problems.push(`a remote service has no launchd ${field}`);
+    if (manager !== 'none') problems.push('a remote service is supervised by its platform: lifecycle.manager must be none');
+    for (const [field, of] of [['label', 'launchd'], ['plist', 'launchd'], ['unit', 'systemd'], ['task', 'Task Scheduler']]) {
+      if (life[field] !== undefined) problems.push(`a remote service has no ${of} ${field}`);
+    }
     if (d.commands?.update !== undefined) problems.push('a remote service declares no update command');
   }
   for (const [name, argv] of Object.entries(d.commands ?? {})) {
     if (!['doctor', 'update'].includes(name)) problems.push(`unknown command ${name}`);
     else if (!Array.isArray(argv) || !argv.length || !argv.every((a) => typeof a === 'string')) problems.push(`command ${name} must be an argument array`);
-    else if (!/^(~\/|\/)/.test(argv[0])) problems.push(`command ${name} must start with an absolute or ~/ executable`);
+    else if (!LOCAL_PATH.test(argv[0])) problems.push(`command ${name} must start with an absolute or ~/ executable`);
   }
   return problems;
 }
@@ -958,4 +1109,175 @@ export function cookieValue(header, name = SESSION_COOKIE) {
     if (k === name) return rest.join('=');
   }
   return null;
+}
+
+// --- systemd and Task Scheduler (DEC-0032, service.md "Supervisor") -------------------------
+// The twins of fabric_service.systemd_unit / task_xml and their install and uninstall. `run(argv)`
+// returns spawnSync's {status, stdout, stderr}; the tests pass a recorder instead of the real tools.
+
+const defaultRun = (argv) => spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', windowsHide: true });
+
+function plain(value, what) {
+  // A supervisor file is line- and XML-structured: no control character in anything written into it.
+  if (/[\x00-\x1f\x7f]/.test(value)) throw new ServiceError(`${what} holds a control character (a line break, a tab, a NUL); a supervisor file cannot carry it.`);
+  return value;
+}
+
+function noSecretInSupervisorFile(argv, environment) {
+  // No supervisor file carries a secret (service.md): not in an argument, an environment name or its value.
+  for (const arg of argv) {
+    if (secretArgument(arg)) throw new ServiceError('An argument carries a credential; a supervisor file never does (read it from the token file or a secret reference).');
+  }
+  for (const [name, value] of Object.entries(environment ?? {})) {
+    if (credentialName(name) || secretValue(String(value))) throw new ServiceError(`Environment ${name} looks like a credential; a supervisor file never carries one.`);
+  }
+}
+
+function check(result, what) {
+  if (result?.status !== 0) throw new ServiceError(`${what} failed: ${String(result?.stderr || result?.stdout || result?.error?.message || '').trim().slice(0, 200)}`);
+}
+
+const systemdQuote = (value) => `"${plain(value, 'An argument').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/%/g, '%%').replace(/\$/g, '$$$$')}"`;
+
+/**
+ * A systemd user unit (DEC-0032): Restart=always, RestartSec=10, TimeoutStopSec above the drain time,
+ * WantedBy=default.target. The service is told who supervises it (FABRIC_SERVICE_SUPERVISOR=systemd).
+ */
+export function systemdUnit(unit, programArguments, { workingDirectory, environment = {}, description, stopTimeout = DEFAULT_EXIT_TIMEOUT } = {}) {
+  if (!UNIT.test(unit)) throw new ServiceError(`unit must match ${UNIT.source}`);
+  const argv = programArguments.map(String);
+  if (!argv.length || !argv[0].startsWith('/')) throw new ServiceError('A systemd unit starts an absolute executable.');
+  if (!(stopTimeout > DRAIN_SECONDS)) throw new ServiceError(`TimeoutStopSec must outlast the ${DRAIN_SECONDS} s drain.`);
+  const env = { ...environment };
+  for (const name of Object.keys(env)) if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new ServiceError(`Environment name ${JSON.stringify(name)} is not a variable name.`);
+  noSecretInSupervisorFile(argv, env);
+  env[SUPERVISOR_ENV] ??= 'systemd';
+  const cwd = plain(String(workingDirectory), 'The working directory');
+  if (!cwd.startsWith('/')) throw new ServiceError("A systemd unit's working directory is absolute.");
+  return [
+    '[Unit]', `Description=${plain(description ?? unit, 'The description').replace(/%/g, '%%')}`, '',
+    '[Service]', 'Type=simple', `ExecStart=${argv.map(systemdQuote).join(' ')}`,
+    // Not quoted: systemd reads WorkingDirectory= as the rest of the line, quotes included.
+    `WorkingDirectory=${cwd.replace(/%/g, '%%')}`,
+    ...Object.keys(env).sort().map((k) => `Environment=${systemdQuote(`${k}=${env[k]}`)}`),
+    'Restart=always', 'RestartSec=10', `TimeoutStopSec=${Math.trunc(stopTimeout)}`, 'KillMode=mixed', '',
+    '[Install]', 'WantedBy=default.target', '',
+  ].join('\n');
+}
+
+const systemdDir = () => path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'systemd', 'user');
+
+/**
+ * Write the user unit, enable it so it comes back after a login, and (re)start it so the new unit is what runs.
+ * The operator's intent wins (LC-14): a unit already installed and disabled stays off — the file is rewritten, so the
+ * new version is what starts once they enable it — unless `forceEnable` (the operator asked for it on).
+ */
+export function systemdInstall(unit, text, { unitDir = systemdDir(), run = defaultRun, platform = process.platform, forceEnable = false } = {}) {
+  if (platform !== 'linux') throw new ServiceError('systemd is the supervisor on Linux only.');
+  if (!UNIT.test(unit)) throw new ServiceError(`unit must match ${UNIT.source}`);
+  fs.mkdirSync(unitDir, { recursive: true });
+  const file = path.join(unitDir, unit);
+  const state = fs.existsSync(file) ? String(run(['systemctl', '--user', 'is-enabled', unit])?.stdout ?? '').trim() : '';
+  atomicWrite(file, text, 0o644);
+  check(run(['systemctl', '--user', 'daemon-reload']), 'systemctl --user daemon-reload');
+  if (state === 'disabled' && !forceEnable) return file;
+  check(run(['systemctl', '--user', 'enable', unit]), 'systemctl --user enable');
+  check(run(['systemctl', '--user', 'restart', unit]), 'systemctl --user restart');
+  return file;
+}
+
+/** Stop it and keep it off across logins (`disable --now`), then remove the unit. */
+export function systemdUninstall(unit, { unitDir = systemdDir(), run = defaultRun, platform = process.platform } = {}) {
+  if (platform !== 'linux') throw new ServiceError('systemd is the supervisor on Linux only.');
+  if (!UNIT.test(unit)) throw new ServiceError(`unit must match ${UNIT.source}`);
+  run(['systemctl', '--user', 'disable', '--now', unit]);
+  fs.rmSync(path.join(unitDir, unit), { force: true });
+  check(run(['systemctl', '--user', 'daemon-reload']), 'systemctl --user daemon-reload');
+}
+
+/** One command line from arguments, quoted the way the Microsoft C runtime parses it (Python's list2cmdline). */
+export function windowsCommandLine(args) {
+  return args.map((arg) => {
+    const quote = arg === '' || /[ \t]/.test(arg);
+    let out = quote ? '"' : '';
+    let slashes = 0;
+    for (const c of arg) {
+      if (c === '\\') { slashes += 1; continue; }
+      if (c === '"') { out += '\\'.repeat(slashes * 2 + 1) + '"'; slashes = 0; continue; }
+      out += '\\'.repeat(slashes) + c;
+      slashes = 0;
+    }
+    return out + '\\'.repeat(quote ? slashes * 2 : slashes) + (quote ? '"' : '');
+  }).join(' ');
+}
+
+const xml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * A per-user Scheduled Task (DEC-0032): a logon trigger, restart on failure every minute, no execution
+ * time limit, run only when the user is logged on, created without administrator rights.
+ */
+export function taskXml(task, programArguments, { workingDirectory, description, user } = {}) {
+  if (!TASK.test(task)) throw new ServiceError(`task must match ${TASK.source}`);
+  const argv = programArguments.map(String);
+  if (!argv.length || !/^[A-Za-z]:[\\/]/.test(argv[0])) throw new ServiceError('A task starts a drive-absolute executable (C:\\...).');
+  for (const arg of argv) plain(arg, 'An argument');
+  plain(String(workingDirectory), 'The working directory');
+  plain(description ?? task, 'The description');
+  noSecretInSupervisorFile(argv, {});
+  const who = user ?? (process.env.USERNAME ? `${process.env.USERDOMAIN ?? ''}\\${process.env.USERNAME}` : '');
+  if (!who) throw new ServiceError('Name the user the task runs as (DOMAIN\\user); USERNAME is not set.');
+  plain(who, 'The user');
+  return `<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>${xml(description ?? task)}</Description><URI>${xml(task)}</URI></RegistrationInfo>
+  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>${xml(who)}</UserId></LogonTrigger></Triggers>
+  <Principals><Principal id="Author"><UserId>${xml(who)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <Enabled>true</Enabled>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
+  </Settings>
+  <Actions Context="Author"><Exec><Command>${xml(argv[0])}</Command><Arguments>${xml(windowsCommandLine(argv.slice(1)))}</Arguments><WorkingDirectory>${xml(workingDirectory)}</WorkingDirectory></Exec></Actions>
+</Task>
+`;
+}
+
+const TASK_DISABLED = /<Settings>(?:(?!<\/Settings>)[\s\S])*<Enabled>false<\/Enabled>/;
+
+/**
+ * Create (or replace) the task from its XML without administrator rights, then (re)start it so the new definition
+ * is what runs. A task already installed and disabled stays off (LC-14) unless `forceEnable`.
+ */
+export function taskInstall(task, xmlText, { run = defaultRun, platform = process.platform, forceEnable = false } = {}) {
+  if (platform !== 'win32') throw new ServiceError('Task Scheduler is the supervisor on Windows only.');
+  const query = run(['schtasks', '/Query', '/TN', task, '/XML']);
+  const existed = query?.status === 0;
+  const keepOff = existed && !forceEnable && TASK_DISABLED.test(String(query?.stdout ?? ''));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-task-'));
+  const file = path.join(dir, 'task.xml');
+  try {
+    // schtasks reads the encoding the declaration names: UTF-16 little-endian with its byte order mark.
+    fs.writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(xmlText, 'utf16le')]));
+    check(run(['schtasks', '/Create', '/TN', task, '/XML', file, '/F']), 'schtasks /Create');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  if (keepOff) {
+    check(run(['schtasks', '/Change', '/TN', task, '/DISABLE']), 'schtasks /Change /DISABLE');
+    return;
+  }
+  if (existed) run(['schtasks', '/End', '/TN', task]);
+  check(run(['schtasks', '/Run', '/TN', task]), 'schtasks /Run');
+}
+
+/** End the running task, then delete it. */
+export function taskUninstall(task, { run = defaultRun, platform = process.platform } = {}) {
+  if (platform !== 'win32') throw new ServiceError('Task Scheduler is the supervisor on Windows only.');
+  run(['schtasks', '/End', '/TN', task]);
+  check(run(['schtasks', '/Delete', '/TN', task, '/F']), 'schtasks /Delete');
 }

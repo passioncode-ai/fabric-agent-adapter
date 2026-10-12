@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
 SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.17.0"
+VERSION = "0.18.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -58,6 +58,8 @@ STDLIB_IMPORTS = {
     "random", "io", "contextlib", "textwrap", "traceback",
     "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
     "email",  # email.utils: the probe reads a cookie's Expires date (DEC-0039)
+    "xml",  # the supervisor tests read the Task Scheduler XML back (FAA-21)
+    "ntpath", "posixpath",  # the lock name the Node kit holds, computed for either system (FAA-21)
     "ipaddress", "math", "struct",  # the delegation verifier: a loopback key-set URL, Ed25519 and claim checks (DEC-0039)
 }
 

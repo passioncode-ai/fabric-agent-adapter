@@ -8,23 +8,23 @@ wins and this page is the defect. The rule each section serves:
 | Contract rule | Here | Kit (Python / Node) |
 |---|---|---|
 | LC-01 quit reaches exit within a deadline | [Shutdown](#shutdown) | `Drain` / `Drain` |
-| LC-03 a job is bounded and exclusive | [one copy under launchd](#one-copy-under-launchd) | `hold_single_instance` / `holdSingleInstance` |
-| LC-09 the footprint is declared | the descriptor and the plist; the service's own `AGENTS.md` names its label and port | `write_descriptor`, `launchd_plist` |
+| LC-03 a job is bounded and exclusive | [one copy under a supervisor](#one-copy-under-a-supervisor) | `hold_single_instance` / `holdSingleInstance` |
+| LC-09 the footprint is declared | the descriptor and the plist, unit or task; the service's own `AGENTS.md` names its label (unit, task) and port | `write_descriptor`, `launchd_plist`, `systemd_unit` / `systemdUnit`, `task_xml` / `taskXml` |
 | LC-11 previous release kept, older pruned | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `prune_releases` / `pruneReleases` |
 | LC-12 every file is bounded | [Logs](#logs) | `RotatingLog`, `cap_stdout_log` / `RotatingLog`, `capStdoutLog` |
-| LC-14 operator intent wins; uninstall is symmetric | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `launchd_install`, `launchd_uninstall` (Python) |
+| LC-14 operator intent wins; uninstall is symmetric | [Install, upgrade, uninstall](#install-upgrade-uninstall), [Linux and Windows](#linux-and-windows) | `launchd_install`, `launchd_uninstall` (Python); `systemd_install` / `systemdInstall`, `task_install` / `taskInstall` and their uninstalls |
 | LC-15 builds clean up after themselves | release pruning runs inside the installer, not later | `prune_releases` / `pruneReleases` |
 
 ## Contents
 
 - [launchd plist](#launchd-plist-generate-it-with-launchd_plist)
 - [Install, upgrade, uninstall](#install-upgrade-uninstall)
-- [One copy under launchd](#one-copy-under-launchd)
+- [One copy under a supervisor](#one-copy-under-a-supervisor)
 - [Directories](#directories)
 - [Logs](#logs)
 - [Shutdown](#shutdown)
 - [Being managed by a host lifecycle broker](#being-managed-by-a-host-lifecycle-broker)
-- [Linux](#linux)
+- [Linux and Windows](#linux-and-windows)
 
 ## launchd plist (generate it with `launchd_plist`)
 
@@ -70,24 +70,24 @@ that deletes an override, and a leftover `disabled` would make a later fresh ins
 off. Tests use a throwaway label or a fake `launchctl` first on `PATH` — never the
 operator's real jobs.
 
-## One copy under launchd
+## One copy under a supervisor
 
 Started by hand, a copy that finds `service.lock` held prints one sentence naming the
 holder and exits 75 at once. Under launchd that exit is a respawn every `ThrottleInterval`
-(10 s), forever. So a copy whose plist carries `FABRIC_SERVICE_SUPERVISOR=launchd` backs
-off in-process — 0.5 s doubling to 30 s, 300 s in all — takes over if the holder leaves,
+(10 s), forever, and under systemd one every `RestartSec`. So a copy whose plist or unit
+carries `FABRIC_SERVICE_SUPERVISOR=launchd` (or `systemd`) backs off in-process — 0.5 s doubling to 30 s, 300 s in all — takes over if the holder leaves,
 and exits 75 only when the wait runs out: a few starts an hour instead of 360. It touches
 nothing while it waits. Two installs sharing one data directory are still the defect to
 remove; the back-off only stops the loop from costing the machine.
 
 ## Directories
 
-| What | macOS | Linux |
-|---|---|---|
-| data + config | `~/Library/Application Support/<id>/` | `${XDG_DATA_HOME:-~/.local/share}/<id>/` |
-| logs | `~/Library/Logs/<id>/` | `${XDG_STATE_HOME:-~/.local/state}/<id>/logs/` |
-| cache (deletable any time) | `~/Library/Caches/<id>/` | `${XDG_CACHE_HOME:-~/.cache}/<id>/` |
-| code | `~/.local/share/<id>/releases/…` | same |
+| What | macOS | Linux | Windows (DEC-0032) |
+|---|---|---|---|
+| data + config | `~/Library/Application Support/<id>/` | `${XDG_DATA_HOME:-~/.local/share}/<id>/` | `%LOCALAPPDATA%\<id>\` |
+| logs | `~/Library/Logs/<id>/` | `${XDG_STATE_HOME:-~/.local/state}/<id>/logs/` | `%LOCALAPPDATA%\<id>\Logs\` |
+| cache (deletable any time) | `~/Library/Caches/<id>/` | `${XDG_CACHE_HOME:-~/.cache}/<id>/` | `%LOCALAPPDATA%\<id>\Cache\` |
+| code | `~/.local/share/<id>/releases/…` | same | under `%LOCALAPPDATA%` too, never a network share |
 
 A repository that versions the data itself (a registry, a plan) may hold the data; the
 service's own code checkout and its releases may not. Directories 0700, secret files 0600. A store carries a schema version and the service
@@ -140,8 +140,58 @@ has to survive being driven from outside:
   well-known document for a service, a process-level answer for a plain app — and keep it honest
   while the app is still starting.
 
-## Linux
+## Linux and Windows
 
-Until a systemd adapter exists, declare `lifecycle.manager: "none"`. A `systemd --user`
-unit with `Restart=always` gives the same guarantees; the host will control it once the
-adapter ships. Everything else in this skill applies unchanged.
+Both kits write and install the supervisor file the contract names (DEC-0032, service.md
+*Supervisor*); the two kits write byte-identical files. A supervisor file never carries a
+secret: the writers refuse a credential-shaped argument, environment name or value, and any
+control character (a line break would end a unit line early).
+
+**Linux — a systemd user unit.** `systemd_unit(unit, argv, working_directory=…)` /
+`systemdUnit(unit, argv, {workingDirectory})` writes `Restart=always`, `RestartSec=10`,
+`TimeoutStopSec` above the drain (15 s default), `KillMode=mixed`, `WantedBy=default.target`
+and `FABRIC_SERVICE_SUPERVISOR=systemd`, quoting every argument (`%` → `%%`, `$` → `$$`).
+`WorkingDirectory=` is written unquoted: systemd reads it as the rest of the line, so quotes would
+become part of the path and the unit would be refused (`systemd-analyze verify` checks it in CI). The
+descriptor says `"lifecycle": {"manager": "systemd", "unit": "<id>.<instance>.service"}`.
+
+| Verb | Command |
+|---|---|
+| install, upgrade | `systemd_install` / `systemdInstall`: write `~/.config/systemd/user/<unit>`, `daemon-reload`, `enable`, `restart` (so the new unit is what runs). A unit already installed that `is-enabled` reports `disabled` stays off: the file is rewritten and nothing starts (LC-14), unless `force_enable` |
+| stop, keep off | `systemctl --user disable --now <unit>` |
+| uninstall | `systemd_uninstall` / `systemdUninstall`: `disable --now`, remove the unit, `daemon-reload` |
+
+A user unit runs while the person is logged in; one that must run without a session needs
+`loginctl enable-linger <user>`, which is the operator's decision, not the installer's.
+
+**Windows — a per-user Scheduled Task.** `task_xml(task, argv, working_directory=…)` /
+`taskXml(task, argv, {workingDirectory})` writes a task with a logon trigger for the current
+user, `InteractiveToken` and `LeastPrivilege` (no administrator rights), restart on failure
+every minute, no execution time limit and `MultipleInstancesPolicy` `IgnoreNew`, its settings in the
+order `schtasks` exports them; the arguments are quoted the way the C runtime parses them. The Windows
+CI job has the real `schtasks` create, read back and delete such a task. The descriptor says
+`"lifecycle": {"manager": "task-scheduler", "task": "\\PassionCode\\<id>.<instance>"}`.
+
+| Verb | Command |
+|---|---|
+| install, upgrade | `task_install` / `taskInstall`: `schtasks /Create /TN <task> /XML <file> /F` from a UTF-16 file it then removes, then `/End` (when it existed) and `/Run`. A task already installed and disabled stays off: it is recreated and disabled again (LC-14), unless `force_enable` |
+| stop, keep off | `schtasks /End /TN <task>`, then `schtasks /Change /TN <task> /DISABLE` |
+| uninstall | `task_uninstall` / `taskUninstall`: `/End`, then `/Delete /F` |
+
+A task cannot set an environment variable, so a copy Task Scheduler restarts does not back off
+in-process; `IgnoreNew` keeps the scheduler from starting a second copy, and a hand-started copy
+holding the lock makes the scheduled one exit 75 once a minute until it leaves.
+
+**One copy on each system.** The Python kit takes `flock` (Linux) or a locked byte
+(Windows); the Node kit cannot, so it holds a name instead — an abstract unix socket on Linux,
+a named pipe on Windows (`lock_name` / `lockName`), each gone with the process. The Python kit
+holds the same name beside its file lock, so the two kits exclude each other everywhere, and
+`check_service.py` reports the lock held when either is. The probe only looks (`/proc/net/unix`,
+`WaitNamedPipeW`); it never takes the name, so it cannot make a service that is starting fail.
+
+**Token files on Windows.** The privacy of `service.token` is its ACL (service.md *Windows
+token files*): the kits write a protected list — the user, SYSTEM and Administrators, set before the
+token's bytes go in, any entry already there dropped — and refuse
+on read a link, a file outside the profile, another owner, or any other granted SID, naming the
+SID. The Node kit reads the list with Windows PowerShell 5.1 (.NET, no modules) and writes it
+with `icacls`; the path goes through the environment, never a command line.
