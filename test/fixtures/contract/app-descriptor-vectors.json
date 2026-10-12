@@ -1,0 +1,183 @@
+{
+  "description": "An app's own descriptor (DEC-0069, service.md#an-apps-descriptor): what an app does with its descriptor on a start, and when a reader treats one as stale.",
+  "action": [
+    {
+      "name": "none-found",
+      "existing": null,
+      "tool": "Example App 0.4.0",
+      "expect": "write",
+      "appPath": "/Applications/Example App.app"
+    },
+    {
+      "name": "same-version",
+      "existing": {
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.0"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        }
+      },
+      "tool": "Example App 0.4.0",
+      "expect": "keep",
+      "appPath": "/Applications/Example App.app"
+    },
+    {
+      "name": "updated",
+      "existing": {
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.0"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        }
+      },
+      "tool": "Example App 0.4.1",
+      "expect": "write",
+      "note": "an update is a reinstall",
+      "appPath": "/Applications/Example App.app"
+    },
+    {
+      "name": "downgraded",
+      "existing": {
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.1"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        }
+      },
+      "tool": "Example App 0.4.0",
+      "expect": "write",
+      "appPath": "/Applications/Example App.app"
+    },
+    {
+      "name": "string-form",
+      "existing": {
+        "installedBy": "Example App 0.4.0"
+      },
+      "tool": "Example App 0.4.0",
+      "expect": "write",
+      "note": "not an app's descriptor yet",
+      "appPath": "/Applications/Example App.app"
+    },
+    {
+      "name": "case-differs",
+      "existing": {
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "example app 0.4.0"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        }
+      },
+      "tool": "Example App 0.4.0",
+      "expect": "write",
+      "note": "tools compare as exact strings",
+      "appPath": "/Applications/Example App.app"
+    },
+    {
+      "name": "installed-by-null",
+      "existing": {
+        "installedBy": null
+      },
+      "tool": "Example App 0.4.0",
+      "expect": "write",
+      "note": "a malformed descriptor is rewritten, never read as kept",
+      "appPath": "/Applications/Example App.app"
+    },
+    {
+      "name": "moved",
+      "existing": {
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.0"
+        },
+        "lifecycle": {
+          "manager": "person",
+          "app": "~/Downloads/Example App.app"
+        }
+      },
+      "tool": "Example App 0.4.0",
+      "appPath": "/Applications/Example App.app",
+      "expect": "write",
+      "note": "the same version from a new path: the app was moved"
+    },
+    {
+      "name": "translocated",
+      "existing": null,
+      "tool": "Example App 0.4.0",
+      "appPath": "/private/var/folders/ab/xyz/T/AppTranslocation/0A1B2C3D/d/Example App.app",
+      "expect": "keep",
+      "note": "macOS App Translocation runs a quarantined app from a randomised read-only copy; that path is never recorded"
+    },
+    {
+      "name": "no-lifecycle",
+      "existing": {
+        "installedBy": {
+          "by": "person",
+          "role": "operator",
+          "tool": "Example App 0.4.0"
+        }
+      },
+      "tool": "Example App 0.4.0",
+      "appPath": "/Applications/Example App.app",
+      "expect": "write",
+      "note": "a descriptor without the installed path is rewritten"
+    }
+  ],
+  "stale": [
+    {
+      "name": "app-gone",
+      "descriptor": {
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        }
+      },
+      "appPresent": false,
+      "expect": true
+    },
+    {
+      "name": "app-present",
+      "descriptor": {
+        "lifecycle": {
+          "manager": "person",
+          "app": "/Applications/Example App.app"
+        }
+      },
+      "appPresent": true,
+      "expect": false
+    },
+    {
+      "name": "supervised-service",
+      "descriptor": {
+        "lifecycle": {
+          "manager": "launchd"
+        }
+      },
+      "appPresent": false,
+      "expect": false
+    },
+    {
+      "name": "not-a-descriptor",
+      "descriptor": "x",
+      "appPresent": false,
+      "expect": false
+    }
+  ],
+  "source": "fixtures/vectors/app-descriptor.json"
+}

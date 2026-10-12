@@ -189,10 +189,23 @@ class Probe:
                 continue
             if key == me:
                 clashes.append("%s declared again in %s" % (me, path.name))
-            elif not self.remote and fs.placement_of(other) != "remote" and other.get("origin") == self.d.get("origin"):
+            # DEC-0069: a descriptor without an origin (an app's) claims no port, so two of them never clash.
+            elif (not self.remote and "origin" in self.d and fs.placement_of(other) != "remote"
+                  and other.get("origin") == self.d.get("origin")):
                 clashes.append("port %d also claimed by %s" % (self.port, key))
-        unique = "a remote origin claims no port here" if self.remote else "port %d is unique" % self.port
+        if self.remote:
+            unique = "a remote origin claims no port here"
+        elif "origin" not in self.d:
+            unique = "an app's descriptor names no origin, so it claims no port (FAC-SEM-010)"
+        else:
+            unique = "port %d is unique" % self.port
         self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
+        if (self.d.get("lifecycle") or {}).get("manager") == "person":
+            # DEC-0069: installed, never running — a reader checks the app is still there; liveness is the app's own file.
+            present = fs.app_present(self.d)
+            self.add("descriptor.app-installed", "PASS" if present else "FAIL",
+                     "%s is installed" % self.d["lifecycle"].get("app") if present
+                     else "%s is gone: a reader treats this descriptor as stale" % self.d["lifecycle"].get("app"))
 
     # well-known ----------------------------------------------------------------
     def well_known_rules(self) -> None:
@@ -762,6 +775,10 @@ class Probe:
 
     def run(self) -> List[Result]:
         self.descriptor_rules()
+        if "origin" not in self.d and not self.remote:
+            self.add("well-known.answers", "NOT_RUN",
+                     "an app's descriptor says it is installed, never that it runs; its live origin is in its own liveness file (DEC-0069)")
+            return self.results
         if not self.port:
             return self.results
         self.well_known_rules()

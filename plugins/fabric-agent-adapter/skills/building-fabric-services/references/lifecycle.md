@@ -104,6 +104,22 @@ never infers supervision from its parent process.
   starts against a held lock are recorded and read as `FAC-SEM-078` reads them
   (`test/*supervisors*`).
 
+## An app's own descriptor and the node
+
+**An app** a person installs and starts has no supervisor (contract DEC-0069). Its descriptor says
+`"lifecycle": {"manager": "person", "app": "<the installed bundle or executable>"}`, `installedBy {by: "person", role,
+tool}` and no `origin`: it says the app is installed, never that it runs. The installer writes it; where there is none
+(a macOS app dragged into Applications), the app writes it on a start when `app_descriptor_action` /
+`appDescriptorAction` answers `write` — no descriptor yet, another version in `installedBy.tool`, or another path than
+`lifecycle.app` — and never from an App Translocation path. Its live origin and process id go in its own liveness file,
+rewritten on every start and removed on quit; a caller that sends anything reads that file and checks the process.
+`write_descriptor` claims no port for it, and a reader that finds `lifecycle.app` gone treats the descriptor as stale.
+
+**The node** (DEC-0061): `"lifecycle": {"manager": "node"}` is a local service Project Observatory's node installed and
+supervises as its child. There is no supervisor file, so `label`, `plist`, `unit` and `task` are refused beside it; the
+node starts the child with the supervisor marker (`--fabric-supervisor node` or the variable) and owns Install, Off,
+Code, Uninstall and state.
+
 ## Directories
 
 | What | macOS | Linux | Windows (DEC-0032) |

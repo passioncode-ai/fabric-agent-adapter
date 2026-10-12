@@ -54,7 +54,11 @@ const O_EXLOCK = 0x20; // BSD/macOS: open(2) takes flock(LOCK_EX); absent from f
 // DEC-0032: a local path starts with ~/ (or ~\ on Windows), / (never //) or a drive letter; a network share never does.
 // DEC-0057: `//server/…` and `/\\server…` are shares on Windows too, so a leading slash is followed by neither.
 const LOCAL_PATH = /^(~[\\/]|\/(?![\\/])|[A-Za-z]:[\\/])/;
-export const MANAGERS = Object.freeze(['launchd', 'systemd', 'task-scheduler', 'none']);
+// DEC-0061: `node` (Project Observatory's node supervises its children, no supervisor file); DEC-0069: `person` (an app a
+// person installs and starts; its descriptor says it is installed, never that it runs).
+export const MANAGERS = Object.freeze(['launchd', 'systemd', 'task-scheduler', 'node', 'person', 'none']);
+/** Managers that write no launchd label or plist (DEC-0057, DEC-0061, DEC-0069). */
+const NOT_LAUNCHD = Object.freeze(['systemd', 'task-scheduler', 'node', 'person']);
 const AUTH_HEADER = /^[A-Za-z][A-Za-z0-9-]{0,63}$/;
 const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$/;
 const TASK = /^\\[A-Za-z0-9 ._\\-]{1,254}$/;
@@ -521,7 +525,9 @@ export function validateDescriptor(d) {
   const problems = [];
   const remote = placementOf(d) === 'remote';
   if (d.placement !== undefined && !PLACEMENTS.includes(d.placement)) problems.push('placement must be local or remote');
-  const required = ['protocol', 'id', 'instance', 'name', 'origin', 'auth', 'lifecycle', 'installedAt', 'installedBy'];
+  // DEC-0069: an app's descriptor says it is installed, never that it runs; its live origin is in its own liveness file.
+  const app = d.lifecycle?.manager === 'person';
+  const required = ['protocol', 'id', 'instance', 'name', ...(app ? [] : ['origin']), 'auth', 'lifecycle', 'installedAt', 'installedBy'];
   for (const key of remote ? required : [...required, 'paths']) {
     if (!(key in d)) problems.push(`missing ${key}`);
   }
@@ -530,7 +536,7 @@ export function validateDescriptor(d) {
   if (!ID.test(d.id)) problems.push(`id must match ${ID}`);
   if (!INSTANCE.test(d.instance)) problems.push(`instance must match ${INSTANCE}`);
   if (remote) problems.push(...remoteOriginProblems(d.origin));
-  else if (!ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
+  else if (d.origin !== undefined && !ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
   if (!d.auth?.tokenFile) problems.push('auth.tokenFile is required');
   else if (!LOCAL_PATH.test(String(d.auth.tokenFile))) problems.push('auth.tokenFile must be a local path, never a network share');
   for (const value of [...(d.paths?.data !== undefined ? [d.paths.data] : []), ...(d.paths?.logs ?? [])]) {
@@ -543,14 +549,18 @@ export function validateDescriptor(d) {
   }
   const life = d.lifecycle ?? {};
   const manager = life.manager;
-  if (!MANAGERS.includes(manager)) problems.push('lifecycle.manager must be launchd, systemd, task-scheduler or none');
+  if (!MANAGERS.includes(manager)) problems.push('lifecycle.manager must be launchd, systemd, task-scheduler, node, person or none');
+  // DEC-0069: `app` is the installed app of a person's descriptor, and nothing else's.
+  if (manager === 'person' && life.app === undefined) problems.push("a person's app declares lifecycle.app, the installed app");
+  if (life.app !== undefined && manager !== 'person') problems.push('lifecycle.app belongs to manager person only');
+  if (life.app !== undefined && !LOCAL_PATH.test(String(life.app))) problems.push('lifecycle.app must be a local path');
   if (manager === 'launchd' && !(life.label && String(life.plist ?? '').endsWith('.plist'))) {
     problems.push('a launchd service declares label and plist');
   }
   if (life.plist !== undefined && !LOCAL_PATH.test(String(life.plist))) problems.push('lifecycle.plist must be a local path');
-  // DEC-0057: a descriptor names one supervisor; launchd's label and plist never sit beside another.
+  // DEC-0057, DEC-0061, DEC-0069: a descriptor names one supervisor; launchd's label and plist never sit beside another.
   for (const field of ['label', 'plist']) {
-    if (life[field] !== undefined && ['systemd', 'task-scheduler'].includes(manager)) problems.push(`lifecycle.${field} belongs to launchd, not to ${manager}`);
+    if (life[field] !== undefined && NOT_LAUNCHD.includes(manager)) problems.push(`lifecycle.${field} belongs to launchd, not to ${manager}`);
   }
   // DEC-0032: `unit` goes with systemd and `task` with Task Scheduler, and with nothing else.
   for (const [field, owner, pattern] of [['unit', 'systemd', UNIT], ['task', 'task-scheduler', TASK]]) {
@@ -565,6 +575,7 @@ export function validateDescriptor(d) {
     }
     if (d.commands?.update !== undefined) problems.push('a remote service declares no update command');
   }
+  problems.push(...descriptorMemberProblems(d));
   for (const [name, argv] of Object.entries(d.commands ?? {})) {
     if (!['doctor', 'update'].includes(name)) problems.push(`unknown command ${name}`);
     else if (!Array.isArray(argv) || !argv.length || !argv.every((a) => typeof a === 'string')) problems.push(`command ${name} must be an argument array`);
@@ -574,6 +585,127 @@ export function validateDescriptor(d) {
 }
 
 /** DEC-0019: `local` unless the descriptor says `remote`. */
+// --- DEC-0061 and DEC-0069: who installed it, how its model calls sign in, offered to others, an app's own descriptor ---
+
+/** The organization edition's data classes, least sensitive first (DEC-0061, DEC-0053). */
+export const PEER_DATA_CLASSES = Object.freeze(['public', 'internal', 'confidential', 'restricted']);
+/** The kind of a runner's sign-in, never a credential's value (DEC-0061). */
+export const CREDENTIAL_KINDS = Object.freeze(['subscription', 'key', 'platform-metered', 'none']);
+/** A subscription runs only in its vendor's runner (DEC-0046): runner kind → login. */
+export const SUBSCRIPTION_RUNNERS = Object.freeze({ 'claude-code': 'claude', 'kimi-code': 'kimi', codex: 'chatgpt' });
+const PEER_ENDPOINT = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?$/;
+const RESIDENCY = /^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$/;
+const RUNNER_KIND_NAME = /^[a-z][a-z0-9-]{1,62}$/;
+const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+const text = (v, low = 1, high = 200) => typeof v === 'string' && v.length >= low && v.length <= high;
+/** A JSON Pointer token (RFC 6901 §4). */
+const pointer = (name) => String(name).replace(/~/g, '~0').replace(/\//g, '~1');
+
+/**
+ * DEC-0061 and DEC-0069 on a descriptor's `installedBy`, `runner` and `peer`, as the schema shapes them, with FAC-SEM-085
+ * (a peer on a reserved name) and FAC-SEM-086 (a credential-shaped value in `runner` or `installedBy`, named by its
+ * place, never its value).
+ */
+export function descriptorMemberProblems(d) {
+  const problems = [];
+  const life = isObj(d.lifecycle) ? d.lifecycle : {};
+  const by = d.installedBy;
+  const places = [];
+  if (typeof by === 'string') {
+    if (!text(by)) problems.push('installedBy is the installer and its version, 1 to 200 characters');
+    places.push(['/installedBy', by]);
+  } else if (isObj(by)) {
+    for (const k of Object.keys(by)) if (!['by', 'role', 'tool'].includes(k)) problems.push(`installedBy has no member ${k}`);
+    if (!['person', 'node', 'organization'].includes(by.by)) problems.push('installedBy.by is person, node or organization');
+    if (by.by === 'person' && !['operator', 'administrator'].includes(by.role)) problems.push('installedBy.role is operator or administrator for a person');
+    if (by.by !== 'person' && 'role' in by) problems.push('installedBy.role belongs to a person only');
+    if (!text(by.tool)) problems.push('installedBy.tool is the installer and its version, 1 to 200 characters');
+    for (const [k, v] of Object.entries(by)) places.push([`/installedBy/${pointer(k)}`, v]);
+  } else problems.push("installedBy is the installer's name or {by, role?, tool}");
+  if (life.manager === 'person' && !(isObj(by) && by.by === 'person')) problems.push("an app's descriptor names who installed it as a person: installedBy {by: person, role, tool} (DEC-0069)");
+  let runner = d.runner;
+  if ('runner' in d) {
+    if (!isObj(runner)) { problems.push('runner is {kind?, credentialKind}'); runner = {}; }
+    for (const k of Object.keys(runner)) if (!['kind', 'credentialKind'].includes(k)) problems.push(`runner has no member ${k}`);
+    if (!CREDENTIAL_KINDS.includes(runner.credentialKind)) problems.push('runner.credentialKind is subscription, key, platform-metered or none');
+    if ('kind' in runner && !(typeof runner.kind === 'string' && RUNNER_KIND_NAME.test(runner.kind))) problems.push("runner.kind is a runner kind's name");
+    if (runner.credentialKind === 'subscription' && !Object.hasOwn(SUBSCRIPTION_RUNNERS, runner.kind)) problems.push("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex");
+    for (const [k, v] of Object.entries(runner)) places.push([`/runner/${pointer(k)}`, v]);
+  }
+  if ('peer' in d) {
+    let peer = d.peer;
+    if (!isObj(peer)) { problems.push('peer is {endpoint, custody, residency, maxDataClass}'); peer = {}; }
+    for (const k of Object.keys(peer)) if (!['endpoint', 'custody', 'residency', 'maxDataClass'].includes(k)) problems.push(`peer has no member ${k}`);
+    const m = typeof peer.endpoint === 'string' && peer.endpoint.length <= 2048 ? PEER_ENDPOINT.exec(peer.endpoint) : null;
+    if (!m) problems.push('peer.endpoint is https://<dns-name>[:<port>][/<path>], no query, fragment, userinfo or IP literal');
+    else if (RESERVED_HOST.test(m[1])) problems.push(`FAC-SEM-085: a service offered to others cannot be reached at the reserved name ${m[1]}`);
+    if (!['organization-managed', 'personal'].includes(peer.custody)) problems.push('peer.custody is organization-managed or personal');
+    const r = peer.residency;
+    if (!Array.isArray(r) || r.length < 1 || r.length > 32 || new Set(r.map((x) => JSON.stringify(x))).size !== r.length || !r.every((x) => typeof x === 'string' && RESIDENCY.test(x))) {
+      problems.push('peer.residency is 1 to 32 distinct ISO 3166-1 alpha-2 codes in upper case, EU admitted, no user-assigned code');
+    }
+    if (!PEER_DATA_CLASSES.includes(peer.maxDataClass)) problems.push('peer.maxDataClass is public, internal, confidential or restricted');
+    if (!('runner' in d)) problems.push('a service offered to others declares runner (DEC-0061)');
+    else if (isObj(runner) && runner.credentialKind === 'subscription') problems.push('a service offered to others never runs on a subscription (DEC-0061)');
+  }
+  for (const [place, value] of places) {
+    if (typeof value === 'string' && secretArgument(value)) problems.push(`FAC-SEM-086: ${place} holds a value shaped like a credential; it names a kind, a role or an installer`);
+  }
+  return problems;
+}
+
+/**
+ * The host's check before it routes a request from anyone but the service's operator (DEC-0061, FAC-SEM-088):
+ * `not-offered`, `peer-invalid`, `data-class-unknown` or `above-max-data-class`; null when it may. The contract's `peerRefusal`.
+ */
+export function peerRefusal(descriptor, dataClass) {
+  if (!isObj(descriptor) || !isObj(descriptor.peer)) return 'not-offered';
+  const max = typeof descriptor.peer.maxDataClass === 'string' ? PEER_DATA_CLASSES.indexOf(descriptor.peer.maxDataClass) : -1;
+  if (max < 0) return 'peer-invalid';
+  const asked = typeof dataClass === 'string' ? PEER_DATA_CLASSES.indexOf(dataClass) : -1;
+  if (asked < 0) return 'data-class-unknown';
+  return asked > max ? 'above-max-data-class' : null;
+}
+
+/**
+ * What an app that writes its own descriptor does with it on a start (DEC-0069): `keep` from a translocated copy (macOS
+ * App Translocation); otherwise `write` when there is none, when it is not an app's descriptor, or when its version
+ * (`installedBy.tool`) or its path (`lifecycle.app`) differs; `keep` otherwise. The contract's `appDescriptorAction`.
+ */
+export function appDescriptorAction(existing, tool, appPath) {
+  if (appPath.includes('/AppTranslocation/')) return 'keep';
+  if (!isObj(existing) || !isObj(existing.installedBy)) return 'write';
+  const recorded = isObj(existing.lifecycle) ? existing.lifecycle.app : undefined;
+  return existing.installedBy.tool === tool && recorded === appPath ? 'keep' : 'write';
+}
+
+/** Whether a reader treats a descriptor as stale (DEC-0069): an app's descriptor whose installed app it did not find. */
+export function appDescriptorStale(descriptor, appPresent) {
+  if (!isObj(descriptor) || !isObj(descriptor.lifecycle) || descriptor.lifecycle.manager !== 'person') return false;
+  return !appPresent;
+}
+
+/** Whether `lifecycle.app` of an app's descriptor exists on this machine (a bundle is a folder, an executable a file). */
+export function appPresent(descriptor) {
+  const app = isObj(descriptor?.lifecycle) ? descriptor.lifecycle.app : undefined;
+  try { return typeof app === 'string' && fs.existsSync(expand(app)); } catch { return false; }
+}
+
+/** Fabric's own descriptor (Fabric ADR-0139): `services/fabric.default.json`. */
+export const FABRIC_SERVICE = Object.freeze(['fabric', 'default']);
+
+/**
+ * `present` or `absent` for Fabric's button (DEC-0040 FB-5, DEC-0069, Fabric SCN-142): present when Fabric's own
+ * descriptor is registered and, for an app's descriptor, its app is still installed; a server sets `data-fabric="absent"`
+ * on the button's script otherwise. The button only follows a link, so the liveness file is not read here.
+ */
+export function fabricButtonPresence(dir = servicesDir()) {
+  let found;
+  try { found = JSON.parse(fs.readFileSync(descriptorPath(...FABRIC_SERVICE, dir), 'utf8')); } catch { return 'absent'; }
+  if (!isObj(found) || validateDescriptor(found).length) return 'absent';
+  return appDescriptorStale(found, appPresent(found)) ? 'absent' : 'present';
+}
+
 export function placementOf(d) {
   return d?.placement === 'remote' ? 'remote' : 'local';
 }
@@ -597,8 +729,8 @@ export function writeDescriptor(d, dir = servicesDir()) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
-  // DEC-0019: only a local placement claims a port on this computer.
-  const port = placementOf(d) === 'remote' ? null : portOf(d.origin);
+  // DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
+  const port = placementOf(d) === 'remote' || d.origin === undefined ? null : portOf(d.origin);
   for (const [file, other] of readDescriptors(dir)) {
     const key = `${other.id}.${other.instance ?? 'default'}`;
     if (key === me) continue;
@@ -661,6 +793,8 @@ const PROFILE_ID = /^[a-z][a-z0-9-]{0,62}$/;
 const RUNNER_KIND = /^[a-z][a-z0-9-]{1,62}$/;
 const MODEL_ID = /^[a-z0-9][a-z0-9._-]{0,63}\/[a-z0-9][a-z0-9._:-]{0,127}$/;
 export const ROUTES = Object.freeze(['subscription', 'key']);
+/** A usage row's route (DEC-0046, DEC-0061): beside a configuration's two, the hosting platform's own metered models. */
+export const USAGE_ROUTES = Object.freeze([...ROUTES, 'platform-metered']);
 
 /** DEC-0046: the well-known `configuration` — {slots, resolved} as service-well-known.schema.json types it. */
 export function configurationProblems(doc) {
@@ -766,7 +900,7 @@ export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, c
   if (costUsd !== null && (typeof costUsd !== 'number' || !Number.isFinite(costUsd) || costUsd < 0)) throw new ServiceError('costUsd must be a non-negative number or null.');
   const basis = costBasis ?? (costUsd === null ? 'unknown' : 'provider');
   if (!COST_BASES.includes(basis) || (costUsd === null) !== (basis === 'unknown')) throw new ServiceError('costBasis is provider or price-list with a cost, unknown without one.');
-  if (route !== undefined && !ROUTES.includes(route)) throw new ServiceError('route is subscription or key (DEC-0046).');
+  if (route !== undefined && !USAGE_ROUTES.includes(route)) throw new ServiceError('route is subscription, key or platform-metered (DEC-0046, DEC-0061).');
   return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis, ...(route === undefined ? {} : { route }) };
 }
 
@@ -1650,13 +1784,20 @@ export function remoteTokenFile(id, instance = 'default', dir = servicesDir()) {
  * a secret. Returns the descriptor path. `token` is read from the caller — a file or stdin —
  * never from an argument vector.
  */
-export function registerRemote({ id, instance = 'default', name, summary, origin, token, doctor, dir = servicesDir(), installedBy = 'fabric-service register-remote' }) {
+/**
+ * DEC-0019, installer side: register an online service on THIS computer — the token file (0600, never printed) and the
+ * descriptor. DEC-0061: `installedBy` defaults to `{by: 'person', role: 'operator', tool: 'fabric-service register-remote'}`
+ * (a person runs this); `runner` (`{kind?, credentialKind}`) says how its model calls sign in, as a kind and never a
+ * credential; `peer` (`{endpoint, custody, residency, maxDataClass}`) offers it to others and needs `runner`.
+ */
+export function registerRemote({ id, instance = 'default', name, summary, origin, token, doctor, dir = servicesDir(),
+  installedBy = { by: 'person', role: 'operator', tool: 'fabric-service register-remote' }, runner, peer }) {
   if (!token || String(token).trim().length < 16) throw new ServiceError('the service token must be at least 16 characters.');
   const tokenFile = remoteTokenFile(id, instance, dir);
   const d = {
     protocol: PROTOCOL, id, instance, name, ...(summary ? { summary } : {}), placement: 'remote', origin,
     auth: { tokenFile }, lifecycle: { manager: 'none' }, ...(doctor ? { commands: { doctor } } : {}),
-    installedAt: nowIso(), installedBy,
+    installedAt: nowIso(), installedBy, ...(runner ? { runner: { ...runner } } : {}), ...(peer ? { peer: { ...peer } } : {}),
   };
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);

@@ -2,8 +2,10 @@
 // Vendors the contract's own vectors the kits are held to, re-answered here by the contract's functions so a stale copy
 // is caught: fixtures/vectors/hub-key.json (DEC-0060, hubKeyCertified), fixtures/vectors/service-supervisor.json
 // (DEC-0057, supervisorMarker and lockWaitBudgetMs) and the fixtures/semantic/service-lock-*.json records (FAC-SEM-078,
-// lockOutcomeRules) and fixtures/vectors/windows-token.json (DEC-0057, windowsTokenAclProblem, FAC-SEM-079). Never
-// written by hand.
+// lockOutcomeRules), fixtures/vectors/windows-token.json (DEC-0057, windowsTokenAclProblem, FAC-SEM-079), and
+// DEC-0061/0069: fixtures/vectors/service-peer.json (peerRefusal), fixtures/vectors/app-descriptor.json
+// (appDescriptorAction, appDescriptorStale), every service descriptor fixture and the FAC-SEM-085/086 semantic ones.
+// Never written by hand.
 //
 //   node test/fixtures/contract/vendor_vectors.mjs --contract <a clean checkout of the contract at the pin>
 //     --contract-src <dir with its src/*.ts staged, .js imports rewritten to .ts> [--out test/fixtures/contract]
@@ -25,6 +27,8 @@ const write = (name, value) => fs.writeFileSync(path.join(out, name), `${JSON.st
 const hubKeyRules = await src('hub-key-rules.ts');
 const supervisor = await src('service-supervisor.ts');
 const windowsToken = await src('windows-token.ts');
+const appDescriptor = await src('app-descriptor.ts');
+const descriptorRules = await src('descriptor-rules.ts');
 
 // hub-key.json: every case re-answered by hubKeyCertified; seeds dropped.
 const hub = read('fixtures/vectors/hub-key.json');
@@ -74,4 +78,25 @@ const negatives = DEC57.map((name) => {
   return { name, descriptor: read(`fixtures/${file}`) };
 });
 write('descriptor-negatives.json', { about: "DEC-0057's killing fixtures for the service descriptor, which the kits' validate_descriptor/validateDescriptor refuse.", source: 'fixtures/negative/service-descriptor-*.json', negatives });
-console.log(`wrote ${hub.cases.length} hub-key cases, ${hub.verifier.length} verifier answers; ${sup.cases.length} marker cases, ${records.length} lock records`);
+
+// DEC-0061: peerRefusal over every case; DEC-0069: appDescriptorAction and appDescriptorStale.
+const peer = read('fixtures/vectors/service-peer.json');
+for (const c of peer.cases) if (descriptorRules.peerRefusal(c.descriptor, c.dataClass) !== c.refusal) throw new Error(`the contract's peer case "${c.name}" no longer answers as written`);
+write('service-peer-vectors.json', { ...peer, source: 'fixtures/vectors/service-peer.json' });
+const app = read('fixtures/vectors/app-descriptor.json');
+for (const c of app.action) if (appDescriptor.appDescriptorAction(c.existing, c.tool, c.appPath) !== c.expect) throw new Error(`the contract's action case "${c.name}" no longer answers as written`);
+for (const c of app.stale) if (appDescriptor.appDescriptorStale(c.descriptor, c.appPresent) !== c.expect) throw new Error(`the contract's stale case "${c.name}" no longer answers as written`);
+write('app-descriptor-vectors.json', { ...app, source: 'fixtures/vectors/app-descriptor.json' });
+
+// Every service descriptor fixture, valid or not as the catalogue says, and the FAC-SEM-085/086 semantic fixtures with
+// the findings descriptorPeerRules gives them.
+const descriptors = catalogue.filter((e) => /(^|\/)service-descriptor-[^/]*\.json$/.test(e.path)).map((e) => ({
+  name: e.path.replace(/^.*\/|\.json$/g, ''), valid: e.valid, descriptor: read(`fixtures/${e.path}`),
+}));
+const semanticDir = path.join(args.contract, 'fixtures/semantic');
+const semanticDescriptors = fs.readdirSync(semanticDir).filter((f) => /^service-(descriptor|peer-endpoint)-.*\.json$/.test(f)).sort().map((file) => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(semanticDir, file), 'utf8'));
+  return { name: file.replace(/\.json$/, ''), document: fixture.document, findings: descriptorRules.descriptorPeerRules(fixture.document).map((f) => ({ code: f.code, instancePath: f.instancePath })) };
+});
+write('descriptor-fixtures.json', { about: 'Every service-descriptor fixture of the contract at the pin, valid or not as fixtures/catalogue.json says, and the FAC-SEM-085/086 semantic fixtures with the findings descriptorPeerRules gives them.', source: 'fixtures/catalogue.json, fixtures/semantic/service-*', descriptors, semantic: semanticDescriptors });
+console.log(`${peer.cases.length} peer cases, ${app.action.length + app.stale.length} app-descriptor cases, ${descriptors.length} descriptor fixtures, ${semanticDescriptors.length} semantic`);

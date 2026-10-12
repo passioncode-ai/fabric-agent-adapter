@@ -16,7 +16,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.23.0"
+  version: "0.24.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "fe55fc67cba1a9e34a736da7d148d4fe2a8fbfa0"
@@ -323,8 +323,11 @@ this estate needs.
 
 ## When something is missing
 
-- **Not macOS / no launchd:** declare `lifecycle.manager: "none"`; hosts show the
-  service read-only. Keep every other rule.
+- **Not macOS / no launchd:** the kits write a systemd user unit (Linux) or a per-user Scheduled Task (Windows); with
+  no supervisor at all declare `lifecycle.manager: "none"`, and hosts show the service read-only. Keep every other rule.
+- **A desktop app with no supervisor** (DEC-0069): its descriptor says `manager: "person"` with `lifecycle.app`, no
+  origin, `installedBy {by: "person", role, tool}`; its live origin is in its own liveness file
+  (the lifecycle reference, *An app's own descriptor and the node*).
 - **No Python:** use the Node kit; run the probe from any machine that has Python and
   can reach the port, or mark the probe `NOT_RUN` with the reason.
 - **Neither kit fits the framework:** implement the four routes and the lock by hand

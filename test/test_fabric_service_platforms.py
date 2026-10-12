@@ -73,7 +73,7 @@ class Descriptors(unittest.TestCase):
 
     def test_an_unknown_manager_is_refused(self):
         problems = fs.validate_descriptor(changed(TASK, manager="windows-service"))
-        self.assertTrue(any("launchd, systemd, task-scheduler or none" in p for p in problems), problems)
+        self.assertTrue(any("launchd, systemd, task-scheduler, node, person or none" in p for p in problems), problems)
 
     def test_a_network_share_is_never_a_local_path(self):
         for share in ("\\\\server\\share\\service.token", "\\\\?\\C:\\x\\service.token", "//server/share/t"):
