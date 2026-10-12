@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.16.0 - 2026-10-12
+
+Runner and model profiles in both kits (contract DEC-0046, Fabric ADR-0147; FAA-19). The contract's credential
+detector (DEC-0044) is ported too. The contract pin is unchanged (`0cacd08`).
+
+### Added
+
+- **`scripts/fabric_profiles.py` and `scripts/fabric-profiles.mjs`**:
+  - `resolve_model_profile` / `resolveModelProfile` (FAC-SEM-060). The order is request, agent, binding or project,
+    then estate default. The project's `modelClasses` narrow the result, and when nothing is left the launch is
+    refused as `model-classes-empty`, with the policy named.
+  - `profile_problems` / `profileProblems`, the FAC-SEM-058…060 checks of catalogues, profile sets, runner profiles
+    and recorded resolutions.
+  - `runner_check` / `runnerCheck`, for the doctor (runners.md C2). It runs only the catalogued bare binary on `PATH`
+    with its catalogued version and `auth` argv, never through a shell, for at most 5 s.
+  - `model_usable`.
+  - `configuration`, the well-known `configuration`, and `configuration_summary`, which gives the Runner and Model
+    tiles for the dashboard.
+- **`scripts/fabric_secrets.py` and `scripts/fabric-secrets.mjs`**: the contract's one credential detector
+  (`secret-shape.ts`), with `credential_name`, `secret_value`, `secret_argument` and `secret_url`. It is the base for
+  FAA-23 (LC-21).
+- **`build_well_known(configuration=)` / `buildWellKnown({ configuration })`** validates the configuration and carries
+  it. `configuration_problems` / `configurationProblems` are added.
+- **`make_usage_receipt(route=)` / `makeUsageReceipt({ route })`**: a receipt records `subscription` or `key`, and
+  the report keeps the rows of one model on two routes apart.
+- **Probe rule `configuration.declared`.**
+- **Vectors**: `test/fixtures/contract/profile-vectors.json` holds 17 rule cases, 35 resolutions and 128
+  credential-detector cases. Every expected answer comes from the contract's own `profile-rules.ts` and
+  `secret-shape.ts` (`make_profile_vectors.mjs`). Credential-shaped samples are made up and stored hex-encoded.
+- Tests: 11 planted defects across both kits were each caught.
+- **Docs**: `references/profiles.md`, a pointer in SKILL.md, and an updated `protocol.md`. The scenario eval
+  `runner-and-model-profiles` came first.
+
 ## 0.15.0 - 2026-10-12
 
 Fabric's button in the dashboard kit (contract DEC-0040, FB-7). With it, FAA-20 is complete. The contract pin is

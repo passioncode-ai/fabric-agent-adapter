@@ -1,0 +1,193 @@
+"""Runner and model profiles in the kit (contract DEC-0046, FAA-19) and the credential detector (DEC-0044), against
+vectors whose expected answers come from the contract's own functions at the pin
+(test/fixtures/contract/make_profile_vectors.mjs)."""
+import base64
+import json
+import os
+from pathlib import Path
+import stat
+import sys
+import tempfile
+import unittest
+
+from test_fabric_service import load
+
+fs = load("fabric_service")
+secrets_mod = load("fabric_secrets")
+profiles = load("fabric_profiles")
+check = load("check_service")
+VECTORS = json.loads((Path(__file__).resolve().parent / "fixtures/contract/profile-vectors.json").read_text())
+
+
+def decode(text):
+    return bytes.fromhex(text).decode("utf-8")
+
+
+class SecretShapeTests(unittest.TestCase):
+    def test_every_case_answers_as_the_contract_does(self):
+        for name, cases in VECTORS["secrets"].items():
+            fn = {"credentialName": secrets_mod.credential_name, "nameWords": secrets_mod.name_words, "secretValue": secrets_mod.secret_value,
+                  "secretArgument": secrets_mod.secret_argument, "secretUrl": secrets_mod.secret_url}[name]
+            for case in cases:
+                value = decode(case["inputHex"])
+                with self.subTest(name, value=value[:30]):
+                    self.assertEqual(fn(value), case["expected"])
+        self.assertGreaterEqual(sum(len(c) for c in VECTORS["secrets"].values()), 120)
+
+
+class ResolutionTests(unittest.TestCase):
+    def test_every_resolution_answers_as_the_contract_does(self):
+        for case in VECTORS["resolutions"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(profiles.resolve_model_profile(**case["input"]), case["expected"])
+
+    def test_the_order_is_request_agent_binding_estate(self):
+        self.assertEqual(profiles.RESOLUTION_ORDER, ("request", "agent", "binding", "estate"))
+
+
+class RuleTests(unittest.TestCase):
+    def test_every_rule_case_answers_as_the_contract_does(self):
+        for case in VECTORS["rules"]:
+            value = json.loads(decode(case["valueHex"]))
+            with self.subTest(case["name"]):
+                self.assertEqual(profiles.profile_problems(case["kind"], value), case["expected"])
+
+    def test_an_unknown_kind_is_none(self):
+        self.assertIsNone(profiles.profile_problems("something-else", {}))
+
+
+class RunnerCheckTests(unittest.TestCase):
+    """runners.md C2: only a catalogued bare binary on PATH, only its version argv, no shell, at most 5 s; `auth`
+    exit 0 means signed in."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.bin = Path(self.temp.name)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def tool(self, name, body):
+        path = self.bin / name
+        path.write_text("#!/bin/sh\n" + body + "\n")
+        path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+    def entry(self, **extra):
+        e = {"kind": "example-code", "name": "Example Code", "binaries": ["example-code"],
+             "version": {"argv": ["--version"], "pattern": "^example (\\d+\\.\\d+\\.\\d+)", "timeoutMs": 2000}}
+        e.update(extra)
+        return e
+
+    @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
+    def test_installed_measured_and_signed_in(self):
+        self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "example 1.4.2"; exit 0; fi; if [ "$1" = "auth" ]; then exit 0; fi; exit 3')
+        got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))
+        self.assertEqual((got["installed"], got["version"], got["signedIn"], got["problems"]), (True, "1.4.2", True, []))
+        self.assertTrue(got["binary"].endswith("example-code"))
+
+    @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
+    def test_not_signed_in_and_unreadable_version(self):
+        self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "something else"; exit 0; fi; exit 1')
+        got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))
+        self.assertEqual((got["installed"], got["version"], got["signedIn"]), (True, None, False))
+        self.assertTrue(any("version" in p for p in got["problems"]))
+
+    @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
+    def test_a_slow_version_answer_is_bounded(self):
+        self.tool("example-code", "sleep 5; echo 'example 1.0.0'")
+        got = profiles.runner_check(self.entry(version={"argv": ["--version"], "pattern": "(\\d+\\.\\d+\\.\\d+)", "timeoutMs": 300}), path=str(self.bin))
+        self.assertIsNone(got["version"])
+        self.assertTrue(any("did not answer" in p for p in got["problems"]))
+
+    def test_not_installed(self):
+        got = profiles.runner_check(self.entry(), path=str(self.bin))
+        self.assertEqual((got["installed"], got["binary"], got["version"]), (False, None, None))
+
+    def test_an_entry_outside_the_catalogue_rules_is_never_run(self):
+        for bad in (self.entry(binaries=["/bin/sh"]), self.entry(binaries=["../x"]), self.entry(version={"argv": "--version", "pattern": "(x)"}),
+                    self.entry(version={"argv": ["--version"], "pattern": "(x)", "timeoutMs": 60000}), self.entry(auth="status")):
+            with self.subTest(bad=bad), self.assertRaises(profiles.ProfileError):
+                profiles.runner_check(bad, path=str(self.bin))
+
+
+class ModelUsableTests(unittest.TestCase):
+    def setUp(self):
+        base = next(c for c in VECTORS["resolutions"] if c["name"] == "profile-resolution-ok.json")["input"]
+        self.catalogue = base["catalogue"]
+        self.model = self.catalogue["models"][0]["id"]
+
+    def test_catalogued_and_within_classes(self):
+        self.assertEqual(profiles.model_usable(self.model, self.catalogue), [])
+        classes = self.catalogue["models"][0]["classes"]
+        self.assertEqual(profiles.model_usable(self.model, self.catalogue, {"meta": {"id": "p", "revision": 1}, "modelClasses": classes}), [])
+        problems = profiles.model_usable(self.model, self.catalogue, {"meta": {"id": "p", "revision": 1}, "modelClasses": ["frontier"]})
+        self.assertTrue(problems and "p" in problems[0])
+        self.assertTrue(profiles.model_usable("example/none", self.catalogue))
+
+
+class ConfigurationTests(unittest.TestCase):
+    """The well-known `configuration` (DEC-0046) and its summary tiles, the dashboard's "Runner & model"."""
+
+    def test_built_from_a_resolution_and_a_runner_profile(self):
+        resolution = {"from": "binding", "profile": "default", "models": ["deepseek/deepseek-v4-pro"]}
+        runner = {"kind": "runner-profile", "id": "claude-sub", "runnerKind": "claude-code", "route": "subscription", "modelProfile": "default"}
+        conf = profiles.configuration(["runner", "model"], resolution, runner)
+        self.assertEqual(conf, {"slots": ["runner", "model"], "resolved": {"from": "binding", "runnerProfile": "claude-sub", "runnerKind": "claude-code",
+                                                                            "route": "subscription", "modelProfile": "default", "models": ["deepseek/deepseek-v4-pro"]}})
+        self.assertEqual(profiles.configuration_summary(conf), [
+            {"label": "Runner", "value": "claude-code · subscription"},
+            {"label": "Model", "value": "default · deepseek/deepseek-v4-pro"},
+        ])
+
+    def test_a_refused_resolution_or_a_bad_slot_is_refused(self):
+        for bad in ({"refused": "no-profile"}, {"from": "nowhere", "profile": "default", "models": []}):
+            with self.subTest(bad=bad), self.assertRaises(profiles.ProfileError):
+                profiles.configuration(["model"], bad)
+        with self.assertRaises(profiles.ProfileError):
+            profiles.configuration(["runner", "model", "runner"], {"from": "agent", "profile": "default", "models": []})
+        with self.assertRaises(profiles.ProfileError):
+            profiles.configuration(["model"], {"from": "agent", "profile": "Bad Id", "models": []})
+        with self.assertRaises(profiles.ProfileError):
+            profiles.configuration(["model"], {"from": "agent", "profile": "default", "models": ["x/y"] * 17})
+
+    def test_build_well_known_carries_it_and_checks_it(self):
+        base = dict(service_id="example-agent", instance="default", name="Example", version="1.0.0", build={"commit": "abc1234"},
+                    started_at=fs.now_iso(), status="ready", degraded=[], surfaces={"events": {"path": "/fabric/v1/events"}})
+        conf = {"slots": ["model"], "resolved": {"from": "estate", "modelProfile": "default", "models": ["deepseek/deepseek-v4-pro"]}}
+        self.assertEqual(fs.build_well_known(**base, configuration=conf)["configuration"], conf)
+        self.assertNotIn("configuration", fs.build_well_known(**base))
+        with self.assertRaises(fs.ServiceError):
+            fs.build_well_known(**base, configuration={"slots": ["model"], "resolved": {"from": "estate", "extra": 1}})
+
+
+class UsageRouteTests(unittest.TestCase):
+    def test_a_receipt_carries_its_route_and_the_report_keeps_routes_apart(self):
+        a = fs.make_usage_receipt("openrouter", "deepseek/deepseek-v4-pro", input_tokens=10, output_tokens=5, cost_usd=0.01, route="key")
+        b = fs.make_usage_receipt("anthropic", "claude", input_tokens=1, output_tokens=1, route="subscription")
+        c = fs.make_usage_receipt("openrouter", "deepseek/deepseek-v4-pro", input_tokens=1, output_tokens=1, cost_usd=0.0)
+        self.assertEqual((a["route"], b["route"]), ("key", "subscription"))
+        self.assertNotIn("route", c)
+        with self.assertRaises(fs.ServiceError):
+            fs.make_usage_receipt("openrouter", "m", input_tokens=1, output_tokens=1, route="borrowed")
+        rows = fs.usage_report([a, b, c], service_id="example-agent")["days"][0]["byModel"]
+        self.assertEqual([(r["provider"], r["model"], r.get("route")) for r in rows],
+                         [("anthropic", "claude", "subscription"), ("openrouter", "deepseek/deepseek-v4-pro", None), ("openrouter", "deepseek/deepseek-v4-pro", "key")])
+
+
+class ProbeConfigurationTests(unittest.TestCase):
+    def rule(self, wk):
+        p = check.Probe.__new__(check.Probe)
+        p.results, p.wk = [], wk
+        p.configuration_rule()
+        return p.results[0]
+
+    def test_verdicts(self):
+        good = {"configuration": {"slots": ["runner"], "resolved": {"from": "agent", "runnerKind": "claude-code", "route": "subscription"}}}
+        self.assertEqual(self.rule(good)["verdict"], "PASS")
+        self.assertEqual(self.rule({})["verdict"], "NOT_RUN")
+        self.assertEqual(self.rule({"configuration": {"slots": ["model"], "resolved": {"models": ["Not A Model"]}}})["verdict"], "FAIL")
+        self.assertEqual(self.rule({"configuration": "x"})["verdict"], "FAIL")
+
+
+if __name__ == "__main__":
+    unittest.main()

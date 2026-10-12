@@ -16,7 +16,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only (Linux services use lifecycle manager none until a systemd adapter exists). Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.15.0"
+  version: "0.16.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "0cacd08b0e95b6abf131eae1206b60792138bc3c"
@@ -83,7 +83,8 @@ are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
 [`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs). When the callers are agents of the estate, the
 service checks each call's delegation token (DEC-0039): read [the delegation reference](references/delegation.md);
 the verifier is [`scripts/fabric_delegation.py`](scripts/fabric_delegation.py) /
-[`scripts/fabric-delegation.mjs`](scripts/fabric-delegation.mjs).
+[`scripts/fabric-delegation.mjs`](scripts/fabric-delegation.mjs). When Fabric chooses the service's runner and models
+(DEC-0046), read [the profiles reference](references/profiles.md).
 
 ## Step 2 — the non-negotiables
 

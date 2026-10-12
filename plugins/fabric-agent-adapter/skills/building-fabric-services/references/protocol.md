@@ -63,7 +63,7 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   entries through unchanged.
 - `configuration` (DEC-0046) MAY say which runner and model profile the service resolved and from where
   (`request`, `agent`, `binding`, `estate`); a usage receipt MAY carry the `route` (`subscription` or `key`). The kits
-  do not emit either yet (FAA-19).
+  build both: `fabric_profiles.configuration` and `make_usage_receipt(route=)` ([profiles](profiles.md)).
 - `build` needs `commit` or `digest` (`sha256:<64 hex>`).
 - `summary`: at most six tiles; `attention: true` counts toward the host's badge.
 - `surfaces.events` is required; `dashboard` and `mcp` when the service has them; `usage`

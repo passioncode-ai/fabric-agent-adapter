@@ -382,7 +382,34 @@ export function dashboardExtension({ minWidth = 360, appearance = ['scheme', 'th
 
 // `extensions` is kept as given (a reader ignores keys it does not know); a dashboard declaration in
 // it must be valid (dashboardExtension builds one).
-export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions }) {
+const PROFILE_ID = /^[a-z][a-z0-9-]{0,62}$/;
+const RUNNER_KIND = /^[a-z][a-z0-9-]{1,62}$/;
+const MODEL_ID = /^[a-z0-9][a-z0-9._-]{0,63}\/[a-z0-9][a-z0-9._:-]{0,127}$/;
+export const ROUTES = Object.freeze(['subscription', 'key']);
+
+/** DEC-0046: the well-known `configuration` — {slots, resolved} as service-well-known.schema.json types it. */
+export function configurationProblems(doc) {
+  if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) return ['configuration is an object'];
+  const problems = Object.keys(doc).filter((k) => k !== 'slots' && k !== 'resolved').map((k) => `configuration has no member ${k}`);
+  const { slots, resolved } = doc;
+  if (!Array.isArray(slots) || slots.length > 2 || new Set(slots).size !== slots.length || !slots.every((s) => s === 'runner' || s === 'model')) problems.push('slots is a list of runner and model, each once');
+  if (resolved === null || typeof resolved !== 'object' || Array.isArray(resolved)) return [...problems, 'resolved is an object'];
+  const checks = {
+    from: (x) => ['request', 'agent', 'binding', 'estate'].includes(x),
+    runnerProfile: (x) => typeof x === 'string' && PROFILE_ID.test(x),
+    modelProfile: (x) => typeof x === 'string' && PROFILE_ID.test(x),
+    runnerKind: (x) => typeof x === 'string' && RUNNER_KIND.test(x),
+    route: (x) => ROUTES.includes(x),
+    models: (x) => Array.isArray(x) && x.length <= 16 && x.every((m) => typeof m === 'string' && MODEL_ID.test(m)),
+  };
+  for (const [k, v] of Object.entries(resolved)) {
+    if (!Object.hasOwn(checks, k)) problems.push(`resolved has no member ${k}`);
+    else if (!checks[k](v)) problems.push(`resolved.${k} is not valid`);
+  }
+  return problems;
+}
+
+export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions, configuration }) {
   if (!STATUSES.includes(status)) throw new ServiceError(`status must be one of ${STATUSES.join(', ')}.`);
   if (!surfaces?.events) throw new ServiceError('surfaces.events is required.');
   if (!(build?.commit || build?.digest)) throw new ServiceError('build needs a commit or a digest.');
@@ -402,6 +429,11 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
       if (problems.length) throw new ServiceError(`Dashboard declaration: ${problems.join('; ')}.`);
     }
     doc.extensions = { ...extensions };
+  }
+  if (configuration !== undefined) {
+    const problems = configurationProblems(configuration);
+    if (problems.length) throw new ServiceError(`configuration: ${problems.join('; ')}.`);
+    doc.configuration = configuration;
   }
   return doc;
 }
@@ -450,7 +482,7 @@ const COUNTS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTok
  * One model call, from the provider's own usage numbers. No prompt, output or caller.
  * `costUsd` null means it cannot be priced: the report counts it as unpriced, never as $0.
  */
-export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0, costUsd = null, costBasis, at } = {}) {
+export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0, costUsd = null, costBasis, at, route } = {}) {
   if (!PROVIDER.test(provider ?? '')) throw new ServiceError('provider must be a lowercase name such as anthropic or openrouter.');
   model = String(model ?? '').trim();
   if (!model || model.length > 128) throw new ServiceError('model must be 1 to 128 characters.');
@@ -459,7 +491,8 @@ export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, c
   if (costUsd !== null && (typeof costUsd !== 'number' || !Number.isFinite(costUsd) || costUsd < 0)) throw new ServiceError('costUsd must be a non-negative number or null.');
   const basis = costBasis ?? (costUsd === null ? 'unknown' : 'provider');
   if (!COST_BASES.includes(basis) || (costUsd === null) !== (basis === 'unknown')) throw new ServiceError('costBasis is provider or price-list with a cost, unknown without one.');
-  return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis };
+  if (route !== undefined && !ROUTES.includes(route)) throw new ServiceError('route is subscription or key (DEC-0046).');
+  return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis, ...(route === undefined ? {} : { route }) };
 }
 
 const utcDate = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -482,8 +515,9 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
     if (date < first || date > last) continue;
     const rows = days.get(date) ?? new Map();
     days.set(date, rows);
-    const k = `${r.provider}\u0000${r.model}`;
-    const row = rows.get(k) ?? emptyRow({ provider: r.provider, model: r.model, bases: new Set() });
+    const k = `${r.provider}\u0000${r.model}\u0000${r.route ?? ''}`;
+    // DEC-0046: rows of one model on two routes stay apart.
+    const row = rows.get(k) ?? emptyRow({ provider: r.provider, model: r.model, ...(r.route ? { route: r.route } : {}), bases: new Set() });
     rows.set(k, row);
     row.calls += 1;
     for (const c of COUNTS) row[c] += Number(r[c] ?? 0);
@@ -493,7 +527,7 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
   const outDays = [...days.keys()].sort().map((date) => {
     const models = [...days.get(date).values()]
       .map(({ bases, ...row }) => closeRow({ ...row, costBasis: bases.size === 1 ? [...bases][0] : 'mixed' }))
-      .sort((a, b) => (a.provider + a.model < b.provider + b.model ? -1 : 1));
+      .sort((a, b) => (`${a.provider}\u0000${a.model}\u0000${a.route ?? ''}` < `${b.provider}\u0000${b.model}\u0000${b.route ?? ''}` ? -1 : 1));
     const day = emptyRow({ date });
     for (const m of models) {
       for (const c of ['calls', 'unpricedCalls', ...COUNTS]) day[c] += m[c];
