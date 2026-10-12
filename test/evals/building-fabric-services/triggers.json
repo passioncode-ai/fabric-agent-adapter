@@ -136,6 +136,10 @@
     {
       "query": "В отчёте о расходах example-agent видно только месячный бюджет, а он ещё режет заказы дороже $2 и проекты по $5 в день — покажи все лимиты.",
       "shouldTrigger": true
+    },
+    {
+      "query": "Our agent chat should fall back from Claude Code to Codex to Hermes in the project's order, and its doctor must say which runner is signed out — wire the runner route checks.",
+      "shouldTrigger": true
     }
   ]
 }
