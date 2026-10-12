@@ -26,8 +26,10 @@
   - They run against the contract's positive, negative and semantic fixtures (`test/fixtures/contract/dec-0025-0027/`)
     and its canonical-form vectors.
   - A cross-kit case requires the two kits' backup files to be byte-identical.
-- Mutation testing: 49 planted defects, all caught. One more mutant was equivalent; the fraction test now names
-  the message it expects, which kills it.
+- Mutation testing: 79 planted defects, all caught. Three further mutants survived the first pass; their tests were
+  tightened (the expected message, a probe where nothing else looks) and they are now caught.
+- An independent review found 20 moderate defects and nothing critical; all are fixed with tests (CHANGELOG 0.19.0).
+  I found one more myself: the readers required `Z` where the contract allows any RFC 3339 offset.
 - Full suites, `test/validate.py` and both strict plugin validations on macOS.
 - The Windows CI job runs the new cases.
 

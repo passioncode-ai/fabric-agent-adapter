@@ -32,10 +32,28 @@ service-side surfaces the pinned contract already carries: DEC-0025 and DEC-0027
   - `usage_limit_problems` and `usageLimitProblems` check a report.
 - **The feed client (FAC-SEM-036).** `token_header` and `tokenHeader` give the one header the descriptor
   declares. `check_service.py` now sends its token through it.
+- **An independent review found 20 moderate defects; all are fixed with tests.**
+  - **The readers follow the schema exactly**, and the two kits accept the same files:
+    - a trailing newline is refused (Python matches a whole string now);
+    - a timestamp is any RFC 3339 date-time with a real calendar date, including an offset;
+    - a string holds at most 1 MiB and a row at most 512 values;
+    - every `extensions` key is a URI;
+    - NaN is refused;
+    - in Node, invalid UTF-8 and a `1.0` integer are refused the way Python refuses them.
+  - **A damaged file never stops anything.** The scan skips it, the digest does not crash, a damaged newest file
+    does not suppress a good snapshot, and an impossible file name makes a snapshot due.
+  - **Safer writes:**
+    - only a temporary file older than an hour is removed;
+    - the snapshot just written is never pruned, even after the clock steps back.
+  - **The restore preview** refuses a key the snapshot holds twice.
+  - **Limits:**
+    - a machine limit over a rolling window is counted from the receipts;
+    - a limit that is not an object is refused.
+  - **Both descriptor validators** check `auth.header` and `auth.scheme` the way the schema does.
 - **Tests.**
   - The contract's fixtures at the pin are copied to `test/fixtures/contract/dec-0025-0027/`.
   - The Windows CI job runs both kits' new cases.
-  - Mutation testing: 49 planted defects, all caught.
+  - Mutation testing: 79 planted defects, all caught.
 - **Docs.**
   - `references/settings-backups.md` is new.
   - `usage.md` covers every limit.

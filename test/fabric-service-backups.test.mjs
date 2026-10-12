@@ -95,7 +95,10 @@ test('write is named by time, private, skips an unchanged snapshot, removes a le
     assert.equal(fs.statSync(dir).mode & 0o777, 0o700);
   }
   assert.equal(k.writeSettingsBackup(backup(TABLES, NOW + DAY), dir), null, 'unchanged: not written');
-  fs.writeFileSync(path.join(dir, '.settings-x.json.tmp1'), 'half');
+  const left = path.join(dir, '.settings-x.json.tmp1');
+  fs.writeFileSync(left, 'half');
+  const twoHoursAgo = new Date(Date.now() - 7_200_000);
+  fs.utimesSync(left, twoHoursAgo, twoHoursAgo);
   for (let day = 1; day <= 20; day += 1) {
     const tables = structuredClone(TABLES);
     tables.projects.rows.push([`p-${100 + day}`, `Day ${day}`, false]);
@@ -106,6 +109,60 @@ test('write is named by time, private, skips an unchanged snapshot, removes a le
   assert.equal(path.basename(kept[0]), 'settings-20261025T020000123000Z.json');
   assert.deepEqual(fs.readdirSync(dir).filter((n) => !n.startsWith('settings-')), []);
   assert.equal(k.readSettingsBackup(kept[0]).counts.projects, 3);
+  const filling = path.join(dir, '.settings-y.json.tmp2');
+  fs.writeFileSync(filling, 'half');
+  k.writeSettingsBackup(backup(TABLES, NOW + 40 * DAY), dir);
+  assert.ok(fs.existsSync(filling), 'a young temporary file belongs to a writer still at work');
+});
+
+test('a clock that stepped back never deletes the new snapshot; a damaged newest file suppresses nothing; an impossible name is due', () => {
+  const dir = temp();
+  for (let day = 0; day < 15; day += 1) {
+    const tables = structuredClone(TABLES);
+    tables.projects.rows.push([`p-${200 + day}`, `Day ${day}`, false]);
+    k.writeSettingsBackup(backup(tables, NOW + day * DAY), dir);
+  }
+  const tables = structuredClone(TABLES);
+  tables.projects.rows.push(['p-999', 'Written after the clock stepped back', false]);
+  const written = k.writeSettingsBackup(backup(tables, NOW - 365 * DAY), dir);
+  assert.ok(fs.existsSync(written));
+  assert.equal(k.settingsBackups(dir).length, k.SETTINGS_BACKUP_KEEP);
+
+  const other = temp();
+  const doc = backup();
+  fs.writeFileSync(path.join(other, 'settings-20991231T000000000000Z.json'), JSON.stringify({ sha256: doc.sha256 }));
+  assert.notEqual(k.writeSettingsBackup(doc, other), null);
+  fs.writeFileSync(path.join(other, 'settings-20991231T000000000001Z.json'), '[]');
+  const more = structuredClone(TABLES);
+  more.projects.rows.push(['p-777', 'x', false]);
+  assert.notEqual(k.writeSettingsBackup(backup(more), other), null);
+
+  const odd = temp();
+  fs.writeFileSync(path.join(odd, 'settings-20261345T000000000000Z.json'), '{}');
+  assert.equal(k.backupDue(odd, NOW), true);
+});
+
+test('what the schema refuses is refused, and a reader parses as the Python one does', () => {
+  const cases = [];
+  let doc = backup(); doc.reason = 'daily\n'; cases.push([doc, 'reason']);
+  doc = backup(); doc.sha256 += '\n'; cases.push([doc, 'sha256']);
+  doc = backup(); doc.created_at = '2026-02-30T00:00:00Z'; cases.push([doc, 'created_at']);
+  doc = backup(); doc.extensions = { 'not a uri': 1 }; cases.push([doc, 'extensions']);
+  doc = backup(); doc.tables.projects.rows[0][1] = 'x'.repeat(1048577); cases.push([doc, 'longer than']);
+  doc = backup(); doc.tables['lone\ud800'] = { columns: ['id'], rows: [] }; doc.counts['lone\ud800'] = 0; cases.push([doc, 'lone']);
+  for (const [d, needle] of cases) assert.ok(has(k.settingsBackupProblems(d), needle), needle);
+  doc = backup(); doc.created_at = '2026-10-05T04:00:00.5+02:00';
+  assert.deepEqual(k.settingsBackupProblems(doc), [], 'an RFC 3339 offset is a date-time too');
+  const dir = temp();
+  const file = path.join(dir, 'settings-20261005T020000000000Z.json');
+  fs.writeFileSync(file, JSON.stringify(backup()).replace('"schema":7', '"schema":7.0'));
+  assert.throws(() => k.readSettingsBackup(file), /not an integer/);
+  const withExtension = { ...backup(), extensions: { 'https://example.com/ext': 'PLACEHOLDER' } };
+  const [head, tail] = JSON.stringify(withExtension).split('PLACEHOLDER');
+  fs.writeFileSync(file, Buffer.concat([Buffer.from(head), Buffer.from([0xff]), Buffer.from(tail)])); // where nothing else looks
+  assert.throws(() => k.readSettingsBackup(file), k.ServiceError, 'invalid UTF-8 is refused, never replaced');
+  fs.writeFileSync(file, JSON.stringify(backup()));
+  assert.equal(k.readSettingsBackup(file).sha256, backup().sha256);
 });
 
 test('due after a day; a damaged file is refused and skipped; an empty one is not a source', () => {
@@ -140,6 +197,11 @@ test('restore adds missing rows, never overwrites, and names what it drops, defa
   assert.deepEqual(plan.tables.secret_bindings.missingRequired, ['scope']);
   assert.deepEqual(plan.tables.secret_bindings.refused, [{ key: ['p-001', 'llm'], reason: 'required column scope is not in the snapshot' }]);
   assert.deepEqual(k.restorePlan(backup(), { projects: { columns: ['id', 'name', 'archived'], key: ['id'], required: [], existing: [] } }).unknownTables, ['secret_bindings']);
+  const twice = structuredClone(TABLES);
+  twice.projects.rows.push(['p-002', 'Board memo again', false]);
+  const dup = k.restorePlan(backup(twice), { projects: { columns: ['id', 'name', 'archived'], key: ['id'], required: [], existing: [] } });
+  assert.equal(dup.tables.projects.insert.length, 2);
+  assert.deepEqual(dup.tables.projects.refused, [{ key: ['p-002'], reason: 'the snapshot holds this key twice' }]);
   const damaged = backup();
   damaged.sha256 = '0'.repeat(64);
   assert.throws(() => k.restorePlan(damaged, {}), k.ServiceError);
@@ -198,6 +260,17 @@ test('the report counts a machine period limit and refuses an incoherent one', (
   assert.deepEqual(report.budget, { period: 'month', limitUsd: 100, spentUsd: 0.75 });
   assert.deepEqual(k.usageLimitProblems(report), []);
   assert.throws(() => k.usageReport(receipts, { id: 'example-agent', now, budgets: [{ id: 'p', scope: 'project', kind: 'daily', period: 'day', limitUsd: 5, enforced: true }] }), k.ServiceError);
+  assert.throws(() => k.usageReport(receipts, { id: 'example-agent', now, budgets: ['machine.daily'] }), /is an object/);
+  const rolling = k.usageReport(receipts.values(), { id: 'example-agent', now, budgets: [{ id: 'machine.24h', scope: 'machine', kind: 'emergency', windowSeconds: 86400, limitUsd: 50, enforced: true }] });
+  assert.equal(rolling.budgets[0].spentUsd, 0.25, 'a rolling machine window is counted from the receipts, even from an iterator');
+});
+
+test('the descriptor names its header and scheme the schema way', () => {
+  const base = { protocol: k.PROTOCOL, id: 'example-agent', instance: 'default', name: 'Example', origin: 'http://127.0.0.1:47195',
+    auth: { tokenFile: '~/t' }, lifecycle: { manager: 'none' }, paths: { data: '~/d', logs: [] }, installedAt: '2026-10-05T00:00:00Z', installedBy: 'test' };
+  assert.deepEqual(k.validateDescriptor(base), []);
+  assert.ok(has(k.validateDescriptor({ ...base, auth: { tokenFile: '~/t', header: 'X Token', scheme: 'none' } }), 'auth.header'));
+  assert.ok(has(k.validateDescriptor({ ...base, auth: { tokenFile: '~/t', scheme: 'Basic' } }), 'auth.scheme'));
 });
 
 test('both kits write byte-identical backup files', { skip: spawnSync('python3', ['--version']).status !== 0 && 'needs python3' }, () => {

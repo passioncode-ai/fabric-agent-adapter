@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 
 from test_fabric_service import load
@@ -86,6 +87,32 @@ class BackupFile(unittest.TestCase):
         doc["tables"]["projects"]["rows"][0][1] = "lone \ud800"
         self.assertTrue(any("surrogate" in p for p in fs.settings_backup_problems(doc)))
 
+    def test_what_the_schema_refuses_is_refused_and_never_crashes(self):
+        cases = []
+        doc = backup(); doc["reason"] = "daily\n"; cases.append((doc, "reason"))
+        doc = backup(); doc["sha256"] += "\n"; cases.append((doc, "sha256"))
+        doc = backup(); doc["created_at"] = "2026-02-30T00:00:00Z"; cases.append((doc, "created_at"))
+        doc = backup(); doc["extensions"] = {"not a uri": 1}; cases.append((doc, "extensions"))
+        doc = backup(); doc["tables"]["projects"]["rows"][0][1] = "x" * 1048577; cases.append((doc, "longer than"))
+        doc = backup(); doc["tables"]["projects"]["columns"].append("name\n"); cases.append((doc, "column projects.name"))
+        doc = backup(); doc["tables"]["lone\ud800"] = {"columns": ["id"], "rows": []}; doc["counts"]["lone\ud800"] = 0
+        cases.append((doc, "lone"))
+        for doc, needle in cases:
+            with self.subTest(needle):
+                problems = fs.settings_backup_problems(doc)
+                self.assertTrue(any(needle in p for p in problems), problems)
+        doc = backup(); doc["created_at"] = "2026-10-05T04:00:00.5+02:00"
+        self.assertEqual(fs.settings_backup_problems(doc), [], "an RFC 3339 offset is a date-time too")
+
+    def test_nan_is_not_json(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "settings-20261005T020000000000Z.json"
+            doc = backup()
+            doc["extensions"] = {"https://example.com/ext": "PLACEHOLDER"}
+            path.write_text(json.dumps(doc).replace('"PLACEHOLDER"', "NaN"), encoding="utf-8")   # where nothing else looks
+            with self.assertRaises(fs.ServiceError):
+                fs.read_settings_backup(path)
+
     def test_make_writes_counts_checksum_and_time(self):
         doc = backup()
         self.assertEqual(doc["format"], "fabric-settings-backup/1")
@@ -144,7 +171,11 @@ class BackupFolder(unittest.TestCase):
 
     def test_a_left_temporary_file_is_removed_and_fourteen_are_kept(self):
         self.dir.mkdir(parents=True)
-        (self.dir / ".settings-x.json.tmp1").write_text("half")
+        left = self.dir / ".settings-x.json.tmp1"
+        left.write_text("half")
+        two_hours_ago = time.time() - 7200
+        os.utime(left, (two_hours_ago, two_hours_ago))
+        filling = self.dir / ".settings-y.json.tmp2"   # a concurrent writer is still filling this one
         for day in range(20):
             tables = copy.deepcopy(TABLES)
             tables["projects"]["rows"].append(["p-%03d" % (100 + day), "Day %d" % day, False])
@@ -153,6 +184,36 @@ class BackupFolder(unittest.TestCase):
         self.assertEqual(len(kept), fs.SETTINGS_BACKUP_KEEP)
         self.assertEqual(kept[0].name, "settings-20261024T020000123000Z.json")
         self.assertEqual([p.name for p in self.dir.iterdir() if not p.name.startswith("settings-")], [])
+        filling.write_text("half")
+        fs.write_settings_backup(backup(now=NOW + dt.timedelta(days=30)), self.dir)
+        self.assertTrue(filling.exists(), "a young temporary file belongs to a writer still at work")
+
+    def test_a_clock_that_stepped_back_never_deletes_the_new_snapshot(self):
+        for day in range(15):
+            tables = copy.deepcopy(TABLES)
+            tables["projects"]["rows"].append(["p-%03d" % (200 + day), "Day %d" % day, False])
+            fs.write_settings_backup(backup(tables, now=NOW + dt.timedelta(days=day)), self.dir)
+        tables = copy.deepcopy(TABLES)
+        tables["projects"]["rows"].append(["p-999", "Written after the clock stepped back", False])
+        written = fs.write_settings_backup(backup(tables, now=NOW - dt.timedelta(days=365)), self.dir)
+        self.assertTrue(written.exists())
+        self.assertEqual(len(fs.settings_backups(self.dir)), fs.SETTINGS_BACKUP_KEEP)
+
+    def test_a_damaged_newest_file_does_not_suppress_a_good_snapshot(self):
+        self.dir.mkdir(parents=True)
+        doc = backup()
+        damaged = self.dir / "settings-20991231T000000000000Z.json"
+        damaged.write_text(json.dumps({"sha256": doc["sha256"]}), encoding="utf-8")
+        self.assertIsNotNone(fs.write_settings_backup(doc, self.dir))
+        (self.dir / "settings-20991231T000000000001Z.json").write_text("[]", encoding="utf-8")
+        tables = copy.deepcopy(TABLES)
+        tables["projects"]["rows"].append(["p-777", "x", False])
+        self.assertIsNotNone(fs.write_settings_backup(backup(tables), self.dir))
+
+    def test_an_impossible_name_makes_a_snapshot_due_and_never_crashes(self):
+        self.dir.mkdir(parents=True)
+        (self.dir / "settings-20261345T000000000000Z.json").write_text("{}")
+        self.assertTrue(fs.backup_due(self.dir, now=NOW))
 
     def test_due_after_a_day(self):
         self.assertTrue(fs.backup_due(self.dir, now=NOW))
@@ -206,6 +267,13 @@ class Restore(unittest.TestCase):
         plan = fs.restore_plan(backup(), {"projects": {"columns": ["id", "name", "archived"], "key": ["id"], "required": [], "existing": []}})
         self.assertEqual(plan["unknownTables"], ["secret_bindings"])
         self.assertEqual(len(plan["tables"]["projects"]["insert"]), 2)
+
+    def test_a_key_the_snapshot_holds_twice_is_refused_in_the_preview(self):
+        tables = copy.deepcopy(TABLES)
+        tables["projects"]["rows"].append(["p-002", "Board memo again", False])
+        plan = fs.restore_plan(backup(tables), {"projects": {"columns": ["id", "name", "archived"], "key": ["id"], "required": [], "existing": []}})
+        self.assertEqual(len(plan["tables"]["projects"]["insert"]), 2)
+        self.assertEqual(plan["tables"]["projects"]["refused"], [{"key": ["p-002"], "reason": "the snapshot holds this key twice"}])
 
     def test_a_damaged_backup_is_never_planned(self):
         doc = backup()
@@ -289,6 +357,22 @@ class Limits(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             fs.usage_report(receipts, service_id="example-agent", now=now,
                             budgets=[{"id": "p", "scope": "project", "kind": "daily", "period": "day", "limitUsd": 5, "enforced": True}])
+        with self.assertRaises(fs.ServiceError) as caught:
+            fs.usage_report(receipts, service_id="example-agent", now=now, budgets=["machine.daily"])
+        self.assertIn("is an object", str(caught.exception))
+        rolling = fs.usage_report(receipts, service_id="example-agent", now=now, budgets=[
+            {"id": "machine.24h", "scope": "machine", "kind": "emergency", "windowSeconds": 86400, "limitUsd": 50, "enforced": True}])
+        self.assertEqual(rolling["budgets"][0]["spentUsd"], 0.25, "a rolling machine window is counted from the receipts")
+
+    def test_the_descriptor_names_its_header_and_scheme_the_schema_way(self):
+        base = {"protocol": fs.PROTOCOL, "id": "example-agent", "instance": "default", "name": "Example", "origin": "http://127.0.0.1:47195",
+                "auth": {"tokenFile": "~/t"}, "lifecycle": {"manager": "none"}, "paths": {"data": "~/d", "logs": []},
+                "installedAt": "2026-10-05T00:00:00Z", "installedBy": "test"}
+        self.assertEqual(fs.validate_descriptor(base), [])
+        for auth, needle in (({"tokenFile": "~/t", "header": "X Token", "scheme": "none"}, "auth.header"),
+                             ({"tokenFile": "~/t", "scheme": "Basic"}, "auth.scheme")):
+            with self.subTest(needle):
+                self.assertTrue(any(needle in p for p in fs.validate_descriptor({**base, "auth": auth})))
 
 
 if __name__ == "__main__":
