@@ -491,3 +491,26 @@ class PinTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PluginLifecycleGateTests(unittest.TestCase):
+    """FAA-22 (LC-19) and FAA-23 (LC-21) for the adapter's own plugin."""
+
+    def test_the_plugin_declares_no_mcp_server_and_no_credential_in_a_hook(self):
+        import tempfile
+        v = validate
+        with tempfile.TemporaryDirectory() as temp:
+            plugin = Path(temp)
+            (plugin / ".claude-plugin").mkdir()
+            (plugin / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "x"}))
+            (plugin / "hooks").mkdir()
+            (plugin / "hooks" / "hooks.json").write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "python3 x.py notice"}]}]}}))
+            errors = []
+            v.validate_plugin_lifecycle(errors, plugin)
+            self.assertEqual(errors, [])
+            (plugin / ".mcp.json").write_text(json.dumps({"mcpServers": {"x": {"command": "node"}}}))
+            (plugin / "hooks" / "hooks.json").write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "x --token=" + "s" + "k-" + "z" * 24}]}]}}))
+            errors = []
+            v.validate_plugin_lifecycle(errors, plugin)
+            self.assertTrue(any("LC-19" in e for e in errors), errors)
+            self.assertTrue(any("LC-21" in e for e in errors), errors)

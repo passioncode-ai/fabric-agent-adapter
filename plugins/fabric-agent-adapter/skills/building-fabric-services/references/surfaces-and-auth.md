@@ -21,7 +21,9 @@
   (`<tool> mcp-register`), which writes `{"type":"http","url":"http://127.0.0.1:<port>/mcp","headers":{...}}`
   atomically, aborts if the file changed meanwhile, and keeps one 0600 backup. The token
   goes in `headers`, never in the URL — every log that records a URL prints its query
-  string.
+  string. An HTTP registration starts nothing per session: every client session talks to the
+  one resident service (LC-19). A stdio server, by contrast, is a process per session — keep
+  one only at project scope.
 - Ship server `instructions` that tell a caller where to start and that every answer
   carries `degraded`.
 

@@ -235,3 +235,60 @@ class EffectAndCostTests(unittest.TestCase):
             self.assertEqual(ADAPTER.main(argv + ["--effect", "draft", "--cost-preset", "quick", "0.25", "Quick", "--json"]), 0)
             manifest = json.loads((Path(temp) / "fabric-agent.json").read_text())
             self.assertEqual((manifest["capabilities"][0]["effect"], manifest["costPresets"][0]["maxUsd"]), ("draft", 0.25))
+
+
+class LifecycleRuleTests(unittest.TestCase):
+    """LC-19 (FAA-22) and LC-21 (FAA-23): no per-session stdio server in a plugin, no credential in argv or a URL."""
+
+    def scaffold(self, root, **overrides):
+        args = scaffold_args("mcp")
+        for key, value in overrides.items():
+            setattr(args, key, value)
+        ADAPTER.scaffold_project(root, args)
+
+    def receipts(self, root):
+        return ADAPTER.check_project(root, None)["gates"]["localStructure"]
+
+    def test_scaffold_refuses_a_credential_in_a_runtime_argument(self):
+        with tempfile.TemporaryDirectory() as temp, self.assertRaises(ADAPTER.AdaptationError):
+            self.scaffold(Path(temp), mcp_mode="stdio", runtime_arg=["--key=" + "Zk9yZ2V0VGhp" + "c0lzQVNlY3JldEtleTEyMzQ1Njc4OTA"])
+
+    def test_check_refuses_a_credential_in_an_argument_or_a_url(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.scaffold(root, mcp_mode="stdio", runtime_arg=["--verbose"])
+            self.assertEqual(self.receipts(root)["status"], "PASS")
+            manifest = json.loads((root / "fabric-agent.json").read_text())
+            manifest["capabilities"][0]["profile"]["connection"]["args"] = ["--api-key=" + "s" + "k-" + "y" * 24]
+            (root / "fabric-agent.json").write_text(json.dumps(manifest))
+            gate = self.receipts(root)
+            self.assertEqual(gate["status"], "FAIL")
+            self.assertTrue(any("LC-21" in r for r in gate["receipts"]), gate)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.scaffold(root, mcp_url="https://agents.example/mcp?api_key=abc")
+            self.assertTrue(any("LC-21" in r for r in self.receipts(root)["receipts"]))
+
+    def test_check_flags_a_plugin_stdio_server_started_in_every_session(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.scaffold(root)
+            plugin = root / "plugins" / "example"
+            (plugin / ".claude-plugin").mkdir(parents=True)
+            (plugin / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "example"}))
+            (plugin / ".mcp.json").write_text(json.dumps({"mcpServers": {"example": {"command": "node", "args": ["server.js"]}}}))
+            gate = self.receipts(root)
+            self.assertEqual(gate["status"], "FAIL")
+            self.assertTrue(any("LC-19" in r and "example" in r for r in gate["receipts"]), gate)
+            (plugin / ".mcp.json").write_text(json.dumps({"mcpServers": {"example": {"type": "http", "url": "http://127.0.0.1:47201/mcp"}}}))
+            self.assertEqual(self.receipts(root)["status"], "PASS")
+            (plugin / ".mcp.json").write_text(json.dumps({"mcpServers": {"example": {"type": "http", "url": "http://127.0.0.1:47201/mcp?token=abc"}}}))
+            self.assertTrue(any("LC-21" in r for r in self.receipts(root)["receipts"]))
+            (plugin / ".mcp.json").unlink()
+            (plugin / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "example", "mcpServers": {"x": {"command": "python3", "args": ["-m", "x"]}}}))
+            self.assertTrue(any("LC-19" in r for r in self.receipts(root)["receipts"]))
+
+    def test_the_detector_copies_are_identical(self):
+        base = Path(__file__).resolve().parents[1] / "plugins/fabric-agent-adapter/skills"
+        self.assertEqual((base / "adapting-projects-to-fabric/scripts/fabric_secrets.py").read_bytes(),
+                         (base / "building-fabric-services/scripts/fabric_secrets.py").read_bytes())

@@ -160,6 +160,16 @@
         "writes the cost options as --cost-preset ID MAX_USD LABEL with one --default-cost-preset when a run's cost varies (DEC-0037), and none when it does not",
         "does not invent a price: the amounts come from the author or the agent's measured runs"
       ]
+    },
+    {
+      "id": "plugin-and-argv-hygiene",
+      "trap": "the project's Claude Code plugin declared a stdio MCP server, so thirty sessions ran thirty copies, and the server's key sat in its argv where ps showed it to every process",
+      "request": "Adapt example-agent, whose repository also ships a Claude Code plugin that runs its MCP server.",
+      "expected": [
+        "runs adapt_project.py check and treats an LC-19 receipt as a finding: the plugin's server becomes one resident HTTP service (building-fabric-services) or a project-scoped registration, never a per-session stdio server",
+        "moves any credential out of argv and out of URL query strings into a secret reference or a header (LC-21, FAC-SEM-057)",
+        "never weakens the check to make it pass"
+      ]
     }
   ]
 }
