@@ -266,6 +266,18 @@
         "hides its own button when the host's fabric_button cookie says owner=host, and shows 'Fabric is not installed — get it at passioncode.ai/fabric' when Fabric is absent (FB-5, FB-6)",
         "a press opens a view in Fabric and starts nothing by itself (FB-8)"
       ]
+    },
+    {
+      "id": "runner-and-model-profiles",
+      "trap": "the service hard-coded one model and its own OpenRouter key, ignored the project's model classes, and its dashboard could not say which runner and model it ran",
+      "request": "example-agent should run on whatever runner and model the operator picks in Fabric, within the project's limits, and show it.",
+      "expected": [
+        "resolves the model profile with the kit's resolve_model_profile / resolveModelProfile: request, agent, binding or project, estate default; the project's modelClasses narrow it, and an empty result refuses the launch naming the policy (model-classes-empty)",
+        "reads the model catalogue and profiles rather than a hard-coded model list, and checks them with profile_problems (FAC-SEM-058…060)",
+        "declares what applies in the well-known `configuration` (slots and resolved) and shows the Runner and Model tiles from configuration_summary; never takes a change through that document",
+        "its doctor runs the kit's runner_check (catalogued binary, version argv, at most 5 s, no shell) and model_usable",
+        "a key route names its key by reference only; a subscription runs only in its vendor's runner (FAC-SEM-059); usage receipts carry the route"
+      ]
     }
   ]
 }

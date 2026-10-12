@@ -758,12 +758,45 @@ def dashboard_extension(min_width: int = 360, appearance: Sequence[str] = ("sche
     return {DASHBOARD_EXTENSION_KEY: value}
 
 
+_PROFILE_ID = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+_RUNNER_KIND = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
+_MODEL_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}/[a-z0-9][a-z0-9._:-]{0,127}$")
+ROUTES = ("subscription", "key")
+
+
+def configuration_problems(doc: Any) -> List[str]:
+    """DEC-0046: the well-known `configuration` — {slots, resolved} as service-well-known.schema.json types it."""
+    if not isinstance(doc, dict):
+        return ["configuration is an object"]
+    problems = ["configuration has no member %s" % k for k in doc if k not in ("slots", "resolved")]
+    slots = doc.get("slots")
+    if not isinstance(slots, list) or len(slots) > 2 or len(set(map(str, slots))) != len(slots) or not all(s in ("runner", "model") for s in slots):
+        problems.append("slots is a list of runner and model, each once")
+    resolved = doc.get("resolved")
+    if not isinstance(resolved, dict):
+        return problems + ["resolved is an object"]
+    for k, v in resolved.items():
+        ok = {"from": lambda x: x in ("request", "agent", "binding", "estate"),
+              "runnerProfile": lambda x: isinstance(x, str) and bool(_PROFILE_ID.match(x)),
+              "modelProfile": lambda x: isinstance(x, str) and bool(_PROFILE_ID.match(x)),
+              "runnerKind": lambda x: isinstance(x, str) and bool(_RUNNER_KIND.match(x)),
+              "route": lambda x: x in ROUTES,
+              "models": lambda x: isinstance(x, list) and len(x) <= 16 and all(isinstance(m, str) and _MODEL_ID.match(m) for m in x)}.get(k)
+        if ok is None:
+            problems.append("resolved has no member %s" % k)
+        elif not ok(v):
+            problems.append("resolved.%s is not valid" % k)
+    return problems
+
+
 def build_well_known(*, service_id: str, instance: str, name: str, version: str, build: Dict[str, Any],
                      started_at: str, status: str, degraded: Sequence[Dict[str, str]],
                      surfaces: Dict[str, Any], summary: Optional[Sequence[Dict[str, Any]]] = None,
                      update_available: Optional[str] = None, pid: Optional[int] = None,
-                     extensions: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                     extensions: Optional[Dict[str, Any]] = None,
+                     configuration: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The unauthenticated identity answer. `degraded` is always present; ready means empty.
+    `configuration` (DEC-0046) says what the operator can configure and what applies now; fabric_profiles builds it.
     `extensions` is kept as given (a reader ignores keys it does not know); a dashboard declaration
     in it must be valid (dashboard_extension builds one)."""
     if status not in STATUSES:
@@ -790,6 +823,11 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
             if problems:
                 raise ServiceError("Dashboard declaration: %s." % "; ".join(problems))
         doc["extensions"] = dict(extensions)
+    if configuration is not None:
+        problems = configuration_problems(configuration)
+        if problems:
+            raise ServiceError("configuration: %s." % "; ".join(problems))
+        doc["configuration"] = configuration
     return doc
 
 
@@ -896,7 +934,7 @@ _PROVIDER = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_tokens: int,
                        cache_read_tokens: int = 0, cache_write_tokens: int = 0,
                        cost_usd: Optional[float] = None, cost_basis: Optional[str] = None,
-                       at: Optional[str] = None) -> Dict[str, Any]:
+                       at: Optional[str] = None, route: Optional[str] = None) -> Dict[str, Any]:
     """One model call, from the provider's own usage numbers. No prompt, output or caller.
 
     `cost_usd` is None when the call cannot be priced: the report counts it as unpriced and
@@ -917,8 +955,13 @@ def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_t
     basis = cost_basis or ("unknown" if cost_usd is None else "provider")
     if basis not in COST_BASES or (cost_usd is None) != (basis == "unknown"):
         raise ServiceError("cost_basis is provider or price-list with a cost, unknown without one.")
-    return {"at": at or now_iso(), "provider": provider, "model": model, **counts,
-            "costUsd": None if cost_usd is None else float(cost_usd), "costBasis": basis}
+    if route is not None and route not in ROUTES:
+        raise ServiceError("route is subscription or key (DEC-0046).")
+    receipt = {"at": at or now_iso(), "provider": provider, "model": model, **counts,
+               "costUsd": None if cost_usd is None else float(cost_usd), "costBasis": basis}
+    if route is not None:
+        receipt["route"] = route  # the operator's own login in its vendor's runner, or an issued key
+    return receipt
 
 
 def _add_totals(row: Dict[str, Any], receipt: Dict[str, Any]) -> None:
@@ -952,20 +995,22 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
         date = str(r.get("at", ""))[:10]
         if not (first <= date <= last):
             continue
-        key = (r["provider"], r["model"])
-        row = days.setdefault(date, {}).setdefault("%s\u0000%s" % key, {
+        key = (r["provider"], r["model"], r.get("route") or "")
+        row = days.setdefault(date, {}).setdefault("%s\u0000%s\u0000%s" % key, {
             "provider": r["provider"], "model": r["model"], "calls": 0, "unpricedCalls": 0,
             "inputTokens": 0, "outputTokens": 0, "cacheReadTokens": 0, "cacheWriteTokens": 0, "_cost": 0.0})
+        if r.get("route"):
+            row["route"] = r["route"]  # DEC-0046: rows of one model on two routes stay apart
         _add_totals(row, r)
         bases.setdefault((date,) + key, set()).add(r.get("costBasis") or "unknown")
     out_days = []
     for date in sorted(days):
         models = []
         for row in days[date].values():
-            seen = bases[(date, row["provider"], row["model"])]
+            seen = bases[(date, row["provider"], row["model"], row.get("route") or "")]
             row["costBasis"] = next(iter(seen)) if len(seen) == 1 else "mixed"
             models.append(_close_totals(row))
-        models.sort(key=lambda m: (m["provider"], m["model"]))
+        models.sort(key=lambda m: (m["provider"], m["model"], m.get("route") or ""))
         day = {"date": date, "calls": 0, "unpricedCalls": 0, "inputTokens": 0, "outputTokens": 0,
                "cacheReadTokens": 0, "cacheWriteTokens": 0, "_cost": 0.0}
         for m in models:

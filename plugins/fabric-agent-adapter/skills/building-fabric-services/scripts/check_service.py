@@ -245,6 +245,7 @@ class Probe:
         if "events" not in (wk.get("surfaces") or {}):
             problems.append("surfaces.events missing")
         self.add("well-known.shape", "FAIL" if problems else "PASS", "; ".join(problems) or "protocol, build, status, degraded, surfaces")
+        self.configuration_rule()
         svc = wk.get("service") or {}
         answered = "%s.%s" % (svc.get("id"), svc.get("instance"))
         expected = "%s.%s" % (self.d.get("id"), self.d.get("instance", "default"))
@@ -523,6 +524,16 @@ class Probe:
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
         self.events_trace_rule(self.events)
+
+    def configuration_rule(self) -> None:
+        """DEC-0046: a well-known `configuration` is {slots, resolved} as the schema types it; absent is NOT_RUN."""
+        if not isinstance(self.wk, dict) or "configuration" not in self.wk:
+            self.add("configuration.declared", "NOT_RUN", "the service declares no runner or model configuration")
+            return
+        problems = fs.configuration_problems(self.wk["configuration"])
+        self.add("configuration.declared", "FAIL" if problems else "PASS", "; ".join(problems) or
+                 "slots %s; resolved from %s" % (", ".join(self.wk["configuration"].get("slots") or []) or "none",
+                                                 (self.wk["configuration"].get("resolved") or {}).get("from", "not stated")))
 
     def delegation_declared_rule(self, mcp_surface: Optional[Dict[str, Any]]) -> None:
         """DL-16 (DEC-0039): a service that accepts delegation tokens names the issuer it trusts and its JWKS
