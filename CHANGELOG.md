@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.14.0 - 2026-10-12
+
+The contract pin moves to Fabric Agent Contract `main` `0cacd08`, which includes PR #46 (DEC-0046, runner and model
+profiles) and PR #47 (CT-31). Bundles issued under the DEC-0045 revision and every earlier supported one stay valid
+(FAA-30).
+
+### Changed
+
+- **Default contract pin `2eb91c0` → `0cacd08b0e95b6abf131eae1206b60792138bc3c`.** `2eb91c0` joins
+  `SUPPORTED_CONTRACT_COMMITS`. The revisions between add DEC-0046's model and runner profile schemas, a model
+  catalogue, an optional `configuration` on the well-known document and an optional `route` on usage receipts.
+  They also tighten `modelClasses` in a grant to the catalogue's closed vocabulary, which the kits do not write. Later
+  merges change fixtures and the contract's privacy check only. The provider manifest and the MCP, A2A and
+  local-runner profiles are unchanged. The compiled-schema arms at `2ce3922` and `0cacd08` agree.
+- **The shared delegation vectors are regenerated with the contract's verifier at the new pin.** The one case the
+  contract used to throw on, a signed token with no `act`, now carries the contract's own answer (`unauthenticated` /
+  `malformed-chain`), which is the answer the kits already gave. The other 81 delegation answers are unchanged. The
+  tests no longer have a `contractThrew` path; they require that the contract answers every case.
+- `references/protocol.md` names DEC-0046's `configuration` and `route`. The kits do not emit them yet (FAA-19).
+
 ## 0.13.0 - 2026-10-12
 
 The scaffolder writes what a capability does outside itself, and what a run may cost (FAA-25; target architecture v4,

@@ -17,9 +17,9 @@ const answer = (r) => (r.ok
 test('every delegation case answers as the contract does', () => {
   assert.ok(V.delegation.length >= 60);
   for (const c of V.delegation) {
-    const got = answer(d.verifyDelegation(c.token, c.options));
-    // A case the contract's verifier throws on (a signed token with no actor chain): DL-2 requires `act`.
-    assert.deepEqual(got, c.contractThrew ? { ok: false, code: 'unauthenticated', detail: 'malformed-chain' } : c.expected, c.name);
+    // Every expected answer is the contract's own; the contract no longer throws on any case (CT-31).
+    assert.equal(c.contractThrew, undefined, c.name);
+    assert.deepEqual(answer(d.verifyDelegation(c.token, c.options)), c.expected, c.name);
   }
 });
 

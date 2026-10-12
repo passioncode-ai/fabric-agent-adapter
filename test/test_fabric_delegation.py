@@ -60,11 +60,8 @@ class VerifierVectorTests(unittest.TestCase):
                 o = options(case["options"])
                 o.setdefault("issuer", None)
                 got = dl.verify_delegation(case["token"], **o)
-                if case.get("contractThrew"):
-                    # The contract's verifier throws here (a signed token with no actor chain); DL-2 requires `act`,
-                    # so the kits refuse it as a malformed chain. The contract was told.
-                    self.assertEqual(answer(got), {"ok": False, "code": "unauthenticated", "detail": "malformed-chain"})
-                    continue
+                # Every expected answer is the contract's own; the contract no longer throws on any case (CT-31).
+                self.assertNotIn("contractThrew", case)
                 self.assertEqual(answer(got), case["expected"])
         self.assertGreaterEqual(len(VECTORS["delegation"]), 60)
 
