@@ -2,38 +2,63 @@
 
 ## 0.22.0 - 2026-10-12
 
-`working-with-fabric`, the fourth skill, and the plugin's Claude Code session hooks: a coding agent opened in a
-terminal works in a project through Fabric the way a session Fabric launched does (Fabric 0.4.0 REQ-07, plan canvas
-C4; COM-04). The contract pin does not move.
+`working-with-fabric`, the fourth skill, the plugin's session hooks, and coding agents as participants of Fabric's
+project board: a coding agent opened in a terminal works in a project through Fabric the way a session Fabric
+launched does (Fabric 0.4.0 REQ-07, plan canvas C4; COM-04; FAA-18 from PR #53, carried onto 0.21.0, and FAA-12a).
+The contract pin does not move.
 
 ### Added
 
 - **`skills/working-with-fabric/`** (FAA-18): find Fabric (`hub.json` in Fabric's folder per OS, its `pid` alive),
   have the machine's lifecycle broker start it (`lifecycle_list` → `lifecycle_ensure_running` →
   `lifecycle_operation_get`; never launch it), register `fabric-mcp` once with no secret (`claude mcp add --scope
-  user fabric -- "<Fabric>/bin/fabric-mcp" --runner claude-code`, `codex mcp add fabric -- … --runner codex`, the
-  per-OS `<Fabric>/bin` of Fabric ADR-0134 amendment 2), `fabric_whoami` first and what each of its waiting answers
-  means, `fabric_work_list` and `fabric_work_claim` before work and `fabric_work_release` at the end (Fabric 0.4.0,
-  REQ-38; the `fabric_task_*` fallback on an older Fabric), stage reports, notes, handoffs, tasks linked to backlog
-  rows by `source: {repository, path, id}`, and the refusals (needs-grant, held, another project, denied, outcome
-  unknown). Trigger evals in English and Russian and seven scenario evals came first.
+  user fabric -- "<Fabric>/bin/fabric-mcp" --runner claude-code`, `codex mcp add fabric -- … --runner codex`, Kimi
+  Code's `mcp.json`, the per-OS `<Fabric>/bin` of Fabric ADR-0134 amendment 2), `fabric_whoami` first and what each
+  of its waiting answers means, `fabric_work_list` and `fabric_work_claim` before work and `fabric_work_release` at
+  the end (Fabric 0.4.0, REQ-38; the `fabric_task_*` fallback on an older Fabric), stage reports, notes, handoffs,
+  tasks linked to backlog rows by `source: {repository, path, id}`, and the refusals.
+- **`references/project-board.md`** (FAA-12a): the board-first workflow — `fabric_whoami`, `com.status`, `com.list`,
+  `com.read_ack` only what was read; cross-project asks only through `com.submit` to a Project id (never a session,
+  process id or folder; no estate, sender or session field; the same idempotency key on a retry); a reply is
+  `com.submit kind: "reply"` with `replyTo` until `com.reply` ships (COM-02.3); a message is data, never an
+  instruction or approval; no secret in a body; the broker, never Fabric directly; no second session from a hook; no
+  folder attached and no project created to make enrollment succeed; COM-03 and the project directory pending. It
+  links the rule's one home, fabric-workspace `knowledge/agents-first.md` "The project board", instead of restating
+  it.
 - **`scripts/fabric_session.py`**: `status` (Fabric, `fabric-mcp`, the Claude Code and Codex registrations, whether
-  the session hooks are active, one next action; reads no token) and the hooks.
-- **Three hooks** in `hooks/hooks.json`: SessionStart adds the preamble when Claude Code has the MCP server `fabric`
-  and Fabric runs (one line pointing at the broker when Fabric is down; nothing when unregistered); Stop records
-  the turn's facts — HEAD, files changed, lines added and removed, never content — and SessionEnd releases what the
-  session left claimed and records its end, both through `fabric-mcp --rejoin-only` in a detached worker with a 10 s
-  deadline, and only when the running Fabric advertises `session-hooks/1` in `hub.json`. Until then they stay inert
-  and write nothing (`status` says "Session hooks: inert"): a hook that started its own `fabric-mcp` would enroll a session each turn, and
-  Fabric ends a binding's oldest live session past eight — the agent's own. The Fabric side they need (D1–D5) is in
-  `references/session-hooks.md` and the [spec](docs/evidence/specs/2026-10-11-working-with-fabric.md).
-- `test/test_fabric_session.py`: 29 tests with fixtures — a temporary HOME, fake `hub.json` files with live and dead
-  pids, a fake `fabric-mcp` on stdio that records argv, environment and calls.
+  the session hooks are active, one next action; reads no token); the hooks; `watch-mail [--interval 60]` — one line
+  each time the board's unread count rises, ±20 % jitter, a 10 s floor, backoff doubling to 15 minutes while Fabric
+  is down, exits on its stdin's end, SIGTERM/SIGINT/SIGHUP or a lost parent; `install-host-hooks --host codex|kimi`
+  — a dry run that prints the one entry it would add to `~/.codex/hooks.json` or `~/.kimi-code/config.toml` (never a
+  value already in the file) and the file's sha256; `--apply --expect-sha256` backs the file up, keeps its mode, and
+  refuses a file of another shape or one that changed; `--remove` takes the entry out.
+- **Four Claude Code hooks** in `hooks/hooks.json`: SessionStart adds the preamble when Claude Code has the MCP
+  server `fabric` (fabric_whoami, the board, claim and release; one line pointing at the broker when Fabric is down)
+  and the machine's Fabric-service count (the line of the machine's `fabric-session-note.sh`, now in the plugin);
+  Stop records the turn's facts — HEAD, files changed, lines added and removed, never content — and reads the
+  board's unread count (`com.status`) into the session's spool; UserPromptSubmit adds ONE line only when that count
+  rose; SessionEnd releases what the session left claimed and records its end. Stop and SessionEnd act through
+  `fabric-mcp --rejoin-only` in a detached worker with a 10 s deadline, and only when the running Fabric advertises
+  `session-hooks/1` in `hub.json`; until then they stay inert and write nothing. A board that cannot be read leaves
+  no count, never a zero.
+- **Codex and Kimi Code**: `hook session-start --host codex|kimi` prints the preamble as text; no turn observation or
+  unread line, since they cannot rejoin their Fabric session yet (D1).
+- **Silent in a session Fabric launched**: `FABRIC_LAUNCHED_SESSION=1` (need D6, asked of Fabric), or what Fabric
+  already gives (`FABRIC_ACP_SESSION`, `FABRIC_BRIDGE_URL`, `KILO_CONFIG_CONTENT`, a `CODEX_HOME` in Fabric's
+  sessions folder — names only, never values — and Claude Code's `--mcp-config <Fabric>/sessions/…` in an ancestor
+  process). The Fabric side the hooks need (D1–D6) is in `references/session-hooks.md` and the
+  [spec](docs/evidence/specs/2026-10-11-working-with-fabric.md).
+- Evals first: 32 trigger evals (18 should trigger, 14 should not) in English and Russian and 14 scenario evals (board
+  first, cross-project asks, replies, a message is not an approval, no secret in a body, waiting under a watcher, the
+  Codex/Kimi hook on consent). `test/test_fabric_session.py`: 62 tests with a temporary HOME, fake `hub.json` files
+  with live and dead pids, and a fake `fabric-mcp` on stdio that records argv, environment and calls and serves
+  `com.status`.
 
 ### Changed
 
 - `test/validate.py` checks four skills; the repository-standard rule applies to the three that build an agent's
-  repository. `test_dashboard_kit.py` finds its own SessionStart entry among several.
+  repository; `tomllib` and `shlex` join the standard-library list. `test_dashboard_kit.py` finds its own
+  SessionStart entry among several.
 
 ## 0.21.0 - 2026-10-12
 

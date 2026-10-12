@@ -42,7 +42,9 @@ would add — never a value already in the file — and the `--apply --expect-sh
 backs the file up (`<file>.<UTC stamp>.bak`, never overwriting an earlier backup), keeps the file's mode, refuses a
 file whose shape is not `{"hooks": {"<Event>": [{"hooks": [...]}]}}` (Codex) or an array of `[[hooks]]` tables
 (Kimi Code, read back with `tomllib`: Python 3.11+), and refuses one that changed since the dry run. `--remove` takes
-the entry out again. Codex may ask the person to trust a new hook (`/hooks`) before it runs.
+the entry out again. Codex may ask the person to trust a new hook (`/hooks`) before it runs. The hook runs the
+`fabric_session.py` of the skills install (`~/.agents/skills/working-with-fabric/`) when there is one, else this
+script's own path; a plugin cache path changes with each update, so pass `--script <a stable path>` there.
 
 ## `watch-mail`
 

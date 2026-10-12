@@ -1,0 +1,20 @@
+# gates, 2026-10-12T21:50Z, branch agent/faa-12a-board-participants on 3ed32f1 + this change, Python 3.14.7, node v26.10.0, 2.1.296 (Claude Code)
+$ npm test
+OK: Fabric Agent Adapter distribution is valid
+Ran 479 tests in 122.524s
+OK (skipped=22)
+ℹ tests 120
+ℹ pass 113
+ℹ fail 0
+ℹ skipped 7
+exit 0
+$ claude plugin validate ./plugins/fabric-agent-adapter --strict
+Validating plugin manifest: <checkout>/plugins/fabric-agent-adapter/.claude-plugin/plugin.json
+
+✔ Validation passed
+exit 0
+$ claude plugin validate . --strict
+Validating marketplace manifest: <checkout>/.claude-plugin/marketplace.json
+
+✔ Validation passed
+exit 0

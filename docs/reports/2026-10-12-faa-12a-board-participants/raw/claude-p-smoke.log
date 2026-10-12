@@ -1,0 +1,21 @@
+# 2026-10-12 — real `claude -p` smoke of the session-start preamble (Claude Code 2.1.296, model haiku)
+# Fabric: the installed app 0.3.5; the lifecycle broker reported fabric.desktop always_on (policyRevision 10);
+#   lifecycle_ensure_running answered ready (process up, 2 windows), but no hub.json appeared within 2 minutes and
+#   nothing listened on 127.0.0.1:47070 — the hub was closed. No project was added; no folder was attached.
+# command (in a fresh git repo whose .mcp.json registers `fabric` -> <Fabric>/bin/fabric-mcp --runner claude-code):
+#   claude -p '<call fabric_whoami once, quote it; quote the [fabric-agent-adapter] context lines>' --model haiku \
+#     --strict-mcp-config --mcp-config cfg.json --plugin-dir <checkout>/plugins/fabric-agent-adapter \
+#     --output-format stream-json --verbose --include-hook-events --allowedTools mcp__fabric__fabric_whoami
+# exit 0. Paths below: the services folder is <services dir>. Other plugins' hook output is omitted.
+
+hook SessionStart exit 0, additionalContext:
+  [fabric-agent-adapter] Fabric's MCP server `fabric` is registered, but Fabric is not running (there is no hub.json). If you need it, ask the machine's lifecycle broker to start it (lifecycle_list, lifecycle_ensure_running, lifecycle_operation_get) or ask the person to open it; never launch it yourself. See working-with-fabric.
+  Fabric on this machine: 22 service descriptors in <services dir> (13 local on 127.0.0.1), protocol fabric-service/0.1 — probe GET <origin>/.well-known/fabric-service, or call the fabric-dashboards MCP list_services if connected. Never kill these services directly; their supervisor owns them.
+init: mcp [{"name": "fabric", "status": "connected", "source": "dynamic"}]; plugin fabric-agent-adapter 0.22.0 (inline --plugin-dir)
+fabric_whoami answered: Fabric is not running, or its hub is closed (Settings → Agent access says why). Open Fabric, then call this tool again.
+result: success (session 154ad039-263a-450e-babc-c3feffce03b1)
+
+# Observed: the machine's own SessionStart note (~/.local/bin/fabric-session-note.sh) printed the same services
+# line a second time; once this plugin is installed, that machine hook is redundant (operator's config, not edited).
+# The live answer was 'Fabric is not running, or its hub is closed', not 'no project': with the hub closed, enrollment
+# never reached the project check.
