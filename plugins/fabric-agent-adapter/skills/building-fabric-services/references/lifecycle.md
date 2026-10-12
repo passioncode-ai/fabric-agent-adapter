@@ -206,7 +206,9 @@ CI job has the real `schtasks` create, read back and delete such a task. The des
 A task cannot set an environment variable, so `task_xml` / `taskXml` write the marker as an
 argument, `--fabric-supervisor task-scheduler`, before any `--`: a copy the Task Scheduler starts
 backs off in-process like one under launchd or systemd. `IgnoreNew` keeps the scheduler from
-starting a second copy.
+starting a second copy. Measured (FAA-38, [report](https://github.com/passioncode-ai/fabric-agent-adapter/blob/main/docs/reports/2026-10-13-faa-38-windows-exit75/README.md)):
+`RestartOnFailure` does not restart a task whose action exits 75, so that wait is the only recovery there; a copy
+that still exits 75 stays down until the next logon.
 
 **One copy on each system.** The Python kit takes `flock` (Linux) or a locked byte
 (Windows); the Node kit cannot, so it holds a name instead — an abstract unix socket on Linux,
