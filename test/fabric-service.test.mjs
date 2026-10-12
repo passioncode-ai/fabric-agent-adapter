@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -179,7 +179,7 @@ test('holdSingleInstance exits 75 in a second process', async () => {
   const dir = temp();
   const lock = await new k.InstanceLock(dir).acquire();
   const child = spawnSync(process.execPath, ['--input-type=module', '-e',
-    `import * as k from ${JSON.stringify(path.join(scripts, 'fabric-service.mjs'))}; await k.holdSingleInstance(${JSON.stringify(dir)}); console.log('ran');`],
+    `import * as k from ${JSON.stringify(pathToFileURL(path.join(scripts, 'fabric-service.mjs')).href)}; await k.holdSingleInstance(${JSON.stringify(dir)}); console.log('ran');`],
   { encoding: 'utf8' });
   assert.equal(child.status, 75);
   assert.match(child.stderr, new RegExp(String(process.pid)));
