@@ -302,6 +302,18 @@
         "lists every spending limit in the usage report's budgets (per_job, approval, daily, monthly, velocity, pool, emergency), enforced or not, and lets the kit count a machine day or month limit so budget and budgets agree (FAC-SEM-031)",
         "sends the service token the way the descriptor declares (token_header / tokenHeader), never an assumed Authorization: Bearer (FAC-SEM-036)"
       ]
+    },
+    {
+      "id": "runner-routes-and-probe-results",
+      "trap": "the service's doctor said a runner was 'broken' in its own words, so Fabric could not tell signed out from not installed; and it accepted a route whose second candidate could neither attach nor spawn, then logged a walk that skipped a candidate",
+      "request": "example-agent chats through whichever terminal agent the project's route prefers; report each runner's state the way Fabric's walk does and check the route and its events.",
+      "expected": [
+        "reports each runner's state with the kit's runner_check / runnerCheck `probe`: not-installed, not-responding or not-connected (the catalogue's auth probe), or null when it can serve — the contract's closed probe results, in the walk's order",
+        "checks a route with route_problems / routeProblems before pinning it: one candidate per runner kind (FAC-SEM-028), every candidate able to attach or spawn (029)",
+        "checks the bundle a host pins: every candidate's provider revision admitted for the capability by id, revision and hash (030), the binding agreeing with the route (032), every kind and drive in the runner catalogue (033)",
+        "checks every route event: it names this route, its candidates by position, probes every candidate above the selection in order (all for an exhausted walk), and obeys the session, hold and recovery policy (FAC-SEM-034)",
+        "never appends runners the route does not name and never invents a probe result outside the closed list"
+      ]
     }
   ]
 }

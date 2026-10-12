@@ -13,6 +13,7 @@ Python: [`scripts/fabric_profiles.py`](../scripts/fabric_profiles.py); Node:
 - Checking the documents
 - Declaring and showing what applies
 - The doctor
+- Runner routes
 - Usage by route
 
 ## Resolving the model profile
@@ -57,6 +58,28 @@ and answers whether the runner is installed, which version answers and whether i
 catalogued binary found on `PATH`, only with the catalogued version argv (and `auth` argv), without a shell, within
 the entry's timeout (at most 5 s); an entry outside these rules is refused and nothing runs. `model_usable(model,
 catalogue, policy)` names why a model cannot be used here: not catalogued, or a class the project does not allow.
+
+`probe` is the contract's closed probe result for that runner, the one Fabric's walk records (DEC-0026):
+`not-installed` (no catalogued binary on `PATH`), `not-responding` (the version probe did not answer in its bound,
+failed or did not match the catalogue's pattern, or the `auth` probe did not answer), `not-connected` (it answers but
+the `auth` probe says signed out), or `None`/`null` when the runner can serve. The order is the walk's: installed,
+then responding, then connected. `problems` still names every problem the doctor found.
+
+## Runner routes
+
+A project may pin a **runner route** (DEC-0026, DEC-0029, `runners.md` §"Runner routes"): the ordered terminal agents
+that serve one capability, each with a session policy (`attach`, `spawn`), what happens when all are unavailable
+(`exhausted`) and whether a conversation returns to a preferred runner (`recovery`). Fabric walks it; a service that
+pins, records or shows routes checks them with `route_problems(kind, value)` / `routeProblems(kind, value)`, the
+contract's `routeRules` finding for finding:
+
+| `kind` | value | rules |
+|---|---|---|
+| `runner-route` | the route | one candidate per runner kind (FAC-SEM-028); a candidate can attach or spawn (029) |
+| `route-bundle` | `{route, admissions, binding?, catalogue?}` | every candidate's provider revision admitted for the capability by id, revision and hash (030); the binding agrees — project, capability, local-runner, a candidate as provider, this route as `runnerRoute` (032); every kind and named drive is in the runner catalogue (033) |
+| `route-event` | `{route, event}` | the event names this route, project and capability; candidates by position; the probes cover every candidate above the selection in order (all for an exhausted walk, none for a sticky relaunch); attach, spawn, `no-held-session` and `spawn-failed` obey the session policy; `held` only under `exhausted: hold`; `preferred-available` only under `recovery: reprobe`, moving up (034) |
+
+A probe result in an event is one of `PROBE_RESULTS`; a host never appends a runner the route does not name.
 
 ## Usage by route
 

@@ -1,0 +1,107 @@
+#!/usr/bin/env node
+// Writes route-vectors.json: DEC-0026/DEC-0029 cases whose expected findings come from the contract's own routeRules
+// at the pin (src/route-rules.ts, FAC-SEM-028…034) — never written by hand. The kits' fabric_profiles.route_problems
+// and fabric-profiles.mjs routeProblems are held to them, code, path and message.
+//
+//   node test/fixtures/contract/make_route_vectors.mjs --contract-src <dir with route-rules.ts, findings.ts>
+//     --positive <dir with runner-route.json, runner-route-event-*.json, binding-runner-route.json>
+//     [--out test/fixtures/contract/route-vectors.json]
+//
+// Needs Node 24 or later (type stripping); the .ts imports are rewritten to .ts in the staged copy.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => (a.startsWith('--') ? [...acc, [a.slice(2), all[i + 1]]] : acc), []));
+const here = path.dirname(fileURLToPath(import.meta.url));
+const { routeRules } = await import(pathToFileURL(path.join(args['contract-src'], 'route-rules.ts')).href);
+const read = (file) => JSON.parse(fs.readFileSync(path.join(args.positive, file), 'utf8'));
+const clone = (v) => JSON.parse(JSON.stringify(v));
+
+const route = read('runner-route.json');
+const selected = read('runner-route-event-selected.json');
+const switched = read('runner-route-event-switched.json');
+const exhausted = read('runner-route-event-exhausted.json');
+const binding = read('binding-runner-route.json');
+const ref = (r) => ({ id: r.id, revision: r.revision, contentHash: r.contentHash });
+const admissions = route.candidates.map((c) => ({ state: 'admitted', capability: route.capability, provider: clone(c.provider) }));
+const catalogue = [
+  { kind: 'claude-code', drives: { pty: {}, sdk: {} } }, { kind: 'codex', drives: { 'codex-app-server': {}, pty: {} } },
+  { kind: 'kimi-code', drives: { acp: {} } }, { kind: 'hermes', drives: { acp: {} } },
+];
+const agreeing = { ...clone(binding), runnerRoute: ref(route.meta) };
+
+const cases = [];
+const add = (name, kind, value) => cases.push({ name, kind, value, expected: routeRules(kind, value) });
+const edit = (base, change) => { const v = clone(base); change(v); return v; };
+
+// FAC-SEM-028, FAC-SEM-029 — the route itself.
+add('route: the positive fixture', 'runner-route', route);
+add('route: a runner kind twice', 'runner-route', edit(route, (r) => { r.candidates[2].runnerKind = 'codex'; }));
+add('route: a candidate that can never run', 'runner-route', edit(route, (r) => { r.candidates[1].session = { attach: 'never', spawn: 'never' }; }));
+add('route: no candidates at all', 'runner-route', edit(route, (r) => { r.candidates = []; }));
+
+// FAC-SEM-030, FAC-SEM-032, FAC-SEM-033 — what a host checks when it pins a route.
+const bundle = { route, admissions, binding: agreeing, catalogue };
+add('bundle: admitted, bound and catalogued', 'route-bundle', bundle);
+add('bundle: a candidate not admitted', 'route-bundle', edit(bundle, (b) => { b.admissions.pop(); }));
+add('bundle: admitted under another hash', 'route-bundle', edit(bundle, (b) => { b.admissions[1].provider.contentHash = `sha256:${'0'.repeat(64)}`; }));
+add('bundle: admitted for another capability', 'route-bundle', edit(bundle, (b) => { b.admissions[0].capability = 'urn:fabric:capability:other'; }));
+add('bundle: an admission that was revoked', 'route-bundle', edit(bundle, (b) => { b.admissions[2].state = 'revoked'; }));
+add('bundle: the binding is for another project and capability', 'route-bundle', edit(bundle, (b) => { b.binding.project = 'urn:project:b'; b.binding.capability = 'urn:fabric:capability:other'; }));
+add('bundle: the binding uses another profile', 'route-bundle', edit(bundle, (b) => { b.binding.profileKind = 'mcp-tool'; }));
+add('bundle: the binding binds a provider the route does not name', 'route-bundle', edit(bundle, (b) => { b.binding.provider = { id: 'urn:fabric:provider:other', revision: 1, contentHash: `sha256:${'1'.repeat(64)}` }; }));
+add('bundle: the binding pins another route', 'route-bundle', edit(bundle, (b) => { b.binding.runnerRoute.revision = 2; }));
+add('bundle: a binding without a runnerRoute', 'route-bundle', edit(bundle, (b) => { delete b.binding.runnerRoute; }));
+add('bundle: a kind the catalogue does not have', 'route-bundle', edit(bundle, (b) => { b.catalogue = b.catalogue.filter((e) => e.kind !== 'hermes'); }));
+add('bundle: a drive the entry does not offer', 'route-bundle', edit(bundle, (b) => { b.catalogue[1].drives = { pty: {} }; }));
+add('bundle: no binding and no catalogue', 'route-bundle', { route, admissions });
+
+// FAC-SEM-034 — an event tells the truth about its route.
+add('event: selected (positive)', 'route-event', { route, event: selected });
+add('event: switched (positive)', 'route-event', { route, event: switched });
+add('event: exhausted (positive)', 'route-event', { route, event: exhausted });
+add('event: names another route, project and capability', 'route-event', { route, event: edit(selected, (e) => { e.route.revision = 9; e.project = 'urn:project:b'; e.capability = 'urn:fabric:capability:other'; }) });
+add('event: a probe at the wrong position', 'route-event', { route, event: edit(selected, (e) => { e.probes[1].runnerKind = 'hermes'; }) });
+add('event: probes out of order', 'route-event', { route, event: edit(selected, (e) => { e.probes.reverse(); }) });
+add('event: a probe missing above the selection', 'route-event', { route, event: edit(selected, (e) => { e.probes.splice(1, 1); }) });
+add('event: no-held-session for a candidate that may spawn', 'route-event', { route, event: edit(selected, (e) => { e.probes[1].result = 'no-held-session'; }) });
+add('event: spawn-failed for a candidate that never spawns', 'route-event', { route, event: edit(selected, (e) => { e.probes[0].result = 'spawn-failed'; }) });
+add('event: attached where attach is never', 'route-event', { route, event: edit(selected, (e) => { e.selected.session = 'attached'; }) });
+add('event: spawned where spawn is never', 'route-event', { route, event: edit(selected, (e) => {
+  e.selected = { index: 0, runnerKind: 'claude-code', provider: clone(route.candidates[0].provider), session: 'spawned', executionContext: e.selected.executionContext };
+  e.probes = [];
+}) });
+add('event: a drive the route does not run it through', 'route-event', { route, event: edit(selected, (e) => { e.selected.drive = 'pty'; }) });
+add('event: the selection names another provider', 'route-event', { route, event: edit(selected, (e) => { e.selected.provider.revision = 7; }) });
+add('event: an index that is not an integer', 'route-event', { route, event: edit(selected, (e) => { e.selected.index = 2.5; }) });
+add('event: a fractional index beside the kind at its floor', 'route-event', { route, event: edit(selected, (e) => { e.selected = { index: 2.5, runnerKind: 'kimi-code', session: 'spawned', executionContext: e.selected.executionContext }; e.probes = e.probes.slice(0, 2); }) });
+add('event: sticky, kept and walked nothing', 'route-event', { route, event: edit(selected, (e) => { e.sticky = true; e.probes = []; }) });
+add('event: sticky under reprobe, without a conversation, with probes', 'route-event', {
+  route: edit(route, (r) => { r.recovery = 'reprobe'; }), event: edit(selected, (e) => { e.sticky = true; delete e.conversation; }),
+});
+add('event: exhausted that skipped a candidate', 'route-event', { route, event: edit(exhausted, (e) => { e.probes.pop(); }) });
+add('event: held without exhausted: hold', 'route-event', { route, event: edit(exhausted, (e) => { e.answer = 'held'; }) });
+add('event: held under exhausted: hold', 'route-event', { route: edit(route, (r) => { r.exhausted = 'hold'; }), event: edit(exhausted, (e) => { e.answer = 'held'; }) });
+add('event: a switch to the same candidate', 'route-event', { route, event: edit(switched, (e) => { e.from = { index: 2, runnerKind: 'kimi-code' }; }) });
+add('event: a switch from a candidate that is not there', 'route-event', { route, event: edit(switched, (e) => { e.from = { index: 9, runnerKind: 'ghost' }; }) });
+add('event: preferred-available under sticky recovery', 'route-event', { route, event: edit(switched, (e) => { e.reason = 'preferred-available'; }) });
+add('event: preferred-available under reprobe, moving up', 'route-event', { route: edit(route, (r) => { r.recovery = 'reprobe'; }), event: edit(switched, (e) => { e.reason = 'preferred-available'; }) });
+add('event: preferred-available under reprobe, moving down', 'route-event', {
+  route: edit(route, (r) => { r.recovery = 'reprobe'; }),
+  event: edit(switched, (e) => {
+    e.reason = 'preferred-available';
+    e.from = { index: 1, runnerKind: 'codex' };
+    e.selected = { index: 3, runnerKind: 'hermes', provider: clone(route.candidates[3].provider), drive: 'acp', session: 'spawned', executionContext: e.selected.executionContext };
+    e.probes = [{ index: 0, runnerKind: 'claude-code', result: 'no-held-session' }, { index: 1, runnerKind: 'codex', result: 'not-installed' }, { index: 2, runnerKind: 'kimi-code', result: 'not-connected' }];
+  }),
+});
+add('event: not an object', 'route-event', 'not an object');
+
+const out = args.out ?? path.join(here, 'route-vectors.json');
+fs.writeFileSync(out, `${JSON.stringify({
+  $comment: 'Generated by make_route_vectors.mjs from the contract pin\'s src/route-rules.ts (routeRules, FAC-SEM-028…034); do not edit by hand.',
+  cases,
+}, null, 2)}\n`);
+console.log(`wrote ${cases.length} cases, ${cases.reduce((n, c) => n + (c.expected?.length ?? 0), 0)} findings, to ${out}`);

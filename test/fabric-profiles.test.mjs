@@ -31,12 +31,17 @@ test('runnerCheck runs only the catalogued binary and argv, bounded, and reads t
   const tool = (body) => { const f = path.join(dir, 'example-code'); fs.writeFileSync(f, `#!/bin/sh\n${body}\n`); fs.chmodSync(f, 0o755); };
   const entry = (extra = {}) => ({ kind: 'example-code', binaries: ['example-code'], version: { argv: ['--version'], pattern: '^example (\\d+\\.\\d+\\.\\d+)', timeoutMs: 2000 }, ...extra });
   assert.equal(p.runnerCheck(entry(), { searchPath: dir }).installed, false);
+  assert.equal(p.runnerCheck(entry(), { searchPath: dir }).probe, 'not-installed');
   tool('if [ "$1" = "--version" ]; then echo "example 2.0.1"; exit 0; fi; if [ "$1" = "auth" ]; then exit 4; fi');
   const got = p.runnerCheck(entry({ auth: ['auth', 'status'] }), { searchPath: dir });
-  assert.deepEqual([got.installed, got.version, got.signedIn], [true, '2.0.1', false]);
+  assert.deepEqual([got.installed, got.version, got.signedIn, got.probe], [true, '2.0.1', false, 'not-connected']);
+  assert.equal(p.runnerCheck(entry(), { searchPath: dir }).probe, null, 'no auth probe: answering is enough');
   tool('sleep 5');
   const slow = p.runnerCheck(entry({ version: { argv: ['--version'], pattern: '(x)', timeoutMs: 300 } }), { searchPath: dir });
   assert.ok(slow.problems.some((m) => m.includes('did not answer')), slow.problems.join('; '));
+  assert.equal(slow.probe, 'not-responding');
+  tool('if [ "$1" = "--version" ]; then echo "example 2.0.1"; exit 0; fi; sleep 5');
+  assert.equal(p.runnerCheck(entry({ auth: ['auth', 'status'], version: { argv: ['--version'], pattern: '^example (\\d+\\.\\d+\\.\\d+)', timeoutMs: 300 } }), { searchPath: dir }).probe, 'not-responding', 'an auth probe that does not answer in its bound');
   for (const bad of [entry({ binaries: ['/bin/sh'] }), entry({ version: { argv: '--version', pattern: '(x)' } }), entry({ version: { argv: [], pattern: '(x)', timeoutMs: 9000 } }), entry({ auth: 'x' })]) {
     assert.throws(() => p.runnerCheck(bad, { searchPath: dir }), p.ProfileError);
   }
@@ -59,4 +64,12 @@ test('configuration, its tiles, the well-known document and the usage route', ()
   const rows = k.usageReport([a, b], { id: 'example-agent' }).days[0].byModel;
   assert.deepEqual(rows.map((r) => r.route ?? null), [null, 'key']);
   assert.deepEqual(p.modelUsable('example/none', { models: [] }), ['model example/none is not in the model catalogue']);
+});
+
+test('every route case answers as the contract does (FAC-SEM-028…034)', () => {
+  const { cases } = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/route-vectors.json'), 'utf8'));
+  assert.ok(cases.length >= 40);
+  for (const c of cases) assert.deepEqual(p.routeProblems(c.kind, c.value), c.expected, c.name);
+  assert.equal(p.routeProblems('something-else', {}), undefined);
+  for (const result of ['not-installed', 'not-responding', 'not-connected']) assert.ok(p.PROBE_RESULTS.includes(result));
 });

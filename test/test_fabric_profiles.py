@@ -83,6 +83,7 @@ class RunnerCheckTests(unittest.TestCase):
         self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "example 1.4.2"; exit 0; fi; if [ "$1" = "auth" ]; then exit 0; fi; exit 3')
         got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))
         self.assertEqual((got["installed"], got["version"], got["signedIn"], got["problems"]), (True, "1.4.2", True, []))
+        self.assertIsNone(got["probe"], "it can serve")
         self.assertTrue(got["binary"].endswith("example-code"))
 
     @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
@@ -91,6 +92,21 @@ class RunnerCheckTests(unittest.TestCase):
         got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))
         self.assertEqual((got["installed"], got["version"], got["signedIn"]), (True, None, False))
         self.assertTrue(any("version" in p for p in got["problems"]))
+        self.assertEqual(got["probe"], "not-responding", "the walk's order: responding before connected")
+
+    @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
+    def test_the_closed_probe_results(self):
+        self.assertEqual(profiles.runner_check(self.entry(), path=str(self.bin))["probe"], "not-installed")
+        self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "example 1.4.2"; exit 0; fi; exit 1')
+        self.assertEqual(profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))["probe"], "not-connected")
+        self.assertIsNone(profiles.runner_check(self.entry(), path=str(self.bin))["probe"], "no auth probe: answering is enough")
+        self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "example 1.4.2"; exit 0; fi; sleep 5')
+        got = profiles.runner_check(self.entry(auth=["auth", "status"], version={"argv": ["--version"], "pattern": "^example (\\d+\\.\\d+\\.\\d+)", "timeoutMs": 300}),
+                                    path=str(self.bin))
+        self.assertEqual(got["probe"], "not-responding", "an auth probe that does not answer in its bound")
+        for result in ("not-installed", "not-responding", "not-connected"):
+            self.assertIn(result, profiles.PROBE_RESULTS)
+
 
     @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
     def test_a_slow_version_answer_is_bounded(self):
@@ -187,6 +203,20 @@ class ProbeConfigurationTests(unittest.TestCase):
         self.assertEqual(self.rule({})["verdict"], "NOT_RUN")
         self.assertEqual(self.rule({"configuration": {"slots": ["model"], "resolved": {"models": ["Not A Model"]}}})["verdict"], "FAIL")
         self.assertEqual(self.rule({"configuration": "x"})["verdict"], "FAIL")
+
+
+class RouteRules(unittest.TestCase):
+    """FAC-SEM-028…034: the cases in route-vectors.json were answered by the contract's own routeRules at the pin."""
+
+    def test_every_case_answers_as_the_contract_does(self):
+        cases = json.loads((Path(__file__).resolve().parent / "fixtures/contract/route-vectors.json").read_text())["cases"]
+        self.assertGreaterEqual(len(cases), 40)
+        for case in cases:
+            with self.subTest(case["name"]):
+                self.assertEqual(profiles.route_problems(case["kind"], case["value"]), case.get("expected"))
+        codes = {f["code"] for c in cases for f in (c.get("expected") or [])}
+        self.assertEqual(codes, {"FAC-SEM-028", "FAC-SEM-029", "FAC-SEM-030", "FAC-SEM-032", "FAC-SEM-033", "FAC-SEM-034"})
+        self.assertIsNone(profiles.route_problems("something-else", {}))
 
 
 if __name__ == "__main__":
