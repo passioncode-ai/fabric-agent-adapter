@@ -290,6 +290,18 @@
         "stops the operator's way: systemd_uninstall / systemdUninstall (disable --now, then remove) and task_uninstall / taskUninstall (/End, then /Delete), plus remove_descriptor",
         "checks one copy with check_service.py: the instance lock is held (a Node service holds an abstract socket on Linux or a named pipe on Windows, and the probe sees it)"
       ]
+    },
+    {
+      "id": "settings-backups-and-every-limit",
+      "trap": "the service kept the operator's project bindings only in its data directory, which a reinstall purged; its spend view showed one monthly budget while it also stopped orders above $2 and capped a project at $5 a day; and a client of its feed assumed Authorization: Bearer against a custom header",
+      "request": "example-agent must never lose what the operator decided, and Fabric's spend view must show every limit it applies.",
+      "expected": [
+        "keeps settings backups with the kit's make_settings_backup / makeSettingsBackup and write_settings_backup / writeSettingsBackup under <root>/settings-backups/<id>/<instance>/ outside the data directory: an allow-list of decision and binding tables, secrets only by name, fractions as strings",
+        "takes a snapshot at start when backup_due / backupDue says the newest is older than 24 hours and daily after; an unchanged snapshot is not rewritten and at least 14 are kept",
+        "restores only on a fresh database from newest_intact_backup / newestIntactBackup, through restore_plan / restorePlan: adds missing rows, never overwrites, names what it dropped, defaulted or refused; a manual restore is a preview the operator applies",
+        "lists every spending limit in the usage report's budgets (per_job, approval, daily, monthly, velocity, pool, emergency), enforced or not, and lets the kit count a machine day or month limit so budget and budgets agree (FAC-SEM-031)",
+        "sends the service token the way the descriptor declares (token_header / tokenHeader), never an assumed Authorization: Bearer (FAC-SEM-036)"
+      ]
     }
   ]
 }

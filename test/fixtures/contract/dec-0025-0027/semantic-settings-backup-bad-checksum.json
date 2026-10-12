@@ -1,0 +1,95 @@
+{
+  "format": "fabric-settings-backup/1",
+  "service": {
+    "id": "example-agent",
+    "instance": "default",
+    "version": "0.4.0",
+    "schema": 7
+  },
+  "created_at": "2026-10-05T02:00:00.123456Z",
+  "reason": "daily",
+  "sha256": "2f062da02074e28a717955e1a6b3283bb6385265c56f2093f192667b24e7c937",
+  "counts": {
+    "projects": 2,
+    "secret_bindings": 1,
+    "settings_overrides": 3,
+    "notification_rules": 0
+  },
+  "tables": {
+    "projects": {
+      "columns": [
+        "id",
+        "name",
+        "note",
+        "archived",
+        "created_at"
+      ],
+      "rows": [
+        [
+          "p-001",
+          "Quarterly report",
+          "Draft in three languages: English, Français, Español — résumé first.",
+          false,
+          "2026-09-01T09:00:00Z"
+        ],
+        [
+          "p-002",
+          "Board memo",
+          "Says \"final\" only after review.\nSecond line.",
+          true,
+          "2026-09-14T16:30:00Z"
+        ]
+      ]
+    },
+    "secret_bindings": {
+      "columns": [
+        "project_id",
+        "slot",
+        "secret_name"
+      ],
+      "rows": [
+        [
+          "p-001",
+          "storage",
+          "EXAMPLE_AGENT_STORAGE_KEY"
+        ]
+      ]
+    },
+    "settings_overrides": {
+      "columns": [
+        "key",
+        "value_text",
+        "value_int",
+        "updated_by"
+      ],
+      "rows": [
+        [
+          "report.locale",
+          "en-GB",
+          null,
+          "operator"
+        ],
+        [
+          "report.max_sections",
+          null,
+          40,
+          "operator"
+        ],
+        [
+          "report.temperature",
+          "0.2",
+          null,
+          "operator"
+        ]
+      ]
+    },
+    "notification_rules": {
+      "columns": [
+        "id",
+        "kind",
+        "enabled"
+      ],
+      "rows": []
+    }
+  }
+}

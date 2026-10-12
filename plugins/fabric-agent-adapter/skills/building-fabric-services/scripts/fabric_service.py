@@ -90,6 +90,7 @@ _SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
 _LOCAL_PATH = re.compile(r"^(~[\\/]|/(?!/)|[A-Za-z]:[\\/])")
 # DEC-0032: the supervisor per system and the field that names its job.
 MANAGERS = ("launchd", "systemd", "task-scheduler", "none")
+_AUTH_HEADER = re.compile(r"[A-Za-z][A-Za-z0-9-]{0,63}")
 _UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$")
 _TASK = re.compile(r"^\\[A-Za-z0-9 ._\\-]{1,254}$")
 WINDOWS = os.name == "nt"
@@ -709,6 +710,10 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("paths must be local paths, never a network share: %r" % value)
     header = auth.get("header", "Authorization")
     scheme = auth.get("scheme", "Bearer")
+    if not (isinstance(header, str) and _AUTH_HEADER.fullmatch(header)):
+        problems.append("auth.header must match %s" % _AUTH_HEADER.pattern)
+    if scheme not in ("Bearer", "none"):
+        problems.append("auth.scheme is Bearer or none")
     if header != "Authorization" and scheme != "none":
         problems.append("a custom auth header carries the raw token: scheme must be none")
     life = descriptor.get("lifecycle") or {}
@@ -1102,11 +1107,19 @@ def _close_totals(row: Dict[str, Any]) -> Dict[str, Any]:
 
 def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instance: str = "default",
                  now: Optional[_dt.datetime] = None,
-                 budget: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                 budget: Optional[Dict[str, Any]] = None,
+                 budgets: Optional[Sequence[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """The `service-usage.schema.json` answer: the last 31 UTC days, oldest first, per provider
     and model. Days without calls are omitted. A row whose calls are all unpriced has
-    `costUsd: None`; totals are the sums of the model rows (FAC-SEM-025)."""
+    `costUsd: None`; totals are the sums of the model rows (FAC-SEM-025).
+
+    ``budgets`` (DEC-0027) lists every spending limit the service applies, enforced or not. A
+    machine limit with a calendar ``period`` and no ``spentUsd`` is counted here from the receipts,
+    the way ``budget`` is, so the two never disagree; a per-order limit (``per_job``, ``approval``)
+    gets ``spentUsd: None``; every other limit states its own spend. A report whose limits break
+    FAC-SEM-031 is refused (``usage_limit_problems``)."""
     now = now or _dt.datetime.now(_dt.timezone.utc)
+    receipts = list(receipts)
     first = (now - _dt.timedelta(days=USAGE_DAYS - 1)).strftime("%Y-%m-%d")
     last = now.strftime("%Y-%m-%d")
     days: Dict[str, Dict[str, Dict[str, Any]]] = {}
@@ -1145,12 +1158,526 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
     if budget is not None:
         if budget.get("period") not in ("day", "month") or not isinstance(budget.get("limitUsd"), (int, float)) or budget["limitUsd"] <= 0:
             raise ServiceError("budget is {period: day|month, limitUsd > 0}.")
-        prefix = last if budget["period"] == "day" else last[:7]
-        window = [d for d in out_days if d["date"].startswith(prefix)]
-        unknown = bool(window) and all(d["costUsd"] is None for d in window)
-        spent = None if unknown else round(sum(d["costUsd"] or 0.0 for d in window), 6)
-        report["budget"] = {"period": budget["period"], "limitUsd": float(budget["limitUsd"]), "spentUsd": spent}
+        report["budget"] = {"period": budget["period"], "limitUsd": float(budget["limitUsd"]),
+                            "spentUsd": _spent_in(out_days, budget["period"], last)}
+    if budgets is not None:
+        limits = []
+        for given in budgets:
+            if not isinstance(given, dict):
+                raise ServiceError("each limit in budgets is an object")
+            limit = dict(given)
+            if "spentUsd" not in limit:
+                if limit.get("kind") in PER_ORDER_KINDS:
+                    limit["spentUsd"] = None
+                elif limit.get("scope") == "machine" and limit.get("period") in ("day", "month"):
+                    limit["spentUsd"] = _spent_in(out_days, limit["period"], last)
+                elif limit.get("scope") == "machine" and _number(limit.get("windowSeconds")):
+                    limit["spentUsd"] = _spent_since(receipts, now - _dt.timedelta(seconds=limit["windowSeconds"]), now)
+            if isinstance(limit.get("limitUsd"), int) and not isinstance(limit.get("limitUsd"), bool):
+                limit["limitUsd"] = float(limit["limitUsd"])
+            limits.append(limit)
+        report["budgets"] = limits
+        problems = usage_limit_problems(report)
+        if problems:
+            raise ServiceError("the report's limits are not coherent: " + "; ".join(problems))
     return report
+
+
+def _spent_since(receipts: List[Dict[str, Any]], start: _dt.datetime, end: _dt.datetime) -> Optional[float]:
+    """Spend in a rolling window, from the receipts' own times; None when every call in it is unpriced."""
+    lo, hi = start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
+    inside = [r for r in receipts if lo < str(r.get("at", "")) <= hi]
+    if inside and all(r.get("costUsd") is None for r in inside):
+        return None
+    return round(sum(r.get("costUsd") or 0.0 for r in inside), 6)
+
+
+def _spent_in(out_days: List[Dict[str, Any]], period: str, last: str) -> Optional[float]:
+    """Spend in the current UTC day or month; None when every call in it is unpriced."""
+    prefix = last if period == "day" else last[:7]
+    window = [d for d in out_days if d["date"].startswith(prefix)]
+    unknown = bool(window) and all(d["costUsd"] is None for d in window)
+    return None if unknown else round(sum(d["costUsd"] or 0.0 for d in window), 6)
+
+
+# --- every spending limit (DEC-0027, FAC-SEM-031) ---------------------------------
+
+LIMIT_SCOPES = ("machine", "project", "pool", "job")
+PER_ORDER_KINDS = ("per_job", "approval")
+_LIMIT_ID = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,63}$")
+_LIMIT_KIND = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+_LIMIT_FIELDS = ("id", "scope", "subject", "kind", "period", "windowSeconds", "since", "limitUsd", "spentUsd", "enforced", "tripped")
+_TIMESTAMP = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?([Zz]|[+-]([0-9]{2}):([0-9]{2}))")
+
+
+def _is_timestamp(value: Any) -> bool:
+    """A JSON Schema `date-time` (RFC 3339): a real calendar date and time, `Z` or an offset."""
+    m = _TIMESTAMP.fullmatch(value) if isinstance(value, str) else None
+    if not m:
+        return False
+    year, month, day, hour, minute, second = (int(m.group(i)) for i in range(1, 7))
+    try:
+        _dt.date(year, month, day)
+    except ValueError:
+        return False
+    offset_ok = m.group(9) is None or (int(m.group(9)) <= 23 and int(m.group(10)) <= 59)
+    return hour <= 23 and minute <= 59 and second <= 60 and offset_ok
+
+
+def _number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def usage_limit_problems(report: Dict[str, Any]) -> List[str]:
+    """The `budgets` of a usage report against `service-usage.schema.json` `$defs/limit` and FAC-SEM-031: unique
+    ids, a subject exactly for project and pool scope, one window that agrees with the kind, per-order limits with
+    no window and no spend, only a relative limit with a null `limitUsd`, a tripped limit enforced, and a legacy
+    `budget` that repeats one enforced machine limit. A breach (spent above the limit) is not a problem: a report
+    truthfully shows one, and a host shows it first. An unknown kind is never refused."""
+    problems: List[str] = []
+    limits = report.get("budgets")
+    if limits is None:
+        return problems
+    if not isinstance(limits, list) or len(limits) > 64:
+        return ["budgets is a list of at most 64 limits"]
+    seen = set()
+    for i, limit in enumerate(limits):
+        at = "/budgets/%d" % i
+        if not isinstance(limit, dict):
+            problems.append("%s is not an object" % at)
+            continue
+        for key in limit:
+            if key not in _LIMIT_FIELDS:
+                problems.append("%s/%s is not a limit field" % (at, key))
+        for key in ("id", "scope", "kind", "limitUsd", "spentUsd", "enforced"):
+            if key not in limit:
+                problems.append("%s is missing %s" % (at, key))
+        if "id" in limit and not (isinstance(limit["id"], str) and _LIMIT_ID.fullmatch(limit["id"])):
+            problems.append("%s/id must match %s" % (at, _LIMIT_ID.pattern))
+        if "scope" in limit and limit["scope"] not in LIMIT_SCOPES:
+            problems.append("%s/scope must be one of %s" % (at, ", ".join(LIMIT_SCOPES)))
+        if "subject" in limit and not (isinstance(limit["subject"], str) and 1 <= len(limit["subject"]) <= 128):
+            problems.append("%s/subject is 1 to 128 characters" % at)
+        if "kind" in limit and not (isinstance(limit["kind"], str) and _LIMIT_KIND.fullmatch(limit["kind"])):
+            problems.append("%s/kind must match %s" % (at, _LIMIT_KIND.pattern))
+        if "period" in limit and limit["period"] not in ("day", "month"):
+            problems.append("%s/period is day or month" % at)
+        if "windowSeconds" in limit and not (isinstance(limit["windowSeconds"], int) and not isinstance(limit["windowSeconds"], bool)
+                                             and limit["windowSeconds"] >= 1):
+            problems.append("%s/windowSeconds is a whole number of seconds, at least 1" % at)
+        if "since" in limit and not _is_timestamp(limit["since"]):
+            problems.append("%s/since is a UTC timestamp" % at)
+        if "limitUsd" in limit and not (limit["limitUsd"] is None or (_number(limit["limitUsd"]) and limit["limitUsd"] > 0)):
+            problems.append("%s/limitUsd is a dollar amount above zero, or null" % at)
+        if "spentUsd" in limit and not (limit["spentUsd"] is None or (_number(limit["spentUsd"]) and limit["spentUsd"] >= 0)):
+            problems.append("%s/spentUsd is a dollar amount, zero or more, or null" % at)
+        for key in ("enforced", "tripped"):
+            if key in limit and not isinstance(limit[key], bool):
+                problems.append("%s/%s is true or false" % (at, key))
+
+        # FAC-SEM-031
+        ident = str(limit.get("id", ""))
+        if ident in seen:
+            problems.append("FAC-SEM-031 %s/id: limit id %s appears twice" % (at, ident))
+        seen.add(ident)
+        scope = limit.get("scope")
+        named = scope in ("project", "pool")
+        if named and "subject" not in limit:
+            problems.append("FAC-SEM-031 %s/subject: a %s limit names its %s in subject" % (at, scope, scope))
+        if not named and "subject" in limit:
+            problems.append("FAC-SEM-031 %s/subject: a %s limit has no subject" % (at, scope))
+        windows = [f for f in ("period", "windowSeconds", "since") if f in limit]
+        if len(windows) > 1:
+            problems.append("FAC-SEM-031 %s/%s: a limit has one window, not %s" % (at, windows[1], " and ".join(windows)))
+        kind = str(limit.get("kind", ""))
+        seconds = limit.get("windowSeconds") if _number(limit.get("windowSeconds")) else None
+        if kind in PER_ORDER_KINDS:
+            if windows:
+                problems.append("FAC-SEM-031 %s/%s: %s bounds one order and has no window" % (at, windows[0], kind))
+            if limit.get("spentUsd", 0) is not None:
+                problems.append("FAC-SEM-031 %s/spentUsd: %s bounds one order, so nothing is spent against it (null)" % (at, kind))
+        elif kind == "daily":
+            if not (limit.get("period") == "day" or seconds == 86400):
+                problems.append("FAC-SEM-031 %s/period: a daily limit counts the UTC day (period day) or the last 24 hours (windowSeconds 86400)" % at)
+        elif kind == "monthly":
+            if not (limit.get("period") == "month" or (seconds is not None and 28 * 86400 <= seconds <= 31 * 86400)):
+                problems.append("FAC-SEM-031 %s/period: a monthly limit counts the UTC month (period month) or a rolling 28–31 days (windowSeconds)" % at)
+        elif kind == "velocity":
+            if seconds is None:
+                problems.append("FAC-SEM-031 %s/windowSeconds: a velocity limit counts a rolling window (windowSeconds)" % at)
+        elif kind in ("pool", "emergency"):
+            if not windows:
+                problems.append("FAC-SEM-031 %s/period: a %s limit names the window it counts (period, windowSeconds or since)" % (at, kind))
+        known = kind in PER_ORDER_KINDS or kind in ("daily", "monthly", "pool", "emergency")
+        if known and "limitUsd" in limit and limit["limitUsd"] is None:
+            problems.append("FAC-SEM-031 %s/limitUsd: a %s limit is a dollar amount; only a relative limit (velocity) may leave it null" % (at, kind))
+        if limit.get("tripped") is True and limit.get("enforced") is not True:
+            problems.append("FAC-SEM-031 %s/tripped: a limit that is not enforced cannot have stopped work" % at)
+
+    budget = report.get("budget")
+    if isinstance(budget, dict) and limits:
+        kind = "daily" if budget.get("period") == "day" else "monthly"
+
+        def same(x: Any, y: Any) -> bool:
+            if x is None or y is None:
+                return x is y
+            return _number(x) and _number(y) and abs(x - y) <= 0.000001
+
+        twin = any(isinstance(l, dict) and l.get("scope") == "machine" and l.get("enforced") is True and l.get("kind") == kind
+                   and l.get("period") == budget.get("period") and same(l.get("limitUsd"), budget.get("limitUsd"))
+                   and same(l.get("spentUsd"), budget.get("spentUsd")) for l in limits)
+        if not twin:
+            problems.append("FAC-SEM-031 /budget: budget repeats one enforced machine %s limit with period %s in budgets[], so old "
+                            "and new readers agree" % (kind, budget.get("period")))
+    return problems
+
+
+# --- the feed client (DEC-0025, FAC-SEM-036) --------------------------------------
+
+def token_header(auth: Any, token: str) -> Tuple[str, str]:
+    """The one header a client sends the service token in, as the descriptor's ``auth`` declares it: ``header``
+    defaults to Authorization and ``scheme`` to Bearer; ``none`` carries the raw token. Never assume
+    ``Authorization: Bearer`` (a feed client that did was refused on every poll and dropped every notify event)."""
+    declared = auth if isinstance(auth, dict) else {}
+    name = declared.get("header") if isinstance(declared.get("header"), str) else "Authorization"
+    scheme = declared.get("scheme") if isinstance(declared.get("scheme"), str) else "Bearer"
+    return name, token if scheme == "none" else "Bearer " + token
+
+
+# --- settings backups (DEC-0025, FAC-SEM-035) -------------------------------------
+
+SETTINGS_BACKUP_FORMAT = "fabric-settings-backup/1"
+SETTINGS_BACKUP_KEEP = 14
+SETTINGS_BACKUP_MAX_AGE_SECONDS = 24 * 60 * 60
+_STALE_TEMP_SECONDS = 60 * 60
+_SAFE_INTEGER = 2 ** 53 - 1
+_TABLE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+_SECRET_TABLE = re.compile(r"^((.+_)?(account_connections?|account_connection_drafts?|tokens?|secrets?|credentials?|passwords?|login_codes?)|(operator_)?sessions?)$")
+_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
+_SECRET_COLUMN = re.compile(r"^(?:.+_)?(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]assphrase|[Aa]pi_?[Kk]ey|[Pp]rivate_[Kk]ey|[Cc]ookie|[Ll]ogin_[Cc]ode|[Oo]tp|[Cc]redential)s?$")
+_REASON = re.compile(r"^[a-z][a-z0-9_.-]{0,63}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SURROGATE = re.compile("[\ud800-\udfff]")
+_URI = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:\S*")
+_MAX_CELL_CHARS = 1048576
+_MAX_ROW_VALUES = 512
+
+
+def _canonical_check(value: Any, at: str = "") -> None:
+    if value is None or isinstance(value, (bool, str)):
+        return
+    if isinstance(value, int):
+        if abs(value) > _SAFE_INTEGER:
+            raise ServiceError("%s: %d is outside ±(2^53 − 1) and has no canonical form; store it as a string" % (at or "/", value))
+        return
+    if isinstance(value, float):
+        raise ServiceError("%s: a fraction has no canonical form; a settings backup stores it as its decimal string" % (at or "/"))
+    if isinstance(value, list):
+        for i, item in enumerate(value):
+            _canonical_check(item, "%s/%d" % (at, i))
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ServiceError("%s: object keys are strings" % (at or "/"))
+            _canonical_check(item, "%s/%s" % (at, key))
+        return
+    raise ServiceError("%s: %s is not a JSON value" % (at or "/", type(value).__name__))
+
+
+def settings_canonical_json(value: Any) -> str:
+    """The settings canonical form (DEC-0025, DEC-0043): keys sorted by code point at every level, ", " and ": ",
+    strings escaped as JSON requires and nothing else, integers in decimal — Python's
+    ``json.dumps(value, sort_keys=True, ensure_ascii=False)``. Refuses a fraction, an integer outside ±(2^53 − 1)
+    and anything that is not JSON."""
+    _canonical_check(value)
+    return json.dumps(value, sort_keys=True, ensure_ascii=False)
+
+
+def settings_backup_digest(tables: Any) -> str:
+    """The ``sha256`` a settings backup carries: SHA-256 of the UTF-8 canonical JSON of ``tables``."""
+    return hashlib.sha256(settings_canonical_json(tables).encode("utf-8")).hexdigest()
+
+
+def settings_backup_problems(doc: Any) -> List[str]:
+    """Why a reader refuses this settings backup: its shape (``settings-backup.schema.json``) and FAC-SEM-035 —
+    the checksum is the digest of the tables, counts name exactly the tables and their rows, every row is as wide as
+    its columns, and every value has a canonical form. Empty means intact."""
+    if not isinstance(doc, dict):
+        return ["a settings backup is a JSON object"]
+    problems: List[str] = []
+    if doc.get("format") != SETTINGS_BACKUP_FORMAT:
+        problems.append("format must be %s, not %r: a reader refuses a format it does not know" % (SETTINGS_BACKUP_FORMAT, doc.get("format")))
+    for key in ("format", "service", "created_at", "reason", "sha256", "counts", "tables"):
+        if key not in doc:
+            problems.append("missing %s" % key)
+    for key in doc:
+        if key not in ("format", "service", "created_at", "reason", "sha256", "counts", "tables", "extensions"):
+            problems.append("%s is not a settings backup field" % key)
+    if "extensions" in doc:
+        if not isinstance(doc["extensions"], dict):
+            problems.append("extensions is an object")
+        else:
+            for key in doc["extensions"]:
+                if not _URI.fullmatch(key):
+                    problems.append("extensions key %r is not a URI" % key)
+    service = doc.get("service")
+    if "service" in doc:
+        if not isinstance(service, dict) or set(service) != {"id", "instance", "version", "schema"}:
+            problems.append("service is {id, instance, version, schema}")
+        else:
+            if not _ID.fullmatch(str(service["id"])):
+                problems.append("service.id must match %s" % _ID.pattern)
+            if not _INSTANCE.fullmatch(str(service["instance"])):
+                problems.append("service.instance must match %s" % _INSTANCE.pattern)
+            if not (isinstance(service["version"], str) and len(service["version"]) <= 64):
+                problems.append("service.version is a string of at most 64 characters")
+            schema = service["schema"]
+            if not ((isinstance(schema, int) and not isinstance(schema, bool) and schema >= 0)
+                    or (isinstance(schema, str) and 1 <= len(schema) <= 64)):
+                problems.append("service.schema is a whole number or a short string")
+    if "created_at" in doc and not _is_timestamp(doc["created_at"]):
+        problems.append("created_at is a UTC timestamp")
+    if "reason" in doc and not (isinstance(doc["reason"], str) and _REASON.fullmatch(doc["reason"])):
+        problems.append("reason must match %s" % _REASON.pattern)
+    if "sha256" in doc and not (isinstance(doc["sha256"], str) and _SHA256.fullmatch(doc["sha256"])):
+        problems.append("sha256 is 64 lowercase hex digits")
+    tables = doc.get("tables") if isinstance(doc.get("tables"), dict) else {}
+    counts = doc.get("counts") if isinstance(doc.get("counts"), dict) else {}
+    if "tables" in doc and not isinstance(doc.get("tables"), dict):
+        problems.append("tables is an object")
+    if "counts" in doc and not isinstance(doc.get("counts"), dict):
+        problems.append("counts is an object")
+    for name in list(tables) + [n for n in counts if n not in tables]:
+        if not _TABLE.fullmatch(name) or _SECRET_TABLE.fullmatch(name):
+            problems.append("table %s is never backed up: it can only hold connections, tokens, secrets, credentials, "
+                            "passwords, login codes or sessions (or its name is not a table name)" % name)
+    for name, count in counts.items():
+        if not (isinstance(count, int) and not isinstance(count, bool) and count >= 0):
+            problems.append("counts.%s is a whole number" % name)
+    canonical = True
+    for name, table in tables.items():
+        if not isinstance(table, dict) or set(table) != {"columns", "rows"}:
+            problems.append("tables.%s is {columns, rows}" % name)
+            continue
+        columns, rows = table["columns"], table["rows"]
+        if not (isinstance(columns, list) and 1 <= len(columns) <= 512 and len(set(map(str, columns))) == len(columns)):
+            problems.append("tables.%s.columns is 1 to 512 distinct names" % name)
+            columns = columns if isinstance(columns, list) else []
+        for column in columns:
+            if not (isinstance(column, str) and _COLUMN.fullmatch(column)) or _SECRET_COLUMN.fullmatch(str(column)):
+                problems.append("column %s.%s is refused: its name says it holds a credential value (name the secret, "
+                                "never store it: secret_name, token_slot)" % (name, column))
+        if not isinstance(rows, list):
+            problems.append("tables.%s.rows is a list" % name)
+            continue
+        width = len(columns)
+        for i, row in enumerate(rows):
+            at = "/tables/%s/rows/%d" % (name, i)
+            if not isinstance(row, list):
+                problems.append("%s is a list of values" % at)
+                continue
+            if len(row) != width:
+                problems.append("FAC-SEM-035 %s: row has %d values for %d columns" % (at, len(row), width))
+            if len(row) > _MAX_ROW_VALUES:
+                problems.append("%s holds more than %d values" % (at, _MAX_ROW_VALUES))
+            for j, cell in enumerate(row):
+                if isinstance(cell, float) or (isinstance(cell, int) and not isinstance(cell, bool) and abs(cell) > _SAFE_INTEGER):
+                    canonical = False
+                    problems.append("FAC-SEM-035 %s/%d: a fraction or an unsafe integer has no canonical form; store it as a string" % (at, j))
+                elif isinstance(cell, str) and _SURROGATE.search(cell):
+                    canonical = False
+                    problems.append("FAC-SEM-035 %s/%d: a string with a lone surrogate cannot be encoded as UTF-8" % (at, j))
+                elif isinstance(cell, str) and len(cell) > _MAX_CELL_CHARS:
+                    problems.append("%s/%d is longer than %d characters" % (at, j, _MAX_CELL_CHARS))
+                elif not (cell is None or isinstance(cell, (bool, int, str))):
+                    canonical = False
+                    problems.append("%s/%d is not a JSON scalar" % (at, j))
+        if counts.get(name) != len(rows):
+            problems.append("FAC-SEM-035 /counts/%s: counts says %s for %d rows" % (name, counts.get(name, "nothing"), len(rows)))
+    for name in counts:
+        if name not in tables:
+            problems.append("FAC-SEM-035 /counts/%s: counts names %s, which the backup does not carry" % (name, name))
+    if canonical and isinstance(doc.get("tables"), dict):
+        try:
+            digest: Optional[str] = settings_backup_digest(tables)
+        except (ServiceError, UnicodeError, TypeError, ValueError) as exc:  # a name no canonical form can carry
+            digest = None
+            problems.append("FAC-SEM-035 /tables: the tables have no canonical form (%s)" % exc)
+        if digest is not None and doc.get("sha256") != digest:
+            problems.append("FAC-SEM-035 /sha256: the checksum does not match the tables: the file is damaged and a reader refuses it")
+    return problems
+
+
+def settings_backup_root(platform: str = sys.platform) -> Path:
+    """Where every service keeps its settings backups — outside its data directory (DEC-0025)."""
+    if platform == "darwin":
+        return Path.home() / "Library/Application Support/PassionCode"
+    if platform == "win32":
+        appdata = os.environ.get("APPDATA")
+        return (Path(appdata) if appdata else Path.home() / "AppData" / "Roaming") / "PassionCode"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "PassionCode"
+
+
+def settings_backup_dir(service_id: str, instance: str = "default", root: Optional[Path] = None) -> Path:
+    _require_id(service_id)
+    if not (isinstance(instance, str) and _INSTANCE.fullmatch(instance)):
+        raise ServiceError("instance must match %s" % _INSTANCE.pattern)
+    return (root or settings_backup_root()) / "settings-backups" / service_id / instance
+
+
+def make_settings_backup(*, service_id: str, instance: str = "default", version: str, schema: Any,
+                         tables: Dict[str, Dict[str, Any]], reason: str, now: Optional[_dt.datetime] = None) -> Dict[str, Any]:
+    """A snapshot of the operator's decisions and bindings: the tables on the service's allow-list, each
+    ``{"columns": [...], "rows": [[...], ...]}`` of JSON scalars (a fraction as its decimal string). Refuses a file a
+    reader would refuse."""
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    doc = {"format": SETTINGS_BACKUP_FORMAT,
+           "service": {"id": service_id, "instance": instance, "version": version, "schema": schema},
+           "created_at": now.astimezone(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"), "reason": reason,
+           "sha256": "", "counts": {name: len(table.get("rows") or []) for name, table in tables.items()}, "tables": tables}
+    try:
+        doc["sha256"] = settings_backup_digest(tables)
+    except ServiceError as exc:
+        raise ServiceError("this snapshot has no canonical form: %s" % exc) from None
+    problems = settings_backup_problems(doc)
+    if problems:
+        raise ServiceError("this snapshot would be refused: " + "; ".join(problems))
+    return doc
+
+
+def _backup_name(doc: Dict[str, Any]) -> str:
+    stamp = doc["created_at"].replace("-", "").replace(":", "")
+    head, _, frac = stamp.rstrip("Z").partition(".")
+    return "settings-%s%sZ.json" % (head, (frac + "000000")[:6])
+
+
+def settings_backups(directory: Path) -> List[Path]:
+    """The snapshot files, newest first (their names sort in time order)."""
+    directory = Path(directory)
+    if not directory.is_dir():
+        return []
+    return sorted((p for p in directory.iterdir() if re.fullmatch(r"settings-[0-9]{8}T[0-9]{12}Z\.json", p.name)), reverse=True)
+
+
+def _no_constant(name: str) -> Any:
+    raise ValueError("%s is not JSON" % name)
+
+
+def read_settings_backup(path: Path) -> Dict[str, Any]:
+    """A snapshot a reader may trust, or ServiceError naming why it is refused (FAC-SEM-035)."""
+    try:
+        doc = json.loads(Path(path).read_text(encoding="utf-8"), parse_constant=_no_constant)
+    except (OSError, ValueError) as exc:
+        raise ServiceError("settings backup %s cannot be read: %s" % (path, exc)) from None
+    problems = settings_backup_problems(doc)
+    if problems:
+        raise ServiceError("settings backup %s is refused: %s" % (path, "; ".join(problems)))
+    return doc
+
+
+def write_settings_backup(doc: Dict[str, Any], directory: Path, *, keep: int = SETTINGS_BACKUP_KEEP) -> Optional[Path]:
+    """Write a snapshot made by ``make_settings_backup``: atomically, 0600 in a 0700 directory, named by its time.
+    A temporary file an interrupted write left is removed first; a snapshot whose checksum equals the newest file's
+    is not written again (None). After a write, all but the ``keep`` newest are removed (at least 14)."""
+    problems = settings_backup_problems(doc)
+    if problems:
+        raise ServiceError("this snapshot would be refused: " + "; ".join(problems))
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    ensure_private_dir(directory)
+    stale = time.time() - _STALE_TEMP_SECONDS
+    for left in directory.iterdir():
+        # Only a temporary file an interrupted write left: one a concurrent writer is still filling is younger.
+        try:
+            if left.name.startswith(".settings-") and left.stat().st_mtime < stale:
+                left.unlink()
+        except OSError:
+            pass
+    existing = settings_backups(directory)
+    if existing:
+        try:
+            if read_settings_backup(existing[0])["sha256"] == doc["sha256"]:
+                return None
+        except Exception:  # noqa: BLE001 - a damaged newest file is no reason to skip a good snapshot
+            pass
+    path = directory / _backup_name(doc)
+    atomic_write(path, json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8") + b"\n", 0o600)
+    # The newest by name, but never the one just written: a clock that stepped back must not delete it.
+    for old in [p for p in settings_backups(directory) if p != path][max(keep, SETTINGS_BACKUP_KEEP) - 1:]:
+        old.unlink()
+    return path
+
+
+def backup_due(directory: Path, now: Optional[_dt.datetime] = None) -> bool:
+    """True when there is no snapshot or the newest is older than 24 hours: take one at start or on the daily tick."""
+    newest = settings_backups(directory)
+    if not newest:
+        return True
+    try:
+        stamp = _dt.datetime.strptime(newest[0].name[len("settings-"):-len("Z.json")], "%Y%m%dT%H%M%S%f").replace(tzinfo=_dt.timezone.utc)
+    except ValueError:
+        return True  # a name no calendar has: take a fresh snapshot rather than trust it
+    return ((now or _dt.datetime.now(_dt.timezone.utc)) - stamp).total_seconds() > SETTINGS_BACKUP_MAX_AGE_SECONDS
+
+
+def newest_intact_backup(directory: Path) -> Tuple[Optional[Path], Optional[Dict[str, Any]], List[Tuple[Path, str]]]:
+    """The source of an automatic restore: the newest snapshot that is intact and has content. Damaged ones are
+    skipped and returned with the reason, for the restore report."""
+    skipped: List[Tuple[Path, str]] = []
+    for path in settings_backups(directory):
+        try:
+            doc = read_settings_backup(path)
+        except Exception as exc:  # noqa: BLE001 - one damaged file never stops the scan
+            skipped.append((path, str(exc)))
+            continue
+        if any(doc["counts"].values()):
+            return path, doc, skipped
+    return None, None, skipped
+
+
+def restore_plan(doc: Dict[str, Any], current: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """What restoring ``doc`` would do — it adds and never overwrites (DEC-0025). ``current`` describes the database
+    now, per table: ``columns`` (all of them), ``key`` (the primary key columns), ``required`` (columns without a
+    default) and ``existing`` (the primary keys present, as tuples). Per table: the rows to insert (dicts over the
+    columns both sides have), how many are already present, the snapshot columns dropped, the current columns left
+    to their defaults, the required columns the snapshot lacks, and every row refused with its key and reason.
+    ``unknownTables`` names snapshot tables the service no longer has. The service applies ``insert`` and adds any
+    row its database refuses to ``refused``; a manual restore shows this plan first and applying it is the operator's act."""
+    problems = settings_backup_problems(doc)
+    if problems:
+        raise ServiceError("a damaged snapshot is never restored: " + "; ".join(problems))
+    plan: Dict[str, Any] = {"source": {"created_at": doc["created_at"], "sha256": doc["sha256"]}, "tables": {}, "unknownTables": []}
+    for name, table in doc["tables"].items():
+        now_table = current.get(name)
+        if now_table is None:
+            plan["unknownTables"].append(name)
+            continue
+        columns = list(now_table.get("columns") or [])
+        key = list(now_table.get("key") or [])
+        required = list(now_table.get("required") or [])
+        existing = {tuple(k) for k in now_table.get("existing") or []}
+        shared = [c for c in table["columns"] if c in columns]
+        missing = [c for c in required if c not in table["columns"]]
+        entry = {"insert": [], "present": 0, "droppedColumns": [c for c in table["columns"] if c not in columns],
+                 "defaultedColumns": [c for c in columns if c not in table["columns"]], "missingRequired": missing, "refused": []}
+        planned = set()
+        for row in table["rows"]:
+            values = dict(zip(table["columns"], row))
+            ident = [values.get(c) for c in key]
+            if any(c not in table["columns"] for c in key):
+                entry["refused"].append({"key": ident, "reason": "the primary key is not in the snapshot"})
+            elif tuple(ident) in planned:
+                entry["refused"].append({"key": ident, "reason": "the snapshot holds this key twice"})
+            elif tuple(ident) in existing:
+                entry["present"] += 1
+            elif missing:
+                entry["refused"].append({"key": ident, "reason": "required column %s is not in the snapshot" % ", ".join(missing)})
+            else:
+                planned.add(tuple(ident))
+                entry["insert"].append({c: values[c] for c in shared})
+        plan["tables"][name] = entry
+    return plan
 
 
 class JsonlUsageLedger:
@@ -2001,7 +2528,7 @@ def prune_releases(releases_dir: Path, keep: int = 2, *, current: Optional[Path]
 # --- helpers for input validation -----------------------------------------------
 
 def _require_id(service_id: str) -> None:
-    if not _ID.match(service_id):
+    if not (isinstance(service_id, str) and _ID.fullmatch(service_id)):
         raise ServiceError("Service id %r must match %s." % (service_id, _ID.pattern))
 
 

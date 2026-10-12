@@ -52,5 +52,7 @@ jobs:
         run: python -m unittest discover -s test -p "test_fabric_service.py" -v
       - name: The supervisor writers on Windows (FAA-21)
         run: python -m unittest discover -s test -p "test_fabric_service_supervisors.py" -v
+      - name: Settings backups and every limit on Windows (FAA-13)
+        run: python -m unittest discover -s test -p "test_fabric_service_backups.py" -v
       - name: The Node kit on Windows — its lock, token ACL and writers (FAA-21)
-        run: node --test test/fabric-service-platforms.test.mjs test/fabric-service-supervisors.test.mjs test/fabric-service.test.mjs
+        run: node --test test/fabric-service-platforms.test.mjs test/fabric-service-supervisors.test.mjs test/fabric-service.test.mjs test/fabric-service-backups.test.mjs

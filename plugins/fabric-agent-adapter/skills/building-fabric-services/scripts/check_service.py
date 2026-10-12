@@ -162,10 +162,9 @@ class Probe:
             conn.close()
 
     def auth_headers(self) -> Dict[str, str]:
-        auth = self.d.get("auth", {})
-        header = auth.get("header", "Authorization")
-        value = self.token or ""
-        return {header: ("Bearer " + value) if auth.get("scheme", "Bearer") == "Bearer" else value}
+        # The header and form the descriptor declares, never an assumed `Authorization: Bearer` (FAC-SEM-036).
+        name, value = fs.token_header(self.d.get("auth"), self.token or "")
+        return {name: value}
 
     # descriptor ------------------------------------------------------------
     def descriptor_rules(self) -> None:
