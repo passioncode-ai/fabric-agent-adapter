@@ -25,7 +25,11 @@
   minimality, a trailing byte, and the hub key's `x`. A test was added for each, and they are now caught.
 - `test_contract_revisions` compiled-schema checks pass for both pins (`FABRIC_CONTRACT_OLD` = `2ce3922`, `FABRIC_CONTRACT_NEW` = `b291bf0`,
   clean checkouts with `pnpm install --frozen-lockfile`): all three profiles valid under the new pin.
-- The full suites, `test/validate.py` and both strict plugin validations pass.
+- `npm test` passes on macOS: 417 Python and 113 Node. Under a load average of 220, a timing check
+  (`well-known.fast`) failed once and passed on rerun.
+- `test/validate.py` and both strict plugin validations pass.
+- Validate run [38249086072](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/38249086072) is green
+  on Linux, Windows and the plugin job.
 
 - An independent review found nothing critical. It reported 5 Python divergences or exceptions, all fixed with
   tests or vectors:
