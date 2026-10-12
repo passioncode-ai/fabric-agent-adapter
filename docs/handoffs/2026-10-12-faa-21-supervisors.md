@@ -26,7 +26,13 @@ in both kits (backlog FAA-21).
   - the cross-kit lock and probe cases.
 - Mutation testing: 14 planted defects in the Python writers, 23 in the Node port and 7 in the lock name and
   probe were each caught.
-- Windows: by the `windows` job of the validate run and of the release run.
+- Windows, in validate run [38199737609](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/38199737609),
+  all jobs green:
+  - The real `schtasks` created, read back and deleted the kit's task.
+  - The lock excludes across the kits in both directions, and the probe sees a live Node service.
+  - The Node token ACL: written and read back, a grant to everyone refused by SID, an explicit grant dropped.
+  - 41 Node cases and 23 + 50 + 14 Python cases.
+- Linux: `systemd-analyze verify` accepts the unit. A planted quoted `WorkingDirectory=` fails it.
 
 **Review and the first Windows run.**
 
@@ -45,6 +51,8 @@ in both kits (backlog FAA-21).
   - Not fixed, documented instead: a task cannot set the supervisor variable.
 - The first `windows` run failed on the pipe's instance limit (`ERROR_PIPE_BUSY`). The pipe now has unlimited
   instances, as libuv's does, and 231 counts as held.
+- Two later runs failed on test paths that only work on POSIX: a `Path` printed with backslashes, and an ESM
+  import from `D:\…`. Both tests are fixed. The unit writer now takes the POSIX form of a `Path`.
 
 **Decisions.**
 
