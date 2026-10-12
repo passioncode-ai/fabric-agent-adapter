@@ -31,7 +31,7 @@
 - An independent review found 20 moderate defects and nothing critical; all are fixed with tests (CHANGELOG 0.19.0).
   I found one more myself: the readers required `Z` where the contract allows any RFC 3339 offset.
 - Full suites, `test/validate.py` and both strict plugin validations on macOS.
-- The Windows CI job runs the new cases.
+- Validate run [38202282212](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/38202282212), after the review: green on Linux, Windows and the plugin job.
 
 **Decisions.**
 
