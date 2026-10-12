@@ -730,7 +730,7 @@ class Probe:
                     self.add("lifecycle.instance-lock", "PASS", "held by the running service")
                 else:
                     msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-                    self.add("lifecycle.instance-lock", "FAIL", "%s exists but nobody holds it" % lock)
+                    self.lock_free(lock)
             finally:
                 os.close(fd)
             return
@@ -747,9 +747,16 @@ class Probe:
             self.add("lifecycle.instance-lock", "PASS" if held else "FAIL", "held by the running service" if held else str(exc))
         else:
             fcntl.flock(fd, fcntl.LOCK_UN)
-            self.add("lifecycle.instance-lock", "FAIL", "%s exists but nobody holds it" % lock)
+            self.lock_free(lock)
         finally:
             os.close(fd)
+
+    def lock_free(self, lock: Path) -> None:
+        """The file lock is free; a Node kit service holds the lock's name instead (fs.lock_name)."""
+        if fs.lock_name_held(lock):
+            self.add("lifecycle.instance-lock", "PASS", "held by the running service (the lock's name, %s)" % ("a named pipe" if fs.WINDOWS else "an abstract socket"))
+        else:
+            self.add("lifecycle.instance-lock", "FAIL", "%s exists but nobody holds it" % lock)
 
     def run(self) -> List[Result]:
         self.descriptor_rules()

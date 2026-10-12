@@ -278,6 +278,18 @@
         "its doctor runs the kit's runner_check (catalogued binary, version argv, at most 5 s, no shell) and model_usable",
         "a key route names its key by reference only; a subscription runs only in its vendor's runner (FAC-SEM-059); usage receipts carry the route"
       ]
+    },
+    {
+      "id": "linux-and-windows-supervision",
+      "trap": "the service declared lifecycle.manager none on Linux and Windows and was started from a shell profile and a Startup-folder shortcut: nothing restarted it after a crash, an exit 75 under a supervisor looped, and the unit carried an API key in Environment=",
+      "request": "Install example-agent on a Linux workstation and a Windows laptop so it survives crashes and logins, the way launchd_install does on the Mac.",
+      "expected": [
+        "on Linux writes a systemd user unit with the kit's systemd_unit / systemdUnit (Restart=always, RestartSec=10, TimeoutStopSec above the drain, WantedBy=default.target, FABRIC_SERVICE_SUPERVISOR=systemd) and installs it with systemd_install / systemdInstall (systemctl --user daemon-reload, enable --now); the descriptor says manager systemd with its unit",
+        "on Windows writes a per-user task with task_xml / taskXml (logon trigger, restart on failure every minute, no execution time limit, IgnoreNew, least privilege) and installs it with task_install / taskInstall (schtasks /Create from the XML without administrator rights, then /Run); the descriptor says manager task-scheduler with its \\PassionCode\\<id>.<instance> task",
+        "never puts a secret in a unit or a task: the writers refuse a credential-shaped argument, environment name or value; the token stays in the protected token file (0600, or on Windows an ACL of the user, SYSTEM and Administrators only)",
+        "stops the operator's way: systemd_uninstall / systemdUninstall (disable --now, then remove) and task_uninstall / taskUninstall (/End, then /Delete), plus remove_descriptor",
+        "checks one copy with check_service.py: the instance lock is held (a Node service holds an abstract socket on Linux or a named pipe on Windows, and the probe sees it)"
+      ]
     }
   ]
 }

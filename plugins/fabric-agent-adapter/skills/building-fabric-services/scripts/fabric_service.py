@@ -18,13 +18,16 @@ import hashlib
 import hmac
 import http.server
 import json
+import ntpath
 import os
 from pathlib import Path
 import plistlib
+import posixpath
 import re
 import secrets
 import shutil
 import signal
+import socket
 import socketserver
 import stat
 import subprocess
@@ -217,6 +220,7 @@ class InstanceLock:
     def __init__(self, data_dir: Path):
         self.path = Path(data_dir) / "service.lock"
         self._fd: Optional[int] = None
+        self._name: Any = None
 
     #: Windows locks a byte range, not the file: one byte far past the pid the file holds, so the
     #: holder may rewrite the pid and another process may still read it (locking past the end of
@@ -242,6 +246,11 @@ class InstanceLock:
             if exc.errno in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES, getattr(errno, "EDEADLOCK", -1)):
                 raise AlreadyRunning(_read_pid(self.path), self.path) from None
             raise
+        try:
+            self._name = _hold_lock_name(self.path)
+        except AlreadyRunning:
+            os.close(fd)
+            raise
         os.ftruncate(fd, 0)
         os.write(fd, str(os.getpid()).encode())
         os.fsync(fd)
@@ -252,6 +261,67 @@ class InstanceLock:
         if self._fd is not None:
             os.close(self._fd)
             self._fd = None
+        if self._name is not None:
+            _drop_lock_name(self._name)
+            self._name = None
+
+
+# The Node kit cannot flock on Linux or lock a byte range on Windows, so it holds a name instead: an
+# abstract unix socket on Linux, a named pipe on Windows — exclusive, no file, gone with the process.
+# This kit holds the same name beside its file lock, so the two kits exclude each other everywhere
+# and the probe sees either one (`lock_name_held`).
+
+def lock_name(lock_path: Path, platform: str = sys.platform) -> Optional[str]:
+    """The name the Node kit holds for this lock file; None where it holds none (macOS: O_EXLOCK)."""
+    if platform.startswith("linux"):
+        digest = hashlib.sha256(posixpath.abspath(str(lock_path)).encode()).hexdigest()[:32]
+        return "\0fabric-service-" + digest
+    if platform == "win32":
+        # Windows paths compare without case: C:\Users and c:\users are one lock.
+        digest = hashlib.sha256(ntpath.normcase(ntpath.abspath(str(lock_path))).encode()).hexdigest()[:32]
+        return "\\\\.\\pipe\\fabric-service-" + digest
+    return None
+
+
+def _hold_lock_name(lock_path: Path) -> Any:
+    name = lock_name(lock_path)
+    if name is None:
+        return None
+    if WINDOWS:
+        handle = _create_first_pipe(name)
+        if handle is None:
+            raise AlreadyRunning(_read_pid(lock_path), lock_path)
+        return handle
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.bind(name)
+    except OSError as exc:
+        sock.close()
+        if exc.errno == errno.EADDRINUSE:
+            raise AlreadyRunning(_read_pid(lock_path), lock_path) from None
+        raise
+    # Held by its descriptor, like the file lock: a socket object would close when collected.
+    return sock.detach()
+
+
+def _drop_lock_name(held: Any) -> None:
+    if WINDOWS:
+        _close_handle(held)
+    else:
+        os.close(held)
+
+
+def lock_name_held(lock_path: Path) -> Optional[bool]:
+    """True when some process holds the lock's name (a running service of either kit); None where
+    there is no name to hold."""
+    if lock_name(lock_path) is None:
+        return None
+    try:
+        held = _hold_lock_name(lock_path)
+    except AlreadyRunning:
+        return True
+    _drop_lock_name(held)
+    return False
 
 
 def _read_pid(path: Path) -> Optional[int]:
@@ -260,6 +330,15 @@ def _read_pid(path: Path) -> Optional[int]:
         return int(text) if re.fullmatch(r"[0-9]{1,10}", text, re.ASCII) else None
     except OSError:
         return None
+
+
+SUPERVISORS = ("launchd", "systemd", "task-scheduler")
+
+
+def supervised() -> bool:
+    """True when a supervisor that restarts on exit started this process and said so in
+    ``FABRIC_SERVICE_SUPERVISOR`` (``launchd_plist`` and ``systemd_unit`` set it)."""
+    return os.environ.get(SUPERVISOR_ENV) in SUPERVISORS
 
 
 def supervised_by_launchd() -> bool:
@@ -281,7 +360,7 @@ def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *
     leaves, and exits 75 only when the wait runs out. Nothing has been touched while it waits.
     ``wait_seconds`` overrides the choice (0 = never wait)."""
     if wait_seconds is None:
-        wait_seconds = LOCK_WAIT_SUPERVISED_SECONDS if supervised_by_launchd() else 0.0
+        wait_seconds = LOCK_WAIT_SUPERVISED_SECONDS if supervised() else 0.0
     deadline = clock() + max(0.0, wait_seconds)
     delay = LOCK_BACKOFF_FIRST_SECONDS
     announced = False
@@ -440,6 +519,24 @@ if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
         finally:
             _kernel32.LocalFree(sd)
 
+    _kernel32.CreateNamedPipeW.argtypes = [wintypes.LPCWSTR] + [wintypes.DWORD] * 6 + [_PVOID]
+    _kernel32.CreateNamedPipeW.restype = wintypes.HANDLE
+    _INVALID_HANDLE = wintypes.HANDLE(-1).value
+
+    def _create_first_pipe(name: str) -> Any:
+        """The pipe's first instance, or None when another process holds it (ERROR_ACCESS_DENIED)."""
+        # PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE; PIPE_REJECT_REMOTE_CLIENTS; one instance.
+        handle = _kernel32.CreateNamedPipeW(name, 0x1 | 0x00080000, 0x8, 1, 0, 0, 0, None)
+        if handle == _INVALID_HANDLE:
+            code = ctypes.get_last_error()
+            if code == 5:
+                return None
+            raise _win_error("CreateNamedPipeW", code)
+        return handle
+
+    def _close_handle(handle: Any) -> None:
+        _kernel32.CloseHandle(handle)
+
     def _win_token_problem(path: Path, info: os.stat_result) -> Optional[str]:
         if getattr(info, "st_file_attributes", 0) & _REPARSE_POINT or not stat.S_ISREG(info.st_mode):
             return "Token file %s is not a regular file (a link or junction); refusing it." % path
@@ -450,6 +547,12 @@ if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
         owner, granting = windows_acl(path)
         return token_acl_problem(path, owner, granting, windows_user_sid())
 else:
+    def _create_first_pipe(name: str) -> Any:  # noqa: ARG001
+        raise ServiceError("named pipes exist only on Windows")
+
+    def _close_handle(handle: Any) -> None:  # noqa: ARG001
+        raise ServiceError("handles exist only on Windows")
+
     def _win_protect(path: Path, folder: bool) -> None:  # noqa: ARG001 - POSIX uses modes
         raise ServiceError("Windows ACLs exist only on Windows")
 
@@ -1515,6 +1618,159 @@ def cookie_value(cookie_header: Optional[str], name: str = SESSION_COOKIE) -> Op
 
 
 # --- launchd -----------------------------------------------------------------
+
+# --- systemd and Task Scheduler (DEC-0032, service.md "Supervisor") ------------------
+
+def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dict[str, str]]) -> None:
+    """No supervisor file carries a secret (service.md): not in an argument, an environment name or its value."""
+    import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
+    for arg in argv:
+        if fabric_secrets.secret_argument(arg):
+            raise ServiceError("an argument carries a credential; a supervisor file never does (read it from the token file or a secret reference)")
+    for name, value in (environment or {}).items():
+        if fabric_secrets.credential_name(name) or fabric_secrets.secret_value(str(value)):
+            raise ServiceError("environment %s looks like a credential; a supervisor file never carries one" % name)
+
+
+def _plain(value: str, what: str) -> str:
+    """A supervisor file is line- and XML-structured: no control character in anything written into it."""
+    if re.search(r"[\x00-\x1f\x7f]", value):
+        raise ServiceError("%s holds a control character (a line break, a tab, a NUL); a supervisor file cannot carry it" % what)
+    return value
+
+
+def _systemd_quote(value: str) -> str:
+    _plain(value, "an argument")
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+    return '"%s"' % escaped
+
+
+def systemd_unit(unit: str, program_arguments: Sequence[str], *, working_directory: Path,
+                 environment: Optional[Dict[str, str]] = None, description: Optional[str] = None,
+                 stop_timeout: int = DEFAULT_EXIT_TIMEOUT) -> str:
+    """A systemd user unit (DEC-0032): Restart=always, RestartSec=10, TimeoutStopSec above the drain time,
+    WantedBy=default.target. The service is told who supervises it (FABRIC_SERVICE_SUPERVISOR=systemd)."""
+    if not _UNIT.match(unit):
+        raise ServiceError("unit must match %s" % _UNIT.pattern)
+    argv = [str(a) for a in program_arguments]
+    if not argv or not argv[0].startswith("/"):
+        raise ServiceError("a systemd unit starts an absolute executable")
+    if stop_timeout <= DRAIN_SECONDS:
+        raise ServiceError("TimeoutStopSec must outlast the %d s drain" % DRAIN_SECONDS)
+    env = dict(environment or {})
+    _no_secret_in_supervisor_file(argv, env)
+    env.setdefault(SUPERVISOR_ENV, "systemd")
+    lines = ["[Unit]", "Description=%s" % _plain(description or unit, "the description"), "",
+             "[Service]", "Type=simple", "ExecStart=%s" % " ".join(_systemd_quote(a) for a in argv),
+             "WorkingDirectory=%s" % _systemd_quote(str(working_directory))]
+    for name in env:
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+            raise ServiceError("environment name %r is not a variable name" % name)
+    lines += ["Environment=%s" % _systemd_quote("%s=%s" % (k, v)) for k, v in sorted(env.items())]
+    lines += ["Restart=always", "RestartSec=10", "TimeoutStopSec=%d" % stop_timeout, "KillMode=mixed", "",
+              "[Install]", "WantedBy=default.target", ""]
+    return "\n".join(lines)
+
+
+def _systemd_dir() -> Path:
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
+
+
+def _check(result: Any, what: str) -> None:
+    if getattr(result, "returncode", 1) != 0:
+        raise ServiceError("%s failed: %s" % (what, (getattr(result, "stderr", "") or getattr(result, "stdout", "") or "").strip()[:200]))
+
+
+def systemd_install(unit: str, text: str, *, unit_dir: Optional[Path] = None, run: Callable[..., Any] = subprocess.run,
+                    system: str = sys.platform) -> Path:
+    """Write the user unit and start it so that it comes back after a login: `systemctl --user enable --now`."""
+    if not system.startswith("linux"):
+        raise ServiceError("systemd is the supervisor on Linux only")
+    if not _UNIT.match(unit):
+        raise ServiceError("unit must match %s" % _UNIT.pattern)
+    folder = unit_dir or _systemd_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / unit
+    atomic_write(path, text.encode("utf-8"), 0o644)
+    _check(run(["systemctl", "--user", "daemon-reload"], capture_output=True, text=True), "systemctl --user daemon-reload")
+    _check(run(["systemctl", "--user", "enable", "--now", unit], capture_output=True, text=True), "systemctl --user enable --now")
+    return path
+
+
+def systemd_uninstall(unit: str, *, unit_dir: Optional[Path] = None, run: Callable[..., Any] = subprocess.run,
+                      system: str = sys.platform) -> None:
+    """Stop it and keep it off across logins (`disable --now`), then remove the unit."""
+    if not system.startswith("linux"):
+        raise ServiceError("systemd is the supervisor on Linux only")
+    run(["systemctl", "--user", "disable", "--now", unit], capture_output=True, text=True)
+    path = (unit_dir or _systemd_dir()) / unit
+    if path.exists():
+        path.unlink()
+    _check(run(["systemctl", "--user", "daemon-reload"], capture_output=True, text=True), "systemctl --user daemon-reload")
+
+
+def _xml(text: str) -> str:
+    return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def task_xml(task: str, program_arguments: Sequence[str], *, working_directory: str, description: Optional[str] = None,
+             user: Optional[str] = None) -> str:
+    """A per-user Scheduled Task (DEC-0032): a logon trigger, restart on failure every minute, no execution time limit,
+    run only when the user is logged on, created without administrator rights."""
+    if not _TASK.match(task):
+        raise ServiceError("task must match %s" % _TASK.pattern)
+    argv = [str(a) for a in program_arguments]
+    if not argv or not re.match(r"^[A-Za-z]:[\\/]", argv[0]):
+        raise ServiceError("a task starts a drive-absolute executable (C:\\…)")
+    for value, what in [(a, "an argument") for a in argv] + [(str(working_directory), "the working directory"),
+                                                           (description or task, "the description")]:
+        _plain(value, what)
+    _no_secret_in_supervisor_file(argv, None)
+    who = user or ("%s\\%s" % (os.environ.get("USERDOMAIN", ""), os.environ["USERNAME"]) if os.environ.get("USERNAME") else "")
+    if not who:
+        raise ServiceError("name the user the task runs as (DOMAIN\\user); USERNAME is not set")
+    _plain(who, "the user")
+    body = """<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>{desc}</Description><URI>{task}</URI></RegistrationInfo>
+  <Triggers><LogonTrigger><Enabled>true</Enabled><UserId>{user}</UserId></LogonTrigger></Triggers>
+  <Principals><Principal id="Author"><UserId>{user}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions Context="Author"><Exec><Command>{command}</Command><Arguments>{arguments}</Arguments><WorkingDirectory>{cwd}</WorkingDirectory></Exec></Actions>
+</Task>
+""".format(desc=_xml(description or task), task=_xml(task), user=_xml(who), command=_xml(argv[0]),
+           arguments=_xml(subprocess.list2cmdline(argv[1:])), cwd=_xml(str(working_directory)))
+    return '<?xml version="1.0" encoding="UTF-16"?>\n' + body
+
+
+def task_install(task: str, xml_text: str, *, run: Callable[..., Any] = subprocess.run, system: str = sys.platform) -> None:
+    """Create (or replace) the task from its XML without administrator rights, then run it."""
+    if system != "win32":
+        raise ServiceError("Task Scheduler is the supervisor on Windows only")
+    fd, name = tempfile.mkstemp(suffix=".xml")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(xml_text.encode("utf-16"))
+        _check(run(["schtasks", "/Create", "/TN", task, "/XML", name, "/F"], capture_output=True, text=True), "schtasks /Create")
+    finally:
+        os.unlink(name)
+    _check(run(["schtasks", "/Run", "/TN", task], capture_output=True, text=True), "schtasks /Run")
+
+
+def task_uninstall(task: str, *, run: Callable[..., Any] = subprocess.run, system: str = sys.platform) -> None:
+    """End the running task, then delete it."""
+    if system != "win32":
+        raise ServiceError("Task Scheduler is the supervisor on Windows only")
+    run(["schtasks", "/End", "/TN", task], capture_output=True, text=True)
+    _check(run(["schtasks", "/Delete", "/TN", task, "/F"], capture_output=True, text=True), "schtasks /Delete")
+
 
 def launchd_plist(label: str, program_arguments: Sequence[str], *, working_directory: Path,
                   stdout_path: Path, environment: Optional[Dict[str, str]] = None,

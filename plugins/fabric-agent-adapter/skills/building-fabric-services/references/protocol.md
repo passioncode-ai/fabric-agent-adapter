@@ -31,7 +31,7 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `name`, `summary` | ≤ 80 and ≤ 200 characters |
 | `origin` | `http://127.0.0.1:<port>`; the port is a machine-wide claim |
 | `auth` | `tokenFile` (0600; on Windows a protected ACL — owner and every granting entry the current user, SYSTEM or Administrators: service.md *Windows token files*, DEC-0032, DEC-0033); `header` default `Authorization` with `scheme` `Bearer`; any other header carries the raw token with `scheme: "none"` |
-| `lifecycle` | `manager` `launchd` (then `label` and `plist`), `systemd` (then `unit`, a `systemctl --user` unit), `task-scheduler` (then `task`, a per-user Scheduled Task) or `none`; `unit` and `task` are refused beside any other manager (DEC-0032). The Python kit and the probe accept all four; the Node kit still accepts only `launchd` and `none` (FAA-16) |
+| `lifecycle` | `manager` `launchd` (then `label` and `plist`), `systemd` (then `unit`, a `systemctl --user` unit), `task-scheduler` (then `task`, a per-user Scheduled Task) or `none`; `unit` and `task` are refused beside any other manager (DEC-0032). Both kits and the probe accept all four; both kits write the unit and the task (`systemd_unit`, `task_xml` / `systemdUnit`, `taskXml`) |
 | `paths` | `data` (required), `logs[]`, optional `config`, `cache` |
 | `commands` | only `doctor` and `update`, argument arrays whose first item is an absolute or `~/` path (Windows: also `C:\…`, `C:/…` or `~\…`, never a network share — DEC-0032) |
 | `source.repository`, `fabricManifest` | optional |

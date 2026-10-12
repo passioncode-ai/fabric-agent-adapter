@@ -7,8 +7,10 @@ written and read back, and the refusals the rule names.
 """
 import copy
 import importlib.util
+import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -142,6 +144,51 @@ class WindowsTokenRule(unittest.TestCase):
     def test_any_other_grant_is_refused_by_sid(self):
         for sid in ("S-1-1-0", "S-1-5-11", "S-1-5-32-545", "S-1-3-0", "S-1-5-21-9-9-9-1002"):
             self.assertIn(sid, self.problem(self.USER, [self.USER, sid]))
+
+
+class LockName(unittest.TestCase):
+    """The Node kit holds a name, not a file lock, on Linux and Windows; this kit holds the same name
+    beside its file lock, and the probe looks for it (FAA-21)."""
+
+    def test_the_name_per_system(self):
+        self.assertRegex(fs.lock_name("/home/example/.local/share/example-agent/service.lock", "linux"), r"^\0fabric-service-[0-9a-f]{32}$")
+        self.assertRegex(fs.lock_name("C:\\Users\\Example\\x\\service.lock", "win32"), r"^\\\\\.\\pipe\\fabric-service-[0-9a-f]{32}$")
+        self.assertEqual(fs.lock_name("C:\\Users\\Example\\x\\service.lock", "win32"), fs.lock_name("c:/users/example/x/service.lock", "win32"))
+        self.assertIsNone(fs.lock_name("/Users/example/service.lock", "darwin"))
+
+    @unittest.skipUnless(sys.platform.startswith("linux") or os.name == "nt", "needs Linux or Windows")
+    def test_a_held_lock_holds_its_name_until_released(self):
+        with tempfile.TemporaryDirectory() as temp:
+            lock = fs.InstanceLock(Path(temp)).acquire()
+            self.assertTrue(fs.lock_name_held(lock.path))
+            lock.release()
+            self.assertFalse(fs.lock_name_held(lock.path))
+
+    @unittest.skipUnless((sys.platform.startswith("linux") or os.name == "nt") and shutil.which("node"), "needs Linux or Windows, and node")
+    def test_the_probe_sees_a_node_service_hold_the_lock(self):
+        check = load("check_service")
+        with tempfile.TemporaryDirectory() as temp:
+            data = Path(temp)
+            holder = subprocess.Popen(["node", "--input-type=module", "-e", textwrap.dedent(f"""
+                const k = await import({json.dumps((SCRIPTS / "fabric-service.mjs").as_uri())});
+                await new k.InstanceLock({json.dumps(str(data))}).acquire();
+                console.log("held");
+                setInterval(() => {{}}, 1000);
+                """)], stdout=subprocess.PIPE, text=True)
+            try:
+                self.assertEqual(holder.stdout.readline().strip(), "held")
+                probe = check.Probe.__new__(check.Probe)
+                probe.results = []
+                probe.lock_rule(data)
+                self.assertEqual(probe.results[-1]["verdict"], "PASS", probe.results)
+                self.assertIn("the lock's name", probe.results[-1]["evidence"])
+            finally:
+                holder.kill()
+                holder.wait()
+                holder.stdout.close()
+            probe.results = []
+            probe.lock_rule(data)
+            self.assertEqual(probe.results[-1]["verdict"], "FAIL", probe.results)
 
 
 @unittest.skipUnless(os.name == "nt", "needs Windows")

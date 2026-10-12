@@ -44,7 +44,8 @@ test('a port is a claim', () => {
   k.writeDescriptor(descriptor(47191, 'maker', 'preview'), dir);
   assert.throws(() => k.writeDescriptor(descriptor(47191, 'writer'), dir), /47191.*maker\.preview/);
   const file = k.writeDescriptor(descriptor(47195), dir);
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  // On Windows the privacy is the file's ACL, not a mode (fabric-service-platforms.test.mjs checks it).
+  if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
 test('invalid descriptors are refused', () => {
@@ -58,8 +59,10 @@ test('token file must be private and tokens compare by scheme', () => {
   const file = path.join(temp(), 'service.token');
   const token = k.ensureToken(file);
   assert.equal(k.readToken(file), token);
-  fs.chmodSync(file, 0o644);
-  assert.throws(() => k.readToken(file), /readable by others/);
+  if (process.platform !== 'win32') { // Windows: a grant to everyone, refused by SID, in fabric-service-platforms.test.mjs
+    fs.chmodSync(file, 0o644);
+    assert.throws(() => k.readToken(file), /readable by others/);
+  }
   assert.ok(k.tokenMatches(`Bearer ${token}`, token));
   assert.ok(!k.tokenMatches(token, token));
   assert.ok(k.tokenMatches(token, token, 'none'));
@@ -212,7 +215,7 @@ test('usage receipt refuses what the report cannot carry; the ledger is private,
   const dir = temp();
   const ledger = new k.JsonlUsageLedger(path.join(dir, 'usage', 'usage.jsonl'));
   for (const r of usageCase.receipts) ledger.record(r);
-  assert.equal(fs.statSync(ledger.file).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(ledger.file).mode & 0o777, 0o600);
   fs.appendFileSync(ledger.file, '{"torn":');
   ledger.record(usageCase.receipts[3]);
   assert.equal(ledger.receipts().length, 6, 'a receipt written after a torn line is not glued to it');

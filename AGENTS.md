@@ -116,12 +116,13 @@ job, no port, no per-session server, no login item. Nothing idles; there is noth
 |---|---|---|---|---|---|
 | `install.sh`, `npx @passioncode-ai/fabric-agent-adapter` | a person | on demand | nothing | exits when done | 0 |
 | `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or resume | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
-| Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`) | resident | the service | `launchctl bootout` + `disable`, or `launchd_uninstall` | declared by each service in its own `AGENTS.md` |
+| Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`), a systemd user unit (`Restart=always`) or a per-user Scheduled Task (logon trigger) | resident | the service | `launchctl bootout` + `disable` or `launchd_uninstall`; `systemctl --user disable --now` or `systemd_uninstall`; `schtasks /End` + `/Change /DISABLE` or `task_uninstall` | declared by each service in its own `AGENTS.md` |
 | Test suites (`npm test`) | a person or CI | on demand | nothing | exit; the lifecycle tests kill their own children in `finally` | 0 |
 
 The kit's services own their labels and ports; this repository owns none. Tests never touch the
 operator's launchd jobs: `test/test_fabric_service_lifecycle.py` puts a fake `launchctl` first on
-`PATH` and uses throwaway labels (`ai.passioncode.test.lifecycle-<hex>`) (LC-14).
+`PATH` and uses throwaway labels (`ai.passioncode.test.lifecycle-<hex>`) (LC-14); the systemd and Task Scheduler
+installers run against a recorder in place of `systemctl` and `schtasks` (`test/*supervisors*`).
 
 **Build retention (LC-15).** There is no build step and no release artefact on the machine: npm
 and GitHub releases are built by `.github/workflows/release.yml` in CI. Output directories: none.

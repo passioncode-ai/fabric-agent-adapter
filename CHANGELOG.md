@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.18.0 - 2026-10-12
+
+Services on Linux and Windows in both kits (contract DEC-0032, DEC-0033; FAA-21): the supervisor files the
+contract names, and the Node kit on Windows.
+
+### Added
+
+- **The supervisor writers, in both kits.** They write byte-identical files, and a test holds them to that.
+  - **Linux — a systemd user unit.** `systemd_unit` / `systemdUnit` writes `Restart=always`, `RestartSec=10`,
+    `TimeoutStopSec` above the drain, `WantedBy=default.target` and `FABRIC_SERVICE_SUPERVISOR=systemd`.
+    `systemd_install` / `systemdInstall` runs `daemon-reload` and `enable --now`. `systemd_uninstall` /
+    `systemdUninstall` runs `disable --now`, removes the unit, then runs `daemon-reload`.
+  - **Windows — a per-user Scheduled Task.** `task_xml` / `taskXml` writes a logon trigger, least privilege,
+    restart every minute on failure, no time limit and `IgnoreNew`. `task_install` / `taskInstall` runs
+    `schtasks /Create` from a UTF-16 file it then removes, then `/Run`. `task_uninstall` / `taskUninstall` runs
+    `/End`, then `/Delete`.
+  - **No secret in a supervisor file.** The writers refuse a credential-shaped argument, environment name or
+    value, and any control character.
+- **The Node kit on Windows and Linux:**
+  - `servicesDir` and `serviceDirs` use `%LOCALAPPDATA%`.
+  - `expand` and `validateDescriptor` match the Python kit: all four managers, `unit` and `task` paired with
+    their manager, Windows paths, never a network share.
+  - The token file gets a protected ACL: written with `icacls`, read with Windows PowerShell 5.1. A refusal
+    names the SID.
+  - The instance lock is a named pipe on Windows (an abstract socket on Linux, as before).
+- **One copy across the kits.** The Python kit holds the Node kit's lock name (`lock_name` / `lockName`)
+  beside its file lock, so the two kits exclude each other on every system. `check_service.py` now reports the
+  lock as held when a Node service holds it. Before this release it failed every Node service on Linux.
+- **A copy under systemd backs off on a held lock** as one under launchd does (`supervised()`).
+- **The Windows CI job** runs the Node kit's platform, supervisor and service tests and the Python supervisor
+  tests.
+- **Docs:**
+  - `references/lifecycle.md`, *Linux and Windows*: the verbs per system and the Windows directories.
+  - `SKILL.md` step 4.
+  - `protocol.md`.
+
+  The scenario eval `linux-and-windows-supervision` and two triggers came first.
+- **Mutation testing:** 14 planted defects in the Python writers, 23 in the Node port and 7 in the lock name
+  and probe were all caught.
+
 ## 0.17.0 - 2026-10-12
 
 The organisation's lifecycle rules LC-19 and LC-21 apply to what the adapter ships and checks (FAA-22, FAA-23):
