@@ -188,15 +188,15 @@ def atomic_write(path: Path, data: bytes, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix="." + path.name + ".", dir=str(path.parent))
     try:
+        if WINDOWS:
+            # The file's ACL is its privacy (DEC-0032): set explicitly and protected — before the bytes go in — so
+            # it does not depend on what the folder hands down. A rename keeps it.
+            _win_protect(Path(tmp), folder=False)
         with os.fdopen(fd, "wb") as handle:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
-        if WINDOWS:
-            # The file's ACL is its privacy (DEC-0032): set explicitly and protected, so it does
-            # not depend on what the folder hands down. A rename keeps it.
-            _win_protect(Path(tmp), folder=False)
-        else:
+        if not WINDOWS:
             os.chmod(tmp, mode)
         os.replace(tmp, path)
     except BaseException:
@@ -248,7 +248,7 @@ class InstanceLock:
             raise
         try:
             self._name = _hold_lock_name(self.path)
-        except AlreadyRunning:
+        except BaseException:
             os.close(fd)
             raise
         os.ftruncate(fd, 0)
@@ -312,16 +312,19 @@ def _drop_lock_name(held: Any) -> None:
 
 
 def lock_name_held(lock_path: Path) -> Optional[bool]:
-    """True when some process holds the lock's name (a running service of either kit); None where
-    there is no name to hold."""
-    if lock_name(lock_path) is None:
+    """True when some process holds the lock's name (a running service of either kit); None where there is no name
+    to hold. It only looks — /proc/net/unix on Linux, WaitNamedPipeW on Windows — and never takes the name, so a
+    probe cannot make a service that is starting at that moment fail."""
+    name = lock_name(lock_path)
+    if name is None:
         return None
+    if WINDOWS:
+        return _pipe_exists(name)
     try:
-        held = _hold_lock_name(lock_path)
-    except AlreadyRunning:
-        return True
-    _drop_lock_name(held)
-    return False
+        with open("/proc/net/unix", encoding="utf-8", errors="replace") as table:
+            return any(line.rstrip("\n").endswith(" @" + name[1:]) for line in table)
+    except OSError:
+        return None
 
 
 def _read_pid(path: Path) -> Optional[int]:
@@ -525,17 +528,28 @@ if WINDOWS:  # pragma: no cover - exercised by the Windows CI job
 
     def _create_first_pipe(name: str) -> Any:
         """The pipe's first instance, or None when another process holds it (ERROR_ACCESS_DENIED)."""
-        # PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE; PIPE_REJECT_REMOTE_CLIENTS; one instance.
-        handle = _kernel32.CreateNamedPipeW(name, 0x1 | 0x00080000, 0x8, 1, 0, 0, 0, None)
+        # PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE; PIPE_REJECT_REMOTE_CLIENTS; unlimited instances,
+        # as libuv creates them: then a second first-instance attempt, ours or the Node kit's, is refused with
+        # ERROR_ACCESS_DENIED (Node: EADDRINUSE), never ERROR_PIPE_BUSY.
+        handle = _kernel32.CreateNamedPipeW(name, 0x1 | 0x00080000, 0x8, 255, 0, 0, 0, None)
         if handle == _INVALID_HANDLE:
             code = ctypes.get_last_error()
-            if code == 5:
+            if code in (5, 231):  # ERROR_ACCESS_DENIED, ERROR_PIPE_BUSY: another process holds it
                 return None
             raise _win_error("CreateNamedPipeW", code)
         return handle
 
     def _close_handle(handle: Any) -> None:
         _kernel32.CloseHandle(handle)
+
+    _kernel32.WaitNamedPipeW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD]
+    _kernel32.WaitNamedPipeW.restype = wintypes.BOOL
+
+    def _pipe_exists(name: str) -> bool:
+        """Some process holds the pipe: waiting for it does not fail with ERROR_FILE_NOT_FOUND. Nothing connects."""
+        if _kernel32.WaitNamedPipeW(name, 1):
+            return True
+        return ctypes.get_last_error() != 2
 
     def _win_token_problem(path: Path, info: os.stat_result) -> Optional[str]:
         if getattr(info, "st_file_attributes", 0) & _REPARSE_POINT or not stat.S_ISREG(info.st_mode):
@@ -552,6 +566,9 @@ else:
 
     def _close_handle(handle: Any) -> None:  # noqa: ARG001
         raise ServiceError("handles exist only on Windows")
+
+    def _pipe_exists(name: str) -> bool:  # noqa: ARG001
+        raise ServiceError("named pipes exist only on Windows")
 
     def _win_protect(path: Path, folder: bool) -> None:  # noqa: ARG001 - POSIX uses modes
         raise ServiceError("Windows ACLs exist only on Windows")
@@ -1660,9 +1677,13 @@ def systemd_unit(unit: str, program_arguments: Sequence[str], *, working_directo
     env = dict(environment or {})
     _no_secret_in_supervisor_file(argv, env)
     env.setdefault(SUPERVISOR_ENV, "systemd")
-    lines = ["[Unit]", "Description=%s" % _plain(description or unit, "the description"), "",
+    cwd = _plain(str(working_directory), "the working directory")
+    if not cwd.startswith("/"):
+        raise ServiceError("a systemd unit's working directory is absolute")
+    lines = ["[Unit]", "Description=%s" % _plain(description or unit, "the description").replace("%", "%%"), "",
              "[Service]", "Type=simple", "ExecStart=%s" % " ".join(_systemd_quote(a) for a in argv),
-             "WorkingDirectory=%s" % _systemd_quote(str(working_directory))]
+             # Not quoted: systemd reads WorkingDirectory= as the rest of the line, quotes included.
+             "WorkingDirectory=%s" % cwd.replace("%", "%%")]
     for name in env:
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
             raise ServiceError("environment name %r is not a variable name" % name)
@@ -1682,8 +1703,11 @@ def _check(result: Any, what: str) -> None:
 
 
 def systemd_install(unit: str, text: str, *, unit_dir: Optional[Path] = None, run: Callable[..., Any] = subprocess.run,
-                    system: str = sys.platform) -> Path:
-    """Write the user unit and start it so that it comes back after a login: `systemctl --user enable --now`."""
+                    system: str = sys.platform, force_enable: bool = False) -> Path:
+    """Write the user unit, enable it so it comes back after a login, and (re)start it so the new unit is what runs.
+
+    The operator's intent wins (LC-14): a unit already installed and disabled stays off — the file is rewritten, so
+    the new version is what starts once they enable it — unless ``force_enable`` (the operator asked for it on)."""
     if not system.startswith("linux"):
         raise ServiceError("systemd is the supervisor on Linux only")
     if not _UNIT.match(unit):
@@ -1691,9 +1715,15 @@ def systemd_install(unit: str, text: str, *, unit_dir: Optional[Path] = None, ru
     folder = unit_dir or _systemd_dir()
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / unit
+    first = not path.exists()
+    state = "" if first else (getattr(run(["systemctl", "--user", "is-enabled", unit], capture_output=True, text=True),
+                                      "stdout", "") or "").strip()
     atomic_write(path, text.encode("utf-8"), 0o644)
     _check(run(["systemctl", "--user", "daemon-reload"], capture_output=True, text=True), "systemctl --user daemon-reload")
-    _check(run(["systemctl", "--user", "enable", "--now", unit], capture_output=True, text=True), "systemctl --user enable --now")
+    if state == "disabled" and not force_enable:
+        return path
+    _check(run(["systemctl", "--user", "enable", unit], capture_output=True, text=True), "systemctl --user enable")
+    _check(run(["systemctl", "--user", "restart", unit], capture_output=True, text=True), "systemctl --user restart")
     return path
 
 
@@ -1739,9 +1769,9 @@ def task_xml(task: str, program_arguments: Sequence[str], *, working_directory: 
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <StartWhenAvailable>true</StartWhenAvailable>
+    <Enabled>true</Enabled>
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
     <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
-    <Enabled>true</Enabled>
   </Settings>
   <Actions Context="Author"><Exec><Command>{command}</Command><Arguments>{arguments}</Arguments><WorkingDirectory>{cwd}</WorkingDirectory></Exec></Actions>
 </Task>
@@ -1750,10 +1780,18 @@ def task_xml(task: str, program_arguments: Sequence[str], *, working_directory: 
     return '<?xml version="1.0" encoding="UTF-16"?>\n' + body
 
 
-def task_install(task: str, xml_text: str, *, run: Callable[..., Any] = subprocess.run, system: str = sys.platform) -> None:
-    """Create (or replace) the task from its XML without administrator rights, then run it."""
+_TASK_DISABLED = re.compile(r"<Settings>(?:(?!</Settings>).)*<Enabled>false</Enabled>", re.S)
+
+
+def task_install(task: str, xml_text: str, *, run: Callable[..., Any] = subprocess.run, system: str = sys.platform,
+                 force_enable: bool = False) -> None:
+    """Create (or replace) the task from its XML without administrator rights, then (re)start it so the new
+    definition is what runs. A task already installed and disabled stays off (LC-14) unless ``force_enable``."""
     if system != "win32":
         raise ServiceError("Task Scheduler is the supervisor on Windows only")
+    query = run(["schtasks", "/Query", "/TN", task, "/XML"], capture_output=True, text=True)
+    existed = getattr(query, "returncode", 1) == 0
+    keep_off = existed and not force_enable and bool(_TASK_DISABLED.search(getattr(query, "stdout", "") or ""))
     fd, name = tempfile.mkstemp(suffix=".xml")
     try:
         with os.fdopen(fd, "wb") as handle:
@@ -1761,6 +1799,11 @@ def task_install(task: str, xml_text: str, *, run: Callable[..., Any] = subproce
         _check(run(["schtasks", "/Create", "/TN", task, "/XML", name, "/F"], capture_output=True, text=True), "schtasks /Create")
     finally:
         os.unlink(name)
+    if keep_off:
+        _check(run(["schtasks", "/Change", "/TN", task, "/DISABLE"], capture_output=True, text=True), "schtasks /Change /DISABLE")
+        return
+    if existed:
+        run(["schtasks", "/End", "/TN", task], capture_output=True, text=True)
     _check(run(["schtasks", "/Run", "/TN", task], capture_output=True, text=True), "schtasks /Run")
 
 

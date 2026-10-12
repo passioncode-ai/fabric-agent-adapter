@@ -59,6 +59,13 @@ test('a network share is never a local path', () => {
   assert.throws(() => k.expand('\\\\server\\share\\x'), k.ServiceError);
 });
 
+test('on Windows an absolute path names its drive, as in the Python kit', () => {
+  assert.equal(k.expand('C:\\Users\\x\\data', 'win32'), 'C:\\Users\\x\\data');
+  assert.throws(() => k.expand('/x/data', 'win32'), k.ServiceError); // relative to the current drive
+  assert.equal(k.expand('/x/data', 'linux'), '/x/data');
+  assert.throws(() => k.expand('C:\\x', 'linux'), k.ServiceError);
+});
+
 test('a remote service carries no supervisor', () => {
   const doc = { ...structuredClone(TASK), placement: 'remote', origin: 'https://agent.example.com', lifecycle: { manager: 'none', task: '\\PassionCode\\x' } };
   delete doc.commands;
@@ -180,4 +187,14 @@ test('Windows: a token shared with everyone is refused by SID', { skip: onWindow
   k.ensureToken(file);
   assert.equal(spawnSync('icacls.exe', [file, '/grant', '*S-1-1-0:(R)']).status, 0);
   assert.throws(() => k.readToken(file), /S-1-1-0/);
+});
+
+test('Windows: protecting a file drops an explicit grant it already carried', { skip: onWindows }, () => {
+  const file = path.join(temp(), 'carried.token');
+  fs.writeFileSync(file, 'x'.repeat(32));
+  assert.equal(spawnSync('icacls.exe', [file, '/grant', '*S-1-1-0:(R)']).status, 0);
+  assert.ok(k.windowsAcl(file).granting.includes('S-1-1-0'));
+  k.windowsProtect(file, { folder: false });
+  const { granting, user } = k.windowsAcl(file);
+  assert.deepEqual(granting.filter((sid) => sid !== user && !k.WINDOWS_TRUSTED.includes(sid)), []);
 });

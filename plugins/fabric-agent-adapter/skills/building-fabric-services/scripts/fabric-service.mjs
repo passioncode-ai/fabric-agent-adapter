@@ -72,10 +72,12 @@ export const nowIso = () => new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 /** Paths in a descriptor may start with ~/ (or ~\\ on Windows); everything else must be absolute,
  * and a network share is never a local path (DEC-0032). */
-export function expand(p) {
+export function expand(p, platform = process.platform) {
   if (!LOCAL_PATH.test(String(p))) throw new ServiceError(`Path ${p} must be absolute or start with ~/.`);
   const out = /^~[\\/]/.test(p) ? path.join(os.homedir(), p.slice(2)) : p;
-  if (!path.isAbsolute(out)) throw new ServiceError(`Path ${p} must be absolute or start with ~/.`);
+  // On Windows an absolute path names its drive: `/x` is relative to the current drive (the Python kit refuses it too).
+  const absolute = platform === 'win32' ? /^[A-Za-z]:[\\/]/.test(out) : path.posix.isAbsolute(out);
+  if (!absolute) throw new ServiceError(`Path ${p} must be absolute or start with ~/.`);
   return out;
 }
 
@@ -123,16 +125,16 @@ export function atomicWrite(file, data, mode = 0o600) {
   const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(4).toString('hex')}`);
   const fd = fs.openSync(tmp, 'wx', mode);
   try {
+    // On Windows the file's ACL is its privacy (DEC-0032): set explicitly and protected — before the bytes go in —
+    // so it does not depend on what the folder hands down. A rename keeps it.
+    if (process.platform === 'win32') windowsProtect(tmp, { folder: false });
     fs.writeSync(fd, data);
     fs.fsyncSync(fd);
   } finally {
     fs.closeSync(fd);
   }
   try {
-    // On Windows the file's ACL is its privacy (DEC-0032): set explicitly and protected, so it does
-    // not depend on what the folder hands down. A rename keeps it.
-    if (process.platform === 'win32') windowsProtect(tmp, { folder: false });
-    else fs.chmodSync(tmp, mode);
+    if (process.platform !== 'win32') fs.chmodSync(tmp, mode);
     fs.renameSync(tmp, file);
   } catch (error) {
     fs.rmSync(tmp, { force: true });
@@ -170,7 +172,9 @@ export class InstanceLock {
     if (!name) throw new ServiceError(`No instance lock on ${process.platform}: the kit supports macOS, Linux and Windows.`);
     this.server = net.createServer();
     await new Promise((resolve, reject) => {
-      this.server.once('error', (error) => reject(error.code === 'EADDRINUSE' ? new AlreadyRunning(readPid(this.path), this.path) : error));
+      // Windows reports a held pipe as EADDRINUSE (access denied) or, when its holder capped the instances, EBUSY.
+      const held = (code) => code === 'EADDRINUSE' || (process.platform === 'win32' && code === 'EBUSY');
+      this.server.once('error', (error) => reject(held(error.code) ? new AlreadyRunning(readPid(this.path), this.path) : error));
       this.server.listen(name, resolve);
     });
     this.server.unref();
@@ -340,9 +344,13 @@ export function windowsUserSid() {
   return userSid;
 }
 
-/** A protected list (inheritance off): this user, SYSTEM, Administrators, full control; a folder hands it down. */
+/**
+ * A protected list (inheritance off): this user, SYSTEM, Administrators, full control; a folder hands it down.
+ * `/reset` first drops any explicit entry already there (`/inheritance:r` keeps those), so the three are all that remain.
+ */
 export function windowsProtect(target, { folder }) {
   const grant = folder ? '(OI)(CI)F' : 'F';
+  windowsHelper('icacls.exe', [target, '/reset']);
   windowsHelper('icacls.exe', [target, '/inheritance:r', '/grant:r', ...[windowsUserSid(), ...WINDOWS_TRUSTED].map((sid) => `*${sid}:${grant}`)]);
 }
 
@@ -1144,10 +1152,13 @@ export function systemdUnit(unit, programArguments, { workingDirectory, environm
   for (const name of Object.keys(env)) if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new ServiceError(`Environment name ${JSON.stringify(name)} is not a variable name.`);
   noSecretInSupervisorFile(argv, env);
   env[SUPERVISOR_ENV] ??= 'systemd';
+  const cwd = plain(String(workingDirectory), 'The working directory');
+  if (!cwd.startsWith('/')) throw new ServiceError("A systemd unit's working directory is absolute.");
   return [
-    '[Unit]', `Description=${plain(description ?? unit, 'The description')}`, '',
+    '[Unit]', `Description=${plain(description ?? unit, 'The description').replace(/%/g, '%%')}`, '',
     '[Service]', 'Type=simple', `ExecStart=${argv.map(systemdQuote).join(' ')}`,
-    `WorkingDirectory=${systemdQuote(String(workingDirectory))}`,
+    // Not quoted: systemd reads WorkingDirectory= as the rest of the line, quotes included.
+    `WorkingDirectory=${cwd.replace(/%/g, '%%')}`,
     ...Object.keys(env).sort().map((k) => `Environment=${systemdQuote(`${k}=${env[k]}`)}`),
     'Restart=always', 'RestartSec=10', `TimeoutStopSec=${Math.trunc(stopTimeout)}`, 'KillMode=mixed', '',
     '[Install]', 'WantedBy=default.target', '',
@@ -1156,15 +1167,22 @@ export function systemdUnit(unit, programArguments, { workingDirectory, environm
 
 const systemdDir = () => path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'systemd', 'user');
 
-/** Write the user unit and start it so that it comes back after a login: `systemctl --user enable --now`. */
-export function systemdInstall(unit, text, { unitDir = systemdDir(), run = defaultRun, platform = process.platform } = {}) {
+/**
+ * Write the user unit, enable it so it comes back after a login, and (re)start it so the new unit is what runs.
+ * The operator's intent wins (LC-14): a unit already installed and disabled stays off — the file is rewritten, so the
+ * new version is what starts once they enable it — unless `forceEnable` (the operator asked for it on).
+ */
+export function systemdInstall(unit, text, { unitDir = systemdDir(), run = defaultRun, platform = process.platform, forceEnable = false } = {}) {
   if (platform !== 'linux') throw new ServiceError('systemd is the supervisor on Linux only.');
   if (!UNIT.test(unit)) throw new ServiceError(`unit must match ${UNIT.source}`);
   fs.mkdirSync(unitDir, { recursive: true });
   const file = path.join(unitDir, unit);
+  const state = fs.existsSync(file) ? String(run(['systemctl', '--user', 'is-enabled', unit])?.stdout ?? '').trim() : '';
   atomicWrite(file, text, 0o644);
   check(run(['systemctl', '--user', 'daemon-reload']), 'systemctl --user daemon-reload');
-  check(run(['systemctl', '--user', 'enable', '--now', unit]), 'systemctl --user enable --now');
+  if (state === 'disabled' && !forceEnable) return file;
+  check(run(['systemctl', '--user', 'enable', unit]), 'systemctl --user enable');
+  check(run(['systemctl', '--user', 'restart', unit]), 'systemctl --user restart');
   return file;
 }
 
@@ -1220,18 +1238,26 @@ export function taskXml(task, programArguments, { workingDirectory, description,
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <StartWhenAvailable>true</StartWhenAvailable>
+    <Enabled>true</Enabled>
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
     <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>
-    <Enabled>true</Enabled>
   </Settings>
   <Actions Context="Author"><Exec><Command>${xml(argv[0])}</Command><Arguments>${xml(windowsCommandLine(argv.slice(1)))}</Arguments><WorkingDirectory>${xml(workingDirectory)}</WorkingDirectory></Exec></Actions>
 </Task>
 `;
 }
 
-/** Create (or replace) the task from its XML without administrator rights, then run it. */
-export function taskInstall(task, xmlText, { run = defaultRun, platform = process.platform } = {}) {
+const TASK_DISABLED = /<Settings>(?:(?!<\/Settings>)[\s\S])*<Enabled>false<\/Enabled>/;
+
+/**
+ * Create (or replace) the task from its XML without administrator rights, then (re)start it so the new definition
+ * is what runs. A task already installed and disabled stays off (LC-14) unless `forceEnable`.
+ */
+export function taskInstall(task, xmlText, { run = defaultRun, platform = process.platform, forceEnable = false } = {}) {
   if (platform !== 'win32') throw new ServiceError('Task Scheduler is the supervisor on Windows only.');
+  const query = run(['schtasks', '/Query', '/TN', task, '/XML']);
+  const existed = query?.status === 0;
+  const keepOff = existed && !forceEnable && TASK_DISABLED.test(String(query?.stdout ?? ''));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-task-'));
   const file = path.join(dir, 'task.xml');
   try {
@@ -1241,6 +1267,11 @@ export function taskInstall(task, xmlText, { run = defaultRun, platform = proces
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+  if (keepOff) {
+    check(run(['schtasks', '/Change', '/TN', task, '/DISABLE']), 'schtasks /Change /DISABLE');
+    return;
+  }
+  if (existed) run(['schtasks', '/End', '/TN', task]);
   check(run(['schtasks', '/Run', '/TN', task]), 'schtasks /Run');
 }
 

@@ -150,12 +150,14 @@ control character (a line break would end a unit line early).
 **Linux — a systemd user unit.** `systemd_unit(unit, argv, working_directory=…)` /
 `systemdUnit(unit, argv, {workingDirectory})` writes `Restart=always`, `RestartSec=10`,
 `TimeoutStopSec` above the drain (15 s default), `KillMode=mixed`, `WantedBy=default.target`
-and `FABRIC_SERVICE_SUPERVISOR=systemd`, quoting every argument (`%` → `%%`, `$` → `$$`). The
+and `FABRIC_SERVICE_SUPERVISOR=systemd`, quoting every argument (`%` → `%%`, `$` → `$$`).
+`WorkingDirectory=` is written unquoted: systemd reads it as the rest of the line, so quotes would
+become part of the path and the unit would be refused (`systemd-analyze verify` checks it in CI). The
 descriptor says `"lifecycle": {"manager": "systemd", "unit": "<id>.<instance>.service"}`.
 
 | Verb | Command |
 |---|---|
-| install, start | `systemd_install` / `systemdInstall`: write `~/.config/systemd/user/<unit>`, `systemctl --user daemon-reload`, `systemctl --user enable --now <unit>` |
+| install, upgrade | `systemd_install` / `systemdInstall`: write `~/.config/systemd/user/<unit>`, `daemon-reload`, `enable`, `restart` (so the new unit is what runs). A unit already installed that `is-enabled` reports `disabled` stays off: the file is rewritten and nothing starts (LC-14), unless `force_enable` |
 | stop, keep off | `systemctl --user disable --now <unit>` |
 | uninstall | `systemd_uninstall` / `systemdUninstall`: `disable --now`, remove the unit, `daemon-reload` |
 
@@ -165,13 +167,14 @@ A user unit runs while the person is logged in; one that must run without a sess
 **Windows — a per-user Scheduled Task.** `task_xml(task, argv, working_directory=…)` /
 `taskXml(task, argv, {workingDirectory})` writes a task with a logon trigger for the current
 user, `InteractiveToken` and `LeastPrivilege` (no administrator rights), restart on failure
-every minute, no execution time limit and `MultipleInstancesPolicy` `IgnoreNew`; the arguments
-are quoted the way the C runtime parses them. The descriptor says
+every minute, no execution time limit and `MultipleInstancesPolicy` `IgnoreNew`, its settings in the
+order `schtasks` exports them; the arguments are quoted the way the C runtime parses them. The Windows
+CI job has the real `schtasks` create, read back and delete such a task. The descriptor says
 `"lifecycle": {"manager": "task-scheduler", "task": "\\PassionCode\\<id>.<instance>"}`.
 
 | Verb | Command |
 |---|---|
-| install, start | `task_install` / `taskInstall`: `schtasks /Create /TN <task> /XML <file> /F` from a UTF-16 file it then removes, `schtasks /Run /TN <task>` |
+| install, upgrade | `task_install` / `taskInstall`: `schtasks /Create /TN <task> /XML <file> /F` from a UTF-16 file it then removes, then `/End` (when it existed) and `/Run`. A task already installed and disabled stays off: it is recreated and disabled again (LC-14), unless `force_enable` |
 | stop, keep off | `schtasks /End /TN <task>`, then `schtasks /Change /TN <task> /DISABLE` |
 | uninstall | `task_uninstall` / `taskUninstall`: `/End`, then `/Delete /F` |
 
@@ -183,10 +186,12 @@ holding the lock makes the scheduled one exit 75 once a minute until it leaves.
 (Windows); the Node kit cannot, so it holds a name instead — an abstract unix socket on Linux,
 a named pipe on Windows (`lock_name` / `lockName`), each gone with the process. The Python kit
 holds the same name beside its file lock, so the two kits exclude each other everywhere, and
-`check_service.py` reports the lock held when either is.
+`check_service.py` reports the lock held when either is. The probe only looks (`/proc/net/unix`,
+`WaitNamedPipeW`); it never takes the name, so it cannot make a service that is starting fail.
 
 **Token files on Windows.** The privacy of `service.token` is its ACL (service.md *Windows
-token files*): the kits write a protected list — the user, SYSTEM and Administrators — and refuse
+token files*): the kits write a protected list — the user, SYSTEM and Administrators, set before the
+token's bytes go in, any entry already there dropped — and refuse
 on read a link, a file outside the profile, another owner, or any other granted SID, naming the
 SID. The Node kit reads the list with Windows PowerShell 5.1 (.NET, no modules) and writes it
 with `icacls`; the path goes through the environment, never a command line.

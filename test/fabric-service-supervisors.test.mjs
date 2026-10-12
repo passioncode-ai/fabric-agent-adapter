@@ -14,12 +14,14 @@ const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plug
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-supervisor-'));
 const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'q'.repeat(24)}`;
 
-function recorder(fail = []) {
+// Stands in for systemctl and schtasks: fails a call naming a word in `fail`, prints `out[word]` for one naming it.
+function recorder(fail = [], out = {}) {
   const calls = [];
   const run = (argv) => {
     calls.push([...argv]);
     const failed = argv.some((word) => fail.includes(word));
-    return { status: failed ? 1 : 0, stdout: '', stderr: failed ? 'refused' : '' };
+    const printed = Object.entries(out).find(([word]) => argv.includes(word))?.[1] ?? '';
+    return { status: failed ? 1 : 0, stdout: printed, stderr: failed ? 'refused' : '' };
   };
   return { calls, run };
 }
@@ -31,7 +33,7 @@ const unit = (extra = {}) => k.systemdUnit(UNIT, ['/usr/bin/node', '/opt/example
 test('the systemd unit carries the contract settings', () => {
   const text = unit();
   for (const line of ['Restart=always', 'RestartSec=10', 'TimeoutStopSec=15', 'WantedBy=default.target', 'Description=Example Agent',
-    'WorkingDirectory="/opt/example agent"', 'Environment="FABRIC_SERVICE_SUPERVISOR=systemd"']) {
+    'WorkingDirectory=/opt/example agent', 'Environment="FABRIC_SERVICE_SUPERVISOR=systemd"']) {
     assert.ok(text.includes(`${line}\n`), line);
   }
   assert.ok(text.includes('ExecStart="/usr/bin/node" "/opt/example agent/serve.mjs" "--port" "47201"\n'));
@@ -52,15 +54,37 @@ test('the systemd unit refuses what it cannot carry', () => {
   refuse(() => unit({ stopTimeout: 5 })); // must outlast the 8 s drain (DRAIN_SECONDS)
   refuse(() => unit({ description: 'Example\nExecStartPre=/bin/sh' }));
   refuse(() => unit({ environment: { 'BAD NAME': 'x' } }));
+  refuse(() => k.systemdUnit('x.service', ['/bin/x'], { workingDirectory: 'relative' }));
 });
 
-test('systemd install enables it now and for every login; uninstall disables and removes it', () => {
+test('the working directory is not quoted, and specifiers stay literal', () => {
+  // Quoted, systemd takes the quotes as part of the path and refuses the unit ("path is not absolute").
+  const text = k.systemdUnit('x.service', ['/bin/x'], { workingDirectory: '/srv/100% x', description: 'at 100% %h' });
+  assert.ok(text.includes('WorkingDirectory=/srv/100%% x\n'), text);
+  assert.ok(text.includes('Description=at 100%% %%h\n'), text);
+});
+
+test('systemd install enables and (re)starts it, keeps a disabled unit off; uninstall disables and removes it', () => {
   const dir = path.join(temp(), 'systemd/user');
+  const reload = ['systemctl', '--user', 'daemon-reload'];
+  const enable = ['systemctl', '--user', 'enable', UNIT];
+  const restart = ['systemctl', '--user', 'restart', UNIT];
+  const isEnabled = ['systemctl', '--user', 'is-enabled', UNIT];
   let r = recorder();
   const file = k.systemdInstall(UNIT, unit(), { unitDir: dir, run: r.run, platform: 'linux' });
   assert.equal(file, path.join(dir, UNIT));
   assert.equal(fs.readFileSync(file, 'utf8'), unit());
-  assert.deepEqual(r.calls, [['systemctl', '--user', 'daemon-reload'], ['systemctl', '--user', 'enable', '--now', UNIT]]);
+  assert.deepEqual(r.calls, [reload, enable, restart], 'a first install enables and starts it');
+  r = recorder([], { 'is-enabled': 'enabled\n' });
+  k.systemdInstall(UNIT, unit({ description: 'v2' }), { unitDir: dir, run: r.run, platform: 'linux' });
+  assert.deepEqual(r.calls, [isEnabled, reload, enable, restart], 'an upgrade restarts what runs');
+  r = recorder([], { 'is-enabled': 'disabled\n' });
+  k.systemdInstall(UNIT, unit({ description: 'v3' }), { unitDir: dir, run: r.run, platform: 'linux' });
+  assert.deepEqual(r.calls, [isEnabled, reload], 'the operator switched it off: it stays off (LC-14)');
+  assert.ok(fs.readFileSync(file, 'utf8').includes('Description=v3'));
+  r = recorder([], { 'is-enabled': 'disabled\n' });
+  k.systemdInstall(UNIT, unit(), { unitDir: dir, run: r.run, platform: 'linux', forceEnable: true });
+  assert.deepEqual(r.calls, [isEnabled, reload, enable, restart]);
   r = recorder();
   k.systemdUninstall(UNIT, { unitDir: dir, run: r.run, platform: 'linux' });
   assert.equal(fs.existsSync(file), false);
@@ -112,19 +136,40 @@ test('the task refuses what it cannot carry', () => {
   }
 });
 
-test('task install creates the task from a UTF-16 file it then removes, and runs it; uninstall ends and deletes it', () => {
-  let r = recorder();
+test('the task settings are in the order Task Scheduler exports them', () => {
+  const settings = task().match(/<Settings>([\s\S]*)<\/Settings>/)[1];
+  assert.deepEqual([...settings.matchAll(/^ {4}<([A-Za-z]+)>/gm)].map((m) => m[1]),
+    ['MultipleInstancesPolicy', 'DisallowStartIfOnBatteries', 'StopIfGoingOnBatteries', 'StartWhenAvailable', 'Enabled', 'ExecutionTimeLimit', 'RestartOnFailure']);
+});
+
+test('task install creates the task from a UTF-16 file it then removes, (re)starts it, keeps a disabled task off; uninstall ends and deletes it', () => {
+  let r = recorder(['/Query']);
   let seen = null;
   const run = (argv) => {
     if (argv[1] === '/Create') seen = fs.readFileSync(argv[argv.indexOf('/XML') + 1]);
     return r.run(argv);
   };
   k.taskInstall(TASK, task(), { run, platform: 'win32' });
-  assert.deepEqual(r.calls.map((c) => c.slice(0, 3)), [['schtasks', '/Create', '/TN'], ['schtasks', '/Run', '/TN']]);
-  assert.ok(r.calls[0].includes('/F'));
+  const steps = () => r.calls.map((c) => c.slice(0, 2));
+  assert.deepEqual(steps(), [['schtasks', '/Query'], ['schtasks', '/Create'], ['schtasks', '/Run']], 'a first install creates and runs it');
+  const create = r.calls[1];
+  assert.deepEqual(create.slice(2, 4), ['/TN', TASK]);
+  assert.ok(create.includes('/F'));
   assert.deepEqual([...seen.subarray(0, 2)], [0xff, 0xfe]);
   assert.equal(seen.subarray(2).toString('utf16le'), task());
-  assert.equal(fs.existsSync(r.calls[0][r.calls[0].indexOf('/XML') + 1]), false, 'the task file is removed once the task exists');
+  assert.equal(fs.existsSync(create[create.indexOf('/XML') + 1]), false, 'the task file is removed once the task exists');
+  const disabled = task().replace('<Enabled>true</Enabled>\n    <ExecutionTimeLimit>', '<Enabled>false</Enabled>\n    <ExecutionTimeLimit>');
+  assert.notEqual(disabled, task());
+  r = recorder([], { '/Query': task() });
+  k.taskInstall(TASK, task(), { run: r.run, platform: 'win32' });
+  assert.deepEqual(steps(), [['schtasks', '/Query'], ['schtasks', '/Create'], ['schtasks', '/End'], ['schtasks', '/Run']], 'an upgrade restarts what runs');
+  r = recorder([], { '/Query': disabled });
+  k.taskInstall(TASK, task(), { run: r.run, platform: 'win32' });
+  assert.deepEqual(steps(), [['schtasks', '/Query'], ['schtasks', '/Create'], ['schtasks', '/Change']], 'the operator switched it off: it stays off (LC-14)');
+  assert.ok(r.calls[2].includes('/DISABLE'));
+  r = recorder([], { '/Query': disabled });
+  k.taskInstall(TASK, task(), { run: r.run, platform: 'win32', forceEnable: true });
+  assert.deepEqual(steps().slice(-2), [['schtasks', '/End'], ['schtasks', '/Run']]);
   r = recorder();
   k.taskUninstall(TASK, { run: r.run, platform: 'win32' });
   assert.deepEqual(r.calls.map((c) => c.slice(0, 2)), [['schtasks', '/End'], ['schtasks', '/Delete']]);

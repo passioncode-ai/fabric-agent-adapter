@@ -18,6 +18,10 @@ contract names, and the Node kit on Windows.
     `/End`, then `/Delete`.
   - **No secret in a supervisor file.** The writers refuse a credential-shaped argument, environment name or
     value, and any control character.
+  - **An upgrade restarts what runs; the operator's off stays off (LC-14).** A unit that `is-enabled` reports
+    disabled, or a task whose settings say `Enabled false`, is rewritten and left off unless `force_enable`.
+  - **Checked by the real readers:** `systemd-analyze verify` on the Linux job (a quoted `WorkingDirectory=` is
+    refused there, so it is written unquoted), and `schtasks /Create` of a throwaway task on the Windows job.
 - **The Node kit on Windows and Linux:**
   - `servicesDir` and `serviceDirs` use `%LOCALAPPDATA%`.
   - `expand` and `validateDescriptor` match the Python kit: all four managers, `unit` and `task` paired with
@@ -37,8 +41,11 @@ contract names, and the Node kit on Windows.
   - `protocol.md`.
 
   The scenario eval `linux-and-windows-supervision` and two triggers came first.
-- **Mutation testing:** 14 planted defects in the Python writers, 23 in the Node port and 7 in the lock name
-  and probe were all caught.
+- **The probe only looks** (`/proc/net/unix`, `WaitNamedPipeW`) and never takes the lock's name.
+- **An independent review** found 2 critical and 9 moderate defects before release; each is fixed with a test, except
+  that a Scheduled Task still cannot tell the service it is supervised (a task sets no environment; documented).
+- **Mutation testing:** 14 planted defects in the Python writers, 23 in the Node port, 7 in the lock name
+  and probe and a quoted `WorkingDirectory=` against `systemd-analyze` were all caught.
 
 ## 0.17.0 - 2026-10-12
 

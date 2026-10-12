@@ -164,6 +164,13 @@ class LockName(unittest.TestCase):
             lock.release()
             self.assertFalse(fs.lock_name_held(lock.path))
 
+    @unittest.skipUnless(sys.platform.startswith("linux") or os.name == "nt", "needs Linux or Windows")
+    def test_the_probe_looks_and_never_takes_the_name(self):
+        # Taking the name, even for a moment, would make a service starting at that moment exit 75.
+        with tempfile.TemporaryDirectory() as temp, \
+                mock.patch.object(fs, "_hold_lock_name", side_effect=AssertionError("the probe took the name")):
+            self.assertFalse(fs.lock_name_held(Path(temp) / "service.lock"))
+
     @unittest.skipUnless((sys.platform.startswith("linux") or os.name == "nt") and shutil.which("node"), "needs Linux or Windows, and node")
     def test_the_probe_sees_a_node_service_hold_the_lock(self):
         check = load("check_service")

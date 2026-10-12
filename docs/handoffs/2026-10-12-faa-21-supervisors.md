@@ -28,6 +28,24 @@ in both kits (backlog FAA-21).
   probe were each caught.
 - Windows: by the `windows` job of the validate run and of the release run.
 
+**Review and the first Windows run.**
+
+- An independent review found 2 critical and 9 moderate defects. All are fixed with tests except one, which is
+  documented.
+  - The task `<Settings>` element order.
+  - A quoted `WorkingDirectory=`: `systemd-analyze` refuses it.
+  - `%` left unescaped in `Description`.
+  - An upgrade did not restart the running service, and an install re-enabled what the operator had disabled
+    (LC-14).
+  - `icacls` kept explicit entries.
+  - The ACL was set after the bytes were written.
+  - An fd leak.
+  - The probe took the lock's name.
+  - Node accepted `/x` on Windows.
+  - Not fixed, documented instead: a task cannot set the supervisor variable.
+- The first `windows` run failed on the pipe's instance limit (`ERROR_PIPE_BUSY`). The pipe now has unlimited
+  instances, as libuv's does, and 231 counts as held.
+
 **Decisions.**
 
 - Node on Windows reads ACLs through Windows PowerShell 5.1 (.NET, `PSModulePath` dropped) and writes them with
