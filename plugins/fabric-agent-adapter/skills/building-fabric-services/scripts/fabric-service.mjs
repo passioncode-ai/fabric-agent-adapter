@@ -866,6 +866,12 @@ function byCodePoint(a, b) {
  * strings escaped as JSON requires and nothing else, integers in decimal — Python's
  * `json.dumps(value, sort_keys=True, ensure_ascii=False)`. Refuses a fraction, an unsafe integer and non-JSON.
  */
+/** CT-25 (DEC-0052): a lone surrogate in a string or a key has no canonical form — Python cannot encode it as UTF-8. */
+function settingsString(text) {
+  if (/\p{Surrogate}/u.test(text)) throw new ServiceError('a lone surrogate has no canonical form');
+  return JSON.stringify(text);
+}
+
 export function settingsCanonicalJson(value) {
   if (value === null) return 'null';
   if (typeof value === 'boolean') return value ? 'true' : 'false';
@@ -873,10 +879,10 @@ export function settingsCanonicalJson(value) {
     if (!Number.isSafeInteger(value)) throw new ServiceError(`${value} has no canonical form: a settings backup stores a fraction as its decimal string`);
     return String(value);
   }
-  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'string') return settingsString(value);
   if (Array.isArray(value)) return `[${value.map(settingsCanonicalJson).join(', ')}]`;
   if (isPlainObject(value) && [Object.prototype, null].includes(Object.getPrototypeOf(value))) {
-    return `{${Object.keys(value).sort(byCodePoint).map((key) => `${JSON.stringify(key)}: ${settingsCanonicalJson(value[key])}`).join(', ')}}`;
+    return `{${Object.keys(value).sort(byCodePoint).map((key) => `${settingsString(key)}: ${settingsCanonicalJson(value[key])}`).join(', ')}}`;
   }
   throw new ServiceError(`${typeof value} is not a JSON value`);
 }

@@ -1364,7 +1364,12 @@ _MAX_ROW_VALUES = 512
 
 
 def _canonical_check(value: Any, at: str = "") -> None:
-    if value is None or isinstance(value, (bool, str)):
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, str):
+        # CT-25 (DEC-0052): Python cannot encode a lone surrogate as UTF-8, so no two languages agree on its bytes.
+        if _SURROGATE.search(value):
+            raise ServiceError("%s: a lone surrogate has no canonical form" % (at or "/"))
         return
     if isinstance(value, int):
         if abs(value) > _SAFE_INTEGER:
@@ -1380,6 +1385,7 @@ def _canonical_check(value: Any, at: str = "") -> None:
         for key, item in value.items():
             if not isinstance(key, str):
                 raise ServiceError("%s: object keys are strings" % (at or "/"))
+            _canonical_check(key, "%s (a key)" % (at or "/"))
             _canonical_check(item, "%s/%s" % (at, key))
         return
     raise ServiceError("%s: %s is not a JSON value" % (at or "/", type(value).__name__))

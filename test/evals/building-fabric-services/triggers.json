@@ -140,6 +140,10 @@
     {
       "query": "Our agent chat should fall back from Claude Code to Codex to Hermes in the project's order, and its doctor must say which runner is signed out — wire the runner route checks.",
       "shouldTrigger": true
+    },
+    {
+      "query": "Apply the operator's signed estate record on each machine and only trust delegation tokens under the hub key it certifies.",
+      "shouldTrigger": true
     }
   ]
 }

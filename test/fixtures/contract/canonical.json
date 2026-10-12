@@ -70,6 +70,18 @@
       {
         "name": "an exponent form that is not an integer",
         "inputJson": "1e-7"
+      },
+      {
+        "name": "a lone surrogate (CT-25, DEC-0052)",
+        "inputJson": "\"\\ud800\""
+      },
+      {
+        "name": "a lone surrogate in a key (CT-25, DEC-0052)",
+        "inputJson": "{\"\\udc00\": 1}"
+      },
+      {
+        "name": "a lone low surrogate after a pair",
+        "inputJson": "[\"\\ud83d\\ude00\\ude00\"]"
       }
     ]
   },
