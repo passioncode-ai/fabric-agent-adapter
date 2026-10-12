@@ -15,6 +15,9 @@ import sys
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from urllib.parse import urlparse
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044, LC-21), beside this file
+
 
 CONTRACT_VERSION = "0.1.0"
 CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"
@@ -230,6 +233,8 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
         lowered = runtime_arg.lower().replace("_", "").replace("-", "")
         if any(term in lowered for term in ("password", "apikey", "accesstoken", "clientsecret")):
             raise AdaptationError("runtime arguments must not contain secret-like values or names")
+        if _secrets.secret_argument(runtime_arg):
+            raise AdaptationError("a runtime argument carries a credential; argv is visible to every process (LC-21): read it from a secret reference instead")
 
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     manifest = {
@@ -465,6 +470,58 @@ import {SCHEMA_PREFIX} from './src/contract.ts';
     return "PASS", ["manifest validated by selected contract schema at %s" % selected_commit]
 
 
+def _credential_problems(manifest: Dict[str, Any]) -> List[str]:
+    """LC-21 (FAA-23): no credential in a launch argument or in a URL the manifest names."""
+    problems: List[str] = []
+    for index, capability in enumerate(manifest.get("capabilities") or []):
+        connection = ((capability or {}).get("profile") or {}).get("connection") if isinstance(capability, dict) else None
+        if not isinstance(connection, dict):
+            continue
+        for arg in connection.get("args") or []:
+            if isinstance(arg, str) and _secrets.secret_argument(arg):
+                problems.append("LC-21: capability[%d] passes a credential in a launch argument; argv is visible to every process" % index)
+        for field in ("url", "agentCardUrl"):
+            if isinstance(connection.get(field), str) and _secrets.secret_url(connection[field]):
+                problems.append("LC-21: capability[%d].%s carries a credential in the URL; a query lands in every log" % (index, field))
+    return problems
+
+
+_PLUGIN_SKIP = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".worktrees"}
+
+
+def _plugin_problems(root: Path) -> List[str]:
+    """LC-19 (FAA-22) and LC-21 for the Claude Code plugins in the project: a plugin's stdio MCP server starts in
+    every session that enables the plugin; serve it over HTTP from one resident process, or register it at project
+    scope instead. No server entry carries a credential in its argv, URL or env."""
+    problems: List[str] = []
+    for top, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in _PLUGIN_SKIP]
+        here = Path(top)
+        if here.name != ".claude-plugin" or "plugin.json" not in files:
+            continue
+        plugin = here.parent
+        name = plugin.relative_to(root).as_posix() or "."
+        servers: Dict[str, Any] = {}
+        for source in (here / "plugin.json", plugin / ".mcp.json"):
+            try:
+                doc = json.loads(source.read_text(encoding="utf-8")) if source.is_file() else {}
+            except (OSError, ValueError):
+                continue
+            block = doc.get("mcpServers") if isinstance(doc, dict) else None
+            if isinstance(block, dict):
+                servers.update({k: v for k, v in block.items() if isinstance(v, dict)})
+        for server, entry in sorted(servers.items()):
+            if "command" in entry:
+                problems.append("LC-19: plugin %s declares the stdio MCP server %s, which starts in every session that enables the plugin; serve it over HTTP from one resident process or register it at project scope" % (name, server))
+            argv = [entry.get("command")] + list(entry.get("args") or [])
+            if any(isinstance(a, str) and _secrets.secret_argument(a) for a in argv) or (isinstance(entry.get("url"), str) and _secrets.secret_url(entry["url"])):
+                problems.append("LC-21: plugin %s's MCP server %s carries a credential in its argv or URL" % (name, server))
+            env = entry.get("env") if isinstance(entry.get("env"), dict) else {}
+            if any(isinstance(v, str) and _secrets.secret_value(v) for v in env.values()):
+                problems.append("LC-21: plugin %s's MCP server %s writes a credential value in env; reference it instead" % (name, server))
+    return problems
+
+
 def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
     errors: List[str] = []
     warnings: List[str] = []
@@ -534,6 +591,7 @@ def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
                 errors.append("secret-like field is forbidden in manifest: %s" % key)
             if isinstance(value, str) and ("replace-me" in value or ".invalid" in value):
                 warnings.append("placeholder:%s" % key)
+        errors.extend(_credential_problems(manifest))
         provider = manifest.get("provider")
         if isinstance(provider, dict) and provider.get("contentHash") == "sha256:" + ("0" * 64):
             warnings.append("placeholder:provider.contentHash")
@@ -545,6 +603,7 @@ def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
     elif contract is not None and manifest_path.is_file():
         shape_status, shape_receipts = _contract_shape(manifest_path, contract, lock["commit"])
 
+    errors.extend(_plugin_problems(root))
     local_status = "PASS" if not errors else "FAIL"
     ready = local_status == "PASS" and shape_status == "PASS" and not warnings
     return {

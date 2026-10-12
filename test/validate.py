@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -498,8 +499,37 @@ def validate_contract_pin(errors: List[str], root: Path = ROOT) -> None:
 # #endregion contract-pin
 
 
+def validate_plugin_lifecycle(errors: List[str], plugin: Path) -> None:
+    """FAA-22 (LC-19) and FAA-23 (LC-21) for the adapter's own plugin: it declares no MCP server — nothing starts per
+    session but its one SessionStart hook — and no hook command carries a credential."""
+    spec = importlib.util.spec_from_file_location(
+        "fabric_secrets", ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_secrets.py")
+    fabric_secrets = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fabric_secrets)
+    manifest = plugin / ".claude-plugin" / "plugin.json"
+    try:
+        declared = json.loads(manifest.read_text(encoding="utf-8")).get("mcpServers") if manifest.is_file() else None
+    except ValueError:
+        declared = None
+    if (plugin / ".mcp.json").exists() or declared:
+        errors.append("LC-19: the plugin declares an MCP server; a plugin's server starts in every session that enables it")
+    hooks = plugin / "hooks" / "hooks.json"
+    if hooks.is_file():
+        def commands(node: Any) -> List[str]:
+            if isinstance(node, dict):
+                found = [node["command"]] if isinstance(node.get("command"), str) else []
+                return found + [c for v in node.values() for c in commands(v)]
+            if isinstance(node, list):
+                return [c for v in node for c in commands(v)]
+            return []
+        for command in commands(json.loads(hooks.read_text(encoding="utf-8"))):
+            if fabric_secrets.secret_argument(command):
+                errors.append("LC-21: a hook command carries a credential; argv is visible to every process")
+
+
 def validate_repo() -> List[str]:
     errors: List[str] = []
+    validate_plugin_lifecycle(errors, ROOT / "plugins/fabric-agent-adapter")
     for path in EXPECTED_FILES:
         if not path.is_file():
             errors.append("missing required file: %s" % path.relative_to(ROOT))

@@ -49,6 +49,8 @@ class ValidationTests(unittest.TestCase):
             "both transports": entry(run={"mcp": {"url": "http://127.0.0.1:47201/mcp", "stdio": {"command": ["/bin/x"]}}}),
             "a stdio server started in every session (FAC-SEM-056, LC-19)": entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "scope": "session"}}}),
             "an unknown stdio scope": entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "scope": "always"}}}),
+            "a key in an argument (LC-21)": entry(run={"mcp": {"stdio": {"command": ["/bin/x", "--api-key=" + "s" + "k-" + "x" * 24]}}}),
+            "a bearer header in an argument (LC-21)": entry(run={"mcp": {"stdio": {"command": ["/bin/x", "--header=Authorization: Bea" + "rer abcdef123456"]}}}),
             "bad id": entry(provider_id="Example_Agent"),
             "manifest is not fabric-agent.json": entry(manifest="~/x/manifest.json"),
             "relative manifest": entry(manifest="fabric-agent.json"),
@@ -60,6 +62,9 @@ class ValidationTests(unittest.TestCase):
         }
         for label, value in cases.items():
             self.assertNotEqual(fp.validate_provider_entry(value), [], label)
+
+    def test_harmless_arguments_pass(self):
+        self.assertEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x", "--verbose", "--port=47201", "apps/Desktop/src/main.ts"]}}})), [])
 
     def test_a_stdio_scope_of_project_or_on_demand_is_accepted(self):
         """DEC-0044: run.mcp.stdio.scope is optional; project and on-demand are the two a host may use."""

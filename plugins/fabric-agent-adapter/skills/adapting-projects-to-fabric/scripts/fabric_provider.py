@@ -29,6 +29,9 @@ import sys
 import tempfile
 from typing import Any, Dict, List, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044, LC-21), beside this file
+
 PROTOCOL = "fabric-provider/0.1"
 _ID = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
 _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
@@ -124,6 +127,8 @@ def _run_problems(run: Any) -> List[str]:
     command = stdio["command"]
     if not isinstance(command, list) or not 1 <= len(command) <= 32 or not all(isinstance(a, str) and a for a in command):
         problems.append("run.mcp.stdio.command is an argument array, never a shell string")
+    elif any(_secrets.secret_argument(a) for a in command):
+        problems.append("run.mcp.stdio.command carries a credential in an argument; argv is visible to every process (LC-21, FAC-SEM-057): pass it as a secret reference in env")
     env = stdio.get("env", {})
     if not isinstance(env, dict):
         return problems + ["run.mcp.stdio.env is an object"]
