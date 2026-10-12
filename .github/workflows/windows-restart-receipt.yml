@@ -1,0 +1,25 @@
+name: windows-restart-receipt
+
+# FAA-38 (contract CT-18): whether the Task Scheduler restarts a task whose action exits 75. On demand only: it waits
+# about four minutes on a Windows runner and touches nothing outside it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  receipt:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install a task as the kit writes it, whose action exits 75; count its starts
+        run: python test/windows_restart_receipt.py "$env:RUNNER_TEMP\windows-restart-receipt.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-restart-receipt
+          path: ${{ runner.temp }}/windows-restart-receipt.json
