@@ -1,0 +1,10 @@
+# red run before implementation, 2026-10-12T20:09:16Z, on top of 04e9b19 with the new tests only
+                     ^^^^^^^^^^
+AttributeError: module 'fabric_session' has no attribute 'tomllib'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)
+exit=1

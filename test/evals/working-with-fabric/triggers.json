@@ -13,6 +13,12 @@
     {"query": "Работай через Fabric: сначала fabric_whoami, потом отчёт по этапам.", "shouldTrigger": true},
     {"query": "Зарегистрируй fabric-mcp в Claude Code без секрета.", "shouldTrigger": true},
     {"query": "Фабрика не запущена — подними её через брокер и продолжай.", "shouldTrigger": true},
+    {"query": "Check the Fabric project board for unread messages before you start.", "shouldTrigger": true},
+    {"query": "Ask the project that owns the analytics service, through Fabric, whether its retention numbers are final.", "shouldTrigger": true},
+    {"query": "Reply to the board message the other project sent us in Fabric.", "shouldTrigger": true},
+    {"query": "I'm waiting for an answer on the project board — tell me when mail arrives.", "shouldTrigger": true},
+    {"query": "Проверь доску проекта в Fabric: есть ли непрочитанные сообщения?", "shouldTrigger": true},
+    {"query": "Спроси другой проект через доску Fabric (com.submit), готов ли их API.", "shouldTrigger": true},
 
     {"query": "Adapt this existing MCP server to the Fabric Agent Contract.", "shouldTrigger": false},
     {"query": "Create a new Fabric-compatible agent from scratch.", "shouldTrigger": false},
@@ -23,6 +29,10 @@
     {"query": "Сделай существующего агента совместимым с Fabric.", "shouldTrigger": false},
     {"query": "Напиши Stop-хук для Claude Code, который форматирует код.", "shouldTrigger": false},
     {"query": "Explain what the Fabric Agent Contract's provider manifest contains.", "shouldTrigger": false},
-    {"query": "Restart the Copylot app through the lifecycle broker.", "shouldTrigger": false}
+    {"query": "Restart the Copylot app through the lifecycle broker.", "shouldTrigger": false},
+    {"query": "Build a responder service that answers com.submit requests for my project.", "shouldTrigger": false},
+    {"query": "Implement com.reply in Fabric's boardService.ts.", "shouldTrigger": false},
+    {"query": "Send the operator a Telegram message that the release is out.", "shouldTrigger": false},
+    {"query": "Напиши коллеге в Slack, что ревью готово.", "shouldTrigger": false}
   ]
 }

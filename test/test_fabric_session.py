@@ -45,7 +45,7 @@ FAKE_MCP = textwrap.dedent('''\
     write("argv", sys.argv[1:])
     write("env", {{"CLAUDE_CODE_SESSION_ID": os.environ.get("CLAUDE_CODE_SESSION_ID")}})
     connected = False
-    tools = {{"connect": ["fabric_whoami", "fabric_session_observe", "fabric_work_release", "fabric_tasks_list"],
+    tools = {{"connect": ["fabric_whoami", "fabric_session_observe", "fabric_work_release", "fabric_tasks_list", "com.status"],
              "old-fabric": ["fabric_whoami", "fabric_tasks_list", "fabric_task_claim"],
              "refuse": ["fabric_whoami", "fabric_session_observe", "fabric_work_release"],
              "never": ["fabric_whoami"]}}[mode]
@@ -66,7 +66,22 @@ FAKE_MCP = textwrap.dedent('''\
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": {{"type": "object"}}}} for n in names]}}}})
         elif method == "tools/call":
             write("call", m["params"])
-            if mode == "refuse":
+            if m["params"]["name"] == "com.status":
+                board = os.environ.get("FAKE_MCP_BOARD")
+                said = open(board).read().strip() if board and os.path.exists(board) else "0"
+                if said == "refuse":
+                    answer = {{"isError": True, "content": [{{"type": "text", "text": json.dumps({{"error": {{
+                        "code": "not_authorized", "message": "secret /private/path", "retryable": False}}}})}}]}}
+                elif said == "unavailable":
+                    answer = {{"content": [{{"type": "text", "text": json.dumps({{"protocol": "fabric-project-comms/0.1",
+                        "board": {{"state": "unavailable", "reason": "The board could not be read."}}, "project": "p1",
+                        "responders": [], "transport": {{"telegram": "off"}}}})}}]}}
+                else:
+                    answer = {{"content": [{{"type": "text", "text": json.dumps({{"protocol": "fabric-project-comms/0.1",
+                        "board": {{"state": "ready"}}, "project": "p1", "responders": [], "transport": {{"telegram": "off"}},
+                        "unread": int(said)}})}}]}}
+                send({{"jsonrpc": "2.0", "id": m["id"], "result": answer}})
+            elif mode == "refuse":
                 send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"isError": True,
                       "content": [{{"type": "text", "text": "not enrolled /private/path"}}],
                       "structuredContent": {{"error": {{"code": "not-enrolled"}}}}}}}})
@@ -82,7 +97,9 @@ class Base(unittest.TestCase):
         self.home = self.base / "home"
         self.home.mkdir()
         self.env = {k: v for k, v in os.environ.items()
-                    if k not in ("XDG_DATA_HOME", "XDG_CACHE_HOME", "LOCALAPPDATA", "CODEX_HOME", "CLAUDE_CODE_SESSION_ID")}
+                    if k not in ("XDG_DATA_HOME", "XDG_CACHE_HOME", "LOCALAPPDATA", "CODEX_HOME", "CLAUDE_CODE_SESSION_ID",
+                                 "FABRIC_SERVICES_DIR", "FABRIC_LAUNCHED_SESSION", "FABRIC_ACP_SESSION",
+                                 "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"
@@ -115,10 +132,10 @@ class Base(unittest.TestCase):
         proc.wait()
         return proc.pid
 
-    def run_hook(self, event, payload, extra_env=None):
+    def run_hook(self, event, payload, extra_env=None, args=(), wrapper=()):
         env = dict(self.env, **(extra_env or {}))
         started = time.perf_counter()
-        done = subprocess.run([sys.executable, "-S", str(SCRIPT), "hook", event],
+        done = subprocess.run(list(wrapper) + [sys.executable, "-S", str(SCRIPT), "hook", event] + list(args),
                               input=payload if isinstance(payload, str) else json.dumps(payload),
                               capture_output=True, text=True, env=env, timeout=10)
         return done, time.perf_counter() - started
@@ -224,7 +241,8 @@ class SessionStart(Base):
         self.assertEqual(done.returncode, 0)
         out = json.loads(done.stdout)["hookSpecificOutput"]
         self.assertEqual(out["hookEventName"], "SessionStart")
-        for word in ("fabric_whoami", "fabric_work_list", "fabric_work_claim", "fabric_work_release", "source: {repository, path, id}"):
+        for word in ("fabric_whoami", "fabric_work_list", "fabric_work_claim", "fabric_work_release", "source: {repository, path, id}",
+                     "com.status", "com.list", "com.read_ack", "com.submit"):
             self.assertIn(word, out["additionalContext"])
         self.assertNotIn("DOOR-TOKEN-SENTINEL", done.stdout)
         self.assertLess(elapsed, 2.0)
@@ -403,9 +421,434 @@ class StopAndEndActive(Base):
         self.assertEqual((done.returncode, done.stdout), (0, ""))
         self.assertLess(elapsed, 2.0, "the hook returns before Fabric is called")
         until = time.monotonic() + 10
+        while time.monotonic() < until and len(self.records("call")) < 2:
+            time.sleep(0.1)
+        self.assertEqual([c["name"] for c in self.records("call")], ["fabric_session_observe", "com.status"])
+
+
+class Active(Base):
+    """A running Fabric that advertises session-hooks/1, a fake fabric-mcp registered as `fabric`, a git repository."""
+
+    def setUp(self):
+        super().setUp()
+        self.hub(features=["session-hooks/1"])
+        self.record = self.base / "record.jsonl"
+        self.board = self.base / "board.txt"
+        fake = self.base / "bin" / "fabric-mcp"
+        fake.parent.mkdir()
+        fake.write_text(FAKE_MCP.format(python=sys.executable))
+        fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+        self.fake = fake
+        self.register(command=str(fake))
+        self.env["FAKE_MCP_RECORD"] = str(self.record)
+        self.env["FAKE_MCP_BOARD"] = str(self.board)
+        subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
+
+    def records(self, kind):
+        if not self.record.exists():
+            return []
+        return [r["value"] for r in map(json.loads, self.record.read_text().splitlines()) if r["kind"] == kind]
+
+    def unread(self, value):
+        self.board.write_text(str(value))
+
+    def turn(self):
+        spawned = []
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=spawned.append)
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        return spawned[0]
+
+    def prompt(self, extra_env=None):
+        done, elapsed = self.run_hook("user-prompt-submit", {"session_id": SID, "cwd": str(self.repo), "prompt": "x"},
+                                      extra_env=extra_env)
+        self.assertEqual(done.returncode, 0)
+        self.assertLess(elapsed, 2.0)
+        return json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"] if done.stdout.strip() else None
+
+
+class BoardUnread(Active):
+    def test_the_stop_worker_writes_the_unread_count_to_the_session_spool(self):
+        self.unread(3)
+        directory = self.turn()
+        self.assertEqual([c["name"] for c in self.records("call")], ["fabric_session_observe", "com.status"])
+        board = json.loads((directory / "board.json").read_text())
+        self.assertEqual(board["unread"], 3)
+        self.assertEqual(stat.S_IMODE((directory / "board.json").stat().st_mode), 0o600)
+        self.assertIn("tool=com.status answer=ok unread=3", self.log_text())
+
+    def test_an_unreadable_board_or_a_refusal_is_no_count(self):
+        for said in ("unavailable", "refuse"):
+            self.unread(said)
+            directory = self.turn()
+            self.assertIsNone(json.loads((directory / "board.json").read_text())["unread"], said)
+        log = self.log_text()
+        self.assertIn("board=unavailable", log)
+        self.assertIn("answer=refused:not_authorized", log)
+        self.assertNotIn("/private/path", log)
+
+    def test_the_end_of_a_session_asks_no_board_status(self):
+        self.unread(2)
+        spawned = []
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "end", self.env, spawn=spawned.append)
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertNotIn("com.status", [c["name"] for c in self.records("call")])
+
+    def test_the_prompt_hook_prints_one_line_only_when_the_count_rises(self):
+        self.assertIsNone(self.prompt(), "no count yet: silent")
+        self.unread(2)
+        self.turn()
+        self.assertEqual(self.prompt(), "2 unread on the project board — com.list")
+        self.assertIsNone(self.prompt(), "the same count is not repeated")
+        self.unread(1)
+        self.turn()
+        self.assertIsNone(self.prompt(), "a fall is not news")
+        self.unread(4)
+        self.turn()
+        self.assertEqual(self.prompt(), "4 unread on the project board — com.list")
+        self.unread(0)
+        self.turn()
+        self.assertIsNone(self.prompt())
+
+    def test_the_prompt_hook_survives_a_broken_spool(self):
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True)
+        for text in ("{broken", json.dumps({"unread": "3"}), json.dumps({"unread": -1}), json.dumps([1])):
+            (directory / "board.json").write_text(text)
+            self.assertIsNone(self.prompt(), text)
+        for stdin in ("not json", "", json.dumps({"session_id": "../x"})):
+            done, _ = self.run_hook("user-prompt-submit", stdin)
+            self.assertEqual((done.returncode, done.stdout), (0, ""))
+
+
+class WatchMail(Active):
+    def watch(self, polls, interval=60, **kw):
+        """Run watch_mail with fake time: stop after `polls` polls; return (exit code, printed lines, sleeps)."""
+        printed, sleeps, done = [], [], {"polls": 0}
+        real_poll = kw.pop("poll", None) or (lambda: fs.poll_unread(SID, self.repo, self.env, deadline_s=8))
+
+        def poll():
+            done["polls"] += 1
+            return real_poll()
+
+        code = fs.watch_mail(SID, self.repo, self.env, interval=interval, poll=poll, out=printed.append,
+                             wait=lambda seconds: sleeps.append(seconds) or False,
+                             stop=lambda: done["polls"] >= polls, rng=kw.pop("rng", lambda: 0.5), **kw)
+        return code, printed, sleeps
+
+    def test_prints_when_the_unread_count_rises(self):
+        counts = iter([0, 2, 2, 1, 3])
+        code, printed, sleeps = self.watch(5, poll=lambda: ("ok", next(counts)))
+        self.assertEqual(code, 0)
+        self.assertEqual(printed, ["2 unread on the project board — com.list", "3 unread on the project board — com.list"])
+        self.assertEqual(sleeps, [60.0] * 5)
+
+    def test_jitter_stays_within_twenty_percent(self):
+        for r, expected in ((0.0, 48.0), (1.0, 72.0)):
+            _, _, sleeps = self.watch(1, poll=lambda: ("ok", 0), rng=lambda r=r: r)
+            self.assertEqual(len(sleeps), 1)
+            self.assertAlmostEqual(sleeps[0], expected)
+
+    def test_fabric_down_backs_off_to_a_bound_and_says_so_once(self):
+        _, printed, sleeps = self.watch(8, interval=60, poll=lambda: ("down", "Fabric is not running"))
+        self.assertEqual(sleeps, [120.0, 240.0, 480.0, 900.0, 900.0, 900.0, 900.0, 900.0])
+        self.assertEqual(len(printed), 1)
+        self.assertIn("Fabric is not running", printed[0])
+        self.assertNotIn("unread", printed[0])
+
+    def test_recovery_resets_the_interval(self):
+        answers = iter([("down", "x"), ("down", "x"), ("ok", 1), ("ok", 1)])
+        _, printed, sleeps = self.watch(4, poll=lambda: next(answers))
+        self.assertEqual(sleeps, [120.0, 240.0, 60.0, 60.0])
+        self.assertEqual(printed[-1], "1 unread on the project board — com.list")
+
+    def test_the_interval_has_a_floor_so_it_never_spins(self):
+        _, _, sleeps = self.watch(2, interval=0, poll=lambda: ("ok", 0))
+        self.assertEqual(sleeps, [float(fs.WATCH_MIN_INTERVAL_S)] * 2)
+
+    def test_a_real_poll_through_fake_fabric_mcp(self):
+        self.unread(5)
+        self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8), ("ok", 5))
+        (argv,) = self.records("argv")
+        self.assertEqual(argv[-3:], ["--rejoin-only", "--runtime-session-id", SID])
+        self.unread("unavailable")
+        self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8)[0], "unavailable")
+        self.hub(features=[])
+        self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8)[0], "down")
+        self.hub(pid=self.dead_pid(), features=["session-hooks/1"])
+        self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8)[0], "down")
+        self.assertEqual(len(self.records("argv")), 2, "no fabric-mcp starts while Fabric is down")
+
+    def test_the_cli_needs_a_session_id_and_exits_on_stdin_close(self):
+        done = subprocess.run([sys.executable, str(SCRIPT), "watch-mail", "--cwd", str(self.repo)],
+                              capture_output=True, text=True, env=self.env, timeout=10)
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("CLAUDE_CODE_SESSION_ID", done.stderr)
+        self.unread(1)
+        proc = subprocess.Popen([sys.executable, str(SCRIPT), "watch-mail", "--interval", "10", "--cwd", str(self.repo)],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
+                                env=dict(self.env, CLAUDE_CODE_SESSION_ID=SID))
+        line = proc.stdout.readline()
+        self.assertEqual(line.strip(), "1 unread on the project board — com.list")
+        started = time.perf_counter()
+        proc.stdin.close()
+        self.assertEqual(proc.wait(timeout=10), 0)
+        self.assertLess(time.perf_counter() - started, 8.0)
+
+    def test_the_cli_exits_on_a_signal(self):
+        import signal
+        proc = subprocess.Popen([sys.executable, str(SCRIPT), "watch-mail", "--interval", "10", "--cwd", str(self.repo)],
+                                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, text=True,
+                                env=dict(self.env, CLAUDE_CODE_SESSION_ID=SID))
+        until = time.monotonic() + 10
         while time.monotonic() < until and not self.records("call"):
             time.sleep(0.1)
-        self.assertEqual([c["name"] for c in self.records("call")], ["fabric_session_observe"])
+        self.assertIsNone(proc.poll(), "stdin from /dev/null is not a closed pipe: keep watching")
+        proc.send_signal(signal.SIGTERM)
+        self.assertEqual(proc.wait(timeout=10), 0)
+
+
+class LaunchedByFabric(Active):
+    def test_the_marker_and_existing_signals(self):
+        self.assertIsNone(fs.fabric_launched(self.env))
+        for extra in ({"FABRIC_LAUNCHED_SESSION": "1"}, {"FABRIC_ACP_SESSION": "x"}, {"FABRIC_BRIDGE_URL": "x"},
+                      {"KILO_CONFIG_CONTENT": "x"}, {"CODEX_HOME": str(self.root / "sessions" / "s1" / "codex-home")}):
+            self.assertIsNotNone(fs.fabric_launched(dict(self.env, **extra)), extra)
+        for extra in ({"FABRIC_LAUNCHED_SESSION": "0"}, {"FABRIC_LAUNCHED_SESSION": ""},
+                      {"CODEX_HOME": str(self.home / ".codex")}):
+            self.assertIsNone(fs.fabric_launched(dict(self.env, **extra)), extra)
+
+    def test_every_hook_is_silent_in_a_launched_session(self):
+        services = self.home / "services"
+        services.mkdir()
+        (services / "a.default.json").write_text('{"origin": "http://127.0.0.1:1"}')
+        self.env["FABRIC_SERVICES_DIR"] = str(services)
+        marker = {"FABRIC_LAUNCHED_SESSION": "1"}
+        for host in ("claude", "codex", "kimi"):
+            done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, extra_env=marker,
+                                    args=["--host", host])
+            self.assertEqual((done.returncode, done.stdout), (0, ""), host)
+        self.assertEqual(fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", dict(self.env, **marker),
+                                       spawn=self.fail), "skipped: launched by Fabric")
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True)
+        (directory / "board.json").write_text(json.dumps({"unread": 3}))
+        self.assertIsNone(self.prompt(extra_env=marker))
+
+    @unittest.skipIf(sys.platform == "win32", "the ancestor check reads POSIX process tables")
+    def test_a_claude_code_fabric_started_is_recognised_by_its_mcp_config(self):
+        wrapper = [sys.executable, "-c",
+                   "import subprocess, sys; i = sys.argv.index('--'); sys.exit(subprocess.run(sys.argv[i + 1:]).returncode)",
+                   "--mcp-config", str(self.root / "sessions" / "s1" / "mcp.json"), "--strict-mcp-config", "--"]
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, wrapper=wrapper)
+        self.assertEqual((done.returncode, done.stdout), (0, ""))
+        elsewhere = [a if a != str(self.root / "sessions" / "s1" / "mcp.json") else str(self.base / "mcp.json") for a in wrapper]
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, wrapper=elsewhere)
+        self.assertIn("fabric_whoami", done.stdout)
+
+
+class ServicesLine(Base):
+    NOTE = ("Fabric on this machine: {total} service descriptors in {dir} ({local} local on 127.0.0.1), protocol "
+            "fabric-service/0.1 — probe GET <origin>/.well-known/fabric-service, or call the fabric-dashboards MCP "
+            "list_services if connected. Never kill these services directly; their supervisor owns them.")
+
+    def services(self):
+        directory = self.base / "svc"
+        directory.mkdir()
+        (directory / "a.default.json").write_text('{\n  "origin": "http://127.0.0.1:4100",\n  "auth": {}\n}')
+        (directory / "b.default.json").write_text('{"origin": "http://localhost:4200"}')
+        (directory / "c.default.json").write_text('{"origin": "https://example.invalid"}')
+        (directory / "notes.txt").write_text("not a descriptor")
+        self.env["FABRIC_SERVICES_DIR"] = str(directory)
+        return directory
+
+    def test_the_line_matches_the_machine_note(self):
+        self.assertIsNone(fs.services_line(self.env))
+        directory = self.services()
+        self.assertEqual(fs.services_line(self.env), self.NOTE.format(total=3, dir=directory, local=2))
+
+    def test_default_services_folder_per_os(self):
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/Users/a"}),
+                         Path("/Users/a/Library/Application Support/ai.passioncode.fabric/services"))
+        self.assertEqual(fs.services_dir("linux", {"HOME": "/h"}), Path("/h/.local/share/passioncode-fabric/services"))
+        self.assertEqual(fs.services_dir("win32", {"HOME": "C:/U", "LOCALAPPDATA": "C:/L"}),
+                         Path("C:/L") / "passioncode-fabric" / "services")
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "/s"}), Path("/s"))
+
+    def test_session_start_carries_it_for_every_host(self):
+        directory = self.services()
+        line = self.NOTE.format(total=3, dir=directory, local=2)
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)})
+        self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], line)
+        for host in ("codex", "kimi"):
+            done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", host])
+            self.assertEqual(done.stdout.strip(), line, host)
+
+
+class OtherHosts(Base):
+    def test_codex_gets_the_preamble_as_text_when_registered(self):
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
+        self.assertEqual((done.returncode, done.stdout), (0, ""), "not registered: silent")
+        codex = self.home / ".codex"
+        codex.mkdir()
+        (codex / "config.toml").write_text('[mcp_servers.fabric]\ncommand = "/opt/Fabric/resources/bin/fabric-mcp"\n')
+        self.hub()
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
+        self.assertIn("this Codex has its MCP server `fabric`", done.stdout)
+        for word in ("fabric_whoami", "com.status", "com.list", "com.submit"):
+            self.assertIn(word, done.stdout)
+        self.assertNotIn("hookSpecificOutput", done.stdout)
+
+    def test_kimi_reads_its_own_mcp_json(self):
+        kimi = self.home / ".kimi-code"
+        kimi.mkdir()
+        (kimi / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "/x/fabric-mcp", "args": []}}}))
+        self.hub(pid=self.dead_pid())
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "kimi"])
+        self.assertIn("Fabric is not running", done.stdout)
+        self.assertIn("lifecycle_ensure_running", done.stdout)
+
+    def test_no_rejoin_for_other_hosts(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('RUNNER = "claude-code"', source)
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "other"])
+        self.assertEqual((done.returncode, done.stdout), (0, ""))
+
+
+class InstallHostHooks(Base):
+    SCRIPT_PATH = "/opt/skills/working-with-fabric/scripts/fabric_session.py"
+
+    def install(self, host, *flags, config=None):
+        argv = ["install-host-hooks", "--host", host, "--script", self.SCRIPT_PATH] + list(flags)
+        if config:
+            argv += ["--config", str(config)]
+        out, err = [], []
+        code = fs.install_host_hooks_cli(argv[1:], env=self.env, out=out.append, err=err.append)
+        return code, "\n".join(out + err), "\n".join(err)
+
+    def codex_file(self, doc):
+        path = self.home / ".codex" / "hooks.json"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps(doc, indent=2))
+        path.chmod(0o640)
+        return path
+
+    def test_dry_run_is_the_default_and_writes_nothing(self):
+        path = self.codex_file({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "other", "timeout": 5}]}]}})
+        before = path.read_bytes()
+        code, out, _ = self.install("codex")
+        self.assertEqual(code, 0)
+        self.assertIn("dry run", out)
+        self.assertIn("hook session-start --host codex", out)
+        self.assertIn(str(path), out)
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(list(path.parent.glob("*.bak")), [])
+
+    def test_apply_backs_up_adds_one_entry_and_keeps_the_rest(self):
+        original = {"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "other", "timeout": 5}]}],
+                              "Stop": [{"hooks": [{"type": "command", "command": "keep"}]}]}}
+        path = self.codex_file(original)
+        before = path.read_bytes()
+        code, out, _ = self.install("codex", "--apply")
+        self.assertEqual(code, 0, out)
+        (backup,) = path.parent.glob("hooks.json.*.bak")
+        self.assertEqual(backup.read_bytes(), before)
+        doc = json.loads(path.read_text())
+        self.assertEqual(doc["hooks"]["Stop"], original["hooks"]["Stop"])
+        self.assertEqual(doc["hooks"]["SessionStart"][0], original["hooks"]["SessionStart"][0])
+        (ours,) = [h for e in doc["hooks"]["SessionStart"] for h in e["hooks"] if "fabric_session.py" in h["command"]]
+        self.assertEqual(ours["command"], "python3 -S %s hook session-start --host codex" % self.SCRIPT_PATH)
+        self.assertLessEqual(ours["timeout"], 5)
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o640)
+        code, out, _ = self.install("codex", "--apply")
+        self.assertEqual(code, 0)
+        self.assertIn("already", out)
+        self.assertEqual(len(list(path.parent.glob("hooks.json.*.bak"))), 1, "nothing to change: no second backup")
+        code, out, _ = self.install("codex", "--remove")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(json.loads(path.read_text()), original)
+
+    def test_a_missing_file_is_created_on_apply_only(self):
+        path = self.home / ".codex" / "hooks.json"
+        code, out, _ = self.install("codex")
+        self.assertEqual(code, 0)
+        self.assertFalse(path.exists())
+        code, out, _ = self.install("codex", "--apply")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(json.loads(path.read_text())["hooks"]["SessionStart"]), 1)
+
+    def test_a_changed_shape_is_refused(self):
+        for doc in ({"hooks": []}, {"hooks": {"SessionStart": {"x": 1}}}, [1], {"hooks": {"SessionStart": [{"hooks": "x"}]}}):
+            path = self.codex_file(doc)
+            before = path.read_bytes()
+            code, _, err = self.install("codex", "--apply")
+            self.assertEqual(code, 1, doc)
+            self.assertIn("shape", err)
+            self.assertEqual(path.read_bytes(), before)
+        path.write_text("{broken")
+        code, _, err = self.install("codex", "--apply")
+        self.assertEqual(code, 1)
+
+    def test_a_file_that_changed_since_the_dry_run_is_refused(self):
+        path = self.codex_file({"hooks": {}})
+        code, out, _ = self.install("codex")
+        digest = [line.split()[-1] for line in out.splitlines() if "sha256" in line][0]
+        path.write_text(json.dumps({"hooks": {"Stop": []}}))
+        code, _, err = self.install("codex", "--apply", "--expect-sha256", digest)
+        self.assertEqual(code, 1)
+        self.assertIn("changed", err)
+
+    def kimi_file(self, text):
+        path = self.home / ".kimi-code" / "config.toml"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(text)
+        return path
+
+    @unittest.skipIf(fs.tomllib is None, "tomllib needs Python 3.11")
+    def test_kimi_appends_one_hooks_table_and_removes_it_exactly(self):
+        original = ('default_model = "m"\n\n[[hooks]]\nevent = "SessionStart"\ncommand = "other"\ntimeout = 5\n'
+                    '# >>> managed (do not edit) >>>\n[[hooks]]\nevent = "Stop"\ncommand = "keep"\n# <<< managed <<<\n')
+        path = self.kimi_file(original)
+        code, out, _ = self.install("kimi")
+        self.assertEqual(path.read_text(), original)
+        self.assertIn('event = "SessionStart"', out)
+        code, out, _ = self.install("kimi", "--apply")
+        self.assertEqual(code, 0, out)
+        text = path.read_text()
+        self.assertTrue(text.startswith(original))
+        hooks = fs.tomllib.loads(text)["hooks"]
+        self.assertEqual(len(hooks), 3)
+        self.assertEqual(hooks[-1]["command"], "python3 -S %s hook session-start --host kimi" % self.SCRIPT_PATH)
+        (backup,) = path.parent.glob("config.toml.*.bak")
+        self.assertEqual(backup.read_text(), original)
+        code, out, _ = self.install("kimi", "--apply")
+        self.assertIn("already", out)
+        code, out, _ = self.install("kimi", "--remove")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(path.read_text(), original)
+
+    @unittest.skipIf(fs.tomllib is None, "tomllib needs Python 3.11")
+    def test_kimi_refuses_a_hooks_key_of_another_shape(self):
+        for text in ('hooks = "x"\n', '[hooks]\nevent = "x"\n', "not = [toml\n"):
+            path = self.kimi_file(text)
+            code, _, err = self.install("kimi", "--apply")
+            self.assertEqual(code, 1, text)
+            self.assertEqual(path.read_text(), text)
+
+    def test_kimi_apply_without_a_toml_reader_is_refused(self):
+        path = self.kimi_file('default_model = "m"\n')
+        saved = fs.tomllib
+        fs.tomllib = None
+        try:
+            code, _, err = self.install("kimi", "--apply")
+        finally:
+            fs.tomllib = saved
+        self.assertEqual(code, 1)
+        self.assertIn("3.11", err)
+        self.assertEqual(path.read_text(), 'default_model = "m"\n')
+
+    def test_an_unknown_host_is_refused(self):
+        code, _, err = self.install("claude", "--apply")
+        self.assertEqual(code, 2)
 
 
 class Status(Base):
@@ -450,9 +893,10 @@ class Status(Base):
 
 
 class PluginHooks(unittest.TestCase):
-    def test_the_three_events_run_the_script_within_short_timeouts(self):
+    def test_the_four_events_run_the_script_within_short_timeouts(self):
         hooks = json.loads(HOOKS.read_text(encoding="utf-8"))["hooks"]
-        expected = {"SessionStart": "hook session-start", "Stop": "hook stop", "SessionEnd": "hook session-end"}
+        expected = {"SessionStart": "hook session-start", "Stop": "hook stop", "SessionEnd": "hook session-end",
+                    "UserPromptSubmit": "hook user-prompt-submit"}
         for event, tail in expected.items():
             commands = [h for e in hooks[event] for h in e["hooks"] if "fabric_session.py" in h["command"]]
             self.assertEqual(len(commands), 1, event)
