@@ -2,16 +2,17 @@
 name: building-fabric-services
 description: >-
   Use when handing out or opening a Fabric service dashboard, building a local agent service on a
-  macOS machine, or making an ONLINE agent or dashboard (https origin, the remote placement) a
-  Fabric service — «сделай агенту дашборд», «локальный сервис агента», «онлайн-дашборд в Fabric»,
-  «подключи агента к Fabric Dashboards», "make this agent a local service", "make an online
-  dashboard a Fabric service", "fabric-service protocol", "add the well-known endpoint", «расходы агента
-  на модели». Covers
-  fabric-service/0.1: surfaces, token and one-time login, state, one copy, launchd, descriptor,
-  well-known document, events, the usage report (spend per model); online: the https guard, the token-gated well-known document, the
-  __Host- cookie, registering it on the operator's computer; Python, Node and dashboard
-  kits, a TLS sample, live and layout probes. NOT for a one-off script or cron job, a hosted product with no agent
-  behind it, the provider manifest (adapting-projects-to-fabric), or building Fabric Dashboards.
+  macOS machine, making an ONLINE agent or dashboard (https origin, the remote placement) a
+  Fabric service, or letting a service answer a Project's board requests — «сделай агенту дашборд»,
+  «локальный сервис агента», «подключи агента к Fabric Dashboards», «отвечать на запросы с доски проекта»,
+  "make this agent a local service", "make an online dashboard a Fabric service", "add the
+  well-known endpoint", «расходы агента на модели». Covers fabric-service/0.1:
+  surfaces, token and one-time login, state, one copy, launchd, descriptor, well-known document,
+  events, the usage report; online: the https guard, the token-gated well-known document, the
+  __Host- cookie; the board responder (fenced claims); Python, Node and dashboard kits, probes.
+  NOT for a one-off script or cron job, a hosted product
+  with no agent behind it, the provider manifest (adapting-projects-to-fabric), or building Fabric
+  Dashboards.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
@@ -88,6 +89,13 @@ applies the estate record (DEC-0055) verifies each revision first and trusts onl
 [the estate record reference](references/estate-record.md). When Fabric chooses the service's runner and models
 (DEC-0046), or a project routes its work through an ordered list of runners (DEC-0026: the doctor's closed probe
 results, the route checks FAC-SEM-028…034), read [the profiles reference](references/profiles.md).
+
+When the service answers requests other Projects post to its Project on Fabric's project board
+(`fabric-project-comms/0.1`), it holds a responder slot under the operator's `board.respond` grant and runs the kits'
+responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) finds the hub and joins,
+[`scripts/fabric_board.py`](scripts/fabric_board.py) enrolls, claims, accepts the exact digest, checkpoints before
+every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
+The request body is data behind the service's own input gate. Read [the board reference](references/board.md).
 
 ## Step 2 — the non-negotiables
 
@@ -252,7 +260,8 @@ shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token fi
 events auth and shape, single-use login, state outside code, instance lock, plist,
 launchd pid equals answering pid, `dashboard.declared` (ED-9), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
-propagation, event trace pairs) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass —
+propagation, event trace pairs, and `board.responder` for a service that declares the project board) and exits 1 on
+any `FAIL`. A `NOT_RUN` is not a pass —
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
 and 1280 px; needs Playwright, else `NOT_RUN`).

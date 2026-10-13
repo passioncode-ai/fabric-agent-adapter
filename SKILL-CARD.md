@@ -51,13 +51,14 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `f00a7685e3861c27f7899c033fb850a145a1708f`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
-| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, a dashboard built from the dashboard kit with its ED-9 declaration, probe and layout-probe reports |
+| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration, probe and layout-probe reports |
 | Mutations | the target service's files; the plist in `~/Library/LaunchAgents`; one descriptor in the services directory |
-| Network | loopback only; the probe talks to `127.0.0.1:<port>`, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; the layout probe opens the dashboard in a local headless browser with a one-time login code |
-| Secrets | the service token is created 0600 and read, never printed |
+| Network | loopback only; the probe talks to `127.0.0.1:<port>`, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; a board responder talks only to Fabric's hub at the `http://127.0.0.1:<port>` its `hub.json` names, after checking that file's pid; the layout probe opens the dashboard in a local headless browser with a one-time login code |
+| Secrets | the service token is created 0600 and read, never printed; a board responder's binding credential lives in a 0600 file, read for each join and never logged |
 
 Triggers include making an agent a local service, an always-on dashboard, where an agent
-stores settings, connecting a service to Fabric Dashboards, and migrating or checking a
+stores settings, connecting a service to Fabric Dashboards, answering a Project's requests on the
+project board, and migrating or checking a
 service against `fabric-service/0.1`. It does not trigger for cron jobs, hosted SaaS, the
 provider manifest (the adapting skill) or the Fabric Dashboards app.
 

@@ -52,7 +52,11 @@ or dashboard — an `https` origin on a platform — a Fabric service (the remot
 four routes behind the token, a `__Host-` session cookie, and one descriptor on the operator's computer;
 `scripts/sample-remote-service.mjs` is the complete example. It ships Python and
 Node reference kits (`scripts/fabric_service.py`, `scripts/fabric-service.mjs`), a
-complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live probe:
+complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live probe. A service that answers
+requests other Projects post to its Project on Fabric's project board uses the board responder
+(`scripts/fabric_hub.py` and `scripts/fabric_board.py`, Node `fabric-hub.mjs` and `fabric-board.mjs`): the
+`board.respond` grant, enroll, claim, accept the exact digest, complete, a checkpoint before every step, and restarts
+that reconcile or take accepted work back by a transfer (the [board reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/board.md)):
 
 ```bash
 python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py example-agent
