@@ -1,13 +1,14 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `fe55fc67cba1a9e34a736da7d148d4fe2a8fbfa0`
+Pinned to `fabric-agent-contract` commit `a046f57cf46ea9e3da57ff8ce6a3ed4d26d8774b`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
 canonical forms DEC-0043; `degraded[].setup` and `run.mcp.stdio.scope` DEC-0044; delegation sealed and trust tiers
 DEC-0045; runner and model profiles DEC-0046; the estate record DEC-0055; one copy under any supervisor and its marker,
 the Windows token-file reader DEC-0057; the hub key the estate certifies DEC-0060; signing credentials DEC-0063; the
-estate record's 60 s skew DEC-0066). The contract's schemas are normative;
+estate record's 60 s skew DEC-0066; an app's own descriptor DEC-0069; the descriptor for listings DEC-0061; identifier equality
+by normal form DEC-0076). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
@@ -40,6 +41,17 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `installedAt`, `installedBy` | when, and who installed it: the installer and its version as a string, or `{by, role?, tool}` (DEC-0061) — `by` `person` (with `role` `operator` or `administrator`), `node` or `organization`; `role` for a person only; `tool` the installer and its version. It names a role, never a person. An app's descriptor uses the object form with `by: "person"`. `register_remote` / `registerRemote` and the sample write the object form |
 | `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none` — a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
 | `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed` or `personal`; `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
+
+## Identifier equality (DEC-0076)
+
+Two identifiers are the same when their normal forms are equal. `normal_identifier` / `normalIdentifier` and
+`same_identifier` / `sameIdentifier` (`fabric_identifiers.py`, `fabric-identifiers.mjs`, ports of the contract's
+`src/identifiers.ts`, held to its `identifiers.json`) apply RFC 3986 §6.2.2 to a URI: scheme and host lower-cased,
+percent-encoding hex upper-cased, unreserved characters decoded, dot segments removed. A `urn:` follows RFC 8141 §3.1
+instead: `urn` and the NID lower-cased, nothing decoded, the NSS's case kept. Any other string is its own normal form,
+and a value that is not a string is compared as it is. The kits compare by it in FAC-SEM-030/032/034 (routes, bindings,
+events), FAC-SEM-076 (estate grants and their revocations) and FAC-SEM-014 (a provider entry's `providerId`), and they
+write the identifiers they scaffold in normal form.
 
 ## Well-known document — `GET /.well-known/fabric-service`
 

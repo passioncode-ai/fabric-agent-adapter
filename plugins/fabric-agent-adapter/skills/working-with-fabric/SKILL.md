@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex and Kimi Code get the session-start preamble hook on the person's consent.
 metadata:
   author: PassionCode.ai
-  version: "0.24.0"
+  version: "0.25.0"
 ---
 
 # Working with Fabric

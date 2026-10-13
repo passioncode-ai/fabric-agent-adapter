@@ -29,6 +29,7 @@ const supervisor = await src('service-supervisor.ts');
 const windowsToken = await src('windows-token.ts');
 const appDescriptor = await src('app-descriptor.ts');
 const descriptorRules = await src('descriptor-rules.ts');
+const identifiers = await src('identifiers.ts');
 
 // hub-key.json: every case re-answered by hubKeyCertified; seeds dropped.
 const hub = read('fixtures/vectors/hub-key.json');
@@ -99,4 +100,10 @@ const semanticDescriptors = fs.readdirSync(semanticDir).filter((f) => /^service-
   return { name: file.replace(/\.json$/, ''), document: fixture.document, findings: descriptorRules.descriptorPeerRules(fixture.document).map((f) => ({ code: f.code, instancePath: f.instancePath })) };
 });
 write('descriptor-fixtures.json', { about: 'Every service-descriptor fixture of the contract at the pin, valid or not as fixtures/catalogue.json says, and the FAC-SEM-085/086 semantic fixtures with the findings descriptorPeerRules gives them.', source: 'fixtures/catalogue.json, fixtures/semantic/service-*', descriptors, semantic: semanticDescriptors });
+// DEC-0076: identifier equality, every case re-answered by normalIdentifier and sameIdentifier.
+const ids = read('fixtures/vectors/identifiers.json');
+for (const c of [...ids.normal, ...ids.laxPorts]) if (identifiers.normalIdentifier(c.input) !== c.expected) throw new Error(`the contract's identifier case "${c.name}" no longer answers as written`);
+for (const [a, b] of ids.same) if (!identifiers.sameIdentifier(a, b)) throw new Error(`the contract's same pair ${a} ${b} no longer answers as written`);
+for (const [a, b] of ids.different) if (identifiers.sameIdentifier(a, b)) throw new Error(`the contract's different pair ${a} ${b} no longer answers as written`);
+write('identifier-vectors.json', { ...ids, source: 'fixtures/vectors/identifiers.json' });
 console.log(`${peer.cases.length} peer cases, ${app.action.length + app.stale.length} app-descriptor cases, ${descriptors.length} descriptor fixtures, ${semanticDescriptors.length} semantic`);

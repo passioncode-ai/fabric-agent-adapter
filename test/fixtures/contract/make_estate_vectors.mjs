@@ -63,6 +63,18 @@ for (const [name, kind, value] of [['positive/estate-record-first', 'estate-reco
   rules.push({ name, kind, value, expected: estate.estateRecordRules(kind, value) });
 }
 
+// DEC-0076: a grant's id is a URI, so grants and `grant` revocations are keyed by its normal form. The semantic fixtures
+// write ids in normal form, so these respell one (`urn` and the NID upper-cased) and take the contract's own answer: a
+// byte comparison passes them, a normal-form one does not; changing the NSS's case keeps them two grants.
+const twice = read(path.join(args.semantic, 'estate-grant-twice.json')).input;
+const respell = (id) => String(id).replace(/^urn:([^:]+)/i, (_, nid) => `URN:${nid.toUpperCase()}`);
+for (const [name, value] of [
+  ['a grant listed twice under two spellings (DEC-0076)', (() => { const r = clone(twice); r.shareGrants[1].meta.id = respell(r.shareGrants[1].meta.id); return r; })()],
+  ['two grants whose ids differ in the NSS case are two (DEC-0076)', (() => { const r = clone(twice); r.shareGrants[1].meta.id = r.shareGrants[1].meta.id.toUpperCase().replace(/^URN:GRANT:ESTATE:/, 'urn:grant:estate:'); return r; })()],
+  ['a grant revoked under another spelling while still listed (DEC-0076)', (() => { const r = clone(twice); r.shareGrants.pop(); r.revocations = [{ kind: 'grant', ref: respell(r.shareGrants[0].meta.id), revokedAt: r.issuedAt }]; return r; })()],
+  ['a grant revoked twice under two spellings (DEC-0076)', (() => { const r = clone(twice); const id = r.shareGrants[0].meta.id; r.shareGrants = []; r.revocations = [{ kind: 'grant', ref: id, revokedAt: r.issuedAt }, { kind: 'grant', ref: respell(id), revokedAt: r.issuedAt }]; return r; })()],
+]) rules.push({ name, kind: 'estate-record', value, expected: estate.estateRecordRules('estate-record', value) });
+
 // The digest, the challenge and placementTrust.
 const digests = [first, second].map((record) => ({ record, digest: estate.estateRecordDigest(record), challenge: estate.estateChallenge(estate.estateRecordDigest(record)).toString('hex'),
   challengeInput: estate.estateChallengeInput(estate.estateRecordDigest(record)).toString('utf8') }));
