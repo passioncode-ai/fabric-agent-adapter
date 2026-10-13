@@ -12,7 +12,7 @@ wins and this page is the defect. The rule each section serves:
 | LC-09 the footprint is declared | the descriptor and the plist, unit or task; the service's own `AGENTS.md` names its label (unit, task) and port | `write_descriptor`, `launchd_plist`, `systemd_unit` / `systemdUnit`, `task_xml` / `taskXml` |
 | LC-11 previous release kept, older pruned | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `prune_releases` / `pruneReleases` |
 | LC-12 every file is bounded | [Logs](#logs) | `RotatingLog`, `cap_stdout_log` / `RotatingLog`, `capStdoutLog` |
-| LC-14 operator intent wins; uninstall is symmetric | [Install, upgrade, uninstall](#install-upgrade-uninstall), [Linux and Windows](#linux-and-windows) | `launchd_install`, `launchd_uninstall` (Python); `systemd_install` / `systemdInstall`, `task_install` / `taskInstall` and their uninstalls |
+| LC-14 operator intent wins; uninstall is symmetric | [Install, upgrade, uninstall](#install-upgrade-uninstall), [Linux and Windows](#linux-and-windows) | `launchd_install` / `launchdInstall`, `launchd_uninstall` / `launchdUninstall`; `systemd_install` / `systemdInstall`, `task_install` / `taskInstall` and their uninstalls |
 | LC-15 builds clean up after themselves | release pruning runs inside the installer, not later | `prune_releases` / `pruneReleases` |
 
 ## Contents
@@ -26,7 +26,7 @@ wins and this page is the defect. The rule each section serves:
 - [Being managed by a host lifecycle broker](#being-managed-by-a-host-lifecycle-broker)
 - [Linux and Windows](#linux-and-windows)
 
-## launchd plist (generate it with `launchd_plist`)
+## launchd plist (generate it with `launchd_plist` or `launchdPlist`; both kits write the same bytes)
 
 | Key | Value | Why |
 |---|---|---|
@@ -37,7 +37,7 @@ wins and this page is the defect. The rule each section serves:
 | `ThrottleInterval` | `10` | bounds a crash loop |
 | `ExitTimeOut` | above the drain and its hard exit (15 s default; `Drain` ends by 10 s) | SIGKILL arrives after it, so it must never come first |
 | `ProcessType` | `Standard` — never `Background`, and no `Nice` > 0 or `LowPriorityIO` | a host probes the service and agents call it while the Mac is busy; a background job is starved for tens of seconds under load and every host reports an outage that never happened (the probe's `lifecycle.priority` rule fails it) |
-| `EnvironmentVariables` | `PATH` set explicitly; `*_FILE` paths to secrets; `FABRIC_SERVICE_SUPERVISOR=launchd` | never a secret value — the plist is world-readable in backups; the supervisor marker is how the lock knows to back off |
+| `EnvironmentVariables` | `PATH` set explicitly; `*_FILE` paths to secrets; `FABRIC_SERVICE_SUPERVISOR=launchd` | never a secret value — the plist is world-readable in backups; the supervisor marker is how the lock knows to back off (the probe's `lifecycle.supervisor-marker` rule fails a plist without it: a copy that finds the lock held would exit 75 at once into a respawn every `ThrottleInterval`) |
 | `StandardOutPath`/`StandardErrorPath` | `~/Library/Logs/<id>/service.log` | one place the host tails |
 
 ## Install, upgrade, uninstall
@@ -45,14 +45,14 @@ wins and this page is the defect. The rule each section serves:
 1. Build or unpack the release into `~/.local/share/<id>/releases/<version>-<sha12>/`
    (a venv or `node_modules` inside it). Never edit a release after it is written.
 2. `write_descriptor` (port and id claims are checked here).
-3. `launchd_install`: write + `plutil -lint`, read `launchctl print-disabled gui/<uid>`,
+3. `launchd_install` (Node: `await launchdInstall(...)`, the same steps): write + `plutil -lint`, read `launchctl print-disabled gui/<uid>`,
    `enable` **only when no override is recorded** (a first install), `bootout` and wait
    until `launchctl print gui/<uid>/<label>` fails, `bootstrap` with up to five retries,
    then poll the well-known document until it answers with this `id.instance`.
 4. Upgrade = new release, rewrite the plist with the new path, `launchd_install`
    again, then `prune_releases(releases_dir, current=<new release>)`: the running release
    and the one before it stay for rollback, older ones go (LC-11, LC-15).
-5. Uninstall = `launchd_uninstall` + `remove_descriptor`. Data stays; `purge=True`
+5. Uninstall = `launchd_uninstall` (Node: `await launchdUninstall(...)`) + `remove_descriptor`. Data stays; `purge=True`
    (with `service_id`) removes data, logs and cache when the operator asks.
 
 **The operator's intent wins (LC-14).** A host stops a service with `bootout` **and**

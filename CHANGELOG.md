@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.30.0 - 2026-10-13
+
+The Node service kit installs and uninstalls a launchd job, as the Python kit does (FAA-04). The probe fails a plist
+whose copy would not know launchd supervises it (FAA-05).
+
+### Added
+
+- **launchd in the Node kit** (`fabric-service.mjs`, FAA-04): `launchdPlist`, `launchdLoaded`, `launchdOverride`,
+  `launchdInstall` and `launchdUninstall`, the twins of the Python `launchd_*` helpers.
+  - `launchdPlist` writes the same bytes as Python's `plistlib`.
+  - It writes `FABRIC_SERVICE_SUPERVISOR=launchd` itself and refuses a marker argument.
+  - It refuses a secret-named variable (a `*_FILE` path is fine), and any variable value or argument shaped like a
+    credential, a control character or an empty program.
+  - `launchdInstall` follows the LC-14 order: lint, then enable only on a first install. A label the operator
+    disabled stays off, with the plist rewritten. The bootout is waited out, the bootstrap retried five times, and
+    the install resolves once the well-known document answers with this `id.instance`.
+  - `launchdUninstall` waits for the unload, removes the plist and resets the override to `enabled`. `purge` (with
+    the service id) removes data, logs and cache; a symlinked folder loses only its link.
+  - Off macOS both are refused, with the name of that platform's installer. `run`, `fetchWellKnown` and `sleep` are
+    injectable, so tests never reach the real launchctl.
+- **Probe rule `lifecycle.supervisor-marker`** (`check_service.py`, FAA-05). It reads the plist's
+  `EnvironmentVariables` and `ProgramArguments` the way the started copy reads them (`supervisor_marker`,
+  DEC-0057). It fails these cases:
+  - no marker;
+  - a marker naming another supervisor, or naming none;
+  - markers that disagree.
+
+  Without the marker, a copy that finds the lock held exits 75 at once, and KeepAlive restarts it every
+  `ThrottleInterval`. Plists written by `launchd_plist` since 0.8.0 (FAA-06) carry the marker; an older one fails
+  until it is regenerated and reinstalled.
+
+### Evidence
+
+- `test/fabric-service-launchd.test.mjs` (20 cases) runs against a launchd stand-in with the Python fake's
+  semantics. Its byte-identity case compares `launchdPlist` with `plistlib` output.
+- Two Python cases in `test/test_fabric_service.py` check `marker_problem` and the rule run on a written plist.
+- 16 planted defects were all caught, after replacing two equivalent mutants with real ones. Among them: enable on
+  every install, a skipped unload wait, a kept override, unsorted keys, an early bootstrap give-up, an ignored
+  instance, a dropped marker, a skipped lint, the legacy override format, an endless uninstall wait, and a probe
+  that accepts any supervisor or none.
+
 ## 0.29.0 - 2026-10-13
 
 `working-with-fabric` carries the limit-stop rule (fabric-workspace principle 10, item 6, operator 2026-10-13).
