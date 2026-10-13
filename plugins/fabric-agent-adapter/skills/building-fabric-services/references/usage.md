@@ -5,6 +5,14 @@ Fabric Agent Contract DEC-0021, `docs/specification/service.md` → *Usage repor
 offer it, so Fabric Dashboards (Spend, MCP `spend`) and Fabric can show each agent's spend beside
 its health without knowing any provider.
 
+## Contents
+
+- What to record
+- What to answer
+- By project (DEC-0065)
+- OpenRouter attribution (DEC-0065)
+- Verify
+
 ## What to record
 
 One **receipt per model call**, built from the numbers the provider returned:
@@ -78,9 +86,36 @@ Call `ledger.prune()` at start (or daily) to keep the file at the reported windo
 `JsonlUsageLedger` appends 0600 JSON lines. A line torn by a killed writer is skipped, and the
 next receipt never glues onto it.
 
+## By project (DEC-0065)
+
+Pass `project_id` / `projectId` (the URI of the project the service ran the call for) and, optionally, `task_run_id` /
+`taskRunId` (the service's own run id) to `make_usage_receipt` / `makeUsageReceipt`. The report then carries `byProject`:
+each project once, by the normal form of its id (DEC-0076, so `URN:PROJECT:a` and `urn:project:a` are one row), with
+its calls, unpriced calls, cost and `taskRuns`. A call for no project is in no row. It is the service's own run
+attribution and names no caller, session or person. `usage_findings` / `usageFindings` port FAC-SEM-025 whole:
+- the arithmetic;
+- the window: every day exists, is not after `generatedAt`'s UTC date, and is at most 30 days before it;
+- the projects: each project and task run once, and their calls, priced calls and known costs within the days' (CT-40).
+
+A row's `route` may be `platform-metered`: the hosting platform's own metered models under the deployment's account.
+
+## OpenRouter attribution (DEC-0065)
+
+A product credits its own OpenRouter traffic with `attribution_headers(setting, request)` / `attributionHeaders`. The
+setting is `{product, title, categories?}`: a lower-case slug (the app is `https://passioncode.ai/<product>/`), a printable
+title, and at most two of OpenRouter's recognized categories (FAC-SEM-098, `attribution_setting_findings`). Attribution
+is off by default: without a setting nothing is sent. The answer adds `HTTP-Referer`, `X-OpenRouter-Title` and
+`X-OpenRouter-Categories` only when all of these hold:
+- the request goes to `https://openrouter.ai` (read as a browser reads a URL);
+- the product itself originated the traffic;
+- the request carries no attribution header of the user's own.
+
+Otherwise it answers why not. It never reads, moves or returns a key.
+
 ## Verify
 
 `check_service.py <id>` reads a declared report: `usage.requires-token` (401 without the token)
-and `usage.report` (identity, USD, dates forward, null for all-unpriced rows, sums). The
+and `usage.report` (identity, USD, dates forward, null for all-unpriced rows, sums, each row's route, the window and
+`byProject`). The
 `sample_service.py` serves one. Fabric Dashboards → **Spend** shows it within a minute of opening
 the page.

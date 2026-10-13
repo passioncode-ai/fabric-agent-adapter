@@ -374,6 +374,17 @@
         "answers a document in a revision it does not read with negotiate_revision / negotiateRevision's schema-unsupported refusal before reading it further, and its own fault when it accepts none",
         "checks both with check_service.py (well-known.protocols, events.data)"
       ]
+    },
+    {
+      "id": "usage-by-project-and-attribution",
+      "trap": "a service's usage report put a day after generatedAt and split one project's spend over two rows spelled differently; it also sent its OpenRouter title on traffic it forwarded for a user who had set their own",
+      "request": "example-agent reports its model spend by the project it ran each call for, and credits its own OpenRouter traffic to the product.",
+      "expected": [
+        "passes project_id / projectId (a URI, kept in normal form) and task_run_id / taskRunId to make_usage_receipt; usage_report writes byProject with each project once and each task run once, naming no caller, session or person",
+        "keeps every day within the last 31 UTC days of generatedAt and holds the report to usage_findings / usageFindings (FAC-SEM-025: arithmetic, window, projects, cost sums) and check_service.py",
+        "adds OpenRouter attribution only through attribution_headers / attributionHeaders with its setting {product, title, categories?} (FAC-SEM-098): off by default, only to https://openrouter.ai, only for traffic it originates, never over a user's own attribution headers",
+        "reports platform-metered calls as their own route"
+      ]
     }
   ]
 }

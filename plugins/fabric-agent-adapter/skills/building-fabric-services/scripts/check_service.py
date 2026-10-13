@@ -880,6 +880,16 @@ def usage_problems(report: Any, service_id: str, instance: str) -> List[str]:
         known = sum(m["costUsd"] for m in models if isinstance(m.get("costUsd"), (int, float)))
         if isinstance(day.get("costUsd"), (int, float)) and abs(day["costUsd"] - known) > 1e-6:
             out.append("%s: costUsd is not the sum of its models' known costs" % at)
+        for j, m in enumerate(models):
+            # DEC-0046, DEC-0061: a row's route is a login in its vendor's runner, an issued key, or the platform's
+            # own metered models (a listing in the cloud).
+            if "route" in m and m["route"] not in fs.USAGE_ROUTES:
+                out.append("%s.byModel[%d]: route %r is not subscription, key or platform-metered" % (at, j, m["route"]))
+    # DEC-0065: the window and the project attribution, as the contract's usageRules reads them (FAC-SEM-025).
+    for finding in fs.usage_findings(report):
+        path, message = finding["instancePath"], finding["message"]
+        if path.startswith(("/byProject", "/generatedAt")) or "generatedAt" in message or "exists in its month" in message:
+            out.append("%s: %s" % (path or "/", message))
     return out
 
 

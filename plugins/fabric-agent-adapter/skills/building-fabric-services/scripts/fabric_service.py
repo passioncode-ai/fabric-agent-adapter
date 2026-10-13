@@ -1618,8 +1618,12 @@ _PROVIDER = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_tokens: int,
                        cache_read_tokens: int = 0, cache_write_tokens: int = 0,
                        cost_usd: Optional[float] = None, cost_basis: Optional[str] = None,
-                       at: Optional[str] = None, route: Optional[str] = None) -> Dict[str, Any]:
+                       at: Optional[str] = None, route: Optional[str] = None,
+                       project_id: Optional[str] = None, task_run_id: Optional[str] = None) -> Dict[str, Any]:
     """One model call, from the provider's own usage numbers. No prompt, output or caller.
+
+    `project_id` (a URI, kept in its normal form, DEC-0076) and `task_run_id` (the service's own run id) attribute the
+    call to the project the service ran it for (DEC-0065); they never name a caller, session or person.
 
     `cost_usd` is None when the call cannot be priced: the report counts it as unpriced and
     never as $0. `cost_basis` is `provider` (the provider reported the charge) or `price-list`
@@ -1645,7 +1649,53 @@ def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_t
                "costUsd": None if cost_usd is None else float(cost_usd), "costBasis": basis}
     if route is not None:
         receipt["route"] = route  # the operator's own login in its vendor's runner, an issued key, or the platform's metered models
+    if task_run_id is not None and project_id is None:
+        raise ServiceError("a task run belongs to a project: give project_id with task_run_id.")
+    if project_id is not None:
+        import fabric_identifiers  # noqa: E402 - beside this file
+        if not (isinstance(project_id, str) and _URI.fullmatch(project_id)):
+            raise ServiceError("project_id is the URI of the project the service ran the call for.")
+        receipt["projectId"] = fabric_identifiers.normal_identifier(project_id)
+    if task_run_id is not None:
+        if not (isinstance(task_run_id, str) and _TASK_RUN_ID.fullmatch(task_run_id)):
+            raise ServiceError("task_run_id is the service's own run id: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$.")
+        receipt["taskRunId"] = task_run_id
     return receipt
+
+
+_URI = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:\S+", re.ASCII)
+_TASK_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", re.ASCII)
+
+
+def _by_project(receipts: List[Dict[str, Any]], first: str, last: str) -> List[Dict[str, Any]]:
+    """DEC-0065's `byProject`: the window's calls by the project the service ran them for, each project once (by its
+    normal form, DEC-0076) and each task run once within it. A call for no project is in no row."""
+    projects: Dict[str, Dict[str, Any]] = {}
+    for r in receipts:
+        if not (first <= str(r.get("at", ""))[:10] <= last) or not r.get("projectId"):
+            continue
+        row = projects.setdefault(r["projectId"], {"projectId": r["projectId"], "calls": 0, "unpricedCalls": 0, "_cost": 0.0, "_runs": {}})
+        row["calls"] += 1
+        if r.get("costUsd") is None:
+            row["unpricedCalls"] += 1
+        else:
+            row["_cost"] += float(r["costUsd"])
+        if r.get("taskRunId"):
+            run = row["_runs"].setdefault(r["taskRunId"], {"taskRunId": r["taskRunId"], "calls": 0, "unpricedCalls": 0, "_cost": 0.0})
+            run["calls"] += 1
+            if r.get("costUsd") is None:
+                run["unpricedCalls"] += 1
+            else:
+                run["_cost"] += float(r["costUsd"])
+    out = []
+    for key in sorted(projects):
+        row = projects[key]
+        runs = [_close_totals(run) for _, run in sorted(row.pop("_runs").items())]
+        row = _close_totals(row)
+        if runs:
+            row["taskRuns"] = runs
+        out.append(row)
+    return out
 
 
 def _add_totals(row: Dict[str, Any], receipt: Dict[str, Any]) -> None:
@@ -1662,6 +1712,246 @@ def _close_totals(row: Dict[str, Any]) -> Dict[str, Any]:
     cost = row.pop("_cost")
     row["costUsd"] = None if row["calls"] and row["unpricedCalls"] == row["calls"] else round(cost, 6)
     return row
+
+
+# --- FAC-SEM-025 whole (DEC-0021, DEC-0065, CT-40, DEC-0076): the contract's `usageRules` -----------------------------
+
+_USAGE_WINDOW_DAYS = 31
+_DAY_MS = 86_400_000
+
+
+def _usage_count(value: Any) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 2 ** 53 - 1 else 0
+
+
+def _usage_cost(value: Any) -> float:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value == value and value >= 0 and value != float("inf") else 0.0
+
+
+def _exceeds(a: float, b: float) -> bool:
+    return a - b > 0.000001 + 1e-9 * max(abs(a), abs(b))
+
+
+def _usd(value: float) -> str:
+    rounded = round(value * 1e6) / 1e6
+    return str(int(rounded)) if rounded == int(rounded) else repr(rounded)
+
+
+def _utc_date_ms(value: Any) -> float:
+    match = re.fullmatch(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", value, re.ASCII) if isinstance(value, str) else None
+    if not match:
+        return float("nan")
+    try:
+        day = _dt.date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except ValueError:
+        return float("nan")
+    return float((day - _dt.date(1970, 1, 1)).days * _DAY_MS)
+
+
+def _usage_list(value: Any) -> List[Dict[str, Any]]:
+    return [x for x in value if isinstance(x, dict)] if isinstance(value, list) else []
+
+
+def _priced_row(row: Dict[str, Any], at: str) -> List[Dict[str, str]]:
+    calls, unpriced = _usage_count(row.get("calls")), _usage_count(row.get("unpricedCalls"))
+    flag = lambda path, message: [{"code": "FAC-SEM-025", "instancePath": path, "message": message}]  # noqa: E731
+    if unpriced > calls:
+        return flag(at + "/unpricedCalls", "more unpriced calls than calls")
+    if calls > 0 and unpriced == calls and row.get("costUsd", _MISSING_COST) is not None:
+        return flag(at + "/costUsd", "every call is unpriced, so the cost is unknown (null), not a number")
+    if unpriced < calls and row.get("costUsd", _MISSING_COST) is None:
+        return flag(at + "/costUsd", "priced calls carry a cost; null is only for a row with no priced call")
+    return []
+
+
+_MISSING_COST = object()
+
+
+def usage_findings(report: Any) -> List[Dict[str, str]]:
+    """FAC-SEM-025 over a usage report, in the contract's order (`src/usage-rules.ts`): the arithmetic of days and
+    models, the window (every date exists, not after `generatedAt`'s UTC date, at most 30 days before it), and the
+    project attribution (each project once by its normal form, each task run once; calls, priced calls and known costs
+    bounded). Malformed input answers findings or none, never an exception."""
+    import fabric_identifiers  # noqa: E402
+    import fabric_estate  # noqa: E402 - the strict RFC 3339 reader
+    value = report if isinstance(report, dict) else {}
+    findings: List[Dict[str, str]] = []
+    flag = lambda path, message: findings.append({"code": "FAC-SEM-025", "instancePath": path, "message": message})  # noqa: E731
+    days = _usage_list(value.get("days"))
+    # The arithmetic.
+    previous = ""
+    for i, day in enumerate(days):
+        at = "/days/%d" % i
+        date = day.get("date")
+        date = "" if date is None else (date if isinstance(date, str) else json.dumps(date))
+        if date <= previous:
+            flag(at + "/date", "days must run forward without a repeat (%s after %s)" % (date, previous))
+        previous = date
+        findings.extend(_priced_row(day, at))
+        models = _usage_list(day.get("byModel"))
+        for j, m in enumerate(models):
+            findings.extend(_priced_row(m, "%s/byModel/%d" % (at, j)))
+        if not models:
+            spent = any((day.get(f) or 0) > 0 for f in ("calls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")
+                        if isinstance(day.get(f) or 0, (int, float))) or (isinstance(day.get("costUsd"), (int, float)) and day["costUsd"] > 0)
+            if spent:
+                flag(at + "/byModel", "a day with calls, tokens or cost names the models they belong to")
+            continue
+        for field in ("calls", "unpricedCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
+            total = sum(m.get(field) or 0 for m in models if isinstance(m.get(field) or 0, (int, float)))
+            if (day.get(field) or 0) != total:
+                flag("%s/%s" % (at, field), "the day's %s is not the sum of its models (%s ≠ %s)" % (field, day.get(field) or 0, total))
+        known = sum(m["costUsd"] for m in models if isinstance(m.get("costUsd"), (int, float)) and not isinstance(m.get("costUsd"), bool))
+        day_cost = day.get("costUsd")
+        if isinstance(day_cost, (int, float)) and not isinstance(day_cost, bool) and abs(day_cost - known) > 0.000001 + 1e-9 * max(abs(day_cost), abs(known)):
+            flag(at + "/costUsd", "the day's cost is not the sum of its models' known costs")
+    # The window.
+    if days:
+        generated = fabric_estate.estate_time(value.get("generatedAt"))
+        if generated != generated:
+            flag("/generatedAt", "generatedAt is an RFC 3339 date-time with an offset, so the window can be read")
+        else:
+            today = (generated // _DAY_MS) * _DAY_MS
+            oldest = today - (_USAGE_WINDOW_DAYS - 1) * _DAY_MS
+            for i, day in enumerate(days):
+                date = _utc_date_ms(day.get("date"))
+                if date != date:
+                    flag("/days/%d/date" % i, "a day's date exists in its month")
+                elif date > today:
+                    flag("/days/%d/date" % i, "a day is not after the UTC date of generatedAt")
+                elif date < oldest:
+                    flag("/days/%d/date" % i, "a day is within the last %d UTC days of generatedAt" % _USAGE_WINDOW_DAYS)
+    # The projects.
+    if isinstance(value.get("byProject"), list):
+        seen: Dict[str, str] = {}
+        project_calls, project_cost = 0, 0.0
+        for p, project in enumerate(value["byProject"]):
+            if not isinstance(project, dict):
+                continue
+            at = "/byProject/%d" % p
+            normal = fabric_identifiers.normal_identifier(project.get("projectId"))
+            if normal is not None:
+                if normal in seen:
+                    flag(at + "/projectId", "each project is one row: %s names the project %s already names" % (project["projectId"], seen[normal]))
+                else:
+                    seen[normal] = project["projectId"]
+            project_calls += _usage_count(project.get("calls"))
+            project_cost += _usage_cost(project.get("costUsd"))
+            findings.extend(_priced_row(project, at))
+            runs: List[str] = []
+            run_calls, run_cost, run_priced = 0, 0.0, 0
+            for r, run in enumerate(_usage_list(project.get("taskRuns"))):
+                if isinstance(run.get("taskRunId"), str):
+                    if run["taskRunId"] in runs:
+                        flag("%s/taskRuns/%d/taskRunId" % (at, r), "each task run is one row within its project")
+                    runs.append(run["taskRunId"])
+                run_calls += _usage_count(run.get("calls"))
+                run_cost += _usage_cost(run.get("costUsd"))
+                run_priced += max(0, _usage_count(run.get("calls")) - _usage_count(run.get("unpricedCalls")))
+                findings.extend(_priced_row(run, "%s/taskRuns/%d" % (at, r)))
+            project_priced = max(0, _usage_count(project.get("calls")) - _usage_count(project.get("unpricedCalls")))
+            known_cost = isinstance(project.get("costUsd"), (int, float)) and not isinstance(project.get("costUsd"), bool) and _usage_cost(project.get("costUsd")) == project.get("costUsd")
+            if run_calls > _usage_count(project.get("calls")):
+                flag(at + "/taskRuns", "a project's task runs hold more calls than the project (%d > %d)" % (run_calls, _usage_count(project.get("calls"))))
+            elif run_priced > project_priced:
+                flag(at + "/taskRuns", "a project's task runs hold more priced calls than the project (%d > %d)" % (run_priced, project_priced))
+            elif known_cost and _exceeds(run_cost, _usage_cost(project.get("costUsd"))):
+                flag(at + "/taskRuns", "a project's task runs cost more than the project (%s > %s)" % (_usd(run_cost), _usd(_usage_cost(project.get("costUsd")))))
+        day_calls = sum(_usage_count(d.get("calls")) for d in days)
+        if project_calls > day_calls:
+            flag("/byProject", "the projects hold more calls than the days (%d > %d)" % (project_calls, day_calls))
+        day_cost_total = sum(_usage_cost(d.get("costUsd")) for d in days)
+        if _exceeds(project_cost, day_cost_total):
+            flag("/byProject", "the projects cost more than the days (%s > %s)" % (_usd(project_cost), _usd(day_cost_total)))
+    return findings
+
+
+# --- OpenRouter attribution (DEC-0065): the contract's `attributionHeaders`, off by default -----------------------------
+
+OPENROUTER_CATEGORIES = ("cli-agent", "ide-extension", "cloud-agent", "programming-app", "native-app-builder",
+                         "creative-writing", "video-gen", "image-gen", "audio-gen", "writing-assistant", "general-chat",
+                         "personal-agent", "legal", "roleplay", "game")
+_ATTR_PRODUCT = re.compile(r"[a-z][a-z0-9-]{0,62}", re.ASCII)
+_ATTR_TITLE = re.compile(r"[\x21-\x7e](?:[\x20-\x7e]{0,98}[\x21-\x7e])?", re.ASCII)
+_ATTRIBUTION_HEADERS = ("http-referer", "referer", "x-openrouter-title", "x-title", "x-openrouter-categories")
+
+
+def attribution_setting_findings(value: Any) -> List[Dict[str, str]]:
+    """FAC-SEM-098: a product's setting names a product slug, a printable title and at most two recognized categories."""
+    if not isinstance(value, dict):
+        return [{"code": "FAC-SEM-098", "instancePath": "", "message": "an attribution setting is an object"}]
+    findings: List[Dict[str, str]] = []
+    flag = lambda at, message: findings.append({"code": "FAC-SEM-098", "instancePath": at, "message": message})  # noqa: E731
+    if not (isinstance(value.get("product"), str) and _ATTR_PRODUCT.fullmatch(value["product"])):
+        flag("/product", "the product is a lower-case slug, the last segment of its product page")
+    if not (isinstance(value.get("title"), str) and _ATTR_TITLE.fullmatch(value["title"])):
+        flag("/title", "the title is the product's full name: printable ASCII, 1 to 100 characters, no space at either end")
+    if "categories" in value:
+        categories = value["categories"]
+        if not isinstance(categories, list):
+            flag("/categories", "categories are a list")
+        else:
+            if len(categories) > 2:
+                flag("/categories", "at most 2 categories per request")
+            seen: List[str] = []
+            for i, category in enumerate(categories):
+                if not (isinstance(category, str) and category in OPENROUTER_CATEGORIES):
+                    flag("/categories/%d" % i, "a category is one OpenRouter recognizes; it drops others without an error")
+                elif category in seen:
+                    flag("/categories/%d" % i, "each category once")
+                else:
+                    seen.append(category)
+    return findings
+
+
+def _is_openrouter(url: Any) -> bool:
+    """Whether a URL's WHATWG reading is https, host openrouter.ai, the default port and no credentials (`new URL`):
+    leading and trailing spaces and controls trimmed, tabs and newlines removed, backslashes read as slashes, the
+    slashes after the scheme optional, the host case-folded, port 443 the default."""
+    if not isinstance(url, str):
+        return False
+    text = url.strip("".join(chr(c) for c in range(0x21))).replace("\t", "").replace("\n", "").replace("\r", "")
+    if not text[:6].lower() == "https:":
+        return False
+    rest = text[6:].lstrip("/\\")
+    end = len(rest)
+    for stop in "/\\?#":
+        found = rest.find(stop)
+        if found != -1:
+            end = min(end, found)
+    authority = rest[:end]
+    if "@" in authority:
+        userinfo, authority = authority.rsplit("@", 1)
+        if userinfo not in ("", ":"):
+            return False
+    host, _, port = authority.partition(":")
+    if port and not (port.isdigit() and int(port) == 443):
+        return False
+    return host.lower() == "openrouter.ai"
+
+
+def attribution_headers(setting: Any, request: Any) -> Dict[str, Any]:
+    """The headers a product adds to one request (DEC-0065, the contract's `attributionHeaders`), or none with the reason:
+    `no-setting` (attribution is off by default), `invalid-setting` (FAC-SEM-098), `not-openrouter` (only
+    `https://openrouter.ai`), `forwarded` (only traffic the product originates), `user-set` (a request that already
+    carries an attribution header keeps the user's own). Only `HTTP-Referer`, `X-OpenRouter-Title` and
+    `X-OpenRouter-Categories`; it never reads, moves or returns a key."""
+    req = request if isinstance(request, dict) else {}
+    if setting is None:
+        return {"headers": {}, "none": "no-setting"}
+    if attribution_setting_findings(setting):
+        return {"headers": {}, "none": "invalid-setting"}
+    if not _is_openrouter(req.get("url")):
+        return {"headers": {}, "none": "not-openrouter"}
+    if req.get("originated") is not True:
+        return {"headers": {}, "none": "forwarded"}
+    present = [str(name).lower() for name in req["headers"]] if isinstance(req.get("headers"), dict) else []
+    if any(name in _ATTRIBUTION_HEADERS for name in present):
+        return {"headers": {}, "none": "user-set"}
+    headers = {"HTTP-Referer": "https://passioncode.ai/%s/" % setting["product"], "X-OpenRouter-Title": setting["title"]}
+    if setting.get("categories"):
+        headers["X-OpenRouter-Categories"] = ",".join(setting["categories"])
+    return {"headers": headers}
 
 
 def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instance: str = "default",
@@ -1714,6 +2004,9 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
         out_days.append(day)
     report: Dict[str, Any] = {"protocol": PROTOCOL, "service": {"id": service_id, "instance": instance},
                               "generatedAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "currency": "USD", "days": out_days}
+    projects = _by_project(receipts, first, last)
+    if projects:
+        report["byProject"] = projects
     if budget is not None:
         if budget.get("period") not in ("day", "month") or not isinstance(budget.get("limitUsd"), (int, float)) or budget["limitUsd"] <= 0:
             raise ServiceError("budget is {period: day|month, limitUsd > 0}.")
