@@ -755,6 +755,43 @@
       }
     },
     {
+      "name": "comms-receipt-replace-transferred",
+      "schema": "comms-receipt.schema.json",
+      "valid": true,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": [
+          {
+            "request": "req_A1b2C3d4E5",
+            "revision": 4,
+            "attempt": {
+              "id": "att_Tr4nsF3rA1",
+              "generation": 3,
+              "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_F6g7H8i9J0",
+            "revision": 2,
+            "attempt": {
+              "id": "att_Tr4nsF3rB2",
+              "generation": 3,
+              "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "comms-receipt-nothing-queued",
       "schema": "comms-receipt.schema.json",
       "valid": true,
@@ -942,6 +979,868 @@
           "leaseExpiresAt": "2026-10-12T10:02:00Z",
           "seq": 4212
         }
+      }
+    },
+    {
+      "name": "comms-receipt-transferred-with-holder",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": [
+          {
+            "request": "req_A1b2C3d4E5",
+            "revision": 4,
+            "attempt": {
+              "id": "att_Tr4nsF3rA1",
+              "generation": 3,
+              "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            },
+            "holder": "sess-1"
+          },
+          {
+            "request": "req_F6g7H8i9J0",
+            "revision": 2,
+            "attempt": {
+              "id": "att_Tr4nsF3rB2",
+              "generation": 3,
+              "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "comms-receipt-transferred-over-limit",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": [
+          {
+            "request": "req_0000000000",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000000",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000001",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000001",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000002",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000002",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000003",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000003",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000004",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000004",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000005",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000005",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000006",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000006",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000007",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000007",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000008",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000008",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000009",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000009",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000010",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000010",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000011",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000011",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000012",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000012",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000013",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000013",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000014",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000014",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000015",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000015",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000016",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000016",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000017",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000017",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000018",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000018",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000019",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000019",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000020",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000020",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000021",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000021",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000022",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000022",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000023",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000023",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000024",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000024",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000025",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000025",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000026",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000026",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000027",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000027",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000028",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000028",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000029",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000029",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000030",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000030",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000031",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000031",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000032",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000032",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000033",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000033",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000034",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000034",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000035",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000035",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000036",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000036",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000037",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000037",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000038",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000038",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000039",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000039",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000040",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000040",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000041",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000041",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000042",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000042",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000043",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000043",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000044",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000044",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000045",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000045",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000046",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000046",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000047",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000047",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000048",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000048",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000049",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000049",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000050",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000050",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000051",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000051",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000052",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000052",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000053",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000053",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000054",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000054",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000055",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000055",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000056",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000056",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000057",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000057",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000058",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000058",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000059",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000059",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000060",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000060",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000061",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000061",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000062",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000062",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000063",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000063",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_0000000064",
+            "revision": 1,
+            "attempt": {
+              "id": "att_0000000064",
+              "generation": 3,
+              "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "comms-receipt-transferred-without-attempt",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": [
+          {
+            "request": "req_A1b2C3d4E5",
+            "revision": 4
+          },
+          {
+            "request": "req_F6g7H8i9J0",
+            "revision": 2,
+            "attempt": {
+              "id": "att_Tr4nsF3rB2",
+              "generation": 3,
+              "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "comms-receipt-transferred-attempt-with-seq",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": [
+          {
+            "request": "req_A1b2C3d4E5",
+            "revision": 4,
+            "attempt": {
+              "id": "att_Tr4nsF3rA1",
+              "generation": 3,
+              "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z",
+              "seq": 7
+            }
+          },
+          {
+            "request": "req_F6g7H8i9J0",
+            "revision": 2,
+            "attempt": {
+              "id": "att_Tr4nsF3rB2",
+              "generation": 3,
+              "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "comms-receipt-transferred-empty",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": []
+      }
+    },
+    {
+      "name": "comms-receipt-transferred-without-request",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": [
+          {
+            "revision": 4,
+            "attempt": {
+              "id": "att_Tr4nsF3rA1",
+              "generation": 3,
+              "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_F6g7H8i9J0",
+            "revision": 2,
+            "attempt": {
+              "id": "att_Tr4nsF3rB2",
+              "generation": 3,
+              "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "comms-receipt-transferred-without-revision",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "slot": {
+          "project": "proj-render",
+          "capability": "render.video",
+          "generation": 3,
+          "leaseExpiresAt": "2026-10-13T10:02:00Z"
+        },
+        "transferred": [
+          {
+            "request": "req_A1b2C3d4E5",
+            "attempt": {
+              "id": "att_Tr4nsF3rA1",
+              "generation": 3,
+              "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          },
+          {
+            "request": "req_F6g7H8i9J0",
+            "revision": 2,
+            "attempt": {
+              "id": "att_Tr4nsF3rB2",
+              "generation": 3,
+              "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "leaseExpiresAt": "2026-10-13T10:02:00Z"
+            }
+          }
+        ]
       }
     },
     {
