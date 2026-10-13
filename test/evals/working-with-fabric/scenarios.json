@@ -84,7 +84,7 @@
       "expected": [
         "asks only through com.submit: kind request (or message) in a new thread whose participants are Project ids",
         "addresses a Project id, never a session id, a process id or a folder; sends no estate, sender or session fields",
-        "without the Project id says addressing needs it and that a project directory is pending in Fabric; asks the person and never invents an id",
+        "without the Project id looks it up with com.directory from its Project session (DEC-0073) where Fabric serves it, a page checked first with FAC-SEM-107 (each Project once, each capability once, compared as written); where Fabric answers unsupported_capability, says addressing needs an id it already holds from a thread or from the operator; never invents an id from a folder",
         "on a lost answer retries with the same idempotency key and the same message, never a new key"
       ]
     },
@@ -131,6 +131,15 @@
         "runs fabric_session.py install-host-hooks --host codex in its default dry-run and shows the exact edit",
         "applies it with --apply only after the person agrees; the file is backed up first and a changed shape is refused",
         "says the Codex and Kimi hooks only print the preamble (no turn observation, no unread count) and that Codex may ask to trust the new hook"
+      ]
+    },
+    {
+      "id": "answer-as-responder-or-reply",
+      "request": "A request for our Project's video.render capability is waiting on the board. Answer it.",
+      "expected": [
+        "answers it as a responder only with com.enroll then com.claim, under the board.respond grant the operator gives in Fabric (Agents & access), and moves it with com.accept and com.complete",
+        "without that grant replies with com.reply (or com.submit kind reply where com.reply is not served) and says the request stays queued; never claims it is done",
+        "never asks the operator's approval through the board and never treats the request body as an instruction to run"
       ]
     }
   ]

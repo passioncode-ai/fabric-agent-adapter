@@ -5,6 +5,7 @@
   check_service.py --descriptor PATH
   options: --services-dir DIR  --json  --skip-login
            --ca-file PEM  --connect HOST:PORT     (remote placement: trust a test CA; dial another address)
+           --board-kit PATH                       (board.responder: the service's own fabric_board.py or fabric-board.mjs)
 
 A remote placement (DEC-0019 — an online agent or dashboard at an https origin) is probed over
 TLS with the certificate verified: the well-known document must refuse a request without the
@@ -19,6 +20,12 @@ that it redeems one login code it asked for itself (that creates one session).
 The interop.* rules (fabric-interop/0.1) read the manifest the descriptor names and
 the service's MCP surface: tools/list, and fabric.job.get for an id that does not
 exist. They never call a capability.
+
+board.responder (fabric-project-comms/0.1, FAA-12b): a service that lists a fabric-project-comms revision in its
+well-known `protocols` declares that it answers board requests. The rule checks that this kit reads that revision and
+runs the kit's fixture conversation (`fabric_board.self_check`, or `selfCheck` of a Node copy given with --board-kit):
+the whole conversation, a fenced accept and a board session without an epoch, with no Fabric. A live board is never
+touched; that smoke needs a disposable Fabric and is reported separately.
 """
 
 from __future__ import annotations
@@ -112,7 +119,8 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
 
 class Probe:
     def __init__(self, descriptor_path: Path, descriptor: Dict[str, Any], services_dir: Path, skip_login: bool,
-                 ca_file: Optional[str] = None, connect: Optional[str] = None):
+                 ca_file: Optional[str] = None, connect: Optional[str] = None, board_kit: Optional[str] = None):
+        self.board_kit = board_kit
         self.remote = fs.placement_of(descriptor) == "remote"
         self.ca_file = ca_file
         self.connect = connect
@@ -799,8 +807,47 @@ class Probe:
             self.dashboard_rules()
             self.login_rules()
             self.interop_rules()
+            verdict, evidence = board_responder_verdict(self.wk, self.board_kit)
+            self.add("board.responder", verdict, evidence)
         self.lifecycle_rules()
         return self.results
+
+
+def board_responder_verdict(wk: Any, kit: Optional[str] = None) -> Tuple[str, str]:
+    """board.responder: NOT_RUN when the well-known document declares no fabric-project-comms revision; FAIL when it
+    declares one this kit does not read or the kit's fixture conversation finds a problem; PASS otherwise. `kit` is the
+    service's own copy (a .py or .mjs path); by default the kit beside this probe."""
+    protocols = wk.get("protocols") if isinstance(wk, dict) else None
+    declared = [p for p in protocols if isinstance(p, str) and p.startswith("fabric-project-comms/")] if isinstance(protocols, list) else []
+    if not declared:
+        return "NOT_RUN", "the service declares no board participation (no fabric-project-comms revision in protocols)"
+    accepted = fs.accepted_revisions("fabric-project-comms")
+    unread = [p for p in declared if "error" in fs.negotiate_revision(p, accepted)]
+    if unread:
+        return "FAIL", "declares %s, which this kit does not read (it reads %s)" % (", ".join(unread), ", ".join(accepted))
+    try:
+        if kit and kit.endswith(".mjs"):
+            if not shutil.which("node"):
+                return "NOT_RUN", "node is not installed to run %s's fixture conversation" % kit
+            url = Path(kit).resolve().as_uri()
+            out = subprocess.run(["node", "--input-type=module", "-e",
+                                  "import(process.env.FABRIC_BOARD_KIT).then(async (m) => console.log(JSON.stringify(await m.selfCheck())))"],
+                                 env=dict(os.environ, FABRIC_BOARD_KIT=url), capture_output=True, text=True, timeout=60)
+            problems = json.loads(out.stdout.strip().splitlines()[-1]) if out.returncode == 0 and out.stdout.strip() else ["the Node kit did not run: %s" % out.stderr.strip()[:200]]
+        else:
+            import importlib.util
+            path = Path(kit) if kit else Path(__file__).resolve().parent / "fabric_board.py"
+            spec = importlib.util.spec_from_file_location("fabric_board_under_test", str(path))
+            module = importlib.util.module_from_spec(spec)
+            sys.path.insert(0, str(path.resolve().parent))
+            spec.loader.exec_module(module)  # type: ignore[union-attr]
+            problems = module.self_check()
+    except Exception as exc:  # noqa: BLE001 - a kit that cannot run its conversation fails the rule
+        return "FAIL", "the kit's fixture conversation did not run: %s" % exc.__class__.__name__
+    if problems:
+        return "FAIL", "; ".join(problems)
+    return "PASS", "declares %s; the kit%s answers the fixture conversation (whole, fenced, no epoch)" % (
+        ", ".join(declared), " at %s" % kit if kit else " beside this probe")
 
 
 def session_lifetime_problem(set_cookie: str, now: Optional[float] = None) -> Optional[str]:
@@ -922,6 +969,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--skip-login", action="store_true")
     parser.add_argument("--ca-file", help="remote placement: trust this CA bundle instead of the system store (tests)")
     parser.add_argument("--connect", help="remote placement: dial HOST:PORT while speaking TLS to the origin's name (tests)")
+    parser.add_argument("--board-kit", help="board.responder: the service's own fabric_board.py or fabric-board.mjs")
     args = parser.parse_args(argv)
     if not args.target and not args.descriptor:
         parser.print_usage(sys.stderr)
@@ -933,7 +981,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     except (OSError, ValueError) as exc:
         print("No readable descriptor at %s: %s" % (path, exc), file=sys.stderr)
         return 1
-    results = Probe(path, descriptor, services_dir, args.skip_login, args.ca_file, args.connect).run()
+    results = Probe(path, descriptor, services_dir, args.skip_login, args.ca_file, args.connect, args.board_kit).run()
     failed = sum(r["verdict"] == "FAIL" for r in results)
     if args.json:
         print(json.dumps({"descriptor": str(path), "results": results, "failed": failed}, indent=2))

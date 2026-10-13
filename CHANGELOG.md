@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.28.0 - 2026-10-13
+
+A service answers a Project's requests on Fabric's project board (`fabric-project-comms/0.1`; FAA-12b, contract
+DEC-0022, DEC-0073, DEC-0078; Fabric ADR-0149), and checks a directory page before it looks a Project up (FAA-40,
+DEC-0077, `FAC-SEM-107`). Repinned to contract `f00a768` (DEC-0078: a replacement's receipt carries the attempt of
+each request it transferred); `a046f57` stays supported.
+
+### Added
+
+- **The hub door client.**
+  - `fabric_hub.py` / `fabric-hub.mjs` re-read `hub.json` before every call, the way Fabric's `locateHub` does: a small
+    regular file, protocol `fabric-hub/0.1`, the origin exactly `http://127.0.0.1:<port>`, a door token inside the
+    registry root, and a live pid. A binding credential is sent only after that check.
+  - `request_board_access` asks the operator for the `board.respond` grant. `poll_access` writes the credential, shown
+    once, to a 0600 file and leaves it out of the answer. `join_board` answers a board session.
+  - Typed `HubError`s: a missing grant carries the arguments to ask with. `Backoff` waits 2 s, doubling up to 5 minutes,
+    with jitter, so a loop never spins.
+  - A `hubKey` in a later `hub.json` is checked with `hub_key_certified` (DEC-0060) when the caller passes an estate
+    record. `fabric-hub/0.1` publishes no key today.
+- **The responder.** `fabric_board.Responder` / `Responder` runs inside the service, one request at a time:
+  - Each tick (15 s ± 5 s) enrolls, claims, reads the message and accepts it with the claim's exact fence. The digest
+    must match the claim's, and the request must name this Project and capability.
+  - `com.effect_begin` is sent only when the handler calls `ctx.begin_effect()`. Renewal is about every 20 s. Progress
+    notes, a fenced `com.reply`, and `com.complete` with an observed outcome and at most 8 sha256 artifacts follow.
+  - A checkpoint (0600, fsync) is written before each step. If it cannot be written, nothing is sent.
+  - It stops acting on `fenced`, `lease_expired` and `authority_changed`.
+  - On restart it reconciles unknown outcomes from what `observe` reads. It takes accepted work back only through
+    `com.responder_replace`'s `transferred` (DEC-0078). On a Fabric that does not answer `transferred`, the work stays
+    held and is never claimed back.
+  - A board session never sends `com.submit`, `com.cancel`, `com.read_ack` or `com.directory`.
+  - With no idempotency epoch in `com.status`, it fails closed.
+  - The body is data: `admit`, the service's own input gate, is required. A refusal completes the request
+    `failed_known` with the gate's sentence.
+- **The directory page check (FAA-40).** `directory_findings`, `directory_problems` and `find_project` / `findProject`
+  apply `FAC-SEM-107`: each Project once, each capability once per Project, compared exactly as written. A page that
+  fails is refused rather than read.
+- **Closed shapes:** `receipt_problems` (with `transferred` for `com.responder_replace` only, each request once),
+  `refusal_problems`, `evidence_problems` (one artifact never twice, DEC-0076), `outcome_problems`, and
+  `comms_digest`, which matches the contract's `commsDigest` vectors.
+- **`check_service.py`** gains the rule `board.responder`:
+  - `NOT_RUN` when the well-known `protocols` lists no `fabric-project-comms` revision.
+  - Otherwise it runs the kit's fixture conversation: `self_check()` / `selfCheck()` covers the whole conversation, a
+    fenced accept and a session without an epoch. `--board-kit` names the service's own copy.
+- **`sample_service.py serve --board-project <uuid>`** opts in to answering `sample.echo` on the board, with a gate
+  and a reply. It is off by default.
+- `references/board.md`, linked from SKILL.md. working-with-fabric's `project-board.md`:
+  - The project directory is decided (DEC-0073).
+  - Answering as a responder needs `board.respond`.
+
+### Evidence
+
+- 20 hub tests and 49 board tests in Python, and 16 Node tests, run against one fake Fabric hub
+  (`test/fake_fabric_hub.py`), which models migration 87's fence order. The Python and Node kits read each other's
+  checkpoint.
+- The contract's 77 comms fixtures, 8 responder-argument digests and 12 `FAC-SEM-107` pages are vendored by
+  `vendor_vectors.mjs` at `f00a768`.
+- 22 planted defects across both kits, all caught (`docs/reports/2026-10-13-faa-12b-board-responders/raw/plants.log`).
+- Red before: the new tests at `origin/main` `65c1751` fail on the missing modules.
+- The live Claude→Codex board smoke is `NOT_RUN`: no disposable Fabric fits this machine. The commands are in
+  `references/board.md`.
+
 ## 0.27.0 - 2026-10-13
 
 The usage report's window and spend by project, and OpenRouter attribution for a product's own traffic (contract
