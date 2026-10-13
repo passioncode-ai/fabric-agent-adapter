@@ -2,6 +2,8 @@
   "skill": "working-with-fabric",
   "queries": [
     {"query": "Connect this Claude Code session to Fabric and claim my task before I start.", "shouldTrigger": true},
+    {"query": "My subagent hit its usage limit and says it resets at 9pm — should I wait for the reset?", "shouldTrigger": true},
+    {"query": "Воркфлоу упёрся в лимит сессии, ждать сброса?", "shouldTrigger": true},
     {"query": "How do I register fabric-mcp in Codex?", "shouldTrigger": true},
     {"query": "fabric_whoami says it is waiting for the operator — what now?", "shouldTrigger": true},
     {"query": "Fabric is not running; start it and then report my progress to it.", "shouldTrigger": true},

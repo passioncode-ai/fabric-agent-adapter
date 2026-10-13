@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.29.0 - 2026-10-13
+
+`working-with-fabric` carries the limit-stop rule (fabric-workspace principle 10, item 6, operator 2026-10-13).
+
+### Added
+
+- **A lane stopped on a limit: restart it at once** (`working-with-fabric`, Step 5). Applies to a workflow lane,
+  subagent or session that stops on *You've hit your session / usage limit · resets <time>*, on a rate-limit error,
+  or after 15–20 minutes of silence with its task unfinished. The agent that started it restarts it at once and does
+  not wait for the reset:
+  - a workflow: `TaskStop`, then `Workflow` with `resumeFromRunId` and the same args;
+  - a subagent: `SendMessage` «resume»;
+  - a session: a re-prompt.
+
+  If a restart stops again at once, the next tries come after 2, 5, 10, then every 15 minutes. A spend, credit or
+  billing limit goes to the operator once and is not retried. A long command in flight is not a stall. Each restart
+  goes into a `fabric_task_note`.
+- The description gains the trigger "hit your limit, resets at".
+
+### Evidence
+
+- The scenario eval `limit-stop-restarts-at-once` and two trigger queries (English and Russian) were written before
+  the prose.
+
 ## 0.28.0 - 2026-10-13
 
 A service answers a Project's requests on Fabric's project board (`fabric-project-comms/0.1`; FAA-12b, contract

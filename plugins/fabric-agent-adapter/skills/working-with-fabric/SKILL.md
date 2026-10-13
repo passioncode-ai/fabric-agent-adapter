@@ -7,7 +7,8 @@ description: >-
   com.submit; unread-mail lines, watch-mail), claiming and releasing work (fabric_work_claim, fabric_work_release),
   reports, handoffs, refusals. Triggers - "connect to Fabric", "register fabric-mcp", "claim the task in Fabric",
   "check the project board", "ask the other project through Fabric", "Fabric is not running", «подключись к
-  Fabric», «возьми задачу в Fabric», «проверь доску проекта», «Fabric не запущен». Explains the plugin's session
+  Fabric», «возьми задачу в Fabric», «проверь доску проекта»,
+  «Fabric не запущен», "hit your limit, resets at". Explains the plugin's session
   hooks. NOT for building or adapting an agent or a board responder (creating-fabric-agents,
   adapting-projects-to-fabric, building-fabric-services), changing Fabric's own code, or messaging people.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
@@ -18,7 +19,7 @@ compatibility: >-
   this plugin; Codex and Kimi Code get the session-start preamble hook on the person's consent.
 metadata:
   author: PassionCode.ai
-  version: "0.28.0"
+  version: "0.29.0"
 ---
 
 # Working with Fabric
@@ -145,6 +146,23 @@ A Fabric older than 0.4.0 has no `fabric_work_*` tools: use `fabric_tasks_list` 
   keeping, with where you learned it.
 - `fabric_question_ask` for a decision you are not entitled to make; `fabric_effect_request` before spending,
   deleting or publishing — refused until a person agrees.
+
+### A lane stopped on a limit: restart it at once
+
+A workflow lane, subagent or session can stop on *You've hit your session / usage limit · resets <time>* or a
+rate-limit error. It can also go silent: no transcript write for 15–20 minutes, its task unfinished, and no command
+of its own still running. In each case, do not wait for the reset ([principle 10, item 6](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/principles.md#10-a-free-agent-takes-the-next-task)).
+Restart it from where it stopped:
+
+- a workflow: stop it (`TaskStop`), then call `Workflow` with `resumeFromRunId` and **the same args**. Finished
+  agents replay from the cache; the failed or stalled ones run again;
+- a subagent: `SendMessage` «resume» to its id, so it keeps its context;
+- a session: re-prompt it with «continue from where you stopped».
+
+The stop is usually stale by then. Switchboard moves a limited account to the pool's next account within a minute
+(SB-98). If a restart stops again at once, retry after 2, 5, 10, then every 15 minutes, and do other work meanwhile.
+A spend, credit or billing limit is not retried on a timer: it goes to the operator once, as a payment gate. A long
+build or test in flight is not a stall. Note each restart (what stopped, when, attempt) with `fabric_task_note`.
 
 ## Step 6 — tasks link to backlog rows, never copy them
 
