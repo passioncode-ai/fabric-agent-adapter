@@ -144,6 +144,18 @@
     {
       "query": "Apply the operator's signed estate record on each machine and only trust delegation tokens under the hub key it certifies.",
       "shouldTrigger": true
+    },
+    {
+      "query": "Our render service should answer video.render requests other Projects post on Fabric's project board — enroll, claim, accept and complete them from inside the service.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Сделай так, чтобы агент-сервис отвечал на запросы с доски проекта в Fabric: com.enroll, com.claim, com.complete, с чекпоинтом перед каждым шагом.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Post a question to another Project on the board from my Claude Code session.",
+      "shouldTrigger": false
     }
   ]
 }

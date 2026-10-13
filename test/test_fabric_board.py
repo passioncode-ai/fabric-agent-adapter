@@ -574,5 +574,108 @@ class CheckpointTests(unittest.TestCase):
                 fb.Checkpoint(path)
 
 
+class SelfCheckAndProbeTests(unittest.TestCase):
+    """check_service.py's board.responder rule and the kit's fixture conversation it runs."""
+
+    def setUp(self) -> None:
+        self.cs = importlib.import_module("check_service")
+
+    def test_self_check_passes(self):
+        self.assertEqual(fb.self_check(), [])
+
+    def test_self_check_catches_a_kit_that_keeps_acting_after_fenced(self):
+        original = fb.Responder._accept
+        fb.Responder._accept = lambda self, entry: True  # planted defect: ignores the board's answer
+        try:
+            problems = fb.self_check()
+        finally:
+            fb.Responder._accept = original
+        self.assertTrue(any(p.startswith("fenced:") for p in problems), problems)
+
+    def test_self_check_catches_a_guessed_epoch(self):
+        original = fb.Responder._status
+
+        def guessing(self):
+            try:
+                return original(self)
+            except fb.BoardError:
+                self.epoch = 1
+                return {"responders": []}
+        fb.Responder._status = guessing
+        try:
+            problems = fb.self_check()
+        finally:
+            fb.Responder._status = original
+        self.assertTrue(any(p.startswith("no-epoch:") for p in problems), problems)
+
+    def test_rule_verdicts(self):
+        self.assertEqual(self.cs.board_responder_verdict({})[0], "NOT_RUN")
+        self.assertEqual(self.cs.board_responder_verdict({"protocols": ["fabric-service/0.1"]})[0], "NOT_RUN")
+        self.assertEqual(self.cs.board_responder_verdict({"protocols": ["fabric-service/0.1", "fabric-project-comms/0.1"]})[0], "PASS")
+        self.assertEqual(self.cs.board_responder_verdict({"protocols": ["fabric-project-comms/0.2"]})[0], "FAIL")
+        node_kit = str(HERE.parent / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board.mjs")
+        self.assertEqual(self.cs.board_responder_verdict({"protocols": ["fabric-project-comms/0.1"]}, node_kit)[0], "PASS")
+
+    def test_rule_fails_a_broken_copy_of_the_kit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = HERE.parent / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"
+            for name in ("fabric_hub.py", "fabric_service.py", "fabric_identifiers.py", "fabric_secrets.py", "fabric_estate.py", "fabric_delegation.py"):
+                (Path(tmp) / name).write_text((scripts / name).read_text())
+            text = (scripts / "fabric_board.py").read_text()
+            planted = text.replace("        if not self._accept(entry):\n            return\n", "        self._accept(entry)  # planted: a lost claim is ignored\n")
+            self.assertNotEqual(planted, text)
+            text = planted
+            (Path(tmp) / "fabric_board.py").write_text(text)
+            verdict, evidence = self.cs.board_responder_verdict({"protocols": ["fabric-project-comms/0.1"]}, str(Path(tmp) / "fabric_board.py"))
+        self.assertEqual(verdict, "FAIL", evidence)
+
+
+class SampleWiringTests(unittest.TestCase):
+    """sample_service.py: the board responder is opt-in (off by default) and answers sample.echo with a reply."""
+
+    def _service(self, tmp: Path, **extra):
+        sample = importlib.import_module("sample_service")
+        args = sample.build_parser().parse_args(["serve", "--port", "47199", "--data-dir", str(tmp / "data"), *sum((["--%s" % k.replace("_", "-"), v] for k, v in extra.items()), [])])
+        svc = sample.Service(args)
+        svc.start()
+        self.addCleanup(svc.lock.release)
+        return svc
+
+    def test_off_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = self._service(Path(tmp))
+            self.assertIsNone(svc.board)
+            self.assertNotIn("protocols", svc.well_known())
+            self.assertEqual(importlib.import_module("check_service").board_responder_verdict(svc.well_known())[0], "NOT_RUN")
+
+    def test_opt_in_answers_on_the_board(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            hub = FakeHub(tmp / "fabric", capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            (tmp / "data").mkdir(mode=0o700)
+            cred = tmp / "data" / "board.credential"
+            cred.write_text(hub.credential)
+            os.chmod(cred, 0o600)
+            svc = self._service(tmp, board_project=PROJECT)
+            svc.board.hub = fh.HubClient(tmp / "fabric")  # the fake, never this machine's Fabric
+            svc.board.spawn = lambda fn: fn()
+            wk = svc.well_known()
+            self.assertIn("fabric-project-comms/0.1", wk["protocols"])
+            self.assertEqual(importlib.import_module("check_service").board_responder_verdict(wk)[0], "PASS")
+            ok = hub.board.queue("sample.echo", text="hello board")
+            refused = hub.board.queue("sample.echo", text="x" * 2001)
+            svc.board.step()
+            hub.board.advance(15)
+            svc.board.step()
+            self.assertEqual(hub.board.requests[ok]["state"], "completed")
+            self.assertEqual(hub.board.replies[0]["body"], {"text": "hello board"})
+            self.assertEqual(hub.board.requests[refused]["state"], "failed_known")
+            kinds = [e["kind"] for e in svc.log.fetch(None, 100)]
+            self.assertIn("board.request.completed", kinds)
+            self.assertIn("board.request.refused", kinds)
+            svc.board.shutdown(0.1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -372,3 +372,7 @@ test('the Python and Node kits write a checkpoint each other reads', async () =>
   assert.equal(out.trim(), 'claimed');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('selfCheck: the fixture conversation check_service.py runs passes on the Node kit', async () => {
+  assert.deepEqual(await fb.selfCheck(), []);
+});

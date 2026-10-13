@@ -9,6 +9,11 @@ once, and `sample.draft` is a job that stops for a titled choice before it compl
 
   sample_service.py serve --port 47190 --data-dir DIR [--id sample] [--instance default]
   sample_service.py register --port 47190 --data-dir DIR [--services-dir DIR]
+
+Opt-in, off by default: `serve --board-project <Project uuid>` also answers that Project's `sample.echo` requests on
+Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Responder, from a board.respond grant whose
+credential is in `<data>/board.credential` (0600; `--board-credential` names another file). The request body is data:
+the gate admits plain text of at most 2,000 characters, and the answer is a reply carrying the same text.
 """
 
 from __future__ import annotations
@@ -27,6 +32,8 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402
 import fabric_interop as fi  # noqa: E402
+import fabric_board as fbd  # noqa: E402 - the board responder (opt-in)
+import fabric_hub as fhb  # noqa: E402
 
 VERSION = "0.1.0"
 # The dashboard is built from the dashboard kit (fabric-dashboard/0.1, DEC-0036) and declares it
@@ -77,6 +84,10 @@ class Service:
         self.degraded = [{"source": "demo", "reason": args.degraded}] if args.degraded else []
         self.started_at = fs.now_iso()
         self.build = {"commit": os.environ.get("FABRIC_BUILD_COMMIT", "0000000"), "builtAt": self.started_at}
+        self.board_project = getattr(args, "board_project", None)
+        self.board_capability = getattr(args, "board_capability", None) or "sample.echo"
+        self.board_credential = Path(args.board_credential) if getattr(args, "board_credential", None) else self.data / "board.credential"
+        self.board: Optional[fbd.Responder] = None
         self.drain = fs.Drain()  # LC-01: SIGTERM drains in-flight calls, then the server stops
 
     def start(self) -> None:
@@ -93,7 +104,25 @@ class Service:
         for cap in CAPABILITIES:
             handler = self.echo if cap["name"] == "sample.echo" else self.draft
             self.mcp.add_tool(fi.tool_for_capability(cap, cap["input"], cap["output"]), handler)
+        if self.board_project:
+            # After the lock, like every other piece of state: the responder's checkpoint lives in the data directory.
+            self.board = fbd.Responder(hub=fhb.HubClient(), project_id=self.board_project, capabilities=[self.board_capability],
+                                       credential_file=self.board_credential, checkpoint_file=self.data / "board-checkpoint.json",
+                                       handler=self.board_answer, admit=self.board_admit, emit=self.log.append, service=self.id)
         self.log.append("service.started", "info", "%s started on build %s." % (self.name, self.build["commit"]))
+
+    # --- the project board (opt-in): the input gate and the answer -------------------
+    def board_admit(self, request: fbd.BoardRequest) -> Optional[str]:
+        """The service's own input gate: the body is data, never an instruction; only short plain text is echoed."""
+        if request.body_format != "text/plain":
+            return "this service echoes plain text only"
+        if len(request.body or "") > 2000:
+            return "the text is longer than the 2,000 characters this service echoes"
+        return None
+
+    def board_answer(self, request: fbd.BoardRequest, ctx: fbd.WorkContext) -> Dict[str, Any]:
+        # No effect outside the service: no begin_effect, so the outcome needs no observation.
+        return {"state": "completed", "summary": "Echoed the request's text.", "reply": {"text": request.body}}
 
     # --- fabric-interop/0.1: the two capabilities ------------------------------------
     def echo(self, args: Dict[str, Any], ctx: fi.CallContext) -> Dict[str, Any]:
@@ -145,6 +174,8 @@ class Service:
                       "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]},
                       "usage": {"path": fs.USAGE_PATH}},
             extensions=fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else None,
+            # DEC-0067: listed only when the board is on — a host pinned before DEC-0067 refuses the member.
+            protocols=["fabric-service/0.1", "fabric-project-comms/0.1"] if self.board is not None else None,
         )
 
 
@@ -291,8 +322,15 @@ def serve(args: argparse.Namespace) -> int:
 
     # Stop taking calls, let in-flight ones finish (8 s at most), then end serve_forever; a
     # hand-over that hangs is cut by the kit's hard exit, inside launchd's ExitTimeOut.
-    svc.drain.install(lambda drained: server.shutdown(),
-                      on_stopping=lambda: svc.log.append("service.stopping", "info", "%s is stopping." % svc.name))
+    import threading
+    board_stop = threading.Event()
+    if svc.board is not None:
+        threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True).start()
+
+    def stopping() -> None:
+        board_stop.set()  # stop claiming; the responder drains its request and leaves its board session
+        svc.log.append("service.stopping", "info", "%s is stopping." % svc.name)
+    svc.drain.install(lambda drained: server.shutdown(), on_stopping=stopping)
     try:
         server.serve_forever(poll_interval=0.2)
     finally:
@@ -377,6 +415,9 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--name", default="Sample Service")
         if name == "serve":
             p.add_argument("--degraded", help="report one degraded source with this reason")
+            p.add_argument("--board-project", help="opt-in: answer this Project's requests on Fabric's project board")
+            p.add_argument("--board-capability", default="sample.echo")
+            p.add_argument("--board-credential", help="the board.respond credential file (0600); default <data>/board.credential")
         else:
             p.add_argument("--services-dir")
             p.add_argument("--label")

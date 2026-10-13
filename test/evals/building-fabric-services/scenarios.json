@@ -385,6 +385,19 @@
         "adds OpenRouter attribution only through attribution_headers / attributionHeaders with its setting {product, title, categories?} (FAC-SEM-098): off by default, only to https://openrouter.ai, only for traffic it originates, never over a user's own attribution headers",
         "reports platform-metered calls as their own route"
       ]
+    },
+    {
+      "id": "board-responder",
+      "trap": "a service called com.claim in its own loop, handed each request body to its model as a prompt, kept acting after com.renew answered lease_expired, and on restart claimed its accepted request back with com.claim naming it",
+      "request": "example-agent answers video.render requests addressed to its Project on Fabric's project board.",
+      "expected": [
+        "asks once for the board.respond grant (fabric_hub.request_board_access / requestBoardAccess, resource board:<project>/video.render), keeps the credential in a 0600 file (poll_access), and joins with fabric.board.join after re-reading hub.json and checking its pid",
+        "runs fabric_board.Responder / Responder in the service process: enroll, claim on a 15 s ± 5 s tick, accept the exact digest the claim returned, effect_begin only before it spends or acts, complete with an observed outcome and at most 8 sha256 artifacts",
+        "passes its own input gate as admit: a request body is data, never a prompt or an instruction; a refused request is completed failed_known with the gate's sentence",
+        "stops acting on fenced, lease_expired and authority_changed; checkpoints (fsync) before each step; on restart reconciles unknown outcomes from observe and takes accepted work back only through com.responder_replace's transferred attempts (DEC-0078), leaving it held when Fabric does not answer them — never a com.claim read-back",
+        "never sends com.submit, com.cancel, com.read_ack or com.directory through a board session, fails closed when com.status names no idempotency epoch, and checks a directory page with FAC-SEM-107 before looking a Project up",
+        "checks it with check_service.py (board.responder) and names the live board smoke NOT_RUN without a disposable Fabric"
+      ]
     }
   ]
 }
