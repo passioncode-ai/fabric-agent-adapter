@@ -30,6 +30,8 @@ const windowsToken = await src('windows-token.ts');
 const appDescriptor = await src('app-descriptor.ts');
 const descriptorRules = await src('descriptor-rules.ts');
 const identifiers = await src('identifiers.ts');
+const protocolRevisions = await src('protocol-revisions.ts');
+const feedData = await src('feed-data.ts');
 
 // hub-key.json: every case re-answered by hubKeyCertified; seeds dropped.
 const hub = read('fixtures/vectors/hub-key.json');
@@ -106,4 +108,22 @@ for (const c of [...ids.normal, ...ids.laxPorts]) if (identifiers.normalIdentifi
 for (const [a, b] of ids.same) if (!identifiers.sameIdentifier(a, b)) throw new Error(`the contract's same pair ${a} ${b} no longer answers as written`);
 for (const [a, b] of ids.different) if (identifiers.sameIdentifier(a, b)) throw new Error(`the contract's different pair ${a} ${b} no longer answers as written`);
 write('identifier-vectors.json', { ...ids, source: 'fixtures/vectors/identifiers.json' });
+// DEC-0067: negotiateRevision's cases, the register, and FAC-SEM-099 over lists answered by protocolsFindings.
+const negotiation = read('fixtures/vectors/protocol-revisions.json');
+for (const c of negotiation.cases) if (!same(protocolRevisions.negotiateRevision(c.received, c.accepted), c.expect)) throw new Error(`the contract's revision case "${c.name}" no longer answers as written`);
+const protocolLists = [
+  ['fabric-service/0.1'], ['fabric-service/0.1', 'fabric-interop/0.1'], [], 'fabric-service/0.1', ['fabric-service/0.1', 'fabric-service/0.1'],
+  ['fabric-service/0.2'], ['Fabric-Service/0.1'], ['fabric-service'], ['other-protocol/3', 'other-protocol/7'], ['other-protocol/1', 'other-protocol/2', 'other-protocol/3'],
+  Array.from({ length: 65 }, (_, i) => `p${i}/1`), [7], ['fabric-service/0.1.2.3'], ['other-protocol/1', 'other-protocol/1'],
+].map((list) => ({ list, findings: protocolRevisions.protocolsFindings(list).map((f) => ({ code: f.code, instancePath: f.instancePath })) }));
+// DEC-0070: every events-page and well-known-protocols fixture as the catalogue lists it, and FAC-SEM-101 over pages.
+const pages = catalogue.filter((e) => /service-events-page|service-well-known-protocols/.test(e.path)).map((e) => ({ name: e.path.replace(/^.*\/|\.json$/g, ''), valid: e.valid, document: read(`fixtures/${e.path}`) }));
+const ev = (value) => ({ events: [{ id: '1', at: '2026-10-13T08:00:00Z', kind: 'job.done', level: 'info', text: 'A note was drafted.', data: { schema: 'https://example.com/schemas/note.json', value } }], cursor: '1' });
+const feedPages = [
+  { notes: 3, inputTokens: 1200, title: 'a plain sentence' }, { apiKey: 'abc' }, { token: 7 }, { list: ['ok', 'sk-' + 'a'.repeat(40)] },
+  { apiKeys: ['k1', 'k2'] }, { nested: { password: 'p' } }, { nested: { url: 'https://user:pa55@example.com/x' } }, { 'a/b~c': 'ghp_' + 'b'.repeat(36) }, { secrets: { one: 'plain words' } }, { apiKeys: { first: 'x' }, notes: 2 },
+].map((value) => ({ page: ev(value), findings: feedData.feedDataFindings(ev(value)).map((f) => ({ code: f.code, instancePath: f.instancePath })) }));
+write('feed-protocols-vectors.json', { about: "DEC-0067's negotiateRevision cases and register, FAC-SEM-099 over lists, the events-page and well-known-protocols fixtures, and FAC-SEM-101 over pages, each answered by the contract's functions.",
+  source: 'fixtures/vectors/protocol-revisions.json, src/protocol-revisions.ts, src/feed-data.ts, fixtures/catalogue.json',
+  register: Object.fromEntries(protocolRevisions.PROTOCOL_REVISIONS), negotiation: negotiation.cases, protocolLists, fixtures: pages, feedPages });
 console.log(`${peer.cases.length} peer cases, ${app.action.length + app.stale.length} app-descriptor cases, ${descriptors.length} descriptor fixtures, ${semanticDescriptors.length} semantic`);

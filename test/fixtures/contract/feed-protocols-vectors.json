@@ -1,0 +1,1492 @@
+{
+  "about": "DEC-0067's negotiateRevision cases and register, FAC-SEM-099 over lists, the events-page and well-known-protocols fixtures, and FAC-SEM-101 over pages, each answered by the contract's functions.",
+  "source": "fixtures/vectors/protocol-revisions.json, src/protocol-revisions.ts, src/feed-data.ts, fixtures/catalogue.json",
+  "register": {
+    "access-log": [
+      "1"
+    ],
+    "approval": [
+      "1"
+    ],
+    "activity-summary": [
+      "1"
+    ],
+    "estate-record": [
+      "1"
+    ],
+    "execution-packet": [
+      "1"
+    ],
+    "fabric-activity": [
+      "0.1"
+    ],
+    "fabric-dashboard": [
+      "0.1"
+    ],
+    "fabric-delegation": [
+      "0.1"
+    ],
+    "fabric-device": [
+      "0.1"
+    ],
+    "fabric-interop": [
+      "0.1"
+    ],
+    "fabric-local-channel": [
+      "0.1"
+    ],
+    "fabric-local-runner": [
+      "0.1"
+    ],
+    "fabric-operator-channel": [
+      "0.1"
+    ],
+    "fabric-package": [
+      "1"
+    ],
+    "fabric-project-comms": [
+      "0.1"
+    ],
+    "fabric-proposal": [
+      "1"
+    ],
+    "fabric-provider": [
+      "0.1"
+    ],
+    "fabric-relay": [
+      "0.1"
+    ],
+    "fabric-secret-envelope": [
+      "1"
+    ],
+    "fabric-service": [
+      "0.1"
+    ],
+    "fabric-settings-backup": [
+      "1"
+    ],
+    "heartbeat": [
+      "1"
+    ],
+    "learning-note": [
+      "1"
+    ],
+    "memory": [
+      "0.1"
+    ],
+    "pipeline": [
+      "0.1"
+    ],
+    "revocation-delta": [
+      "1"
+    ],
+    "session-handoff": [
+      "1"
+    ],
+    "window-lease": [
+      "1"
+    ]
+  },
+  "negotiation": [
+    {
+      "name": "accepts-N",
+      "received": "fabric-device/0.1",
+      "accepted": [
+        "fabric-device/0.1"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "refuses-newer",
+      "received": "fabric-device/0.2",
+      "accepted": [
+        "fabric-device/0.1"
+      ],
+      "expect": {
+        "error": {
+          "code": "schema-unsupported",
+          "message": "this receiver does not read that protocol revision",
+          "data": {
+            "protocol": "fabric-device/0.2",
+            "accepted": [
+              "fabric-device/0.1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "names-only-same-protocol",
+      "received": "fabric-service/0.2",
+      "accepted": [
+        "fabric-device/0.1",
+        "fabric-service/0.1"
+      ],
+      "expect": {
+        "error": {
+          "code": "schema-unsupported",
+          "message": "this receiver does not read that protocol revision",
+          "data": {
+            "protocol": "fabric-service/0.2",
+            "accepted": [
+              "fabric-service/0.1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown-protocol-lists-all",
+      "received": "other/1",
+      "accepted": [
+        "fabric-device/0.1",
+        "fabric-service/0.1"
+      ],
+      "expect": {
+        "error": {
+          "code": "schema-unsupported",
+          "message": "this receiver does not read that protocol revision",
+          "data": {
+            "protocol": "other/1",
+            "accepted": [
+              "fabric-device/0.1",
+              "fabric-service/0.1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "exact-match-only",
+      "received": "fabric-device/0.10",
+      "accepted": [
+        "fabric-device/0.1"
+      ],
+      "note": "a revision is compared as a whole string; a lax prefix or numeric match gets this wrong",
+      "expect": {
+        "error": {
+          "code": "schema-unsupported",
+          "message": "this receiver does not read that protocol revision",
+          "data": {
+            "protocol": "fabric-device/0.10",
+            "accepted": [
+              "fabric-device/0.1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "case-sensitive",
+      "received": "Fabric-Device/0.1",
+      "accepted": [
+        "fabric-device/0.1"
+      ],
+      "expect": {
+        "error": {
+          "code": "schema-unsupported",
+          "message": "this receiver does not read that protocol revision",
+          "data": {
+            "protocol": "Fabric-Device/0.1",
+            "accepted": [
+              "fabric-device/0.1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "not-a-string",
+      "received": 7,
+      "accepted": [
+        "fabric-device/0.1"
+      ],
+      "expect": {
+        "error": {
+          "code": "schema-unsupported",
+          "message": "this receiver does not read that protocol revision",
+          "data": {
+            "protocol": "",
+            "accepted": [
+              "fabric-device/0.1"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "protocolLists": [
+    {
+      "list": [
+        "fabric-service/0.1"
+      ],
+      "findings": []
+    },
+    {
+      "list": [
+        "fabric-service/0.1",
+        "fabric-interop/0.1"
+      ],
+      "findings": []
+    },
+    {
+      "list": [],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": ""
+        }
+      ]
+    },
+    {
+      "list": "fabric-service/0.1",
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/protocols"
+        }
+      ]
+    },
+    {
+      "list": [
+        "fabric-service/0.1",
+        "fabric-service/0.1"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/1"
+        }
+      ]
+    },
+    {
+      "list": [
+        "fabric-service/0.2"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/0"
+        }
+      ]
+    },
+    {
+      "list": [
+        "Fabric-Service/0.1"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/0"
+        }
+      ]
+    },
+    {
+      "list": [
+        "fabric-service"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/0"
+        }
+      ]
+    },
+    {
+      "list": [
+        "other-protocol/3",
+        "other-protocol/7"
+      ],
+      "findings": []
+    },
+    {
+      "list": [
+        "other-protocol/1",
+        "other-protocol/2",
+        "other-protocol/3"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/2"
+        }
+      ]
+    },
+    {
+      "list": [
+        "p0/1",
+        "p1/1",
+        "p2/1",
+        "p3/1",
+        "p4/1",
+        "p5/1",
+        "p6/1",
+        "p7/1",
+        "p8/1",
+        "p9/1",
+        "p10/1",
+        "p11/1",
+        "p12/1",
+        "p13/1",
+        "p14/1",
+        "p15/1",
+        "p16/1",
+        "p17/1",
+        "p18/1",
+        "p19/1",
+        "p20/1",
+        "p21/1",
+        "p22/1",
+        "p23/1",
+        "p24/1",
+        "p25/1",
+        "p26/1",
+        "p27/1",
+        "p28/1",
+        "p29/1",
+        "p30/1",
+        "p31/1",
+        "p32/1",
+        "p33/1",
+        "p34/1",
+        "p35/1",
+        "p36/1",
+        "p37/1",
+        "p38/1",
+        "p39/1",
+        "p40/1",
+        "p41/1",
+        "p42/1",
+        "p43/1",
+        "p44/1",
+        "p45/1",
+        "p46/1",
+        "p47/1",
+        "p48/1",
+        "p49/1",
+        "p50/1",
+        "p51/1",
+        "p52/1",
+        "p53/1",
+        "p54/1",
+        "p55/1",
+        "p56/1",
+        "p57/1",
+        "p58/1",
+        "p59/1",
+        "p60/1",
+        "p61/1",
+        "p62/1",
+        "p63/1",
+        "p64/1"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": ""
+        }
+      ]
+    },
+    {
+      "list": [
+        7
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/0"
+        }
+      ]
+    },
+    {
+      "list": [
+        "fabric-service/0.1.2.3"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/0"
+        }
+      ]
+    },
+    {
+      "list": [
+        "other-protocol/1",
+        "other-protocol/1"
+      ],
+      "findings": [
+        {
+          "code": "FAC-SEM-099",
+          "instancePath": "/1"
+        }
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "name": "service-well-known-protocols",
+      "valid": true,
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "protocols": [
+          "fabric-service/0.1",
+          "fabric-settings-backup/1"
+        ],
+        "service": {
+          "id": "example-agent",
+          "instance": "default",
+          "name": "Example Agent",
+          "version": "0.2.0",
+          "build": {
+            "commit": "8b80be9",
+            "dirty": false,
+            "builtAt": "2026-09-28T17:40:00Z"
+          }
+        },
+        "process": {
+          "pid": 51234,
+          "startedAt": "2026-09-28T17:41:02Z"
+        },
+        "status": "degraded",
+        "degraded": [
+          {
+            "source": "llm",
+            "reason": "No model key: drafting is paused."
+          }
+        ],
+        "summary": [
+          {
+            "label": "Jobs running",
+            "value": 2
+          },
+          {
+            "label": "Awaiting you",
+            "value": 1,
+            "attention": true
+          }
+        ],
+        "surfaces": {
+          "dashboard": {
+            "path": "/dashboard",
+            "login": true
+          },
+          "mcp": {
+            "path": "/mcp",
+            "transport": "streamable-http"
+          },
+          "events": {
+            "path": "/fabric/v1/events"
+          }
+        },
+        "update": {
+          "available": null
+        }
+      }
+    },
+    {
+      "name": "service-well-known-protocols-unparsed",
+      "valid": false,
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "protocols": [
+          "fabric-service"
+        ],
+        "service": {
+          "id": "example-agent",
+          "instance": "default",
+          "name": "Example Agent",
+          "version": "0.2.0",
+          "build": {
+            "commit": "8b80be9",
+            "dirty": false,
+            "builtAt": "2026-09-28T17:40:00Z"
+          }
+        },
+        "process": {
+          "pid": 51234,
+          "startedAt": "2026-09-28T17:41:02Z"
+        },
+        "status": "degraded",
+        "degraded": [
+          {
+            "source": "llm",
+            "reason": "No model key: drafting is paused."
+          }
+        ],
+        "summary": [
+          {
+            "label": "Jobs running",
+            "value": 2
+          },
+          {
+            "label": "Awaiting you",
+            "value": 1,
+            "attention": true
+          }
+        ],
+        "surfaces": {
+          "dashboard": {
+            "path": "/dashboard",
+            "login": true
+          },
+          "mcp": {
+            "path": "/mcp",
+            "transport": "streamable-http"
+          },
+          "events": {
+            "path": "/fabric/v1/events"
+          }
+        },
+        "update": {
+          "available": null
+        }
+      }
+    },
+    {
+      "name": "service-events-page-data",
+      "valid": true,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "billing",
+                  "export"
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                }
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-limits",
+      "valid": true,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "k0": 0,
+                "k1": 1,
+                "k2": 2,
+                "k3": 3,
+                "k4": 4,
+                "k5": 5,
+                "k6": 6,
+                "k7": 7,
+                "k8": 8,
+                "k9": 9,
+                "k10": 10,
+                "k11": 11,
+                "k12": 12,
+                "k13": 13,
+                "k14": 14,
+                "k15": 15,
+                "k16": 16,
+                "k17": 17,
+                "k18": 18,
+                "k19": 19,
+                "k20": 20,
+                "k21": 21,
+                "k22": 22,
+                "k23": 23,
+                "k24": 24,
+                "k25": 25,
+                "k26": 26,
+                "k27": 27,
+                "k28": 28,
+                "k29": 29,
+                "k30": 30,
+                "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-long-string",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "billing",
+                  "export"
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                },
+                "note": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-too-many",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "k0": 0,
+                "k1": 1,
+                "k2": 2,
+                "k3": 3,
+                "k4": 4,
+                "k5": 5,
+                "k6": 6,
+                "k7": 7,
+                "k8": 8,
+                "k9": 9,
+                "k10": 10,
+                "k11": 11,
+                "k12": 12,
+                "k13": 13,
+                "k14": 14,
+                "k15": 15,
+                "k16": 16,
+                "k17": 17,
+                "k18": 18,
+                "k19": 19,
+                "k20": 20,
+                "k21": 21,
+                "k22": 22,
+                "k23": 23,
+                "k24": 24,
+                "k25": 25,
+                "k26": 26,
+                "k27": 27,
+                "k28": 28,
+                "k29": 29,
+                "k30": 30,
+                "k31": 31,
+                "k32": 32
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-too-deep",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "billing",
+                  "export"
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                },
+                "nested": {
+                  "deeper": {
+                    "x": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-long-list",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t",
+                  "t"
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                }
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-wide-object",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "billing",
+                  "export"
+                ],
+                "counts": {
+                  "k0": 0,
+                  "k1": 1,
+                  "k2": 2,
+                  "k3": 3,
+                  "k4": 4,
+                  "k5": 5,
+                  "k6": 6,
+                  "k7": 7,
+                  "k8": 8,
+                  "k9": 9,
+                  "k10": 10,
+                  "k11": 11,
+                  "k12": 12,
+                  "k13": 13,
+                  "k14": 14,
+                  "k15": 15,
+                  "k16": 16,
+                  "k17": 17,
+                  "k18": 18,
+                  "k19": 19,
+                  "k20": 20,
+                  "k21": 21,
+                  "k22": 22,
+                  "k23": 23,
+                  "k24": 24,
+                  "k25": 25,
+                  "k26": 26,
+                  "k27": 27,
+                  "k28": 28,
+                  "k29": 29,
+                  "k30": 30,
+                  "k31": 31,
+                  "k32": 32
+                }
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-extra-member",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "billing",
+                  "export"
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                }
+              },
+              "note": "x"
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-without-schema",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "billing",
+                  "export"
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                }
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-object-in-list",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "https://example.org/example-agent/schemas/question-unanswered-1.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  {
+                    "a": 1
+                  }
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                }
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-data-relative-schema",
+      "valid": false,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "community.question_unanswered",
+            "level": "notice",
+            "text": "A question in the community chat has had no answer for 2 hours.",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "data": {
+              "schema": "schemas/question.json",
+              "value": {
+                "questionId": "q-8812",
+                "waitingMinutes": 120,
+                "topics": [
+                  "billing",
+                  "export"
+                ],
+                "counts": {
+                  "inputTokens": 1834,
+                  "replies": 0
+                }
+              }
+            }
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page",
+      "valid": true,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "job.awaiting_choice",
+            "level": "notice",
+            "text": "The Q3 report draft is ready for your approval (12 sections, 3 languages).",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    },
+    {
+      "name": "service-events-page-traced",
+      "valid": true,
+      "document": {
+        "events": [
+          {
+            "id": "4213",
+            "at": "2026-09-28T17:55:10Z",
+            "kind": "job.awaiting_choice",
+            "level": "notice",
+            "text": "The Q3 report draft is ready for your approval (12 sections, 3 languages).",
+            "subject": {
+              "type": "report",
+              "id": "q3",
+              "label": "Q3 report"
+            },
+            "link": "/dashboard#/approvals/77",
+            "notify": true,
+            "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+            "spanId": "00f067aa0ba902b7"
+          },
+          {
+            "id": "4214",
+            "at": "2026-09-28T17:56:00Z",
+            "kind": "service.started",
+            "level": "info",
+            "text": "Service started on build 8b80be9."
+          }
+        ],
+        "cursor": "4214"
+      }
+    }
+  ],
+  "feedPages": [
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "notes": 3,
+                "inputTokens": 1200,
+                "title": "a plain sentence"
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": []
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "apiKey": "abc"
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/apiKey"
+        }
+      ]
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "token": 7
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": []
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "list": [
+                  "ok",
+                  "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                ]
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/list/1"
+        }
+      ]
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "apiKeys": [
+                  "k1",
+                  "k2"
+                ]
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/apiKeys/0"
+        },
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/apiKeys/1"
+        }
+      ]
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "nested": {
+                  "password": "p"
+                }
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/nested/password"
+        }
+      ]
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "nested": {
+                  "url": "https://user:pa55@example.com/x"
+                }
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/nested/url"
+        }
+      ]
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "a/b~c": "ghp_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/a~1b~0c"
+        }
+      ]
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "secrets": {
+                  "one": "plain words"
+                }
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/secrets/one"
+        }
+      ]
+    },
+    {
+      "page": {
+        "events": [
+          {
+            "id": "1",
+            "at": "2026-10-13T08:00:00Z",
+            "kind": "job.done",
+            "level": "info",
+            "text": "A note was drafted.",
+            "data": {
+              "schema": "https://example.com/schemas/note.json",
+              "value": {
+                "apiKeys": {
+                  "first": "x"
+                },
+                "notes": 2
+              }
+            }
+          }
+        ],
+        "cursor": "1"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-101",
+          "instancePath": "/events/0/data/value/apiKeys/first"
+        }
+      ]
+    }
+  ]
+}

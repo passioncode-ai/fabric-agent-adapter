@@ -116,6 +116,24 @@ empty, or `null` for an empty log. Retain at least seven days or 1000 events.
 path on the service origin, never an absolute URL. Optional SSE stream at
 `surfaces.events.stream` carrying the same objects.
 
+**Machine-readable `data` (DEC-0070).** An event may carry `data {schema, value}` beside its sentence: `schema` is the
+absolute URI of a payload schema the service publishes; `value` is an object of at most 32 members, each a scalar (a
+string of at most 500 characters, a number, a boolean, null), a list of at most 32 scalars, or an object of at most 32
+scalar members. `text` stays the event: a host that ignores `data` loses nothing, and one that does not know the schema
+treats `value` as opaque. No string in `value` sits under a credential's name or has a credential's shape
+(`FAC-SEM-101`); personal data is the service's own duty. `make_event` / `makeEvent` (and `JsonlEventLog.append`) take
+`data=` and refuse one that breaks either rule, naming the place, never the value; `check_service.py` checks the feed it
+fetches (`events.data`). A host pinned before DEC-0070 that validates events against a closed copy refuses the member.
+
+**Protocol revisions (DEC-0067).** The well-known document may list `protocols`, the revisions the service accepts: at
+most N and N−1 per protocol, consecutive in the contract's register, each `<name>/<revision>` once, 1 to 64 entries
+(`FAC-SEM-099`). `build_well_known` / `buildWellKnown` take `protocols=` and check it; list them only once your hosts
+are pinned at or after DEC-0067, because the document is closed for an older reader. A service that receives a document
+in a revision it does not read answers `negotiate_revision` / `negotiateRevision`'s `schema-unsupported` refusal before
+reading it further (HTTP 400, or an MCP `isError` result's `structuredContent`); a receiver that accepts none answers its
+own fault `no-accepted-revisions`. `PROTOCOL_REVISIONS` is the contract's register; `check_service.py` reads
+`well-known.protocols`.
+
 ## Login code and the operator session — `POST /fabric/v1/login-code`
 
 Token required → `{ "url": "/fabric/v1/login?code=<16–256 url-safe chars>", "expiresAt": "…" }`,

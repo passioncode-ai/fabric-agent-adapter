@@ -362,6 +362,18 @@
         "writes identifiers in their normal form (the scaffolded provider and capability ids, a provider entry's providerId) and compares providerId by normal form (FAC-SEM-014)",
         "never lower-cases a path or a URN's NSS and never decodes a reserved character: those spellings are different identifiers"
       ]
+    },
+    {
+      "id": "feed-data-and-protocols",
+      "trap": "a service put a daily summary's counts into the event sentence for hosts to parse, then added the summary as data with an apiKey field in it; another listed protocols in its well-known document while Fabric Dashboards was pinned before DEC-0067 and refused the closed document",
+      "request": "example-agent publishes a daily summary on its feed with machine-readable counts, and says which protocol revisions it accepts.",
+      "expected": [
+        "adds data {schema, value} through make_event / makeEvent (data=…): schema the absolute URI of a payload schema it publishes, value at most 32 members of scalars, short lists or flat objects; the text stays the sentence",
+        "never puts a credential in data: make_event refuses a string under a credential's name or of a credential's shape (FAC-SEM-101), naming the place and never the value; personal data is the service's own duty",
+        "lists protocols with build_well_known / buildWellKnown (protocols=[…]) only once its hosts are pinned at or after DEC-0067, N and N−1 per protocol (FAC-SEM-099)",
+        "answers a document in a revision it does not read with negotiate_revision / negotiateRevision's schema-unsupported refusal before reading it further, and its own fault when it accepts none",
+        "checks both with check_service.py (well-known.protocols, events.data)"
+      ]
     }
   ]
 }
