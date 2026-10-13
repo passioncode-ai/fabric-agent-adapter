@@ -7,7 +7,7 @@ into fabric-agent-contract `main` as `a83bec6b47776af688402c18efec507143061f68` 
 
 A Fabric service's dashboard is shown inside Fabric Dashboards beside the agent console. The console
 can take up to half the window, so a page that assumed a desktop width loses its navigation and
-scrolls sideways (measured on the brand board: 4 of 14 navigation links visible at 380 px, a 410 px
+scrolls sideways (measured on the first adopting dashboard: 4 of 14 navigation links visible at 380 px, a 410 px
 document in a 380 px view). DEC-0036 states what a page promises (ED-1…ED-6), what a host promises
 (ED-7, ED-8) and how a page declares it (ED-9, ED-10). This run gives every agent built with the
 adapter a kit that meets the page side, a probe that measures it, a declaration check, and a notice
@@ -19,7 +19,7 @@ that tells an already-built dashboard it has an update to take.
 |---|---|
 | contract `docs/specification/embedded-dashboard.md` @ `a83bec6` | ED-1…ED-10, the carrier cookie, the reference theme ids, the probe's named rules |
 | contract `schemas/service-dashboard-extension.schema.json` @ `a83bec6` | the ED-9 declaration shape the probe checks |
-| sshlg-brand-agent `docs/handoffs/2026-10-11-embedded-dashboard-profile.md` | the operator's decisions (360/480, release), the kit's file list, the hook's detection rule |
+| the adopting service's repository `docs/handoffs/2026-10-11-embedded-dashboard-profile.md` | the operator's decisions (360/480, release), the kit's file list, the hook's detection rule |
 | sheleg-design `styles/workbench.md` (1.64.0) | the graphite token layer verbatim, its AA gotchas (status words in `--ink`, no accent text on `--bg`/`--panel-2`) |
 | this repository `AGENTS.md`, `docs/backlog.md`, `test/validate.py`, commit `3537587` | the pin-move precedent, version sync, stdlib-only scripts, evals before prose, LC-09 footprint |
 | `building-fabric-services/references/dashboard.md` | the existing page principles the kit extends (CSP, calm refresh, partial failure) |
@@ -89,4 +89,4 @@ Walking skeleton first: the CSS + demo page + layout probe prove the floor befor
 
 - The host side (ED-7 host floor, ED-8 carrier writer, the theme picker in the host): fabric-dashboards
   FD-39/FD-40, another session's worktree.
-- The brand board adopting the kit: sshlg-brand-agent, the next task after this release.
+- The first adopting dashboard adopting the kit: the adopting service's repository, the next task after this release.
