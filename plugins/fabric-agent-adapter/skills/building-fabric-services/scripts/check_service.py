@@ -75,6 +75,29 @@ def plist_problems(plist: dict, label: object, token: object = None) -> list:
     return problems
 
 
+def marker_problem(plist: dict) -> Optional[str]:
+    """What is wrong with the job's supervisor marker (DEC-0057; FAA-05), read the way the copy it starts reads it.
+
+    Without ``FABRIC_SERVICE_SUPERVISOR=launchd`` (or ``--fabric-supervisor launchd``) a copy that finds the
+    lock held exits 75 at once, and KeepAlive starts it again every ThrottleInterval."""
+    env = plist.get("EnvironmentVariables")
+    env = {str(k): str(v) for k, v in env.items()} if isinstance(env, dict) else {}
+    argv = plist.get("ProgramArguments")
+    argv = [str(a) for a in argv] if isinstance(argv, list) else []
+    marker = fs.supervisor_marker(env, argv)
+    if marker["kind"] == "supervised" and marker["manager"] == "launchd":
+        return None
+    fix = ("a copy that finds the lock held exits 75 at once and KeepAlive respawns it every ThrottleInterval; "
+           "regenerate the plist with launchd_plist / launchdPlist and reinstall")
+    if marker["kind"] == "conflict":
+        return "%s — %s" % (fs.marker_conflict_message(marker), fix)
+    if marker["kind"] == "supervised":
+        return "the marker names %s, not launchd — %s" % (marker["manager"], fix)
+    if marker.get("unreadable") is not None:
+        return "the marker %r names no supervisor — %s" % (marker["unreadable"], fix)
+    return "no %s=launchd — %s" % (fs.SUPERVISOR_ENV, fix)
+
+
 def priority_problems(plist: dict) -> list:
     """A service that answers hosts and agents must not be scheduled as background work."""
     out = []
@@ -701,6 +724,9 @@ class Probe:
             return
         problems = plist_problems(plist, life.get("label"), self.token)
         self.add("lifecycle.plist", "FAIL" if problems else "PASS", "; ".join(problems) or "%s: RunAtLoad, KeepAlive, no secrets" % plist_path.name)
+        marker = marker_problem(plist)
+        self.add("lifecycle.supervisor-marker", "FAIL" if marker else "PASS",
+                 marker or "%s: %s=launchd, so a copy that finds the lock held backs off" % (plist_path.name, fs.SUPERVISOR_ENV))
         slow = priority_problems(plist)
         self.add("lifecycle.priority", "FAIL" if slow else "PASS",
                  "; ".join(slow) + " — macOS may starve the service under load and hosts then see an outage; use ProcessType Standard"

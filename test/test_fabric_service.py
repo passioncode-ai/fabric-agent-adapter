@@ -392,6 +392,48 @@ class DocumentTests(unittest.TestCase):
                          ["Label 'x'", "KeepAlive is False, not true"])
 
 
+    def test_probe_reads_the_launchd_marker_the_way_a_copy_does(self):
+        """FAA-05: a plist without FABRIC_SERVICE_SUPERVISOR=launchd starts a copy that exits 75 into a respawn loop."""
+        import plistlib
+        made = plistlib.loads(fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"), stdout_path=Path("/tmp/l")))
+        self.assertIsNone(check.marker_problem(made))
+        by_argument = {"ProgramArguments": ["/bin/x", "--fabric-supervisor", "launchd"], "EnvironmentVariables": {"PATH": "/bin"}}
+        self.assertIsNone(check.marker_problem(by_argument), "the argument form is a marker too (DEC-0057)")
+        for plist, words in (
+            ({"ProgramArguments": ["/bin/x"], "EnvironmentVariables": {"PATH": "/bin"}}, "no FABRIC_SERVICE_SUPERVISOR"),
+            ({"ProgramArguments": ["/bin/x"]}, "no FABRIC_SERVICE_SUPERVISOR"),
+            ({"ProgramArguments": ["/bin/x"], "EnvironmentVariables": {fs.SUPERVISOR_ENV: ""}}, "no FABRIC_SERVICE_SUPERVISOR"),
+            ({"ProgramArguments": ["/bin/x"], "EnvironmentVariables": {fs.SUPERVISOR_ENV: "systemd"}}, "names systemd"),
+            ({"ProgramArguments": ["/bin/x"], "EnvironmentVariables": {fs.SUPERVISOR_ENV: "cron"}}, "names no supervisor"),
+            ({"ProgramArguments": ["/bin/x", "--fabric-supervisor", "node"], "EnvironmentVariables": {fs.SUPERVISOR_ENV: "launchd"}}, "disagree"),
+            ({"ProgramArguments": ["/bin/x", "--", "--fabric-supervisor", "launchd"]}, "no FABRIC_SERVICE_SUPERVISOR"),
+            ({"ProgramArguments": "/bin/x", "EnvironmentVariables": ["launchd"]}, "no FABRIC_SERVICE_SUPERVISOR"),
+        ):
+            problem = check.marker_problem(plist)
+            self.assertIsNotNone(problem, plist)
+            self.assertIn(words, problem, plist)
+        self.assertIn("exits 75", check.marker_problem({"ProgramArguments": ["/bin/x"]}))
+
+    def test_probe_runs_the_marker_rule_on_the_job_file(self):
+        import plistlib
+        checker = load("check_service")
+        with tempfile.TemporaryDirectory() as tmp:
+            plist = Path(tmp) / "job.plist"
+            d = descriptor(47110, data=tmp)
+            d["lifecycle"] = {"manager": "launchd", "label": "a.b.c", "plist": str(plist)}
+            verdicts = {}
+            for name, body in (("made", fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"), stdout_path=Path("/tmp/l"))),
+                               ("old", plistlib.dumps({"Label": "a.b.c", "ProgramArguments": ["/bin/true"], "RunAtLoad": True, "KeepAlive": True}))):
+                plist.write_bytes(body)
+                p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
+                with mock.patch.object(checker.shutil, "which", return_value=None):
+                    p.lifecycle_rules()
+                verdicts[name] = {r["rule"]: r for r in p.results}["lifecycle.supervisor-marker"]
+            self.assertEqual(verdicts["made"]["verdict"], "PASS", verdicts["made"])
+            self.assertEqual(verdicts["old"]["verdict"], "FAIL")
+            self.assertIn("exits 75", verdicts["old"]["evidence"])
+
+
 class LiveServiceTests(unittest.TestCase):
     """The sample service, probed by check_service.py, with defects planted on purpose."""
 

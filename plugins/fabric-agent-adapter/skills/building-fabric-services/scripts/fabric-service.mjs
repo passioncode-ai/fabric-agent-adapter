@@ -2328,3 +2328,185 @@ export function taskUninstall(task, { run = defaultRun, platform = process.platf
   run(['schtasks', '/End', '/TN', task]);
   check(run(['schtasks', '/Delete', '/TN', task, '/F']), 'schtasks /Delete');
 }
+
+// --- launchd (macOS; lifecycle.md "Install, upgrade, uninstall", LC-14; FAA-04) ------------------------------------
+// The twins of fabric_service.launchd_plist / launchd_loaded / launchd_override / launchd_install / launchd_uninstall.
+// `run(argv)` returns spawnSync's {status, stdout, stderr}; the tests pass a launchd stand-in, never the real launchctl.
+
+const LABEL = /^[A-Za-z0-9][A-Za-z0-9._-]{0,250}$/;
+const DEFAULT_PATH = '/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function launchdLabel(label) {
+  if (!LABEL.test(String(label))) throw new ServiceError(`label must match ${LABEL.source}`);
+  return String(label);
+}
+
+function plistValue(value, depth) {
+  // plistlib.dumps's layout, byte for byte: one tab per level, keys sorted, & < > escaped, empty containers self-closed.
+  const pad = '\t'.repeat(depth);
+  if (value === true || value === false) return `${pad}<${value}/>\n`;
+  if (Number.isInteger(value)) return `${pad}<integer>${value}</integer>\n`;
+  if (typeof value === 'string') return `${pad}<string>${plain(value, 'A plist string').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</string>\n`;
+  if (Array.isArray(value)) return value.length ? `${pad}<array>\n${value.map((v) => plistValue(v, depth + 1)).join('')}${pad}</array>\n` : `${pad}<array/>\n`;
+  const keys = Object.keys(value).sort();
+  if (!keys.length) return `${pad}<dict/>\n`;
+  const inner = keys.map((k) => `${pad}\t<key>${plain(k, 'A plist key').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</key>\n${plistValue(value[k], depth + 1)}`).join('');
+  return `${pad}<dict>\n${inner}${pad}</dict>\n`;
+}
+
+/**
+ * The launchd job: RunAtLoad + KeepAlive true + ThrottleInterval 10, ProcessType Standard, ExitTimeOut above the drain.
+ * FABRIC_SERVICE_SUPERVISOR=launchd tells the lock to back off instead of exiting into a respawn loop (DEC-0057).
+ * No secret is written: an environment name ending TOKEN/SECRET/PASSWORD/KEY (a `*_FILE` path is fine), a value or an
+ * argument shaped like a credential is refused. Returns the XML text, the same bytes Python's plistlib writes.
+ */
+export function launchdPlist(label, programArguments, { workingDirectory, stdoutPath, environment = {}, exitTimeout = DEFAULT_EXIT_TIMEOUT } = {}) {
+  launchdLabel(label);
+  const argv = programArguments.map(String);
+  if (!argv.length) throw new ServiceError('A launchd job starts a program; ProgramArguments is empty.');
+  if (!(exitTimeout > DRAIN_SECONDS)) throw new ServiceError(`ExitTimeOut must outlast the ${DRAIN_SECONDS} s drain.`);
+  if (workingDirectory === undefined || stdoutPath === undefined) throw new ServiceError('A launchd job names its working directory and its log file.');
+  const env = { ...environment };
+  for (const [name, value] of Object.entries(env)) {
+    if (/(TOKEN|SECRET|PASSWORD|KEY)$/.test(name) && !name.endsWith('_FILE')) throw new ServiceError(`Environment variable ${name} looks like a secret; pass a *_FILE path instead.`);
+    if (secretValue(String(value))) throw new ServiceError(`Environment ${name} holds a value shaped like a credential; a plist never carries one.`);
+  }
+  for (const arg of argv) {
+    if (secretArgument(arg)) throw new ServiceError('An argument carries a credential; a plist never does (read it from the token file or a secret reference).');
+  }
+  noMarkerArgument(argv);
+  if (env.PATH === undefined) env.PATH = DEFAULT_PATH;
+  env[SUPERVISOR_ENV] = 'launchd'; // the plist's writer writes the marker, whatever the caller passed
+  const job = {
+    Label: label,
+    ProgramArguments: argv,
+    WorkingDirectory: String(workingDirectory),
+    RunAtLoad: true,
+    KeepAlive: true,
+    ThrottleInterval: 10,
+    ExitTimeOut: Math.trunc(exitTimeout),
+    // Standard, never Background: macOS starves a Background job under load and every host then reports an outage.
+    ProcessType: 'Standard',
+    StandardOutPath: String(stdoutPath),
+    StandardErrorPath: String(stdoutPath),
+    EnvironmentVariables: env,
+  };
+  return '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+    + `<plist version="1.0">\n${plistValue(job, 0)}</plist>\n`;
+}
+
+function launchdDomain(platform, uid) {
+  // DEC-0032: launchd is macOS's supervisor; Linux has systemd and Windows Task Scheduler.
+  if (platform !== 'darwin') throw new ServiceError('launchd is the supervisor on macOS only; use systemdInstall on Linux and taskInstall on Windows.');
+  return `gui/${uid ?? process.getuid()}`;
+}
+
+/** True when launchd has the job loaded (`launchctl print gui/<uid>/<label>` answers). */
+export function launchdLoaded(label, { run = defaultRun, platform = process.platform, uid } = {}) {
+  return run(['launchctl', 'print', `${launchdDomain(platform, uid)}/${launchdLabel(label)}`])?.status === 0;
+}
+
+const OVERRIDE_ROW = /^\s*"([^"]+)"\s*=>\s*(\S+)\s*$/;
+
+/**
+ * The operator's launchd override for `label`: 'disabled', 'enabled', null when none is recorded (a first install), or
+ * 'unknown' when the table cannot be read. macOS 14+ prints `=> disabled|enabled`, older releases `=> true|false`.
+ */
+export function launchdOverride(label, { run = defaultRun, platform = process.platform, uid } = {}) {
+  const result = run(['launchctl', 'print-disabled', launchdDomain(platform, uid)]);
+  if (result?.status !== 0) return 'unknown';
+  for (const line of String(result.stdout ?? '').split('\n')) {
+    const match = OVERRIDE_ROW.exec(line);
+    if (match && match[1] === label) return ['disabled', 'true'].includes(match[2]) ? 'disabled' : 'enabled';
+  }
+  return null;
+}
+
+async function wellKnownOf(origin) {
+  try {
+    const response = await fetch(`${origin}/.well-known/fabric-service`, { signal: AbortSignal.timeout(2000) });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write and lint the plist, bootout and WAIT for the unload, bootstrap (retrying launchd's EIO 5 times), then poll the
+ * well-known document until it answers with this identity; resolves to that document.
+ *
+ * The operator's intent wins (LC-14): only a first install (no override recorded) enables the label. A label the
+ * operator disabled stays disabled and unloaded — the plist is still rewritten, so the new release is what starts once
+ * they turn it back on — and the answer is {disabled: true, label, plist, loaded}. `forceEnable` is for an operator
+ * who asked for the service to be switched on.
+ */
+export async function launchdInstall(label, plistPath, plistText, { origin, serviceId, instance = 'default', timeout = 40, forceEnable = false,
+  run = defaultRun, platform = process.platform, uid, fetchWellKnown = wellKnownOf, sleep = pause } = {}) {
+  const domain = launchdDomain(platform, uid);
+  launchdLabel(label);
+  if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
+  const opts = { run, platform, uid };
+  atomicWrite(plistPath, plistText, 0o644);
+  const lint = run(['plutil', '-lint', String(plistPath)]);
+  if (lint?.status !== 0) throw new ServiceError(`plist failed plutil -lint: ${String(lint?.stdout || lint?.stderr || '').trim().slice(0, 200)}`);
+  const target = `${domain}/${label}`;
+  const override = launchdOverride(label, opts);
+  if (forceEnable || override === null) run(['launchctl', 'enable', target]);
+  else if (override === 'disabled') return { disabled: true, label, plist: String(plistPath), loaded: launchdLoaded(label, opts) };
+  run(['launchctl', 'bootout', target]);
+  const unloaded = Date.now() + 15_000;
+  while (launchdLoaded(label, opts) && Date.now() < unloaded) await sleep(250);
+  let last = '';
+  for (let attempt = 0; ; attempt += 1) {
+    const result = run(['launchctl', 'bootstrap', domain, String(plistPath)]);
+    if (result?.status === 0) break;
+    last = String(result?.stderr || result?.stdout || '').trim();
+    if (attempt === 4) throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}`);
+    await sleep(1000);
+  }
+  const deadline = Date.now() + timeout * 1000;
+  while (Date.now() < deadline) {
+    const doc = await fetchWellKnown(origin);
+    if (doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
+    await sleep(500);
+  }
+  throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log.`);
+}
+
+/**
+ * Symmetric with launchdInstall (LC-14): bootout and WAIT until the job is gone, remove the plist, and reset the
+ * override to enabled — launchctl has no verb that deletes an override, and a leftover `disabled` would keep a later
+ * fresh install off. Data stays unless `purge` (then `serviceId` names whose data, logs and cache go). A job still
+ * loaded at `timeout` seconds throws, leaving the plist and the data in place.
+ */
+export async function launchdUninstall(label, plistPath, { timeout = 30, purge = false, serviceId, run = defaultRun, platform = process.platform, uid, sleep = pause } = {}) {
+  const domain = launchdDomain(platform, uid);
+  launchdLabel(label);
+  if (purge && !serviceId) throw new ServiceError('purge needs the service id whose data, logs and cache to remove.');
+  const dirs = purge ? serviceDirs(serviceId, platform) : {};
+  const opts = { run, platform, uid };
+  const target = `${domain}/${label}`;
+  run(['launchctl', 'bootout', target]);
+  const deadline = Date.now() + timeout * 1000;
+  while (launchdLoaded(label, opts)) {
+    if (Date.now() >= deadline) throw new ServiceError(`launchd job ${label} is still loaded ${timeout} s after bootout; nothing was removed.`);
+    await sleep(100);
+  }
+  let plistRemoved = true;
+  try {
+    fs.unlinkSync(plistPath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    plistRemoved = false;
+  }
+  run(['launchctl', 'enable', target]);
+  const purged = [];
+  for (const dir of Object.values(dirs)) {
+    try { fs.lstatSync(dir); } catch { continue; }
+    fs.rmSync(dir, { recursive: true, force: true }); // a symlinked folder: the link goes, never what it points at
+    purged.push(dir);
+  }
+  return { unloaded: true, plistRemoved, override: 'enabled', purged };
+}
