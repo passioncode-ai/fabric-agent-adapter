@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.27.0 - 2026-10-13
+
+The usage report's window and spend by project, and OpenRouter attribution for a product's own traffic (contract
+DEC-0065, FAA-33). Pin unchanged at `a046f57`.
+
+### Added
+
+- **Spend by project.** `make_usage_receipt` / `makeUsageReceipt` take `project_id` / `projectId`, a URI kept in its
+  normal form (DEC-0076), and `task_run_id` / `taskRunId`. `usage_report` / `usageReport` then write `byProject`: each
+  project once, each task run once within it, with calls, unpriced calls and cost. It names no caller, session or
+  person.
+- **FAC-SEM-025 whole:** `usage_findings` / `usageFindings` check the arithmetic, the window (every day exists, is not
+  after `generatedAt`'s UTC date and is at most 30 days before it) and the projects. The projects' calls, priced calls
+  and known costs are bounded by the days' (CT-40).
+- **OpenRouter attribution, off by default:** `attribution_headers` / `attributionHeaders` and
+  `attribution_setting_findings` / `attributionSettingFindings` (FAC-SEM-098). The answer adds `HTTP-Referer`,
+  `X-OpenRouter-Title` and `X-OpenRouter-Categories` only with a valid setting, only to `https://openrouter.ai` (read as
+  a browser reads the URL), only for traffic the product originates, and never over a user's own attribution.
+- **`check_service.py`** `usage.report` reads each row's route (`platform-metered` included), the window and
+  `byProject`.
+
+### Evidence
+
+- Both kits pass the contract's 34 attribution cases.
+- Both kits give the contract's `usageRules` answer on 21 reports: its six positive usage fixtures and 15 edits of the
+  by-project one.
+- 23 planted defects, all caught.
+- The scenario eval `usage-by-project-and-attribution` was written before the prose.
+
 ## 0.26.0 - 2026-10-13
 
 Feed events carry machine-readable `data` (contract DEC-0070, FAA-35), and a service says which protocol revisions it

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { normalIdentifier } from './fabric-identifiers.mjs';
 import { credentialName, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 
 export const PROTOCOL = 'fabric-service/0.1';
@@ -1016,7 +1017,11 @@ const COUNTS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTok
  * One model call, from the provider's own usage numbers. No prompt, output or caller.
  * `costUsd` null means it cannot be priced: the report counts it as unpriced, never as $0.
  */
-export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0, costUsd = null, costBasis, at, route } = {}) {
+/**
+ * One model call. `projectId` (a URI, kept in its normal form, DEC-0076) and `taskRunId` (the service's own run id) attribute
+ * it to the project the service ran it for (DEC-0065); they never name a caller, session or person.
+ */
+export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0, costUsd = null, costBasis, at, route, projectId, taskRunId } = {}) {
   if (!PROVIDER.test(provider ?? '')) throw new ServiceError('provider must be a lowercase name such as anthropic or openrouter.');
   model = String(model ?? '').trim();
   if (!model || model.length > 128) throw new ServiceError('model must be 1 to 128 characters.');
@@ -1026,7 +1031,34 @@ export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, c
   const basis = costBasis ?? (costUsd === null ? 'unknown' : 'provider');
   if (!COST_BASES.includes(basis) || (costUsd === null) !== (basis === 'unknown')) throw new ServiceError('costBasis is provider or price-list with a cost, unknown without one.');
   if (route !== undefined && !USAGE_ROUTES.includes(route)) throw new ServiceError('route is subscription, key or platform-metered (DEC-0046, DEC-0061).');
-  return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis, ...(route === undefined ? {} : { route }) };
+  if (taskRunId !== undefined && projectId === undefined) throw new ServiceError('a task run belongs to a project: give projectId with taskRunId.');
+  if (projectId !== undefined && !(typeof projectId === 'string' && /^[A-Za-z][A-Za-z0-9+.-]*:\S+$/.test(projectId))) throw new ServiceError('projectId is the URI of the project the service ran the call for.');
+  if (taskRunId !== undefined && !(typeof taskRunId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(taskRunId))) throw new ServiceError("taskRunId is the service's own run id: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$.");
+  return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis, ...(route === undefined ? {} : { route }),
+    ...(projectId === undefined ? {} : { projectId: normalIdentifier(projectId) }), ...(taskRunId === undefined ? {} : { taskRunId }) };
+}
+
+/** DEC-0065's `byProject`: the window's calls by project (normal form, DEC-0076), each task run once within it. */
+function byProject(receipts, first, last) {
+  const projects = new Map();
+  const add = (row, r) => { row.calls += 1; if (r.costUsd === null || r.costUsd === undefined) row.unpricedCalls += 1; else row.cost += r.costUsd; };
+  for (const r of receipts) {
+    const date = String(r.at ?? '').slice(0, 10);
+    if (date < first || date > last || !r.projectId) continue;
+    if (!projects.has(r.projectId)) projects.set(r.projectId, { projectId: r.projectId, calls: 0, unpricedCalls: 0, cost: 0, runs: new Map() });
+    const row = projects.get(r.projectId);
+    add(row, r);
+    if (r.taskRunId) {
+      if (!row.runs.has(r.taskRunId)) row.runs.set(r.taskRunId, { taskRunId: r.taskRunId, calls: 0, unpricedCalls: 0, cost: 0 });
+      add(row.runs.get(r.taskRunId), r);
+    }
+  }
+  const close = ({ cost, ...rest }) => ({ ...rest, costUsd: rest.calls && rest.unpricedCalls === rest.calls ? null : Math.round(cost * 1e6) / 1e6 });
+  return [...projects.keys()].sort().map((key) => {
+    const { runs, ...row } = projects.get(key);
+    const taskRuns = [...runs.keys()].sort().map((id) => close(runs.get(id)));
+    return { ...close(row), ...(taskRuns.length ? { taskRuns } : {}) };
+  });
 }
 
 const utcDate = (ms) => new Date(ms).toISOString().slice(0, 10);
@@ -1041,6 +1073,181 @@ function closeRow(row) {
  * model; days without calls are omitted. A row whose calls are all unpriced costs null; totals
  * are the sums of the model rows (FAC-SEM-025).
  */
+// --- FAC-SEM-025 whole (DEC-0021, DEC-0065, CT-40, DEC-0076): the contract's `usageRules` --------------------------------
+
+const usageCount = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : 0);
+const usageCost = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
+const exceeds = (a, b) => a - b > 0.000001 + 1e-9 * Math.max(Math.abs(a), Math.abs(b));
+const usd = (v) => String(Math.round(v * 1e6) / 1e6);
+const usageList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'object' && x !== null && !Array.isArray(x)) : []);
+const RFC3339_TIME = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$/;
+function strictTime(value) {
+  const m = typeof value === 'string' ? RFC3339_TIME.exec(value) : null;
+  if (!m) return NaN;
+  const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number);
+  const date = new Date(0);
+  date.setUTCFullYear(y, mo - 1, d);
+  if (date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d || h > 23 || mi > 59 || s > 59) return NaN;
+  return Date.parse(value);
+}
+function utcDateMs(value) {
+  const m = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
+  if (!m) return NaN;
+  const [y, mo, d] = m.slice(1).map(Number);
+  const ms = Date.UTC(y, mo - 1, d);
+  const date = new Date(ms);
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d ? ms : NaN;
+}
+function pricedRow(row, at) {
+  const calls = usageCount(row.calls), unpriced = usageCount(row.unpricedCalls);
+  const flag = (p, message) => [{ code: 'FAC-SEM-025', instancePath: p, message }];
+  if (unpriced > calls) return flag(`${at}/unpricedCalls`, 'more unpriced calls than calls');
+  if (calls > 0 && unpriced === calls && row.costUsd !== null) return flag(`${at}/costUsd`, 'every call is unpriced, so the cost is unknown (null), not a number');
+  if (unpriced < calls && row.costUsd === null) return flag(`${at}/costUsd`, 'priced calls carry a cost; null is only for a row with no priced call');
+  return [];
+}
+
+/**
+ * FAC-SEM-025 over a usage report, in the contract's order (`src/usage-rules.ts`): the arithmetic, the window (every
+ * date exists, not after `generatedAt`'s UTC date, at most 30 days before it) and the project attribution (each project
+ * once by its normal form, each task run once; calls, priced calls and known costs bounded). Never throws.
+ */
+export function usageFindings(report) {
+  const value = typeof report === 'object' && report !== null && !Array.isArray(report) ? report : {};
+  const findings = [];
+  const flag = (instancePath, message) => findings.push({ code: 'FAC-SEM-025', instancePath, message });
+  const days = usageList(value.days);
+  let previous = '';
+  days.forEach((day, i) => {
+    const at = `/days/${i}`;
+    const date = String(day.date ?? '');
+    if (date <= previous) flag(`${at}/date`, `days must run forward without a repeat (${date} after ${previous})`);
+    previous = date;
+    findings.push(...pricedRow(day, at));
+    const models = usageList(day.byModel);
+    models.forEach((m, j) => findings.push(...pricedRow(m, `${at}/byModel/${j}`)));
+    if (!models.length) {
+      const spent = ['calls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'].some((f) => Number(day[f] ?? 0) > 0) || Number(day.costUsd ?? 0) > 0;
+      if (spent) flag(`${at}/byModel`, 'a day with calls, tokens or cost names the models they belong to');
+      return;
+    }
+    for (const field of ['calls', 'unpricedCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) {
+      const sum = models.reduce((n, m) => n + Number(m[field] ?? 0), 0);
+      if (Number(day[field] ?? 0) !== sum) flag(`${at}/${field}`, `the day's ${field} is not the sum of its models (${String(day[field] ?? 0)} ≠ ${sum})`);
+    }
+    const known = models.map((m) => (typeof m.costUsd === 'number' ? m.costUsd : null)).filter((x) => x !== null).reduce((n, x) => n + x, 0);
+    if (typeof day.costUsd === 'number' && Math.abs(day.costUsd - known) > 0.000001 + 1e-9 * Math.max(Math.abs(day.costUsd), Math.abs(known))) flag(`${at}/costUsd`, "the day's cost is not the sum of its models' known costs");
+  });
+  if (days.length) {
+    const generated = strictTime(value.generatedAt);
+    if (Number.isNaN(generated)) flag('/generatedAt', 'generatedAt is an RFC 3339 date-time with an offset, so the window can be read');
+    else {
+      const today = Math.floor(generated / 86_400_000) * 86_400_000;
+      const oldest = today - 30 * 86_400_000;
+      days.forEach((day, i) => {
+        const date = utcDateMs(day.date);
+        if (Number.isNaN(date)) flag(`/days/${i}/date`, "a day's date exists in its month");
+        else if (date > today) flag(`/days/${i}/date`, 'a day is not after the UTC date of generatedAt');
+        else if (date < oldest) flag(`/days/${i}/date`, 'a day is within the last 31 UTC days of generatedAt');
+      });
+    }
+  }
+  if (Array.isArray(value.byProject)) {
+    const seen = new Map();
+    let projectCalls = 0, projectCost = 0;
+    value.byProject.forEach((project, p) => {
+      if (typeof project !== 'object' || project === null || Array.isArray(project)) return;
+      const at = `/byProject/${p}`;
+      const normal = normalIdentifier(project.projectId);
+      if (normal !== undefined) {
+        if (seen.has(normal)) flag(`${at}/projectId`, `each project is one row: ${String(project.projectId)} names the project ${seen.get(normal)} already names`);
+        else seen.set(normal, String(project.projectId));
+      }
+      projectCalls += usageCount(project.calls);
+      projectCost += usageCost(project.costUsd);
+      findings.push(...pricedRow(project, at));
+      const runs = new Set();
+      let runCalls = 0, runCost = 0, runPriced = 0;
+      usageList(project.taskRuns).forEach((run, r) => {
+        if (typeof run.taskRunId === 'string') {
+          if (runs.has(run.taskRunId)) flag(`${at}/taskRuns/${r}/taskRunId`, 'each task run is one row within its project');
+          runs.add(run.taskRunId);
+        }
+        runCalls += usageCount(run.calls);
+        runCost += usageCost(run.costUsd);
+        runPriced += Math.max(0, usageCount(run.calls) - usageCount(run.unpricedCalls));
+        findings.push(...pricedRow(run, `${at}/taskRuns/${r}`));
+      });
+      const projectPriced = Math.max(0, usageCount(project.calls) - usageCount(project.unpricedCalls));
+      if (runCalls > usageCount(project.calls)) flag(`${at}/taskRuns`, `a project's task runs hold more calls than the project (${runCalls} > ${usageCount(project.calls)})`);
+      else if (runPriced > projectPriced) flag(`${at}/taskRuns`, `a project's task runs hold more priced calls than the project (${runPriced} > ${projectPriced})`);
+      else if (usageCost(project.costUsd) === project.costUsd && exceeds(runCost, usageCost(project.costUsd))) flag(`${at}/taskRuns`, `a project's task runs cost more than the project (${usd(runCost)} > ${usd(usageCost(project.costUsd))})`);
+    });
+    const dayCalls = days.reduce((n, d) => n + usageCount(d.calls), 0);
+    if (projectCalls > dayCalls) flag('/byProject', `the projects hold more calls than the days (${projectCalls} > ${dayCalls})`);
+    const dayCost = days.reduce((n, d) => n + usageCost(d.costUsd), 0);
+    if (exceeds(projectCost, dayCost)) flag('/byProject', `the projects cost more than the days (${usd(projectCost)} > ${usd(dayCost)})`);
+  }
+  return findings;
+}
+
+// --- OpenRouter attribution (DEC-0065): the contract's `attributionHeaders`, off by default ------------------------------
+
+export const OPENROUTER_CATEGORIES = Object.freeze(['cli-agent', 'ide-extension', 'cloud-agent', 'programming-app', 'native-app-builder',
+  'creative-writing', 'video-gen', 'image-gen', 'audio-gen', 'writing-assistant', 'general-chat', 'personal-agent', 'legal', 'roleplay', 'game']);
+const ATTR_PRODUCT = /^[a-z][a-z0-9-]{0,62}$/;
+const ATTR_TITLE = /^[\x21-\x7e](?:[\x20-\x7e]{0,98}[\x21-\x7e])?$/;
+const ATTRIBUTION_HEADER_NAMES = new Set(['http-referer', 'referer', 'x-openrouter-title', 'x-title', 'x-openrouter-categories']);
+
+/** FAC-SEM-098: a product's setting names a product slug, a printable title and at most two recognized categories. */
+export function attributionSettingFindings(value) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return [{ code: 'FAC-SEM-098', instancePath: '', message: 'an attribution setting is an object' }];
+  const findings = [];
+  const flag = (instancePath, message) => findings.push({ code: 'FAC-SEM-098', instancePath, message });
+  if (typeof value.product !== 'string' || !ATTR_PRODUCT.test(value.product)) flag('/product', 'the product is a lower-case slug, the last segment of its product page');
+  if (typeof value.title !== 'string' || !ATTR_TITLE.test(value.title)) flag('/title', "the title is the product's full name: printable ASCII, 1 to 100 characters, no space at either end");
+  if (value.categories !== undefined) {
+    if (!Array.isArray(value.categories)) flag('/categories', 'categories are a list');
+    else {
+      if (value.categories.length > 2) flag('/categories', 'at most 2 categories per request');
+      const seen = new Set();
+      value.categories.forEach((c, i) => {
+        if (typeof c !== 'string' || !OPENROUTER_CATEGORIES.includes(c)) flag(`/categories/${i}`, 'a category is one OpenRouter recognizes; it drops others without an error');
+        else if (seen.has(c)) flag(`/categories/${i}`, 'each category once');
+        else seen.add(c);
+      });
+    }
+  }
+  return findings;
+}
+
+function isOpenRouter(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && u.hostname === 'openrouter.ai' && u.port === '' && u.username === '' && u.password === '';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The headers a product adds to one request (DEC-0065, the contract's `attributionHeaders`), or none with the reason:
+ * `no-setting` (off by default), `invalid-setting`, `not-openrouter`, `forwarded`, `user-set`. Only `HTTP-Referer`,
+ * `X-OpenRouter-Title` and `X-OpenRouter-Categories`; it never reads, moves or returns a key.
+ */
+export function attributionHeaders(setting, given) {
+  const request = typeof given === 'object' && given !== null ? given : {};
+  if (setting === undefined || setting === null) return { headers: {}, none: 'no-setting' };
+  if (attributionSettingFindings(setting).length) return { headers: {}, none: 'invalid-setting' };
+  if (typeof request.url !== 'string' || !isOpenRouter(request.url)) return { headers: {}, none: 'not-openrouter' };
+  if (request.originated !== true) return { headers: {}, none: 'forwarded' };
+  const present = typeof request.headers === 'object' && request.headers !== null ? Object.keys(request.headers).map((n) => n.toLowerCase()) : [];
+  if (present.some((n) => ATTRIBUTION_HEADER_NAMES.has(n))) return { headers: {}, none: 'user-set' };
+  const headers = { 'HTTP-Referer': `https://passioncode.ai/${setting.product}/`, 'X-OpenRouter-Title': setting.title };
+  if (setting.categories?.length) headers['X-OpenRouter-Categories'] = setting.categories.join(',');
+  return { headers };
+}
+
 /**
  * `budgets` (DEC-0027) lists every spending limit the service applies, enforced or not. A machine limit with a
  * calendar `period` and no `spentUsd` is counted here from the receipts, the way `budget` is, so the two never
@@ -1077,6 +1284,8 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
     return { ...closeRow(day), byModel: models };
   });
   const report = { protocol: PROTOCOL, service: { id, instance }, generatedAt: new Date(now).toISOString().replace(/\.\d{3}Z$/, 'Z'), currency: 'USD', days: outDays };
+  const projects = byProject(receipts, first, last);
+  if (projects.length) report.byProject = projects;
   if (budget !== undefined) {
     if (!['day', 'month'].includes(budget?.period) || typeof budget.limitUsd !== 'number' || !(budget.limitUsd > 0)) throw new ServiceError('budget is {period: day|month, limitUsd > 0}.');
     report.budget = { period: budget.period, limitUsd: budget.limitUsd, spentUsd: spentIn(outDays, budget.period, last) };
