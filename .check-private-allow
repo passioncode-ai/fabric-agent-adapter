@@ -1,0 +1,4 @@
+# Reviewed synthetic findings for org-index scripts/check_private.py (Fabric ADR-0092).
+# P3: the test home `/Users/a`, a one-letter synthetic user that fabric_root's tests resolve paths under.
+P3:test/test_fabric_session.py:db09958f63deaa0c
+P3:test/test_fabric_session.py:c8ba34e38ab8ad8b

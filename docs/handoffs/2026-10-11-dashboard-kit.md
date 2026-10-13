@@ -3,7 +3,7 @@
 Branch `agent/faa-17-dashboard-kit`, cut from `origin/main` `9e830a2` (0.8.3). Objective (operator,
 2026-10-11): a Fabric service's dashboard narrowed inside Fabric Dashboards beside the agent console lost
 its navigation; fix it at the factory level — a kit every agent inherits, a notice for dashboards already
-built, theme presets — with the brand board as the first adopter. Spec, decisions and REQ table:
+built, theme presets — with the first adopting dashboard as the first adopter. Spec, decisions and REQ table:
 [docs/evidence/specs/2026-10-11-dashboard-kit.md](../evidence/specs/2026-10-11-dashboard-kit.md).
 
 ## Completed
@@ -56,11 +56,11 @@ Notice latency on this machine (load average ≈ 50): median 294–443 ms; in-pr
    `npx @passioncode-ai/passioncode@latest update` updates this machine.
 3. The host side (ED-7 host floor, ED-8 carrier writer, the theme picker): fabric-dashboards FD-39/FD-40,
    another session's worktree `../fabric-dashboards-host-floor` (local commit `bb13b1c`, not pushed).
-4. The brand board adopts the kit (sshlg-brand-agent, its handoff step 4).
+4. The first adopting dashboard adopts the kit (the adopting service's repository, its handoff step 4).
 
 ## Follow-up (same day)
 
-The brand board, built on the kit, was measured live: 21 rules, 0 FAIL at 360–1440 px. One run caught the
+The first adopting dashboard, built on the kit, was measured live: 21 rules, 0 FAIL at 360–1440 px. One run caught the
 board mid-load (its header grew when data arrived, a false ED-5 at 360); `check_dashboard_layout.mjs`
 now waits for network idle and lets each width settle (branch `agent/faa-17-probe-settle`), in 0.9.0.
 
