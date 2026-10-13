@@ -12,7 +12,7 @@ from test_adapt_project import ADAPTER, ROOT, scaffold_args
 
 OLD = '2ce392291c6668598d12cd38327e24696b5ca15c'
 NEW = 'a046f57cf46ea9e3da57ff8ce6a3ed4d26d8774b'
-DEC57 = 'fe55fc67cba1a9e34a736da7d148d4fe2a8fbfa0'  # DEC-0057…0075 (0.23.0, 0.25.0); bundles issued under it stay valid
+DEC57 = 'fe55fc67cba1a9e34a736da7d148d4fe2a8fbfa0'  # DEC-0057…0075 (0.23.0, 0.26.0); bundles issued under it stay valid
 DEC55 = 'b291bf09e0a9f9fd3c16cf540832cd021203b7d1'  # DEC-0055 (estate-record/1, 0.21.0); bundles issued under it stay valid
 DEC46 = '0cacd08b0e95b6abf131eae1206b60792138bc3c'  # DEC-0046 and FAA-22/23 era; bundles issued under it stay valid
 DEC45 = '2eb91c00e852d9c31d804310d38fad91589fcbac'  # DEC-0041…0045; bundles issued under it stay valid

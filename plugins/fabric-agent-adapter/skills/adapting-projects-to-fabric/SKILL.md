@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.25.0"
+  version: "0.26.0"
   contract-version: "0.1.0"
   contract-commit: "a046f57cf46ea9e3da57ff8ce6a3ed4d26d8774b"
 ---

@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.26.0 - 2026-10-13
+
+Feed events carry machine-readable `data` (contract DEC-0070, FAA-35), and a service says which protocol revisions it
+accepts (DEC-0067, FAA-37). Both are in the pin `a046f57`, which does not move.
+
+### Added
+
+- **`data` on an event.**
+  - `make_event` / `makeEvent` and `JsonlEventLog.append` take `data={schema, value}`.
+  - `schema` is the absolute URI of a payload schema the service publishes.
+  - `value` holds at most 32 members. Each is a scalar (a string of at most 500 characters), a list of at most 32
+    scalars, or an object of at most 32 scalar members.
+  - FAC-SEM-101 refuses a string under a credential's name or of a credential's shape, at either level. The refusal names
+    the place, never the value.
+  - `feed_data_findings` / `feedDataFindings` and `feed_data_problems` / `feedDataProblems`.
+- **Protocol revisions.**
+  - `PROTOCOL_REVISIONS` (the contract's register), `parse_revision`, `accepted_revisions` (N and N−1),
+    `negotiate_revision` / `negotiateRevision` (`schema-unsupported`, or the receiver's own `no-accepted-revisions`) and
+    `protocols_findings` / `protocolsFindings` (FAC-SEM-099).
+  - `build_well_known` / `buildWellKnown` take `protocols`. List them only once your hosts are pinned at or after
+    DEC-0067, because the document is closed for an older reader.
+- **`check_service.py`** reads `well-known.protocols` and `events.data`.
+
+### Evidence
+
+Every case below is answered by the contract's own functions at `a046f57` (`vendor_vectors.mjs`):
+- the 7 `negotiateRevision` cases and the register;
+- FAC-SEM-099 over 14 lists;
+- every events-page and well-known-protocols fixture as the catalogue lists it;
+- FAC-SEM-101 over 10 pages.
+
+N and N−1 cannot occur at this pin, because each protocol has one revision. That rule is held on a register with three
+revisions. 20 planted defects were all caught. The scenario eval `feed-data-and-protocols` was written before the prose.
+
 ## 0.25.0 - 2026-10-13
 
 Identifier equality by normal form (contract DEC-0076) in both kits, and the contract pin moves from `fe55fc6` to

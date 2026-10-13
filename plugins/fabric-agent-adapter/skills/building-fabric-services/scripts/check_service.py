@@ -260,6 +260,11 @@ class Probe:
         if "events" not in (wk.get("surfaces") or {}):
             problems.append("surfaces.events missing")
         self.add("well-known.shape", "FAIL" if problems else "PASS", "; ".join(problems) or "protocol, build, status, degraded, surfaces")
+        if "protocols" in wk:
+            # DEC-0067, FAC-SEM-099: the revisions it accepts, N and N−1 per protocol, each once.
+            findings = fs.protocols_findings(wk["protocols"])
+            self.add("well-known.protocols", "FAIL" if findings else "PASS",
+                     "; ".join("%s %s" % (f["instancePath"], f["message"]) for f in findings) or ", ".join(wk["protocols"]))
         self.configuration_rule()
         svc = wk.get("service") or {}
         answered = "%s.%s" % (svc.get("id"), svc.get("instance"))
@@ -346,6 +351,11 @@ class Probe:
                 bad.append("%s (text is not a sentence)" % e.get("id"))
         self.add("events.page", "FAIL" if bad else "PASS",
                  ("bad events: " + ", ".join(bad)) if bad else "%d event(s), cursor %r" % (len(events), page["cursor"]))
+        # DEC-0070, FAC-SEM-101: an event's data never carries a credential; the finding names the place, never the value.
+        leaks = fs.feed_data_findings(page)
+        if any(isinstance(e, dict) and "data" in e for e in events) or leaks:
+            self.add("events.data", "FAIL" if leaks else "PASS",
+                     "; ".join("%s: %s" % (f["instancePath"], f["message"]) for f in leaks) or "every event's data is free of credentials")
 
     def usage_rules(self) -> None:
         """DEC-0021: a declared usage report requires the token and adds up (FAC-SEM-025)."""
