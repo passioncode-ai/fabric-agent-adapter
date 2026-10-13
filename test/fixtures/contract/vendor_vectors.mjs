@@ -32,6 +32,8 @@ const descriptorRules = await src('descriptor-rules.ts');
 const identifiers = await src('identifiers.ts');
 const protocolRevisions = await src('protocol-revisions.ts');
 const feedData = await src('feed-data.ts');
+const semanticRules = await src('semantic-rules.ts');
+const commsDigestFn = await src('comms-digest.ts');
 
 // hub-key.json: every case re-answered by hubKeyCertified; seeds dropped.
 const hub = read('fixtures/vectors/hub-key.json');
@@ -127,3 +129,31 @@ write('feed-protocols-vectors.json', { about: "DEC-0067's negotiateRevision case
   source: 'fixtures/vectors/protocol-revisions.json, src/protocol-revisions.ts, src/feed-data.ts, fixtures/catalogue.json',
   register: Object.fromEntries(protocolRevisions.PROTOCOL_REVISIONS), negotiation: negotiation.cases, protocolLists, fixtures: pages, feedPages });
 console.log(`${peer.cases.length} peer cases, ${app.action.length + app.stale.length} app-descriptor cases, ${descriptors.length} descriptor fixtures, ${semanticDescriptors.length} semantic`);
+
+// fabric-project-comms/0.1 (DEC-0022, DEC-0073, DEC-0077; FAA-12b, FAA-40): every comms fixture as the catalogue lists it,
+// the commsDigest of every valid argument fixture, and FAC-SEM-107 over directory pages answered by the contract's rule.
+const commsFixtures = catalogue.filter((e) => /(^|\/)comms-[^/]*\.json$/.test(e.path)).map((e) => ({
+  name: e.path.replace(/^.*\/|\.json$/g, ''), schema: e.schema, valid: e.valid, document: read(`fixtures/${e.path}`),
+}));
+const ARG_SCHEMAS = { 'comms-enroll.schema.json': 'com.enroll', 'comms-claim.schema.json': 'com.claim', 'comms-fenced.schema.json': 'com.accept',
+  'comms-progress.schema.json': 'com.progress', 'comms-effect-begin.schema.json': 'com.effect_begin', 'comms-complete.schema.json': 'com.complete',
+  'comms-reconcile.schema.json': 'com.reconcile', 'comms-responder-replace.schema.json': 'com.responder_replace' };
+const commsDigests = commsFixtures.filter((f) => f.valid && ARG_SCHEMAS[f.schema]).map((f) => ({ name: f.name, operation: ARG_SCHEMAS[f.schema], args: f.document, digest: commsDigestFn.commsDigest(ARG_SCHEMAS[f.schema], f.document) }));
+const dirEntry = (id, capabilities, name = id) => ({ id, name, capabilities: capabilities.map(([capability, responder]) => ({ capability, responder })) });
+const dirPage = (...projects) => ({ protocol: 'fabric-project-comms/0.1', snapshot: { readAt: '2026-10-13T10:00:00Z', stale: false }, projects, cursor: null });
+const directoryPages = [
+  dirPage(dirEntry('proj-a', [['a.b', 'active'], ['a.c', 'absent']]), dirEntry('proj-b', [['a.b', 'stale']])),
+  dirPage(),
+  dirPage(dirEntry('proj-a', []), dirEntry('proj-b', []), dirEntry('proj-a', [], 'Other name')),
+  dirPage(dirEntry('proj-a', []), dirEntry('proj-a', [])),
+  dirPage(dirEntry('proj-a', [['a.b', 'active'], ['a.b', 'absent']])),
+  dirPage(dirEntry('proj-a', [['a.b', 'active'], ['A.b', 'active']]), dirEntry('Proj-a', [])),
+  dirPage(dirEntry('urn:x:A', []), dirEntry('URN:x:A', [])),
+  dirPage(dirEntry('proj-a', [['a.b', 'active'], ['a.b', 'stale'], ['a.b', 'absent']]), dirEntry('proj-a', [['a.b', 'active']])),
+  {}, { projects: 'x' }, { projects: [null, 3, { id: 7, capabilities: 'x' }, { capabilities: [null, { capability: 7 }] }] },
+  { projects: [{ id: 'p', capabilities: [{ capability: 7 }, { capability: 7 }] }, { id: 7 }, { id: 7 }] },
+].map((page) => ({ page, findings: semanticRules.evaluateSemanticRules('comms-directory', page).map((f) => ({ code: f.code, instancePath: f.instancePath, message: f.message })) }));
+write('comms-vectors.json', { about: "fabric-project-comms/0.1 at the pin: every comms fixture as fixtures/catalogue.json lists it, the commsDigest of each valid responder argument fixture, and FAC-SEM-107 (DEC-0077) over directory pages, each answered by the contract's functions.",
+  source: 'fixtures/catalogue.json, fixtures/*/comms-*.json, src/comms-digest.ts, src/semantic-rules.ts',
+  fixtures: commsFixtures, digests: commsDigests, directoryPages });
+console.log(`${commsFixtures.length} comms fixtures, ${commsDigests.length} digests, ${directoryPages.length} directory pages`);
