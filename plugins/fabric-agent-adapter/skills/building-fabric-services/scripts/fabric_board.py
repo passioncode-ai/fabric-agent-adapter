@@ -782,7 +782,7 @@ class Responder:
                            episode=entry["request"], request=entry["request"], capability=capability)
                 continue
             entry.update(generation=item["attempt"]["generation"], attempt=item["attempt"]["id"], digest=item["attempt"]["digest"],
-                         revision=item["revision"], step="accepted" if entry.get("step") in ("accepting", "held") else entry.get("step"))
+                         revision=item["revision"], step="accepted" if entry.get("step") in ("accepting", "held", "lapsed") else entry.get("step"))
             self.checkpoint.put(entry)
             if self.current is None:
                 self._resume(entry)
@@ -847,18 +847,18 @@ class Responder:
             self._drop_session()
             self._emit("board.access.needed", "warn", "This service may not answer requests for this Project: the operator "
                        "has to allow it in Fabric (Agents & access). Nothing is claimed until then.", notify=True,
-                       episode="access", code=code)
+                       episode="access", reason=code)
         elif code in ("no-epoch", "schema-unsupported", "checkpoint", "receipt-shape"):
             self.state = "down"
             self._drop_session()
             self._emit("board.blocked", "error", "The responder stopped answering requests: %s" % getattr(exc, "message", str(exc)),
-                       notify=True, episode=code, code=code)
+                       notify=True, episode=code, reason=code)
         else:
             self.state = "down"
             if code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol"):
                 self._drop_session()
             self._emit("board.down", "warn", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
-                       episode="down", code=code)
+                       episode="down", reason=code)
         return wait
 
     def _drop_session(self) -> None:
@@ -890,8 +890,24 @@ class Responder:
             if capability != held_by_work and self.now() - slot.get("renewed_at", 0) >= RENEW_SECONDS - 0.5:
                 self._enroll(capability)  # the holder's enroll renews its lease (no event); a lapsed one re-enrolls
         if self.current is None and not self.stopping:
+            self._continue_lapsed()
+        if self.current is None and not self.stopping:
             self._reconcile_pending()
             self._claim_next()
+
+    def _continue_lapsed(self) -> None:
+        """Accepted work whose lease lapsed goes back to this responder by `com.responder_replace` with a transfer."""
+        lapsed: Dict[str, List[Dict[str, Any]]] = {}
+        for entry in self.checkpoint.entries.values():
+            if entry.get("step") == "lapsed" and self.slots.get(entry.get("capability"), {}).get("state") == "held":
+                lapsed.setdefault(entry["capability"], []).append(json.loads(json.dumps(entry)))
+        for capability, entries in lapsed.items():
+            live = [e for e in entries if self._read_state(e) == "accepted"]
+            for e in entries:
+                if e not in live:
+                    self.checkpoint.drop(e["request"])
+            if live:
+                self._replace(capability, live, self.slots[capability].get("generation", 0))
 
     def _reconcile_pending(self) -> None:
         """Work whose outcome became unknown while running (its attempt was lost after the effect began) is tried
@@ -944,14 +960,14 @@ class Responder:
             self.checkpoint.drop(entry["request"])
             self._emit("board.request.skipped", "warn", "A claimed request was not accepted: the message read back carries "
                        "another digest than the claim. Nothing was done; the claim lapses.", request=entry["request"],
-                       capability=capability, code="digest-mismatch")
+                       capability=capability, reason="digest-mismatch")
             return
         if not isinstance(req, dict) or req.get("id") != entry["request"] or req.get("capability") != capability \
                 or req.get("target") != self.project:
             self.checkpoint.drop(entry["request"])
             self._emit("board.request.skipped", "warn", "A claimed request was not accepted: it is not addressed to this "
                        "Project and capability. Nothing was done; the claim lapses.", request=entry["request"],
-                       capability=capability, code="not-addressed")
+                       capability=capability, reason="not-addressed")
             return
         request = BoardRequest(message, capability)
         if message.get("redacted") is True or not isinstance(request.body, str):
@@ -1030,12 +1046,19 @@ class Responder:
             self.checkpoint.put(entry)
             self._emit("board.reconcile.needed", "warn", "The attempt was lost after its effect began; the outcome stays unknown "
                        "until this service observes what happened.", notify=True, episode=entry["request"],
-                       request=entry["request"], capability=entry["capability"], code=code)
+                       request=entry["request"], capability=entry["capability"], reason=code)
+        elif code == "lease_expired" and entry.get("step") not in ("claimed", "accepting"):
+            # Our own lease lapsed on accepted work: the board holds it (C4). It continues only by a checkpoint transfer
+            # to this responder, which the next tick asks for; nothing outside the service had begun.
+            entry["step"] = "lapsed"
+            self.checkpoint.put(entry)
+            self._emit("board.attempt.lost", "warn", "This service's lease on an accepted request lapsed; it stopped working "
+                       "on it and takes it back by a transfer.", request=entry["request"], capability=entry["capability"], reason=code)
         else:
             self.checkpoint.drop(entry["request"])
             self._emit("board.attempt.lost", "warn", "The board took a request back from this service (%s); it stopped working "
                        "on it, and nothing had been done outside the service." % code, request=entry["request"],
-                       capability=entry["capability"], code=code)
+                       capability=entry["capability"], reason=code)
 
     def _renew(self, work: _Work) -> None:
         entry = work.entry
