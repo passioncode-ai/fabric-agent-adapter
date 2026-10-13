@@ -34,6 +34,8 @@ const protocolRevisions = await src('protocol-revisions.ts');
 const feedData = await src('feed-data.ts');
 const semanticRules = await src('semantic-rules.ts');
 const commsDigestFn = await src('comms-digest.ts');
+const usageRulesModule = await src('usage-rules.ts');
+const attribution = await src('openrouter-attribution.ts');
 
 // hub-key.json: every case re-answered by hubKeyCertified; seeds dropped.
 const hub = read('fixtures/vectors/hub-key.json');
@@ -128,6 +130,34 @@ const feedPages = [
 write('feed-protocols-vectors.json', { about: "DEC-0067's negotiateRevision cases and register, FAC-SEM-099 over lists, the events-page and well-known-protocols fixtures, and FAC-SEM-101 over pages, each answered by the contract's functions.",
   source: 'fixtures/vectors/protocol-revisions.json, src/protocol-revisions.ts, src/feed-data.ts, fixtures/catalogue.json',
   register: Object.fromEntries(protocolRevisions.PROTOCOL_REVISIONS), negotiation: negotiation.cases, protocolLists, fixtures: pages, feedPages });
+// DEC-0065: OpenRouter attribution, every case re-answered; FAC-SEM-025 whole over the positive usage fixtures and
+// edits of the by-project one, each answered by the contract's usageRules.
+const attributionVectors = read('fixtures/vectors/openrouter-attribution.json');
+for (const c of attributionVectors.cases) if (!same(attribution.attributionHeaders(c.setting, c.request), c.expect)) throw new Error(`the contract's attribution case "${c.name}" no longer answers as written`);
+const usagePositive = catalogue.filter((e) => /positive\/service-usage[^/]*\.json$/.test(e.path)).map((e) => [e.path.replace(/^.*\/|\.json$/g, ''), read(`fixtures/${e.path}`)]);
+const byProject = read('fixtures/positive/service-usage-by-project.json');
+const edited = (name, change) => { const r = JSON.parse(JSON.stringify(byProject)); change(r); return [name, r]; };
+const respell = (id) => String(id).replace(/^urn:([^:]+)/i, (_, nid) => `URN:${nid.toUpperCase()}`);
+const usageCases = [...usagePositive,
+  edited('a project named twice under two spellings (DEC-0076)', (r) => { r.byProject.push({ ...JSON.parse(JSON.stringify(r.byProject[0])), projectId: respell(r.byProject[0].projectId), taskRuns: [] }); }),
+  edited('a task run twice in its project', (r) => { const p = r.byProject.find((x) => x.taskRuns?.length); p.taskRuns.push({ ...p.taskRuns[0] }); }),
+  edited('task runs hold more calls than the project', (r) => { const p = r.byProject.find((x) => x.taskRuns?.length); p.taskRuns[0].calls = p.calls + 1; }),
+  edited('task runs hold more calls than the project, all unpriced', (r) => { const p = r.byProject.find((x) => x.taskRuns?.length); p.taskRuns[0].calls = p.calls + 1; p.taskRuns[0].unpricedCalls = p.calls + 1; p.taskRuns[0].costUsd = null; }),
+  edited('task runs cost more than the project (CT-40)', (r) => { const p = r.byProject.find((x) => x.taskRuns?.length && typeof x.costUsd === 'number'); p.taskRuns[0].costUsd = p.costUsd + 1; }),
+  edited('projects hold more calls than the days', (r) => { r.byProject[0].calls += 1000; }),
+  edited('projects cost more than the days (CT-40)', (r) => { r.byProject[0].costUsd = (r.byProject[0].costUsd ?? 0) + 1000; }),
+  edited('an all-unpriced project with a number for its cost', (r) => { r.byProject[0].unpricedCalls = r.byProject[0].calls; r.byProject[0].costUsd = 0; }),
+  edited('a day after generatedAt', (r) => { r.days[r.days.length - 1].date = '2026-10-05'; }),
+  edited('a day more than 30 days before generatedAt', (r) => { r.days[0].date = '2026-09-03'; }),
+  edited('a day that does not exist', (r) => { r.days[0].date = '2026-02-30'; }),
+  edited('an unreadable generatedAt', (r) => { r.generatedAt = '2026-10-04 16:00:00'; }),
+  edited('days out of order', (r) => { r.days.reverse(); }),
+  edited("a day's calls are not its models' sum", (r) => { r.days[0].calls += 1; }),
+  edited("a day's cost is not its models' known costs", (r) => { r.days[0].costUsd += 0.5; }),
+].map(([name, report]) => ({ name, report, findings: usageRulesModule.usageRules(report).map((f) => ({ code: f.code, instancePath: f.instancePath })) }));
+write('usage-attribution-vectors.json', { about: "DEC-0065: OpenRouter attribution's cases and FAC-SEM-025 over reports, answered by the contract's attributionHeaders and usageRules.",
+  source: 'fixtures/vectors/openrouter-attribution.json, src/usage-rules.ts, fixtures/positive/service-usage*.json', attribution: attributionVectors.cases, usage: usageCases });
+console.log(`${attributionVectors.cases.length} attribution cases, ${usageCases.length} usage reports`);
 console.log(`${peer.cases.length} peer cases, ${app.action.length + app.stale.length} app-descriptor cases, ${descriptors.length} descriptor fixtures, ${semanticDescriptors.length} semantic`);
 
 // fabric-project-comms/0.1 (DEC-0022, DEC-0073, DEC-0077; FAA-12b, FAA-40): every comms fixture as the catalogue lists it,
