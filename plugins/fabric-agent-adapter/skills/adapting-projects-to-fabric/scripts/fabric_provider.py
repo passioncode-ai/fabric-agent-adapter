@@ -142,7 +142,8 @@ def _run_problems(run: Any) -> List[str]:
 
 
 def manifest_problems(entry: Dict[str, Any]) -> List[str]:
-    """FAC-SEM-014 (DEC-0017), URI half: the manifest resolves and its provider.id equals providerId."""
+    """FAC-SEM-014 (DEC-0017), URI half: the manifest resolves and its provider.id equals providerId, compared by normal
+    form (DEC-0076)."""
     try:
         manifest = json.loads(Path(os.path.expanduser(str(entry["manifest"]))).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -150,7 +151,8 @@ def manifest_problems(entry: Dict[str, Any]) -> List[str]:
     provider = manifest.get("provider") if isinstance(manifest, dict) else None
     if not isinstance(provider, dict) or not isinstance(manifest.get("capabilities"), list):
         return ["%s is not a provider manifest (FAC-SEM-014)" % entry["manifest"]]
-    if provider.get("id") != entry["providerId"]:
+    import fabric_identifiers  # noqa: E402 - beside this file; DEC-0076: URIs compared by normal form
+    if not fabric_identifiers.same_identifier(provider.get("id"), entry["providerId"]):
         return ["providerId %s is not the manifest's provider.id %s (FAC-SEM-014)" % (entry["providerId"], provider.get("id"))]
     return []
 
@@ -195,6 +197,9 @@ def write_provider_entry(entry: Dict[str, Any], directory: Optional[Path] = None
     clash = _service_ids(services or services_dir()).get(entry["id"])
     if clash:
         raise ProviderError("%s is already a service (%s); an id is a service or a provider, never both (FAC-SEM-013)." % (entry["id"], clash))
+    import fabric_identifiers  # noqa: E402 - beside this file
+    # DEC-0076: written in its normal form, so a reader that looks it up finds one spelling.
+    entry = dict(entry, providerId=fabric_identifiers.normal_identifier(entry["providerId"]))
     target = (directory or providers_dir()) / ("%s.json" % entry["id"])
     _atomic_write(target, (json.dumps(entry, indent=2, ensure_ascii=False) + "\n").encode())
     return target

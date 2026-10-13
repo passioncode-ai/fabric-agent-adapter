@@ -19,6 +19,7 @@ import shutil
 import subprocess
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+import fabric_identifiers as _ids
 import fabric_secrets as _secrets
 import fabric_service as _fs
 
@@ -314,9 +315,12 @@ def _object_at(value: Any, key: str) -> Dict[str, Any]:
 
 
 def _ref_key(ref: Any) -> str:
+    """A revision reference compared whole: id, revision and content hash. The id is an identifier, so it enters the key
+    in its normal form (DEC-0076)."""
     if not isinstance(ref, dict):
         return ""
-    return "%s@%s#%s" % (_field(ref, "id"), _field(ref, "revision"), _field(ref, "contentHash"))
+    normal = _ids.normal_identifier(ref.get("id"))
+    return "%s@%s#%s" % (normal if normal is not None else _field(ref, "id"), _field(ref, "revision"), _field(ref, "contentHash"))
 
 
 def _same_ref(a: Any, b: Any) -> bool:
@@ -343,7 +347,7 @@ def _runner_route(value: Dict[str, Any]) -> List[Dict[str, str]]:
 def _route_bundle(value: Dict[str, Any]) -> List[Dict[str, str]]:
     route = _object_at(value, "route")
     admitted = {_ref_key(a.get("provider")) for a in _list(value.get("admissions"))
-                if a.get("state") == "admitted" and a.get("capability", _MISSING) == route.get("capability", _MISSING)}
+                if a.get("state") == "admitted" and _ids.same_identifier(a.get("capability", _MISSING), route.get("capability", _MISSING))}
     findings = []
     for index, candidate in enumerate(_candidates(route)):
         key = _ref_key(candidate.get("provider"))
@@ -363,9 +367,10 @@ def _binding_agreement(binding: Dict[str, Any], route: Dict[str, Any]) -> List[D
     def disagree(path: str, message: str) -> None:
         findings.append(_finding("FAC-SEM-032", "/binding/" + path, message))
 
-    if binding.get("project", _MISSING) != route.get("project", _MISSING):
+    # DEC-0076: project and capability are identifiers, compared by normal form.
+    if not _ids.same_identifier(binding.get("project", _MISSING), route.get("project", _MISSING)):
         disagree("project", "the binding is for %s, the route for %s" % (_field(binding, "project"), _field(route, "project")))
-    if binding.get("capability", _MISSING) != route.get("capability", _MISSING):
+    if not _ids.same_identifier(binding.get("capability", _MISSING), route.get("capability", _MISSING)):
         disagree("capability", "the binding binds %s, the route orders %s" % (_field(binding, "capability"), _field(route, "capability")))
     if binding.get("profileKind") != "local-runner":
         disagree("profileKind", "a runner route serves the local-runner profile, not %s" % _field(binding, "profileKind"))
@@ -408,9 +413,9 @@ def _route_event(value: Dict[str, Any]) -> List[Dict[str, str]]:
 
     if not _same_ref(event.get("route"), route.get("meta")):
         wrong("/route", "the event names route %s, not %s" % (_ref_key(event.get("route")), _ref_key(route.get("meta"))))
-    if event.get("project", _MISSING) != route.get("project", _MISSING):
+    if not _ids.same_identifier(event.get("project", _MISSING), route.get("project", _MISSING)):
         wrong("/project", "the event is for %s, the route for %s" % (_field(event, "project"), _field(route, "project")))
-    if event.get("capability", _MISSING) != route.get("capability", _MISSING):
+    if not _ids.same_identifier(event.get("capability", _MISSING), route.get("capability", _MISSING)):
         wrong("/capability", "the event names %s, the route orders %s" % (_field(event, "capability"), _field(route, "capability")))
 
     def candidate_at(ref: Dict[str, Any], path: str) -> Optional[Dict[str, Any]]:

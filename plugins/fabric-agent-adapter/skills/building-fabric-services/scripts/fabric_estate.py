@@ -826,15 +826,21 @@ def _secret_references(value: Dict[str, Any], flag) -> None:
             slots.append(key)
 
 
+def _grant_key(ident: Any) -> Any:
+    """A grant's id is a URI, so grants and their revocations are keyed by its normal form (DEC-0076)."""
+    import fabric_identifiers  # noqa: E402 - beside this file
+    return fabric_identifiers.normal_identifier(ident) if isinstance(ident, str) else ident
+
+
 def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
     grant_ids: List[Any] = []
     for index, grant in enumerate(_list(_get(value, "shareGrants"))):
         if _get(grant, "principalKind") != "external":
             flag("/shareGrants/%d/principalKind" % index, "a share grant is to a principal outside the estate: principalKind external")
         ident = _get(_get(grant, "meta"), "id") if isinstance(_get(grant, "meta"), dict) else _MISSING
-        if _contains(grant_ids, ident):
+        if _contains(grant_ids, _grant_key(ident)):
             flag("/shareGrants/%d/meta/id" % index, "grant %s is listed twice" % _js_string(ident))
-        grant_ids.append(ident)
+        grant_ids.append(_grant_key(ident))
     machines = _list(_get(value, "machines"))
     listed = {
         "authority": [_get(e, "credentialId") for e in _list(_get(value, "authorities"))],
@@ -847,11 +853,12 @@ def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
     }
     seen: List[str] = []
     for index, revocation in enumerate(_list(_get(value, "revocations"))):
-        key = "%s %s" % (_s(revocation, "kind"), _s(revocation, "ref"))
+        ref = _grant_key(_get(revocation, "ref")) if _get(revocation, "kind") == "grant" else _get(revocation, "ref")
+        key = "%s %s" % (_s(revocation, "kind"), _js_string(ref))
         if key in seen:
             flag("/revocations/%d" % index, "the %s %s is revoked twice" % (_s(revocation, "kind"), _s(revocation, "ref")))
         seen.append(key)
-        if _contains(listed.get(_s(revocation, "kind"), []), _get(revocation, "ref")):
+        if _contains(listed.get(_s(revocation, "kind"), []), ref):
             flag("/revocations/%d/ref" % index, "the record still lists the %s it revokes: revocation outranks addition" % _s(revocation, "kind"))
 
 

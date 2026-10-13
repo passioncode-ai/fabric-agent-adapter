@@ -350,6 +350,18 @@
         "a host routes a request from anyone but the operator only when peer_refusal / peerRefusal answers null: never above maxDataClass, an unknown class refused first",
         "sets data-fabric=\"absent\" on Fabric's button unless fabric_button_presence / fabricButtonPresence answers present (Fabric's own descriptor registered and, for an app's, its app still installed)"
       ]
+    },
+    {
+      "id": "identifiers-by-normal-form",
+      "trap": "a host pinned a runner route for urn:project:a while the binding said URN:PROJECT:a; the kit compared bytes, refused the binding, and a revoked share grant spelled URN:GRANT:… stayed trusted",
+      "request": "example-agent checks routes, bindings, events, provider entries and estate grants; make two spellings of one identifier read as one, and two different identifiers stay two.",
+      "expected": [
+        "compares identifiers with same_identifier / sameIdentifier (DEC-0076): RFC 3986 §6.2.2 syntax normalization, RFC 8141 §3.1 for urn: (scheme and NID lower-cased, NSS case kept, nothing decoded), any other string as it is",
+        "keys a revision reference by the normal form of its id, so FAC-SEM-030/032/034 accept a respelled project, capability, provider or route",
+        "keys share grants and grant revocations by normal form (FAC-SEM-076): a grant listed twice under two spellings, or revoked under another spelling while listed, is found",
+        "writes identifiers in their normal form (the scaffolded provider and capability ids, a provider entry's providerId) and compares providerId by normal form (FAC-SEM-014)",
+        "never lower-cases a path or a URN's NSS and never decodes a reserved character: those spellings are different identifiers"
+      ]
     }
   ]
 }

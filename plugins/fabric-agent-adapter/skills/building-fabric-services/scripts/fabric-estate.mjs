@@ -12,6 +12,7 @@
 
 import crypto from 'node:crypto';
 import { jcs } from './fabric-delegation.mjs';
+import { normalIdentifier } from './fabric-identifiers.mjs';
 import { secretValue } from './fabric-secrets.mjs';
 
 export const ESTATE_RECORD_SCHEMA = 'estate-record/1';
@@ -428,12 +429,14 @@ function secretReferences(value, flag) {
 }
 
 function grantsAndRevocations(value, flag) {
+  // A grant's id is a URI, so grants and their revocations are keyed by its normal form (DEC-0076).
+  const grantKey = (id) => (typeof id === 'string' ? normalIdentifier(id) : id);
   const grantIds = new Set();
   list(value.shareGrants).forEach((grant, index) => {
     if (grant.principalKind !== 'external') flag(`/shareGrants/${index}/principalKind`, 'a share grant is to a principal outside the estate: principalKind external');
     const id = isObject(grant.meta) ? grant.meta.id : undefined;
-    if (grantIds.has(id)) flag(`/shareGrants/${index}/meta/id`, `grant ${String(id)} is listed twice`);
-    grantIds.add(id);
+    if (grantIds.has(grantKey(id))) flag(`/shareGrants/${index}/meta/id`, `grant ${String(id)} is listed twice`);
+    grantIds.add(grantKey(id));
   });
   const machines = list(value.machines);
   // A Map, so a kind such as `constructor` or `__proto__` reads nothing from Object.prototype.
@@ -448,10 +451,11 @@ function grantsAndRevocations(value, flag) {
   }));
   const seen = new Set();
   list(value.revocations).forEach((revocation, index) => {
-    const key = `${String(revocation.kind)} ${String(revocation.ref)}`;
+    const ref = revocation.kind === 'grant' ? grantKey(revocation.ref) : revocation.ref;
+    const key = `${String(revocation.kind)} ${String(ref)}`;
     if (seen.has(key)) flag(`/revocations/${index}`, `the ${String(revocation.kind)} ${String(revocation.ref)} is revoked twice`);
     seen.add(key);
-    if (listed.get(String(revocation.kind))?.has(revocation.ref)) flag(`/revocations/${index}/ref`, `the record still lists the ${String(revocation.kind)} it revokes: revocation outranks addition`);
+    if (listed.get(String(revocation.kind))?.has(ref)) flag(`/revocations/${index}/ref`, `the record still lists the ${String(revocation.kind)} it revokes: revocation outranks addition`);
   });
 }
 

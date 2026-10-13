@@ -21,10 +21,10 @@ import fabric_secrets as _secrets  # noqa: E402 - the contract's credential dete
 
 CONTRACT_VERSION = "0.1.0"
 CONTRACT_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-contract"
-CONTRACT_COMMIT = "fe55fc67cba1a9e34a736da7d148d4fe2a8fbfa0"
+CONTRACT_COMMIT = "a046f57cf46ea9e3da57ff8ce6a3ed4d26d8774b"
 # #region supported-contract-revisions — docs: README.md#contract-pin
 # Only this declaration may name a legacy revision in live files.
-SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "b291bf09e0a9f9fd3c16cf540832cd021203b7d1", "0cacd08b0e95b6abf131eae1206b60792138bc3c", "2eb91c00e852d9c31d804310d38fad91589fcbac", "8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5", "a83bec6b47776af688402c18efec507143061f68", "52da526d7cc1e063d74c5b520dbc03d0ace15246", "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5", "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
+SUPPORTED_CONTRACT_COMMITS = (CONTRACT_COMMIT, "fe55fc67cba1a9e34a736da7d148d4fe2a8fbfa0", "b291bf09e0a9f9fd3c16cf540832cd021203b7d1", "0cacd08b0e95b6abf131eae1206b60792138bc3c", "2eb91c00e852d9c31d804310d38fad91589fcbac", "8e49fbd5fbbf230e32c1969cd24ac3c22422f0a5", "a83bec6b47776af688402c18efec507143061f68", "52da526d7cc1e063d74c5b520dbc03d0ace15246", "78b2da018d2c4bd9ac1bde1dc3b7f1a110a175f5", "623bf61358c339cb10297807b3f024b5d9f1f327", "23f9fda4c05f8a3852246ee98d4f2adf74ed0875", "9091d3d6606b0c4b5591a38c3674356a01fd7f55", "df55c8c54a23251342a7ee57ba95642b7eb39e61", "2ce392291c6668598d12cd38327e24696b5ca15c")
 # #endregion supported-contract-revisions
 INTEROP_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
 MCP_REVISION = "2026-07-28"
@@ -46,6 +46,15 @@ GENERATED_PATHS = (
 class AdaptationError(Exception):
     """Expected user-facing adaptation error."""
 
+
+
+def _normal_identifier(value: str) -> str:
+    """DEC-0076's normal form, from fabric_identifiers.py beside this file (byte-identical to the service kit's)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("fabric_identifiers", Path(__file__).resolve().parent / "fabric_identifiers.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.normal_identifier(value)
 
 def _read_text(path: Path, limit: int = 262_144) -> str:
     try:
@@ -237,24 +246,27 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
             raise AdaptationError("a runtime argument carries a credential; argv is visible to every process (LC-21): read it from a secret reference instead")
 
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    # DEC-0076: a writer emits identifiers in their normal form, so every reader finds them under one spelling.
+    provider_id = _normal_identifier(args.provider_id)
+    capability_id = _normal_identifier(args.capability_id)
     manifest = {
         "contractVersion": CONTRACT_VERSION,
         "provider": {
-            "id": args.provider_id,
+            "id": provider_id,
             "revision": 1,
             "contentHash": "sha256:" + ("0" * 64),
             "createdAt": created_at,
             "createdBy": "urn:fabric:adapter:author",
             "name": args.provider_name,
             "identity": {
-                "subject": args.provider_id,
+                "subject": provider_id,
                 "method": "local-install" if args.profile == "local-runner" or (args.profile == "mcp" and args.mcp_mode == "stdio") else "tls",
             },
             "supportedContractVersions": [CONTRACT_VERSION],
         },
         "capabilities": [
             {
-                "id": args.capability_id,
+                "id": capability_id,
                 "name": args.capability_name,
                 "inputSchema": _schema_uri(args.schema_base, "schemas/capability-input.schema.json"),
                 "outputSchema": _schema_uri(args.schema_base, "schemas/capability-output.schema.json"),

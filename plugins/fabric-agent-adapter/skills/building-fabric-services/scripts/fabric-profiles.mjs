@@ -4,6 +4,7 @@
 // the well-known `configuration` with its summary tiles ("Runner & model"). No dependencies.
 
 import { spawnSync } from 'node:child_process';
+import { normalIdentifier, sameIdentifier } from './fabric-identifiers.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { secretValue } from './fabric-secrets.mjs';
@@ -210,7 +211,8 @@ export const PROBE_RESULTS = Object.freeze(['not-catalogued', 'not-admitted', 'n
 
 const routeCandidates = (value) => (Array.isArray(value?.candidates) ? value.candidates.filter(isObject) : []);
 const objectAt = (value, key) => (isObject(value?.[key]) ? value[key] : {});
-const refKey = (ref) => (isObject(ref) ? `${String(ref.id)}@${String(ref.revision)}#${String(ref.contentHash)}` : '');
+// A revision reference compared whole; its id is an identifier, so it enters the key in its normal form (DEC-0076).
+const refKey = (ref) => (isObject(ref) ? `${String(normalIdentifier(ref.id) ?? ref.id)}@${String(ref.revision)}#${String(ref.contentHash)}` : '');
 const sameRef = (a, b) => refKey(a) !== '' && refKey(a) === refKey(b);
 
 function runnerRoute(value) {
@@ -229,7 +231,7 @@ function runnerRoute(value) {
 function routeBundle(value) {
   const route = objectAt(value, 'route');
   const admissions = Array.isArray(value.admissions) ? value.admissions.filter(isObject) : [];
-  const admitted = new Set(admissions.filter((a) => a.state === 'admitted' && a.capability === route.capability).map((a) => refKey(a.provider)));
+  const admitted = new Set(admissions.filter((a) => a.state === 'admitted' && sameIdentifier(a.capability, route.capability)).map((a) => refKey(a.provider)));
   const findings = [];
   routeCandidates(route).forEach((candidate, index) => {
     const key = refKey(candidate.provider);
@@ -238,8 +240,9 @@ function routeBundle(value) {
   if (isObject(value.binding)) {
     const binding = value.binding;
     const disagree = (where, message) => findings.push(finding('FAC-SEM-032', `/binding/${where}`, message));
-    if (binding.project !== route.project) disagree('project', `the binding is for ${String(binding.project)}, the route for ${String(route.project)}`);
-    if (binding.capability !== route.capability) disagree('capability', `the binding binds ${String(binding.capability)}, the route orders ${String(route.capability)}`);
+    // DEC-0076: project and capability are identifiers, compared by normal form.
+    if (!sameIdentifier(binding.project, route.project)) disagree('project', `the binding is for ${String(binding.project)}, the route for ${String(route.project)}`);
+    if (!sameIdentifier(binding.capability, route.capability)) disagree('capability', `the binding binds ${String(binding.capability)}, the route orders ${String(route.capability)}`);
     if (binding.profileKind !== 'local-runner') disagree('profileKind', `a runner route serves the local-runner profile, not ${String(binding.profileKind)}`);
     if (!routeCandidates(route).some((c) => sameRef(c.provider, binding.provider))) disagree('provider', `the binding's provider ${refKey(binding.provider)} is not a candidate of the route`);
     if (binding.runnerRoute !== undefined && !sameRef(binding.runnerRoute, route.meta)) disagree('runnerRoute', `the binding pins ${refKey(binding.runnerRoute)}, not this route ${refKey(route.meta)}`);
@@ -263,8 +266,8 @@ function routeEvent(value) {
   const findings = [];
   const wrong = (where, message) => findings.push(finding('FAC-SEM-034', `/event${where}`, message));
   if (!sameRef(event.route, route.meta)) wrong('/route', `the event names route ${refKey(event.route)}, not ${refKey(route.meta)}`);
-  if (event.project !== route.project) wrong('/project', `the event is for ${String(event.project)}, the route for ${String(route.project)}`);
-  if (event.capability !== route.capability) wrong('/capability', `the event names ${String(event.capability)}, the route orders ${String(route.capability)}`);
+  if (!sameIdentifier(event.project, route.project)) wrong('/project', `the event is for ${String(event.project)}, the route for ${String(route.project)}`);
+  if (!sameIdentifier(event.capability, route.capability)) wrong('/capability', `the event names ${String(event.capability)}, the route orders ${String(route.capability)}`);
   const indexOf = (ref) => (typeof ref.index === 'number' && Number.isInteger(ref.index) ? ref.index : -1);
   const candidateAt = (ref, where) => {
     const index = indexOf(ref);

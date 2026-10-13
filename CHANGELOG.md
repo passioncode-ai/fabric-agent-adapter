@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.25.0 - 2026-10-13
+
+Identifier equality by normal form (contract DEC-0076) in both kits, and the contract pin moves from `fe55fc6` to
+contract `main` `a046f57` (FAA-39). `fe55fc6` joins the supported revisions. DEC-0077 (`com.directory` pages) is in the
+pin. Its consumer is the kits' board client, which is not built yet (FAA-12b), so nothing reads it.
+
+### Added
+
+- **`normal_identifier` / `normalIdentifier` and `same_identifier` / `sameIdentifier`** (`fabric_identifiers.py`,
+  byte-identical in both skills, and `fabric-identifiers.mjs`). They port the contract's `src/identifiers.ts` and are
+  held to its `identifiers.json` (33 normal forms, 8 same, 8 different, 6 lax-port mistakes).
+  - A URI follows RFC 3986 §6.2.2.
+  - A `urn:` follows RFC 8141 §3.1 (the NSS's case is kept and nothing is decoded).
+  - Any other string is its own normal form.
+
+### Changed
+
+- **Compared by normal form:**
+  - FAC-SEM-030, FAC-SEM-032 and FAC-SEM-034 compare a revision reference's id and the project and capability of
+    admissions, bindings and events;
+  - FAC-SEM-076 compares share grants and `grant` revocations;
+  - FAC-SEM-014 compares a provider entry's `providerId`.
+
+  Two spellings of one identifier now read as one, and two identifiers stay two.
+- **Written in normal form:** the scaffolded `provider.id`, `identity.subject` and capability `id`, and the `providerId`
+  that `write_provider_entry` stores.
+
+### Evidence
+
+- The route and estate generators now add respelled-id cases (`urn` and the NID upper-cased, and the NSS's case
+  changed), each answered by the contract's own functions. The contract's fixtures are in normal form, so without these
+  cases the kits' byte comparisons stayed green.
+- The compiled-schema revision tests pass at `2ce3922` → `a046f57`.
+- 20 planted defects, all caught.
+- The scenario eval `identifiers-by-normal-form` was written before the prose.
+
 ## 0.24.0 - 2026-10-13
 
 An app's own descriptor (contract DEC-0069) and the descriptor for listings (DEC-0061) in both kits (FAA-34). The contract
