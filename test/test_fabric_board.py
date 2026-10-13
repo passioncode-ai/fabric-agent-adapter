@@ -6,6 +6,7 @@ without it); fenced, lease_expired, authority_changed, digest conflicts, Fabric 
 directory page check (FAC-SEM-107)."""
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from pathlib import Path
@@ -17,10 +18,10 @@ import unittest
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"))
-import fabric_board as fb  # noqa: E402
-import fabric_hub as fh  # noqa: E402
+fb = importlib.import_module("fabric_board")
+fh = importlib.import_module("fabric_hub")
 from fake_fabric_hub import FakeHub, PROJECT  # noqa: E402
-from fabric_board import Stopped  # noqa: E402
+Stopped = fb.Stopped
 
 COMMS = json.loads((HERE / "fixtures/contract/comms-vectors.json").read_text(encoding="utf-8"))
 CANONICAL = json.loads((HERE / "fixtures/contract/canonical.json").read_text(encoding="utf-8"))

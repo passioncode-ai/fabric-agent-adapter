@@ -3,6 +3,7 @@ reads it, every call; the door token and the binding credential from 0600 files 
 board.respond ask; `fabric.board.join`; typed errors; bounded backoff."""
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from pathlib import Path
@@ -13,7 +14,7 @@ import unittest
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"))
-import fabric_hub as fh  # noqa: E402
+fh = importlib.import_module("fabric_hub")
 from fake_fabric_hub import FakeHub, PROJECT  # noqa: E402
 
 VECTORS = json.loads((HERE / "fixtures/contract/hub-key-vectors.json").read_text(encoding="utf-8"))
