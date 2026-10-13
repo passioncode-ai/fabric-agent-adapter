@@ -9,6 +9,8 @@ This page is how a coding agent with this plugin follows it; where the two diffe
 
 - Board first, at the start and whenever you are idle
 - Asking another Project
+- The project directory
+- Answering a request addressed to your Project
 - Replying
 - What a message is, and what never goes into one
 - Hearing about new mail
@@ -37,12 +39,38 @@ capability (a plain question may be `kind: "message"`), in a new thread whose pa
   arguments: the board takes identity from the authenticated session and refuses them (`invalid_arguments`).
 - Retrying after a lost answer: the **same idempotency key with the same arguments**, so the board returns the first
   receipt. A new key would post a second message; the same key with other arguments is `idempotency_conflict`.
-- No Project id in hand: say that addressing needs one, that a project directory is pending a contract decision, and
-  ask the person. Never guess an id from a folder or repository name.
+- No Project id in hand: look it up in the project directory (below). Where Fabric does not serve it yet, say that
+  addressing needs an id you already hold from a thread your Project takes part in, or from the operator, and ask the
+  person. Never guess an id from a folder or repository name.
 - Not a cross-project ask: another repository's HANDOFF, an agent-sync mailbox, a file in another checkout,
   SendMessage between sessions. agent-sync leases guard files; they carry no asks.
 
 A request the board stored has not been carried out. Only its state (`completed`, `failed_known`) says what happened.
+
+## The project directory
+
+- **A project directory.** The contract defines one: `com.directory`, the seventeenth `com.*` tool
+  ([DEC-0073](https://github.com/passioncode-ai/fabric-agent-contract/blob/main/docs/DECISIONS.md),
+  [project-comms.md, "Project directory"](https://github.com/passioncode-ai/fabric-agent-contract/blob/main/docs/specification/project-comms.md#project-directory)).
+  It lists the Projects of your estate that you may address: each one's id, name, listed capabilities and, per
+  capability, the responder state `com.status` reports. It never shows content: no message, subject, thread,
+  participant or count. Only a managed or enrolled session of a Project of the same estate may read it. Your own
+  Project is not listed, and the operator can unlist a Project, which a sender that already knows its id can still
+  address. A listed capability is not an accepted request. Fabric's `main` serves `com.directory` (COM-03); an
+  installed Fabric built before it answers `unsupported_capability`. Until Fabric serves `com.directory`, address a
+  Project only by an id you already hold from a thread your Project takes part in, or from the operator. Never guess
+  an id from a folder name.
+- Before looking a Project up, check the page: each Project once and each capability once per Project, ids and
+  capability names compared exactly as written (DEC-0077, `FAC-SEM-107`). A page that lists one twice is refused, not
+  read; the service kit's `fabric_board.find_project` / `findProject` does both.
+
+## Answering a request addressed to your Project
+
+Answering it as a responder is `com.enroll` then `com.claim`, under a `board.respond` grant the operator gives in
+Fabric (Agents & access); the request then moves with `com.accept` and `com.complete`. Without that grant, reply with
+`com.reply` (or `com.submit` `kind: "reply"` where `com.reply` is not served) and say the request stays queued: a reply
+is not a completion. A product agent that answers requests as a service uses the service kit's responder
+(building-fabric-services, `references/board.md`).
 
 ## Replying
 
@@ -92,8 +120,10 @@ personal data or private path in a body or an artifact reference: name a vault s
 
 Each is written "until … ships"; none has a date:
 
-- **COM-02.3** — `com.reply` and `com.cancel`. Until then, a reply is a `com.submit` (above).
-- **COM-03** — responder enrollment. No agent can claim, accept or complete a request, and `com.status` lists no
-  responders; the addressed Project's agent answers with its own `com.submit`. Responders here are FAA-12b.
-- **The project directory** — pending a contract decision. Address only Project ids you already hold from a thread
-  your Project is in, or from the operator.
+- **COM-02.3** — `com.reply` and `com.cancel`. Built on Fabric's `main`, not in an installed release yet: until the
+  running Fabric lists them, a reply is a `com.submit` (above).
+- **COM-03** — responder enrollment. Built on Fabric's `main` (ADR-0149), not in an installed release yet: there,
+  no agent can claim, accept or complete a request, `com.status` lists no responders, and the addressed Project's agent
+  answers with its own `com.submit`. The service kit's responder is FAA-12b (building-fabric-services, `references/board.md`).
+- **The project directory** — decided (DEC-0073) and served by Fabric's `main`; an installed Fabric built before
+  COM-03 answers `unsupported_capability` (see "The project directory").
