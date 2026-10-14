@@ -240,3 +240,15 @@ write('package-vectors.json', { about: "fabric-package/1 at the pin: the contrac
   vectors: packageVectors, fixtures: packageFixtures, semantic: semanticPackages });
 fs.writeFileSync(path.join(here, '../../../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-package.schema.json'), `${JSON.stringify(strip(resolved), null, 2)}\n`);
 console.log(`${packageVectors.cases.length} package cases, ${packageFixtures.length} package fixtures, ${semanticPackages.length} semantic, schema bundled with ${Object.keys(outside).length} outside definitions`);
+
+// DEC-0079 (FAA-42): the operator's hold matrix, every case re-answered by the contract's holdRefuses, for the kits'
+// port that decides locally which of its own calls a known hold would refuse.
+const holdModule = await src('comms-hold.ts');
+const holdVectors = read('fixtures/vectors/comms-hold.json');
+for (const c of holdVectors.cases) {
+  if (holdModule.holdRefuses(c.tool, c.target, c.holds) !== c.refused) throw new Error(`stale hold case: ${c.name}`);
+}
+write('comms-hold-vectors.json', { about: "DEC-0079 at the pin: the hold matrix's cases, each re-answered by the contract's holdRefuses, with the tools, the scopes per tool and the tools a hold never refuses.",
+  source: 'fixtures/vectors/comms-hold.json, src/comms-hold.ts',
+  tools: holdModule.COMMS_TOOLS, scopes: Object.fromEntries(holdModule.HOLD_SCOPES), neverHeld: holdModule.NEVER_HELD, cases: holdVectors.cases });
+console.log(`${holdVectors.cases.length} hold cases`);

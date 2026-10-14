@@ -60,13 +60,21 @@ REFUSAL_CODES = frozenset(["invalid_arguments", "body_too_large", "not_authorize
                            "unsupported_capability", "unsupported_operation", "not_available", "idempotency_conflict",
                            "idempotency_window_expired", "capacity_exceeded", "digest_conflict", "revision_conflict",
                            "fenced", "lease_expired", "invalid_transition", "reconcile_required", "observation_required",
-                           "cursor_reset_required", "immutable_participants"])
+                           "cursor_reset_required", "immutable_participants", "held"])
 #: On these the attempt is no longer ours: stop acting at once (C4).
 STOP_CODES = frozenset(["fenced", "lease_expired", "authority_changed"])
 REQUEST_STATES = ("queued", "claimed", "accepted", "in_progress", "completed", "failed_known", "cancelled", "expired",
                   "outcome_unknown")
 EFFECT_STATES = ("not_started", "started", "succeeded_observed", "failed_observed", "unknown")
 TERMINAL = frozenset(["completed", "failed_known", "cancelled", "expired"])
+#: DEC-0079: what an operator's hold may refuse, by the scopes that refuse it. A tool not named here is never refused
+#: `held` — it settles, reports on or keeps alive started work (com.renew, com.progress, com.complete, com.reconcile),
+#: cancels or reads. The contract's HOLD_SCOPES.
+HOLD_SCOPES = {"com.submit": ("thread",), "com.reply": ("thread",), "com.enroll": ("project", "slot"),
+               "com.responder_replace": ("project", "slot"), "com.claim": ("thread", "project", "slot"),
+               "com.accept": ("thread", "project", "slot"), "com.effect_begin": ("thread", "project", "slot")}
+#: How long a held slot waits before it asks again: doubling from the poll interval, never past this.
+HOLD_RETRY_MAX_SECONDS = 900.0
 
 _OPAQUE = re.compile(r"[A-Za-z0-9_-]{8,128}")
 _PROJECT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,191}")
@@ -188,7 +196,7 @@ def receipt_problems(value: Any, op: Optional[str] = None) -> List[str]:
     if "request" in value:
         r = value["request"]
         keys = ("id", "state", "effect", "revision")
-        if _closed(r, "/request", keys, keys, problems):
+        if _closed(r, "/request", keys, keys + ("settledBy",), problems):
             if not (isinstance(r.get("id"), str) and _OPAQUE.fullmatch(r["id"])):
                 problems.append("/request/id is a board id")
             if r.get("state") not in REQUEST_STATES:
@@ -197,6 +205,12 @@ def receipt_problems(value: Any, op: Optional[str] = None) -> List[str]:
                 problems.append("/request/effect is an effect state")
             if not _is_int(r.get("revision"), 1):
                 problems.append("/request/revision is an integer ≥ 1")
+            if "settledBy" in r:
+                # DEC-0081: present only when the estate owner settled it; absent, the responder did.
+                if r["settledBy"] != "owner":
+                    problems.append("/request/settledBy is owner")
+                if r.get("state") not in ("completed", "failed_known"):
+                    problems.append("/request/settledBy names a settled request (completed or failed_known)")
     if "slot" in value:
         s = value["slot"]
         keys = ("project", "capability", "generation", "leaseExpiresAt")
@@ -248,6 +262,8 @@ def refusal_problems(value: Any) -> List[str]:
                 problems.append("/error/message is 1 to 300 characters")
             if not isinstance(e.get("retryable"), bool):
                 problems.append("/error/retryable is a boolean")
+            elif e.get("code") == "held" and e["retryable"] is not True:
+                problems.append("/error/retryable is true for held: the operator lifts a hold (DEC-0079)")
     return problems
 
 
@@ -312,12 +328,46 @@ def directory_problems(page: Any) -> List[str]:
             continue
         for c, entry in enumerate(caps):
             cat = "%s/capabilities/%d" % (at, c)
-            if _closed(entry, cat, ("capability", "responder"), ("capability", "responder"), problems):
+            if _closed(entry, cat, ("capability", "responder"), ("capability", "responder", "held"), problems):
                 if not (isinstance(entry.get("capability"), str) and _CAPABILITY.fullmatch(entry["capability"])):
                     problems.append("%s/capability is a capability name" % cat)
                 if entry.get("responder") not in ("active", "stale", "absent"):
                     problems.append("%s/responder is active, stale or absent" % cat)
+                if "held" in entry and not isinstance(entry["held"], bool):
+                    problems.append("%s/held is a boolean (DEC-0079)" % cat)
     return problems + ["%s %s" % (f["instancePath"], f["message"]) for f in directory_findings(page)]
+
+
+def hold_refuses(tool: Any, target: Any, holds: Any) -> bool:
+    """DEC-0079, the contract's ``holdRefuses``: True when a board refuses ``tool`` on ``target`` with ``held`` under
+    ``holds``. ``target`` is what the board resolved (``thread``, ``project``, ``capability``, ``fenced``, ``repeat``);
+    ``holds`` is ``{threads, projects, slots: [{project, capability}]}``. Ids compare as written. Malformed input never
+    raises: a member of the wrong type counts as absent, and an unknown tool is never refused ``held``."""
+    scopes = HOLD_SCOPES.get(tool) if isinstance(tool, str) else None
+    if not scopes or not isinstance(target, dict):
+        return False
+    if target.get("repeat") is True:
+        return False
+    if tool == "com.reply" and target.get("fenced") is True:
+        return False
+    holds = holds if isinstance(holds, dict) else {}
+
+    def text(value: Any) -> Optional[str]:
+        return value if isinstance(value, str) else None
+
+    def strings(value: Any) -> set:
+        return {item for item in value if isinstance(item, str)} if isinstance(value, list) else set()
+
+    thread, project, capability = text(target.get("thread")), text(target.get("project")), text(target.get("capability"))
+    if "thread" in scopes and thread is not None and thread in strings(holds.get("threads")):
+        return True
+    if "project" in scopes and project is not None and project in strings(holds.get("projects")):
+        return True
+    slots = holds.get("slots")
+    if "slot" in scopes and project is not None and capability is not None and isinstance(slots, list):
+        return any(isinstance(slot, dict) and slot.get("project") == project and slot.get("capability") == capability
+                   for slot in slots)
+    return False
 
 
 def find_project(page: Any, project_id: str, capability: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -630,6 +680,9 @@ class Responder:
         self.claim_keys: Dict[str, str] = {}
         self._said: Dict[str, str] = {}
         self._rr = 0
+        #: The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS.
+        self.hold_delay = POLL_SECONDS
+        self._on_hold: set = set()
 
     # -- events -------------------------------------------------------------------------------------------------
     def _emit(self, kind: str, level: str, text: str, notify: bool = False, episode: Optional[str] = None, **value: Any) -> None:
@@ -712,6 +765,9 @@ class Responder:
         try:
             receipt = self._receipt("com.enroll", self._call("com.enroll", args))
         except BoardError as exc:
+            if exc.code == "held":
+                self._pause(capability)
+                return
             if exc.code == "fenced":
                 self.slots[capability] = {"state": "contested", "renewed_at": self.now()}
                 self._emit("board.slot.contested", "warn", "Another responder holds the %s slot on this Project; this service "
@@ -721,6 +777,25 @@ class Responder:
             raise
         self.slots[capability] = {"state": "held", "generation": receipt["slot"]["generation"], "renewed_at": self.now()}
         self._said.pop("board.slot.contested", None)
+        self._lifted(capability)
+
+    def _pause(self, capability: str) -> None:
+        """The operator holds this slot or its Project (DEC-0079): ask again later, the pause doubling each time, and
+        never act around the hold. Accepted work in progress continues; only new work waits."""
+        slot = self.slots.get(capability) or {}
+        pauses = slot.get("pauses", 0) + 1 if slot.get("state") == "paused" else 1
+        wait = min(HOLD_RETRY_MAX_SECONDS, self.hold_delay * 2 ** (pauses - 1))
+        self.slots[capability] = {"state": "paused", "pauses": pauses, "retry_at": self.now() + wait, "renewed_at": self.now()}
+        if capability not in self._on_hold:  # once per hold, per capability
+            self._on_hold.add(capability)
+            self._emit("board.slot.held", "info", "The operator holds new work for %s on this Project; the service waits and "
+                       "asks again later. Work already accepted continues." % capability, capability=capability)
+
+    def _lifted(self, capability: str) -> None:
+        if capability in self._on_hold:
+            self._on_hold.discard(capability)
+            self._emit("board.slot.released", "info", "The operator's hold on %s was lifted; the service takes new work "
+                       "again." % capability, capability=capability)
 
     # -- restart: reconcile and transfer -------------------------------------------------------------------------
     def _read_state(self, entry: Dict[str, Any]) -> Optional[str]:
@@ -750,10 +825,17 @@ class Responder:
                 transfer.setdefault(entry["capability"], []).append(entry)
             else:  # in_progress (lost result once a new generation holds the slot) or outcome_unknown
                 reconcile.append(entry)
-        generations = {r.get("capability"): r.get("generation", 0) for r in status.get("responders") or [] if isinstance(r, dict)}
+        responders = [r for r in status.get("responders") or [] if isinstance(r, dict)]
+        generations = {r.get("capability"): r.get("generation", 0) for r in responders}
+        on_hold = {r.get("capability") for r in responders if r.get("held") is True}  # DEC-0079
         for capability in capabilities:
             held = transfer.get(capability)
-            if held:
+            if capability in on_hold:
+                for entry in held or []:
+                    entry["step"] = "lapsed"  # taken back by a transfer once the hold is lifted
+                    self.checkpoint.put(entry)
+                self._pause(capability)
+            elif held:
                 self._replace(capability, held, generations.get(capability, 0))
             else:
                 self._enroll(capability)
@@ -767,8 +849,18 @@ class Responder:
         args = {"idempotency": self._idem(self._key("replace")), "capability": capability, "expectedGeneration": generation,
                 "transfer": {"requests": [e["request"] for e in entries][:64],
                              "checkpoint": {"summary": "Resumed by the same service after a restart; no effect had begun."}}}
-        receipt = self._receipt("com.responder_replace", self._call("com.responder_replace", args))
+        try:
+            receipt = self._receipt("com.responder_replace", self._call("com.responder_replace", args))
+        except BoardError as exc:
+            if exc.code != "held":
+                raise
+            for entry in entries:
+                entry["step"] = "lapsed"  # nothing moved: taken back by a transfer once the hold is lifted
+                self.checkpoint.put(entry)
+            self._pause(capability)
+            return
         self.slots[capability] = {"state": "held", "generation": receipt["slot"]["generation"], "renewed_at": self.now()}
+        self._lifted(capability)
         moved = {item["request"]: item for item in receipt.get("transferred") or []}
         for entry in entries:
             item = moved.get(entry["request"])
@@ -848,6 +940,10 @@ class Responder:
             self._emit("board.access.needed", "warn", "This service may not answer requests for this Project: the operator "
                        "has to allow it in Fabric (Agents & access). Nothing is claimed until then.", notify=True,
                        episode="access", reason=code)
+        elif code == "held":
+            self.state = "paused"
+            self._emit("board.held", "info", "The operator holds new work on this Project; the responder waits and asks again "
+                       "with a growing pause.", episode="held", reason=code)
         elif code in ("no-epoch", "schema-unsupported", "checkpoint", "receipt-shape"):
             self.state = "down"
             self._drop_session()
@@ -887,6 +983,10 @@ class Responder:
                 self._renew(work)
         held_by_work = work.entry["capability"] if work is not None and self.current is not None else None
         for capability, slot in list(self.slots.items()):
+            if slot.get("state") == "paused":
+                if capability != held_by_work and self.now() >= slot.get("retry_at", 0.0):
+                    self._enroll(capability)  # still held: a longer pause; lifted: the slot is ours again
+                continue
             if capability != held_by_work and self.now() - slot.get("renewed_at", 0) >= RENEW_SECONDS - 0.5:
                 self._enroll(capability)  # the holder's enroll renews its lease (no event); a lapsed one re-enrolls
         if self.current is None and not self.stopping:
@@ -936,6 +1036,9 @@ class Responder:
                     continue
                 if exc.code == "fenced":
                     self.slots[capability] = {"state": "contested", "renewed_at": self.now()}
+                    continue
+                if exc.code == "held":
+                    self._pause(capability)
                     continue
                 raise
             if "request" not in answer:
@@ -992,7 +1095,18 @@ class Responder:
         key = entry["keys"].get("accept") or self._key("accept")
         entry["keys"]["accept"], entry["step"] = key, "accepting"
         self.checkpoint.put(entry)
-        receipt = self._fenced("com.accept", entry, {"fence": self._fence(entry, key)})
+        try:
+            receipt = self._fenced("com.accept", entry, {"fence": self._fence(entry, key)})
+        except BoardError as exc:
+            if exc.code != "held":
+                raise
+            # A hold came between the claim and the accept (DEC-0079): nothing was done, the claim lapses and the request
+            # waits on the board for the hold to be lifted.
+            self.checkpoint.drop(entry["request"])
+            self._emit("board.request.waiting", "info", "A claimed request was not accepted: the operator holds it. Nothing "
+                       "was done; it waits on the board.", request=entry["request"], capability=entry["capability"])
+            self._pause(entry["capability"])
+            return False
         if receipt is None:
             return False  # the claim was lost before it was accepted; nothing was done
         entry["revision"], entry["step"] = receipt["request"]["revision"], "accepted"
@@ -1087,14 +1201,30 @@ class Responder:
         if summary:
             args["summary"] = " ".join(str(summary).split())[:SUMMARY_MAX]
         receipt = None
-        for attempt in range(3):  # a lost answer: the same key again tells whether it was stored
+        lost, delay = 0, self.hold_delay
+        while True:  # a lost answer: the same key again tells whether it was stored
             try:
                 receipt = self._fenced("com.effect_begin", entry, args)
                 break
             except BoardError as exc:
-                if exc.code != "unreachable" or attempt == 2:
+                if exc.code == "held":
+                    # The operator holds this work (DEC-0079): the effect has not begun. Wait, keep the lease (the tick
+                    # renews it; com.renew is never held), and ask again with the same key.
+                    entry["effect"], entry["step"] = False, "effect-held"
+                    self.checkpoint.put(entry)
+                    self._emit("board.request.waiting", "info", "The operator holds this request before its effect: the "
+                               "service waits and does nothing outside it until the hold is lifted.", episode=entry["request"],
+                               request=entry["request"], capability=entry["capability"])
+                    if ctx.stopped.wait(delay):
+                        raise Stopped() from None
+                    delay = min(HOLD_RETRY_MAX_SECONDS, delay * 2)
+                    entry["effect"], entry["step"] = True, "effect-beginning"
+                    self.checkpoint.put(entry)
+                    continue
+                if exc.code != "unreachable" or lost == 2:
                     raise Stopped() from None
-                time.sleep(attempt + 1)
+                lost += 1
+                time.sleep(lost)
         if receipt is None:
             raise Stopped()
         entry["revision"], entry["step"] = receipt["request"]["revision"], "in-progress"

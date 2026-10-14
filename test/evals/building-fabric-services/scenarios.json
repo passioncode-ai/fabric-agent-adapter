@@ -410,6 +410,18 @@
         "signs with an Ed25519 key file the person names (mode 600, a kid), never generates, stores or prints a key, and hands the public JWK over for the installing machine to pin; the algorithm is EdDSA until Fabric records D2",
         "verifies with verify --trust before handing it over, and names what this version does not do: ES256, hub or passkey signing, the organization's passkey countersignature, Fabric recording packages by agentRef"
       ]
+    },
+    {
+      "id": "board-responder-held",
+      "trap": "a responder treated an operator's hold as an outage: it logged board.down, retried every tick, stopped the request it had already accepted, and on restart claimed the held request back to get around the hold",
+      "request": "The operator put a hold on example-agent's video.render slot while it was answering board requests; make the service behave.",
+      "expected": [
+        "reads held as a retryable refusal the operator lifts (DEC-0079), never as a failure or an outage: one board.slot.held event per capability, no board.down",
+        "pauses only new work for that slot: a slot com.status names held is not enrolled; enroll, claim and replace are asked again after a pause that doubles from 15 s up to 15 minutes",
+        "keeps work it already accepted going under the hold: com.renew, com.progress and com.complete are never held; an effect_begin refused held waits with the same idempotency key and starts nothing outside the service",
+        "a hold between the claim and the accept does nothing: the claim lapses and the request waits on the board; accepted work found at restart under a hold is kept for a transfer after the hold is lifted, never claimed back",
+        "reads settledBy: owner on a receipt as the estate owner's settlement (DEC-0081), not the responder's"
+      ]
     }
   ]
 }

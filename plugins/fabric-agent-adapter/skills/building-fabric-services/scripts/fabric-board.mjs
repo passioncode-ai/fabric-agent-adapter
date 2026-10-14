@@ -39,11 +39,20 @@ export const RESPOND_TOOLS = Object.freeze(new Set(['com.status', 'com.list', 'c
 export const REFUSAL_CODES = Object.freeze(new Set(['invalid_arguments', 'body_too_large', 'not_authorized', 'authority_changed',
   'unsupported_capability', 'unsupported_operation', 'not_available', 'idempotency_conflict', 'idempotency_window_expired',
   'capacity_exceeded', 'digest_conflict', 'revision_conflict', 'fenced', 'lease_expired', 'invalid_transition', 'reconcile_required',
-  'observation_required', 'cursor_reset_required', 'immutable_participants']));
+  'observation_required', 'cursor_reset_required', 'immutable_participants', 'held']));
 export const STOP_CODES = Object.freeze(new Set(['fenced', 'lease_expired', 'authority_changed']));
 const REQUEST_STATES = ['queued', 'claimed', 'accepted', 'in_progress', 'completed', 'failed_known', 'cancelled', 'expired', 'outcome_unknown'];
 const EFFECT_STATES = ['not_started', 'started', 'succeeded_observed', 'failed_observed', 'unknown'];
 const TERMINAL = new Set(['completed', 'failed_known', 'cancelled', 'expired']);
+/**
+ * DEC-0079: what an operator's hold may refuse, by the scopes that refuse it. A tool not named here is never refused
+ * `held`: it settles, reports on or keeps alive started work, cancels or reads. The contract's HOLD_SCOPES.
+ */
+export const HOLD_SCOPES = Object.freeze({ 'com.submit': ['thread'], 'com.reply': ['thread'], 'com.enroll': ['project', 'slot'],
+  'com.responder_replace': ['project', 'slot'], 'com.claim': ['thread', 'project', 'slot'], 'com.accept': ['thread', 'project', 'slot'],
+  'com.effect_begin': ['thread', 'project', 'slot'] });
+/** How long a held slot waits before it asks again: doubling from the poll interval, never past this. */
+export const HOLD_RETRY_MAX_SECONDS = 900;
 const OPAQUE = /^[A-Za-z0-9_-]{8,128}$/;
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$/;
 const CAPABILITY = /^[a-z][a-z0-9._-]{1,127}$/;
@@ -138,11 +147,16 @@ export function receiptProblems(value, op) {
   if ('request' in value) {
     const r = value.request;
     const keys = ['id', 'state', 'effect', 'revision'];
-    if (closed(r, '/request', keys, keys, problems)) {
+    if (closed(r, '/request', keys, [...keys, 'settledBy'], problems)) {
       if (!str(r.id, OPAQUE)) problems.push('/request/id is a board id');
       if (!REQUEST_STATES.includes(r.state)) problems.push('/request/state is a request state');
       if (!EFFECT_STATES.includes(r.effect)) problems.push('/request/effect is an effect state');
       if (!isInt(r.revision, 1)) problems.push('/request/revision is an integer ≥ 1');
+      if ('settledBy' in r) {
+        // DEC-0081: present only when the estate owner settled it; absent, the responder did.
+        if (r.settledBy !== 'owner') problems.push('/request/settledBy is owner');
+        if (!['completed', 'failed_known'].includes(r.state)) problems.push('/request/settledBy names a settled request (completed or failed_known)');
+      }
     }
   }
   if ('slot' in value) {
@@ -187,6 +201,7 @@ export function refusalProblems(value) {
       if (!REFUSAL_CODES.has(e.code)) problems.push('/error/code is a refusal code the contract names');
       if (typeof e.message !== 'string' || e.message.length < 1 || e.message.length > 300) problems.push('/error/message is 1 to 300 characters');
       if (typeof e.retryable !== 'boolean') problems.push('/error/retryable is a boolean');
+      else if (e.code === 'held' && e.retryable !== true) problems.push('/error/retryable is true for held: the operator lifts a hold (DEC-0079)');
     }
   }
   return problems;
@@ -236,12 +251,38 @@ export function directoryProblems(page) {
     }
     project.capabilities.forEach((entry, c) => {
       const cat = `${at}/capabilities/${c}`;
-      if (!closed(entry, cat, ['capability', 'responder'], ['capability', 'responder'], problems)) return;
+      if (!closed(entry, cat, ['capability', 'responder'], ['capability', 'responder', 'held'], problems)) return;
       if (!str(entry.capability, CAPABILITY)) problems.push(`${cat}/capability is a capability name`);
       if (!['active', 'stale', 'absent'].includes(entry.responder)) problems.push(`${cat}/responder is active, stale or absent`);
+      if ('held' in entry && typeof entry.held !== 'boolean') problems.push(`${cat}/held is a boolean (DEC-0079)`);
     });
   });
   return [...problems, ...directoryFindings(page).map((f) => `${f.instancePath} ${f.message}`)];
+}
+
+/**
+ * DEC-0079, the contract's holdRefuses: true when a board refuses `tool` on `target` with `held` under `holds`. `target`
+ * is what the board resolved ({thread, project, capability, fenced, repeat}); `holds` is {threads, projects, slots:
+ * [{project, capability}]}. Ids compare as written; an inherited or mistyped member counts as absent; never throws.
+ */
+export function holdRefuses(tool, target, holds) {
+  const own = (value, key) => (isObj(value) && Object.hasOwn(value, key) ? value[key] : undefined);
+  const scopes = typeof tool === 'string' && Object.hasOwn(HOLD_SCOPES, tool) ? HOLD_SCOPES[tool] : undefined;
+  if (!scopes || !isObj(target)) return false;
+  if (own(target, 'repeat') === true) return false;
+  if (tool === 'com.reply' && own(target, 'fenced') === true) return false;
+  const text = (v) => (typeof v === 'string' ? v : undefined);
+  const strings = (v) => new Set(Array.isArray(v) ? v.filter((item) => typeof item === 'string') : []);
+  const thread = text(own(target, 'thread'));
+  const project = text(own(target, 'project'));
+  const capability = text(own(target, 'capability'));
+  if (scopes.includes('thread') && thread !== undefined && strings(own(holds, 'threads')).has(thread)) return true;
+  if (scopes.includes('project') && project !== undefined && strings(own(holds, 'projects')).has(project)) return true;
+  const slots = own(holds, 'slots');
+  if (scopes.includes('slot') && project !== undefined && capability !== undefined && Array.isArray(slots)) {
+    return slots.some((slot) => own(slot, 'project') === project && own(slot, 'capability') === capability);
+  }
+  return false;
 }
 
 /** Look a Project up in one com.directory page a Project session read; the page is checked first (FAC-SEM-107). */
@@ -493,6 +534,9 @@ export class Responder {
     this.said = {};
     this.rr = 0;
     this.reconcileAt = 0;
+    /** The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS. */
+    this.holdDelay = POLL_SECONDS;
+    this.onHold = new Set();
   }
 
   // -- events --
@@ -568,6 +612,10 @@ export class Responder {
     try {
       receipt = this.receipt('com.enroll', await this.call('com.enroll', args));
     } catch (e) {
+      if (e.code === 'held') {
+        this.pause(capability);
+        return;
+      }
       if (e.code === 'fenced') {
         this.slots[capability] = { state: 'contested', renewedAt: this.now() };
         this.emit('board.slot.contested', 'warn', `Another responder holds the ${capability} slot on this Project; this service waits for it to lapse and never takes it over by itself.`, { notify: true, episode: capability, capability });
@@ -577,6 +625,27 @@ export class Responder {
     }
     this.slots[capability] = { state: 'held', generation: receipt.slot.generation, renewedAt: this.now() };
     delete this.said['board.slot.contested'];
+    this.lifted(capability);
+  }
+
+  /**
+   * The operator holds this slot or its Project (DEC-0079): ask again later, the pause doubling each time, and never act
+   * around the hold. Accepted work in progress continues; only new work waits.
+   */
+  pause(capability) {
+    const slot = this.slots[capability] ?? {};
+    const pauses = slot.state === 'paused' ? (slot.pauses ?? 0) + 1 : 1;
+    const wait = Math.min(HOLD_RETRY_MAX_SECONDS, this.holdDelay * 2 ** (pauses - 1));
+    this.slots[capability] = { state: 'paused', pauses, retryAt: this.now() + wait, renewedAt: this.now() };
+    if (!this.onHold.has(capability)) { // once per hold, per capability
+      this.onHold.add(capability);
+      this.emit('board.slot.held', 'info', `The operator holds new work for ${capability} on this Project; the service waits and asks again later. Work already accepted continues.`, { capability });
+    }
+  }
+
+  lifted(capability) {
+    if (!this.onHold.delete(capability)) return;
+    this.emit('board.slot.released', 'info', `The operator's hold on ${capability} was lifted; the service takes new work again.`, { capability });
   }
 
   // -- restart: reconcile and transfer --
@@ -607,9 +676,17 @@ export class Responder {
       else if (state === 'accepted') (transfer[entry.capability] ??= []).push(entry);
       else reconcile.push(entry);
     }
-    const generations = Object.fromEntries((status.responders ?? []).filter(isObj).map((r) => [r.capability, r.generation ?? 0]));
+    const responders = (status.responders ?? []).filter(isObj);
+    const generations = Object.fromEntries(responders.map((r) => [r.capability, r.generation ?? 0]));
+    const onHold = new Set(responders.filter((r) => r.held === true).map((r) => r.capability)); // DEC-0079
     for (const capability of capabilities) {
-      if (transfer[capability]?.length) await this.replace(capability, transfer[capability], generations[capability] ?? 0);
+      if (onHold.has(capability)) {
+        for (const entry of transfer[capability] ?? []) {
+          entry.step = 'lapsed'; // taken back by a transfer once the hold is lifted
+          this.checkpoint.put(entry);
+        }
+        this.pause(capability);
+      } else if (transfer[capability]?.length) await this.replace(capability, transfer[capability], generations[capability] ?? 0);
       else await this.enroll(capability);
     }
     for (const entry of reconcile) if (this.slots[entry.capability]?.state === 'held') await this.reconcile(entry);
@@ -618,8 +695,20 @@ export class Responder {
   async replace(capability, entries, generation) {
     const args = { idempotency: this.idem(this.key('replace')), capability, expectedGeneration: isInt(generation, 0) ? generation : 0,
       transfer: { requests: entries.map((e) => e.request).slice(0, 64), checkpoint: { summary: 'Resumed by the same service after a restart; no effect had begun.' } } };
-    const receipt = this.receipt('com.responder_replace', await this.call('com.responder_replace', args));
+    let receipt;
+    try {
+      receipt = this.receipt('com.responder_replace', await this.call('com.responder_replace', args));
+    } catch (e) {
+      if (e.code !== 'held') throw e;
+      for (const entry of entries) {
+        entry.step = 'lapsed'; // nothing moved: taken back by a transfer once the hold is lifted
+        this.checkpoint.put(entry);
+      }
+      this.pause(capability);
+      return;
+    }
     this.slots[capability] = { state: 'held', generation: receipt.slot.generation, renewedAt: this.now() };
+    this.lifted(capability);
     const moved = new Map((receipt.transferred ?? []).map((item) => [item.request, item]));
     for (const entry of entries) {
       const item = moved.get(entry.request);
@@ -697,6 +786,9 @@ export class Responder {
       this.state = 'not-authorized';
       await this.dropSession();
       this.emit('board.access.needed', 'warn', 'This service may not answer requests for this Project: the operator has to allow it in Fabric (Agents & access). Nothing is claimed until then.', { notify: true, episode: 'access', reason: code });
+    } else if (code === 'held') {
+      this.state = 'paused';
+      this.emit('board.held', 'info', 'The operator holds new work on this Project; the responder waits and asks again with a growing pause.', { episode: 'held', reason: code });
     } else if (['no-epoch', 'schema-unsupported', 'checkpoint', 'receipt-shape'].includes(code)) {
       this.state = 'down';
       await this.dropSession();
@@ -736,6 +828,11 @@ export class Responder {
     }
     const heldByWork = work && this.current ? work.entry.capability : null;
     for (const [capability, slot] of Object.entries(this.slots)) {
+      if (slot.state === 'paused') {
+        // still held: a longer pause; lifted: the slot is ours again
+        if (capability !== heldByWork && this.now() >= (slot.retryAt ?? 0)) await this.enroll(capability);
+        continue;
+      }
       if (capability !== heldByWork && this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.enroll(capability);
     }
     if (!this.current && !this.stopping) await this.continueLapsed();
@@ -788,6 +885,10 @@ export class Responder {
         }
         if (e.code === 'fenced') {
           this.slots[capability] = { state: 'contested', renewedAt: this.now() };
+          continue;
+        }
+        if (e.code === 'held') {
+          this.pause(capability);
           continue;
         }
         throw e;
@@ -843,7 +944,17 @@ export class Responder {
     entry.keys.accept ??= this.key('accept');
     entry.step = 'accepting';
     this.checkpoint.put(entry);
-    const receipt = await this.fenced('com.accept', entry, { fence: this.fence(entry, entry.keys.accept) });
+    let receipt;
+    try {
+      receipt = await this.fenced('com.accept', entry, { fence: this.fence(entry, entry.keys.accept) });
+    } catch (e) {
+      if (e.code !== 'held') throw e;
+      // A hold came between the claim and the accept (DEC-0079): nothing was done, the claim lapses and the request waits.
+      this.checkpoint.drop(entry.request);
+      this.emit('board.request.waiting', 'info', 'A claimed request was not accepted: the operator holds it. Nothing was done; it waits on the board.', { request: entry.request, capability: entry.capability });
+      this.pause(entry.capability);
+      return false;
+    }
     if (!receipt) return false; // the claim was lost before it was accepted; nothing was done
     entry.revision = receipt.request.revision;
     entry.step = 'accepted';
@@ -916,20 +1027,42 @@ export class Responder {
     if (!(await this.fenced('com.progress', entry, args))) throw new Stopped();
   }
 
-  async effectBegin(entry, summary) {
+  async effectBegin(entry, summary, ctx) {
     entry.keys.effect_begin ??= this.key('effect');
     entry.step = 'effect-beginning';
     entry.effect = true; // from here a lost attempt is an unknown outcome, never "nothing happened"
     this.checkpoint.put(entry);
     const args = { fence: this.fence(entry, entry.keys.effect_begin), ...(summary ? { summary: clean(summary) } : {}) };
     let receipt = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    let lost = 0;
+    let delay = this.holdDelay;
+    for (;;) { // a lost answer: the same key again tells whether it was stored
       try {
         receipt = await this.fenced('com.effect_begin', entry, args);
         break;
       } catch (e) {
-        if (e.code !== 'unreachable' || attempt === 2) throw new Stopped();
-        await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 1000));
+        if (e.code === 'held') {
+          // The operator holds this work (DEC-0079): the effect has not begun. Wait, keep the lease (the tick renews it;
+          // com.renew is never held), and ask again with the same key.
+          entry.effect = false;
+          entry.step = 'effect-held';
+          this.checkpoint.put(entry);
+          this.emit('board.request.waiting', 'info', 'The operator holds this request before its effect: the service waits and does nothing outside it until the hold is lifted.', { episode: entry.request, request: entry.request, capability: entry.capability });
+          const until = Date.now() + delay * 1000;
+          while (Date.now() < until) {
+            if (ctx?.stopped) throw new Stopped();
+            await new Promise((resolve) => setTimeout(resolve, Math.min(250, Math.max(1, until - Date.now()))));
+          }
+          if (ctx?.stopped) throw new Stopped();
+          delay = Math.min(HOLD_RETRY_MAX_SECONDS, delay * 2);
+          entry.effect = true;
+          entry.step = 'effect-beginning';
+          this.checkpoint.put(entry);
+          continue;
+        }
+        if (e.code !== 'unreachable' || lost === 2) throw new Stopped();
+        lost += 1;
+        await new Promise((resolve) => setTimeout(resolve, lost * 1000));
       }
     }
     if (!receipt) throw new Stopped();

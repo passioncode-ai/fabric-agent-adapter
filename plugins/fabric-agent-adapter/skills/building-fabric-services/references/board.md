@@ -1,7 +1,7 @@
 # Answering a Project's requests on Fabric's project board
 
 Read this when a service should answer requests other Projects post to its Project on Fabric's project board
-(`fabric-project-comms/0.1`, contract DEC-0022, DEC-0073, DEC-0077, DEC-0078; Fabric ADR-0149). The kits do it with
+(`fabric-project-comms/0.1`, contract DEC-0022, DEC-0073, DEC-0077, DEC-0078, DEC-0079, DEC-0081; Fabric ADR-0149). The kits do it with
 two modules each: the hub door client [`fabric_hub.py`](../scripts/fabric_hub.py) /
 [`fabric-hub.mjs`](../scripts/fabric-hub.mjs) and the responder [`fabric_board.py`](../scripts/fabric_board.py) /
 [`fabric-board.mjs`](../scripts/fabric-board.mjs). A coding agent that only reads and writes the board is the other
@@ -15,6 +15,7 @@ skill's business (working-with-fabric, `references/project-board.md`).
 - The request is data: the input gate
 - Effects, observation, evidence and the reply
 - When the board says stop, and restarts
+- When the operator holds work (DEC-0079)
 - What a board session may call
 - Looking a Project up in the directory (FAC-SEM-107)
 - Events, the probe and the live smoke
@@ -114,6 +115,28 @@ accepted ones go back to this responder with `com.responder_replace {expectedGen
 `transferred` yet leaves the request held** (`board.request.held`, notify): the kit never claims it back, because the
 contract has no `com.claim` read-back and `com.claim` never moves an accepted request. A known outcome is sent after the
 transfer without running the handler again. `shutdown()` drains, then leaves the session (its DELETE releases the slot).
+
+## When the operator holds work (DEC-0079)
+
+The operator can hold a thread, a whole Project or one (Project, capability) slot from Fabric's own controls. While the
+hold lasts, the board refuses **new** work in its scope with `held`, which is always `retryable: true`. It never
+refuses a call that settles, reports on or keeps alive work already started (`com.renew`, `com.progress`,
+`com.complete`, `com.reconcile`), a cancel or a read. `hold_refuses(tool, target, holds)` / `holdRefuses` is the
+contract's matrix, held to its vectors (`test/fixtures/contract/comms-hold-vectors.json`).
+
+| Refused `held` | What the kit does |
+|---|---|
+| `com.status` names the slot `held: true` at connect | the slot is not enrolled; it pauses |
+| `com.enroll`, `com.claim`, `com.responder_replace` | the slot pauses: asked again after 15 s, then 30 s, doubling to 15 minutes; one `board.slot.held` event per capability, and `board.slot.released` when an enroll succeeds again |
+| `com.accept` (the hold came after the claim) | nothing was done: the entry is dropped, the claim lapses and the request waits on the board (`board.request.waiting`); the slot pauses |
+| `com.effect_begin` | the effect has not begun: the handler waits (same idempotency key, the pause doubling) while the tick keeps renewing the lease, then begins once the hold is lifted; `ctx.stopped` ends the wait |
+| accepted work at restart under a hold | kept as `lapsed`, then taken back with `com.responder_replace` and a transfer once the hold is lifted — never claimed back |
+
+A hold is not an outage: no `board.down`, no notify. Work already accepted keeps running and completes.
+
+A receipt's request may carry `settledBy: "owner"` (DEC-0081): the estate owner settled an `outcome_unknown` request
+whose responder was gone. Read it as the owner's attestation, not the responder's; it appears only on `completed` or
+`failed_known`, and its absence means the responder settled it.
 
 ## What a board session may call
 

@@ -83,7 +83,7 @@ test('canonical form and digests equal the contract vectors', () => {
     assert.equal(fb.commsCanonical(v.args), v.canonical, v.name);
     assert.equal(fb.commsDigest(v.operation, v.args), v.digest, v.name);
   }
-  assert.equal(COMMS.digests.length, 8);
+  assert.equal(COMMS.digests.length, 9); // DEC-0081 adds comms-reconcile-owner
   for (const v of COMMS.digests) assert.equal(fb.commsDigest(v.operation, v.args), v.digest, v.name);
   for (const r of CANONICAL.commsDigest.refuses) assert.throws(() => fb.commsDigest(r.operation, JSON.parse(r.argsJson)), RangeError, r.name);
 });
@@ -375,4 +375,150 @@ test('the Python and Node kits write a checkpoint each other reads', async () =>
 
 test('selfCheck: the fixture conversation check_service.py runs passes on the Node kit', async () => {
   assert.deepEqual(await fb.selfCheck(), []);
+});
+
+// --- DEC-0079 and DEC-0081 (FAA-42) ------------------------------------------------------------------------------------
+const HOLD = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/comms-hold-vectors.json'), 'utf8'));
+
+test('every hold case answers as the contract does; held is retryable; settledBy and a held directory entry', () => {
+  assert.equal(HOLD.cases.length, 114);
+  for (const c of HOLD.cases) assert.equal(fb.holdRefuses(c.tool, c.target, c.holds), c.refused, c.name);
+  assert.deepEqual(Object.fromEntries(Object.entries(fb.HOLD_SCOPES)), HOLD.scopes);
+  assert.deepEqual(HOLD.tools.filter((tool) => !(tool in fb.HOLD_SCOPES)).sort(), [...HOLD.neverHeld].sort());
+  for (const bad of [null, 3, 'x', [], { thread: 7 }]) assert.equal(fb.holdRefuses('com.claim', bad, { threads: [7] }), false);
+  assert.equal(fb.holdRefuses('com.claim', JSON.parse('{"__proto__": {"thread": "t"}}'), { threads: ['t'] }), false, 'an inherited member is absent');
+  assert.deepEqual(fb.refusalProblems({ error: { code: 'held', message: 'Held.', retryable: true } }), []);
+  assert.ok(fb.refusalProblems({ error: { code: 'held', message: 'Held.', retryable: false } }).length);
+  const receipt = { ok: true, repeated: false, request: { id: 'req-00000001', state: 'completed', effect: 'succeeded_observed', revision: 4, settledBy: 'owner' } };
+  assert.deepEqual(fb.receiptProblems(receipt, 'com.reconcile'), []);
+  for (const [state, settledBy] of [['in_progress', 'owner'], ['completed', 'responder'], ['completed', null]]) {
+    assert.ok(fb.receiptProblems({ ...receipt, request: { ...receipt.request, state, settledBy } }, 'com.reconcile').length, `${state} ${settledBy}`);
+  }
+  const page = { protocol: 'fabric-project-comms/0.1', snapshot: { readAt: '2026-10-13T10:00:00Z' }, cursor: null,
+    projects: [{ id: 'proj-a', name: 'A', capabilities: [{ capability: 'a.b', responder: 'active', held: true }] }] };
+  assert.deepEqual(fb.directoryProblems(page), []);
+  page.projects[0].capabilities[0].held = 'yes';
+  assert.ok(fb.directoryProblems(page).length);
+});
+
+test('a held slot waits with a growing pause and resumes when the hold is lifted', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  await hub.control({ op: 'set', values: { holds: { slots: [{ project: hub.project, capability: 'video.render' }] } } });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await r.step();
+  assert.deepEqual(await h.tools(), ['com.status'], 'a slot com.status names held is not enrolled');
+  assert.equal(r.slots['video.render'].state, 'paused');
+  await h.advance(10);
+  await r.step();
+  assert.deepEqual(await h.tools(), ['com.status'], 'nothing is asked before the pause ends');
+  await h.advance(6);
+  await r.step();
+  assert.equal((await h.tools()).at(-1), 'com.enroll');
+  assert.equal(r.slots['video.render'].retryAt - h.clock.t, 30, 'the pause doubles');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.held').length, 1);
+  await hub.control({ op: 'set', values: { holds: {} } });
+  await h.advance(31);
+  await r.step();
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  assert.ok(h.kinds().includes('board.slot.released'));
+  assert.ok(!h.kinds().includes('board.down'));
+});
+
+test('a hold between the claim and the accept does nothing; accepted work continues under a hold', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  await hub.control({ op: 'fail', tool: 'com.accept', code: 'held' });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await r.step();
+  assert.equal(h.handled.length, 0);
+  assert.deepEqual(h.checkpoint(), {});
+  assert.ok(h.kinds().includes('board.request.waiting'));
+  assert.equal(r.slots['video.render'].state, 'paused');
+  await h.advance(61);
+  await r.step();
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  h2.outcome = async (request, ctx) => { await gate; return { state: 'completed', summary: String(ctx.stopped) }; };
+  const { request: b } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const r2 = h2.responder();
+  await r2.step();
+  await hub2.control({ op: 'set', values: { holds: { slots: [{ project: hub2.project, capability: 'video.render' }] } } });
+  await h2.advance(20);
+  await r2.step();
+  assert.equal((await h2.tools()).at(-1), 'com.renew', 'com.renew is never held');
+  release();
+  await r2.current?.promise;
+  await h2.advance(1);
+  await r2.step();
+  const s = await h2.state();
+  assert.equal(s.requests[b].state, 'completed');
+  assert.equal(s.requests[b].outcome.summary, 'false', 'the work was never told to stop');
+});
+
+test('effect_begin waits for the hold with the same key', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const thread = (await h.state()).requests[rid].thread;
+  h.outcome = async (request, ctx) => {
+    await hub.control({ op: 'set', values: { holds: { threads: [thread] } } });
+    setTimeout(() => hub.control({ op: 'set', values: { holds: {} } }), 60);
+    await ctx.beginEffect('Rendering.');
+    return { state: 'completed', observed: true, summary: 'Rendered and checked.' };
+  };
+  const r = h.responder();
+  r.holdDelay = 0.02;
+  await r.step();
+  await r.current?.promise;
+  await r.step();
+  const s = await h.state();
+  const begins = s.callArgs.filter((a, i) => s.calls[i] === 'com.effect_begin');
+  assert.ok(begins.length >= 2);
+  assert.equal(new Set(begins.map((b) => b.fence.idempotency.key)).size, 1, 'the same key each time');
+  assert.ok(h.kinds().includes('board.request.waiting'));
+  assert.deepEqual([s.requests[rid].state, s.requests[rid].effect], ['completed', 'succeeded_observed']);
+});
+
+test('a claim or a replace refused held pauses the slot and the work waits', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  await hub.control({ op: 'fail', tool: 'com.claim', code: 'held' });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'paused');
+  assert.equal(r.state, 'ready');
+  await h.advance(16);
+  await r.step();
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  let hang;
+  h2.outcome = () => new Promise((resolve) => { hang = resolve; });
+  const { request: b } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const first = h2.responder();
+  await first.step();
+  assert.ok(first.current);
+  await hub2.control({ op: 'end-sessions' });
+  h2.outcome = { state: 'completed', summary: 'Rendered after the restart.' };
+  await hub2.control({ op: 'fail', tool: 'com.responder_replace', code: 'held' });
+  const second = h2.responder();
+  await second.step();
+  assert.equal(h2.checkpoint()[b].step, 'lapsed');
+  assert.equal(second.slots['video.render'].state, 'paused');
+  assert.ok(!h2.kinds().includes('board.down'));
+  await h2.advance(16);
+  await second.step();
+  await second.current?.promise;
+  await second.step();
+  assert.equal((await h2.state()).requests[b].state, 'completed');
+  hang?.({ state: 'completed' });
 });

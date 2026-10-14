@@ -1,6 +1,6 @@
 # fabric-service/0.1 — wire reference
 
-Pinned to `fabric-agent-contract` commit `f00a7685e3861c27f7899c033fb850a145a1708f`
+Pinned to `fabric-agent-contract` commit `1636fa97262f4a26e2086572d540c2ee701e0010`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -8,7 +8,7 @@ canonical forms DEC-0043; `degraded[].setup` and `run.mcp.stdio.scope` DEC-0044;
 DEC-0045; runner and model profiles DEC-0046; the estate record DEC-0055; one copy under any supervisor and its marker,
 the Windows token-file reader DEC-0057; the hub key the estate certifies DEC-0060; signing credentials DEC-0063; the
 estate record's 60 s skew DEC-0066; an app's own descriptor DEC-0069; the descriptor for listings DEC-0061; identifier equality
-by normal form DEC-0076; the project board's directory page DEC-0077 and a replacement's transferred attempts DEC-0078). The contract's schemas are normative;
+by normal form DEC-0076; the project board's directory page DEC-0077 and a replacement's transferred attempts DEC-0078; an operator's hold DEC-0079, a structured finding DEC-0080 and the owner's settlement DEC-0081). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 

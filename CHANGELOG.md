@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.32.0 - 2026-10-14
+
+The adapter is pinned at contract `1636fa9`. The board kits now read the operator's hold (DEC-0079) and the owner's
+settlement (DEC-0081) (FAA-42, contract CT-42). Before this, a Fabric serving either decision would have broken a
+responder at this pin:
+- a `held` refusal was read as a malformed answer, and the responder blocked;
+- a receipt carrying `settledBy`, a directory page carrying `held`, and a held refusal were all refused as shapes the
+  contract does not name.
+
+### Changed
+
+- **Repin** from `f00a768` to `1636fa9`. Every vendored vector is byte-identical except `comms-vectors.json`, which
+  gains 59 comms fixtures and one digest. `f00a768` stays a supported revision.
+
+### Added
+
+- **`held` (DEC-0079)** in `fabric_board.py` / `fabric-board.mjs`:
+  - `held` is a known refusal code and must be `retryable: true`.
+  - A slot that `com.status` names `held`, or whose `com.enroll`, `com.claim` or `com.responder_replace` is refused
+    `held`, pauses. It is asked again after 15 s, the wait doubling up to 15 minutes. One `board.slot.held` event per
+    capability is emitted, then `board.slot.released`; no `board.down`.
+  - Accepted work continues: `com.renew`, `com.progress` and `com.complete` are never held.
+  - `com.effect_begin` refused `held` waits and asks again with the same key. Nothing outside the service starts until
+    it is answered.
+  - A hold between the claim and the accept does nothing; the request waits on the board.
+  - Accepted work found at restart under a hold is kept for a transfer once the hold is lifted.
+  - `hold_refuses` / `holdRefuses`: the contract's matrix, held to its 114 cases (`comms-hold-vectors.json`, vendored
+    and re-answered by the contract's own function).
+- **`settledBy: "owner"` (DEC-0081)** read on a receipt's request (only `completed` or `failed_known`), and **`held`**
+  read on a directory page's capability and on `com.status` responders.
+- **Docs:**
+  - `references/board.md`: "When the operator holds work".
+  - `working-with-fabric`'s `references/project-board.md`:
+    - `held` means wait and retry with the same key, never route around the hold;
+    - a structured finding (DEC-0080), sent only where `com.submit` takes `finding`, with an idempotency key of at
+      least 128 random bits and `repeated: true` read as the standing finding;
+    - `settledBy` read as the owner's attestation.
+
+### Evidence
+
+- Two scenario evals (`board-responder-held`, `board-held-and-finding`) were written before the prose.
+- The fake board models holds from its own records.
+- 13 Python hold cases (`HoldShapeTests`, `HoldTests`, two in `RestartTests`) and 5 Node ones (`test/fabric-board.test.mjs`, the cases after "DEC-0079 and DEC-0081").
+- 30 planted defects (16 Python, 14 Node) were all caught, two of them only after a case was added for them.
+
 ## 0.31.1 - 2026-10-14
 
 ### Fixed
