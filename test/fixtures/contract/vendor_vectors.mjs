@@ -187,3 +187,56 @@ write('comms-vectors.json', { about: "fabric-project-comms/0.1 at the pin: every
   source: 'fixtures/catalogue.json, fixtures/*/comms-*.json, src/comms-digest.ts, src/semantic-rules.ts',
   fixtures: commsFixtures, digests: commsDigests, directoryPages });
 console.log(`${commsFixtures.length} comms fixtures, ${commsDigests.length} digests, ${directoryPages.length} directory pages`);
+
+// fabric-package/1 (DEC-0050, DEC-0051, DEC-0071, DEC-0074; FAA-27a): the contract's package vectors re-answered by its
+// packageDigest, packageSigningInput, verifyPackage and checkPackageFolder; every package fixture as the catalogue lists
+// it; FAC-SEM-064…066 and FAC-SEM-102 over the semantic ones; and the schema bundled with its outside references, which
+// the kits validate against. The vectors' seeds are the contract's published test keys: the kits sign with them in tests.
+const packageRules = await src('package-rules.ts');
+const packageVectors = read('fixtures/vectors/package.json');
+if (packageRules.packageDigest(packageVectors.digest.package) !== packageVectors.digest.expected) throw new Error('stale package digest vector');
+if (packageRules.packageSigningInput(packageVectors.signingInput.digest, packageVectors.signingInput.role).toString('utf8') !== packageVectors.signingInput.utf8) throw new Error('stale signing input vector');
+const folderFiles = new Map(Object.entries(packageVectors.folder.files).map(([p, text]) => [p, Buffer.from(text, 'utf8')]));
+if (!same(packageRules.checkPackageFolder(packageVectors.digest.package, folderFiles), packageVectors.folder.expected)) throw new Error('stale folder vector');
+for (const c of packageVectors.cases) {
+  if (!same(packageRules.verifyPackage(c.package, c.trust, c.options ?? {}), c.expected)) throw new Error(`stale package case: ${c.name}`);
+}
+const packageFixtures = catalogue.filter((e) => e.schema === 'fabric-package.schema.json').map((e) => ({ name: e.path.replace(/^.*\/|\.json$/g, ''), valid: e.valid, document: read(`fixtures/${e.path}`) }));
+const semanticPackages = fs.readdirSync(path.join(args.contract, 'fixtures/semantic')).filter((f) => /^package-.*\.json$/.test(f)).sort().map((f) => {
+  const document = read(`fixtures/semantic/${f}`);
+  return { name: f.replace(/\.json$/, ''), document, findings: semanticRules.evaluateSemanticRules('package', document).map((x) => ({ code: x.code, instancePath: x.instancePath })) };
+});
+for (const f of packageFixtures.filter((x) => x.valid)) {
+  const findings = semanticRules.evaluateSemanticRules('package', f.document);
+  if (findings.length) throw new Error(`positive package fixture ${f.name} has findings`);
+}
+// The schema, bundled: each outside $ref (common, service-common, manifest) inlined under $defs, so a kit needs one file.
+const schemaFile = (name) => read(`schemas/${name}`);
+const bundled = schemaFile('fabric-package.schema.json');
+const outside = {};
+const pointer = (doc, ref) => ref.split('/').slice(1).reduce((node, token) => node[token.replace(/~1/g, '/').replace(/~0/g, '~')], doc);
+// A local '#…' reference inside an outside file means that file: it is qualified before it is inlined.
+const inline = (node, from = null) => {
+  if (Array.isArray(node)) return node.map((item) => inline(item, from));
+  if (!node || typeof node !== 'object') return node;
+  const outNode = {};
+  for (const [key, value] of Object.entries(node)) {
+    const ref = key === '$ref' && typeof value === 'string' ? (value.startsWith('#') && from ? `${from}${value}` : value) : null;
+    if (ref && !ref.startsWith('#')) {
+      const [file, frag] = ref.split('#');
+      const name = `${file.replace(/\.schema\.json$/, '')}${frag.replace(/\//g, '.')}`;
+      if (!(name in outside)) { outside[name] = null; outside[name] = inline(pointer(schemaFile(file), frag), file); }
+      outNode.$ref = `#/$defs/${name}`;
+    } else outNode[key] = inline(value, from);
+  }
+  return outNode;
+};
+const resolved = inline(bundled);
+resolved.$defs = { ...resolved.$defs, ...outside };
+const strip = (node) => (Array.isArray(node) ? node.map(strip) : node && typeof node === 'object'
+  ? Object.fromEntries(Object.entries(node).filter(([k]) => !['description', 'title', '$comment'].includes(k)).map(([k, v]) => [k, k === 'properties' || k === '$defs' ? Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, strip(pv)])) : strip(v)])) : node);
+write('package-vectors.json', { about: "fabric-package/1 at the pin: the contract's vectors (each case re-answered by its verifyPackage), every package fixture as fixtures/catalogue.json lists it, and FAC-SEM-064…066/102 over the semantic package fixtures, answered by the contract's rules.",
+  source: 'fixtures/vectors/package.json, fixtures/catalogue.json, fixtures/*/fabric-package-*.json, fixtures/semantic/package-*.json, src/package-rules.ts, src/semantic-rules.ts',
+  vectors: packageVectors, fixtures: packageFixtures, semantic: semanticPackages });
+fs.writeFileSync(path.join(here, '../../../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-package.schema.json'), `${JSON.stringify(strip(resolved), null, 2)}\n`);
+console.log(`${packageVectors.cases.length} package cases, ${packageFixtures.length} package fixtures, ${semanticPackages.length} semantic, schema bundled with ${Object.keys(outside).length} outside definitions`);

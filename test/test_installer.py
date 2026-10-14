@@ -115,5 +115,19 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("npx @passioncode-ai/passioncode@latest update", out)
         self.assertNotIn("npx passioncode@", out)
 
+    def test_the_package_commands_run_the_kit_and_install_nothing(self):
+        """FAA-27a: pack / sign / verify are the kit's fabric-package.mjs behind the npm command."""
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            folder = home / "pkg"
+            folder.mkdir()
+            out = run(home, "pack", str(folder))
+            self.assertEqual(out.returncode, 1, out.stderr)
+            self.assertIn("fabric.package.json", json.loads(out.stdout)["error"])
+            self.assertFalse((home / ".agents").exists(), "a package command installs no skill")
+            self.assertEqual(run(home, "sign", str(folder)).returncode, 2, "sign without --key is a usage error")
+            self.assertIn("pack <folder>", run(home, "--help").stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

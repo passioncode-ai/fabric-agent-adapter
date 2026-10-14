@@ -31,6 +31,14 @@ Usage:
       remove plain ~/.claude/skills copies that shadow the installed plugin
   npx @passioncode-ai/fabric-agent-adapter --help
 
+Packages (fabric-package/1):
+  npx @passioncode-ai/fabric-agent-adapter pack <folder> [--apply]
+      list the folder's files, derive agentRef, compute the digest, check it
+  npx @passioncode-ai/fabric-agent-adapter sign <folder> --key <file> [--kid <kid>] [--role publisher|organization] [--apply]
+      add an Ed25519 signature from a private key file (never made or kept here)
+  npx @passioncode-ai/fabric-agent-adapter verify <folder> --trust <trust.json> [--countersigned]
+      check the folder and its signatures against the keys you pin
+
 Claude Code (recommended):
   claude plugin marketplace add ${REPO}
   claude plugin install ${PLUGIN_ID}
@@ -162,4 +170,11 @@ function main(argv) {
   return 0;
 }
 
-process.exit(main(process.argv));
+const PACKAGE_COMMANDS = ['pack', 'sign', 'verify'];
+if (PACKAGE_COMMANDS.includes(process.argv[2])) {
+  // The package commands live in the kit (fabric-package.mjs), one implementation for the skill and this CLI.
+  const kit = path.join(ROOT, 'plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-package.mjs');
+  import(require('url').pathToFileURL(kit).href).then((m) => { process.exitCode = m.main(process.argv.slice(2)); });
+} else {
+  process.exit(main(process.argv));
+}
