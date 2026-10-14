@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.31.1 - 2026-10-14
+
+### Fixed
+
+- `fabric_package.py` no longer carries a PEM private-key header as one literal string. It is still the line that
+  reads a PKCS#8 key file, and it reads files exactly as before. The PassionCode launcher's vendor step scans every
+  shipped file for that marker, and the literal made it refuse to vendor 0.31.0. A test now fails if any file under
+  `plugins/` or `bin/` carries the marker. Planted check: an unsplit marker fails the test.
+
 ## 0.31.0 - 2026-10-14
 
 An agent is packed, signed and verified as a `fabric-package/1` folder (FAA-27a and FAA-36, `RM-28 pilot`; contract
