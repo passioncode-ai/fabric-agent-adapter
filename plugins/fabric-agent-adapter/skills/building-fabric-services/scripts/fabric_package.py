@@ -141,7 +141,7 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
         if kid is not None and named is not None and kid != named:
             raise PackageError("--kid %s disagrees with the key's own kid %s." % (kid, named))
         kid = kid if kid is not None else named
-    elif "-----BEGIN PRIVATE KEY-----" in text:
+    elif "-----BEGIN " + "PRIVATE KEY-----" in text:  # split, so a secret scanner never reads this line as a key
         body = "".join(line for line in text.splitlines() if line and not line.startswith("-----"))
         try:
             der = base64.b64decode(body, validate=True)

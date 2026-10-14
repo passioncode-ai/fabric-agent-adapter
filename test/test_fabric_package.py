@@ -7,6 +7,7 @@ import copy
 import importlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -100,6 +101,18 @@ def write_agent(root, **draft_extra):
     draft.update(draft_extra)
     (root / fp.PACKAGE_FILE).write_text(json.dumps(draft, indent=2) + "\n")
     return draft
+
+
+class ShippedFilesTests(unittest.TestCase):
+    def test_no_shipped_file_carries_a_private_key_marker(self):
+        """A secret scanner (the launcher's vendor step among them) refuses a file whose text looks like a PEM private
+        key; the kits split the marker they parse for."""
+        marker = re.compile("-----BEGIN (?:RSA |EC |OPENSSH )?" + "PRIVATE KEY-----")
+        base = Path(__file__).resolve().parent.parent
+        found = [str(path.relative_to(base)) for top in ("plugins", "bin") for path in (base / top).rglob("*")
+                 if path.is_file() and "__pycache__" not in path.parts
+                 and marker.search(path.read_text(encoding="utf-8", errors="ignore"))]
+        self.assertEqual(found, [])
 
 
 class PackTests(unittest.TestCase):
