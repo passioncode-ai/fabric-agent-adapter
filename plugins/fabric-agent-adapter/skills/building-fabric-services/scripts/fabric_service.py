@@ -49,9 +49,10 @@ DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensio
 DASHBOARD_KIT = "fabric-dashboard-kit@1.1.0"
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 EXIT_ALREADY_RUNNING = 75
-# Lifecycle contract (fabric-workspace knowledge/lifecycle.md). A launchd-supervised copy that finds
-# the lock held backs off in-process for this long before its exit 75 (LC-03, F8): under KeepAlive
-# with ThrottleInterval 10 that is a few starts an hour instead of one every 10 s.
+# Lifecycle rules: references/lifecycle.md, the rule for this kit's users, which implements the public
+# contract's service specification (Lifecycle). A launchd-supervised copy that finds the lock held backs
+# off in-process for this long before its exit 75 (LC-03, F8): under KeepAlive with ThrottleInterval 10
+# that is a few starts an hour instead of one every 10 s.
 SUPERVISOR_ENV = "FABRIC_SERVICE_SUPERVISOR"
 LOCK_WAIT_SUPERVISED_SECONDS = 300.0
 LOCK_BACKOFF_FIRST_SECONDS = 0.5

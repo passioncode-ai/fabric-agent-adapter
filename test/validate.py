@@ -344,6 +344,24 @@ def validate_python_imports(path: Path, errors: List[str]) -> None:
                 errors.append("non-stdlib import in %s: %s" % (path.relative_to(ROOT), name))
 
 
+# A public skill page never defers to a source its reader cannot open (release iteration 1, N-12; USR-014).
+# fabric-workspace is private to the organization: a page may cite it for provenance, but a paragraph that
+# links or names it must not say that it "wins" or that this page is the defect. The public page is the rule.
+PRIVATE_SOURCE = re.compile(r"fabric-workspace")
+DEFERRAL = re.compile(r"\bwins\b|is the defect|takes precedence|\bprevails\b|is authoritative", re.IGNORECASE)
+
+
+def private_source_deferrals(text: str) -> List[str]:
+    """Each paragraph that names a private source and defers to it, as `line N: <start of the paragraph>`."""
+    found: List[str] = []
+    line = 1
+    for paragraph in re.split(r"\n[ \t]*\n", text):
+        if PRIVATE_SOURCE.search(paragraph) and DEFERRAL.search(paragraph):
+            found.append("line %d: %s" % (line, " ".join(paragraph.split())[:80]))
+        line += paragraph.count("\n") + 2
+    return found
+
+
 def validate_skill(name: str, errors: List[str]) -> None:
     skill_dir = SKILLS[name]
     skill_file = skill_dir / "SKILL.md"
@@ -380,6 +398,11 @@ def validate_skill(name: str, errors: List[str]) -> None:
         text = ref.read_text(encoding="utf-8")
         if len(text.splitlines()) > 100 and "## Contents" not in text:
             errors.append("%s: reference over 100 lines needs Contents: %s" % (name, ref.name))
+    for page in sorted(skill_dir.rglob("*.md")):
+        for where in private_source_deferrals(page.read_text(encoding="utf-8")):
+            errors.append("%s: %s defers to a private source (fabric-workspace); a public page states the rule "
+                          "itself and cites the private page for provenance only — %s"
+                          % (name, page.relative_to(skill_dir), where))
 
     triggers = json.loads((ROOT / "test/evals" / name / "triggers.json").read_text(encoding="utf-8"))
     if triggers.get("skill") != name:
@@ -665,6 +688,13 @@ def validator_self_test() -> List[str]:
     detected = validate_metadata(illegal, "adapting-projects-to-fabric")
     if len(detected) < 3:
         return ["validator self-test did not detect bad name/description/boundary"]
+    deferring = ("Intro.\n\nThis page implements [the contract](https://github.com/passioncode-ai/fabric-workspace/"
+                 "blob/main/knowledge/lifecycle.md). Where the two differ, the contract\nwins and this page is the defect.\n")
+    found = private_source_deferrals(deferring)
+    if len(found) != 1 or not found[0].startswith("line 3: This page implements"):
+        return ["validator self-test missed a page that defers to a private source"]
+    if private_source_deferrals("Provenance: fabric-workspace LC-14.\n\nThe operator's intent wins.\n"):
+        return ["validator self-test flagged a deferral in a paragraph that names no private source"]
     planted = "---\nname: x\ndescription: Use when X extension: which. NOT for Y.\n---\n"
     try:
         parse_frontmatter(planted)
