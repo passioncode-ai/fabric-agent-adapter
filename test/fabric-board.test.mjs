@@ -468,8 +468,8 @@ test('effect_begin waits for the hold with the same key', async (t) => {
   const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
   const thread = (await h.state()).requests[rid].thread;
   h.outcome = async (request, ctx) => {
-    await hub.control({ op: 'set', values: { holds: { threads: [thread] } } });
-    setTimeout(() => hub.control({ op: 'set', values: { holds: {} } }), 60);
+    // FAA-43: the board lifts the hold right after the first held begin, never on a timer.
+    await hub.control({ op: 'set', values: { holds: { threads: [thread] }, lift_holds_after: 'com.effect_begin' } });
     await ctx.beginEffect('Rendering.');
     return { state: 'completed', observed: true, summary: 'Rendered and checked.' };
   };
@@ -480,7 +480,7 @@ test('effect_begin waits for the hold with the same key', async (t) => {
   await r.step();
   const s = await h.state();
   const begins = s.callArgs.filter((a, i) => s.calls[i] === 'com.effect_begin');
-  assert.ok(begins.length >= 2);
+  assert.equal(begins.length, 2, 'one begin refused held, then the same begin once the hold is lifted');
   assert.equal(new Set(begins.map((b) => b.fence.idempotency.key)).size, 1, 'the same key each time');
   assert.ok(h.kinds().includes('board.request.waiting'));
   assert.deepEqual([s.requests[rid].state, s.requests[rid].effect], ['completed', 'succeeded_observed']);

@@ -34,6 +34,9 @@ was checked against no share grant.
 - **Every estate rule is total on hostile JSON**, as the contract's became in DEC-0082's fix rounds: an
   `instancePath` names an item by its index as written (a non-object before it no longer shifts it), and a value whose
   own `toString` member is data is shown as its JSON instead of throwing.
+- **A flaky board test** (FAA-43): the hold test of `com.effect_begin` lifted the hold on a 50 ms timer, so a slow runner
+  saw one begin instead of two. The fake board now lifts it right after the first held begin (`lift_holds_after`), in
+  the Python and the Node twin.
 
 ### Evidence
 
