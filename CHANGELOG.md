@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.32.1 - 2026-10-14
+
+The `building-fabric-services` lifecycle reference is now the rule its readers follow (release iteration 1, N-12;
+operator decision O6). It used to link the organization's private lifecycle contract and say "the contract wins and
+this page is the defect", which left a public reader with a rule they could not open.
+
+### Changed
+
+- **`references/lifecycle.md` is normative.** A new *The rules* section states the lifecycle itself: the supervisor
+  owns the process (never kill a service; start, stop and restart only through launchd, systemd, the Task Scheduler
+  or the node; state is read from the supervisor; restart no sooner than 10 s; off stays off), the descriptor, and
+  readiness through the well-known document. A table states each lifecycle rule the kits serve (LC-01, -02, -03, -04,
+  -05, -09, -11, -12, -14, -15, -21, -22) in one sentence, with the section and the kit function that serve it. It
+  links only public sources: the Fabric Agent Contract's service specification, *Lifecycle*. The `LC-` ids remain
+  for provenance.
+- **`working-with-fabric` `references/project-board.md`** no longer says the private page "wins": it is the rule a
+  coding agent with this plugin follows, and cites the knowledge base for provenance.
+- The two kits' lifecycle comments (`fabric_service.py`, `fabric-service.mjs`) point at the reference and the
+  public specification instead of the private page.
+
+### Added
+
+- **`test/validate.py` refuses a skill page that defers to a private source**: a paragraph that names
+  `fabric-workspace` and says it "wins", "takes precedence", "prevails" or "is authoritative", or that this page "is
+  the defect". The validator's self-test plants one; `test/test_validate.py` covers the cases.
+
 ## 0.32.0 - 2026-10-14
 
 The adapter is pinned at contract `1636fa9`. The board kits now read the operator's hold (DEC-0079) and the owner's

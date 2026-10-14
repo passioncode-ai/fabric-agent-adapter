@@ -514,3 +514,29 @@ class PluginLifecycleGateTests(unittest.TestCase):
             v.validate_plugin_lifecycle(errors, plugin)
             self.assertTrue(any("LC-19" in e for e in errors), errors)
             self.assertTrue(any("LC-21" in e for e in errors), errors)
+
+
+class PrivateSourceDeferralTests(unittest.TestCase):
+    """A public skill page states its rule; it never defers to fabric-workspace, which its reader cannot open (N-12)."""
+
+    def test_a_paragraph_that_lets_a_private_page_win_is_refused(self):
+        text = ("# Page\n\nThis page implements the [contract](https://github.com/passioncode-ai/fabric-workspace/blob/main/"
+                "knowledge/lifecycle.md).\nWhere the two differ, the contract wins and this page is the defect.\n")
+        found = validate.private_source_deferrals(text)
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0].startswith("line 3: "), found)
+
+    def test_that_page_wins_is_refused_too(self):
+        text = "The rule lives in fabric-workspace `knowledge/agents-first.md`; where the two differ, that page wins.\n"
+        self.assertEqual(len(validate.private_source_deferrals(text)), 1)
+
+    def test_provenance_without_deferral_and_a_deferral_without_a_private_source_pass(self):
+        self.assertEqual(validate.private_source_deferrals(
+            "Inside PassionCode.ai it implements fabric-workspace `knowledge/lifecycle.md`, cited for provenance.\n"), [])
+        self.assertEqual(validate.private_source_deferrals(
+            "Where this page and the public specification disagree, the specification wins.\n\n"
+            "The operator's intent wins (LC-14).\n"), [])
+
+    def test_every_shipped_skill_page_is_free_of_private_deferrals(self):
+        for page in sorted((ROOT / "plugins").rglob("*.md")):
+            self.assertEqual(validate.private_source_deferrals(page.read_text(encoding="utf-8")), [], str(page))

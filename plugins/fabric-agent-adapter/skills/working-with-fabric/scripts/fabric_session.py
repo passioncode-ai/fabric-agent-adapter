@@ -60,7 +60,7 @@ WATCH_MAX_BACKOFF_S = 900
 SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 LOCAL_ORIGIN = re.compile(r'"origin": "http://(?:127\.0\.0\.1|localhost)')
-VERSION = "0.32.0"
+VERSION = "0.32.1"
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code"}
 # A session Fabric launched. FABRIC_LAUNCHED_SESSION=1 is the marker Fabric is asked to set (need D6); the others are
 # what Fabric already gives a launched session (fabric sessionBundle.ts): only their NAMES are looked at, never a value

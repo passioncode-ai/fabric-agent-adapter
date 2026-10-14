@@ -1,30 +1,72 @@
 # Lifecycle — supervisor, install, release layout, state
 
-This page implements the organization's
-[product lifecycle contract](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/lifecycle.md)
-(rules LC-01…LC-15) for `fabric-service/0.1` services. Where the two differ, the contract
-wins and this page is the defect. The rule each section serves:
-
-| Contract rule | Here | Kit (Python / Node) |
-|---|---|---|
-| LC-01 quit reaches exit within a deadline | [Shutdown](#shutdown) | `Drain` / `Drain` |
-| LC-03 a job is bounded and exclusive | [one copy under a supervisor](#one-copy-under-a-supervisor) | `hold_single_instance` / `holdSingleInstance` |
-| LC-09 the footprint is declared | the descriptor and the plist, unit or task; the service's own `AGENTS.md` names its label (unit, task) and port | `write_descriptor`, `launchd_plist`, `systemd_unit` / `systemdUnit`, `task_xml` / `taskXml` |
-| LC-11 previous release kept, older pruned | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `prune_releases` / `pruneReleases` |
-| LC-12 every file is bounded | [Logs](#logs) | `RotatingLog`, `cap_stdout_log` / `RotatingLog`, `capStdoutLog` |
-| LC-14 operator intent wins; uninstall is symmetric | [Install, upgrade, uninstall](#install-upgrade-uninstall), [Linux and Windows](#linux-and-windows) | `launchd_install` / `launchdInstall`, `launchd_uninstall` / `launchdUninstall`; `systemd_install` / `systemdInstall`, `task_install` / `taskInstall` and their uninstalls |
-| LC-15 builds clean up after themselves | release pruning runs inside the installer, not later | `prune_releases` / `pruneReleases` |
+**This page is the rule** for anyone who builds, installs or runs a `fabric-service/0.1` service with this
+skill. Everything you must follow is stated here or in the public Fabric Agent Contract's
+[service specification, *Lifecycle*](https://github.com/passioncode-ai/fabric-agent-contract/blob/main/docs/specification/service.md#lifecycle), which this page
+implements and links; where the two disagree, the specification is right and this page is the defect (report it in
+this repository). Inside
+PassionCode.ai the same rules make up the organization's product lifecycle contract, kept in its knowledge base. The
+`LC-` ids below are that contract's, given for provenance only: nothing behind them is needed to follow this page.
 
 ## Contents
 
-- [launchd plist](#launchd-plist-generate-it-with-launchd_plist)
+- [The rules](#the-rules)
+- [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes)
 - [Install, upgrade, uninstall](#install-upgrade-uninstall)
 - [One copy under a supervisor](#one-copy-under-a-supervisor)
+- [An app's own descriptor and the node](#an-apps-own-descriptor-and-the-node)
 - [Directories](#directories)
 - [Logs](#logs)
 - [Shutdown](#shutdown)
 - [Being managed by a host lifecycle broker](#being-managed-by-a-host-lifecycle-broker)
 - [Linux and Windows](#linux-and-windows)
+
+## The rules
+
+**The supervisor owns the process.** A local service runs under exactly one supervisor, named in its descriptor's
+`lifecycle.manager`: `launchd` (macOS), `systemd` (Linux), `task-scheduler` (Windows) or `node` (Project
+Observatory's node supervising its children). An app a person starts says `person` and has no supervisor; where a host
+runs a lifecycle broker, the broker is the one that quits it ([below](#being-managed-by-a-host-lifecycle-broker)).
+Starting, stopping and restarting go through the supervisor and nothing else:
+
+- **Never kill a service.** A host, an agent, an installer or the service's own CLI never starts a service process
+  directly and never kills or signals one. It asks the supervisor: on macOS `bootout` + `disable` to stop and keep
+  off, `enable` + `bootstrap` to start, `kickstart -k` to restart; [Linux and Windows](#linux-and-windows) have
+  their own verbs; a node's child is started, stopped and restarted only through the node.
+- **State comes from the supervisor**: `launchctl print`, `systemctl --user show`, the task's state and last run,
+  or the node's record. Compare the supervisor's pid with the well-known `process.pid` to see a second copy.
+- **Restart is the supervisor's.** A service that exits is started again, no sooner than 10 s after its last start
+  (`KeepAlive` with `ThrottleInterval` 10, `Restart=always` with `RestartSec=10`, the node likewise; a scheduled task
+  restarts on failure every minute). A restart onto new code shows as a new `service.build`.
+- **Off stays off.** The operator's off survives a login, an upgrade and a reinstall (LC-14).
+
+**The descriptor is the installation.** The installer writes one descriptor per instance (`<id>.<instance>.json`,
+atomic, mode 0600) and the uninstaller removes it; a running service never writes its own, except an app
+([below](#an-apps-own-descriptor-and-the-node)). It names the supervisor and its file (`label` and `plist`, `unit`,
+or `task`; none for `node` and `person`), the `origin` `http://127.0.0.1:<port>` (a port is a claim: an installer
+refuses a port another instance declares), the service's directories, and commands as argument arrays that never
+carry a credential. Only `doctor` and `update` are commands a host may run.
+
+**Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
+authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's.
+`status` is `starting`, `ready`, `degraded` or `stopping`; `degraded` is always present, and an empty list asserts
+full health. A process that cannot serve does not answer, and a host derives `down`. An install or upgrade polls
+that document until `service.id` matches (at most 40 s) before it calls the service started.
+
+| Id | Rule | Here | Kit (Python / Node) |
+|---|---|---|---|
+| LC-01 | **Quit reaches exit within a deadline.** Every trigger (`SIGTERM`, `SIGINT`, logout, the app's own quit) ends the process: within 5 s idle, within 10 s with work in flight, then a hard exit. Nothing starts after quit begins | [Shutdown](#shutdown) | `Drain` / `Drain` |
+| LC-02 | **Every child has an owner, a deadline and a process group.** No subprocess without a timeout; on timeout or the parent's exit the whole group goes; no orphan survives. Locks and shared resources are released in `finally` | your own code | — |
+| LC-03 | **A job is bounded and exclusive.** One copy holds `service.lock`; a scheduled job has a watchdog shorter than its interval, shares its lock with every manual entry point, bounds every network call and records each run's outcome. Long work is journalled before it starts | [One copy under a supervisor](#one-copy-under-a-supervisor) | `hold_single_instance` / `holdSingleInstance` |
+| LC-04 | **Credentials are silent after setup.** No background prompt; a credential read that is denied or absent is cached and backs off until a person acts | [Directories](#directories) (secret files 0600) | — |
+| LC-05 | **Identity is stable across updates.** The supervisor runs a stable executable inside a release directory, never an interpreter by a versioned package-manager path; signed builds are pinned by team and identifier | [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes) | — |
+| LC-09 | **The footprint is declared.** The service's `AGENTS.md` names every resident process, its supervisor label, unit or task and its port, who starts each and who stops it | the descriptor and the supervisor file | `write_descriptor`, `launchd_plist`, `systemd_unit` / `systemdUnit`, `task_xml` / `taskXml` |
+| LC-11 | **An update is a lifecycle event.** An upgrade writes a new immutable release and restarts through the supervisor; the previous release is kept for rollback, older ones are pruned | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `prune_releases` / `pruneReleases` |
+| LC-12 | **Every file is bounded.** Logs rotate by size (5 × 5 MB), mode 0600, never in `/tmp`; temporary leftovers are swept at start | [Logs](#logs) | `RotatingLog`, `cap_stdout_log` / `RotatingLog`, `capStdoutLog` |
+| LC-14 | **The operator's intent wins; uninstall is symmetric.** No install or upgrade re-enables what the operator turned off; uninstall removes what install added (supervisor file, override, descriptor), and data goes only on an explicit purge | [Install, upgrade, uninstall](#install-upgrade-uninstall), [Linux and Windows](#linux-and-windows) | `launchd_install` / `launchdInstall`, `launchd_uninstall` / `launchdUninstall`; `systemd_install` / `systemdInstall`, `task_install` / `taskInstall` and their uninstalls |
+| LC-15 | **Builds clean up after themselves.** At most the current release and the one before it remain; the prune runs inside the installer, not later | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `prune_releases` / `pruneReleases` |
+| LC-21 | **A secret never travels in a command line.** Keys reach the process through its environment, a 0600 file or a vault, never argv; a supervisor file carries no secret | [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes), [Linux and Windows](#linux-and-windows) | the supervisor-file writers refuse a secret-shaped value |
+| LC-22 | **Work survives a restart.** Work started but not finished is journalled on disk, without secrets, before it starts; the restarted service takes it back or cleans it up | [Shutdown](#shutdown) | — (the service's own journal) |
 
 ## launchd plist (generate it with `launchd_plist` or `launchdPlist`; both kits write the same bytes)
 
@@ -168,7 +210,7 @@ has to survive being driven from outside:
 
 - **Quit reaches exit through both doors.** A broker asks the platform's own quit first — on
   macOS `NSRunningApplication.terminate()`, the path Cmd+Q and the Dock take — and `SIGTERM` a few
-  seconds later. Handle both and exit inside the deadline (fabric-workspace LC-01). A desktop app
+  seconds later. Handle both and exit inside the deadline (LC-01). A desktop app
   that answers `SIGTERM` by closing its window and staying alive is stopped late or not at all.
 - **A background launch stays in the background.** A broker opens the app non-activating
   (`NSWorkspace.OpenConfiguration.activates = false`); do not call `app.focus()`, `show()` on a

@@ -1,9 +1,10 @@
 # The project board (`fabric-project-comms/0.1`, the `com.*` tools)
 
 Read this when the session starts in a project a Fabric hub serves, when the person asks about board mail, when you
-need something from another Project, or when you wait for an answer. The rule itself has one home: PassionCode's
-knowledge base, [agents-first.md, "The project board"](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/agents-first.md#the-project-board).
-This page is how a coding agent with this plugin follows it; where the two differ, that page wins.
+need something from another Project, or when you wait for an answer. This page is the rule a coding agent with this
+plugin follows. Inside PassionCode.ai it implements the knowledge base's
+[agents-first.md, "The project board"](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/agents-first.md#the-project-board)
+(private to the organization), and is kept in step with it; nothing behind that link is needed to follow this page.
 
 ## Contents
 
