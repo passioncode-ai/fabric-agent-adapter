@@ -26,6 +26,41 @@ export const FLAGS = Object.freeze({ UP: 0x01, UV: 0x04, BE: 0x08, BS: 0x10, AT:
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const isString = (value) => typeof value === 'string';
 const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
+/** The object items of an array with their index as written, so an instancePath names the item even after a non-object. */
+const indexed = (value) => (Array.isArray(value) ? value.flatMap((item, index) => (isObject(item) ? [[item, index]] : [])) : []);
+/** The contract's `show`: String(value), or its JSON where String() throws (an object whose own `toString` is data). */
+const show = (value) => {
+  if (typeof value === 'string') return value;
+  try {
+    return String(value);
+  } catch {
+    return JSON.stringify(value) ?? typeof value;
+  }
+};
+/** The contract's `toNumber`: Number(value), or NaN where Number() throws. */
+const toNumber = (value) => {
+  try {
+    return Number(value);
+  } catch {
+    return Number.NaN;
+  }
+};
+/** DEC-0082: the personal context, and an organization's context `org:<orgId>` (the contract's `context-route.ts`). */
+export const PERSONAL_CONTEXT = 'personal';
+export const ORG_CONTEXT_PREFIX = 'org:';
+const ORG_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+/** The context `value` names, or undefined: `personal` exactly, or `org:` and an organization id; compared as written. */
+export function parseContext(value) {
+  if (typeof value !== 'string') return undefined;
+  if (value === PERSONAL_CONTEXT) return { kind: 'personal' };
+  if (!value.startsWith(ORG_CONTEXT_PREFIX)) return undefined;
+  const org = value.slice(ORG_CONTEXT_PREFIX.length);
+  return ORG_ID.test(org) ? { kind: 'org', org } : undefined;
+}
+/** A placement's or a secret placement's context: its `context`, `personal` when absent (DEC-0082). */
+const contextOf = (entry) => (entry.context === undefined ? PERSONAL_CONTEXT : entry.context);
+/** A collision-free key over JSON values. */
+const keyOf = (...parts) => JSON.stringify(parts);
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest();
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const bytes = (text) => Buffer.from(text, 'base64url');
@@ -255,10 +290,13 @@ export function verifyEstateRecord(record, trust) {
   return { ok: true, digest, revision: record.revision, signedBy: credential.credentialId, signCount: assertion.signCount };
 }
 
-/** What a package verifier trusts for a package placed on a machine; undefined when the record places no such agent there. */
-export function placementTrust(record, machineId, agentRef) {
+/**
+ * What a package verifier trusts for a package placed on a machine in a context (DEC-0082; `personal` when not given);
+ * undefined when the record places no such agent there in that context.
+ */
+export function placementTrust(record, machineId, agentRef, context = PERSONAL_CONTEXT) {
   const machine = list(record.machines).find((entry) => entry.id === machineId);
-  const placement = list(machine?.packages).find((entry) => entry.agentRef === agentRef);
+  const placement = list(machine?.packages).find((entry) => entry.agentRef === agentRef && contextOf(entry) === context);
   if (!placement) return undefined;
   return { publisher: list(record.publisherKeys).filter((key) => key.kid === placement.publisherKid) };
 }
@@ -335,7 +373,7 @@ function revisionChain(value) {
   const parent = isObject(value.parent) ? value.parent : {};
   const next = isObject(value.next) ? value.next : {};
   if (next.estate !== parent.estate) flag('/next/estate', "a revision continues its parent's estate");
-  if (next.revision !== Number(parent.revision) + 1) flag('/next/revision', `the revision after ${String(parent.revision)} is ${Number(parent.revision) + 1}: a revision never skips or repeats one`);
+  if (next.revision !== toNumber(parent.revision) + 1) flag('/next/revision', `the revision after ${show(parent.revision)} is ${toNumber(parent.revision) + 1}: a revision never skips or repeats one`);
   let parentDigest;
   try {
     parentDigest = estateRecordDigest(parent);
@@ -345,14 +383,14 @@ function revisionChain(value) {
   if (next.parent !== parentDigest) flag('/next/parent', 'parent names the digest of the revision before it');
   if (estateTime(next.issuedAt) < estateTime(parent.issuedAt)) flag('/next/issuedAt', 'a revision is never issued before its parent');
   const kept = new Set(list(next.revocations).map(revocationKey));
-  list(parent.revocations).forEach((entry, index) => {
-    if (!kept.has(revocationKey(entry))) flag(`/parent/revocations/${index}`, `the ${String(entry.kind)} revocation of ${String(entry.ref)} is dropped: a revision keeps every revocation before it`);
+  indexed(parent.revocations).forEach(([entry, index]) => {
+    if (!kept.has(revocationKey(entry))) flag(`/parent/revocations/${index}`, `the ${show(entry.kind)} revocation of ${show(entry.ref)} is dropped: a revision keeps every revocation before it`);
   });
   return findings;
 }
 
 const validDeviceKey = (key) => {
-  const raw = Buffer.from(String(key.publicKey ?? ''), 'base64');
+  const raw = Buffer.from(show(key.publicKey ?? ''), 'base64');
   return key.alg === 'ed25519' ? raw.length === 32 && !smallOrder(raw) : isValidP256Key(raw);
 };
 
@@ -360,69 +398,73 @@ function keys(value, flag) {
   const ids = new Set();
   const hubKids = new Set();
   const hubKeys = new Set();
-  list(value.machines).forEach((machine, m) => {
+  indexed(value.machines).forEach(([machine, m]) => {
     const at = `/machines/${m}`;
-    if (ids.has(machine.id)) flag(`${at}/id`, `machine ${String(machine.id)} is listed twice`);
+    if (ids.has(machine.id)) flag(`${at}/id`, `machine ${show(machine.id)} is listed twice`);
     ids.add(machine.id);
     const deviceKeys = list(machine.deviceKeys);
     if (deviceKeys.filter((key) => key.use === 'sig').length !== 1) flag(`${at}/deviceKeys`, 'a machine has exactly one signing device key, <id>#sig');
     if (deviceKeys.filter((key) => key.use === 'kem').length > 1) flag(`${at}/deviceKeys`, 'a machine has at most one key-agreement device key, <id>#kem');
     const seen = new Set();
     deviceKeys.forEach((key, k) => {
-      if (key.kid !== `${String(machine.id)}#${String(key.use)}`) flag(`${at}/deviceKeys/${k}/kid`, 'a device key is listed as <machine id>#sig or <machine id>#kem, by its role');
+      if (key.kid !== `${show(machine.id)}#${show(key.use)}`) flag(`${at}/deviceKeys/${k}/kid`, 'a device key is listed as <machine id>#sig or <machine id>#kem, by its role');
       if (!validDeviceKey(key)) flag(`${at}/deviceKeys/${k}/publicKey`, 'an Ed25519 key is never of small order (DEC-0045) and a P-256 key is a valid point (SEC 1 §3.2.2)');
       if (seen.has(key.publicKey)) flag(`${at}/deviceKeys/${k}/publicKey`, 'one key is never used for the other role');
       seen.add(key.publicKey);
     });
     if (isObject(machine.hubKey)) {
       const hub = machine.hubKey;
-      if (hubKids.has(hub.kid)) flag(`${at}/hubKey/kid`, `hub key ${String(hub.kid)} is certified for two machines: one kid per machine`);
+      if (hubKids.has(hub.kid)) flag(`${at}/hubKey/kid`, `hub key ${show(hub.kid)} is certified for two machines: one kid per machine`);
       hubKids.add(hub.kid);
       if (hubKeys.has(hub.x)) flag(`${at}/hubKey/x`, 'one hub public key is certified for two machines under two kids: one key per machine');
       hubKeys.add(hub.x);
-      if (smallOrder(Buffer.from(String(hub.x ?? ''), 'base64url'))) flag(`${at}/hubKey/x`, 'a hub key of small order verifies forged tokens and is never certified (DEC-0045)');
+      if (smallOrder(Buffer.from(show(hub.x ?? ''), 'base64url'))) flag(`${at}/hubKey/x`, 'a hub key of small order verifies forged tokens and is never certified (DEC-0045)');
     }
   });
   const credentials = new Set();
-  list(value.authorities).forEach((authority, index) => {
+  indexed(value.authorities).forEach(([authority, index]) => {
     if (credentials.has(authority.credentialId)) flag(`/authorities/${index}/credentialId`, 'a passkey is listed once');
     credentials.add(authority.credentialId);
-    if ('problem' in credentialKey(authority.publicKey, String(authority.alg))) flag(`/authorities/${index}/publicKey`, "a passkey's public key is a valid P-256 point for ES256 or an Ed25519 key of full order for EdDSA");
+    if ('problem' in credentialKey(authority.publicKey, show(authority.alg))) flag(`/authorities/${index}/publicKey`, "a passkey's public key is a valid P-256 point for ES256 or an Ed25519 key of full order for EdDSA");
   });
 }
 
 function placements(value, flag) {
   const kids = new Set();
-  list(value.publisherKeys).forEach((key, index) => {
-    if (kids.has(key.kid)) flag(`/publisherKeys/${index}/kid`, `publisher key ${String(key.kid)} is pinned twice`);
+  indexed(value.publisherKeys).forEach(([key, index]) => {
+    if (kids.has(key.kid)) flag(`/publisherKeys/${index}/kid`, `publisher key ${show(key.kid)} is pinned twice`);
     kids.add(key.kid);
   });
-  list(value.machines).forEach((machine, m) => {
+  indexed(value.machines).forEach(([machine, m]) => {
     const agents = new Set();
-    list(machine.packages).forEach((placement, p) => {
+    indexed(machine.packages).forEach(([placement, p]) => {
       const at = `/machines/${m}/packages/${p}`;
-      if (agents.has(placement.agentRef)) flag(`${at}/agentRef`, `${String(placement.agentRef)} is placed twice on one machine`);
-      agents.add(placement.agentRef);
-      if (!kids.has(placement.publisherKid)) flag(`${at}/publisherKid`, `publisher key ${String(placement.publisherKid)} is not in publisherKeys, so the machine pins no key to verify the package under`);
+      const key = keyOf(placement.agentRef, contextOf(placement));
+      if (agents.has(key)) flag(`${at}/agentRef`, `${show(placement.agentRef)} is placed twice on one machine in the context ${show(contextOf(placement))}`);
+      agents.add(key);
+      if (!kids.has(placement.publisherKid)) flag(`${at}/publisherKid`, `publisher key ${show(placement.publisherKid)} is not in publisherKeys, so the machine pins no key to verify the package under`);
     });
   });
 }
 
 function secretReferences(value, flag) {
   const machineIds = new Set(list(value.machines).map((machine) => machine.id));
-  list(value.machines).forEach((machine, m) => {
-    const placed = new Set(list(machine.packages).map((placement) => placement.agentRef));
+  indexed(value.machines).forEach(([machine, m]) => {
+    const placed = new Set(list(machine.packages).map((placement) => keyOf(placement.agentRef, contextOf(placement))));
     const slots = new Set();
-    list(machine.secrets).forEach((secret, s) => {
+    indexed(machine.secrets).forEach(([secret, s]) => {
       const at = `/machines/${m}/secrets/${s}`;
-      for (const field of ['slot', 'from', 'agentRef']) {
+      // The message never repeats the value, and no message of this rule repeats a secret placement's context.
+      for (const field of ['slot', 'from', 'agentRef', 'context']) {
         const text = secret[field];
         if (isString(text) && secretValue(text)) flag(`${at}/${field}`, 'a secret placement names a slot, never a value: this looks like a credential');
       }
-      if (!placed.has(secret.agentRef)) flag(`${at}/agentRef`, 'a secret goes only where a placed package declares it (v4 Path 2): this agent is not placed on this machine');
+      if (!placed.has(keyOf(secret.agentRef, contextOf(secret)))) flag(`${at}/agentRef`, "a secret goes only where a placed package declares it (v4 Path 2): this agent is not placed on this machine in the secret's context");
       if (!machineIds.has(secret.from)) flag(`${at}/from`, 'the slot is filled from a machine of this estate');
-      const key = `${String(secret.agentRef)} ${String(secret.slot)}`;
-      if (slots.has(key)) flag(`${at}/slot`, `slot ${String(secret.slot)} is placed twice for one agent on one machine`);
+      // An envelope names no context (DEC-0082), so an organization's instance fills its slot on its own machine.
+      else if (contextOf(secret) !== PERSONAL_CONTEXT && secret.from !== machine.id) flag(`${at}/from`, "an organization's instance fills its slot from its own machine's vault, never by an envelope from another machine");
+      const key = keyOf(secret.agentRef, secret.slot, contextOf(secret));
+      if (slots.has(key)) flag(`${at}/slot`, `slot ${show(secret.slot)} is placed twice for one agent in one context on one machine`);
       slots.add(key);
     });
   });
@@ -432,10 +474,10 @@ function grantsAndRevocations(value, flag) {
   // A grant's id is a URI, so grants and their revocations are keyed by its normal form (DEC-0076).
   const grantKey = (id) => (typeof id === 'string' ? normalIdentifier(id) : id);
   const grantIds = new Set();
-  list(value.shareGrants).forEach((grant, index) => {
+  indexed(value.shareGrants).forEach(([grant, index]) => {
     if (grant.principalKind !== 'external') flag(`/shareGrants/${index}/principalKind`, 'a share grant is to a principal outside the estate: principalKind external');
     const id = isObject(grant.meta) ? grant.meta.id : undefined;
-    if (grantIds.has(grantKey(id))) flag(`/shareGrants/${index}/meta/id`, `grant ${String(id)} is listed twice`);
+    if (grantIds.has(grantKey(id))) flag(`/shareGrants/${index}/meta/id`, `grant ${show(id)} is listed twice`);
     grantIds.add(grantKey(id));
   });
   const machines = list(value.machines);
@@ -450,12 +492,50 @@ function grantsAndRevocations(value, flag) {
     grant: grantIds,
   }));
   const seen = new Set();
-  list(value.revocations).forEach((revocation, index) => {
+  indexed(value.revocations).forEach(([revocation, index]) => {
     const ref = revocation.kind === 'grant' ? grantKey(revocation.ref) : revocation.ref;
-    const key = `${String(revocation.kind)} ${String(ref)}`;
-    if (seen.has(key)) flag(`/revocations/${index}`, `the ${String(revocation.kind)} ${String(revocation.ref)} is revoked twice`);
+    const key = `${show(revocation.kind)} ${show(ref)}`;
+    if (seen.has(key)) flag(`/revocations/${index}`, `the ${show(revocation.kind)} ${show(revocation.ref)} is revoked twice`);
     seen.add(key);
-    if (listed.get(String(revocation.kind))?.has(ref)) flag(`/revocations/${index}/ref`, `the record still lists the ${String(revocation.kind)} it revokes: revocation outranks addition`);
+    if (listed.get(show(revocation.kind))?.has(ref)) flag(`/revocations/${index}/ref`, `the record still lists the ${show(revocation.kind)} it revokes: revocation outranks addition`);
+  });
+}
+
+/**
+ * FAC-SEM-110 (DEC-0082): a grant to a principal outside the estate (`principalKind: external`) is used in that
+ * principal's organization, so its `context` is never `personal`; absent means not stated.
+ */
+export function grantContextFindings(grant, at) {
+  if (!isObject(grant) || grant.principalKind !== 'external' || grant.context !== PERSONAL_CONTEXT) return [];
+  return [{ code: 'FAC-SEM-110', instancePath: `${at}/context`, message: "a grant to a principal outside the estate is used in that principal's organization, never in the personal context: name the organization's org:<orgId>, or leave context out" }];
+}
+
+/**
+ * FAC-SEM-111 (DEC-0082) for one placement: an instance in an organization's context names, in `grant`, a share grant
+ * of the same record (by the normal form of its id, DEC-0076) whose `context` is the placement's, as written, and that
+ * the record does not revoke; a personal instance names none; a malformed context fails closed.
+ */
+function placementGrantProblems(record, placement) {
+  const context = contextOf(placement);
+  if (context === PERSONAL_CONTEXT) {
+    return placement.grant === undefined ? [] : [['/grant', "a personal instance runs under no share grant: only a placement in an organization's context names one"]];
+  }
+  if (typeof placement.grant !== 'string') return [['/grant', `an instance placed in the context ${show(context)} names the share grant it runs under, by its id`]];
+  const id = normalIdentifier(placement.grant);
+  const grants = list(record.shareGrants).filter((grant) => isObject(grant.meta) && typeof grant.meta.id === 'string' && normalIdentifier(grant.meta.id) === id);
+  const problems = [];
+  if (grants.length === 0) problems.push(['/grant', `the record has no share grant ${placement.grant}`]);
+  else if (parseContext(context)?.kind !== 'org') problems.push(['/context', `${show(context)} is not an organization's context id (org:<orgId>), so no share grant matches it`]);
+  else if (!grants.some((grant) => grant.context === context)) problems.push(['/grant', `the share grant ${placement.grant} is not for the context ${show(context)}: its context must be the placement's, as written`]);
+  if (list(record.revocations).some((entry) => entry.kind === 'grant' && typeof entry.ref === 'string' && normalIdentifier(entry.ref) === id)) problems.push(['/grant', `the record revokes the share grant ${placement.grant}, so no instance runs under it`]);
+  return problems;
+}
+
+function placementGrants(value, flag) {
+  indexed(value.machines).forEach(([machine, m]) => {
+    indexed(machine.packages).forEach(([placement, p]) => {
+      for (const [suffix, message] of placementGrantProblems(value, placement)) flag(`/machines/${m}/packages/${p}${suffix}`, message);
+    });
   });
 }
 
@@ -466,8 +546,10 @@ function recordFindings(value) {
   placements(value, flagger(findings, 'FAC-SEM-074'));
   secretReferences(value, flagger(findings, 'FAC-SEM-075'));
   grantsAndRevocations(value, flagger(findings, 'FAC-SEM-076'));
+  indexed(value.shareGrants).forEach(([grant, index]) => findings.push(...grantContextFindings(grant, `/shareGrants/${index}`)));
+  placementGrants(value, flagger(findings, 'FAC-SEM-111'));
   // FAC-SEM-092 (DEC-0063) on each passkey the record lists.
-  list(value.authorities).forEach((authority, index) => signingCredential(authority, `/authorities/${index}`, flagger(findings, 'FAC-SEM-092')));
+  indexed(value.authorities).forEach(([authority, index]) => signingCredential(authority, `/authorities/${index}`, flagger(findings, 'FAC-SEM-092')));
   return findings;
 }
 
@@ -480,8 +562,7 @@ function installation(value) {
   const findings = [];
   const record = isObject(value.record) ? value.record : {};
   const pkg = isObject(value.package) ? value.package : {};
-  const machineIndex = list(record.machines).findIndex((entry) => entry.id === value.machine);
-  const machine = list(record.machines)[machineIndex];
+  const [machine, machineIndex] = indexed(record.machines).find(([entry]) => entry.id === value.machine) ?? [undefined, -1];
   let digest;
   try {
     digest = packageDigest(pkg);
@@ -490,18 +571,23 @@ function installation(value) {
   }
   const flag074 = flagger(findings, 'FAC-SEM-074');
   if (!machine) {
-    flag074('/machine', `machine ${String(value.machine)} is not in the estate record`);
+    flag074('/machine', `machine ${show(value.machine)} is not in the estate record`);
     return findings;
   }
   if (digest === undefined || digest !== pkg.digest) flag074('/package/digest', 'the package is not the one its digest names: it changed after it was packed');
-  const placement = list(machine.packages).find((entry) => entry.agentRef === pkg.agentRef);
-  if (!placement) flag074('/package/agentRef', `the record places no ${String(pkg.agentRef)} on machine ${String(value.machine)}`);
-  else if (placement.digest !== digest) flag074('/package', `the record places ${String(placement.digest)} of this agent on this machine, not this package`);
+  const context = contextOf(value);
+  const [placement, placementIndex] = indexed(machine.packages).find(([entry]) => entry.agentRef === pkg.agentRef && contextOf(entry) === context) ?? [undefined, -1];
+  if (!placement) flag074('/package/agentRef', `the record places no ${show(pkg.agentRef)} on machine ${show(value.machine)} in the context ${show(context)}`);
+  else if (placement.digest !== digest) flag074('/package', `the record places ${show(placement.digest)} of this agent on this machine in this context, not this package`);
   const declared = new Set(list(pkg.secrets).map((slot) => slot.name));
   const flag075 = flagger(findings, 'FAC-SEM-075');
-  list(machine.secrets).forEach((secret, index) => {
-    if (secret.agentRef === pkg.agentRef && !declared.has(secret.slot)) flag075(`/record/machines/${machineIndex}/secrets/${index}/slot`, `the package declares no slot ${String(secret.slot)}: a secret goes only where a placed package declares it`);
+  indexed(machine.secrets).forEach(([secret, index]) => {
+    if (secret.agentRef === pkg.agentRef && contextOf(secret) === context && !declared.has(secret.slot)) flag075(`/record/machines/${machineIndex}/secrets/${index}/slot`, `the package declares no slot ${show(secret.slot)}: a secret goes only where a placed package declares it`);
   });
+  if (placement) {
+    const flag111 = flagger(findings, 'FAC-SEM-111');
+    for (const [suffix, message] of placementGrantProblems(record, placement)) flag111(`/record/machines/${machineIndex}/packages/${placementIndex}${suffix}`, message);
+  }
   return findings;
 }
 

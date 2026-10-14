@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.33.0 - 2026-10-15
+
+The adapter is pinned at contract `82e1636`. The estate kits now read contexts (DEC-0082; FAA-41, the RM-28 pilot): one
+agent placed on a machine for the person and for each organization it serves. Before this, at the old pin, a record
+placing one agent in two contexts was refused as a duplicate placement (FAC-SEM-074), and an organization's instance
+was checked against no share grant.
+
+### Changed
+
+- **Repin** from `1636fa9` to `82e1636`. Every vendored vector is byte-identical except `estate-vectors.json`.
+  `1636fa9` stays a supported revision.
+- **Placement and slot keys** in `fabric_estate.py` / `fabric-estate.mjs` carry the context: a placement is keyed by
+  agent and context (FAC-SEM-074), a secret slot by agent, slot and context (FAC-SEM-075). A secret fills a slot of an
+  agent placed in its own context. An absent `context` is `personal`; `null` is not absent.
+- **`placement_trust(record, machine, agentRef, context="personal")`** / `placementTrust(…, context)` answer for the
+  placement in that context. A caller that passes none gets the personal placement, as before.
+- **`estate-placement`** takes `{record, machine, package, context?}` and checks the placement in that context.
+
+### Added
+
+- **FAC-SEM-110**: a share grant (`principalKind: external`) is never in the `personal` context. Checked on each of an
+  estate record's `shareGrants[]`, and on a grant of its own with `grant_context_findings` / `grantContextFindings`.
+- **FAC-SEM-111**: an organization's placement names, in `grant`, a share grant of the record whose `context` is the
+  placement's, as written, and that the record does not revoke; a personal placement names none; a context that is not
+  `org:<orgId>` fails closed. Checked on a record and on an installation.
+- **An organization's slot is filled from its own machine**: an envelope names no context (FAC-SEM-075).
+- **`parse_context` / `parseContext`**: `personal`, `org:<orgId>` (`[A-Za-z0-9][A-Za-z0-9_-]{0,127}`), or nothing,
+  compared as written.
+
+### Fixed
+
+- **Every estate rule is total on hostile JSON**, as the contract's became in DEC-0082's fix rounds: an
+  `instancePath` names an item by its index as written (a non-object before it no longer shifts it), and a value whose
+  own `toString` member is data is shown as its JSON instead of throwing.
+
+### Evidence
+
+- Both kits answer 115 contract rule cases (19 hostile, built by `make_estate_vectors.mjs` from the contexts fixture),
+  28 grant-context cases and 19 `placementTrust` cases.
+- 28 planted defects, 14 per kit, all caught.
+- A new eval scenario, `estate-contexts`.
+
 ## 0.32.0 - 2026-10-14
 
 The adapter is pinned at contract `1636fa9`. The board kits now read the operator's hold (DEC-0079) and the owner's

@@ -422,6 +422,16 @@
         "a hold between the claim and the accept does nothing: the claim lapses and the request waits on the board; accepted work found at restart under a hold is kept for a transfer after the hold is lifted, never claimed back",
         "reads settledBy: owner on a receipt as the estate owner's settlement (DEC-0081), not the responder's"
       ]
+    },
+    {
+      "id": "estate-contexts",
+      "trap": "the machine ran an organization's instance of example-agent beside the personal one, keyed both by agentRef alone, filled the org instance's slot by an envelope from another machine, and trusted the personal placement's publisher key for it",
+      "request": "Run example-agent on this machine both for me and for my organization org:example-org, as the estate record places it.",
+      "expected": [
+        "reads each placement's context (absent is personal; personal or org:<orgId>, compared as written) and keys placements, and each secret slot, by agentRef with that context, so one agent placed once per context is no FAC-SEM-074 finding (DEC-0082)",
+        "requires the organization's placement to name a share grant of the record whose context is that placement's, as written, that the record does not revoke (FAC-SEM-111), and fills its slot from this machine's own vault, never by an envelope from another machine",
+        "asks placement_trust(record, machine, agentRef, context) / placementTrust(record, machine, agentRef, context) for the context being installed, and checks the installation as estate-placement {record, machine, package, context}"
+      ]
     }
   ]
 }

@@ -151,6 +151,84 @@ def _list(value: Any) -> List[Dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
+def _indexed(value: Any) -> List[Tuple[Dict[str, Any], int]]:
+    """The object items of an array with their index in the array as written, so an instancePath names the item it
+    flags even when a non-object precedes it (the contract's ``indexed``)."""
+    return [(item, i) for i, item in enumerate(value) if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+class _Unshowable(Exception):
+    pass
+
+
+def _strict_string(value: Any) -> str:
+    """String(value), raising where JavaScript's String() throws: an object whose own ``toString`` is not a function
+    (every own member of parsed JSON is data), directly or inside an array it joins."""
+    if isinstance(value, dict):
+        if "toString" in value:
+            raise _Unshowable()
+        return "[object Object]"
+    if isinstance(value, list):
+        return ",".join("" if item is None else _strict_string(item) for item in value)
+    return _js_string(value)
+
+
+def _json_stringify(value: Any) -> str:
+    """JSON.stringify for a parsed JSON value: members in their order, numbers as JavaScript writes them."""
+    if isinstance(value, dict):
+        return "{" + ",".join(_delegation._string(k) + ":" + _json_stringify(v) for k, v in value.items()) + "}"
+    if isinstance(value, list):
+        return "[" + ",".join(_json_stringify(v) for v in value) + "]"
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if _number(value):
+        text = _js_string(value)
+        return "null" if text in ("NaN", "Infinity", "-Infinity") else text
+    return _delegation._string(value)
+
+
+def _show(value: Any) -> str:
+    """The contract's ``show``: String(value), or the value's JSON where String() would throw."""
+    try:
+        return _strict_string(value)
+    except _Unshowable:
+        return _json_stringify(value)
+
+
+def _key_of(*parts: Any) -> str:
+    """The contract's ``keyOf``: a collision-free key over JSON values, JSON.stringify of the parts (an absent value
+    is null inside an array, as JavaScript writes it)."""
+    return _json_stringify([None if part is _MISSING else part for part in parts])
+
+
+#: DEC-0082: the personal context, and an organization's context ``org:<orgId>`` (the contract's ``context-route.ts``).
+PERSONAL_CONTEXT = "personal"
+ORG_CONTEXT_PREFIX = "org:"
+_ORG_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}")
+
+
+def parse_context(value: Any) -> Optional[Dict[str, str]]:
+    """The context ``value`` names, or None when it names none: ``personal`` exactly, or ``org:`` and an organization id
+    (``[A-Za-z0-9][A-Za-z0-9_-]{0,127}``). Compared as written: ``Personal``, ``ORG:x`` or a trailing newline name no
+    context. Never raises."""
+    if not isinstance(value, str):
+        return None
+    if value == PERSONAL_CONTEXT:
+        return {"kind": "personal"}
+    if not value.startswith(ORG_CONTEXT_PREFIX):
+        return None
+    org = value[len(ORG_CONTEXT_PREFIX):]
+    return {"kind": "org", "org": org} if _ORG_ID.fullmatch(org) else None
+
+
+def _context_of(entry: Any) -> Any:
+    """A placement's or a secret placement's context: its ``context``, ``personal`` when absent (DEC-0082)."""
+    context = _get(entry, "context")
+    return PERSONAL_CONTEXT if context is _MISSING else context
+
+
 def _b64url_bytes(text: str) -> bytes:
     """Buffer.from(text, "base64url") for text of the base64url alphabet: a dangling sixth bit group is ignored."""
     return _delegation._b64decode(text)
@@ -514,7 +592,7 @@ def _signing_credential(credential: Any, path: str, flag) -> None:
 
 
 def _revocation_key(entry: Dict[str, Any]) -> str:
-    return "%s %s" % (_s(entry, "kind"), _s(entry, "ref"))
+    return "%s %s" % (_show(_get(entry, "kind")), _show(_get(entry, "ref")))
 
 
 def _lt(a: float, b: float) -> bool:
@@ -610,11 +688,13 @@ def verify_estate_record(record: Any, *, at: Any, parent: Any = _MISSING, author
     return {"ok": True, "digest": digest, "revision": record["revision"], "signedBy": credential["credentialId"], "signCount": assertion["signCount"]}
 
 
-def placement_trust(record: Dict[str, Any], machine_id: str, agent_ref: str) -> Optional[Dict[str, Any]]:
-    """What a package verifier (DEC-0051) trusts for a package placed on a machine: the publisher keys the placement
-    names, from the record's `publisherKeys`. None when the record places no such agent on that machine."""
+def placement_trust(record: Dict[str, Any], machine_id: str, agent_ref: str, context: str = PERSONAL_CONTEXT) -> Optional[Dict[str, Any]]:
+    """What a package verifier (DEC-0051) trusts for a package placed on a machine in a context (DEC-0082; ``personal``
+    when not given, so a caller written before contexts is unchanged): the publisher keys the placement names, from the
+    record's `publisherKeys`. None when the record places no such agent on that machine in that context."""
     machine = next((m for m in _list(_get(record, "machines")) if _same(_get(m, "id"), machine_id)), None)
-    placement = next((p for p in _list(_get(machine, "packages")) if _same(_get(p, "agentRef"), agent_ref)), None)
+    placement = next((p for p in _list(_get(machine, "packages"))
+                      if _same(_get(p, "agentRef"), agent_ref) and _same(_context_of(p), context)), None)
     if placement is None:
         return None
     return {"publisher": [k for k in _list(_get(record, "publisherKeys")) if _same(_get(k, "kid"), _get(placement, "publisherKid"))]}
@@ -720,7 +800,7 @@ def _revision_chain(value: Dict[str, Any]) -> List[Dict[str, str]]:
         flag("/next/estate", "a revision continues its parent's estate")
     expected = _js_to_number(_get(parent, "revision")) + 1
     if not _same(_get(nxt, "revision"), expected):
-        flag("/next/revision", "the revision after %s is %s: a revision never skips or repeats one" % (_s(parent, "revision"), _js_string(expected)))
+        flag("/next/revision", "the revision after %s is %s: a revision never skips or repeats one" % (_show(_get(parent, "revision")), _js_string(expected)))
     try:
         parent_digest: Any = estate_record_digest(parent)
     except TypeError:
@@ -730,15 +810,15 @@ def _revision_chain(value: Dict[str, Any]) -> List[Dict[str, str]]:
     if _lt(estate_time(_get(nxt, "issuedAt")), estate_time(_get(parent, "issuedAt"))):
         flag("/next/issuedAt", "a revision is never issued before its parent")
     kept = {_revocation_key(e) for e in _list(_get(nxt, "revocations"))}
-    for index, entry in enumerate(_list(_get(parent, "revocations"))):
+    for entry, index in _indexed(_get(parent, "revocations")):
         if _revocation_key(entry) not in kept:
-            flag("/parent/revocations/%d" % index, "the %s revocation of %s is dropped: a revision keeps every revocation before it" % (_s(entry, "kind"), _s(entry, "ref")))
+            flag("/parent/revocations/%d" % index, "the %s revocation of %s is dropped: a revision keeps every revocation before it" % (_show(_get(entry, "kind")), _show(_get(entry, "ref"))))
     return findings
 
 
 def _valid_device_key(key: Dict[str, Any]) -> bool:
     public = _get(key, "publicKey")
-    raw = _node_base64("" if public is _MISSING or public is None else _js_string(public))
+    raw = _node_base64("" if public is _MISSING or public is None else _show(public))
     if _get(key, "alg") == "ed25519":
         return len(raw) == 32 and not _delegation.is_small_order_key(raw)
     return is_valid_p256_key(raw)
@@ -748,10 +828,10 @@ def _keys(value: Dict[str, Any], flag) -> None:
     ids: List[Any] = []
     hub_kids: List[Any] = []
     hub_keys: List[Any] = []
-    for m, machine in enumerate(_list(_get(value, "machines"))):
+    for machine, m in _indexed(_get(value, "machines")):
         at = "/machines/%d" % m
         if _contains(ids, _get(machine, "id")):
-            flag("%s/id" % at, "machine %s is listed twice" % _s(machine, "id"))
+            flag("%s/id" % at, "machine %s is listed twice" % _show(_get(machine, "id")))
         ids.append(_get(machine, "id"))
         device_keys = _list(_get(machine, "deviceKeys"))
         if len([k for k in device_keys if _get(k, "use") == "sig"]) != 1:
@@ -759,8 +839,8 @@ def _keys(value: Dict[str, Any], flag) -> None:
         if len([k for k in device_keys if _get(k, "use") == "kem"]) > 1:
             flag("%s/deviceKeys" % at, "a machine has at most one key-agreement device key, <id>#kem")
         seen: List[Any] = []
-        for k, key in enumerate(device_keys):
-            if not _same(_get(key, "kid"), "%s#%s" % (_s(machine, "id"), _s(key, "use"))):
+        for key, k in _indexed(_get(machine, "deviceKeys")):
+            if not _same(_get(key, "kid"), "%s#%s" % (_show(_get(machine, "id")), _show(_get(key, "use")))):
                 flag("%s/deviceKeys/%d/kid" % (at, k), "a device key is listed as <machine id>#sig or <machine id>#kem, by its role")
             if not _valid_device_key(key):
                 flag("%s/deviceKeys/%d/publicKey" % (at, k), "an Ed25519 key is never of small order (DEC-0045) and a P-256 key is a valid point (SEC 1 §3.2.2)")
@@ -770,7 +850,7 @@ def _keys(value: Dict[str, Any], flag) -> None:
         hub = _get(machine, "hubKey")
         if isinstance(hub, dict):
             if _contains(hub_kids, _get(hub, "kid")):
-                flag("%s/hubKey/kid" % at, "hub key %s is certified for two machines: one kid per machine" % _s(hub, "kid"))
+                flag("%s/hubKey/kid" % at, "hub key %s is certified for two machines: one kid per machine" % _show(_get(hub, "kid")))
             hub_kids.append(_get(hub, "kid"))
             if _contains(hub_keys, _get(hub, "x")):
                 flag("%s/hubKey/x" % at, "one hub public key is certified for two machines under two kids: one key per machine")
@@ -780,49 +860,55 @@ def _keys(value: Dict[str, Any], flag) -> None:
             if _delegation.is_small_order_key(raw):
                 flag("%s/hubKey/x" % at, "a hub key of small order verifies forged tokens and is never certified (DEC-0045)")
     credentials: List[Any] = []
-    for index, authority in enumerate(_list(_get(value, "authorities"))):
+    for authority, index in _indexed(_get(value, "authorities")):
         if _contains(credentials, _get(authority, "credentialId")):
             flag("/authorities/%d/credentialId" % index, "a passkey is listed once")
         credentials.append(_get(authority, "credentialId"))
-        if "problem" in credential_key(_get(authority, "publicKey"), _s(authority, "alg")):
+        if "problem" in credential_key(_get(authority, "publicKey"), _show(_get(authority, "alg"))):
             flag("/authorities/%d/publicKey" % index, "a passkey's public key is a valid P-256 point for ES256 or an Ed25519 key of full order for EdDSA")
 
 
 def _placements(value: Dict[str, Any], flag) -> None:
     kids: List[Any] = []
-    for index, key in enumerate(_list(_get(value, "publisherKeys"))):
+    for key, index in _indexed(_get(value, "publisherKeys")):
         if _contains(kids, _get(key, "kid")):
-            flag("/publisherKeys/%d/kid" % index, "publisher key %s is pinned twice" % _s(key, "kid"))
+            flag("/publisherKeys/%d/kid" % index, "publisher key %s is pinned twice" % _show(_get(key, "kid")))
         kids.append(_get(key, "kid"))
-    for m, machine in enumerate(_list(_get(value, "machines"))):
-        agents: List[Any] = []
-        for p, placement in enumerate(_list(_get(machine, "packages"))):
+    for machine, m in _indexed(_get(value, "machines")):
+        agents: List[str] = []
+        for placement, p in _indexed(_get(machine, "packages")):
             at = "/machines/%d/packages/%d" % (m, p)
-            if _contains(agents, _get(placement, "agentRef")):
-                flag("%s/agentRef" % at, "%s is placed twice on one machine" % _s(placement, "agentRef"))
-            agents.append(_get(placement, "agentRef"))
+            key = _key_of(_get(placement, "agentRef"), _context_of(placement))
+            if key in agents:
+                flag("%s/agentRef" % at, "%s is placed twice on one machine in the context %s"
+                     % (_show(_get(placement, "agentRef")), _show(_context_of(placement))))
+            agents.append(key)
             if not _contains(kids, _get(placement, "publisherKid")):
-                flag("%s/publisherKid" % at, "publisher key %s is not in publisherKeys, so the machine pins no key to verify the package under" % _s(placement, "publisherKid"))
+                flag("%s/publisherKid" % at, "publisher key %s is not in publisherKeys, so the machine pins no key to verify the package under" % _show(_get(placement, "publisherKid")))
 
 
 def _secret_references(value: Dict[str, Any], flag) -> None:
     machine_ids = [_get(m, "id") for m in _list(_get(value, "machines"))]
-    for m, machine in enumerate(_list(_get(value, "machines"))):
-        placed = [_get(p, "agentRef") for p in _list(_get(machine, "packages"))]
+    for machine, m in _indexed(_get(value, "machines")):
+        placed = [_key_of(_get(p, "agentRef"), _context_of(p)) for p in _list(_get(machine, "packages"))]
         slots: List[str] = []
-        for s, secret in enumerate(_list(_get(machine, "secrets"))):
+        for secret, s in _indexed(_get(machine, "secrets")):
             at = "/machines/%d/secrets/%d" % (m, s)
-            for field in ("slot", "from", "agentRef"):
+            # The message never repeats the value, and no message of this rule repeats a secret placement's context.
+            for field in ("slot", "from", "agentRef", "context"):
                 text = _get(secret, field)
                 if isinstance(text, str) and _secrets.secret_value(text):
                     flag("%s/%s" % (at, field), "a secret placement names a slot, never a value: this looks like a credential")
-            if not _contains(placed, _get(secret, "agentRef")):
-                flag("%s/agentRef" % at, "a secret goes only where a placed package declares it (v4 Path 2): this agent is not placed on this machine")
+            if _key_of(_get(secret, "agentRef"), _context_of(secret)) not in placed:
+                flag("%s/agentRef" % at, "a secret goes only where a placed package declares it (v4 Path 2): this agent is not placed on this machine in the secret's context")
             if not _contains(machine_ids, _get(secret, "from")):
                 flag("%s/from" % at, "the slot is filled from a machine of this estate")
-            key = "%s %s" % (_s(secret, "agentRef"), _s(secret, "slot"))
+            elif not _same(_context_of(secret), PERSONAL_CONTEXT) and not _same(_get(secret, "from"), _get(machine, "id")):
+                # An envelope names no context (DEC-0082): an organization's instance fills its slot on its own machine.
+                flag("%s/from" % at, "an organization's instance fills its slot from its own machine's vault, never by an envelope from another machine")
+            key = _key_of(_get(secret, "agentRef"), _get(secret, "slot"), _context_of(secret))
             if key in slots:
-                flag("%s/slot" % at, "slot %s is placed twice for one agent on one machine" % _s(secret, "slot"))
+                flag("%s/slot" % at, "slot %s is placed twice for one agent in one context on one machine" % _show(_get(secret, "slot")))
             slots.append(key)
 
 
@@ -834,12 +920,12 @@ def _grant_key(ident: Any) -> Any:
 
 def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
     grant_ids: List[Any] = []
-    for index, grant in enumerate(_list(_get(value, "shareGrants"))):
+    for grant, index in _indexed(_get(value, "shareGrants")):
         if _get(grant, "principalKind") != "external":
             flag("/shareGrants/%d/principalKind" % index, "a share grant is to a principal outside the estate: principalKind external")
         ident = _get(_get(grant, "meta"), "id") if isinstance(_get(grant, "meta"), dict) else _MISSING
         if _contains(grant_ids, _grant_key(ident)):
-            flag("/shareGrants/%d/meta/id" % index, "grant %s is listed twice" % _js_string(ident))
+            flag("/shareGrants/%d/meta/id" % index, "grant %s is listed twice" % _show(ident))
         grant_ids.append(_grant_key(ident))
     machines = _list(_get(value, "machines"))
     listed = {
@@ -852,14 +938,60 @@ def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
         "grant": grant_ids,
     }
     seen: List[str] = []
-    for index, revocation in enumerate(_list(_get(value, "revocations"))):
+    for revocation, index in _indexed(_get(value, "revocations")):
         ref = _grant_key(_get(revocation, "ref")) if _get(revocation, "kind") == "grant" else _get(revocation, "ref")
-        key = "%s %s" % (_s(revocation, "kind"), _js_string(ref))
+        kind = _show(_get(revocation, "kind"))
+        key = "%s %s" % (kind, _show(ref))
         if key in seen:
-            flag("/revocations/%d" % index, "the %s %s is revoked twice" % (_s(revocation, "kind"), _s(revocation, "ref")))
+            flag("/revocations/%d" % index, "the %s %s is revoked twice" % (kind, _show(_get(revocation, "ref"))))
         seen.append(key)
-        if _contains(listed.get(_s(revocation, "kind"), []), ref):
-            flag("/revocations/%d/ref" % index, "the record still lists the %s it revokes: revocation outranks addition" % _s(revocation, "kind"))
+        if _contains(listed.get(kind, []), ref):
+            flag("/revocations/%d/ref" % index, "the record still lists the %s it revokes: revocation outranks addition" % kind)
+
+
+def grant_context_findings(grant: Any, at: str) -> List[Dict[str, str]]:
+    """FAC-SEM-110 (DEC-0082): a grant to a principal outside the estate (``principalKind: external``, a share grant) is
+    used in that principal's organization, so its ``context`` is never ``personal``; absent means not stated."""
+    if not isinstance(grant, dict) or _get(grant, "principalKind") != "external" or _get(grant, "context") != PERSONAL_CONTEXT:
+        return []
+    return [{"code": "FAC-SEM-110", "instancePath": "%s/context" % at,
+             "message": "a grant to a principal outside the estate is used in that principal's organization, never in the personal context: "
+                        "name the organization's org:<orgId>, or leave context out"}]
+
+
+def _placement_grant_problems(record: Dict[str, Any], placement: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """FAC-SEM-111 (DEC-0082) for one placement: an instance in an organization's context names, in ``grant``, a share
+    grant of the same record (matched by the normal form of its id, DEC-0076) whose ``context`` is the placement's, as
+    written, and that the record does not revoke; a personal instance names none. Any other context needs a grant, and
+    only an ``org:<orgId>`` context can match one, so a malformed context fails closed."""
+    import fabric_identifiers  # noqa: E402 - beside this file
+    context = _context_of(placement)
+    grant = _get(placement, "grant")
+    if _same(context, PERSONAL_CONTEXT):
+        return [] if grant is _MISSING else [("/grant", "a personal instance runs under no share grant: only a placement in an organization's context names one")]
+    if not isinstance(grant, str):
+        return [("/grant", "an instance placed in the context %s names the share grant it runs under, by its id" % _show(context))]
+    ident = fabric_identifiers.normal_identifier(grant)
+    grants = [g for g in _list(_get(record, "shareGrants")) if isinstance(_get(g, "meta"), dict)
+              and isinstance(_get(g["meta"], "id"), str) and fabric_identifiers.normal_identifier(g["meta"]["id"]) == ident]
+    problems: List[Tuple[str, str]] = []
+    if not grants:
+        problems.append(("/grant", "the record has no share grant %s" % grant))
+    elif (parse_context(context) or {}).get("kind") != "org":
+        problems.append(("/context", "%s is not an organization's context id (org:<orgId>), so no share grant matches it" % _show(context)))
+    elif not any(_same(_get(g, "context"), context) for g in grants):
+        problems.append(("/grant", "the share grant %s is not for the context %s: its context must be the placement's, as written" % (grant, _show(context))))
+    if any(_get(e, "kind") == "grant" and isinstance(_get(e, "ref"), str) and fabric_identifiers.normal_identifier(e["ref"]) == ident
+           for e in _list(_get(record, "revocations"))):
+        problems.append(("/grant", "the record revokes the share grant %s, so no instance runs under it" % grant))
+    return problems
+
+
+def _placement_grants(value: Dict[str, Any], flag) -> None:
+    for machine, m in _indexed(_get(value, "machines")):
+        for placement, p in _indexed(_get(machine, "packages")):
+            for suffix, message in _placement_grant_problems(value, placement):
+                flag("/machines/%d/packages/%d%s" % (m, p, suffix), message)
 
 
 def _record_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -869,7 +1001,10 @@ def _record_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
     _placements(value, _finding(findings, "FAC-SEM-074"))
     _secret_references(value, _finding(findings, "FAC-SEM-075"))
     _grants_and_revocations(value, _finding(findings, "FAC-SEM-076"))
-    for index, authority in enumerate(_list(_get(value, "authorities"))):  # FAC-SEM-092 (DEC-0063)
+    for grant, index in _indexed(_get(value, "shareGrants")):  # FAC-SEM-110 (DEC-0082)
+        findings.extend(grant_context_findings(grant, "/shareGrants/%d" % index))
+    _placement_grants(value, _finding(findings, "FAC-SEM-111"))
+    for authority, index in _indexed(_get(value, "authorities")):  # FAC-SEM-092 (DEC-0063)
         _signing_credential(authority, "/authorities/%d" % index, _finding(findings, "FAC-SEM-092"))
     return findings
 
@@ -884,29 +1019,36 @@ def _installation(value: Dict[str, Any]) -> List[Dict[str, str]]:
     record = value["record"] if isinstance(_get(value, "record"), dict) else {}
     pkg = value["package"] if isinstance(_get(value, "package"), dict) else {}
     machines = _list(_get(record, "machines"))
-    machine_index = next((i for i, m in enumerate(machines) if _same(_get(m, "id"), _get(value, "machine"))), -1)
+    machine_index = next((i for m, i in _indexed(_get(record, "machines")) if _same(_get(m, "id"), _get(value, "machine"))), -1)
     flag074 = _finding(findings, "FAC-SEM-074")
     if machine_index < 0:
-        flag074("/machine", "machine %s is not in the estate record" % _s(value, "machine"))
+        flag074("/machine", "machine %s is not in the estate record" % _show(_get(value, "machine")))
         return findings
-    machine = machines[machine_index]
+    machine = record["machines"][machine_index]
     try:
         digest: Any = _package_digest(pkg)
     except TypeError:
         digest = _MISSING
     if digest is _MISSING or not _same(digest, _get(pkg, "digest")):
         flag074("/package/digest", "the package is not the one its digest names: it changed after it was packed")
-    placement = next((p for p in _list(_get(machine, "packages")) if _same(_get(p, "agentRef"), _get(pkg, "agentRef"))), None)
+    context = _context_of(value)
+    placement, placement_index = next(((p, i) for p, i in _indexed(_get(machine, "packages"))
+                                       if _same(_get(p, "agentRef"), _get(pkg, "agentRef")) and _same(_context_of(p), context)), (None, -1))
     if placement is None:
-        flag074("/package/agentRef", "the record places no %s on machine %s" % (_s(pkg, "agentRef"), _s(value, "machine")))
+        flag074("/package/agentRef", "the record places no %s on machine %s in the context %s"
+                % (_show(_get(pkg, "agentRef")), _show(_get(value, "machine")), _show(context)))
     elif not _same(_get(placement, "digest"), digest):
-        flag074("/package", "the record places %s of this agent on this machine, not this package" % _s(placement, "digest"))
+        flag074("/package", "the record places %s of this agent on this machine in this context, not this package" % _show(_get(placement, "digest")))
     declared = [_get(slot, "name") for slot in _list(_get(pkg, "secrets"))]
     flag075 = _finding(findings, "FAC-SEM-075")
-    for index, secret in enumerate(_list(_get(machine, "secrets"))):
-        if _same(_get(secret, "agentRef"), _get(pkg, "agentRef")) and not _contains(declared, _get(secret, "slot")):
+    for secret, index in _indexed(_get(machine, "secrets")):
+        if _same(_get(secret, "agentRef"), _get(pkg, "agentRef")) and _same(_context_of(secret), context) and not _contains(declared, _get(secret, "slot")):
             flag075("/record/machines/%d/secrets/%d/slot" % (machine_index, index),
-                    "the package declares no slot %s: a secret goes only where a placed package declares it" % _s(secret, "slot"))
+                    "the package declares no slot %s: a secret goes only where a placed package declares it" % _show(_get(secret, "slot")))
+    if placement is not None:
+        flag111 = _finding(findings, "FAC-SEM-111")
+        for suffix, message in _placement_grant_problems(record, placement):
+            flag111("/record/machines/%d/packages/%d%s" % (machine_index, placement_index, suffix), message)
     return findings
 
 
