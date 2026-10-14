@@ -10,7 +10,9 @@ one live attempt per request, the fence checked in Fabric's order (request, auth
 and holder, attempt, leases, revision), receipts kept per (operation, key), the replacement effects and the release on
 the session's DELETE. Its clock is a number the test moves (`advance`), never the wall clock. Knobs the tests turn:
 `fail_next[tool] = code` (one refusal), `drop_next[tool]` (the call commits but its answer is lost), `down` (every call
-503), `omit_transferred` (a board pinned before DEC-0078), `revoked` (the operator revoked the grant).
+503), `omit_transferred` (a board pinned before DEC-0078), `revoked` (the operator revoked the grant), `holds` (an
+operator's hold, DEC-0079: `{threads, projects, slots: [{project, capability}]}`, refused `held` at call time and named
+in `com.status`).
 
 Python tests use it in-process (`FakeHub(root)`); the Node tests run it as a process (`python3 fake_fabric_hub.py
 serve --root DIR`), which prints one JSON line `{port, control}` and takes test commands as JSON on POST /_control.
@@ -79,6 +81,7 @@ class Board:
         self.status_epoch = True  # Fabric before the fix round tells a board session no epoch
         self.replies: List[Dict[str, Any]] = []
         self.directory_page: Optional[Dict[str, Any]] = None
+        self.holds: Dict[str, Any] = {}
 
     # -- test setup ----------------------------------------------------------------------------------------------
     def queue(self, capability: str, text: str = "Render the attached composition.", sender: str = OTHER_PROJECT,
@@ -166,11 +169,41 @@ class Board:
                 moved.append({"request": rid, "revision": r["revision"], "attempt": self._attempt_json(r)})
         return moved
 
+    # DEC-0079's matrix, from the board's own records (never the payload): what each tool may be refused for.
+    HOLD_SCOPES = {"com.submit": ("thread",), "com.reply": ("thread",), "com.enroll": ("project", "slot"),
+                   "com.responder_replace": ("project", "slot"), "com.claim": ("thread", "project", "slot"),
+                   "com.accept": ("thread", "project", "slot"), "com.effect_begin": ("thread", "project", "slot")}
+
+    def _slot_held(self, capability: Any) -> bool:
+        h = self.holds or {}
+        return self.project in (h.get("projects") or []) or any(
+            s.get("project") == self.project and s.get("capability") == capability for s in h.get("slots") or [])
+
+    def _held(self, tool: str, args: Dict[str, Any]) -> bool:
+        scopes = self.HOLD_SCOPES.get(tool)
+        if not scopes or not self.holds:
+            return False
+        fence = args.get("fence") if isinstance(args.get("fence"), dict) else {}
+        r = self.requests.get(fence.get("request") or args.get("request"))
+        capability = r["capability"] if r else args.get("capability")
+        if r and "thread" in scopes and r["thread"] in (self.holds.get("threads") or []):
+            return True
+        if tool == "com.claim" and not r:
+            # a plain claim is refused for a held slot; a held thread's request is simply not handed out
+            return self._slot_held(capability)
+        return ("project" in scopes or "slot" in scopes) and self._slot_held(capability)
+
+    def _claimable(self, r: Dict[str, Any]) -> bool:
+        return r["thread"] not in ((self.holds or {}).get("threads") or [])
+
     # -- the tools ---------------------------------------------------------------------------------------------
     def call(self, session: str, capabilities: List[str], tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
         self.calls.append((tool, args))
         if tool in self.fail_next:
-            return refusal(self.fail_next.pop(tool), "a refusal the test asked for", retryable=False)
+            code = self.fail_next.pop(tool)
+            return refusal(code, "a refusal the test asked for", retryable=code == "held")
+        if self._held(tool, args):
+            return refusal("held", "The operator holds this work; try again later.", retryable=True)
         handler = getattr(self, "op_" + tool.split(".", 1)[1], None)
         if handler is None:
             return refusal("unsupported_capability", "This board does not serve %s." % tool)
@@ -182,6 +215,8 @@ class Board:
             s = self._slot(cap)
             live = s["holder"] is not None and s["lease"] > self.now
             entry = {"capability": cap, "state": "active" if live else ("stale" if s["holder"] else "absent"), "generation": s["generation"]}
+            if self.holds:
+                entry["held"] = self._slot_held(cap)
             if s["holder"]:
                 entry["leaseExpiresAt"], entry["provenance"] = iso(s["lease"]), "trusted"
             responders.append(entry)
@@ -249,7 +284,7 @@ class Board:
             for rid in self.order:
                 r = self.requests[rid]
                 lapsed = r["state"] == "claimed" and (r["attempt"] is None or r["attempt"]["lease"] <= self.now)
-                if r["capability"] == cap and (r["state"] == "queued" or lapsed):
+                if r["capability"] == cap and (r["state"] == "queued" or lapsed) and self._claimable(r):
                     pick = r
                     break
         if pick is None:

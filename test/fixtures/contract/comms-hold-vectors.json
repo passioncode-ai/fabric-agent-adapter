@@ -1,0 +1,1932 @@
+{
+  "about": "DEC-0079 at the pin: the hold matrix's cases, each re-answered by the contract's holdRefuses, with the tools, the scopes per tool and the tools a hold never refuses.",
+  "source": "fixtures/vectors/comms-hold.json, src/comms-hold.ts",
+  "tools": [
+    "com.submit",
+    "com.list",
+    "com.get",
+    "com.read_ack",
+    "com.reply",
+    "com.cancel",
+    "com.status",
+    "com.directory",
+    "com.enroll",
+    "com.claim",
+    "com.renew",
+    "com.accept",
+    "com.progress",
+    "com.effect_begin",
+    "com.complete",
+    "com.reconcile",
+    "com.responder_replace"
+  ],
+  "scopes": {
+    "com.submit": [
+      "thread"
+    ],
+    "com.reply": [
+      "thread"
+    ],
+    "com.enroll": [
+      "project",
+      "slot"
+    ],
+    "com.responder_replace": [
+      "project",
+      "slot"
+    ],
+    "com.claim": [
+      "thread",
+      "project",
+      "slot"
+    ],
+    "com.accept": [
+      "thread",
+      "project",
+      "slot"
+    ],
+    "com.effect_begin": [
+      "thread",
+      "project",
+      "slot"
+    ]
+  },
+  "neverHeld": [
+    "com.list",
+    "com.get",
+    "com.read_ack",
+    "com.cancel",
+    "com.status",
+    "com.directory",
+    "com.renew",
+    "com.progress",
+    "com.complete",
+    "com.reconcile"
+  ],
+  "cases": [
+    {
+      "name": "com.submit: a message or request into an existing thread, no hold",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.submit: a message or request into an existing thread, thread held",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.submit: a message or request into an existing thread, project held",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.submit: a message or request into an existing thread, slot held",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.submit: a message or request into an existing thread, thread, Project and slot all held",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.reply: a participant's reply, no hold",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.reply: a participant's reply, thread held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.reply: a participant's reply, project held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reply: a participant's reply, slot held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reply: a participant's reply, thread, Project and slot all held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.reply: a responder's fenced reply, no hold",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "fenced": true
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.reply: a responder's fenced reply, thread held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "fenced": true
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reply: a responder's fenced reply, project held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "fenced": true
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reply: a responder's fenced reply, slot held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "fenced": true
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reply: a responder's fenced reply, thread, Project and slot all held",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "fenced": true
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.enroll: enrolling in a slot, no hold",
+      "tool": "com.enroll",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.enroll: enrolling in a slot, thread held",
+      "tool": "com.enroll",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.enroll: enrolling in a slot, project held",
+      "tool": "com.enroll",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.enroll: enrolling in a slot, slot held",
+      "tool": "com.enroll",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.enroll: enrolling in a slot, thread, Project and slot all held",
+      "tool": "com.enroll",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.responder_replace: replacing a slot's responder, no hold",
+      "tool": "com.responder_replace",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.responder_replace: replacing a slot's responder, thread held",
+      "tool": "com.responder_replace",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.responder_replace: replacing a slot's responder, project held",
+      "tool": "com.responder_replace",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.responder_replace: replacing a slot's responder, slot held",
+      "tool": "com.responder_replace",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.responder_replace: replacing a slot's responder, thread, Project and slot all held",
+      "tool": "com.responder_replace",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.claim: claiming a named request, no hold",
+      "tool": "com.claim",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.claim: claiming a named request, thread held",
+      "tool": "com.claim",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.claim: claiming a named request, project held",
+      "tool": "com.claim",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.claim: claiming a named request, slot held",
+      "tool": "com.claim",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.claim: claiming a named request, thread, Project and slot all held",
+      "tool": "com.claim",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.claim: claiming the oldest claimable request of a slot, no hold",
+      "tool": "com.claim",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.claim: claiming the oldest claimable request of a slot, thread held",
+      "tool": "com.claim",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.claim: claiming the oldest claimable request of a slot, project held",
+      "tool": "com.claim",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.claim: claiming the oldest claimable request of a slot, slot held",
+      "tool": "com.claim",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.claim: claiming the oldest claimable request of a slot, thread, Project and slot all held",
+      "tool": "com.claim",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.accept: accepting a claimed request, no hold",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.accept: accepting a claimed request, thread held",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.accept: accepting a claimed request, project held",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.accept: accepting a claimed request, slot held",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.accept: accepting a claimed request, thread, Project and slot all held",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.effect_begin: beginning an accepted request's effect, no hold",
+      "tool": "com.effect_begin",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.effect_begin: beginning an accepted request's effect, thread held",
+      "tool": "com.effect_begin",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.effect_begin: beginning an accepted request's effect, project held",
+      "tool": "com.effect_begin",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.effect_begin: beginning an accepted request's effect, slot held",
+      "tool": "com.effect_begin",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.effect_begin: beginning an accepted request's effect, thread, Project and slot all held",
+      "tool": "com.effect_begin",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "com.complete: completing started work, no hold",
+      "tool": "com.complete",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.complete: completing started work, thread held",
+      "tool": "com.complete",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.complete: completing started work, project held",
+      "tool": "com.complete",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.complete: completing started work, slot held",
+      "tool": "com.complete",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.complete: completing started work, thread, Project and slot all held",
+      "tool": "com.complete",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reconcile: reconciling an outcome_unknown request, no hold",
+      "tool": "com.reconcile",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.reconcile: reconciling an outcome_unknown request, thread held",
+      "tool": "com.reconcile",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reconcile: reconciling an outcome_unknown request, project held",
+      "tool": "com.reconcile",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reconcile: reconciling an outcome_unknown request, slot held",
+      "tool": "com.reconcile",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.reconcile: reconciling an outcome_unknown request, thread, Project and slot all held",
+      "tool": "com.reconcile",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.progress: reporting progress, with or without a note, no hold",
+      "tool": "com.progress",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.progress: reporting progress, with or without a note, thread held",
+      "tool": "com.progress",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.progress: reporting progress, with or without a note, project held",
+      "tool": "com.progress",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.progress: reporting progress, with or without a note, slot held",
+      "tool": "com.progress",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.progress: reporting progress, with or without a note, thread, Project and slot all held",
+      "tool": "com.progress",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.renew: renewing the slot's and attempt's lease, no hold",
+      "tool": "com.renew",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.renew: renewing the slot's and attempt's lease, thread held",
+      "tool": "com.renew",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.renew: renewing the slot's and attempt's lease, project held",
+      "tool": "com.renew",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.renew: renewing the slot's and attempt's lease, slot held",
+      "tool": "com.renew",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.renew: renewing the slot's and attempt's lease, thread, Project and slot all held",
+      "tool": "com.renew",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.cancel: the sender cancelling its request, no hold",
+      "tool": "com.cancel",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.cancel: the sender cancelling its request, thread held",
+      "tool": "com.cancel",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.cancel: the sender cancelling its request, project held",
+      "tool": "com.cancel",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.cancel: the sender cancelling its request, slot held",
+      "tool": "com.cancel",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.cancel: the sender cancelling its request, thread, Project and slot all held",
+      "tool": "com.cancel",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.read_ack: marking a message read, no hold",
+      "tool": "com.read_ack",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.read_ack: marking a message read, thread held",
+      "tool": "com.read_ack",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.read_ack: marking a message read, project held",
+      "tool": "com.read_ack",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.read_ack: marking a message read, slot held",
+      "tool": "com.read_ack",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.read_ack: marking a message read, thread, Project and slot all held",
+      "tool": "com.read_ack",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.list: reading a page, no hold",
+      "tool": "com.list",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.list: reading a page, thread held",
+      "tool": "com.list",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.list: reading a page, project held",
+      "tool": "com.list",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.list: reading a page, slot held",
+      "tool": "com.list",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.list: reading a page, thread, Project and slot all held",
+      "tool": "com.list",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.get: reading a message, no hold",
+      "tool": "com.get",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.get: reading a message, thread held",
+      "tool": "com.get",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.get: reading a message, project held",
+      "tool": "com.get",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.get: reading a message, slot held",
+      "tool": "com.get",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.get: reading a message, thread, Project and slot all held",
+      "tool": "com.get",
+      "target": {
+        "thread": "thr-held-0001"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.status: reading the Project's status, no hold",
+      "tool": "com.status",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.status: reading the Project's status, thread held",
+      "tool": "com.status",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.status: reading the Project's status, project held",
+      "tool": "com.status",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.status: reading the Project's status, slot held",
+      "tool": "com.status",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.status: reading the Project's status, thread, Project and slot all held",
+      "tool": "com.status",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.directory: reading the directory, no hold",
+      "tool": "com.directory",
+      "target": {},
+      "holds": {},
+      "refused": false
+    },
+    {
+      "name": "com.directory: reading the directory, thread held",
+      "tool": "com.directory",
+      "target": {},
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.directory: reading the directory, project held",
+      "tool": "com.directory",
+      "target": {},
+      "holds": {
+        "projects": [
+          "proj-b"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.directory: reading the directory, slot held",
+      "tool": "com.directory",
+      "target": {},
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "com.directory: reading the directory, thread, Project and slot all held",
+      "tool": "com.directory",
+      "target": {},
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a fenced reply into a held thread is never refused (a port that refuses every com.reply in a held thread is wrong)",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "fenced": true
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a fenced reply whose fenced is not the boolean true is a participant's reply",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "fenced": "true"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "lax: a request submitted into an unheld thread to a held Project is not refused; it queues and waits",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a new thread (no thread yet) is never thread-held",
+      "tool": "com.submit",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a participant's reply is not refused by a hold on its Project or slot",
+      "tool": "com.reply",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: enrolling is not refused by a thread hold, even with the thread named",
+      "tool": "com.enroll",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: replacing a responder is not refused by a thread hold, even with the thread named",
+      "tool": "com.responder_replace",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: Project ids compare as written; a hold on Proj-B does not hold proj-b",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "projects": [
+          "Proj-B"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: thread ids compare as written; a hold on THR-HELD-0001 does not hold thr-held-0001",
+      "tool": "com.claim",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "THR-HELD-0001"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a slot hold names a Project and a capability; the same capability of another Project is not held",
+      "tool": "com.claim",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-c",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a slot hold on another capability of the same Project does not hold this one",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish.draft"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a slot hold is not a prefix; publish does not hold publish.release",
+      "tool": "com.effect_begin",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish.release"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: capability names compare as written; a hold on Publish does not hold publish",
+      "tool": "com.enroll",
+      "target": {
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "Publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "lax: a hold on another thread does not hold this one",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-other-0002"
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "repeat: a repeat of a submit whose receipt was stored before the hold answers that receipt",
+      "tool": "com.submit",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "repeat": true
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "repeat: a repeat of an accept whose receipt was stored before the hold answers that receipt",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "repeat": true
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "repeat: repeat is only the boolean true",
+      "tool": "com.accept",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish",
+        "repeat": 1
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": true
+    },
+    {
+      "name": "unknown: a tool the board does not serve is never refused held (it is unsupported_capability)",
+      "tool": "com.release",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    },
+    {
+      "name": "unknown: tool names compare as written; COM.ACCEPT is not com.accept",
+      "tool": "COM.ACCEPT",
+      "target": {
+        "thread": "thr-held-0001",
+        "project": "proj-b",
+        "capability": "publish"
+      },
+      "holds": {
+        "threads": [
+          "thr-held-0001"
+        ],
+        "projects": [
+          "proj-b"
+        ],
+        "slots": [
+          {
+            "project": "proj-b",
+            "capability": "publish"
+          }
+        ]
+      },
+      "refused": false
+    }
+  ]
+}

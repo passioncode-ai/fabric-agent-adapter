@@ -36,7 +36,7 @@ class DigestTests(unittest.TestCase):
                 self.assertEqual(fb.comms_digest(v["operation"], v["args"]), v["digest"])
 
     def test_digest_of_every_responder_argument_fixture(self):
-        self.assertEqual(len(COMMS["digests"]), 8)
+        self.assertEqual(len(COMMS["digests"]), 9)  # DEC-0081 adds comms-reconcile-owner
         for v in COMMS["digests"]:
             with self.subTest(v["name"]):
                 self.assertEqual(fb.comms_digest(v["operation"], v["args"]), v["digest"])
@@ -535,6 +535,32 @@ class RestartTests(Conversation):
         self.assertFalse(any(a.get("request") == rid for t, a in self.board.calls if t == "com.claim"))
         self.assertIn("board.request.held", self.kinds())
 
+    def test_a_restart_under_a_hold_keeps_accepted_work_for_a_transfer(self):
+        rid, _ = self._crash_after(effect=False)
+        self.board.holds = {"slots": [{"project": PROJECT, "capability": "video.render"}]}
+        second = self.responder()
+        second.step()
+        self.assertNotIn("com.responder_replace", self.tools())
+        self.assertEqual(self.checkpoint()[rid]["step"], "lapsed")
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+        self.board.holds = {}
+        self.board.advance(16)
+        second.step()
+        self.assertIn("com.responder_replace", self.tools())
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+
+    def test_a_replace_refused_held_keeps_the_work_for_a_later_transfer(self):
+        rid, _ = self._crash_after(effect=False)
+        self.board.fail_next["com.responder_replace"] = "held"
+        second = self.responder()
+        second.step()
+        self.assertEqual(self.checkpoint()[rid]["step"], "lapsed")
+        self.assertEqual(second.slots["video.render"]["state"], "paused")
+        self.assertNotIn("board.down", self.kinds())
+        self.board.advance(16)
+        second.step()
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+
     def test_a_known_outcome_is_sent_after_the_transfer_without_running_again(self):
         self.board.drop_next["com.complete"] = 1
         self.board.fail_next["com.complete"] = "not_available"  # the first complete is refused before anything is stored
@@ -557,6 +583,161 @@ class RestartTests(Conversation):
         self.assertEqual(r.state, "stopped")
         self.assertIsNone(self.board.slots["video.render"]["holder"])
         self.assertEqual(self.hub.sessions, {})
+
+
+HOLD = json.loads((Path(__file__).resolve().parent / "fixtures/contract/comms-hold-vectors.json").read_text())
+
+
+class HoldShapeTests(unittest.TestCase):
+    """DEC-0079 and DEC-0081 in the shapes the kit reads."""
+
+    def test_every_hold_case_answers_as_the_contract_does(self):
+        self.assertEqual(len(HOLD["cases"]), 114)
+        for case in HOLD["cases"]:
+            with self.subTest(case["name"]):
+                self.assertIs(fb.hold_refuses(case["tool"], case["target"], case["holds"]), case["refused"])
+        self.assertEqual({k: list(v) for k, v in fb.HOLD_SCOPES.items()}, HOLD["scopes"])
+        self.assertEqual(sorted(set(HOLD["tools"]) - set(fb.HOLD_SCOPES)), sorted(HOLD["neverHeld"]))
+        for bad in (None, 3, "x", [], {"thread": 7}):
+            self.assertFalse(fb.hold_refuses("com.claim", bad, {"threads": [7]}))
+        self.assertFalse(fb.hold_refuses("com.renew", {"project": "p"}, {"projects": ["p"]}), "never held")
+
+    def test_held_is_a_retryable_refusal(self):
+        self.assertEqual(fb.refusal_problems({"error": {"code": "held", "message": "Held.", "retryable": True}}), [])
+        self.assertTrue(fb.refusal_problems({"error": {"code": "held", "message": "Held.", "retryable": False}}))
+        self.assertIn("held", fb.REFUSAL_CODES)
+
+    def test_settled_by_the_owner(self):
+        base = {"ok": True, "repeated": False, "request": {"id": "req-00000001", "state": "completed", "effect": "succeeded_observed",
+                                                            "revision": 4, "settledBy": "owner"}}
+        self.assertEqual(fb.receipt_problems(base, "com.reconcile"), [])
+        for state, value in (("in_progress", "owner"), ("completed", "responder"), ("completed", None)):
+            bad = json.loads(json.dumps(base))
+            bad["request"].update(state=state, settledBy=value)
+            self.assertTrue(fb.receipt_problems(bad, "com.reconcile"), (state, value))
+
+    def test_a_held_capability_in_a_directory_page(self):
+        page = {"protocol": "fabric-project-comms/0.1", "snapshot": {"readAt": "2026-10-13T10:00:00Z"}, "cursor": None,
+                "projects": [{"id": "proj-a", "name": "A", "capabilities": [{"capability": "a.b", "responder": "active", "held": True}]}]}
+        self.assertEqual(fb.directory_problems(page), [])
+        page["projects"][0]["capabilities"][0]["held"] = "yes"
+        self.assertTrue(fb.directory_problems(page))
+
+
+class HoldTests(Conversation):
+    """DEC-0079: an operator's hold refuses new work `held`; the responder waits with a growing pause and never stops
+    work it already accepted."""
+
+    def slot_hold(self):
+        return {"slots": [{"project": PROJECT, "capability": "video.render"}]}
+
+    def test_a_held_slot_waits_with_a_growing_pause_and_resumes_when_lifted(self):
+        self.board.holds = self.slot_hold()
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        r.step()
+        self.assertEqual(self.tools(), ["com.status"], "a slot com.status names held is not enrolled")
+        self.assertIn("board.slot.held", self.kinds())
+        self.assertEqual(r.slots["video.render"]["state"], "paused")
+        self.board.advance(10)
+        r.step()
+        self.assertEqual(self.tools(), ["com.status"], "nothing is asked before the pause ends")
+        self.board.advance(6)
+        r.step()
+        self.assertEqual(self.tools()[-1], "com.enroll")
+        self.assertEqual(r.slots["video.render"]["pauses"], 2)
+        self.assertEqual(r.slots["video.render"]["retry_at"] - self.board.now, 30.0, "the pause doubles")
+        self.assertEqual(self.kinds().count("board.slot.held"), 1, "said once per hold")
+        self.board.holds = {}
+        self.board.advance(31)
+        r.step()
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertIn("board.slot.released", self.kinds())
+        self.assertNotIn("board.down", self.kinds())
+
+    def test_the_pause_is_capped(self):
+        self.board.holds = {"projects": [PROJECT]}
+        r = self.responder()
+        r.step()
+        for _ in range(12):
+            self.board.advance(r.slots["video.render"]["retry_at"] - self.board.now)
+            r.step()
+        self.assertEqual(r.slots["video.render"]["retry_at"] - self.board.now, fb.HOLD_RETRY_MAX_SECONDS)
+
+    def test_accepted_work_continues_under_a_hold(self):
+        release, seen = threading.Event(), {}
+
+        def slow(request, ctx):
+            release.wait(5)
+            seen["stopped"] = ctx.stopped.is_set()
+            return {"state": "completed", "summary": "Rendered."}
+        self.outcome = slow
+        rid = self.board.queue("video.render")
+        r = self.responder(spawn=lambda fn: threading.Thread(target=fn, daemon=True).start())
+        r.step()
+        self.board.holds = self.slot_hold()
+        self.board.advance(20)
+        r.step()
+        self.assertEqual(self.tools()[-1], "com.renew", "com.renew is never held")
+        release.set()
+        import time
+        time.sleep(0.1)
+        self.board.advance(1)
+        r.step()
+        self.assertFalse(seen["stopped"])
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+
+    def test_effect_begin_waits_for_the_hold_with_the_same_key(self):
+        rid = self.board.queue("video.render")
+        thread = self.board.requests[rid]["thread"]
+
+        def acts(request, ctx):
+            self.board.holds = {"threads": [thread]}
+            threading.Timer(0.05, lambda: setattr(self.board, "holds", {})).start()
+            ctx.begin_effect("Rendering.")
+            return {"state": "completed", "observed": True, "summary": "Rendered and checked."}
+        self.outcome = acts
+        r = self.responder()
+        r.hold_delay = 0.01
+        r.step()
+        begins = [a for t, a in self.board.calls if t == "com.effect_begin"]
+        self.assertGreaterEqual(len(begins), 2)
+        self.assertEqual(len({b["fence"]["idempotency"]["key"] for b in begins}), 1, "the same key each time")
+        self.assertIn("board.request.waiting", self.kinds())
+        self.assertEqual((self.board.requests[rid]["state"], self.board.requests[rid]["effect"]), ("completed", "succeeded_observed"))
+
+    def test_a_hold_between_the_claim_and_the_accept_does_nothing(self):
+        self.board.fail_next["com.accept"] = "held"
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        r.step()
+        self.assertEqual(self.handled, [])
+        self.assertEqual(self.checkpoint(), {})
+        self.assertIn("board.request.waiting", self.kinds())
+        self.assertEqual(r.slots["video.render"]["state"], "paused")
+        self.board.advance(61)
+        r.step()
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+
+    def test_a_claim_refused_held_pauses_the_slot(self):
+        self.board.fail_next["com.claim"] = "held"
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "paused")
+        self.assertEqual(r.state, "ready")
+        self.assertIn("board.slot.held", self.kinds())
+        self.board.advance(16)
+        r.step()
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+
+    def test_a_held_refusal_elsewhere_pauses_the_responder_quietly(self):
+        r = self.responder()
+        wait = r._fault(fb.BoardError("held", "Held.", True, op="com.reply"))
+        self.assertGreater(wait, 0)
+        self.assertEqual(r.state, "paused")
+        self.assertIn("board.held", self.kinds())
+        self.assertNotIn("board.down", self.kinds())
 
 
 class CheckpointTests(unittest.TestCase):

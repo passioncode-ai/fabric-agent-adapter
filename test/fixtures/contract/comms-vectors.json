@@ -385,6 +385,1890 @@
       }
     },
     {
+      "name": "comms-submit-finding",
+      "schema": "comms-submit.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-message-finding",
+      "schema": "comms-message.schema.json",
+      "valid": true,
+      "document": {
+        "id": "msg_F1n2D3g4H5",
+        "thread": "thr_Q1w2E3r4T5",
+        "kind": "finding",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-13T11:00:00Z",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "redacted": true
+            },
+            {
+              "redacted": true
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-finding-repeated",
+      "schema": "comms-receipt.schema.json",
+      "valid": true,
+      "document": {
+        "ok": true,
+        "repeated": true,
+        "message": "msg_F1n2D3g4H5",
+        "thread": "thr_Q1w2E3r4T5",
+        "at": "2026-10-13T11:00:00Z"
+      }
+    },
+    {
+      "name": "comms-submit-finding-on-message",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "message",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-redacted-item",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "redacted": true
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-duplicate-affects",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-affects-over-limit",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-1"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-2"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-3"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-4"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-5"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-6"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-7"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-8"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-9"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-10"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-11"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-12"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-13"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-14"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-15"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-16"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-17"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-affects-empty",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-consequence-too-long",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞𝄞",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-consequence-empty",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-dedupe-key-short",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "kkkkkkk"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-dedupe-key-long",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-dedupe-key-slash",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred/CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-without-severity",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-without-consequence",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-without-affects",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-without-dedupe-key",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-bad-severity",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "Blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-with-evidence",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41",
+          "evidence": [
+            {
+              "url": "https://example.org/runs/4711"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-row-copied",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41",
+              "title": "Fabric adopts DEC-0073",
+              "status": "open"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-task-open",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2",
+              "title": "Repin"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-row-without-repository",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-row-without-path",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-row-without-id",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-repository-url",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "https://github.com/passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-repository-dot",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/..",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-path-traversal",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/../backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-path-absolute",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "/docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-path-hidden",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": ".github/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-path-empty-segment",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs//backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-path-too-long",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-row-id-space",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT 41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-row-id-too-long",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-message-finding-on-message",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_F1n2D3g4H5",
+        "thread": "thr_Q1w2E3r4T5",
+        "kind": "message",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-13T11:00:00Z",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "redacted": true
+            },
+            {
+              "redacted": true
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-message-finding-redacted-false",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_F1n2D3g4H5",
+        "thread": "thr_Q1w2E3r4T5",
+        "kind": "finding",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-13T11:00:00Z",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "redacted": false
+            },
+            {
+              "redacted": true
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-message-finding-redacted-with-row",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_F1n2D3g4H5",
+        "thread": "thr_Q1w2E3r4T5",
+        "kind": "finding",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-13T11:00:00Z",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41",
+              "redacted": true
+            },
+            {
+              "redacted": true
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-message-finding-redacted-message",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_F1n2D3g4H5",
+        "thread": "thr_Q1w2E3r4T5",
+        "kind": "finding",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-13T11:00:00Z",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "redacted": true
+            },
+            {
+              "redacted": true
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        },
+        "redacted": true
+      }
+    },
+    {
+      "name": "comms-submit-finding-key-short",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "kkkkkkkkkkkkkkkkkkkkk"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tsk_7Hn3Kq9Lm2"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-task-too-long",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-finding-task-slash",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "fnd_Q7mX2cL9pZ4tVb1Nk8Rw"
+        },
+        "thread": {
+          "id": "thr_Q1w2E3r4T5"
+        },
+        "kind": "finding",
+        "body": {
+          "text": "The board answers a replacement without `transferred`, so a kit that took a request over cannot fence it. The failing run is attached.",
+          "format": "text/markdown"
+        },
+        "artifacts": [
+          {
+            "id": "https://example.org/runs/4711",
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "label": "failing run"
+          }
+        ],
+        "finding": {
+          "severity": "blocking",
+          "consequence": "A kit that takes a transferred request over cannot complete it until the board answers transferred.",
+          "affects": [
+            {
+              "repository": "passioncode-ai/fabric-agent-contract",
+              "path": "docs/backlog.md",
+              "id": "CT-41"
+            },
+            {
+              "repository": "example-org/example-tool",
+              "path": "docs/backlog.md",
+              "id": "EX-12"
+            },
+            {
+              "task": "tasks/42"
+            }
+          ],
+          "dedupeKey": "transferred-missing:CT-41"
+        }
+      }
+    },
+    {
       "name": "comms-page-redacted-with-body",
       "schema": "comms-page.schema.json",
       "valid": false,
@@ -1808,6 +3692,291 @@
       }
     },
     {
+      "name": "comms-reconcile-owner",
+      "schema": "comms-reconcile.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "owner-settle-req_A1b2C3d4E5"
+        },
+        "request": "req_A1b2C3d4E5",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expectedRevision": 5,
+        "outcome": {
+          "state": "failed_known",
+          "observed": true,
+          "summary": "The operator checked the registry: release 1.4.2 was never published, and the build log shows the upload refused.",
+          "evidence": [
+            {
+              "id": "fabric://artifact/registry-check",
+              "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-reconcile-owner",
+      "schema": "comms-receipt.schema.json",
+      "valid": true,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "completed",
+          "effect": "succeeded_observed",
+          "revision": 7,
+          "settledBy": "owner"
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-complete-responder",
+      "schema": "comms-receipt.schema.json",
+      "valid": true,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "failed_known",
+          "effect": "failed_observed",
+          "revision": 6
+        }
+      }
+    },
+    {
+      "name": "comms-message-settled-by-owner",
+      "schema": "comms-message.schema.json",
+      "valid": true,
+      "document": {
+        "id": "msg_Q2w3e4r5t6",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "request",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-04T15:00:00Z",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "body": {
+          "text": "Please publish release 1.4.2 of the iOS app."
+        },
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "state": "completed",
+          "effect": "succeeded_observed",
+          "revision": 7,
+          "settledBy": "owner"
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-settled-by-unknown",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "completed",
+          "effect": "succeeded_observed",
+          "revision": 7,
+          "settledBy": "operator"
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-settled-while-unknown",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "outcome_unknown",
+          "effect": "unknown",
+          "revision": 7,
+          "settledBy": "owner"
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-settled-cancelled",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "cancelled",
+          "effect": "not_started",
+          "revision": 7,
+          "settledBy": "owner"
+        }
+      }
+    },
+    {
+      "name": "comms-message-settled-while-unknown",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_Q2w3e4r5t6",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "request",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-04T15:00:00Z",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "body": {
+          "text": "Please publish release 1.4.2 of the iOS app."
+        },
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "state": "outcome_unknown",
+          "effect": "unknown",
+          "revision": 7,
+          "settledBy": "owner"
+        }
+      }
+    },
+    {
+      "name": "comms-message-settled-by-unknown",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_Q2w3e4r5t6",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "request",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-04T15:00:00Z",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "body": {
+          "text": "Please publish release 1.4.2 of the iOS app."
+        },
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "state": "completed",
+          "effect": "succeeded_observed",
+          "revision": 7,
+          "settledBy": "Owner"
+        }
+      }
+    },
+    {
+      "name": "comms-message-settled-expired",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_Q2w3e4r5t6",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "request",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-04T15:00:00Z",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "body": {
+          "text": "Please publish release 1.4.2 of the iOS app."
+        },
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "state": "expired",
+          "effect": "not_started",
+          "revision": 7,
+          "settledBy": "owner"
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-settled-by-responder",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "completed",
+          "effect": "succeeded_observed",
+          "revision": 7,
+          "settledBy": "responder"
+        }
+      }
+    },
+    {
+      "name": "comms-message-settled-by-responder",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_Q2w3e4r5t6",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "request",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-04T15:00:00Z",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "body": {
+          "text": "Please publish release 1.4.2 of the iOS app."
+        },
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "state": "completed",
+          "effect": "succeeded_observed",
+          "revision": 7,
+          "settledBy": "responder"
+        }
+      }
+    },
+    {
       "name": "comms-receipt-transferred-without-revision",
       "schema": "comms-receipt.schema.json",
       "valid": false,
@@ -2842,6 +5011,168 @@
         ],
         "cursor": "cur_N3xtPage01"
       }
+    },
+    {
+      "name": "comms-refusal-held",
+      "schema": "comms-refusal.schema.json",
+      "valid": true,
+      "document": {
+        "error": {
+          "code": "held",
+          "message": "The operator has put this work on hold; it continues when the operator resumes it.",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "comms-refusal-held-not-retryable",
+      "schema": "comms-refusal.schema.json",
+      "valid": false,
+      "document": {
+        "error": {
+          "code": "held",
+          "message": "The operator has put this work on hold; it continues when the operator resumes it.",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "comms-status-held",
+      "schema": "comms-status.schema.json",
+      "valid": true,
+      "document": {
+        "protocol": "fabric-project-comms/0.1",
+        "board": {
+          "state": "ready"
+        },
+        "project": "proj-analytics",
+        "responders": [
+          {
+            "capability": "analytics.retention",
+            "state": "active",
+            "generation": 2,
+            "leaseExpiresAt": "2026-10-13T15:02:00Z",
+            "provenance": "trusted",
+            "held": true
+          },
+          {
+            "capability": "analytics.ask",
+            "state": "absent",
+            "generation": 0,
+            "held": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "comms-status-held-not-boolean",
+      "schema": "comms-status.schema.json",
+      "valid": false,
+      "document": {
+        "protocol": "fabric-project-comms/0.1",
+        "board": {
+          "state": "ready"
+        },
+        "project": "proj-analytics",
+        "responders": [
+          {
+            "capability": "analytics.retention",
+            "state": "active",
+            "generation": 2,
+            "held": "operator"
+          }
+        ]
+      }
+    },
+    {
+      "name": "comms-directory-held",
+      "schema": "comms-directory.schema.json",
+      "valid": true,
+      "document": {
+        "protocol": "fabric-project-comms/0.1",
+        "snapshot": {
+          "readAt": "2026-10-13T10:00:00Z"
+        },
+        "projects": [
+          {
+            "id": "proj-analytics",
+            "name": "Analytics",
+            "capabilities": [
+              {
+                "capability": "analytics.retention",
+                "responder": "active",
+                "held": true
+              },
+              {
+                "capability": "analytics.ask",
+                "responder": "absent",
+                "held": false
+              }
+            ]
+          },
+          {
+            "id": "proj-render",
+            "name": "Video rendering",
+            "capabilities": [
+              {
+                "capability": "video.render",
+                "responder": "stale"
+              }
+            ]
+          }
+        ],
+        "cursor": null
+      }
+    },
+    {
+      "name": "comms-directory-held-not-boolean",
+      "schema": "comms-directory.schema.json",
+      "valid": false,
+      "document": {
+        "protocol": "fabric-project-comms/0.1",
+        "snapshot": {
+          "readAt": "2026-10-13T10:00:00Z"
+        },
+        "projects": [
+          {
+            "id": "proj-analytics",
+            "name": "Analytics",
+            "capabilities": [
+              {
+                "capability": "analytics.retention",
+                "responder": "active",
+                "held": 1
+              }
+            ]
+          }
+        ],
+        "cursor": null
+      }
+    },
+    {
+      "name": "comms-directory-entry-held",
+      "schema": "comms-directory.schema.json",
+      "valid": false,
+      "document": {
+        "protocol": "fabric-project-comms/0.1",
+        "snapshot": {
+          "readAt": "2026-10-13T10:00:00Z"
+        },
+        "projects": [
+          {
+            "id": "proj-analytics",
+            "name": "Analytics",
+            "held": true,
+            "capabilities": [
+              {
+                "capability": "analytics.retention",
+                "responder": "active"
+              }
+            ]
+          }
+        ],
+        "cursor": null
+      }
     }
   ],
   "digests": [
@@ -3002,6 +5333,31 @@
         }
       },
       "digest": "sha256:09d01e090648572445dabeae2f8055a63f4a648dc86702c553ff08ef199aec68"
+    },
+    {
+      "name": "comms-reconcile-owner",
+      "operation": "com.reconcile",
+      "args": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "owner-settle-req_A1b2C3d4E5"
+        },
+        "request": "req_A1b2C3d4E5",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "expectedRevision": 5,
+        "outcome": {
+          "state": "failed_known",
+          "observed": true,
+          "summary": "The operator checked the registry: release 1.4.2 was never published, and the build log shows the upload refused.",
+          "evidence": [
+            {
+              "id": "fabric://artifact/registry-check",
+              "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            }
+          ]
+        }
+      },
+      "digest": "sha256:9974dfcfd31c975843cee15f8230fd101c9df0e2b30f363e234e8811b16887f8"
     }
   ],
   "directoryPages": [

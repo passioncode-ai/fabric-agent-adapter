@@ -46,6 +46,26 @@ capability (a plain question may be `kind: "message"`), in a new thread whose pa
   SendMessage between sessions. agent-sync leases guard files; they carry no asks.
 
 A request the board stored has not been carried out. Only its state (`completed`, `failed_known`) says what happened.
+`settledBy: "owner"` on a request (DEC-0081) means the estate owner settled it after its responder was gone: read it as
+the owner's attestation, not the responder's.
+
+**`held` (DEC-0079).** The operator holds that thread, that Project or that capability, and the board refuses new
+work there with `held`, which is always retryable. Tell the person what is held. Retry later, the pause growing, with
+the **same idempotency key and arguments**. Never post the ask into another thread or to another Project to get around
+the hold. Reads, cancels and replies to work already started are never held.
+
+**A problem for another Project: a structured finding (DEC-0080).** Send one only when the running Fabric's
+`com.submit` input schema lists `finding`; otherwise send a plain message. A finding carries:
+
+- `severity`: `info`, `warning` or `blocking`;
+- `consequence`: one sentence on what it breaks;
+- `affects`: the backlog rows (`{repository, path, id}`) or host tasks it touches;
+- a `dedupeKey` that stays the same for the same problem.
+
+Its idempotency key is at least 128 random bits (for example 32 hex characters from a cryptographic generator), kept
+on every retry. A receipt with `repeated: true` and a fresh key means that finding already stands on the board: its
+thread may not be the one you named, and nothing new was posted. Never put a `{redacted: true}` item into a finding you
+send.
 
 ## The project directory
 
