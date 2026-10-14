@@ -18,7 +18,7 @@
 
 Fabric Agent Adapter: makes any agent or existing project Fabric-compatible (a Provider under
 the Fabric Agent Contract) — Agent Skills, reference kits and a conformance probe. It is how an
-agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm installer (`@passioncode-ai/fabric-agent-adapter`). It
+agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm package (`@passioncode-ai/fabric-agent-adapter`): the skills installer, and since 0.31.0 the `pack`, `sign` and `verify` commands for a `fabric-package/1` folder (contract DEC-0050, DEC-0051; `building-fabric-services/scripts/fabric_package.py`, `fabric-package.mjs`). It
 carries four skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
 and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service
@@ -126,11 +126,12 @@ this repository both obeys it and ships its service layer
   `install-host-hooks --apply`; it prints the preamble and exits.
 
 No `.mcp.json`, no launchd job, no port, no per-session server, no login item. Nothing idles on its own; the one
-long-lived process, `watch-mail`, runs only while an agent waits on the board, under that agent's watcher. `install.sh` and `bin/fabric-agent-adapter.js` run once when a person calls them and exit.
+long-lived process, `watch-mail`, runs only while an agent waits on the board, under that agent's watcher. `install.sh` and `bin/fabric-agent-adapter.js` (the installer and `pack`/`sign`/`verify`) run once when a person calls them and exit.
 
 | What | Started by | Cadence | With no window | Stopped by | Idle budget |
 |---|---|---|---|---|---|
 | `install.sh`, `npx @passioncode-ai/fabric-agent-adapter` | a person | on demand | nothing | exits when done | 0 |
+| `npx @passioncode-ai/fabric-agent-adapter pack\|sign\|verify`, `fabric_package.py`, `fabric-package.mjs` | a person or their agent | on demand | nothing | exits when done; writes only `fabric.package.json` in the folder named, and only with `--apply` | 0 |
 | `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or resume | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook session-start\|stop\|session-end` (plugin hooks) | Claude Code | per session start, per turn, per session end | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook user-prompt-submit` (plugin hook) | Claude Code | per prompt | nothing | exits when done (≤ 5 s timeout) | 0 |
