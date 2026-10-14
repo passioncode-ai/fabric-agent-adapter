@@ -194,6 +194,27 @@ class PackTests(unittest.TestCase):
         self.assertIn("/evals/receipt/suite", [p.get("instancePath") for p in answer["problems"]])
         self.assertTrue(any("run it again" in n for n in answer["notes"]))
 
+    def test_files_are_listed_in_utf16_order_and_an_added_file_is_caught(self):
+        write_agent(self.root)
+        for name in ("a.md", "a/x.md", "\U0001F600.md", "\uFF5E.md"):
+            (self.root / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / name).write_text("x\n")
+        paths = [f["path"] for f in fp.pack(self.root)["package"]["files"]]
+        mine = [p for p in paths if p in ("a.md", "a/x.md", "\U0001F600.md", "\uFF5E.md")]
+        self.assertEqual(mine, ["a.md", "a/x.md", "\U0001F600.md", "\uFF5E.md"], "RFC 8785 order: UTF-16 code units")
+        self.assertEqual(paths, sorted(paths, key=lambda p: p.encode("utf-16-be", "surrogatepass")))
+        self.assertTrue(fp.pack(self.root, apply=True)["applied"])
+        (self.root / "added.md").write_text("added after packing\n")
+        answer = fp.verify(self.root, {"publisher": []})
+        self.assertIn({"rule": "folder", "problem": "file-unlisted", "instancePath": "added.md", "message": "file-unlisted"}, answer["problems"])
+
+    def test_the_schema_counts_code_points(self):
+        pkg = copy.deepcopy(next(f["document"] for f in VECTORS["fixtures"] if f["name"] == "fabric-package-agent"))
+        pkg["resultSignal"]["says"] = "\U0001F600" * 120
+        self.assertEqual(fp.schema_problems(pkg), [], "120 astral characters are 120, not 240")
+        pkg["resultSignal"]["says"] += "x"
+        self.assertEqual([p["instancePath"] for p in fp.schema_problems(pkg)], ["/resultSignal/says"])
+
     def test_pack_drops_old_signatures(self):
         write_agent(self.root, signatures=[{"role": "publisher", "alg": "EdDSA", "kid": "x", "sig": "AA"}])
         answer = fp.pack(self.root)

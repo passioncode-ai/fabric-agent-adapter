@@ -172,6 +172,30 @@ test('pack refuses a chosen agentRef and a stale receipt, and drops old signatur
   assert.ok(dropped.notes.some((n) => n.includes('dropped 1 signature')));
 });
 
+test('files are listed in UTF-16 order, and a file added after packing is caught', (t) => {
+  const root = tempDir(t);
+  writeAgent(root);
+  const names = ['a.md', 'a/x.md', '\u{1F600}.md', '\uFF5E.md'];
+  for (const name of names) {
+    fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+    fs.writeFileSync(path.join(root, name), 'x\n');
+  }
+  const paths = k.pack(root).package.files.map((f) => f.path);
+  assert.deepEqual(paths.filter((p) => names.includes(p)), names, 'RFC 8785 order: UTF-16 code units');
+  assert.deepEqual(paths, [...paths].sort());
+  assert.ok(k.pack(root, { apply: true }).applied);
+  fs.writeFileSync(path.join(root, 'added.md'), 'added after packing\n');
+  assert.ok(k.verify(root, { publisher: [] }).problems.some((p) => p.problem === 'file-unlisted' && p.instancePath === 'added.md'));
+});
+
+test('the schema counts code points', () => {
+  const pkg = structuredClone(VECTORS.fixtures.find((f) => f.name === 'fabric-package-agent').document);
+  pkg.resultSignal.says = '\u{1F600}'.repeat(120);
+  assert.deepEqual(k.schemaProblems(pkg), [], '120 astral characters are 120, not 240');
+  pkg.resultSignal.says += 'x';
+  assert.deepEqual(k.schemaProblems(pkg).map((p) => p.instancePath), ['/resultSignal/says']);
+});
+
 test('sign then verify, a countersignature, re-signing, and a folder changed after signing', (t) => {
   const dir = tempDir(t);
   const root = path.join(dir, 'pkg');

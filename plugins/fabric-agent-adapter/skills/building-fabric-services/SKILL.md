@@ -8,16 +8,17 @@ description: >-
   "make this agent a local service", "make an online dashboard a Fabric service", "add the
   well-known endpoint", «расходы агента на модели». Covers fabric-service/0.1:
   surfaces, token and one-time login, state, one copy, launchd, descriptor, well-known document,
-  events, the usage report; online: the https guard, the token-gated well-known document, the
-  __Host- cookie; the board responder (fenced claims); Python, Node and dashboard kits, probes.
+  events, the usage report; online: the https guard, token-gated well-known, the
+  __Host- cookie; the board responder (fenced claims); Python, Node and dashboard kits, probes;
+  packing and signing (fabric-package/1).
   NOT for a one-off script or cron job, a hosted product
-  with no agent behind it, the provider manifest (adapting-projects-to-fabric), or building Fabric
+  with no agent, the provider manifest (adapting-projects-to-fabric), or building Fabric
   Dashboards.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.30.0"
+  version: "0.31.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "f00a7685e3861c27f7899c033fb850a145a1708f"
@@ -270,6 +271,23 @@ and 1280 px; needs Playwright, else `NOT_RUN`).
 Then prove the lock: start a second copy by hand against the same data directory; it
 must exit 75 while the first keeps serving. Prove recovery: `kill -9` the launchd pid;
 the well-known document must answer again with a new pid within about 15 seconds.
+
+## Packing and signing it — `fabric-package/1`
+
+To hand an agent to another machine or an organization, pack it as one folder (contract DEC-0050, DEC-0051). Write the
+author's `fabric.package.json` (the descriptive fields; for an agent `resultSignal` and `evals` with the receipt of the
+suite as packed), then:
+
+```bash
+python3 <skill-dir>/scripts/fabric_package.py pack <folder>            # or: node fabric-package.mjs, npx @passioncode-ai/fabric-agent-adapter pack
+python3 <skill-dir>/scripts/fabric_package.py pack <folder> --apply
+python3 <skill-dir>/scripts/fabric_package.py sign <folder> --key <key file> --kid <kid> --apply
+python3 <skill-dir>/scripts/fabric_package.py verify <folder> --trust <trust.json>
+```
+
+`pack` derives `agentRef`, lists every file with its SHA-256, computes the digest and checks the schema, the rules and
+the folder; it refuses `.env`, keys, `.git`, caches and symlinks. `sign` uses a key file the person names (Ed25519,
+`EdDSA`); it never makes, keeps or prints a key. Read [the package reference](references/package.md) before packing.
 
 ## The repository around the service
 

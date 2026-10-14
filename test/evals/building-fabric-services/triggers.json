@@ -156,6 +156,18 @@
     {
       "query": "Post a question to another Project on the board from my Claude Code session.",
       "shouldTrigger": false
+    },
+    {
+      "query": "Pack example-agent as a fabric-package/1 folder and sign it with our publisher key.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Упакуй агента в пакет Fabric и подпиши его, чтобы поставить в организацию.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Zip this folder and upload it to S3.",
+      "shouldTrigger": false
     }
   ]
 }
