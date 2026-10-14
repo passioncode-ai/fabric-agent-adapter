@@ -693,7 +693,7 @@ class HoldTests(Conversation):
 
         def acts(request, ctx):
             self.board.holds = {"threads": [thread]}
-            threading.Timer(0.05, lambda: setattr(self.board, "holds", {})).start()
+            self.board.lift_holds_after = "com.effect_begin"  # FAA-43: lifted by the first held begin, not by a timer
             ctx.begin_effect("Rendering.")
             return {"state": "completed", "observed": True, "summary": "Rendered and checked."}
         self.outcome = acts
@@ -701,7 +701,7 @@ class HoldTests(Conversation):
         r.hold_delay = 0.01
         r.step()
         begins = [a for t, a in self.board.calls if t == "com.effect_begin"]
-        self.assertGreaterEqual(len(begins), 2)
+        self.assertEqual(len(begins), 2, "one begin refused held, then the same begin once the hold is lifted")
         self.assertEqual(len({b["fence"]["idempotency"]["key"] for b in begins}), 1, "the same key each time")
         self.assertIn("board.request.waiting", self.kinds())
         self.assertEqual((self.board.requests[rid]["state"], self.board.requests[rid]["effect"]), ("completed", "succeeded_observed"))

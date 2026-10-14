@@ -12,7 +12,8 @@ the session's DELETE. Its clock is a number the test moves (`advance`), never th
 `fail_next[tool] = code` (one refusal), `drop_next[tool]` (the call commits but its answer is lost), `down` (every call
 503), `omit_transferred` (a board pinned before DEC-0078), `revoked` (the operator revoked the grant), `holds` (an
 operator's hold, DEC-0079: `{threads, projects, slots: [{project, capability}]}`, refused `held` at call time and named
-in `com.status`).
+in `com.status`), `lift_holds_after` (a tool name: the board lifts every hold right after it refuses that tool
+`held` once, so a test waits on the call itself, never on the wall clock).
 
 Python tests use it in-process (`FakeHub(root)`); the Node tests run it as a process (`python3 fake_fabric_hub.py
 serve --root DIR`), which prints one JSON line `{port, control}` and takes test commands as JSON on POST /_control.
@@ -82,6 +83,7 @@ class Board:
         self.replies: List[Dict[str, Any]] = []
         self.directory_page: Optional[Dict[str, Any]] = None
         self.holds: Dict[str, Any] = {}
+        self.lift_holds_after: Optional[str] = None
 
     # -- test setup ----------------------------------------------------------------------------------------------
     def queue(self, capability: str, text: str = "Render the attached composition.", sender: str = OTHER_PROJECT,
@@ -203,6 +205,8 @@ class Board:
             code = self.fail_next.pop(tool)
             return refusal(code, "a refusal the test asked for", retryable=code == "held")
         if self._held(tool, args):
+            if tool == self.lift_holds_after:
+                self.holds, self.lift_holds_after = {}, None
             return refusal("held", "The operator holds this work; try again later.", retryable=True)
         handler = getattr(self, "op_" + tool.split(".", 1)[1], None)
         if handler is None:

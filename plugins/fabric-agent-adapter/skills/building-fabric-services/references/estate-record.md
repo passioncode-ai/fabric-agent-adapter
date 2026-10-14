@@ -1,10 +1,11 @@
 # The estate record — what the operator's machines are, signed by their passkey (DEC-0055)
 
 Fabric Agent Contract DEC-0055, `docs/specification/estate-record.md`, schema `schemas/estate-record.schema.json`,
-rules `FAC-SEM-072…076`. One revision of one person's estate lists:
+rules `FAC-SEM-072…076`, with contexts (DEC-0082, `docs/specification/contexts.md`, `FAC-SEM-110`, `FAC-SEM-111`).
+One revision of one person's estate lists:
 - the passkeys that sign it;
 - the machines, with their device keys and a certificate of each machine's hub key;
-- the packages placed on each machine;
+- the packages placed on each machine, each in a context: the person's own, or an organization's;
 - where each secret slot is filled from (by reference only);
 - share grants and revocations.
 
@@ -16,6 +17,7 @@ derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fab
 
 - Applying a revision
 - Trusting a delegation key
+- Contexts: one agent for you and for an organization
 - Checking a record you produce
 - What the kit does not do
 
@@ -51,7 +53,8 @@ It checks, in the order of the ER table:
    - The signature: ES256 or EdDSA, under a key validated first (a valid P-256 point; an Ed25519 key of full order).
 7. **The window.** At most 30 days. A revision may be issued up to 60 s ahead of the verifier's clock (DEC-0066,
    `CLOCK_SKEW_SECONDS`); earlier than that it is `not-yet-valid`.
-8. **The record's own rules.** A violation is `rule-violation` with its `codes`, `FAC-SEM-072…076` and `FAC-SEM-092`
+8. **The record's own rules.** A violation is `rule-violation` with its `codes`, `FAC-SEM-072…076`, `FAC-SEM-110`,
+   `FAC-SEM-111` and `FAC-SEM-092`
    (each passkey the record lists is a signing credential, its origins within its RP ID).
 
 Dates are strict RFC 3339: a `T`, an offset, and a day that exists. `:60` and a space are refused. Passkey JWK `x`
@@ -90,14 +93,40 @@ gate = fd.delegation_gate(audience=..., jwks=keys, issuer=..., effects=..., esta
   `{certified: true, machine, revision}` or `{certified: false, fault, detail}`. Both kits are held to the contract's
   `fixtures/vectors/hub-key.json` (`test/fixtures/contract/hub-key-vectors.json`).
 
+## Contexts: one agent for you and for an organization
+
+A placement and a secret placement carry a `context` (DEC-0082): `personal`, or `org:<orgId>` with an organization id
+of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent. A context is compared as written:
+`Personal`, `ORG:x` or a trailing newline names no context. `parse_context(value)` / `parseContext(value)` answer
+`{kind: "personal"}`, `{kind: "org", org}` or nothing.
+
+- **One agent, once per context.** A machine may place the same `agentRef` for the person and for each organization;
+  placements are keyed by agent and context (FAC-SEM-074), and a secret slot by agent, slot and context (FAC-SEM-075).
+  A secret fills a slot of an agent placed on that machine in the secret's own context.
+- **An organization's instance runs under a share grant** (FAC-SEM-111). Its placement names, in `grant`, a share grant
+  of the record whose `context` is the placement's, as written, and that the record does not revoke. A personal
+  placement names no grant. A context that is not `org:<orgId>` matches no grant, so it fails closed.
+- **An organization's slot is filled from its own machine.** An envelope names no context, so a secret placed in an
+  organization's context has `from` equal to the machine it sits on (FAC-SEM-075).
+- **A share grant is never personal** (FAC-SEM-110). A grant to a principal outside the estate (`principalKind:
+  external`) is used in that principal's organization; `context: "personal"` on it is a finding, and an absent one
+  means not stated. `grant_context_findings(grant, at)` / `grantContextFindings(grant, at)` check one grant on its own.
+
+Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
+non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
+answer the contract's contexts fixtures and variants of them (`test/fixtures/contract/estate-vectors.json`).
+
 ## Checking a record you produce
 
 `estate_record_rules(kind, value)` / `estateRecordRules(kind, value)` are the contract's rules, finding for finding:
-- `estate-record` (FAC-SEM-072…076);
+- `estate-record` (FAC-SEM-072…076, 110, 111);
 - `estate-record-revision` `{parent, next}` (072);
-- `estate-placement` `{record, machine, package}` (074, 075).
+- `estate-placement` `{record, machine, package, context?}` (074, 075, 111): the package placed on that machine in that
+  context, `personal` when `context` is absent.
 
-`placement_trust(record, machine, agentRef)` names the publisher keys a package verifier trusts for a placed package.
+`placement_trust(record, machine, agentRef, context="personal")` / `placementTrust(record, machine, agentRef, context)`
+names the publisher keys a package verifier trusts for the package placed in that context. A caller that passes no
+context gets the personal placement, as before contexts.
 
 ## What the kit does not do
 

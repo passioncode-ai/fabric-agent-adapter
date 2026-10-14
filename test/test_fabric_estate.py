@@ -65,7 +65,14 @@ class ContractVectors(unittest.TestCase):
             with self.subTest(case["name"]):
                 self.assertEqual(fe.estate_record_rules(case["kind"], case["value"]), case.get("expected"))
         codes = {f["code"] for c in V["rules"] for f in (c.get("expected") or [])}
-        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076"})
+        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076", "FAC-SEM-110", "FAC-SEM-111"})
+
+    def test_a_grants_context_answers_as_the_contract_does(self):
+        """FAC-SEM-110 (DEC-0082) on a grant of its own, against the contract's grant-context fixtures and variants."""
+        self.assertGreaterEqual(len(V["grantContext"]), 7)
+        for case in V["grantContext"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(fe.grant_context_findings(case["value"], ""), case["expected"])
 
     def test_the_digest_the_challenge_and_placement_trust(self):
         for case in V["digests"]:
@@ -73,7 +80,10 @@ class ContractVectors(unittest.TestCase):
             self.assertEqual(fe.estate_challenge_input(case["digest"]).decode("utf-8"), case["challengeInput"])
             self.assertEqual(fe.estate_challenge(case["digest"]).hex(), case["challenge"])
         for case in V["placementTrust"]:
-            self.assertEqual(fe.placement_trust(case["record"], case["machine"], case["agentRef"]), case["expected"])
+            if "context" in case:  # DEC-0082: one placement per context
+                self.assertEqual(fe.placement_trust(case["record"], case["machine"], case["agentRef"], case["context"]), case["expected"])
+            else:
+                self.assertEqual(fe.placement_trust(case["record"], case["machine"], case["agentRef"]), case["expected"])
 
     def test_p256_keys_and_passkey_keys(self):
         for case in V["p256"]:

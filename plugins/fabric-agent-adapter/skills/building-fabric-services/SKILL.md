@@ -18,10 +18,10 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.32.1"
+  version: "0.33.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "1636fa97262f4a26e2086572d540c2ee701e0010"
+  extension-commit: "82e163665e156a08aa3b92e4711015582c06162c"
 ---
 
 # Building Fabric services
@@ -86,7 +86,8 @@ are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
 service checks each call's delegation token (DEC-0039): read [the delegation reference](references/delegation.md);
 the verifier is [`scripts/fabric_delegation.py`](scripts/fabric_delegation.py) /
 [`scripts/fabric-delegation.mjs`](scripts/fabric-delegation.mjs). A service on the operator's machines that
-applies the estate record (DEC-0055) verifies each revision first and trusts only the keys it certifies: read
+applies the estate record (DEC-0055) verifies each revision first and trusts only the keys it certifies, and runs an
+agent once per context, the person's or an organization's (DEC-0082): read
 [the estate record reference](references/estate-record.md). When Fabric chooses the service's runner and models
 (DEC-0046), or a project routes its work through an ordered list of runners (DEC-0026: the doctor's closed probe
 results, the route checks FAC-SEM-028…034), read [the profiles reference](references/profiles.md).
