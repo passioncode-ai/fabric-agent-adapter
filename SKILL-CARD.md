@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.30.0` |
+| Version | `0.31.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `f00a7685e3861c27f7899c033fb850a145a1708f` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -24,7 +24,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.30.0` |
+| Version | `0.31.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `f00a7685e3861c27f7899c033fb850a145a1708f` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
@@ -46,12 +46,12 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.30.0` |
+| Version | `0.31.0` |
 | Plugin | `fabric-agent-adapter` |
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `f00a7685e3861c27f7899c033fb850a145a1708f`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
-| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration, probe and layout-probe reports |
+| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration, a signed `fabric-package/1` folder (`fabric_package`, `fabric-package.mjs`), probe and layout-probe reports |
 | Mutations | the target service's files; the plist in `~/Library/LaunchAgents`; one descriptor in the services directory |
 | Network | loopback only; the probe talks to `127.0.0.1:<port>`, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; a board responder talks only to Fabric's hub at the `http://127.0.0.1:<port>` its `hub.json` names, after checking that file's pid; the layout probe opens the dashboard in a local headless browser with a one-time login code |
 | Secrets | the service token is created 0600 and read, never printed; a board responder's binding credential lives in a 0600 file, read for each join and never logged |
@@ -66,7 +66,7 @@ provider manifest (the adapting skill) or the Fabric Dashboards app.
 
 | Field | Value |
 |---|---|
-| Version | `0.30.0` |
+| Version | `0.31.0` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | the desktop app 0.4.0 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
 | Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, coordinate, report, link backlog rows, release |

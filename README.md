@@ -231,6 +231,18 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
   --contract /path/to/fabric-agent-contract --json
 ```
 
+Pack, sign and verify an agent as a `fabric-package/1` folder (contract DEC-0050, DEC-0051; nothing is written without
+`--apply`, and the key file is the person's, never made or kept here):
+
+```bash
+npx @passioncode-ai/fabric-agent-adapter pack ./example-agent            # the digest, agentRef and every problem
+npx @passioncode-ai/fabric-agent-adapter pack ./example-agent --apply
+npx @passioncode-ai/fabric-agent-adapter sign ./example-agent --key ./publisher.jwk --apply
+npx @passioncode-ai/fabric-agent-adapter verify ./example-agent --trust ./trust.json
+```
+
+See [the package reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/package.md).
+
 Scaffolding is non-destructive by default. It writes only the paths declared in the
 [delivery brief](docs/evidence/specs/2026-08-27-brief.md) and refuses collisions.
 

@@ -1,0 +1,631 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fabric.passioncode.ai/agent-contract/0.1.0/schemas/fabric-package.schema.json",
+  "type": "object",
+  "required": [
+    "schema",
+    "kind",
+    "id",
+    "version",
+    "publisher",
+    "licence",
+    "files",
+    "digest"
+  ],
+  "properties": {
+    "schema": {
+      "const": "fabric-package/1"
+    },
+    "kind": {
+      "enum": [
+        "agent",
+        "skill-set"
+      ]
+    },
+    "id": {
+      "$ref": "#/$defs/name"
+    },
+    "version": {
+      "$ref": "#/$defs/common.$defs.semver"
+    },
+    "publisher": {
+      "$ref": "#/$defs/name"
+    },
+    "agentRef": {
+      "$ref": "#/$defs/agentRef"
+    },
+    "licence": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "layer": {
+      "enum": [
+        "base",
+        "org",
+        "team",
+        "workplace",
+        "person"
+      ]
+    },
+    "runners": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9./-]+$"
+      }
+    },
+    "skills": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "maxLength": 64
+      }
+    },
+    "allowedToolsCeiling": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "listingChars": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "provider": {
+      "$ref": "#/$defs/path"
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "entry"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/service-common.$defs.serviceId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "entry": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "enum": [
+                "node",
+                "python",
+                "binary"
+              ]
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "secrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "purpose"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "optional": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "requires": {
+      "type": "object",
+      "properties": {
+        "servers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/service-common.$defs.serviceId"
+          }
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "publisher",
+              "id",
+              "range"
+            ],
+            "properties": {
+              "publisher": {
+                "$ref": "#/$defs/name"
+              },
+              "id": {
+                "$ref": "#/$defs/name"
+              },
+              "range": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "darwin",
+              "linux",
+              "windows"
+            ]
+          }
+        },
+        "gpu": {
+          "type": "boolean"
+        },
+        "mcp": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "required": [
+              "role",
+              "tools"
+            ],
+            "properties": {
+              "role": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "contract": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "tools": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 128,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$"
+                }
+              },
+              "secrets": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "costPresets": {
+      "$ref": "#/$defs/manifest.properties.costPresets"
+    },
+    "resultSignal": {
+      "type": "object",
+      "required": [
+        "name",
+        "says"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/name"
+        },
+        "says": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      },
+      "additionalProperties": false
+    },
+    "state": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "purpose"
+        ],
+        "properties": {
+          "path": {
+            "$ref": "#/$defs/path"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evals": {
+      "type": "object",
+      "required": [
+        "suite"
+      ],
+      "properties": {
+        "suite": {
+          "$ref": "#/$defs/path"
+        },
+        "receipt": {
+          "type": "object",
+          "required": [
+            "ranAt",
+            "suite",
+            "passed",
+            "failed"
+          ],
+          "properties": {
+            "ranAt": {
+              "$ref": "#/$defs/common.$defs.timestamp"
+            },
+            "suite": {
+              "$ref": "#/$defs/common.$defs.sha256"
+            },
+            "passed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ecosystem",
+          "name",
+          "version",
+          "sha256"
+        ],
+        "properties": {
+          "ecosystem": {
+            "enum": [
+              "npm",
+              "pypi",
+              "cargo",
+              "go",
+              "other"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 214
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "sha256": {
+            "$ref": "#/$defs/common.$defs.sha256"
+          },
+          "path": {
+            "$ref": "#/$defs/path"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "$ref": "#/$defs/path"
+          },
+          "sha256": {
+            "$ref": "#/$defs/common.$defs.sha256"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "digest": {
+      "$ref": "#/$defs/common.$defs.sha256"
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "alg",
+          "kid",
+          "sig"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "publisher",
+              "organization"
+            ]
+          },
+          "alg": {
+            "enum": [
+              "EdDSA"
+            ]
+          },
+          "kid": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+          },
+          "sig": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        },
+        "additionalProperties": false
+      },
+      "contains": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "const": "publisher"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "minContains": 1,
+      "maxContains": 1
+    },
+    "extensions": {
+      "$ref": "#/$defs/common.$defs.extensions"
+    }
+  },
+  "additionalProperties": false,
+  "if": {
+    "properties": {
+      "kind": {
+        "const": "agent"
+      }
+    },
+    "required": [
+      "kind"
+    ]
+  },
+  "then": {
+    "required": [
+      "agentRef",
+      "resultSignal",
+      "evals"
+    ],
+    "properties": {
+      "agentRef": true,
+      "provider": true,
+      "resultSignal": true,
+      "evals": {
+        "type": "object",
+        "required": [
+          "receipt"
+        ],
+        "properties": {
+          "receipt": true
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "not": {
+            "required": [
+              "provider"
+            ],
+            "properties": {
+              "provider": true
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "skills",
+            "requires"
+          ],
+          "properties": {
+            "service": false,
+            "skills": {
+              "type": "array",
+              "minItems": 1
+            },
+            "requires": {
+              "type": "object",
+              "required": [
+                "mcp"
+              ],
+              "properties": {
+                "mcp": true
+              }
+            },
+            "state": false,
+            "layer": false
+          }
+        }
+      }
+    ]
+  },
+  "else": {
+    "required": [
+      "layer",
+      "skills"
+    ],
+    "properties": {
+      "layer": true,
+      "agentRef": false,
+      "provider": false,
+      "service": false,
+      "secrets": false,
+      "costPresets": false,
+      "resultSignal": false,
+      "state": false,
+      "skills": {
+        "type": "array",
+        "minItems": 1
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "agentRef": {
+      "type": "string",
+      "maxLength": 146,
+      "pattern": "^urn:fabric:agent:[a-z][a-z0-9]*(?:-[a-z0-9]+)*:[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "path": {
+      "type": "string",
+      "pattern": "^(?![/~])(?!.*\\\\)(?!.*//)(?!(?:.*/)?\\.{1,2}(?:/|$))[^\\u0000-\\u001f:]{1,256}(?<!/)$"
+    },
+    "common.$defs.semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "service-common.$defs.serviceId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,62}$"
+    },
+    "manifest.properties.costPresets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "capability",
+          "label",
+          "maxUsd"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,39}$"
+          },
+          "capability": {
+            "$ref": "#/$defs/common.$defs.capabilityName"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "paidTools": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "depth": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "common.$defs.capabilityName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{1,127}$"
+    },
+    "common.$defs.timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "common.$defs.sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "common.$defs.extensions": {
+      "type": "object",
+      "propertyNames": {
+        "format": "uri"
+      },
+      "additionalProperties": true
+    }
+  }
+}

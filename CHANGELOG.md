@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.31.0 - 2026-10-14
+
+An agent is packed, signed and verified as a `fabric-package/1` folder (FAA-27a and FAA-36, `RM-28 pilot`; contract
+DEC-0050, DEC-0051, DEC-0071, DEC-0074, all at the pin `f00a768`).
+
+### Added
+
+- **`fabric_package.py` and `fabric-package.mjs`** (`building-fabric-services`). The two write the same bytes.
+  - `pack <folder>` reads the author's `fabric.package.json` and does the rest:
+    - derives `agentRef` and lists every other file with its SHA-256, in UTF-16 order;
+    - computes the RFC 8785 digest;
+    - checks the result against the contract's schema (bundled at the pin), FAC-SEM-064…066 and FAC-SEM-102, and the
+      folder check.
+    - It refuses symlinks, `.git`, caches and files that are credentials by name, and names each one.
+    - It writes nothing without `--apply`, or while a problem stands.
+  - `sign <folder> --key <file>` adds an Ed25519 (`EdDSA`) publisher signature or organization countersignature over
+    the typed statement.
+    - The key is a JWK or PKCS#8 PEM file at mode 600, which the person names. The kit never makes, keeps or prints a
+      key.
+    - A folder that no longer matches its package is not signed.
+  - `verify <folder> --trust <file>` runs the contract's `verifyPackage` in PK-1…PK-10's order, with the small-order key
+    check first, plus the folder check and the rules.
+  - Also exported: `consumer_placement` / `consumerPlacement` for a consumer agent's `requires.mcp`.
+- **`npx @passioncode-ai/fabric-agent-adapter pack|sign|verify`**: the same commands from the npm package.
+- **`references/package.md`**: what a package is, the author's file, the three commands, a consumer agent, and what this
+  version does not do. That list: ES256 (Fabric D2), hub and passkey signing, the passkey countersignature, Fabric
+  recording packages by `agentRef`, and `publish`.
+
+### Evidence
+
+- `test/fixtures/contract/vendor_vectors.mjs` now writes `package-vectors.json`, with every case re-answered by the
+  contract's own functions, and the bundled schema. The other vendored files came out byte-identical.
+- The Python and Node tests each hold 17 cases:
+  - every verifier case;
+  - every signature reproduced from the vector seeds;
+  - every fixture through the schema, and every semantic fixture through the rules;
+  - pack rebuilding the vector package byte for byte;
+  - both kits packing and signing one folder to the same bytes.
+
+  `test/test_installer.py` covers the npm commands. 28 planted defects were all caught, three of them after a case was
+  added for them.
+- A scenario eval (`package-pack-sign`) and three trigger queries were written before the prose.
+
 ## 0.30.0 - 2026-10-13
 
 The Node service kit installs and uninstalls a launchd job, as the Python kit does (FAA-04). The probe fails a plist
