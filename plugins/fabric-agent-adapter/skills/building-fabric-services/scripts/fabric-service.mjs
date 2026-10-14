@@ -20,7 +20,8 @@ export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-cont
 export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.0';
 export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 export const EXIT_ALREADY_RUNNING = 75;
-// Lifecycle contract (fabric-workspace knowledge/lifecycle.md), the same values as fabric_service.py.
+// Lifecycle rules: references/lifecycle.md (the rule for this kit's users; it implements the public
+// contract's service specification, Lifecycle), the same values as fabric_service.py.
 // A launchd-supervised copy that finds the lock held backs off in-process before its exit 75 (LC-03).
 export const SUPERVISOR_ENV = 'FABRIC_SERVICE_SUPERVISOR';
 export const LOCK_WAIT_SUPERVISED_SECONDS = 300;
