@@ -140,6 +140,23 @@ class ModelUsableTests(unittest.TestCase):
         self.assertTrue(problems and "p" in problems[0])
         self.assertTrue(profiles.model_usable("example/none", self.catalogue))
 
+    def test_open_vendor_is_descriptive_in_the_doctor_too(self):
+        """DEC-0083: the doctor admits as the resolution does — open-vendor is never checked against the policy, and a
+        model whose only class is open-vendor is admitted on nothing."""
+        catalogue = {"models": [{"id": "example/open", "classes": ["cheap", "open-vendor"]},
+                                {"id": "example/bare", "classes": ["open-vendor"]}]}
+        policy = {"meta": {"id": "p", "revision": 1}, "modelClasses": ["cheap"]}
+        self.assertEqual(profiles.model_usable("example/open", catalogue, policy), [])
+        self.assertEqual(profiles.model_usable("example/bare", catalogue, policy),
+                         ["model example/bare has no class but open-vendor, which admits nothing, so policy p does not allow it"])
+        self.assertEqual(profiles.model_usable("example/bare", catalogue, dict(policy, modelClasses=["open-vendor"])),
+                         ["model example/bare has no class but open-vendor, which admits nothing, so policy p does not allow it"])
+        self.assertEqual(profiles.model_usable("example/bare", catalogue), [], "no policy: nothing to admit against")
+        for model in ("example/open", "example/bare"):
+            resolution = profiles.resolve_model_profile(catalogue=catalogue, profiles=[{"id": "x", "models": [model]}],
+                                                        choices={"estate": "x"}, policy=policy)
+            self.assertEqual("models" in resolution, profiles.model_usable(model, catalogue, policy) == [], model)
+
 
 class ConfigurationTests(unittest.TestCase):
     """The well-known `configuration` (DEC-0046) and its summary tiles, the dashboard's "Runner & model"."""

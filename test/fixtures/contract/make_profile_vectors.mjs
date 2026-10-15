@@ -84,6 +84,27 @@ for (const [file, kind] of [['registry-models.json', 'model-catalogue'], ['model
   vary('two profiles, both closed', (v) => { const b = clone(p0(v)); b.id = 'second-lane'; b.models = [b.models[0]]; p0(v).fallback = 'none'; v.profiles.push(b); return v; });
 }
 
+// FAC-SEM-112 on the resolution's outcome (the models the policy leaves) and DEC-0083's admission: open-vendor is
+// descriptive, so a policy admits and excludes nothing by it, and a model with no other class does not stay.
+if (fs.existsSync(path.join(args.semantic, 'profile-resolution-user-content-policy-drops-open.json'))) {
+  const pd = read(args.semantic, 'profile-resolution-user-content-policy-drops-open.json').input;
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const vary = (name, edit) => { const value = edit(clone(pd)); ruleCases.push({ name: `crafted policy FAC-SEM-112: ${name}`, kind: 'profile-resolution', value, expected: rules.profileRules('profile-resolution', value) }); };
+  const row = (v, id) => v.catalogue.models.find((m) => m.id === id);
+  vary('the policy allows strong too', (v) => { v.policy.modelClasses = ['strong', 'cheap', 'chinese-vendor']; return v; });
+  vary('the policy names open-vendor alone', (v) => { v.policy.modelClasses = ['open-vendor']; return v; });
+  vary('the policy names open-vendor beside cheap', (v) => { v.policy.modelClasses = ['open-vendor', 'cheap']; return v; });
+  vary('the open model carries only open-vendor', (v) => { row(v, 'deepseek/deepseek-v4-pro').classes = ['open-vendor']; v.policy.modelClasses = ['cheap', 'strong', 'chinese-vendor']; return v; });
+  vary('the open model carries only open-vendor and cheap', (v) => { row(v, 'deepseek/deepseek-v4-pro').classes = ['open-vendor', 'cheap']; return v; });
+  vary('no fallback, the policy drops the first', (v) => { v.profiles[0].fallback = 'none'; return v; });
+  vary('the policy without an id', (v) => { delete v.policy.meta.id; return v; });
+  vary('the policy id with its own toString', (v) => { v.policy.meta.id = { toString: 1 }; return v; });
+  vary('the profile id with its own toString', (v) => { v.profiles[0].id = { toString: 1 }; v.choices = { estate: 'member-chat' }; return v; });
+  vary('the profile route closed already: one finding, not two', (v) => { row(v, 'deepseek/deepseek-v4-pro').classes = ['strong', 'cheap']; return v; });
+  vary('the policy leaves nothing: a refusal, no outcome finding', (v) => { v.policy.modelClasses = ['frontier']; return v; });
+  vary('a second profile with the same id first in the list', (v) => { v.profiles.unshift({ ...clone(v.profiles[0]), models: ['qwen/qwen3.8-flash'], fallback: 'none' }); return v; });
+}
+
 // Resolutions: every profile-resolution fixture's inputs, then the order and the classes varied over them.
 const base = read(args.semantic, 'profile-resolution-ok.json');
 const resolutions = [];

@@ -28,6 +28,10 @@ RESOLUTION_ORDER = ("request", "agent", "binding", "estate")
 # The vendor login each subscription is, and the one runner kind it runs in (DEC-0046, ADR-0147 decision 2).
 SUBSCRIPTION_RUNNER = {"claude": "claude-code", "kimi": "kimi-code", "chatgpt": "codex"}
 MAX_PROBE_MS = 5000
+#: DEC-0083: the model class of a model whose vendor publishes its weights openly — descriptive: a policy admits and
+#: excludes nothing by it — and what a lane reads when it reads what a member, a client or the public sends.
+OPEN_VENDOR = "open-vendor"
+USER_CONTENT = "user-content"
 _BARE_BINARY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
@@ -79,7 +83,8 @@ def _js_number(value: Any) -> Optional[float]:
 def resolve_model_profile(*, catalogue: Any = None, profiles: Any = None, choices: Any = None, policy: Any = None) -> Dict[str, Any]:
     """FAC-SEM-060: the request's profile, else the agent's, else the binding's or project's, else the estate default.
     When the project's policy names `modelClasses`, a model stays only if every class the catalogue gives it is
-    allowed; an empty result refuses the launch, naming the policy."""
+    allowed; the descriptive class `open-vendor` is not checked (DEC-0083), and a model with no other class does not stay.
+    An empty result refuses the launch, naming the policy."""
     choices = choices if isinstance(choices, dict) else {}
     level = next((name for name in RESOLUTION_ORDER if isinstance(choices.get(name), str)), None)
     if level is None:
@@ -95,7 +100,11 @@ def resolve_model_profile(*, catalogue: Any = None, profiles: Any = None, choice
     rows = {}
     for row in _list(catalogue.get("models") if isinstance(catalogue, dict) else None):
         rows[json.dumps(row.get("id"))] = row
-    within = [m for m in models if json.dumps(m) in rows and all(c in allowed for c in _strings(rows[json.dumps(m)].get("classes")))]
+    def admitted(model: str) -> bool:
+        row = rows.get(json.dumps(model))
+        admission = [c for c in _strings(row.get("classes")) if c != OPEN_VENDOR] if row is not None else []
+        return bool(admission) and all(c in allowed for c in admission)
+    within = [m for m in models if admitted(m)]
     if within:
         return {"from": level, "profile": profile_id, "models": within}
     meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
@@ -170,12 +179,6 @@ def _profile_resolution(value: Dict[str, Any]) -> List[Dict[str, str]]:
     return findings
 
 
-#: DEC-0083: the model class of a model whose vendor publishes its weights openly, and what a lane reads when it reads
-#: what a member, a client or the public sends.
-OPEN_VENDOR = "open-vendor"
-USER_CONTENT = "user-content"
-
-
 def closed_user_content_route(profile: Any, catalogue: Any) -> Optional[List[str]]:
     """FAC-SEM-112 (DEC-0083) for one profile: the models that run when the lane reads user content and none of them is
     an open-vendor model, or None when the profile does not read user content or its route has one. Under
@@ -192,19 +195,41 @@ def closed_user_content_route(profile: Any, catalogue: Any) -> Optional[List[str
     return [_estate._show(model) for model in route]
 
 
+def _closed_route(fallback: Any, closed: List[str]) -> str:
+    """How a closed route is named in a finding: under ``between-turns`` all of it, otherwise its first model."""
+    return "none of its models is" if fallback == "between-turns" else "its first model, %s, is not" % (closed[0] if closed else "none")
+
+
 def _open_vendor_routes(value: Dict[str, Any]) -> List[Dict[str, str]]:
     """FAC-SEM-112: a profile that reads user content has an open-vendor route, so the lane never runs on closed vendors
-    alone, which refuse the content it exists to handle."""
+    alone, which refuse the content it exists to handle. The resolution's outcome is held to the same test: when the
+    resolved profile reads user content and its own route is open, the models the policy leaves must still give one,
+    or the policy is named as what leaves the lane closed (one cause, one finding)."""
     findings = []
-    for i, profile in enumerate(_list(value.get("profiles"))):
+    profiles = _list(value.get("profiles"))
+    for i, profile in enumerate(profiles):
         closed = closed_user_content_route(profile, value.get("catalogue"))
         if closed is None:
             continue
-        which = ("none of its models is" if profile.get("fallback") == "between-turns"
-                 else "its first model, %s, is not" % (closed[0] if closed else "none"))
         findings.append(_finding("FAC-SEM-112", "/profiles/%d/models" % i, "profile %s reads user content, but %s open-vendor in "
-                                 "the catalogue: the lane would run on closed vendors alone" % (_show_id(profile), which)))
+                                 "the catalogue: the lane would run on closed vendors alone" % (_show_id(profile), _closed_route(profile.get("fallback"), closed))))
+    choices = value.get("choices") if isinstance(value.get("choices"), dict) else {}
+    outcome = resolve_model_profile(catalogue=value.get("catalogue"), profiles=value.get("profiles"), choices=choices, policy=value.get("policy"))
+    if "models" not in outcome:
+        return findings
+    profile = next((item for item in profiles if item.get("id") == outcome["profile"]), None)  # a string: == is ===
+    if profile is None or closed_user_content_route(profile, value.get("catalogue")) is not None:
+        return findings
+    closed = closed_user_content_route(dict(profile, models=outcome["models"]), value.get("catalogue"))
+    if closed is None:
+        return findings
+    policy = value.get("policy")
+    meta = policy.get("meta") if isinstance(policy, dict) and isinstance(policy.get("meta"), dict) else {}
+    findings.append(_finding("FAC-SEM-112", "/resolved/models", "the policy %s leaves profile %s's lane on closed vendors alone: of the "
+                             "models it admits, %s open-vendor in the catalogue" % (_estate._show(meta["id"]) if "id" in meta else "undefined",
+                                                                                    _show_id(profile), _closed_route(profile.get("fallback"), closed))))
     return findings
+
 
 
 def _show_id(profile: Dict[str, Any]) -> str:
@@ -296,9 +321,12 @@ def model_usable(model: str, catalogue: Any, policy: Any = None) -> List[str]:
         return ["model %s is not in the model catalogue" % model]
     if isinstance(policy, dict) and isinstance(policy.get("modelClasses"), list):
         allowed = set(_strings(policy["modelClasses"]))
-        outside = [c for c in _strings(rows[model].get("classes")) if c not in allowed]
+        meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
+        admission = [c for c in _strings(rows[model].get("classes")) if c != OPEN_VENDOR]  # DEC-0083: descriptive
+        if not admission:
+            return ["model %s has no class but %s, which admits nothing, so policy %s does not allow it" % (model, OPEN_VENDOR, _js_string(meta.get("id")))]
+        outside = [c for c in admission if c not in allowed]
         if outside:
-            meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
             return ["model %s has class %s, which policy %s does not allow" % (model, ", ".join(outside), _js_string(meta.get("id")))]
     return []
 

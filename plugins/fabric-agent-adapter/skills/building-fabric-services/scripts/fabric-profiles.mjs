@@ -21,6 +21,10 @@ export class ProfileError extends Error {}
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
 const strings = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []);
+/** DEC-0083: the model class of a model whose vendor publishes its weights openly — descriptive: a policy admits and
+ * excludes nothing by it — and what a lane reads when it reads what a member, a client or the public sends. */
+export const OPEN_VENDOR = 'open-vendor';
+export const USER_CONTENT = 'user-content';
 /** The contract's `show`: String(value), or its JSON where String() throws (an object whose own `toString` is data). */
 const show = (value) => {
   if (typeof value === 'string') return value;
@@ -48,7 +52,12 @@ export function resolveModelProfile({ catalogue, profiles, choices = {}, policy 
   if (!isObject(policy) || !Array.isArray(policy.modelClasses)) return { from: level, profile: id, models };
   const allowed = new Set(strings(policy.modelClasses));
   const rows = new Map(list(isObject(catalogue) ? catalogue.models : undefined).map((row) => [row.id, row]));
-  const within = models.filter((model) => { const row = rows.get(model); return row !== undefined && strings(row.classes).every((name) => allowed.has(name)); });
+  // The descriptive class open-vendor is not checked (DEC-0083), and a model with no other class does not stay.
+  const within = models.filter((model) => {
+    const row = rows.get(model);
+    const admission = row === undefined ? [] : strings(row.classes).filter((name) => name !== OPEN_VENDOR);
+    return admission.length > 0 && admission.every((name) => allowed.has(name));
+  });
   if (within.length) return { from: level, profile: id, models: within };
   const meta = isObject(policy.meta) ? policy.meta : {};
   return { refused: 'model-classes-empty', profile: id, policy: { id: String(meta.id), revision: Number(meta.revision) } };
@@ -112,11 +121,6 @@ function profileResolution(value) {
   return findings;
 }
 
-/** DEC-0083: the model class of a model whose vendor publishes its weights openly. */
-export const OPEN_VENDOR = 'open-vendor';
-/** DEC-0083: what a lane reads when it reads what a member, a client or the public sends. */
-export const USER_CONTENT = 'user-content';
-
 /**
  * FAC-SEM-112 (DEC-0083) for one profile: the models that run when the lane reads user content and none of them is an
  * open-vendor model, or undefined when the profile does not read user content or its route has one. Under
@@ -136,14 +140,26 @@ export function closedUserContentRoute(profile, catalogue) {
 }
 
 /** FAC-SEM-112: a profile that reads user content has an open-vendor route, so the lane never runs on closed vendors alone. */
+const closedRoute = (fallback, closed) => (fallback === 'between-turns' ? 'none of its models is' : `its first model, ${closed[0] ?? 'none'}, is not`);
+
+/** FAC-SEM-112 on the profiles and on the resolution's outcome: the models the policy leaves keep an open-vendor route. */
 function openVendorRoutes(value) {
   const findings = [];
-  list(value.profiles).forEach((profile, i) => {
+  const profiles = list(value.profiles);
+  profiles.forEach((profile, i) => {
     const closed = closedUserContentRoute(profile, value.catalogue);
     if (closed === undefined) return;
-    const which = profile.fallback === 'between-turns' ? 'none of its models is' : `its first model, ${closed[0] ?? 'none'}, is not`;
-    findings.push(finding('FAC-SEM-112', `/profiles/${i}/models`, `profile ${show(profile.id)} reads user content, but ${which} open-vendor in the catalogue: the lane would run on closed vendors alone`));
+    findings.push(finding('FAC-SEM-112', `/profiles/${i}/models`, `profile ${show(profile.id)} reads user content, but ${closedRoute(profile.fallback, closed)} open-vendor in the catalogue: the lane would run on closed vendors alone`));
   });
+  const choices = isObject(value.choices) ? value.choices : {};
+  const outcome = resolveModelProfile({ catalogue: value.catalogue, profiles: value.profiles, choices, policy: value.policy });
+  if (!('models' in outcome)) return findings;
+  const profile = profiles.find((item) => item.id === outcome.profile);
+  if (!profile || closedUserContentRoute(profile, value.catalogue) !== undefined) return findings;
+  const closed = closedUserContentRoute({ ...profile, models: outcome.models }, value.catalogue);
+  if (closed === undefined) return findings;
+  const meta = isObject(value.policy) && isObject(value.policy.meta) ? value.policy.meta : {};
+  findings.push(finding('FAC-SEM-112', '/resolved/models', `the policy ${show(meta.id)} leaves profile ${show(profile.id)}'s lane on closed vendors alone: of the models it admits, ${closedRoute(profile.fallback, closed)} open-vendor in the catalogue`));
   return findings;
 }
 
@@ -217,7 +233,10 @@ export function modelUsable(model, catalogue, policy) {
   if (!rows.has(model)) return [`model ${model} is not in the model catalogue`];
   if (isObject(policy) && Array.isArray(policy.modelClasses)) {
     const allowed = new Set(strings(policy.modelClasses));
-    const outside = strings(rows.get(model).classes).filter((c) => !allowed.has(c));
+    const admission = strings(rows.get(model).classes).filter((c) => c !== OPEN_VENDOR);
+    const policyId = String((isObject(policy.meta) ? policy.meta : {}).id);
+    if (!admission.length) return [`model ${model} has no class but ${OPEN_VENDOR}, which admits nothing, so policy ${policyId} does not allow it`];
+    const outside = admission.filter((c) => !allowed.has(c));
     if (outside.length) return [`model ${model} has class ${outside.join(', ')}, which policy ${String((isObject(policy.meta) ? policy.meta : {}).id)} does not allow`];
   }
   return [];

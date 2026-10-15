@@ -66,6 +66,20 @@ test('configuration, its tiles, the well-known document and the usage route', ()
   assert.deepEqual(p.modelUsable('example/none', { models: [] }), ['model example/none is not in the model catalogue']);
 });
 
+test('open-vendor is descriptive in the doctor too (DEC-0083)', () => {
+  const catalogue = { models: [{ id: 'example/open', classes: ['cheap', 'open-vendor'] }, { id: 'example/bare', classes: ['open-vendor'] }] };
+  const policy = { meta: { id: 'p', revision: 1 }, modelClasses: ['cheap'] };
+  const bare = ['model example/bare has no class but open-vendor, which admits nothing, so policy p does not allow it'];
+  assert.deepEqual(p.modelUsable('example/open', catalogue, policy), []);
+  assert.deepEqual(p.modelUsable('example/bare', catalogue, policy), bare);
+  assert.deepEqual(p.modelUsable('example/bare', catalogue, { ...policy, modelClasses: ['open-vendor'] }), bare);
+  assert.deepEqual(p.modelUsable('example/bare', catalogue), []);
+  for (const model of ['example/open', 'example/bare']) {
+    const resolution = p.resolveModelProfile({ catalogue, profiles: [{ id: 'x', models: [model] }], choices: { estate: 'x' }, policy });
+    assert.equal('models' in resolution, p.modelUsable(model, catalogue, policy).length === 0, model);
+  }
+});
+
 test('every route case answers as the contract does (FAC-SEM-028…034)', () => {
   const { cases } = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/route-vectors.json'), 'utf8'));
   assert.ok(cases.length >= 40);
