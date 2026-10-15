@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import https from 'node:https';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -105,6 +106,13 @@ test('registerRemote writes a 0600 token and a descriptor that claims no port', 
 
 const haveOpenssl = spawnSync('openssl', ['version']).status === 0;
 
+/** A port the system says is free on 127.0.0.1 now (FAA-46: a random port in a fixed range collided with a parallel test). */
+const freePort = () => new Promise((resolve, reject) => {
+  const server = net.createServer();
+  server.on('error', reject);
+  server.listen(0, '127.0.0.1', () => { const { port } = server.address(); server.close(() => resolve(port)); });
+});
+
 test('the sample online service over real TLS, met the way a host meets it', { skip: !haveOpenssl && 'openssl not available' }, async () => {
   const dir = temp();
   const cert = path.join(dir, 'cert.pem'), keyFile = path.join(dir, 'key.pem');
@@ -114,13 +122,20 @@ test('the sample online service over real TLS, met the way a host meets it', { s
   const token = 'r'.repeat(40);
   fs.writeFileSync(path.join(dir, 'token'), token, { mode: 0o600 });
   fs.writeFileSync(path.join(dir, 'session.key'), Buffer.alloc(32, 3), { mode: 0o600 });
-  const port = 47000 + Math.floor(Math.random() * 1500);
-  const origin = `https://agent.example.com:${port}`;
-  const child = spawn(process.execPath, [path.join(scripts, 'sample-remote-service.mjs'), '--origin', origin, '--port', String(port),
-    '--token-file', path.join(dir, 'token'), '--session-key-file', path.join(dir, 'session.key'), '--tls-cert', cert, '--tls-key', keyFile], { stdio: ['ignore', 'pipe', 'pipe'] });
-  let out = '';
-  child.stdout.on('data', (b) => { out += b; });
-  child.stderr.on('data', (b) => { out += b; });
+  // The port is free when asked, and another process may still take it before the sample binds: a bind refused with
+  // EADDRINUSE is retried on a new port, never reported as the sample's failure.
+  let port, child, out = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    port = await freePort();
+    out = '';
+    child = spawn(process.execPath, [path.join(scripts, 'sample-remote-service.mjs'), '--origin', `https://agent.example.com:${port}`, '--port', String(port),
+      '--token-file', path.join(dir, 'token'), '--session-key-file', path.join(dir, 'session.key'), '--tls-cert', cert, '--tls-key', keyFile], { stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.on('data', (b) => { out += b; });
+    child.stderr.on('data', (b) => { out += b; });
+    for (let i = 0; i < 50 && !out.includes('example agent on') && !out.includes('EADDRINUSE'); i++) await new Promise((r) => setTimeout(r, 100));
+    if (!out.includes('EADDRINUSE')) break;
+    child.kill('SIGTERM');
+  }
   const ask = (method, p, headers = {}) => new Promise((resolve, reject) => {
     const req = https.request({ host: '127.0.0.1', port, servername: 'agent.example.com', ca: fs.readFileSync(cert), method, path: p, headers: { Host: `agent.example.com:${port}`, ...headers }, timeout: 3000 }, (res) => {
       let body = ''; res.on('data', (c) => { body += c; }); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
@@ -128,7 +143,6 @@ test('the sample online service over real TLS, met the way a host meets it', { s
     req.on('error', reject); req.end();
   });
   try {
-    for (let i = 0; i < 50 && !out.includes('example agent on'); i++) await new Promise((r) => setTimeout(r, 100));
     assert.ok(out.includes('example agent on'), `the sample did not start: ${out}`);
     const anon = await ask('GET', '/.well-known/fabric-service');
     assert.equal(anon.status, 401);
