@@ -90,6 +90,14 @@ def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _double(value: Any) -> float:
+    """A JSON number as JavaScript holds it: the nearest double, and an integer beyond the double range ±Infinity."""
+    try:
+        return float(value)
+    except OverflowError:
+        return math.inf if value > 0 else -math.inf
+
+
 def _same(a: Any, b: Any) -> bool:
     """JavaScript's === (and a Set's SameValueZero) on parsed JSON: an object equals only itself."""
     if a is _MISSING or b is _MISSING:
@@ -99,7 +107,7 @@ def _same(a: Any, b: Any) -> bool:
     if isinstance(a, bool) or isinstance(b, bool):
         return isinstance(a, bool) and isinstance(b, bool) and a == b
     if _number(a) and _number(b):
-        return a == b
+        return _double(a) == _double(b)  # 2**53 + 1 is 2**53 in JavaScript
     return type(a) is type(b) and a == b
 
 
@@ -137,7 +145,7 @@ def _js_to_number(value: Any) -> float:
         radix = _JS_RADIX.fullmatch(text)
         if radix:
             digits, base = next((radix.group(k), b) for k, b in (("x", 16), ("o", 8), ("b", 2)) if radix.group(k))
-            return float(int(digits, base))
+            return _double(int(digits, base))
     return math.nan
 
 
@@ -173,10 +181,37 @@ def _strict_string(value: Any) -> str:
     return _js_string(value)
 
 
+_INDEX_KEY = re.compile(r"0|[1-9][0-9]*", re.ASCII)
+
+
+def _js_keys(value: Dict[str, Any]) -> List[str]:
+    """An object's own keys in the order JavaScript lists them: array-index keys ("0" … "4294967294", no leading zero)
+    ascending, then the others in the order written."""
+    index = sorted((k for k in value if _INDEX_KEY.fullmatch(k) and int(k) <= 2 ** 32 - 2), key=int)
+    taken = set(index)
+    return index + [k for k in value if k not in taken]
+
+
+def _js_json_string(text: str) -> str:
+    """JSON.stringify of a string (well-formed, ES2019): a lone surrogate is escaped as \\uXXXX, never refused."""
+    out = ['"']
+    for ch in text:
+        code = ord(ch)
+        if ch in _delegation._ESCAPES:
+            out.append(_delegation._ESCAPES[ch])
+        elif code < 0x20 or 0xD800 <= code <= 0xDFFF:
+            out.append("\\u%04x" % code)
+        else:
+            out.append(ch)
+    out.append('"')
+    return "".join(out)
+
+
 def _json_stringify(value: Any) -> str:
-    """JSON.stringify for a parsed JSON value: members in their order, numbers as JavaScript writes them."""
+    """JSON.stringify for a parsed JSON value: members in JavaScript's key order, numbers as JavaScript writes them, a
+    lone surrogate escaped."""
     if isinstance(value, dict):
-        return "{" + ",".join(_delegation._string(k) + ":" + _json_stringify(v) for k, v in value.items()) + "}"
+        return "{" + ",".join(_js_json_string(k) + ":" + _json_stringify(value[k]) for k in _js_keys(value)) + "}"
     if isinstance(value, list):
         return "[" + ",".join(_json_stringify(v) for v in value) + "]"
     if value is None:
@@ -186,7 +221,7 @@ def _json_stringify(value: Any) -> str:
     if _number(value):
         text = _js_string(value)
         return "null" if text in ("NaN", "Infinity", "-Infinity") else text
-    return _delegation._string(value)
+    return _js_json_string(value)
 
 
 def _show(value: Any) -> str:

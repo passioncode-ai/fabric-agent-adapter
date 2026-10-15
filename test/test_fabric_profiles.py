@@ -175,6 +175,24 @@ class AdmissionVectorTests(unittest.TestCase):
                 self.assertEqual(profiles.model_usable("example/model", catalogue, policy) == [], case["admitted"], "doctor")
 
 
+class DoctorOnHostileInputTests(unittest.TestCase):
+    """The doctor's model_usable never raises: an id that is an object, a model that is not a string, a policy id whose
+    own toString is data or that is null — each answers as the contract's show writes it."""
+
+    def test_hostile_catalogue_and_policy(self):
+        catalogue = {"models": [{"id": {"toString": 1}, "classes": ["cheap"]}, {"id": ["x"], "classes": ["cheap"]},
+                                {"id": "example/m", "classes": ["strong"]}]}
+        self.assertEqual(profiles.model_usable("example/m", catalogue), [])
+        self.assertEqual(profiles.model_usable({"toString": 1}, catalogue), ['model {"toString":1} is not in the model catalogue'])
+        self.assertEqual(profiles.model_usable(None, catalogue), ["model null is not in the model catalogue"])
+        self.assertEqual(profiles.model_usable({"toString": 1, "a": "\ud800"}, catalogue), ['model {"toString":1,"a":"\\ud800"} is not in the model catalogue'])
+        self.assertEqual(profiles.model_usable({"toString": 1, "b": 0, "2": 0}, catalogue), ['model {"2":0,"toString":1,"b":0} is not in the model catalogue'])
+        for meta, shown in (({"id": {"toString": 1}}, '{"toString":1}'), ({"id": None}, "null"), ({}, "undefined"), ({"id": 7}, "7"),
+                            ({"id": {"toString": 1, "a": "\udc00"}}, '{"toString":1,"a":"\\udc00"}'), ({"id": 9007199254740993}, "9007199254740992")):
+            self.assertEqual(profiles.model_usable("example/m", catalogue, {"meta": meta, "modelClasses": ["cheap"]}),
+                             ["model example/m has class strong, which policy %s does not allow" % shown])
+
+
 class DuplicateKeyTests(unittest.TestCase):
     """FAC-SEM-058/060 count duplicates as JavaScript's Set does. JSON written by JavaScript never says 1.0, so the vectors
     cannot hold this case; a Python caller can pass one, and 1 and 1.0 are one number."""
@@ -258,10 +276,15 @@ class RouteRules(unittest.TestCase):
         self.assertGreaterEqual(len(cases), 40)
         for case in cases:
             with self.subTest(case["name"]):
-                self.assertEqual(profiles.route_problems(case["kind"], case["value"]), case.get("expected"))
+                # A raw case keeps its JSON text: a big integer or a key order a JavaScript object cannot carry.
+                value = json.loads(case["valueText"]) if "valueText" in case else case["value"]
+                self.assertEqual(profiles.route_problems(case["kind"], value), case.get("expected"))
         codes = {f["code"] for c in cases for f in (c.get("expected") or [])}
         self.assertEqual(codes, {"FAC-SEM-028", "FAC-SEM-029", "FAC-SEM-030", "FAC-SEM-032", "FAC-SEM-033", "FAC-SEM-034"})
         self.assertIsNone(profiles.route_problems("something-else", {}))
+        for kind in ("constructor", "__proto__", "toString", "hasOwnProperty"):
+            self.assertIsNone(profiles.route_problems(kind, {}), kind)
+            self.assertIsNone(profiles.profile_problems(kind, {}), kind)
 
 
 if __name__ == "__main__":

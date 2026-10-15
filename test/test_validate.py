@@ -489,6 +489,27 @@ class PinTests(unittest.TestCase):
             lock = json.loads((Path(temp) / 'fabric-contract.lock.json').read_text())
             self.assertEqual({key: lock[key] for key in pin}, pin)
 
+
+class BoardRowTests(unittest.TestCase):
+    """The task board's rows split into the header's columns, as the workspace aggregator reads them."""
+
+    TABLE = "| ID | Item | Status | Source |\n|---|---|---|---|\n"
+
+    def test_a_pipe_in_a_cell_is_refused_escaped_or_not(self):
+        for cell in ("`--to me\\|person`", "a|b"):
+            found = validate.malformed_board_rows(self.TABLE + "| X-1 | %s | open | here |\n" % cell)
+            self.assertEqual(len(found), 1, cell)
+            self.assertIn("docs/backlog.md:3", found[0])
+
+    def test_a_well_formed_table_passes(self):
+        self.assertEqual(validate.malformed_board_rows(self.TABLE + "| X-1 | item | open | here |\n\ntext\n| A | B |\n|---|---|\n| 1 | 2 |\n"), [])
+
+    def test_the_repository_board_is_well_formed(self):
+        board = (Path(__file__).resolve().parent.parent / "docs/backlog.md").read_text(encoding="utf-8")
+        self.assertEqual(validate.malformed_board_rows(board), [])
+
+
+
 if __name__ == "__main__":
     unittest.main()
 

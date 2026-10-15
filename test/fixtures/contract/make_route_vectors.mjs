@@ -116,6 +116,46 @@ add('event: the route, project and capability spelled otherwise (DEC-0076)', 'ro
 add('bundle: the binding\'s project in another case of its NSS is another project (DEC-0076)', 'route-bundle', edit(bundle, (b) => { b.binding.project = b.binding.project.replace(/[a-z]+$/, (s) => s.toUpperCase()); }));
 add('event: the capability in another case of its NSS is another capability (DEC-0076)', 'route-event', { route, event: edit(selected, (e) => { e.capability = e.capability.replace(/[a-z-]+$/, (s) => s.toUpperCase()); }) });
 
+// Hostile JSON (the contract's rules show a value whose own toString is data as its JSON, and compare with ===, so 1
+// and true differ and null is not absent): every rule answered as the contract answers it, never by a throw.
+{
+  const hostile = { toString: 1 };
+  add('hostile: a runner kind with its own toString, twice', 'runner-route', edit(route, (r) => { r.candidates[0].runnerKind = hostile; r.candidates[1].runnerKind = { toString: 1 }; }));
+  add('hostile: runner kinds null and absent are two kinds', 'runner-route', edit(route, (r) => { r.candidates[0].runnerKind = null; delete r.candidates[1].runnerKind; }));
+  add('hostile: runner kinds true and "true" show the same', 'runner-route', edit(route, (r) => { r.candidates[0].runnerKind = true; r.candidates[1].runnerKind = 'true'; }));
+  add('hostile: a provider revision with its own toString', 'route-bundle', edit(bundle, (b) => { b.route.candidates[0].provider.revision = hostile; }));
+  add('hostile: the route capability with its own toString', 'route-bundle', edit(bundle, (b) => { b.route.capability = hostile; }));
+  add('hostile: a binding profile kind and project with their own toString', 'route-bundle', edit(bundle, (b) => { b.binding.profileKind = hostile; b.binding.project = hostile; }));
+  add('hostile: a catalogue kind and a candidate drive with their own toString', 'route-bundle', edit(bundle, (b) => { b.catalogue[0].kind = hostile; b.route.candidates[0].drive = hostile; }));
+  add('hostile: a revision null against one absent', 'route-bundle', edit(bundle, (b) => { b.route.candidates[0].provider.revision = null; delete b.admissions[0].provider.revision; }));
+  const at = selected.selected.index;
+  add('hostile: the selected runner kind true against a candidate kind 1', 'route-event', { route: edit(route, (r) => { r.candidates[at].runnerKind = 1; }), event: edit(selected, (e) => { e.selected.runnerKind = true; }) });
+  add('hostile: the selected runner kind null against one absent', 'route-event', { route: edit(route, (r) => { delete r.candidates[at].runnerKind; }), event: edit(selected, (e) => { e.selected.runnerKind = null; }) });
+  add('hostile: the selected drive true against the candidate drive 1', 'route-event', { route: edit(route, (r) => { r.candidates[at].drive = 1; }), event: edit(selected, (e) => { e.selected.drive = true; }) });
+  add('hostile: the event project and capability with their own toString', 'route-event', { route, event: edit(selected, (e) => { e.project = hostile; e.capability = { toString: 1 }; }) });
+  add('hostile: a selected runner kind and index with their own toString', 'route-event', { route, event: edit(selected, (e) => { e.selected.runnerKind = hostile; e.selected.index = { toString: 1 }; }) });
+}
+
+// JSON a JavaScript object cannot carry as written (see make_profile_vectors.mjs): the case keeps `valueText`, and the
+// contract answers JSON.parse of it.
+{
+  const raw = (name, kind, object, literals = {}) => {
+    let text = JSON.stringify(object);
+    for (const [mark, literal] of Object.entries(literals)) text = text.split(JSON.stringify(`@@${mark}@@`)).join(literal);
+    const value = JSON.parse(text);
+    cases.push({ name: `raw: ${name}`, kind, value, valueText: text, expected: routeRules(kind, value) });
+  };
+  const at = selected.selected.index;
+  raw('two runner kinds whose number-like key comes first only in JavaScript', 'runner-route', edit(route, (r) => { r.candidates[0].runnerKind = '@@a@@'; r.candidates[1].runnerKind = '@@b@@'; }), { a: '{"toString":1,"1":0}', b: '{"1":0,"toString":1}' });
+  raw('a candidate drive with its own toString and a lone surrogate', 'route-bundle', edit(bundle, (b) => { b.route.candidates[0].drive = { toString: 1, x: '\udc00' }; }));
+  raw('a binding capability 2**53+1 against the route 2**53', 'route-bundle', edit(bundle, (b) => { b.binding.capability = '@@a@@'; b.route.capability = '@@b@@'; }), { a: '9007199254740993', b: '9007199254740992' });
+  raw('a selected runner kind 2**53+1 against the candidate 2**53', 'route-event', { route: edit(route, (r) => { r.candidates[at].runnerKind = '@@b@@'; }), event: edit(selected, (e) => { e.selected.runnerKind = '@@a@@'; }) }, { a: '9007199254740993', b: '9007199254740992' });
+  raw('a selected drive 2**53+1 against the candidate drive 2**53', 'route-event', { route: edit(route, (r) => { r.candidates[at].drive = '@@b@@'; }), event: edit(selected, (e) => { e.selected.drive = '@@a@@'; }) }, { a: '9007199254740993', b: '9007199254740992' });
+  for (const [label, literal] of [['of 401 digits', `1${'0'.repeat(400)}`], ['1e21', '1e21'], ['2**53+1', '9007199254740993']]) {
+    raw(`a probe index ${label}`, 'route-event', { route, event: edit(selected, (e) => { (e.probes ??= []).unshift({ ...e.selected, index: '@@i@@' }); }) }, { i: literal });
+  }
+}
+
 const out = args.out ?? path.join(here, 'route-vectors.json');
 fs.writeFileSync(out, `${JSON.stringify({
   $comment: 'Generated by make_route_vectors.mjs from the contract pin\'s src/route-rules.ts (routeRules, FAC-SEM-028…034); do not edit by hand.',

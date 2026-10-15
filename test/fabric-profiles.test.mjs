@@ -77,6 +77,17 @@ test('the resolver and the doctor admit as the contract does (DEC-0083 model-adm
   }
 });
 
+test('the doctor never throws on hostile input', () => {
+  const catalogue = { models: [{ id: { toString: 1 }, classes: ['cheap'] }, { id: ['x'], classes: ['cheap'] }, { id: 'example/m', classes: ['strong'] }] };
+  assert.deepEqual(p.modelUsable('example/m', catalogue), []);
+  assert.deepEqual(p.modelUsable({ toString: 1 }, catalogue), ['model {"toString":1} is not in the model catalogue']);
+  assert.deepEqual(p.modelUsable(null, catalogue), ['model null is not in the model catalogue']);
+  assert.deepEqual(p.modelUsable({ toString: 1, a: '\ud800' }, catalogue), ['model {"toString":1,"a":"\\ud800"} is not in the model catalogue']);
+  for (const [meta, shown] of [[{ id: { toString: 1 } }, '{"toString":1}'], [{ id: null }, 'null'], [{}, 'undefined'], [{ id: 7 }, '7'], [{ id: { toString: 1, a: '\udc00' } }, '{"toString":1,"a":"\\udc00"}']]) {
+    assert.deepEqual(p.modelUsable('example/m', catalogue, { meta, modelClasses: ['cheap'] }), [`model example/m has class strong, which policy ${shown} does not allow`]);
+  }
+});
+
 test('open-vendor is descriptive in the doctor too (DEC-0083)', () => {
   const catalogue = { models: [{ id: 'example/open', classes: ['cheap', 'open-vendor'] }, { id: 'example/bare', classes: ['open-vendor'] }] };
   const policy = { meta: { id: 'p', revision: 1 }, modelClasses: ['cheap'] };
@@ -94,7 +105,11 @@ test('open-vendor is descriptive in the doctor too (DEC-0083)', () => {
 test('every route case answers as the contract does (FAC-SEM-028…034)', () => {
   const { cases } = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/route-vectors.json'), 'utf8'));
   assert.ok(cases.length >= 40);
-  for (const c of cases) assert.deepEqual(p.routeProblems(c.kind, c.value), c.expected, c.name);
+  for (const c of cases) assert.deepEqual(p.routeProblems(c.kind, c.valueText === undefined ? c.value : JSON.parse(c.valueText)), c.expected, c.name);
   assert.equal(p.routeProblems('something-else', {}), undefined);
+  for (const kind of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+    assert.equal(p.routeProblems(kind, {}), undefined, kind);
+    assert.equal(p.profileProblems(kind, {}), undefined, kind);
+  }
   for (const result of ['not-installed', 'not-responding', 'not-connected']) assert.ok(p.PROBE_RESULTS.includes(result));
 });
