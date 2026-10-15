@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
 
 import os  # noqa: E402
-import random  # noqa: E402
+import socket  # noqa: E402
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 import time  # noqa: E402
@@ -147,6 +147,13 @@ class GuardVerdict(unittest.TestCase):
         self.assertEqual(probe.guard_verdict("network.host-check", True, 401, b"")[0], "FAIL")
 
 
+def free_port() -> int:
+    """A port the system says is free on 127.0.0.1 now."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
 class ProbeAgainstTheTlsSample(unittest.TestCase):
     """The probe against the shipped online sample, over real TLS — the way a host meets it."""
 
@@ -156,22 +163,33 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=agent.example.com",
                         "-addext", "subjectAltName=DNS:agent.example.com", "-keyout", str(self.key), "-out", str(self.cert)],
                        check=True, capture_output=True)
-        self.port = random.randint(48500, 49500)
-        self.origin = "https://agent.example.com:%d" % self.port
         token = "p" * 40
         (self.dir / "token").write_text(token)
         os.chmod(self.dir / "token", 0o600)
         (self.dir / "session.key").write_bytes(bytes(32))
+        # FAA-46: a port the system says is free, not a random one from a fixed range a parallel test may hold; a bind
+        # that still loses the race (EADDRINUSE) is retried on a new port, never reported as the sample's failure.
+        for _attempt in range(3):
+            self.port = free_port()
+            self.origin = "https://agent.example.com:%d" % self.port
+            self.child = subprocess.Popen(["node", str(SCRIPTS / "sample-remote-service.mjs"), "--origin", self.origin, "--port", str(self.port),
+                                           "--token-file", str(self.dir / "token"), "--session-key-file", str(self.dir / "session.key"),
+                                           "--tls-cert", str(self.cert), "--tls-key", str(self.key)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            deadline = time.time() + 5
+            seen = b""
+            while time.time() < deadline and b"example agent on" not in seen and b"EADDRINUSE" not in seen:
+                line = self.child.stdout.readline()
+                if not line:
+                    break
+                seen += line
+            if b"EADDRINUSE" not in seen:
+                break
+            self.child.terminate()
+            self.child.wait(timeout=5)
+            self.child.stdout.close()
+        self.assertIn(b"example agent on", seen)
         self.services = self.dir / "services"
         fs.register_remote(service_id="example-agent", name="Example Agent", origin=self.origin, token=token, directory=self.services)
-        self.child = subprocess.Popen(["node", str(SCRIPTS / "sample-remote-service.mjs"), "--origin", self.origin, "--port", str(self.port),
-                                       "--token-file", str(self.dir / "token"), "--session-key-file", str(self.dir / "session.key"),
-                                       "--tls-cert", str(self.cert), "--tls-key", str(self.key)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        deadline = time.time() + 5
-        line = b""
-        while time.time() < deadline and b"example agent on" not in line:
-            line = self.child.stdout.readline()
-        self.assertIn(b"example agent on", line)
 
     def tearDown(self):
         self.child.terminate()
