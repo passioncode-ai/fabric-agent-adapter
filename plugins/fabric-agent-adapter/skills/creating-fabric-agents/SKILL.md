@@ -5,9 +5,9 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.33.0"
+  version: "0.34.0"
   contract-version: "0.1.0"
-  contract-commit: "82e163665e156a08aa3b92e4711015582c06162c"
+  contract-commit: "d8146cfb0a1c74fc6432284c4356bb0c864b37b5"
 ---
 
 # Creating Fabric-compatible agents
@@ -123,7 +123,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
 The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
 does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
 
-Pin exactly contract `0.1.0` at commit `82e163665e156a08aa3b92e4711015582c06162c` and
+Pin exactly contract `0.1.0` at commit `d8146cfb0a1c74fc6432284c4356bb0c864b37b5` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check
@@ -152,7 +152,11 @@ absent, apply the `fabric-service/0.1` rules from the pinned contract's
 `docs/specification/service.md` by hand and mark its probe `NOT_RUN`.
 
 Build the capability behind the chosen surface. Keep model choice and internal reasoning
-outside the contract; expose typed outcomes, evidence, and protocol-visible state. Every
+outside the contract; expose typed outcomes, evidence, and protocol-visible state. One fact
+about each model lane is the contract's (DEC-0083): what it reads. Ask in the grill which
+lanes read what members, clients or the public send, declare it as the profile's `reads`,
+and give such a lane an open-vendor route (FAC-SEM-112; the `building-fabric-services`
+profiles reference). Every
 provider output is untrusted until schemas and semantic assertions pass. The step-2
 observables are the definition of done; an observable attached after the code exists
 lets the output decide what counts as success.

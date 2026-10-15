@@ -21,6 +21,21 @@ export class ProfileError extends Error {}
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
 const strings = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []);
+/** The object items of an array with their index as written, so an instancePath names the item even after a non-object. */
+const indexed = (value) => (Array.isArray(value) ? value.flatMap((item, index) => (isObject(item) ? [[item, index]] : [])) : []);
+/** DEC-0083: the model class of a model whose vendor publishes its weights openly — descriptive: a policy admits and
+ * excludes nothing by it — and what a lane reads when it reads what a member, a client or the public sends. */
+export const OPEN_VENDOR = 'open-vendor';
+export const USER_CONTENT = 'user-content';
+/** The contract's `show`: String(value), or its JSON where String() throws (an object whose own `toString` is data). */
+const show = (value) => {
+  if (typeof value === 'string') return value;
+  try {
+    return String(value);
+  } catch {
+    return JSON.stringify(value) ?? typeof value;
+  }
+};
 const jsonEqual = (a, b) => JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
 function sortKeys(value) {
   if (Array.isArray(value)) return value.map(sortKeys);
@@ -39,7 +54,12 @@ export function resolveModelProfile({ catalogue, profiles, choices = {}, policy 
   if (!isObject(policy) || !Array.isArray(policy.modelClasses)) return { from: level, profile: id, models };
   const allowed = new Set(strings(policy.modelClasses));
   const rows = new Map(list(isObject(catalogue) ? catalogue.models : undefined).map((row) => [row.id, row]));
-  const within = models.filter((model) => { const row = rows.get(model); return row !== undefined && strings(row.classes).every((name) => allowed.has(name)); });
+  // The descriptive class open-vendor is not checked (DEC-0083), and a model with no other class does not stay.
+  const within = models.filter((model) => {
+    const row = rows.get(model);
+    const admission = row === undefined ? [] : strings(row.classes).filter((name) => name !== OPEN_VENDOR);
+    return admission.length > 0 && admission.every((name) => allowed.has(name));
+  });
   if (within.length) return { from: level, profile: id, models: within };
   const meta = isObject(policy.meta) ? policy.meta : {};
   return { refused: 'model-classes-empty', profile: id, policy: { id: String(meta.id), revision: Number(meta.revision) } };
@@ -50,13 +70,13 @@ const finding = (code, instancePath, message) => ({ code, instancePath, message 
 function modelCatalogue(value) {
   const findings = [];
   const seen = new Set();
-  list(value.models).forEach((row, index) => {
-    if (seen.has(row.id)) findings.push(finding('FAC-SEM-058', `/models/${index}/id`, `model ${String(row.id)} is catalogued more than once`));
+  indexed(value.models).forEach(([row, index]) => {
+    if (seen.has(row.id)) findings.push(finding('FAC-SEM-058', `/models/${index}/id`, `model ${show(row.id)} is catalogued more than once`));
     seen.add(row.id);
     const routing = isObject(row.provider) ? row.provider : {};
     const ignored = new Set(strings(routing.ignore));
     for (const slug of strings(routing.order)) {
-      if (ignored.has(slug) || ignored.has(slug.split('/')[0])) findings.push(finding('FAC-SEM-058', `/models/${index}/provider`, `model ${String(row.id)} both orders and ignores provider ${slug}`));
+      if (ignored.has(slug) || ignored.has(slug.split('/')[0])) findings.push(finding('FAC-SEM-058', `/models/${index}/provider`, `model ${show(row.id)} both orders and ignores provider ${slug}`));
     }
   });
   return findings;
@@ -65,8 +85,8 @@ function modelCatalogue(value) {
 function modelProfiles(value) {
   const findings = [];
   const seen = new Set();
-  list(value.profiles).forEach((profile, index) => {
-    if (seen.has(profile.id)) findings.push(finding('FAC-SEM-058', `/profiles/${index}/id`, `model profile ${String(profile.id)} is declared more than once`));
+  indexed(value.profiles).forEach(([profile, index]) => {
+    if (seen.has(profile.id)) findings.push(finding('FAC-SEM-058', `/profiles/${index}/id`, `model profile ${show(profile.id)} is declared more than once`));
     seen.add(profile.id);
   });
   return findings;
@@ -90,11 +110,11 @@ function profileResolution(value) {
   const findings = [];
   const catalogued = new Set(list(isObject(value.catalogue) ? value.catalogue.models : undefined).map((row) => row.id));
   const ids = new Set();
-  list(value.profiles).forEach((profile, i) => {
-    if (ids.has(profile.id)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/id`, `profile id ${String(profile.id)} is offered more than once to one resolution`));
+  indexed(value.profiles).forEach(([profile, i]) => {
+    if (ids.has(profile.id)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/id`, `profile id ${show(profile.id)} is offered more than once to one resolution`));
     ids.add(profile.id);
-    strings(profile.models).forEach((model, j) => {
-      if (!catalogued.has(model)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/models/${j}`, `profile ${String(profile.id)} names ${model}, which the catalogue does not hold`));
+    (Array.isArray(profile.models) ? profile.models : []).forEach((model, j) => {
+      if (typeof model === 'string' && !catalogued.has(model)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/models/${j}`, `profile ${show(profile.id)} names ${model}, which the catalogue does not hold`));
     });
   });
   const choices = isObject(value.choices) ? value.choices : {};
@@ -103,9 +123,51 @@ function profileResolution(value) {
   return findings;
 }
 
+/**
+ * FAC-SEM-112 (DEC-0083) for one profile: the models that run when the lane reads user content and none of them is an
+ * open-vendor model, or undefined when the profile does not read user content or its route has one. Under
+ * `between-turns` every model may run; under `none`, or any other value (failing closed), only the first. A model the
+ * catalogue does not hold, or whose row is not `open-vendor`, counts as closed. Never throws.
+ */
+export function closedUserContentRoute(profile, catalogue) {
+  if (!isObject(profile) || !strings(profile.reads).includes(USER_CONTENT)) return undefined;
+  const models = Array.isArray(profile.models) ? profile.models : [];
+  const route = profile.fallback === 'between-turns' ? models : models.slice(0, 1);
+  const open = new Set();
+  for (const row of list(isObject(catalogue) ? catalogue.models : undefined)) {
+    if (typeof row.id === 'string' && strings(row.classes).includes(OPEN_VENDOR)) open.add(row.id);
+  }
+  if (route.some((model) => typeof model === 'string' && open.has(model))) return undefined;
+  return route.map((model) => show(model));
+}
+
+/** FAC-SEM-112: a profile that reads user content has an open-vendor route, so the lane never runs on closed vendors alone. */
+const closedRoute = (fallback, closed) => (fallback === 'between-turns' ? 'none of its models is' : `its first model, ${closed[0] ?? 'none'}, is not`);
+
+/** FAC-SEM-112 on the profiles and on the resolution's outcome: the models the policy leaves keep an open-vendor route. */
+function openVendorRoutes(value) {
+  const findings = [];
+  const profiles = list(value.profiles);
+  indexed(value.profiles).forEach(([profile, i]) => {
+    const closed = closedUserContentRoute(profile, value.catalogue);
+    if (closed === undefined) return;
+    findings.push(finding('FAC-SEM-112', `/profiles/${i}/models`, `profile ${show(profile.id)} reads user content, but ${closedRoute(profile.fallback, closed)} open-vendor in the catalogue: the lane would run on closed vendors alone`));
+  });
+  const choices = isObject(value.choices) ? value.choices : {};
+  const outcome = resolveModelProfile({ catalogue: value.catalogue, profiles: value.profiles, choices, policy: value.policy });
+  if (!('models' in outcome)) return findings;
+  const profile = profiles.find((item) => item.id === outcome.profile);
+  if (!profile || closedUserContentRoute(profile, value.catalogue) !== undefined) return findings;
+  const closed = closedUserContentRoute({ ...profile, models: outcome.models }, value.catalogue);
+  if (closed === undefined) return findings;
+  const meta = isObject(value.policy) && isObject(value.policy.meta) ? value.policy.meta : {};
+  findings.push(finding('FAC-SEM-112', '/resolved/models', `the policy ${show(meta.id)} leaves profile ${show(profile.id)}'s lane on closed vendors alone: of the models it admits, ${closedRoute(profile.fallback, closed)} open-vendor in the catalogue`));
+  return findings;
+}
+
 /** The contract's profileRules: findings for a model-catalogue, model-profiles, runner-profile or profile-resolution; else undefined. */
 export function profileProblems(kind, value) {
-  return { 'model-catalogue': modelCatalogue, 'model-profiles': modelProfiles, 'runner-profile': runnerProfile, 'profile-resolution': profileResolution }[kind]?.(value);
+  return { 'model-catalogue': modelCatalogue, 'model-profiles': modelProfiles, 'runner-profile': runnerProfile, 'profile-resolution': (v) => [...profileResolution(v), ...openVendorRoutes(v)] }[kind]?.(value);
 }
 
 // ---- the doctor's checks ----
@@ -173,7 +235,10 @@ export function modelUsable(model, catalogue, policy) {
   if (!rows.has(model)) return [`model ${model} is not in the model catalogue`];
   if (isObject(policy) && Array.isArray(policy.modelClasses)) {
     const allowed = new Set(strings(policy.modelClasses));
-    const outside = strings(rows.get(model).classes).filter((c) => !allowed.has(c));
+    const admission = strings(rows.get(model).classes).filter((c) => c !== OPEN_VENDOR);
+    const policyId = String((isObject(policy.meta) ? policy.meta : {}).id);
+    if (!admission.length) return [`model ${model} has no class but ${OPEN_VENDOR}, which admits nothing, so policy ${policyId} does not allow it`];
+    const outside = admission.filter((c) => !allowed.has(c));
     if (outside.length) return [`model ${model} has class ${outside.join(', ')}, which policy ${String((isObject(policy.meta) ? policy.meta : {}).id)} does not allow`];
   }
   return [];

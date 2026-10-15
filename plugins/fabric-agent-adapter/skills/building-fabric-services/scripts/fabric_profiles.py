@@ -19,6 +19,7 @@ import shutil
 import subprocess
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+import fabric_estate as _estate
 import fabric_identifiers as _ids
 import fabric_secrets as _secrets
 import fabric_service as _fs
@@ -27,6 +28,10 @@ RESOLUTION_ORDER = ("request", "agent", "binding", "estate")
 # The vendor login each subscription is, and the one runner kind it runs in (DEC-0046, ADR-0147 decision 2).
 SUBSCRIPTION_RUNNER = {"claude": "claude-code", "kimi": "kimi-code", "chatgpt": "codex"}
 MAX_PROBE_MS = 5000
+#: DEC-0083: the model class of a model whose vendor publishes its weights openly — descriptive: a policy admits and
+#: excludes nothing by it — and what a lane reads when it reads what a member, a client or the public sends.
+OPEN_VENDOR = "open-vendor"
+USER_CONTENT = "user-content"
 _BARE_BINARY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
@@ -36,6 +41,35 @@ class ProfileError(ValueError):
 
 def _list(value: Any) -> List[Dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _indexed(value: Any) -> List[tuple]:
+    """The object items of an array with their index as written, so an instancePath names the item even after a
+    non-object (the contract's ``indexed``)."""
+    return [(item, i) for i, item in enumerate(value) if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _set_key(value: Any) -> Any:
+    """A key with JavaScript's Set semantics for a JSON value: 1 and true, null and absent, are different; two objects
+    are never the same member however equal."""
+    if value is _MISSING_ID:
+        return ("undefined",)
+    if value is None:
+        return ("null",)
+    if isinstance(value, bool):
+        return ("boolean", value)
+    if isinstance(value, (int, float)):
+        return ("number", float(value))
+    if isinstance(value, str):
+        return ("string", value)
+    return ("object", id(value))
+
+
+_MISSING_ID = object()
+
+
+def _id_of(item: Dict[str, Any]) -> Any:
+    return item.get("id", _MISSING_ID)
 
 
 def _strings(value: Any) -> List[str]:
@@ -75,10 +109,11 @@ def _js_number(value: Any) -> Optional[float]:
     return None
 
 
-def resolve_model_profile(*, catalogue: Any, profiles: Any, choices: Any, policy: Any = None) -> Dict[str, Any]:
+def resolve_model_profile(*, catalogue: Any = None, profiles: Any = None, choices: Any = None, policy: Any = None) -> Dict[str, Any]:
     """FAC-SEM-060: the request's profile, else the agent's, else the binding's or project's, else the estate default.
     When the project's policy names `modelClasses`, a model stays only if every class the catalogue gives it is
-    allowed; an empty result refuses the launch, naming the policy."""
+    allowed; the descriptive class `open-vendor` is not checked (DEC-0083), and a model with no other class does not stay.
+    An empty result refuses the launch, naming the policy."""
     choices = choices if isinstance(choices, dict) else {}
     level = next((name for name in RESOLUTION_ORDER if isinstance(choices.get(name), str)), None)
     if level is None:
@@ -94,7 +129,11 @@ def resolve_model_profile(*, catalogue: Any, profiles: Any, choices: Any, policy
     rows = {}
     for row in _list(catalogue.get("models") if isinstance(catalogue, dict) else None):
         rows[json.dumps(row.get("id"))] = row
-    within = [m for m in models if json.dumps(m) in rows and all(c in allowed for c in _strings(rows[json.dumps(m)].get("classes")))]
+    def admitted(model: str) -> bool:
+        row = rows.get(json.dumps(model))
+        admission = [c for c in _strings(row.get("classes")) if c != OPEN_VENDOR] if row is not None else []
+        return bool(admission) and all(c in allowed for c in admission)
+    within = [m for m in models if admitted(m)]
     if within:
         return {"from": level, "profile": profile_id, "models": within}
     meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
@@ -106,25 +145,25 @@ def _finding(code: str, path: str, message: str) -> Dict[str, str]:
 
 
 def _model_catalogue(value: Dict[str, Any]) -> List[Dict[str, str]]:
-    findings, seen = [], []
-    for index, row in enumerate(_list(value.get("models"))):
-        if row.get("id") in seen:
-            findings.append(_finding("FAC-SEM-058", "/models/%d/id" % index, "model %s is catalogued more than once" % _js_string(row.get("id"))))
-        seen.append(row.get("id"))
+    findings, seen = [], set()
+    for row, index in _indexed(value.get("models")):
+        if _set_key(_id_of(row)) in seen:
+            findings.append(_finding("FAC-SEM-058", "/models/%d/id" % index, "model %s is catalogued more than once" % _show_id(row)))
+        seen.add(_set_key(_id_of(row)))
         routing = row.get("provider") if isinstance(row.get("provider"), dict) else {}
         ignored = set(_strings(routing.get("ignore")))
         for slug in _strings(routing.get("order")):
             if slug in ignored or slug.split("/")[0] in ignored:
-                findings.append(_finding("FAC-SEM-058", "/models/%d/provider" % index, "model %s both orders and ignores provider %s" % (_js_string(row.get("id")), slug)))
+                findings.append(_finding("FAC-SEM-058", "/models/%d/provider" % index, "model %s both orders and ignores provider %s" % (_show_id(row), slug)))
     return findings
 
 
 def _model_profiles(value: Dict[str, Any]) -> List[Dict[str, str]]:
-    findings, seen = [], []
-    for index, profile in enumerate(_list(value.get("profiles"))):
-        if profile.get("id") in seen:
-            findings.append(_finding("FAC-SEM-058", "/profiles/%d/id" % index, "model profile %s is declared more than once" % _js_string(profile.get("id"))))
-        seen.append(profile.get("id"))
+    findings, seen = [], set()
+    for profile, index in _indexed(value.get("profiles")):
+        if _set_key(_id_of(profile)) in seen:
+            findings.append(_finding("FAC-SEM-058", "/profiles/%d/id" % index, "model profile %s is declared more than once" % _show_id(profile)))
+        seen.add(_set_key(_id_of(profile)))
     return findings
 
 
@@ -154,14 +193,15 @@ def _profile_resolution(value: Dict[str, Any]) -> List[Dict[str, str]]:
     findings = []
     catalogue = value.get("catalogue")
     catalogued = [row.get("id") for row in _list(catalogue.get("models") if isinstance(catalogue, dict) else None)]
-    ids: List[Any] = []
-    for i, profile in enumerate(_list(value.get("profiles"))):
-        if profile.get("id") in ids:
-            findings.append(_finding("FAC-SEM-060", "/profiles/%d/id" % i, "profile id %s is offered more than once to one resolution" % _js_string(profile.get("id"))))
-        ids.append(profile.get("id"))
-        for j, model in enumerate(_strings(profile.get("models"))):
-            if model not in catalogued:
-                findings.append(_finding("FAC-SEM-060", "/profiles/%d/models/%d" % (i, j), "profile %s names %s, which the catalogue does not hold" % (_js_string(profile.get("id")), model)))
+    ids = set()
+    for profile, i in _indexed(value.get("profiles")):
+        if _set_key(_id_of(profile)) in ids:
+            findings.append(_finding("FAC-SEM-060", "/profiles/%d/id" % i, "profile id %s is offered more than once to one resolution" % _show_id(profile)))
+        ids.add(_set_key(_id_of(profile)))
+        # Every model by its index as written; only a string can name a catalogued model.
+        for j, model in enumerate(profile.get("models") if isinstance(profile.get("models"), list) else []):
+            if isinstance(model, str) and model not in catalogued:
+                findings.append(_finding("FAC-SEM-060", "/profiles/%d/models/%d" % (i, j), "profile %s names %s, which the catalogue does not hold" % (_show_id(profile), model)))
     choices = value.get("choices") if isinstance(value.get("choices"), dict) else {}
     expected = resolve_model_profile(catalogue=catalogue, profiles=value.get("profiles"), choices=choices, policy=value.get("policy"))
     if "resolved" not in value or value["resolved"] != expected:
@@ -169,11 +209,69 @@ def _profile_resolution(value: Dict[str, Any]) -> List[Dict[str, str]]:
     return findings
 
 
+def closed_user_content_route(profile: Any, catalogue: Any) -> Optional[List[str]]:
+    """FAC-SEM-112 (DEC-0083) for one profile: the models that run when the lane reads user content and none of them is
+    an open-vendor model, or None when the profile does not read user content or its route has one. Under
+    ``between-turns`` every model may run; under ``none``, or any other value (failing closed), only the first. A model
+    the catalogue does not hold, or whose row is not ``open-vendor``, counts as closed. Never raises."""
+    if not isinstance(profile, dict) or USER_CONTENT not in _strings(profile.get("reads")):
+        return None
+    models = profile.get("models") if isinstance(profile.get("models"), list) else []
+    route = models if profile.get("fallback") == "between-turns" else models[:1]
+    open_ids = {row["id"] for row in _list(catalogue.get("models") if isinstance(catalogue, dict) else None)
+                if isinstance(row.get("id"), str) and OPEN_VENDOR in _strings(row.get("classes"))}
+    if any(isinstance(model, str) and model in open_ids for model in route):
+        return None
+    return [_estate._show(model) for model in route]
+
+
+def _closed_route(fallback: Any, closed: List[str]) -> str:
+    """How a closed route is named in a finding: under ``between-turns`` all of it, otherwise its first model."""
+    return "none of its models is" if fallback == "between-turns" else "its first model, %s, is not" % (closed[0] if closed else "none")
+
+
+def _open_vendor_routes(value: Dict[str, Any]) -> List[Dict[str, str]]:
+    """FAC-SEM-112: a profile that reads user content has an open-vendor route, so the lane never runs on closed vendors
+    alone, which refuse the content it exists to handle. The resolution's outcome is held to the same test: when the
+    resolved profile reads user content and its own route is open, the models the policy leaves must still give one,
+    or the policy is named as what leaves the lane closed (one cause, one finding)."""
+    findings = []
+    profiles = _list(value.get("profiles"))
+    for profile, i in _indexed(value.get("profiles")):
+        closed = closed_user_content_route(profile, value.get("catalogue"))
+        if closed is None:
+            continue
+        findings.append(_finding("FAC-SEM-112", "/profiles/%d/models" % i, "profile %s reads user content, but %s open-vendor in "
+                                 "the catalogue: the lane would run on closed vendors alone" % (_show_id(profile), _closed_route(profile.get("fallback"), closed))))
+    choices = value.get("choices") if isinstance(value.get("choices"), dict) else {}
+    outcome = resolve_model_profile(catalogue=value.get("catalogue"), profiles=value.get("profiles"), choices=choices, policy=value.get("policy"))
+    if "models" not in outcome:
+        return findings
+    profile = next((item for item in profiles if item.get("id") == outcome["profile"]), None)  # a string: == is ===
+    if profile is None or closed_user_content_route(profile, value.get("catalogue")) is not None:
+        return findings
+    closed = closed_user_content_route(dict(profile, models=outcome["models"]), value.get("catalogue"))
+    if closed is None:
+        return findings
+    policy = value.get("policy")
+    meta = policy.get("meta") if isinstance(policy, dict) and isinstance(policy.get("meta"), dict) else {}
+    findings.append(_finding("FAC-SEM-112", "/resolved/models", "the policy %s leaves profile %s's lane on closed vendors alone: of the "
+                             "models it admits, %s open-vendor in the catalogue" % (_estate._show(meta["id"]) if "id" in meta else "undefined",
+                                                                                    _show_id(profile), _closed_route(profile.get("fallback"), closed))))
+    return findings
+
+
+
+def _show_id(profile: Dict[str, Any]) -> str:
+    """show(profile.id), where an absent id is JavaScript's undefined."""
+    return _estate._show(profile["id"]) if "id" in profile else "undefined"
+
+
 def profile_problems(kind: str, value: Dict[str, Any]) -> Optional[List[Dict[str, str]]]:
     """The contract's profileRules: findings for a `model-catalogue`, `model-profiles`, `runner-profile` or
     `profile-resolution` document; None for another kind."""
     return {"model-catalogue": _model_catalogue, "model-profiles": _model_profiles, "runner-profile": _runner_profile,
-            "profile-resolution": _profile_resolution}.get(kind, lambda v: None)(value)
+            "profile-resolution": lambda v: _profile_resolution(v) + _open_vendor_routes(v)}.get(kind, lambda v: None)(value)
 
 
 # --- the doctor's checks ----------------------------------------------------------------------------------------
@@ -253,9 +351,12 @@ def model_usable(model: str, catalogue: Any, policy: Any = None) -> List[str]:
         return ["model %s is not in the model catalogue" % model]
     if isinstance(policy, dict) and isinstance(policy.get("modelClasses"), list):
         allowed = set(_strings(policy["modelClasses"]))
-        outside = [c for c in _strings(rows[model].get("classes")) if c not in allowed]
+        meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
+        admission = [c for c in _strings(rows[model].get("classes")) if c != OPEN_VENDOR]  # DEC-0083: descriptive
+        if not admission:
+            return ["model %s has no class but %s, which admits nothing, so policy %s does not allow it" % (model, OPEN_VENDOR, _js_string(meta.get("id")))]
+        outside = [c for c in admission if c not in allowed]
         if outside:
-            meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
             return ["model %s has class %s, which policy %s does not allow" % (model, ", ".join(outside), _js_string(meta.get("id")))]
     return []
 

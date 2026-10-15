@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.34.0 - 2026-10-15
+
+The adapter is pinned at contract `d8146cf`. The profile kits now read what a lane reads (DEC-0083; FAA-45, contract
+CT-52): a model profile that reads what members, clients or the public send keeps an open-vendor model on its route,
+so the lane never runs on closed vendors alone, which refuse the content it exists to handle.
+
+### Changed
+
+- **Repin** from `82e1636` to `d8146cf`. Every vendored vector is byte-identical except `profile-vectors.json`.
+  `82e1636` stays a supported revision.
+- **`open-vendor` is descriptive** in `resolve_model_profile` / `resolveModelProfile` and in the doctor's `model_usable` /
+  `modelUsable`: a project's `modelClasses` never admit or exclude a model by it, and a model whose only class is
+  `open-vendor` is admitted on nothing. Both copies of the every-class rule answer the contract's shared
+  `model-admission.json` vectors.
+- **FAC-SEM-058 and FAC-SEM-060 are total on hostile input**, as the contract's became in DEC-0083's fix round: an
+  `instancePath` names an item by its index as written (a non-object before it no longer shifts it, and every model
+  counts at its own index), a duplicate id is what JavaScript's `Set` calls one (`1` and `true`, `null` and absent, are
+  two), and an id whose own `toString` member is data is shown as its JSON.
+
+### Added
+
+- **FAC-SEM-112** on a `profile-resolution`: a profile with `reads: ["user-content"]` has an open-vendor route — with
+  `fallback: none` its first model is `open-vendor` in the catalogue, with `between-turns` at least one is — and the
+  models the project's policy leaves must still give one, or the finding at `/resolved/models` names the policy.
+  `closed_user_content_route` / `closedUserContentRoute` name the models that would run on a closed route.
+- `creating-fabric-agents` asks in its grill which lanes read user content; `profile-selection.md` and the profiles
+  reference say how such a lane is declared and routed, and that a content refusal or an empty answer is a failed turn.
+
+### Fixed
+
+- **`make_profile_vectors.mjs` read the contract's newer fixtures vacuously.** Since DEC-0083 a profile fixture wraps
+  its document as `{description, kind, expect, input}`; the generator fed the wrapper to the rules, so every expectation
+  came out empty and the Node test passed without checking anything. It now unwraps them and stops when a fixture's own
+  `expect` disagrees with the contract's answer.
+- `resolve_model_profile` takes `catalogue` and `profiles` as optional, as the contract's resolver does, so an absent
+  catalogue resolves instead of raising.
+
+### Evidence
+
+- Both kits answer 72 rule cases (45 crafted: FAC-SEM-112 edges, the policy's outcome, hostile ids and indexes), 81
+  resolutions and 8 admission cases.
+- 51 planted defects (30 in Python, 21 in Node), all caught but two that cannot differ on JSON input: a redundant
+  type check, now removed from the code, and the Node message of a duplicate object id, which parsed JSON never
+  produces. A unit test covers `1` and `1.0` as one id, a case JSON written by JavaScript cannot hold.
+- Eval scenarios `lanes-that-read-user-content` and `user-content-open-vendor-route`.
+
 ## 0.33.0 - 2026-10-15
 
 The adapter is pinned at contract `82e1636`. The estate kits now read contexts (DEC-0082; FAA-41, the RM-28 pilot): one

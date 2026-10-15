@@ -116,6 +116,15 @@
         "writes the cost options as --cost-preset ID MAX_USD LABEL with one --default-cost-preset when a run's cost varies (DEC-0037), and none when it does not",
         "does not invent a price: the amounts come from the author or the agent's measured runs"
       ]
+    },
+    {
+      "id": "lanes-that-read-user-content",
+      "request": "Create a fabric-compatible example-agent that triages the reviews customers leave and drafts replies; it uses a cheap model.",
+      "expected": [
+        "asks, during the grill, which of the agent's lanes read what members, clients or the public send, and records the answer as each model profile's `reads` (DEC-0083): `user-content`, `operator` or `web`",
+        "gives a lane that reads user content an open-vendor route: with `fallback: none` its first model is `open-vendor` in the catalogue, with `between-turns` at least one is (FAC-SEM-112); never a closed vendor alone",
+        "does not choose the model itself or name a vendor list: which models are open-vendor is the catalogue's fact, and the profile is resolved in Fabric"
+      ]
     }
   ]
 }
