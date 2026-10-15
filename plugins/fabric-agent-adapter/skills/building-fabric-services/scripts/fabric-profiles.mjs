@@ -36,12 +36,25 @@ const show = (value) => {
     return JSON.stringify(value) ?? typeof value;
   }
 };
-const jsonEqual = (a, b) => JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
-function sortKeys(value) {
-  if (Array.isArray(value)) return value.map(sortKeys);
-  if (isObject(value)) return Object.fromEntries(Object.keys(value).sort().map((k) => [k, sortKeys(value[k])]));
-  return value;
+/** The contract's jsonEqual: arrays by item, objects by own member whatever the order, anything else by ===, so 1 and
+ * true differ and NaN equals nothing (a JSON.stringify comparison would call NaN and null equal). */
+function jsonEqual(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => jsonEqual(item, b[i]));
+  if (isObject(a) || isObject(b)) {
+    if (!isObject(a) || !isObject(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && jsonEqual(a[key], b[key]));
+  }
+  return a === b;
 }
+/** The contract's toNumber: Number(value), or NaN where Number() throws (an object whose own toString is data). */
+const toNumber = (value) => {
+  try {
+    return Number(value);
+  } catch {
+    return Number.NaN;
+  }
+};
 
 /** FAC-SEM-060: the request's profile, else the agent's, else the binding's or project's, else the estate default. */
 export function resolveModelProfile({ catalogue, profiles, choices = {}, policy } = {}) {
@@ -62,7 +75,7 @@ export function resolveModelProfile({ catalogue, profiles, choices = {}, policy 
   });
   if (within.length) return { from: level, profile: id, models: within };
   const meta = isObject(policy.meta) ? policy.meta : {};
-  return { refused: 'model-classes-empty', profile: id, policy: { id: String(meta.id), revision: Number(meta.revision) } };
+  return { refused: 'model-classes-empty', profile: id, policy: { id: show(meta.id), revision: toNumber(meta.revision) } };
 }
 
 const finding = (code, instancePath, message) => ({ code, instancePath, message });
@@ -95,12 +108,12 @@ function modelProfiles(value) {
 function runnerProfile(value) {
   const findings = [];
   if (value.route === 'subscription' && isObject(value.subscription)) {
-    const login = String(value.subscription.login);
+    const login = show(value.subscription.login);
     const runner = Object.hasOwn(SUBSCRIPTION_RUNNER, login) ? SUBSCRIPTION_RUNNER[login] : undefined;
-    if (runner !== value.runnerKind) findings.push(finding('FAC-SEM-059', '/runnerKind', `a ${login} subscription runs only in ${runner ?? "its vendor's runner"}, not in ${String(value.runnerKind)}; another runner takes the key route`));
+    if (runner !== value.runnerKind) findings.push(finding('FAC-SEM-059', '/runnerKind', `a ${login} subscription runs only in ${runner ?? "its vendor's runner"}, not in ${show(value.runnerKind)}; another runner takes the key route`));
   }
   if (value.route === 'key' && isObject(value.key)) {
-    if (value.key.modelAllowList !== value.modelProfile) findings.push(finding('FAC-SEM-059', '/key/modelAllowList', `the key admits the models of ${String(value.key.modelAllowList)}, but the profile runs ${String(value.modelProfile)}`));
+    if (value.key.modelAllowList !== value.modelProfile) findings.push(finding('FAC-SEM-059', '/key/modelAllowList', `the key admits the models of ${show(value.key.modelAllowList)}, but the profile runs ${show(value.modelProfile)}`));
     if (typeof value.key.ref === 'string' && secretValue(value.key.ref)) findings.push(finding('FAC-SEM-059', '/key/ref', 'the key is named by its secret reference, never by its value'));
   }
   return findings;
@@ -167,7 +180,9 @@ function openVendorRoutes(value) {
 
 /** The contract's profileRules: findings for a model-catalogue, model-profiles, runner-profile or profile-resolution; else undefined. */
 export function profileProblems(kind, value) {
-  return { 'model-catalogue': modelCatalogue, 'model-profiles': modelProfiles, 'runner-profile': runnerProfile, 'profile-resolution': (v) => [...profileResolution(v), ...openVendorRoutes(v)] }[kind]?.(value);
+  const table = { 'model-catalogue': modelCatalogue, 'model-profiles': modelProfiles, 'runner-profile': runnerProfile, 'profile-resolution': (v) => [...profileResolution(v), ...openVendorRoutes(v)] };
+  // Own members only: a kind such as `constructor` or `__proto__` names no rule.
+  return typeof kind === 'string' && Object.hasOwn(table, kind) ? table[kind](value) : undefined;
 }
 
 // ---- the doctor's checks ----
@@ -231,15 +246,16 @@ export function runnerCheck(entry, { searchPath = process.env.PATH, run = spawnS
 
 /** Problems with running `model` here: not in the catalogue, or a class the project's policy does not allow. */
 export function modelUsable(model, catalogue, policy) {
+  // The last row of an id wins, as the Map the resolver builds; a model that is not a string matches no row.
   const rows = new Map(list(isObject(catalogue) ? catalogue.models : undefined).map((row) => [row.id, row]));
-  if (!rows.has(model)) return [`model ${model} is not in the model catalogue`];
+  if (typeof model !== 'string' || !rows.has(model)) return [`model ${show(model)} is not in the model catalogue`];
   if (isObject(policy) && Array.isArray(policy.modelClasses)) {
     const allowed = new Set(strings(policy.modelClasses));
+    const policyId = show((isObject(policy.meta) ? policy.meta : {}).id);
     const admission = strings(rows.get(model).classes).filter((c) => c !== OPEN_VENDOR);
-    const policyId = String((isObject(policy.meta) ? policy.meta : {}).id);
     if (!admission.length) return [`model ${model} has no class but ${OPEN_VENDOR}, which admits nothing, so policy ${policyId} does not allow it`];
     const outside = admission.filter((c) => !allowed.has(c));
-    if (outside.length) return [`model ${model} has class ${outside.join(', ')}, which policy ${String((isObject(policy.meta) ? policy.meta : {}).id)} does not allow`];
+    if (outside.length) return [`model ${model} has class ${outside.join(', ')}, which policy ${policyId} does not allow`];
   }
   return [];
 }
@@ -277,14 +293,14 @@ export const PROBE_RESULTS = Object.freeze(['not-catalogued', 'not-admitted', 'n
 const routeCandidates = (value) => (Array.isArray(value?.candidates) ? value.candidates.filter(isObject) : []);
 const objectAt = (value, key) => (isObject(value?.[key]) ? value[key] : {});
 // A revision reference compared whole; its id is an identifier, so it enters the key in its normal form (DEC-0076).
-const refKey = (ref) => (isObject(ref) ? `${String(normalIdentifier(ref.id) ?? ref.id)}@${String(ref.revision)}#${String(ref.contentHash)}` : '');
+const refKey = (ref) => (isObject(ref) ? `${show(normalIdentifier(ref.id) ?? ref.id)}@${show(ref.revision)}#${show(ref.contentHash)}` : '');
 const sameRef = (a, b) => refKey(a) !== '' && refKey(a) === refKey(b);
 
 function runnerRoute(value) {
   const findings = [];
   const kinds = new Set();
   routeCandidates(value).forEach((candidate, index) => {
-    const kind = String(candidate.runnerKind);
+    const kind = show(candidate.runnerKind);
     if (kinds.has(kind)) findings.push(finding('FAC-SEM-028', `/candidates/${index}/runnerKind`, `runner kind ${kind} appears in the route more than once`));
     kinds.add(kind);
     const session = objectAt(candidate, 'session');
@@ -300,25 +316,25 @@ function routeBundle(value) {
   const findings = [];
   routeCandidates(route).forEach((candidate, index) => {
     const key = refKey(candidate.provider);
-    if (!admitted.has(key)) findings.push(finding('FAC-SEM-030', `/route/candidates/${index}/provider`, `candidate ${String(candidate.runnerKind)} names provider ${key}, which is not a revision admitted for ${String(route.capability)}`));
+    if (!admitted.has(key)) findings.push(finding('FAC-SEM-030', `/route/candidates/${index}/provider`, `candidate ${show(candidate.runnerKind)} names provider ${key}, which is not a revision admitted for ${show(route.capability)}`));
   });
   if (isObject(value.binding)) {
     const binding = value.binding;
     const disagree = (where, message) => findings.push(finding('FAC-SEM-032', `/binding/${where}`, message));
     // DEC-0076: project and capability are identifiers, compared by normal form.
-    if (!sameIdentifier(binding.project, route.project)) disagree('project', `the binding is for ${String(binding.project)}, the route for ${String(route.project)}`);
-    if (!sameIdentifier(binding.capability, route.capability)) disagree('capability', `the binding binds ${String(binding.capability)}, the route orders ${String(route.capability)}`);
-    if (binding.profileKind !== 'local-runner') disagree('profileKind', `a runner route serves the local-runner profile, not ${String(binding.profileKind)}`);
+    if (!sameIdentifier(binding.project, route.project)) disagree('project', `the binding is for ${show(binding.project)}, the route for ${show(route.project)}`);
+    if (!sameIdentifier(binding.capability, route.capability)) disagree('capability', `the binding binds ${show(binding.capability)}, the route orders ${show(route.capability)}`);
+    if (binding.profileKind !== 'local-runner') disagree('profileKind', `a runner route serves the local-runner profile, not ${show(binding.profileKind)}`);
     if (!routeCandidates(route).some((c) => sameRef(c.provider, binding.provider))) disagree('provider', `the binding's provider ${refKey(binding.provider)} is not a candidate of the route`);
     if (binding.runnerRoute !== undefined && !sameRef(binding.runnerRoute, route.meta)) disagree('runnerRoute', `the binding pins ${refKey(binding.runnerRoute)}, not this route ${refKey(route.meta)}`);
   }
   if (Array.isArray(value.catalogue)) {
-    const byKind = new Map(value.catalogue.filter(isObject).map((entry) => [String(entry.kind), entry]));
+    const byKind = new Map(value.catalogue.filter(isObject).map((entry) => [show(entry.kind), entry]));
     routeCandidates(route).forEach((candidate, index) => {
-      const kind = String(candidate.runnerKind);
+      const kind = show(candidate.runnerKind);
       const entry = byKind.get(kind);
       if (!entry) { findings.push(finding('FAC-SEM-033', `/route/candidates/${index}/runnerKind`, `runner kind ${kind} has no entry in the host's catalogue`)); return; }
-      if (candidate.drive !== undefined && !Object.hasOwn(objectAt(entry, 'drives'), String(candidate.drive))) findings.push(finding('FAC-SEM-033', `/route/candidates/${index}/drive`, `the catalogue entry for ${kind} offers no drive ${String(candidate.drive)}`));
+      if (candidate.drive !== undefined && !Object.hasOwn(objectAt(entry, 'drives'), show(candidate.drive))) findings.push(finding('FAC-SEM-033', `/route/candidates/${index}/drive`, `the catalogue entry for ${kind} offers no drive ${show(candidate.drive)}`));
     });
   }
   return findings;
@@ -331,14 +347,14 @@ function routeEvent(value) {
   const findings = [];
   const wrong = (where, message) => findings.push(finding('FAC-SEM-034', `/event${where}`, message));
   if (!sameRef(event.route, route.meta)) wrong('/route', `the event names route ${refKey(event.route)}, not ${refKey(route.meta)}`);
-  if (!sameIdentifier(event.project, route.project)) wrong('/project', `the event is for ${String(event.project)}, the route for ${String(route.project)}`);
-  if (!sameIdentifier(event.capability, route.capability)) wrong('/capability', `the event names ${String(event.capability)}, the route orders ${String(route.capability)}`);
+  if (!sameIdentifier(event.project, route.project)) wrong('/project', `the event is for ${show(event.project)}, the route for ${show(route.project)}`);
+  if (!sameIdentifier(event.capability, route.capability)) wrong('/capability', `the event names ${show(event.capability)}, the route orders ${show(route.capability)}`);
   const indexOf = (ref) => (typeof ref.index === 'number' && Number.isInteger(ref.index) ? ref.index : -1);
   const candidateAt = (ref, where) => {
     const index = indexOf(ref);
     const candidate = index >= 0 ? list[index] : undefined;
     if (!candidate || candidate.runnerKind !== ref.runnerKind || (ref.provider !== undefined && !sameRef(candidate.provider, ref.provider))) {
-      wrong(where, `candidate ${String(ref.index)} (${String(ref.runnerKind)}) is not that position of the route`);
+      wrong(where, `candidate ${show(ref.index)} (${show(ref.runnerKind)}) is not that position of the route`);
       return undefined;
     }
     return candidate;
@@ -346,8 +362,8 @@ function routeEvent(value) {
   const probes = Array.isArray(event.probes) ? event.probes.filter(isObject) : [];
   probes.forEach((probe, position) => {
     const candidate = candidateAt(probe, `/probes/${position}`);
-    if (candidate && probe.result === 'no-held-session' && objectAt(candidate, 'session').spawn !== 'never') wrong(`/probes/${position}/result`, `${String(probe.runnerKind)} may spawn, so finding no held session does not pass it over`);
-    if (candidate && probe.result === 'spawn-failed' && objectAt(candidate, 'session').spawn !== 'allowed') wrong(`/probes/${position}/result`, `${String(probe.runnerKind)} has spawn: never, so it cannot have failed to spawn`);
+    if (candidate && probe.result === 'no-held-session' && objectAt(candidate, 'session').spawn !== 'never') wrong(`/probes/${position}/result`, `${show(probe.runnerKind)} may spawn, so finding no held session does not pass it over`);
+    if (candidate && probe.result === 'spawn-failed' && objectAt(candidate, 'session').spawn !== 'allowed') wrong(`/probes/${position}/result`, `${show(probe.runnerKind)} has spawn: never, so it cannot have failed to spawn`);
   });
   const expectProbes = (count) => {
     const indexes = probes.map(indexOf);
@@ -365,9 +381,9 @@ function routeEvent(value) {
   const chosen = candidateAt(selected, '/selected');
   if (chosen) {
     const session = objectAt(chosen, 'session');
-    if (selected.session === 'attached' && session.attach !== 'preferred') wrong('/selected/session', `${String(selected.runnerKind)} has attach: never, so the host cannot attach it`);
-    if (selected.session === 'spawned' && session.spawn !== 'allowed') wrong('/selected/session', `${String(selected.runnerKind)} has spawn: never, so the host cannot spawn it`);
-    if (chosen.drive !== undefined && selected.drive !== undefined && selected.drive !== chosen.drive) wrong('/selected/drive', `the route runs ${String(selected.runnerKind)} through ${String(chosen.drive)}, not ${String(selected.drive)}`);
+    if (selected.session === 'attached' && session.attach !== 'preferred') wrong('/selected/session', `${show(selected.runnerKind)} has attach: never, so the host cannot attach it`);
+    if (selected.session === 'spawned' && session.spawn !== 'allowed') wrong('/selected/session', `${show(selected.runnerKind)} has spawn: never, so the host cannot spawn it`);
+    if (chosen.drive !== undefined && selected.drive !== undefined && selected.drive !== chosen.drive) wrong('/selected/drive', `the route runs ${show(selected.runnerKind)} through ${show(chosen.drive)}, not ${show(selected.drive)}`);
     if (event.sticky === true) {
       // A sticky relaunch keeps the conversation's runner and walks nothing above it.
       if (route.recovery === 'reprobe') wrong('/sticky', 'a route with recovery: reprobe walks from the top at every launch');
@@ -394,5 +410,6 @@ function routeEvent(value) {
  */
 export function routeProblems(kind, value) {
   if (!isObject(value)) return undefined;
-  return { 'runner-route': runnerRoute, 'route-bundle': routeBundle, 'route-event': routeEvent }[kind]?.(value);
+  const table = { 'runner-route': runnerRoute, 'route-bundle': routeBundle, 'route-event': routeEvent };
+  return typeof kind === 'string' && Object.hasOwn(table, kind) ? table[kind](value) : undefined;
 }

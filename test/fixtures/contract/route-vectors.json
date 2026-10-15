@@ -6957,6 +6957,3191 @@
           "message": "the event names urn:fabric:capability:AGENT-CHAT, the route orders urn:fabric:capability:agent-chat"
         }
       ]
+    },
+    {
+      "name": "hostile: a runner kind with its own toString, twice",
+      "kind": "runner-route",
+      "value": {
+        "kind": "runner-route",
+        "meta": {
+          "id": "urn:route:project-a:agent-chat",
+          "revision": 1,
+          "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "createdAt": "2026-10-07T09:00:00Z",
+          "createdBy": "urn:agent:pm:a"
+        },
+        "project": "urn:project:a",
+        "capability": "urn:fabric:capability:agent-chat",
+        "candidates": [
+          {
+            "runnerKind": {
+              "toString": 1
+            },
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            },
+            "session": {
+              "attach": "preferred",
+              "spawn": "never"
+            }
+          },
+          {
+            "runnerKind": {
+              "toString": 1
+            },
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            },
+            "drive": "codex-app-server",
+            "session": {
+              "attach": "preferred",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "kimi-code",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          }
+        ],
+        "exhausted": "capability-unavailable",
+        "recovery": "sticky"
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-028",
+          "instancePath": "/candidates/1/runnerKind",
+          "message": "runner kind {\"toString\":1} appears in the route more than once"
+        }
+      ]
+    },
+    {
+      "name": "hostile: runner kinds null and absent are two kinds",
+      "kind": "runner-route",
+      "value": {
+        "kind": "runner-route",
+        "meta": {
+          "id": "urn:route:project-a:agent-chat",
+          "revision": 1,
+          "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "createdAt": "2026-10-07T09:00:00Z",
+          "createdBy": "urn:agent:pm:a"
+        },
+        "project": "urn:project:a",
+        "capability": "urn:fabric:capability:agent-chat",
+        "candidates": [
+          {
+            "runnerKind": null,
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            },
+            "session": {
+              "attach": "preferred",
+              "spawn": "never"
+            }
+          },
+          {
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            },
+            "drive": "codex-app-server",
+            "session": {
+              "attach": "preferred",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "kimi-code",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          }
+        ],
+        "exhausted": "capability-unavailable",
+        "recovery": "sticky"
+      },
+      "expected": []
+    },
+    {
+      "name": "hostile: runner kinds true and \"true\" show the same",
+      "kind": "runner-route",
+      "value": {
+        "kind": "runner-route",
+        "meta": {
+          "id": "urn:route:project-a:agent-chat",
+          "revision": 1,
+          "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "createdAt": "2026-10-07T09:00:00Z",
+          "createdBy": "urn:agent:pm:a"
+        },
+        "project": "urn:project:a",
+        "capability": "urn:fabric:capability:agent-chat",
+        "candidates": [
+          {
+            "runnerKind": true,
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            },
+            "session": {
+              "attach": "preferred",
+              "spawn": "never"
+            }
+          },
+          {
+            "runnerKind": "true",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            },
+            "drive": "codex-app-server",
+            "session": {
+              "attach": "preferred",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "kimi-code",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          }
+        ],
+        "exhausted": "capability-unavailable",
+        "recovery": "sticky"
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-028",
+          "instancePath": "/candidates/1/runnerKind",
+          "message": "runner kind true appears in the route more than once"
+        }
+      ]
+    },
+    {
+      "name": "hostile: a provider revision with its own toString",
+      "kind": "route-bundle",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": {
+                  "toString": 1
+                },
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "admissions": [
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          }
+        ],
+        "binding": {
+          "meta": {
+            "id": "urn:binding:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "createdAt": "2026-08-26T10:02:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "provider": {
+            "id": "urn:fabric:provider:claude-code-local",
+            "revision": 1,
+            "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "admission": {
+            "id": "urn:admission:claude-code:1",
+            "revision": 1,
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "profileKind": "local-runner",
+          "executionContext": {
+            "id": "urn:context:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "accountPool": {
+            "id": "urn:pool:project-a:claude",
+            "revision": 1,
+            "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "grants": [],
+          "dataPolicy": {
+            "id": "urn:policy:data:project-a",
+            "revision": 1,
+            "contentHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "coordinationPolicy": {
+            "id": "urn:policy:coord:project-a",
+            "revision": 1,
+            "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "checkerPolicy": {
+            "id": "urn:policy:checker:project-a",
+            "revision": 1,
+            "contentHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "role": "fabric.example/agent-chat",
+          "state": "active",
+          "runnerRoute": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        },
+        "catalogue": [
+          {
+            "kind": "claude-code",
+            "drives": {
+              "pty": {},
+              "sdk": {}
+            }
+          },
+          {
+            "kind": "codex",
+            "drives": {
+              "codex-app-server": {},
+              "pty": {}
+            }
+          },
+          {
+            "kind": "kimi-code",
+            "drives": {
+              "acp": {}
+            }
+          },
+          {
+            "kind": "hermes",
+            "drives": {
+              "acp": {}
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/0/provider",
+          "message": "candidate claude-code names provider urn:fabric:provider:claude-code-local@{\"toString\":1}#sha256:2222222222222222222222222222222222222222222222222222222222222222, which is not a revision admitted for urn:fabric:capability:agent-chat"
+        },
+        {
+          "code": "FAC-SEM-032",
+          "instancePath": "/binding/provider",
+          "message": "the binding's provider urn:fabric:provider:claude-code-local@1#sha256:2222222222222222222222222222222222222222222222222222222222222222 is not a candidate of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the route capability with its own toString",
+      "kind": "route-bundle",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": {
+            "toString": 1
+          },
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "admissions": [
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          }
+        ],
+        "binding": {
+          "meta": {
+            "id": "urn:binding:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "createdAt": "2026-08-26T10:02:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "provider": {
+            "id": "urn:fabric:provider:claude-code-local",
+            "revision": 1,
+            "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "admission": {
+            "id": "urn:admission:claude-code:1",
+            "revision": 1,
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "profileKind": "local-runner",
+          "executionContext": {
+            "id": "urn:context:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "accountPool": {
+            "id": "urn:pool:project-a:claude",
+            "revision": 1,
+            "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "grants": [],
+          "dataPolicy": {
+            "id": "urn:policy:data:project-a",
+            "revision": 1,
+            "contentHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "coordinationPolicy": {
+            "id": "urn:policy:coord:project-a",
+            "revision": 1,
+            "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "checkerPolicy": {
+            "id": "urn:policy:checker:project-a",
+            "revision": 1,
+            "contentHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "role": "fabric.example/agent-chat",
+          "state": "active",
+          "runnerRoute": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        },
+        "catalogue": [
+          {
+            "kind": "claude-code",
+            "drives": {
+              "pty": {},
+              "sdk": {}
+            }
+          },
+          {
+            "kind": "codex",
+            "drives": {
+              "codex-app-server": {},
+              "pty": {}
+            }
+          },
+          {
+            "kind": "kimi-code",
+            "drives": {
+              "acp": {}
+            }
+          },
+          {
+            "kind": "hermes",
+            "drives": {
+              "acp": {}
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/0/provider",
+          "message": "candidate claude-code names provider urn:fabric:provider:claude-code-local@1#sha256:2222222222222222222222222222222222222222222222222222222222222222, which is not a revision admitted for {\"toString\":1}"
+        },
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/1/provider",
+          "message": "candidate codex names provider urn:fabric:provider:codex-local@3#sha256:3333333333333333333333333333333333333333333333333333333333333333, which is not a revision admitted for {\"toString\":1}"
+        },
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/2/provider",
+          "message": "candidate kimi-code names provider urn:fabric:provider:kimi-code-local@1#sha256:4444444444444444444444444444444444444444444444444444444444444444, which is not a revision admitted for {\"toString\":1}"
+        },
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/3/provider",
+          "message": "candidate hermes names provider urn:fabric:provider:hermes-local@2#sha256:5555555555555555555555555555555555555555555555555555555555555555, which is not a revision admitted for {\"toString\":1}"
+        },
+        {
+          "code": "FAC-SEM-032",
+          "instancePath": "/binding/capability",
+          "message": "the binding binds urn:fabric:capability:agent-chat, the route orders {\"toString\":1}"
+        }
+      ]
+    },
+    {
+      "name": "hostile: a binding profile kind and project with their own toString",
+      "kind": "route-bundle",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "admissions": [
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          }
+        ],
+        "binding": {
+          "meta": {
+            "id": "urn:binding:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "createdAt": "2026-08-26T10:02:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": {
+            "toString": 1
+          },
+          "capability": "urn:fabric:capability:agent-chat",
+          "provider": {
+            "id": "urn:fabric:provider:claude-code-local",
+            "revision": 1,
+            "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "admission": {
+            "id": "urn:admission:claude-code:1",
+            "revision": 1,
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "profileKind": {
+            "toString": 1
+          },
+          "executionContext": {
+            "id": "urn:context:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "accountPool": {
+            "id": "urn:pool:project-a:claude",
+            "revision": 1,
+            "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "grants": [],
+          "dataPolicy": {
+            "id": "urn:policy:data:project-a",
+            "revision": 1,
+            "contentHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "coordinationPolicy": {
+            "id": "urn:policy:coord:project-a",
+            "revision": 1,
+            "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "checkerPolicy": {
+            "id": "urn:policy:checker:project-a",
+            "revision": 1,
+            "contentHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "role": "fabric.example/agent-chat",
+          "state": "active",
+          "runnerRoute": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        },
+        "catalogue": [
+          {
+            "kind": "claude-code",
+            "drives": {
+              "pty": {},
+              "sdk": {}
+            }
+          },
+          {
+            "kind": "codex",
+            "drives": {
+              "codex-app-server": {},
+              "pty": {}
+            }
+          },
+          {
+            "kind": "kimi-code",
+            "drives": {
+              "acp": {}
+            }
+          },
+          {
+            "kind": "hermes",
+            "drives": {
+              "acp": {}
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-032",
+          "instancePath": "/binding/project",
+          "message": "the binding is for {\"toString\":1}, the route for urn:project:a"
+        },
+        {
+          "code": "FAC-SEM-032",
+          "instancePath": "/binding/profileKind",
+          "message": "a runner route serves the local-runner profile, not {\"toString\":1}"
+        }
+      ]
+    },
+    {
+      "name": "hostile: a catalogue kind and a candidate drive with their own toString",
+      "kind": "route-bundle",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              },
+              "drive": {
+                "toString": 1
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "admissions": [
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          }
+        ],
+        "binding": {
+          "meta": {
+            "id": "urn:binding:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "createdAt": "2026-08-26T10:02:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "provider": {
+            "id": "urn:fabric:provider:claude-code-local",
+            "revision": 1,
+            "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "admission": {
+            "id": "urn:admission:claude-code:1",
+            "revision": 1,
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "profileKind": "local-runner",
+          "executionContext": {
+            "id": "urn:context:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "accountPool": {
+            "id": "urn:pool:project-a:claude",
+            "revision": 1,
+            "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "grants": [],
+          "dataPolicy": {
+            "id": "urn:policy:data:project-a",
+            "revision": 1,
+            "contentHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "coordinationPolicy": {
+            "id": "urn:policy:coord:project-a",
+            "revision": 1,
+            "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "checkerPolicy": {
+            "id": "urn:policy:checker:project-a",
+            "revision": 1,
+            "contentHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "role": "fabric.example/agent-chat",
+          "state": "active",
+          "runnerRoute": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        },
+        "catalogue": [
+          {
+            "kind": {
+              "toString": 1
+            },
+            "drives": {
+              "pty": {},
+              "sdk": {}
+            }
+          },
+          {
+            "kind": "codex",
+            "drives": {
+              "codex-app-server": {},
+              "pty": {}
+            }
+          },
+          {
+            "kind": "kimi-code",
+            "drives": {
+              "acp": {}
+            }
+          },
+          {
+            "kind": "hermes",
+            "drives": {
+              "acp": {}
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-033",
+          "instancePath": "/route/candidates/0/runnerKind",
+          "message": "runner kind claude-code has no entry in the host's catalogue"
+        }
+      ]
+    },
+    {
+      "name": "hostile: a revision null against one absent",
+      "kind": "route-bundle",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": null,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "admissions": [
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          }
+        ],
+        "binding": {
+          "meta": {
+            "id": "urn:binding:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "createdAt": "2026-08-26T10:02:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "provider": {
+            "id": "urn:fabric:provider:claude-code-local",
+            "revision": 1,
+            "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "admission": {
+            "id": "urn:admission:claude-code:1",
+            "revision": 1,
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "profileKind": "local-runner",
+          "executionContext": {
+            "id": "urn:context:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "accountPool": {
+            "id": "urn:pool:project-a:claude",
+            "revision": 1,
+            "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "grants": [],
+          "dataPolicy": {
+            "id": "urn:policy:data:project-a",
+            "revision": 1,
+            "contentHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "coordinationPolicy": {
+            "id": "urn:policy:coord:project-a",
+            "revision": 1,
+            "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "checkerPolicy": {
+            "id": "urn:policy:checker:project-a",
+            "revision": 1,
+            "contentHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "role": "fabric.example/agent-chat",
+          "state": "active",
+          "runnerRoute": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        },
+        "catalogue": [
+          {
+            "kind": "claude-code",
+            "drives": {
+              "pty": {},
+              "sdk": {}
+            }
+          },
+          {
+            "kind": "codex",
+            "drives": {
+              "codex-app-server": {},
+              "pty": {}
+            }
+          },
+          {
+            "kind": "kimi-code",
+            "drives": {
+              "acp": {}
+            }
+          },
+          {
+            "kind": "hermes",
+            "drives": {
+              "acp": {}
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/0/provider",
+          "message": "candidate claude-code names provider urn:fabric:provider:claude-code-local@null#sha256:2222222222222222222222222222222222222222222222222222222222222222, which is not a revision admitted for urn:fabric:capability:agent-chat"
+        },
+        {
+          "code": "FAC-SEM-032",
+          "instancePath": "/binding/provider",
+          "message": "the binding's provider urn:fabric:provider:claude-code-local@1#sha256:2222222222222222222222222222222222222222222222222222222222222222 is not a candidate of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected runner kind true against a candidate kind 1",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": 1,
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": true,
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate 3 (true) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected runner kind null against one absent",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": null,
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate 3 (null) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected drive true against the candidate drive 1",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": 1,
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": true,
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected/drive",
+          "message": "the route runs hermes through 1, not true"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the event project and capability with their own toString",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": {
+            "toString": 1
+          },
+          "capability": {
+            "toString": 1
+          },
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/project",
+          "message": "the event is for {\"toString\":1}, the route for urn:project:a"
+        },
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/capability",
+          "message": "the event names {\"toString\":1}, the route orders urn:fabric:capability:agent-chat"
+        }
+      ]
+    },
+    {
+      "name": "hostile: a selected runner kind and index with their own toString",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": {
+              "toString": 1
+            },
+            "runnerKind": {
+              "toString": 1
+            },
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate {\"toString\":1} ({\"toString\":1}) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "raw: two runner kinds whose number-like key comes first only in JavaScript",
+      "kind": "runner-route",
+      "value": {
+        "kind": "runner-route",
+        "meta": {
+          "id": "urn:route:project-a:agent-chat",
+          "revision": 1,
+          "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "createdAt": "2026-10-07T09:00:00Z",
+          "createdBy": "urn:agent:pm:a"
+        },
+        "project": "urn:project:a",
+        "capability": "urn:fabric:capability:agent-chat",
+        "candidates": [
+          {
+            "runnerKind": {
+              "1": 0,
+              "toString": 1
+            },
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            },
+            "session": {
+              "attach": "preferred",
+              "spawn": "never"
+            }
+          },
+          {
+            "runnerKind": {
+              "1": 0,
+              "toString": 1
+            },
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            },
+            "drive": "codex-app-server",
+            "session": {
+              "attach": "preferred",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "kimi-code",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          },
+          {
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": {
+              "attach": "never",
+              "spawn": "allowed"
+            }
+          }
+        ],
+        "exhausted": "capability-unavailable",
+        "recovery": "sticky"
+      },
+      "valueText": "{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"candidates\":[{\"runnerKind\":{\"toString\":1,\"1\":0},\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"}},{\"runnerKind\":{\"1\":0,\"toString\":1},\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"}",
+      "expected": [
+        {
+          "code": "FAC-SEM-028",
+          "instancePath": "/candidates/1/runnerKind",
+          "message": "runner kind {\"1\":0,\"toString\":1} appears in the route more than once"
+        }
+      ]
+    },
+    {
+      "name": "raw: a candidate drive with its own toString and a lone surrogate",
+      "kind": "route-bundle",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              },
+              "drive": {
+                "toString": 1,
+                "x": "\udc00"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "admissions": [
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          }
+        ],
+        "binding": {
+          "meta": {
+            "id": "urn:binding:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "createdAt": "2026-08-26T10:02:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "provider": {
+            "id": "urn:fabric:provider:claude-code-local",
+            "revision": 1,
+            "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "admission": {
+            "id": "urn:admission:claude-code:1",
+            "revision": 1,
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "profileKind": "local-runner",
+          "executionContext": {
+            "id": "urn:context:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "accountPool": {
+            "id": "urn:pool:project-a:claude",
+            "revision": 1,
+            "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "grants": [],
+          "dataPolicy": {
+            "id": "urn:policy:data:project-a",
+            "revision": 1,
+            "contentHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "coordinationPolicy": {
+            "id": "urn:policy:coord:project-a",
+            "revision": 1,
+            "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "checkerPolicy": {
+            "id": "urn:policy:checker:project-a",
+            "revision": 1,
+            "contentHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "role": "fabric.example/agent-chat",
+          "state": "active",
+          "runnerRoute": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        },
+        "catalogue": [
+          {
+            "kind": "claude-code",
+            "drives": {
+              "pty": {},
+              "sdk": {}
+            }
+          },
+          {
+            "kind": "codex",
+            "drives": {
+              "codex-app-server": {},
+              "pty": {}
+            }
+          },
+          {
+            "kind": "kimi-code",
+            "drives": {
+              "acp": {}
+            }
+          },
+          {
+            "kind": "hermes",
+            "drives": {
+              "acp": {}
+            }
+          }
+        ]
+      },
+      "valueText": "{\"route\":{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"candidates\":[{\"runnerKind\":\"claude-code\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"},\"drive\":{\"toString\":1,\"x\":\"\\udc00\"}},{\"runnerKind\":\"codex\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"},\"admissions\":[{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}},{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"}},{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"}},{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"}}],\"binding\":{\"meta\":{\"id\":\"urn:binding:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\",\"createdAt\":\"2026-08-26T10:02:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"admission\":{\"id\":\"urn:admission:claude-code:1\",\"revision\":1,\"contentHash\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"profileKind\":\"local-runner\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"accountPool\":{\"id\":\"urn:pool:project-a:claude\",\"revision\":1,\"contentHash\":\"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"},\"grants\":[],\"dataPolicy\":{\"id\":\"urn:policy:data:project-a\",\"revision\":1,\"contentHash\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"coordinationPolicy\":{\"id\":\"urn:policy:coord:project-a\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"checkerPolicy\":{\"id\":\"urn:policy:checker:project-a\",\"revision\":1,\"contentHash\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\"},\"role\":\"fabric.example/agent-chat\",\"state\":\"active\",\"runnerRoute\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\"}},\"catalogue\":[{\"kind\":\"claude-code\",\"drives\":{\"pty\":{},\"sdk\":{}}},{\"kind\":\"codex\",\"drives\":{\"codex-app-server\":{},\"pty\":{}}},{\"kind\":\"kimi-code\",\"drives\":{\"acp\":{}}},{\"kind\":\"hermes\",\"drives\":{\"acp\":{}}}]}",
+      "expected": [
+        {
+          "code": "FAC-SEM-033",
+          "instancePath": "/route/candidates/0/drive",
+          "message": "the catalogue entry for claude-code offers no drive {\"toString\":1,\"x\":\"\\udc00\"}"
+        }
+      ]
+    },
+    {
+      "name": "raw: a binding capability 2**53+1 against the route 2**53",
+      "kind": "route-bundle",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": 9007199254740992,
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "admissions": [
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:claude-code-local",
+              "revision": 1,
+              "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:codex-local",
+              "revision": 3,
+              "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:kimi-code-local",
+              "revision": 1,
+              "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+            }
+          },
+          {
+            "state": "admitted",
+            "capability": "urn:fabric:capability:agent-chat",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            }
+          }
+        ],
+        "binding": {
+          "meta": {
+            "id": "urn:binding:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+            "createdAt": "2026-08-26T10:02:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": 9007199254740992,
+          "provider": {
+            "id": "urn:fabric:provider:claude-code-local",
+            "revision": 1,
+            "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "admission": {
+            "id": "urn:admission:claude-code:1",
+            "revision": 1,
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "profileKind": "local-runner",
+          "executionContext": {
+            "id": "urn:context:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "accountPool": {
+            "id": "urn:pool:project-a:claude",
+            "revision": 1,
+            "contentHash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "grants": [],
+          "dataPolicy": {
+            "id": "urn:policy:data:project-a",
+            "revision": 1,
+            "contentHash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          "coordinationPolicy": {
+            "id": "urn:policy:coord:project-a",
+            "revision": 1,
+            "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "checkerPolicy": {
+            "id": "urn:policy:checker:project-a",
+            "revision": 1,
+            "contentHash": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+          },
+          "role": "fabric.example/agent-chat",
+          "state": "active",
+          "runnerRoute": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        },
+        "catalogue": [
+          {
+            "kind": "claude-code",
+            "drives": {
+              "pty": {},
+              "sdk": {}
+            }
+          },
+          {
+            "kind": "codex",
+            "drives": {
+              "codex-app-server": {},
+              "pty": {}
+            }
+          },
+          {
+            "kind": "kimi-code",
+            "drives": {
+              "acp": {}
+            }
+          },
+          {
+            "kind": "hermes",
+            "drives": {
+              "acp": {}
+            }
+          }
+        ]
+      },
+      "valueText": "{\"route\":{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":9007199254740992,\"candidates\":[{\"runnerKind\":\"claude-code\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"}},{\"runnerKind\":\"codex\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"},\"admissions\":[{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"}},{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"}},{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"}},{\"state\":\"admitted\",\"capability\":\"urn:fabric:capability:agent-chat\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"}}],\"binding\":{\"meta\":{\"id\":\"urn:binding:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\",\"createdAt\":\"2026-08-26T10:02:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":9007199254740993,\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"admission\":{\"id\":\"urn:admission:claude-code:1\",\"revision\":1,\"contentHash\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"profileKind\":\"local-runner\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},\"accountPool\":{\"id\":\"urn:pool:project-a:claude\",\"revision\":1,\"contentHash\":\"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"},\"grants\":[],\"dataPolicy\":{\"id\":\"urn:policy:data:project-a\",\"revision\":1,\"contentHash\":\"sha256:7777777777777777777777777777777777777777777777777777777777777777\"},\"coordinationPolicy\":{\"id\":\"urn:policy:coord:project-a\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"checkerPolicy\":{\"id\":\"urn:policy:checker:project-a\",\"revision\":1,\"contentHash\":\"sha256:9999999999999999999999999999999999999999999999999999999999999999\"},\"role\":\"fabric.example/agent-chat\",\"state\":\"active\",\"runnerRoute\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\"}},\"catalogue\":[{\"kind\":\"claude-code\",\"drives\":{\"pty\":{},\"sdk\":{}}},{\"kind\":\"codex\",\"drives\":{\"codex-app-server\":{},\"pty\":{}}},{\"kind\":\"kimi-code\",\"drives\":{\"acp\":{}}},{\"kind\":\"hermes\",\"drives\":{\"acp\":{}}}]}",
+      "expected": [
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/0/provider",
+          "message": "candidate claude-code names provider urn:fabric:provider:claude-code-local@1#sha256:2222222222222222222222222222222222222222222222222222222222222222, which is not a revision admitted for 9007199254740992"
+        },
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/1/provider",
+          "message": "candidate codex names provider urn:fabric:provider:codex-local@3#sha256:3333333333333333333333333333333333333333333333333333333333333333, which is not a revision admitted for 9007199254740992"
+        },
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/2/provider",
+          "message": "candidate kimi-code names provider urn:fabric:provider:kimi-code-local@1#sha256:4444444444444444444444444444444444444444444444444444444444444444, which is not a revision admitted for 9007199254740992"
+        },
+        {
+          "code": "FAC-SEM-030",
+          "instancePath": "/route/candidates/3/provider",
+          "message": "candidate hermes names provider urn:fabric:provider:hermes-local@2#sha256:5555555555555555555555555555555555555555555555555555555555555555, which is not a revision admitted for 9007199254740992"
+        }
+      ]
+    },
+    {
+      "name": "raw: a selected runner kind 2**53+1 against the candidate 2**53",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": 9007199254740992,
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": 9007199254740992,
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "valueText": "{\"route\":{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"candidates\":[{\"runnerKind\":\"claude-code\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"}},{\"runnerKind\":\"codex\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":9007199254740992,\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"},\"event\":{\"at\":\"2026-10-07T09:05:00Z\",\"route\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"run\":\"urn:run:project-a:42\",\"conversation\":\"urn:conversation:project-a:7\",\"launch\":\"operator\",\"id\":\"urn:event:route:1\",\"kind\":\"runner-selected\",\"selected\":{\"index\":3,\"runnerKind\":9007199254740993,\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},\"probes\":[{\"index\":0,\"runnerKind\":\"claude-code\",\"result\":\"no-held-session\"},{\"index\":1,\"runnerKind\":\"codex\",\"result\":\"not-installed\",\"detail\":\"no catalogued binary codex on PATH\"},{\"index\":2,\"runnerKind\":\"kimi-code\",\"result\":\"not-connected\",\"detail\":\"kimi answered its version probe but is signed out\"}]}}",
+      "expected": []
+    },
+    {
+      "name": "raw: a selected drive 2**53+1 against the candidate drive 2**53",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": 9007199254740992,
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": 9007199254740992,
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "valueText": "{\"route\":{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"candidates\":[{\"runnerKind\":\"claude-code\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"}},{\"runnerKind\":\"codex\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":9007199254740992,\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"},\"event\":{\"at\":\"2026-10-07T09:05:00Z\",\"route\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"run\":\"urn:run:project-a:42\",\"conversation\":\"urn:conversation:project-a:7\",\"launch\":\"operator\",\"id\":\"urn:event:route:1\",\"kind\":\"runner-selected\",\"selected\":{\"index\":3,\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":9007199254740993,\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},\"probes\":[{\"index\":0,\"runnerKind\":\"claude-code\",\"result\":\"no-held-session\"},{\"index\":1,\"runnerKind\":\"codex\",\"result\":\"not-installed\",\"detail\":\"no catalogued binary codex on PATH\"},{\"index\":2,\"runnerKind\":\"kimi-code\",\"result\":\"not-connected\",\"detail\":\"kimi answered its version probe but is signed out\"}]}}",
+      "expected": []
+    },
+    {
+      "name": "raw: a probe index of 401 digits",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": null,
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": "spawned",
+              "sessionRef": "urn:session:project-a:hermes:1",
+              "executionContext": {
+                "id": "urn:context:project-a:agent-chat:hermes",
+                "revision": 1,
+                "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+              },
+              "permissionMode": "ask"
+            },
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "valueText": "{\"route\":{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"candidates\":[{\"runnerKind\":\"claude-code\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"}},{\"runnerKind\":\"codex\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"},\"event\":{\"at\":\"2026-10-07T09:05:00Z\",\"route\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"run\":\"urn:run:project-a:42\",\"conversation\":\"urn:conversation:project-a:7\",\"launch\":\"operator\",\"id\":\"urn:event:route:1\",\"kind\":\"runner-selected\",\"selected\":{\"index\":3,\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},\"probes\":[{\"index\":10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000,\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},{\"index\":0,\"runnerKind\":\"claude-code\",\"result\":\"no-held-session\"},{\"index\":1,\"runnerKind\":\"codex\",\"result\":\"not-installed\",\"detail\":\"no catalogued binary codex on PATH\"},{\"index\":2,\"runnerKind\":\"kimi-code\",\"result\":\"not-connected\",\"detail\":\"kimi answered its version probe but is signed out\"}]}}",
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes/0",
+          "message": "candidate Infinity (hermes) is not that position of the route"
+        },
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes",
+          "message": "the walk must record candidates 0, 1, 2 in order; it records -1, 0, 1, 2"
+        }
+      ]
+    },
+    {
+      "name": "raw: a probe index 1e21",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 1e+21,
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": "spawned",
+              "sessionRef": "urn:session:project-a:hermes:1",
+              "executionContext": {
+                "id": "urn:context:project-a:agent-chat:hermes",
+                "revision": 1,
+                "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+              },
+              "permissionMode": "ask"
+            },
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "valueText": "{\"route\":{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"candidates\":[{\"runnerKind\":\"claude-code\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"}},{\"runnerKind\":\"codex\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"},\"event\":{\"at\":\"2026-10-07T09:05:00Z\",\"route\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"run\":\"urn:run:project-a:42\",\"conversation\":\"urn:conversation:project-a:7\",\"launch\":\"operator\",\"id\":\"urn:event:route:1\",\"kind\":\"runner-selected\",\"selected\":{\"index\":3,\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},\"probes\":[{\"index\":1e21,\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},{\"index\":0,\"runnerKind\":\"claude-code\",\"result\":\"no-held-session\"},{\"index\":1,\"runnerKind\":\"codex\",\"result\":\"not-installed\",\"detail\":\"no catalogued binary codex on PATH\"},{\"index\":2,\"runnerKind\":\"kimi-code\",\"result\":\"not-connected\",\"detail\":\"kimi answered its version probe but is signed out\"}]}}",
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes/0",
+          "message": "candidate 1e+21 (hermes) is not that position of the route"
+        },
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes",
+          "message": "the walk must record candidates 0, 1, 2 in order; it records 1e+21, 0, 1, 2"
+        }
+      ]
+    },
+    {
+      "name": "raw: a probe index 2**53+1",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 3,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 9007199254740992,
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": "spawned",
+              "sessionRef": "urn:session:project-a:hermes:1",
+              "executionContext": {
+                "id": "urn:context:project-a:agent-chat:hermes",
+                "revision": 1,
+                "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+              },
+              "permissionMode": "ask"
+            },
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "valueText": "{\"route\":{\"kind\":\"runner-route\",\"meta\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\",\"createdAt\":\"2026-10-07T09:00:00Z\",\"createdBy\":\"urn:agent:pm:a\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"candidates\":[{\"runnerKind\":\"claude-code\",\"provider\":{\"id\":\"urn:fabric:provider:claude-code-local\",\"revision\":1,\"contentHash\":\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"},\"session\":{\"attach\":\"preferred\",\"spawn\":\"never\"}},{\"runnerKind\":\"codex\",\"provider\":{\"id\":\"urn:fabric:provider:codex-local\",\"revision\":3,\"contentHash\":\"sha256:3333333333333333333333333333333333333333333333333333333333333333\"},\"drive\":\"codex-app-server\",\"session\":{\"attach\":\"preferred\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"kimi-code\",\"provider\":{\"id\":\"urn:fabric:provider:kimi-code-local\",\"revision\":1,\"contentHash\":\"sha256:4444444444444444444444444444444444444444444444444444444444444444\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}},{\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":{\"attach\":\"never\",\"spawn\":\"allowed\"}}],\"exhausted\":\"capability-unavailable\",\"recovery\":\"sticky\"},\"event\":{\"at\":\"2026-10-07T09:05:00Z\",\"route\":{\"id\":\"urn:route:project-a:agent-chat\",\"revision\":1,\"contentHash\":\"sha256:6666666666666666666666666666666666666666666666666666666666666666\"},\"project\":\"urn:project:a\",\"capability\":\"urn:fabric:capability:agent-chat\",\"run\":\"urn:run:project-a:42\",\"conversation\":\"urn:conversation:project-a:7\",\"launch\":\"operator\",\"id\":\"urn:event:route:1\",\"kind\":\"runner-selected\",\"selected\":{\"index\":3,\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},\"probes\":[{\"index\":9007199254740993,\"runnerKind\":\"hermes\",\"provider\":{\"id\":\"urn:fabric:provider:hermes-local\",\"revision\":2,\"contentHash\":\"sha256:5555555555555555555555555555555555555555555555555555555555555555\"},\"drive\":\"acp\",\"session\":\"spawned\",\"sessionRef\":\"urn:session:project-a:hermes:1\",\"executionContext\":{\"id\":\"urn:context:project-a:agent-chat:hermes\",\"revision\":1,\"contentHash\":\"sha256:8888888888888888888888888888888888888888888888888888888888888888\"},\"permissionMode\":\"ask\"},{\"index\":0,\"runnerKind\":\"claude-code\",\"result\":\"no-held-session\"},{\"index\":1,\"runnerKind\":\"codex\",\"result\":\"not-installed\",\"detail\":\"no catalogued binary codex on PATH\"},{\"index\":2,\"runnerKind\":\"kimi-code\",\"result\":\"not-connected\",\"detail\":\"kimi answered its version probe but is signed out\"}]}}",
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes/0",
+          "message": "candidate 9007199254740992 (hermes) is not that position of the route"
+        },
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes",
+          "message": "the walk must record candidates 0, 1, 2 in order; it records 9007199254740992, 0, 1, 2"
+        }
+      ]
     }
   ]
 }

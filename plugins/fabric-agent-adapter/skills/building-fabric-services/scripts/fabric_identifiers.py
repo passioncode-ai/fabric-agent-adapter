@@ -163,12 +163,19 @@ def normal_identifier(value: Any) -> Optional[str]:
     return _urn_form(authority, path, query) if scheme.lower() == "urn" else _generic_form(scheme, authority, path, query, fragment)
 
 
+def _double(value: Any) -> float:
+    try:
+        return float(value)
+    except OverflowError:
+        return float("inf") if value > 0 else float("-inf")
+
+
 def _strict_equal(a: Any, b: Any) -> bool:
     """JavaScript's === on parsed JSON: numbers by value, booleans only with booleans, objects by identity."""
     if isinstance(a, bool) or isinstance(b, bool):
         return isinstance(a, bool) and isinstance(b, bool) and a == b
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-        return a == b
+        return _double(a) == _double(b)  # as JavaScript holds them: 2**53 + 1 is 2**53
     if isinstance(a, (dict, list)) or isinstance(b, (dict, list)):
         return a is b
     return type(a) is type(b) and a == b

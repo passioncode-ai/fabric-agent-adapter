@@ -128,6 +128,83 @@ if (fs.existsSync(path.join(args.semantic, 'profile-resolution-user-content-poli
   { const v = clone(res); v.profiles = [null, { ...clone(v.profiles[0]), id: { toString: 1 }, models: ['example/not-catalogued'] }]; push('an uncatalogued model under an object id after a non-object', 'profile-resolution', v); }
 }
 
+// FAC-SEM-059 and FAC-SEM-060 compare as the contract does: === (1 and true differ, null is not absent), jsonEqual for a
+// recorded resolution (NaN equals nothing), show for a value whose own toString is data, and toNumber for a policy
+// revision a refusal names. Each case is a positive fixture varied one way, answered by the contract's own rules.
+{
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const push = (name, kind, value) => ruleCases.push({ name: `crafted strict: ${name}`, kind, value, expected: rules.profileRules(kind, value) });
+  const sub = read(args.positive, 'runner-profile-subscription.json');
+  const key = read(args.positive, 'runner-profile-key.json');
+  const v = (base, edit) => { const x = clone(base); edit(x); return x; };
+  push('an unknown login, runnerKind null', 'runner-profile', v(sub, (x) => { x.subscription.login = 'unknown-vendor'; x.runnerKind = null; }));
+  push('an unknown login, runnerKind absent', 'runner-profile', v(sub, (x) => { x.subscription.login = 'unknown-vendor'; delete x.runnerKind; }));
+  push('a login named constructor', 'runner-profile', v(sub, (x) => { x.subscription.login = 'constructor'; }));
+  push('a login named __proto__', 'runner-profile', v(sub, (x) => { x.subscription.login = '__proto__'; }));
+  push('a login with its own toString', 'runner-profile', v(sub, (x) => { x.subscription.login = { toString: 1 }; }));
+  push('a login null', 'runner-profile', v(sub, (x) => { x.subscription.login = null; x.runnerKind = null; }));
+  push('a runnerKind with its own toString', 'runner-profile', v(sub, (x) => { x.runnerKind = { toString: 1 }; }));
+  push('an allow-list true against a profile 1', 'runner-profile', v(key, (x) => { x.key.modelAllowList = true; x.modelProfile = 1; }));
+  push('an allow-list null against an absent profile', 'runner-profile', v(key, (x) => { x.key.modelAllowList = null; delete x.modelProfile; }));
+  push('an allow-list and a profile with their own toString', 'runner-profile', v(key, (x) => { x.key.modelAllowList = { toString: 1 }; x.modelProfile = { toString: 1 }; }));
+
+  const res = read(args.semantic, 'profile-resolution-ok.json');
+  const refusing = (edit) => v(res, (x) => { x.policy = { meta: { id: 'policy-a', revision: 3 }, modelClasses: ['frontier-only'] }; x.choices = { estate: x.profiles[0].id }; edit(x); });
+  for (const [label, id] of [['an id with its own toString', { toString: 1 }], ['an id null', null], ['an id 7', 7], ['an id true', true]]) {
+    push(`a refusal naming ${label}`, 'profile-resolution', refusing((x) => { x.policy.meta.id = id; }));
+  }
+  push('a refusal naming no id', 'profile-resolution', refusing((x) => { delete x.policy.meta.id; }));
+  for (const [label, revision] of [['"0x10"', '0x10'], ['null', null], ['[5]', [5]], ['true', true], ['" 4 "', ' 4 '], ['"abc"', 'abc'], ['its own toString', { toString: 1 }], ['"1e2"', '1e2']]) {
+    push(`a refusal naming revision ${label}`, 'profile-resolution', refusing((x) => { x.policy.meta.revision = revision; }));
+  }
+  push('a refusal with no revision', 'profile-resolution', refusing((x) => { delete x.policy.meta.revision; }));
+  push('a recorded refusal with revision null where the answer is NaN', 'profile-resolution', refusing((x) => {
+    x.policy.meta.revision = 'abc'; x.resolved = { refused: 'model-classes-empty', profile: x.choices.estate, policy: { id: 'policy-a', revision: null } };
+  }));
+  push('a recorded refusal with revision true where the answer is 1', 'profile-resolution', refusing((x) => {
+    x.policy.meta.revision = 1; x.resolved = { refused: 'model-classes-empty', profile: x.choices.estate, policy: { id: 'policy-a', revision: true } };
+  }));
+  push('a recorded refusal with revision 1 where the answer is 1', 'profile-resolution', refusing((x) => {
+    x.policy.meta.revision = 1; x.resolved = { refused: 'model-classes-empty', profile: x.choices.estate, policy: { id: 'policy-a', revision: 1 } };
+  }));
+  push('a recorded resolution with its members in another order', 'profile-resolution', v(res, (x) => {
+    if (x.resolved && typeof x.resolved === 'object') x.resolved = Object.fromEntries(Object.entries(x.resolved).reverse());
+  }));
+  push('a recorded resolution null', 'profile-resolution', v(res, (x) => { x.resolved = null; }));
+  push('a recorded resolution with one member more', 'profile-resolution', v(res, (x) => { if (x.resolved && typeof x.resolved === 'object') x.resolved.extra = 1; }));
+  push('a recorded resolution with one member fewer', 'profile-resolution', v(res, (x) => { if (x.resolved && typeof x.resolved === 'object') delete x.resolved[Object.keys(x.resolved)[0]]; }));
+}
+
+// JSON a JavaScript object cannot carry as written: an integer past 2**53 or past the double range, and members whose
+// number-like keys JavaScript reorders. The case keeps the JSON text; the contract answers JSON.parse of that text, as a
+// host would. `@@name@@` strings in the object are replaced by the literal JSON text after stringify.
+{
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const raw = (name, kind, object, literals = {}) => {
+    let text = JSON.stringify(object);
+    for (const [mark, literal] of Object.entries(literals)) text = text.split(JSON.stringify(`@@${mark}@@`)).join(literal);
+    const value = JSON.parse(text);
+    ruleCases.push({ name: `crafted raw: ${name}`, kind, value, rawText: text, expected: rules.profileRules(kind, value) });
+  };
+  const res = read(args.semantic, 'profile-resolution-ok.json');
+  const key = read(args.positive, 'runner-profile-key.json');
+  const big = '9007199254740993', huge = `1${'0'.repeat(400)}`;
+  raw('a lone surrogate as the chosen profile', 'profile-resolution', { choices: { estate: '\ud800' }, profiles: [] });
+  raw('an allow-list 2**53+1 against a profile 2**53', 'runner-profile', { ...clone(key), key: { ...clone(key.key), modelAllowList: '@@a@@' }, modelProfile: '@@b@@' }, { a: big, b: '9007199254740992' });
+  raw('an allow-list with a number-like key after toString', 'runner-profile', { ...clone(key), key: { ...clone(key.key), modelAllowList: '@@a@@' } }, { a: '{"toString":1,"2":0}' });
+  raw('two profile ids past the double range', 'model-profiles', { profiles: [{ id: '@@h@@' }, { id: '@@h@@' }] }, { h: huge });
+  raw('a recorded refusal revision 2**53+1 where the policy says 2**53', 'profile-resolution', (() => {
+    const x = clone(res); x.choices = { estate: x.profiles[0].id }; x.policy = { meta: { id: 'policy-a', revision: '@@r@@' }, modelClasses: ['frontier-only'] };
+    x.resolved = { refused: 'model-classes-empty', profile: x.choices.estate, policy: { id: 'policy-a', revision: '@@b@@' } }; return x;
+  })(), { r: '9007199254740992', b: big });
+  raw('a refusal naming a revision of 0x and 300 f digits', 'profile-resolution', (() => {
+    const x = clone(res); x.choices = { estate: x.profiles[0].id }; x.policy = { meta: { id: 'policy-a', revision: `0x${'f'.repeat(300)}` }, modelClasses: ['frontier-only'] }; return x;
+  })());
+  raw('a refusal naming a policy id with its own toString and a lone surrogate', 'profile-resolution', (() => {
+    const x = clone(res); x.choices = { estate: x.profiles[0].id }; x.policy = { meta: { id: { toString: 1, a: '\udc00' }, revision: 1 }, modelClasses: ['frontier-only'] }; return x;
+  })());
+}
+
 // Resolutions: every profile-resolution fixture's inputs, then the order and the classes varied over them.
 const base = read(args.semantic, 'profile-resolution-ok.json');
 const resolutions = [];
@@ -192,7 +269,7 @@ const admission = fs.existsSync(admissionFile) ? read(path.dirname(admissionFile
 }) : [];
 
 // A rule case's value may hold a made-up key (runner-profile-key-value): stored base64-encoded like the inputs above.
-for (const c of ruleCases) { c.valueHex = Buffer.from(JSON.stringify(c.value), 'utf8').toString('hex'); delete c.value; }
+for (const c of ruleCases) { c.valueHex = Buffer.from(c.rawText ?? JSON.stringify(c.value), 'utf8').toString('hex'); delete c.value; delete c.rawText; }
 const out = args.out ?? path.join(here, 'profile-vectors.json');
 fs.writeFileSync(out, `${JSON.stringify({ about: "DEC-0046 and DEC-0044 cases; expected answers from the contract's profile-rules.ts and secret-shape.ts at the pin (make_profile_vectors.mjs). Every credential-shaped sample is made up and stored hex-encoded. Do not edit by hand.", rules: ruleCases, resolutions, secrets, admission }, null, 1)}\n`);
 console.log(`wrote ${out}: ${ruleCases.length} rule, ${resolutions.length} resolution, ${admission.length} admission, ${Object.values(secrets).reduce((n, l) => n + l.length, 0)} secret-shape cases`);

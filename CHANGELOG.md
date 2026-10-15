@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.34.1 - 2026-10-15
+
+A review of 0.33.0 and 0.34.0 found the profile and route rules disagreeing with the contract on JSON they never met in
+its vectors. The kits now answer as the contract's TypeScript does on any input. The contract pin is unchanged
+(`d8146cf`).
+
+### Fixed
+
+- **FAC-SEM-059 (`runner-profile`) compared loosely.** Python read a missing member and `null` as the same and `1`
+  and `true` as equal: an unknown login with `runnerKind: null`, or an allow-list `true` against a profile `1`, passed.
+  Node threw on a login or runner kind whose own `toString` member is data. Both now compare with `===`, show such a
+  value as its JSON, and read only the vendor table's own members.
+- **FAC-SEM-060 compared a recorded resolution loosely.** Python's `!=` called `1` and `true` equal; Node's
+  `JSON.stringify` comparison called `NaN` and `null` equal. Both now use the contract's `jsonEqual`, where NaN equals
+  nothing.
+- **A refusal (`model-classes-empty`) named its policy wrongly on hostile input.** Node threw on an id or revision
+  whose own `toString` is data; Python wrote `[object Object]`, read `null` as `undefined`, and did not read a revision
+  as `Number()` does (`"0x10"`, `[5]`, `null`). Both now use the contract's `show` and `toNumber`; a revision that is
+  not a number is written as null.
+- **Route rules (FAC-SEM-028…034) threw or misread hostile JSON.** Node used `String()` where the contract uses `show`;
+  Python wrote `[object Object]`, and compared a probe's runner kind and a drive with `!=` (`1` equal to `true`).
+- **The doctor's `model_usable` raised on a catalogue row whose id is an object** (Python), and threw on a policy id
+  whose own `toString` is data (Node).
+- **Python wrote and compared JSON values unlike JavaScript** (found by an independent review of this fix):
+  - a lone surrogate (`"\ud800"`, valid JSON) raised `TypeError` wherever a message wrote a value, because
+    `_json_stringify` used the RFC 8785 writer that refuses one; it now escapes it as `JSON.stringify` does;
+  - members whose keys are array indexes came out in the order written, where JavaScript writes them first and
+    ascending, so two equal hostile runner kinds were not a FAC-SEM-028 duplicate;
+  - integers past 2**53 compared exactly, where JavaScript compares doubles (`9007199254740993` is
+    `9007199254740992`), and integers past the double range raised `OverflowError` where JavaScript reads Infinity;
+  - a probe index was written as an exact integer instead of JavaScript's number (`1e+21`).
+  These helpers are shared with the estate and identifier kits, whose vectors stay green.
+- **Node looked a rule kind up on inherited members**: `routeProblems("__proto__", …)` threw and `"constructor"`
+  answered the value; both now answer `undefined`, as the contract does.
+- **The task board broke the workspace's publication**: rows FAA-28 and FAA-27a split into six cells (an escaped
+  `\|`, and a fragment a 0.31.0 edit left behind). Both are fixed, and `test/validate.py` now refuses any board row that
+  does not split into the header's columns.
+
+### Evidence
+
+- 38 new profile cases and 21 new route cases (`make_profile_vectors.mjs`, `make_route_vectors.mjs`), each answered by
+  the contract's own rules; cases JavaScript cannot carry as an object (big integers, key order) keep their JSON text.
+  Against 0.34.0's kits the first 44 of them fail 27 Python subtests and two Node tests.
+- The reviewer's side-by-side comparison of the contract, the Node kit and the Python kit on 17 hostile inputs: 17 of
+  17 identical after the fix (Python 1 of 17 before).
+- Unit tests for the doctor and the rule dispatch on hostile input, in both kits; `BoardRowTests` for the board check.
+- Planted defects in the new code, all caught; two were redundant code, now removed.
+
 ## 0.34.0 - 2026-10-15
 
 The adapter is pinned at contract `d8146cf`. The profile kits now read what a lane reads (DEC-0083; FAA-45, contract

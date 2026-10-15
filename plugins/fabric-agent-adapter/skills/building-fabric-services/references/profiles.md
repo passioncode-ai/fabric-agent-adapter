@@ -39,7 +39,9 @@ and name the policy; never fall back to a model outside it. No level at all is `
 (a model catalogued once; a provider never both ordered and ignored, a base slug covering its variants), a
 `model-profiles` set (an id once), a `runner-profile` (a subscription only in its vendor's runner — Claude in Claude
 Code, Kimi in Kimi Code, ChatGPT in Codex; a key route's allow-list is its own model profile; a key named by reference,
-never by value) and a recorded `profile-resolution` (it equals the order's answer).
+never by value) and a recorded `profile-resolution` (it equals the order's answer). Every rule compares as the contract
+does — `===` (`1` and `true` differ, `null` is not absent) and its `jsonEqual` for a recorded resolution, where NaN
+equals nothing — and never raises on hostile JSON: a value whose own `toString` member is data is shown as its JSON.
 
 ## A lane that reads user content
 

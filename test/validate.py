@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.34.0"
+VERSION = "0.34.1"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -557,6 +557,24 @@ def validate_plugin_lifecycle(errors: List[str], plugin: Path) -> None:
                 errors.append("LC-21: a hook command carries a credential; argv is visible to every process")
 
 
+def malformed_board_rows(text: str) -> List[str]:
+    """Rows of a task table that do not split into its header's columns. The common-backlog aggregator splits a row on
+    every `|`, an escaped `\\|` included, so a cell that holds one breaks the workspace's publication."""
+    problems: List[str] = []
+    width = None
+    for number, line in enumerate(text.splitlines(), 1):
+        if not line.startswith("|"):
+            width = None
+            continue
+        cells = len(line.strip().strip("|").split("|"))
+        if width is None:
+            width = cells  # the header row
+        elif not re.fullmatch(r"\|[\s:|-]+\|?", line.strip()) and cells != width:
+            problems.append("docs/backlog.md:%d: a task row with %d cells in a table of %d (a `|` inside a cell, escaped or not, splits it)"
+                            % (number, cells, width))
+    return problems
+
+
 def validate_repo() -> List[str]:
     errors: List[str] = []
     validate_plugin_lifecycle(errors, ROOT / "plugins/fabric-agent-adapter")
@@ -569,6 +587,7 @@ def validate_repo() -> List[str]:
     for name in SKILL_NAMES:
         validate_skill(name, errors)
     validate_contract_pin(errors)
+    errors.extend(malformed_board_rows((ROOT / "docs/backlog.md").read_text(encoding="utf-8")))
 
     skill_files = sorted(path for path in ROOT.rglob("SKILL.md") if ".git" not in path.parts)
     if skill_files != sorted(SKILLS[name] / "SKILL.md" for name in SKILL_NAMES):
