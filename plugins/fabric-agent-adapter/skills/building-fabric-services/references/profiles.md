@@ -11,6 +11,7 @@ Python: [`scripts/fabric_profiles.py`](../scripts/fabric_profiles.py); Node:
 
 - Resolving the model profile
 - Checking the documents
+- A lane that reads user content
 - Declaring and showing what applies
 - The doctor
 - Runner routes
@@ -38,6 +39,25 @@ and name the policy; never fall back to a model outside it. No level at all is `
 `model-profiles` set (an id once), a `runner-profile` (a subscription only in its vendor's runner — Claude in Claude
 Code, Kimi in Kimi Code, ChatGPT in Codex; a key route's allow-list is its own model profile; a key named by reference,
 never by value) and a recorded `profile-resolution` (it equals the order's answer).
+
+## A lane that reads user content
+
+A model profile names what the lane it serves reads (DEC-0083, `reads`): `user-content` — what a member, a client or
+the public sends (messages, questions, images, reviews, screenshots, voice); `operator` — only what the estate's own
+operator or its agents write; `web` — pages fetched from the open web. Absent is "not declared", which stays valid.
+
+A profile that reads `user-content` has an **open-vendor route** (FAC-SEM-112): with `fallback: none` (or any value the
+contract does not name) its first model is `open-vendor` in the catalogue; with `between-turns` at least one of its
+models is. Closed vendors refuse the content such a lane exists to handle, so a closed route alone skips the worst of
+it. Which models are `open-vendor` is the catalogue writer's fact; the service never keeps a vendor list of its own,
+and a model the catalogue does not hold counts as closed.
+
+- `profile_problems("profile-resolution", doc)` / `profileProblems(...)` answer FAC-SEM-112 beside FAC-SEM-060.
+- `closed_user_content_route(profile, catalogue)` / `closedUserContentRoute(profile, catalogue)` name the models that
+  would run on such a lane when none is open-vendor, or `None`/`undefined` when the route holds.
+- On such a lane a content refusal, or an empty answer to a non-empty request, is a **failed turn**: under
+  `between-turns` the runner moves to the next model; it never counts that answer as done.
+- `operator` and `web` carry no model rule in this revision; they let a lane say that it reads no user content.
 
 ## Declaring and showing what applies
 

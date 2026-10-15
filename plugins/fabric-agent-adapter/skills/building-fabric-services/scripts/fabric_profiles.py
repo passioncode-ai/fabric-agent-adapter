@@ -19,6 +19,7 @@ import shutil
 import subprocess
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+import fabric_estate as _estate
 import fabric_identifiers as _ids
 import fabric_secrets as _secrets
 import fabric_service as _fs
@@ -75,7 +76,7 @@ def _js_number(value: Any) -> Optional[float]:
     return None
 
 
-def resolve_model_profile(*, catalogue: Any, profiles: Any, choices: Any, policy: Any = None) -> Dict[str, Any]:
+def resolve_model_profile(*, catalogue: Any = None, profiles: Any = None, choices: Any = None, policy: Any = None) -> Dict[str, Any]:
     """FAC-SEM-060: the request's profile, else the agent's, else the binding's or project's, else the estate default.
     When the project's policy names `modelClasses`, a model stays only if every class the catalogue gives it is
     allowed; an empty result refuses the launch, naming the policy."""
@@ -169,11 +170,53 @@ def _profile_resolution(value: Dict[str, Any]) -> List[Dict[str, str]]:
     return findings
 
 
+#: DEC-0083: the model class of a model whose vendor publishes its weights openly, and what a lane reads when it reads
+#: what a member, a client or the public sends.
+OPEN_VENDOR = "open-vendor"
+USER_CONTENT = "user-content"
+
+
+def closed_user_content_route(profile: Any, catalogue: Any) -> Optional[List[str]]:
+    """FAC-SEM-112 (DEC-0083) for one profile: the models that run when the lane reads user content and none of them is
+    an open-vendor model, or None when the profile does not read user content or its route has one. Under
+    ``between-turns`` every model may run; under ``none``, or any other value (failing closed), only the first. A model
+    the catalogue does not hold, or whose row is not ``open-vendor``, counts as closed. Never raises."""
+    if not isinstance(profile, dict) or USER_CONTENT not in _strings(profile.get("reads")):
+        return None
+    models = profile.get("models") if isinstance(profile.get("models"), list) else []
+    route = models if profile.get("fallback") == "between-turns" else models[:1]
+    open_ids = {row["id"] for row in _list(catalogue.get("models") if isinstance(catalogue, dict) else None)
+                if isinstance(row.get("id"), str) and OPEN_VENDOR in _strings(row.get("classes"))}
+    if any(isinstance(model, str) and model in open_ids for model in route):
+        return None
+    return [_estate._show(model) for model in route]
+
+
+def _open_vendor_routes(value: Dict[str, Any]) -> List[Dict[str, str]]:
+    """FAC-SEM-112: a profile that reads user content has an open-vendor route, so the lane never runs on closed vendors
+    alone, which refuse the content it exists to handle."""
+    findings = []
+    for i, profile in enumerate(_list(value.get("profiles"))):
+        closed = closed_user_content_route(profile, value.get("catalogue"))
+        if closed is None:
+            continue
+        which = ("none of its models is" if profile.get("fallback") == "between-turns"
+                 else "its first model, %s, is not" % (closed[0] if closed else "none"))
+        findings.append(_finding("FAC-SEM-112", "/profiles/%d/models" % i, "profile %s reads user content, but %s open-vendor in "
+                                 "the catalogue: the lane would run on closed vendors alone" % (_show_id(profile), which)))
+    return findings
+
+
+def _show_id(profile: Dict[str, Any]) -> str:
+    """show(profile.id), where an absent id is JavaScript's undefined."""
+    return _estate._show(profile["id"]) if "id" in profile else "undefined"
+
+
 def profile_problems(kind: str, value: Dict[str, Any]) -> Optional[List[Dict[str, str]]]:
     """The contract's profileRules: findings for a `model-catalogue`, `model-profiles`, `runner-profile` or
     `profile-resolution` document; None for another kind."""
     return {"model-catalogue": _model_catalogue, "model-profiles": _model_profiles, "runner-profile": _runner_profile,
-            "profile-resolution": _profile_resolution}.get(kind, lambda v: None)(value)
+            "profile-resolution": lambda v: _profile_resolution(v) + _open_vendor_routes(v)}.get(kind, lambda v: None)(value)
 
 
 # --- the doctor's checks ----------------------------------------------------------------------------------------

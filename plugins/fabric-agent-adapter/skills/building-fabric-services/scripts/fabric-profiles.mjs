@@ -21,6 +21,15 @@ export class ProfileError extends Error {}
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
 const strings = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []);
+/** The contract's `show`: String(value), or its JSON where String() throws (an object whose own `toString` is data). */
+const show = (value) => {
+  if (typeof value === 'string') return value;
+  try {
+    return String(value);
+  } catch {
+    return JSON.stringify(value) ?? typeof value;
+  }
+};
 const jsonEqual = (a, b) => JSON.stringify(sortKeys(a)) === JSON.stringify(sortKeys(b));
 function sortKeys(value) {
   if (Array.isArray(value)) return value.map(sortKeys);
@@ -103,9 +112,44 @@ function profileResolution(value) {
   return findings;
 }
 
+/** DEC-0083: the model class of a model whose vendor publishes its weights openly. */
+export const OPEN_VENDOR = 'open-vendor';
+/** DEC-0083: what a lane reads when it reads what a member, a client or the public sends. */
+export const USER_CONTENT = 'user-content';
+
+/**
+ * FAC-SEM-112 (DEC-0083) for one profile: the models that run when the lane reads user content and none of them is an
+ * open-vendor model, or undefined when the profile does not read user content or its route has one. Under
+ * `between-turns` every model may run; under `none`, or any other value (failing closed), only the first. A model the
+ * catalogue does not hold, or whose row is not `open-vendor`, counts as closed. Never throws.
+ */
+export function closedUserContentRoute(profile, catalogue) {
+  if (!isObject(profile) || !strings(profile.reads).includes(USER_CONTENT)) return undefined;
+  const models = Array.isArray(profile.models) ? profile.models : [];
+  const route = profile.fallback === 'between-turns' ? models : models.slice(0, 1);
+  const open = new Set();
+  for (const row of list(isObject(catalogue) ? catalogue.models : undefined)) {
+    if (typeof row.id === 'string' && strings(row.classes).includes(OPEN_VENDOR)) open.add(row.id);
+  }
+  if (route.some((model) => typeof model === 'string' && open.has(model))) return undefined;
+  return route.map((model) => show(model));
+}
+
+/** FAC-SEM-112: a profile that reads user content has an open-vendor route, so the lane never runs on closed vendors alone. */
+function openVendorRoutes(value) {
+  const findings = [];
+  list(value.profiles).forEach((profile, i) => {
+    const closed = closedUserContentRoute(profile, value.catalogue);
+    if (closed === undefined) return;
+    const which = profile.fallback === 'between-turns' ? 'none of its models is' : `its first model, ${closed[0] ?? 'none'}, is not`;
+    findings.push(finding('FAC-SEM-112', `/profiles/${i}/models`, `profile ${show(profile.id)} reads user content, but ${which} open-vendor in the catalogue: the lane would run on closed vendors alone`));
+  });
+  return findings;
+}
+
 /** The contract's profileRules: findings for a model-catalogue, model-profiles, runner-profile or profile-resolution; else undefined. */
 export function profileProblems(kind, value) {
-  return { 'model-catalogue': modelCatalogue, 'model-profiles': modelProfiles, 'runner-profile': runnerProfile, 'profile-resolution': profileResolution }[kind]?.(value);
+  return { 'model-catalogue': modelCatalogue, 'model-profiles': modelProfiles, 'runner-profile': runnerProfile, 'profile-resolution': (v) => [...profileResolution(v), ...openVendorRoutes(v)] }[kind]?.(value);
 }
 
 // ---- the doctor's checks ----

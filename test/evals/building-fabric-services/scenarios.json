@@ -432,6 +432,16 @@
         "requires the organization's placement to name a share grant of the record whose context is that placement's, as written, that the record does not revoke (FAC-SEM-111), and fills its slot from this machine's own vault, never by an envelope from another machine",
         "asks placement_trust(record, machine, agentRef, context) / placementTrust(record, machine, agentRef, context) for the context being installed, and checks the installation as estate-placement {record, machine, package, context}"
       ]
+    },
+    {
+      "id": "user-content-open-vendor-route",
+      "trap": "the review-triage lane ran on one closed model, which refused the worst reviews and answered others with nothing, and the service counted those as done",
+      "request": "example-agent's review-triage profile reads what customers send; make its route hold.",
+      "expected": [
+        "declares `reads: [\"user-content\"]` on the profile and checks the recorded resolution with profile_problems / profileProblems, which answer FAC-SEM-112 when the route has no open-vendor model",
+        "treats a content refusal or an empty answer to a non-empty request as a failed turn on that lane, so `between-turns` moves to the next model",
+        "counts a model the catalogue does not hold, or whose row lacks `open-vendor`, as closed; closed_user_content_route / closedUserContentRoute names the models that would run"
+      ]
     }
   ]
 }

@@ -24,10 +24,22 @@ const KINDS = ['profile-resolution', 'model-catalogue', 'model-profiles', 'runne
 // The contract's own semantic fixtures, through its own rules.
 const ruleCases = fs.readdirSync(args.semantic).filter((f) => f.endsWith('.json')).sort().map((file) => {
   const kind = KINDS.find((k) => file.startsWith(`${k}-`));
-  const value = read(args.semantic, file);
-  return { name: file, kind, value, expected: rules.profileRules(kind, value) };
+  const fixture = read(args.semantic, file);
+  // Older profile fixtures are the document itself; newer ones (DEC-0083 on) wrap it as {description, kind, expect,
+  // input}. A wrapped fixture's own `expect` must be what the contract's rules answer, so a shape this script misreads
+  // stops it instead of vendoring a vacuous case.
+  const wrapped = typeof fixture.kind === 'string' && 'input' in fixture && Array.isArray(fixture.expect);
+  const value = wrapped ? fixture.input : fixture;
+  const expected = rules.profileRules(kind, value);
+  if (wrapped) {
+    const got = [...new Set((expected ?? []).map((f) => f.code))].sort().join(',');
+    const want = [...new Set(fixture.expect)].sort().join(',');
+    if (got !== want) throw new Error(`${file}: the contract's rules answer [${got}], the fixture expects [${want}]`);
+  }
+  return { name: file, kind, value, expected };
 });
 for (const [file, kind] of [['registry-models.json', 'model-catalogue'], ['model-profiles.json', 'model-profiles'],
+  ['model-profiles-user-content.json', 'model-profiles'],
   ['runner-profile-subscription.json', 'runner-profile'], ['runner-profile-key.json', 'runner-profile']]) {
   const value = read(args.positive, file);
   ruleCases.push({ name: `positive/${file}`, kind, value, expected: rules.profileRules(kind, value) });
@@ -39,6 +51,37 @@ for (const [file, kind] of [['registry-models.json', 'model-catalogue'], ['model
   const variant = JSON.parse(JSON.stringify(catalogue));
   variant.models[0].provider = { order: ['deepinfra/turbo', 'together'], ignore: ['deepinfra'] };
   ruleCases.push({ name: 'crafted: an ordered variant of an ignored base slug', kind: 'model-catalogue', value: variant, expected: rules.profileRules('model-catalogue', variant) });
+}
+
+// FAC-SEM-112 (DEC-0083) on hostile and edge input: the open-fallback fixture varied one way each, answered by the
+// contract's own rules. The rule must be total on any JSON: a fallback it does not know reads as none, a model or a
+// class that is not a string counts as closed, and a value whose own toString is data is shown, never thrown on.
+{
+  const uc = read(args.semantic, 'profile-resolution-user-content-open-fallback.json').input;
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const vary = (name, edit) => { const value = edit(clone(uc)); ruleCases.push({ name: `crafted FAC-SEM-112: ${name}`, kind: 'profile-resolution', value, expected: rules.profileRules('profile-resolution', value) }); };
+  const p0 = (v) => v.profiles[0];
+  vary('the open model first, no fallback', (v) => { p0(v).models = [...p0(v).models].reverse(); p0(v).fallback = 'none'; return v; });
+  vary('the open model second, no fallback', (v) => { p0(v).fallback = 'none'; return v; });
+  vary('a fallback the contract does not name reads as none', (v) => { p0(v).fallback = 'sometimes'; return v; });
+  vary('no fallback field reads as none', (v) => { delete p0(v).fallback; return v; });
+  vary('reads only operator', (v) => { p0(v).reads = ['operator']; return v; });
+  vary('reads only web', (v) => { p0(v).reads = ['web']; return v; });
+  vary('reads user-content and operator', (v) => { p0(v).reads = ['operator', 'user-content']; return v; });
+  vary('reads written as a string, not a list, on a closed route', (v) => { p0(v).reads = 'user-content'; p0(v).fallback = 'none'; return v; });
+  vary('reads User-Content in another case, on a closed route', (v) => { p0(v).reads = ['User-Content']; p0(v).fallback = 'none'; return v; });
+  vary('no models at all', (v) => { p0(v).models = []; return v; });
+  vary('models not a list', (v) => { p0(v).models = 'deepseek/deepseek-v4-pro'; return v; });
+  vary('a model that is not a string', (v) => { p0(v).models = [{ toString: 1 }, 7]; return v; });
+  vary('a first model with its own toString, no fallback', (v) => { p0(v).models = [{ toString: 1 }, ...p0(v).models]; p0(v).fallback = 'none'; return v; });
+  vary('a first model that is a number, no fallback', (v) => { p0(v).models = [7.5, ...p0(v).models]; p0(v).fallback = 'none'; return v; });
+  vary('the open class not a list in the catalogue', (v) => { v.catalogue.models.forEach((m) => { m.classes = 'open-vendor'; }); return v; });
+  vary('the open class in another case', (v) => { v.catalogue.models.forEach((m) => { m.classes = (m.classes ?? []).map((c) => (c === 'open-vendor' ? 'Open-Vendor' : c)); }); return v; });
+  vary('no catalogue', (v) => { delete v.catalogue; return v; });
+  vary('a profile id with its own toString', (v) => { p0(v).id = { toString: 1 }; p0(v).fallback = 'none'; return v; });
+  vary('a non-object before the profile', (v) => { p0(v).fallback = 'none'; v.profiles = [null, ...v.profiles]; return v; });
+  vary('the first profile open, the second closed', (v) => { const b = clone(p0(v)); b.id = 'second-lane'; b.fallback = 'none'; v.profiles.push(b); return v; });
+  vary('two profiles, both closed', (v) => { const b = clone(p0(v)); b.id = 'second-lane'; b.models = [b.models[0]]; p0(v).fallback = 'none'; v.profiles.push(b); return v; });
 }
 
 // Resolutions: every profile-resolution fixture's inputs, then the order and the classes varied over them.
@@ -56,7 +99,7 @@ for (let mask = 0; mask < 16; mask++) {
   levels.forEach((level, i) => { if (mask & (1 << i)) choices[level] = ids[i % ids.length]; });
   add(`order mask ${mask}`, { catalogue: base.catalogue, profiles: base.profiles, choices });
 }
-const classes = ['frontier', 'strong', 'cheap', 'code', 'vision', 'chinese-vendor'];
+const classes = ['frontier', 'strong', 'cheap', 'code', 'vision', 'chinese-vendor', 'open-vendor'];
 for (const allowed of [[], ['cheap'], ['strong', 'cheap'], ['strong', 'cheap', 'chinese-vendor'], classes]) {
   for (const id of ids) {
     add(`classes ${allowed.join('+') || 'none'} on ${id}`, { catalogue: base.catalogue, profiles: base.profiles, choices: { binding: id },

@@ -57,7 +57,10 @@ Use when Fabric launches an installed process such as a coding CLI. Require:
 - project-scoped account selection outside the manifest.
 
 The user may choose the project's default terminal and override it per agent. Model choice
-stays inside the selected agent/provider; the Fabric profile remains model-agnostic.
+stays inside the selected agent/provider; the Fabric profile remains model-agnostic. The one
+exception is a lane that reads what members, clients or the public send: its model profile
+declares `reads: ["user-content"]` and has an open-vendor route (contract DEC-0083,
+FAC-SEM-112), whichever models the agent picks.
 
 ## Reject or defer
 

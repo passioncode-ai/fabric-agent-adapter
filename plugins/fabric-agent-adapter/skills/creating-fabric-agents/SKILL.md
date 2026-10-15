@@ -152,7 +152,11 @@ absent, apply the `fabric-service/0.1` rules from the pinned contract's
 `docs/specification/service.md` by hand and mark its probe `NOT_RUN`.
 
 Build the capability behind the chosen surface. Keep model choice and internal reasoning
-outside the contract; expose typed outcomes, evidence, and protocol-visible state. Every
+outside the contract; expose typed outcomes, evidence, and protocol-visible state. One fact
+about each model lane is the contract's (DEC-0083): what it reads. Ask in the grill which
+lanes read what members, clients or the public send, declare it as the profile's `reads`,
+and give such a lane an open-vendor route (FAC-SEM-112; the `building-fabric-services`
+profiles reference). Every
 provider output is untrusted until schemas and semantic assertions pass. The step-2
 observables are the definition of done; an observable attached after the code exists
 lets the output decide what counts as success.
