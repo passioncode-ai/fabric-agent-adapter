@@ -21,6 +21,8 @@ export class ProfileError extends Error {}
 const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
 const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
 const strings = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []);
+/** The object items of an array with their index as written, so an instancePath names the item even after a non-object. */
+const indexed = (value) => (Array.isArray(value) ? value.flatMap((item, index) => (isObject(item) ? [[item, index]] : [])) : []);
 /** DEC-0083: the model class of a model whose vendor publishes its weights openly — descriptive: a policy admits and
  * excludes nothing by it — and what a lane reads when it reads what a member, a client or the public sends. */
 export const OPEN_VENDOR = 'open-vendor';
@@ -68,13 +70,13 @@ const finding = (code, instancePath, message) => ({ code, instancePath, message 
 function modelCatalogue(value) {
   const findings = [];
   const seen = new Set();
-  list(value.models).forEach((row, index) => {
-    if (seen.has(row.id)) findings.push(finding('FAC-SEM-058', `/models/${index}/id`, `model ${String(row.id)} is catalogued more than once`));
+  indexed(value.models).forEach(([row, index]) => {
+    if (seen.has(row.id)) findings.push(finding('FAC-SEM-058', `/models/${index}/id`, `model ${show(row.id)} is catalogued more than once`));
     seen.add(row.id);
     const routing = isObject(row.provider) ? row.provider : {};
     const ignored = new Set(strings(routing.ignore));
     for (const slug of strings(routing.order)) {
-      if (ignored.has(slug) || ignored.has(slug.split('/')[0])) findings.push(finding('FAC-SEM-058', `/models/${index}/provider`, `model ${String(row.id)} both orders and ignores provider ${slug}`));
+      if (ignored.has(slug) || ignored.has(slug.split('/')[0])) findings.push(finding('FAC-SEM-058', `/models/${index}/provider`, `model ${show(row.id)} both orders and ignores provider ${slug}`));
     }
   });
   return findings;
@@ -83,8 +85,8 @@ function modelCatalogue(value) {
 function modelProfiles(value) {
   const findings = [];
   const seen = new Set();
-  list(value.profiles).forEach((profile, index) => {
-    if (seen.has(profile.id)) findings.push(finding('FAC-SEM-058', `/profiles/${index}/id`, `model profile ${String(profile.id)} is declared more than once`));
+  indexed(value.profiles).forEach(([profile, index]) => {
+    if (seen.has(profile.id)) findings.push(finding('FAC-SEM-058', `/profiles/${index}/id`, `model profile ${show(profile.id)} is declared more than once`));
     seen.add(profile.id);
   });
   return findings;
@@ -108,11 +110,11 @@ function profileResolution(value) {
   const findings = [];
   const catalogued = new Set(list(isObject(value.catalogue) ? value.catalogue.models : undefined).map((row) => row.id));
   const ids = new Set();
-  list(value.profiles).forEach((profile, i) => {
-    if (ids.has(profile.id)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/id`, `profile id ${String(profile.id)} is offered more than once to one resolution`));
+  indexed(value.profiles).forEach(([profile, i]) => {
+    if (ids.has(profile.id)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/id`, `profile id ${show(profile.id)} is offered more than once to one resolution`));
     ids.add(profile.id);
-    strings(profile.models).forEach((model, j) => {
-      if (!catalogued.has(model)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/models/${j}`, `profile ${String(profile.id)} names ${model}, which the catalogue does not hold`));
+    (Array.isArray(profile.models) ? profile.models : []).forEach((model, j) => {
+      if (typeof model === 'string' && !catalogued.has(model)) findings.push(finding('FAC-SEM-060', `/profiles/${i}/models/${j}`, `profile ${show(profile.id)} names ${model}, which the catalogue does not hold`));
     });
   });
   const choices = isObject(value.choices) ? value.choices : {};
@@ -146,7 +148,7 @@ const closedRoute = (fallback, closed) => (fallback === 'between-turns' ? 'none 
 function openVendorRoutes(value) {
   const findings = [];
   const profiles = list(value.profiles);
-  profiles.forEach((profile, i) => {
+  indexed(value.profiles).forEach(([profile, i]) => {
     const closed = closedUserContentRoute(profile, value.catalogue);
     if (closed === undefined) return;
     findings.push(finding('FAC-SEM-112', `/profiles/${i}/models`, `profile ${show(profile.id)} reads user content, but ${closedRoute(profile.fallback, closed)} open-vendor in the catalogue: the lane would run on closed vendors alone`));

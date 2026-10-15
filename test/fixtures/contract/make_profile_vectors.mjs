@@ -105,6 +105,29 @@ if (fs.existsSync(path.join(args.semantic, 'profile-resolution-user-content-poli
   vary('a second profile with the same id first in the list', (v) => { v.profiles.unshift({ ...clone(v.profiles[0]), models: ['qwen/qwen3.8-flash'], fallback: 'none' }); return v; });
 }
 
+// FAC-SEM-058 and FAC-SEM-060 on hostile input (DEC-0083's fix round): an instancePath names an item by its index as
+// written, a duplicate is what JavaScript's Set calls one (1 and true, null and absent, are two; two equal objects are
+// two), and an id whose own toString is data is shown as its JSON.
+{
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const cat = read(args.positive, 'registry-models.json');
+  const prof = read(args.positive, 'model-profiles.json');
+  const res = read(args.semantic, 'profile-resolution-ok.json');
+  const push = (name, kind, value) => ruleCases.push({ name: `crafted hostile: ${name}`, kind, value, expected: rules.profileRules(kind, value) });
+  const dup = (rows, i, id) => { const r = clone(rows[i]); r.id = id; return r; };
+  { const v = clone(cat); v.models = [7, ...v.models, clone(v.models[0])]; push('a non-object before the catalogue, then a row twice', 'model-catalogue', v); }
+  { const v = clone(cat); v.models = [dup(v.models, 0, 1), dup(v.models, 0, true)]; push('catalogue ids 1 and true are two', 'model-catalogue', v); }
+  { const v = clone(cat); const a = dup(v.models, 0, null); const b = clone(v.models[0]); delete b.id; v.models = [a, b]; push('catalogue ids null and absent are two', 'model-catalogue', v); }
+  { const v = clone(cat); v.models = [dup(v.models, 0, 1), dup(v.models, 0, 1.0)]; push('catalogue ids 1 and 1.0 are one', 'model-catalogue', v); }
+  { const v = clone(cat); v.models = [dup(v.models, 0, { toString: 1 }), dup(v.models, 0, { toString: 1 })]; push('two equal object ids are two', 'model-catalogue', v); }
+  { const v = clone(cat); const r = dup(v.models, 0, { toString: 1 }); r.provider = { order: ['x'], ignore: ['x'] }; v.models = [r]; push('an ordered and ignored provider on an object id', 'model-catalogue', v); }
+  { const v = clone(prof); v.profiles = [null, ...v.profiles, clone(v.profiles[0])]; push('a non-object before the profiles, then one twice', 'model-profiles', v); }
+  { const v = clone(prof); const a = clone(v.profiles[0]); const b = clone(v.profiles[0]); a.id = 'x'; b.id = 'x'; v.profiles = ['s', a, 3, b]; push('profiles with non-objects between a duplicate', 'model-profiles', v); }
+  { const v = clone(res); v.profiles = [false, ...v.profiles, clone(v.profiles[0])]; push('a non-object before the offered profiles, then one twice', 'profile-resolution', v); }
+  { const v = clone(res); v.profiles[0].models = [5, { toString: 1 }, 'example/not-catalogued', ...v.profiles[0].models]; push('non-string models before an uncatalogued one', 'profile-resolution', v); }
+  { const v = clone(res); v.profiles = [null, { ...clone(v.profiles[0]), id: { toString: 1 }, models: ['example/not-catalogued'] }]; push('an uncatalogued model under an object id after a non-object', 'profile-resolution', v); }
+}
+
 // Resolutions: every profile-resolution fixture's inputs, then the order and the classes varied over them.
 const base = read(args.semantic, 'profile-resolution-ok.json');
 const resolutions = [];

@@ -43,6 +43,35 @@ def _list(value: Any) -> List[Dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
+def _indexed(value: Any) -> List[tuple]:
+    """The object items of an array with their index as written, so an instancePath names the item even after a
+    non-object (the contract's ``indexed``)."""
+    return [(item, i) for i, item in enumerate(value) if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _set_key(value: Any) -> Any:
+    """A key with JavaScript's Set semantics for a JSON value: 1 and true, null and absent, are different; two objects
+    are never the same member however equal."""
+    if value is _MISSING_ID:
+        return ("undefined",)
+    if value is None:
+        return ("null",)
+    if isinstance(value, bool):
+        return ("boolean", value)
+    if isinstance(value, (int, float)):
+        return ("number", float(value))
+    if isinstance(value, str):
+        return ("string", value)
+    return ("object", id(value))
+
+
+_MISSING_ID = object()
+
+
+def _id_of(item: Dict[str, Any]) -> Any:
+    return item.get("id", _MISSING_ID)
+
+
 def _strings(value: Any) -> List[str]:
     return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
 
@@ -116,25 +145,25 @@ def _finding(code: str, path: str, message: str) -> Dict[str, str]:
 
 
 def _model_catalogue(value: Dict[str, Any]) -> List[Dict[str, str]]:
-    findings, seen = [], []
-    for index, row in enumerate(_list(value.get("models"))):
-        if row.get("id") in seen:
-            findings.append(_finding("FAC-SEM-058", "/models/%d/id" % index, "model %s is catalogued more than once" % _js_string(row.get("id"))))
-        seen.append(row.get("id"))
+    findings, seen = [], set()
+    for row, index in _indexed(value.get("models")):
+        if _set_key(_id_of(row)) in seen:
+            findings.append(_finding("FAC-SEM-058", "/models/%d/id" % index, "model %s is catalogued more than once" % _show_id(row)))
+        seen.add(_set_key(_id_of(row)))
         routing = row.get("provider") if isinstance(row.get("provider"), dict) else {}
         ignored = set(_strings(routing.get("ignore")))
         for slug in _strings(routing.get("order")):
             if slug in ignored or slug.split("/")[0] in ignored:
-                findings.append(_finding("FAC-SEM-058", "/models/%d/provider" % index, "model %s both orders and ignores provider %s" % (_js_string(row.get("id")), slug)))
+                findings.append(_finding("FAC-SEM-058", "/models/%d/provider" % index, "model %s both orders and ignores provider %s" % (_show_id(row), slug)))
     return findings
 
 
 def _model_profiles(value: Dict[str, Any]) -> List[Dict[str, str]]:
-    findings, seen = [], []
-    for index, profile in enumerate(_list(value.get("profiles"))):
-        if profile.get("id") in seen:
-            findings.append(_finding("FAC-SEM-058", "/profiles/%d/id" % index, "model profile %s is declared more than once" % _js_string(profile.get("id"))))
-        seen.append(profile.get("id"))
+    findings, seen = [], set()
+    for profile, index in _indexed(value.get("profiles")):
+        if _set_key(_id_of(profile)) in seen:
+            findings.append(_finding("FAC-SEM-058", "/profiles/%d/id" % index, "model profile %s is declared more than once" % _show_id(profile)))
+        seen.add(_set_key(_id_of(profile)))
     return findings
 
 
@@ -164,14 +193,15 @@ def _profile_resolution(value: Dict[str, Any]) -> List[Dict[str, str]]:
     findings = []
     catalogue = value.get("catalogue")
     catalogued = [row.get("id") for row in _list(catalogue.get("models") if isinstance(catalogue, dict) else None)]
-    ids: List[Any] = []
-    for i, profile in enumerate(_list(value.get("profiles"))):
-        if profile.get("id") in ids:
-            findings.append(_finding("FAC-SEM-060", "/profiles/%d/id" % i, "profile id %s is offered more than once to one resolution" % _js_string(profile.get("id"))))
-        ids.append(profile.get("id"))
-        for j, model in enumerate(_strings(profile.get("models"))):
-            if model not in catalogued:
-                findings.append(_finding("FAC-SEM-060", "/profiles/%d/models/%d" % (i, j), "profile %s names %s, which the catalogue does not hold" % (_js_string(profile.get("id")), model)))
+    ids = set()
+    for profile, i in _indexed(value.get("profiles")):
+        if _set_key(_id_of(profile)) in ids:
+            findings.append(_finding("FAC-SEM-060", "/profiles/%d/id" % i, "profile id %s is offered more than once to one resolution" % _show_id(profile)))
+        ids.add(_set_key(_id_of(profile)))
+        # Every model by its index as written; only a string can name a catalogued model.
+        for j, model in enumerate(profile.get("models") if isinstance(profile.get("models"), list) else []):
+            if isinstance(model, str) and model not in catalogued:
+                findings.append(_finding("FAC-SEM-060", "/profiles/%d/models/%d" % (i, j), "profile %s names %s, which the catalogue does not hold" % (_show_id(profile), model)))
     choices = value.get("choices") if isinstance(value.get("choices"), dict) else {}
     expected = resolve_model_profile(catalogue=catalogue, profiles=value.get("profiles"), choices=choices, policy=value.get("policy"))
     if "resolved" not in value or value["resolved"] != expected:
@@ -207,7 +237,7 @@ def _open_vendor_routes(value: Dict[str, Any]) -> List[Dict[str, str]]:
     or the policy is named as what leaves the lane closed (one cause, one finding)."""
     findings = []
     profiles = _list(value.get("profiles"))
-    for i, profile in enumerate(profiles):
+    for profile, i in _indexed(value.get("profiles")):
         closed = closed_user_content_route(profile, value.get("catalogue"))
         if closed is None:
             continue

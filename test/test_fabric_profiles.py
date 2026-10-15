@@ -158,6 +158,17 @@ class ModelUsableTests(unittest.TestCase):
             self.assertEqual("models" in resolution, profiles.model_usable(model, catalogue, policy) == [], model)
 
 
+class DuplicateKeyTests(unittest.TestCase):
+    """FAC-SEM-058/060 count duplicates as JavaScript's Set does. JSON written by JavaScript never says 1.0, so the vectors
+    cannot hold this case; a Python caller can pass one, and 1 and 1.0 are one number."""
+
+    def test_an_integer_and_a_float_of_one_value_are_one_id(self):
+        catalogue = {"models": [{"id": 1, "classes": ["cheap"]}, {"id": 1.0, "classes": ["cheap"]}, {"id": True, "classes": ["cheap"]}]}
+        found = profiles.profile_problems("model-catalogue", catalogue)
+        self.assertEqual([f["instancePath"] for f in found], ["/models/1/id"])
+        self.assertEqual(found[0]["message"], "model 1 is catalogued more than once")
+
+
 class ConfigurationTests(unittest.TestCase):
     """The well-known `configuration` (DEC-0046) and its summary tiles, the dashboard's "Runner & model"."""
 
