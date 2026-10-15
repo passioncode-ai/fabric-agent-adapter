@@ -180,8 +180,19 @@ const secrets = {
   secretUrl: urls.map((input) => ({ inputHex: enc(input), expected: shape.secretUrl(input) })),
 };
 
+// DEC-0083's shared admission vectors (fixtures/vectors/model-admission.json): every copy of the every-class rule — the
+// kits' resolver and their doctor's model_usable — answers each case as the contract's admittedByClasses does. Each case's
+// stated answer is checked against that function here, so a vendored case can never disagree with the contract.
+const admissionFile = path.join(args.positive, '..', 'vectors', 'model-admission.json');
+const admission = fs.existsSync(admissionFile) ? read(path.dirname(admissionFile), 'model-admission.json').cases.map((c) => {
+  const row = c.classes === null ? undefined : { id: 'example/model', classes: c.classes };
+  const got = rules.admittedByClasses(row, c.modelClasses);
+  if (got !== c.admitted) throw new Error(`model-admission.json "${c.name}": admittedByClasses answers ${got}, the case says ${c.admitted}`);
+  return c;
+}) : [];
+
 // A rule case's value may hold a made-up key (runner-profile-key-value): stored base64-encoded like the inputs above.
 for (const c of ruleCases) { c.valueHex = Buffer.from(JSON.stringify(c.value), 'utf8').toString('hex'); delete c.value; }
 const out = args.out ?? path.join(here, 'profile-vectors.json');
-fs.writeFileSync(out, `${JSON.stringify({ about: "DEC-0046 and DEC-0044 cases; expected answers from the contract's profile-rules.ts and secret-shape.ts at the pin (make_profile_vectors.mjs). Every credential-shaped sample is made up and stored hex-encoded. Do not edit by hand.", rules: ruleCases, resolutions, secrets }, null, 1)}\n`);
-console.log(`wrote ${out}: ${ruleCases.length} rule, ${resolutions.length} resolution, ${Object.values(secrets).reduce((n, l) => n + l.length, 0)} secret-shape cases`);
+fs.writeFileSync(out, `${JSON.stringify({ about: "DEC-0046 and DEC-0044 cases; expected answers from the contract's profile-rules.ts and secret-shape.ts at the pin (make_profile_vectors.mjs). Every credential-shaped sample is made up and stored hex-encoded. Do not edit by hand.", rules: ruleCases, resolutions, secrets, admission }, null, 1)}\n`);
+console.log(`wrote ${out}: ${ruleCases.length} rule, ${resolutions.length} resolution, ${admission.length} admission, ${Object.values(secrets).reduce((n, l) => n + l.length, 0)} secret-shape cases`);

@@ -158,6 +158,23 @@ class ModelUsableTests(unittest.TestCase):
             self.assertEqual("models" in resolution, profiles.model_usable(model, catalogue, policy) == [], model)
 
 
+class AdmissionVectorTests(unittest.TestCase):
+    """DEC-0083's shared vectors (contract fixtures/vectors/model-admission.json): the resolver and the doctor are the
+    kit's two copies of the every-class rule, and both answer every case as the contract's admittedByClasses does."""
+
+    def test_the_resolver_and_the_doctor_admit_as_the_contract_does(self):
+        self.assertGreaterEqual(len(VECTORS["admission"]), 8)
+        for case in VECTORS["admission"]:
+            with self.subTest(case["name"]):
+                rows = [] if case["classes"] is None else [{"id": "example/model", "classes": case["classes"]}]
+                catalogue = {"models": rows}
+                policy = {"meta": {"id": "p", "revision": 1}, "modelClasses": case["modelClasses"]}
+                resolved = profiles.resolve_model_profile(catalogue=catalogue, profiles=[{"id": "x", "models": ["example/model"]}],
+                                                          choices={"estate": "x"}, policy=policy)
+                self.assertEqual("models" in resolved, case["admitted"], "resolver")
+                self.assertEqual(profiles.model_usable("example/model", catalogue, policy) == [], case["admitted"], "doctor")
+
+
 class DuplicateKeyTests(unittest.TestCase):
     """FAC-SEM-058/060 count duplicates as JavaScript's Set does. JSON written by JavaScript never says 1.0, so the vectors
     cannot hold this case; a Python caller can pass one, and 1 and 1.0 are one number."""

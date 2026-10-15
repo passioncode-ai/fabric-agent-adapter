@@ -66,6 +66,17 @@ test('configuration, its tiles, the well-known document and the usage route', ()
   assert.deepEqual(p.modelUsable('example/none', { models: [] }), ['model example/none is not in the model catalogue']);
 });
 
+test('the resolver and the doctor admit as the contract does (DEC-0083 model-admission vectors)', () => {
+  assert.ok(V.admission.length >= 8);
+  for (const c of V.admission) {
+    const catalogue = { models: c.classes === null ? [] : [{ id: 'example/model', classes: c.classes }] };
+    const policy = { meta: { id: 'p', revision: 1 }, modelClasses: c.modelClasses };
+    const resolved = p.resolveModelProfile({ catalogue, profiles: [{ id: 'x', models: ['example/model'] }], choices: { estate: 'x' }, policy });
+    assert.equal('models' in resolved, c.admitted, `resolver: ${c.name}`);
+    assert.equal(p.modelUsable('example/model', catalogue, policy).length === 0, c.admitted, `doctor: ${c.name}`);
+  }
+});
+
 test('open-vendor is descriptive in the doctor too (DEC-0083)', () => {
   const catalogue = { models: [{ id: 'example/open', classes: ['cheap', 'open-vendor'] }, { id: 'example/bare', classes: ['open-vendor'] }] };
   const policy = { meta: { id: 'p', revision: 1 }, modelClasses: ['cheap'] };
