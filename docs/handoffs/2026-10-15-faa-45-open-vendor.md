@@ -37,6 +37,13 @@ merge `a3e330f`, main `d8146cf`; board row CT-52). This change ports it to `fabr
 - Planted defects: 51 (30 Python, 21 Node), all caught but two that cannot differ on JSON input; the admission
   vectors alone catch a doctor without the exemption in both kits.
 
+## Trap found
+
+`backlog: FAA-41 and FAA-43 done` (#112, `c2e4ec3`) put a private project's name into FAA-45's source cell in this
+public repository: the privacy scan ran in the same command as the commit, so its hits did not stop the commit. This
+change replaces the name with a neutral phrase; the earlier commit stays in history, since a public `main` is never
+rewritten. Run the private-term scan before `git commit`, and stop on any hit.
+
 ## Open
 
 - Release: PR → CI → merge → tag `v0.34.0` → npm; then FAA-45 → done.
