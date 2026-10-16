@@ -10,7 +10,7 @@ Evidence cut: 2026-10-16. Scope is the 30 IDs in Switchboard `catalog/agents.jso
 | `codex` | SessionStart JSON | Native 0.162.1 reproduces old failure and accepts corrected context; [parser receipt](codex.md) |
 | `hermes` | Native frozen prompt section | Native 0.21.4 / 2026.9.21 fixture passed; [module](hermes.md) |
 | `opencode` | Native system transform | Native 1.19.0 loader/context fixture passed; [module](opencode-pi.md) |
-| `openclaw` | `before_prompt_build` / `prependContext` | Native 2026.10.4 isolated runtime fixture passed; global executable absent; [module and permission negatives](openclaw.md) |
+| `openclaw` | `before_prompt_build` / `prependContext` | Native 2026.10.4 fixture passed; permanent CLI subsequently installed, all three native permission cases passed; [module and permission negatives](openclaw.md) |
 | `pi` | `before_agent_start` structured prompt | Native 1.1.0 loader/context fixture passed; [module](opencode-pi.md) |
 | `kimi-code` | Existing `[[hooks]]` SessionStart command | Installed 2.1.1, adapter regression tests retained; current native stdout consumption not exercised. [Official hook contract](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/hooks.html) distinguishes observational events from blocking ones |
 | `gemini-cli` | SessionStart JSON `hookSpecificOutput.additionalContext` | Installed 0.63.0; contract checked, no new adapter/native runtime claim. [Official reference](https://geminicli.com/docs/hooks/reference/#sessionstart) requires JSON stdout, timeout milliseconds, startup advisory |

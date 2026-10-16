@@ -16,7 +16,7 @@ No fabricated universal hook protocol, extra Fabric runner registration or non-C
 
 Current tool session is `no-project` in Fabric, after an earlier credential-check outage. No board claim or cross-project delivery was asserted. This source task remains authorized by the operator and tracked locally. No private agent data or machine paths are included in this repository. Existing unrelated machine hooks remain local-only and are not copied here.
 
-The isolated OpenClaw runtime was used for real positive and permission-negative loader checks, then removed after its own process ended because the machine hit ENOSPC. Approximately 628 MiB of available space was recovered (`df -k`: 615704 to 1258640 KiB). A globally installed OpenClaw runtime is not claimed.
+The isolated OpenClaw runtime was used for real positive and permission-negative loader checks, then removed after its own process ended because the machine hit ENOSPC. Approximately 628 MiB of available space was recovered (`df -k`: 615704 to 1258640 KiB). After space became available, OpenClaw 2026.10.4 (383c124) was installed permanently through npm. Its reviewed package postinstall completed, `fs-safe` reported ready, and the lifecycle marker was absent. `test/native/openclaw_hooks.py <installed CLI>` passed all three actual native cases: enabled hook, denied conversation access and denied prompt injection. No Gateway or model session was started.
 
 ## Verification and delivery
 
@@ -36,3 +36,15 @@ Commit/push the tested isolated branch, integrate through PR, release v0.35.0 th
 - `claude plugin validate ./plugins/fabric-agent-adapter --strict` and `claude plugin validate . --strict`: exit 0.
 
 No private configuration, hook bodies or account data are part of these receipts.
+
+## Delivery chain
+
+| Owner | Revision / branch | Evidence and entry point |
+|---|---|---|
+| [fabric-agent-adapter](https://github.com/passioncode-ai/fabric-agent-adapter) | `v0.35.0`, `766dde0abadd929bcdb88a0d90fed23c114c3a7a` | [PR 116](https://github.com/passioncode-ai/fabric-agent-adapter/pull/116), [release workflow](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/38967232797), this handoff |
+| [passioncode](https://github.com/passioncode-ai/passioncode) | `codex/launcher-adapter-035`, 0.2.8 pending | Member pin updates adapter to 0.35.0; release/install receipt pending |
+| [fabric-workspace](https://github.com/passioncode-ai/fabric-workspace) | `codex/host-hooks-release`, pending | Owning products/how-to-work facts; publication uses existing workspace sync |
+
+A clean remote clone of `v0.35.0` passed `python3 test/validate.py` and contained this handoff and the compatibility matrix. The release merge has the same tree as the locally tested implementation.
+
+Global native loader installation must pass an explicit stable `--script <agents-hub>/working-with-fabric/scripts/fabric_session.py`; do not bind loaders to a release-cache directory that retention later removes. Local configuration hashes are kept local only. They are not repository artifacts.
