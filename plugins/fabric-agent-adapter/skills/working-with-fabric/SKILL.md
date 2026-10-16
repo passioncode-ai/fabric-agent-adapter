@@ -16,10 +16,10 @@ compatibility: >-
   Needs the Fabric desktop app (0.4.0 or later for fabric-mcp and the fabric_work tools) and an MCP client.
   The status script needs Python 3.9+ (3.11+ to edit Kimi Code's config.toml). Starting Fabric needs the
   local-lifecycle MCP server; without it the person opens Fabric. The full session hooks run in Claude Code from
-  this plugin; Codex and Kimi Code get the session-start preamble hook on the person's consent.
+  this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.34.1"
+  version: "0.35.0"
 ---
 
 # Working with Fabric
@@ -202,17 +202,19 @@ Never tell the person a call failed or succeeded when its outcome is unknown.
 ## Codex, Kimi Code and other agents
 
 Register with the agent's own CLI (Step 2). They cannot rejoin their Fabric session from a hook yet, so they get one
-hook only: the session-start preamble, which the person adds on consent. Show the edit first, then apply it when the
-person agrees:
+context bridge only. Inspect its dry run, then apply within the person's existing authorization:
 
 ```bash
-python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host codex   # or kimi; a dry run, writes nothing
+python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host codex   # kimi, hermes, opencode, openclaw or pi; dry run
 python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host codex --apply --expect-sha256 <digest>
 ```
 
 It edits `~/.codex/hooks.json` (`hooks.SessionStart`) or appends one `[[hooks]]` table to `~/.kimi-code/config.toml`,
 backs the file up first, refuses a file of another shape or one that changed since the dry run, and `--remove` takes
-it out again. Never edit those files by hand for the person. Without the hook, put the preamble into the first prompt
+it out again. Hermes/OpenCode/OpenClaw/Pi use their native plugin loaders, not Claude hook JSON.
+Hermes also needs `hermes plugins enable fabric-agent-adapter`; removal uses `hermes plugins disable fabric-agent-adapter`.
+Read [native host hooks](references/native-host-hooks.md) for exact paths, permission behavior and verification.
+Registration and a loaded hook do not prove live Fabric admission. Never edit those files by hand for the person. Without the hook, put the preamble into the first prompt
 yourself: "Call `fabric_whoami` first; `com.status` and `com.list`; `fabric_work_list`, then `fabric_work_claim`,
 before you start; `fabric_work_release` when you stop." Without an MCP client at all there is no way in: say so,
 and do the work without claiming Fabric saw it.

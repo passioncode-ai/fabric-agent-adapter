@@ -3,11 +3,11 @@
 COM-04; FAA-12a).
 
   fabric_session.py status [--json] [--cwd DIR]          # Fabric, fabric-mcp, the registrations; ONE next action
-  fabric_session.py hook session-start [--host H]         # H: claude (default), codex, kimi — the preamble
+  fabric_session.py hook session-start [--host H]         # H: claude, codex, kimi, hermes, opencode, openclaw, pi
   fabric_session.py hook stop|session-end|user-prompt-submit   # Claude Code only: hook JSON on stdin, always exit 0
   fabric_session.py deliver SESSION_DIR                  # the detached worker the stop and session-end hooks start
   fabric_session.py watch-mail [--interval 60]           # Claude Code: one line each time the unread count rises
-  fabric_session.py install-host-hooks --host codex|kimi [--apply | --remove]   # dry run unless --apply/--remove
+  fabric_session.py install-host-hooks --host HOST [--apply | --remove]   # dry run unless --apply/--remove
 
 Standard library only. Nothing here reads a token or a credential: Fabric's door token and enrollment credentials
 stay with `fabric-mcp`. Nothing secret goes into argv or the log. A turn observation is facts only: the HEAD commit,
@@ -60,8 +60,10 @@ WATCH_MAX_BACKOFF_S = 900
 SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 LOCAL_ORIGIN = re.compile(r'"origin": "http://(?:127\.0\.0\.1|localhost)')
-VERSION = "0.34.1"
-HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code"}
+VERSION = "0.35.0"
+HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
+         "hermes": "Hermes", "opencode": "OpenCode", "openclaw": "OpenClaw", "pi": "Pi"}
+NATIVE_PLUGIN_HOSTS = frozenset(("hermes", "opencode", "openclaw", "pi"))
 # A session Fabric launched. FABRIC_LAUNCHED_SESSION=1 is the marker Fabric is asked to set (need D6); the others are
 # what Fabric already gives a launched session (fabric sessionBundle.ts): only their NAMES are looked at, never a value
 # — two of them carry the session's credential.
@@ -69,7 +71,8 @@ LAUNCH_MARKER = "FABRIC_LAUNCHED_SESSION"
 LAUNCH_SIGNALS = ("FABRIC_ACP_SESSION", "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT")
 
 PREAMBLE = (
-    "[fabric-agent-adapter] Fabric is running and this {host} has its MCP server `fabric`. "
+    "[fabric-agent-adapter] Fabric is running and this {host} has its MCP server `fabric` registered. "
+    "Registration is not proof of connection or admission. "
     "Call `fabric_whoami` first. Then read the project board: `com.status` (is it ready, how many unread), "
     "`com.list` for the messages, and `com.read_ack` only for what you actually read. "
     "Before you start work, call `fabric_work_list` (who is working on what here) and "
@@ -443,14 +446,17 @@ def read_hook_input() -> Dict[str, Any]:
 
 def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None,
                        host: str = "claude") -> Optional[str]:
-    """What to print, or None: Claude Code's hook JSON, or plain text for Codex and Kimi Code. The preamble when the
+    """What to print, or None: Claude/Codex hook JSON, plain context for native plugins and Kimi. The preamble when the
     host has `fabric` registered (one line pointing at the broker when Fabric is down), and the machine's
     descriptor-count line when it has Fabric services. Silent in a session Fabric launched."""
     if host not in HOSTS or fabric_launched(env):
         return None
     cwd = Path(payload.get("cwd") or os.getcwd())
     parts: List[str] = []
-    if host_registered(host, cwd, env):
+    registered = host_registered(host, cwd, env)
+    if host in NATIVE_PLUGIN_HOSTS and payload.get("fabric_registered") is True:
+        registered = True  # Native bridge's boolean observation, never enrollment or authorization.
+    if registered:
         hub = locate_hub(fabric_root(env=env))
         if hub["state"] == "running":
             parts.append(PREAMBLE.format(host=HOSTS[host]))
@@ -462,7 +468,7 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     if not parts or launched_by_ancestor(env):
         return None
     context = "\n".join(parts)
-    if host != "claude":
+    if host not in ("claude", "codex"):
         return context
     return json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}})
 
@@ -1083,8 +1089,14 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
         args = parser.parse_args(list(argv))
     except SystemExit as exc:
         return int(exc.code or 2)
+    if args.host in NATIVE_PLUGIN_HOSTS:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_fabric_native_installer", Path(__file__).with_name("host_hooks.py"))
+        installer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(installer)
+        return installer.main(list(argv), env=env, out=out, err=err)
     if args.host not in ("codex", "kimi"):
-        err("install-host-hooks: --host must be codex or kimi (Claude Code gets its hooks from the plugin)")
+        err("install-host-hooks: --host must be codex, kimi, hermes, opencode, openclaw or pi (Claude uses its plugin)")
         return 2
     if args.config:
         path = Path(args.config).expanduser()
@@ -1117,8 +1129,15 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
                     del doc["hooks"]["SessionStart"]
                 new = (json.dumps(doc, indent=2) + "\n").encode("utf-8")
             elif present:
-                out("install-host-hooks: the Fabric preamble hook is already in %s; nothing to change" % path)
-                return 0
+                owned = [h for g in doc["hooks"]["SessionStart"] for h in g.get("hooks", [])
+                         if _is_ours(h.get("command"), args.host)]
+                if len(owned) != 1:
+                    raise Refused("multiple Fabric hooks are configured; preserve their matchers and resolve duplicates before updating")
+                if owned[0]["command"] == command:
+                    out("install-host-hooks: the Fabric preamble hook is already in %s; nothing to change" % path)
+                    return 0
+                owned[0]["command"] = command
+                new = (json.dumps(doc, indent=2) + "\n").encode("utf-8")
             else:
                 doc.setdefault("hooks", {}).setdefault("SessionStart", []).append(entry)
                 new = (json.dumps(doc, indent=2) + "\n").encode("utf-8")

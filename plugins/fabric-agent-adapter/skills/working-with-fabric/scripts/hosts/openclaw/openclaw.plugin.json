@@ -1,0 +1,11 @@
+{
+  "id": "fabric-agent-adapter",
+  "name": "Fabric Agent Adapter",
+  "description": "Bounded Fabric context using the native OpenClaw prompt hook.",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

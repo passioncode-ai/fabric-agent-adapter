@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.35.0 - 2026-10-16
+
+### Fixed
+
+- Codex SessionStart emits explicit JSON. Its preamble began with `[fabric-agent-adapter]`, which Codex treats as JSON-looking output and rejected with `hook returned invalid session start JSON output`.
+- The Codex hook installer updates a stale owned command while preserving its matcher, timeout and unrelated hooks; ambiguous duplicate entries are refused.
+
+### Added
+
+- Native bounded context adapters for Hermes prompt sections, OpenCode system transforms, OpenClaw `before_prompt_build`, and Pi `before_agent_start`; no model calls or lifecycle enrollment from these hooks.
+- Dry-run native installers with source preflight, config hash fences, managed-file checks and preservation of unrelated settings and explicit OpenClaw denials. Hermes opt-in uses its own CLI.
+- Optional native loader probes, negative permission and timeout tests, and a sourced capability survey of all 30 Switchboard hosts plus Tabby. Native context loading is separate from live Fabric admission.
+
 ## 0.34.1 - 2026-10-15
 
 A review of 0.33.0 and 0.34.0 found the profile and route rules disagreeing with the contract on JSON they never met in

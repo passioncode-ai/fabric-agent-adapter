@@ -696,11 +696,12 @@ class ServicesLine(Base):
         self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], line)
         for host in ("codex", "kimi"):
             done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", host])
-            self.assertEqual(done.stdout.strip(), line, host)
+            context = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"] if host == "codex" else done.stdout.strip()
+            self.assertEqual(context, line, host)
 
 
 class OtherHosts(Base):
-    def test_codex_gets_the_preamble_as_text_when_registered(self):
+    def test_codex_gets_valid_session_start_json_when_registered(self):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
         self.assertEqual((done.returncode, done.stdout), (0, ""), "not registered: silent")
         codex = self.home / ".codex"
@@ -711,7 +712,23 @@ class OtherHosts(Base):
         self.assertIn("this Codex has its MCP server `fabric`", done.stdout)
         for word in ("fabric_whoami", "com.status", "com.list", "com.submit"):
             self.assertIn(word, done.stdout)
-        self.assertNotIn("hookSpecificOutput", done.stdout)
+        output = json.loads(done.stdout)
+        self.assertEqual(output["hookSpecificOutput"]["hookEventName"], "SessionStart")
+        self.assertIsInstance(output["hookSpecificOutput"]["additionalContext"], str)
+
+    def test_native_plugins_use_plain_context_and_only_boolean_registration_evidence(self):
+        self.hub()
+        for host in ("hermes", "opencode", "openclaw", "pi"):
+            for registered in (True, False, "true", 1, None):
+                with self.subTest(host=host, registered=registered):
+                    done, _ = self.run_hook("session-start", {"cwd": str(self.repo), "fabric_registered": registered},
+                                            args=["--host", host])
+                    self.assertEqual(done.returncode, 0)
+                    if registered is True:
+                        self.assertIn("fabric_whoami", done.stdout)
+                        self.assertNotIn("hookSpecificOutput", done.stdout)
+                    else:
+                        self.assertEqual(done.stdout, "")
 
     def test_kimi_reads_its_own_mcp_json(self):
         kimi = self.home / ".kimi-code"
@@ -801,6 +818,19 @@ class InstallHostHooks(Base):
         code, out, _ = self.install("codex", "--apply")
         self.assertEqual(code, 0, out)
         self.assertEqual(len(json.loads(path.read_text())["hooks"]["SessionStart"]), 1)
+
+    def test_codex_upgrades_one_owned_command_and_preserves_group_policy(self):
+        old=fs.hook_command('/old/fabric_session.py', 'codex')
+        group={"matcher":"startup|resume", "hooks":[{"type":"command", "command":old,"timeout":4},
+                                                         {"type":"command", "command":"other"}]}
+        path=self.codex_file({"hooks":{"SessionStart":[group]}})
+        code,out,_=self.install('codex','--apply')
+        self.assertEqual(code,0,out)
+        new=json.loads(path.read_text())['hooks']['SessionStart'][0]
+        self.assertEqual(new['matcher'],group['matcher'])
+        self.assertEqual(new['hooks'][1],group['hooks'][1])
+        self.assertEqual(new['hooks'][0]['command'],fs.hook_command(self.SCRIPT_PATH,'codex'))
+        self.assertEqual(new['hooks'][0]['timeout'],4)
 
     def test_a_changed_shape_is_refused(self):
         for doc in ({"hooks": []}, {"hooks": {"SessionStart": {"x": 1}}}, [1], {"hooks": {"SessionStart": [{"hooks": "x"}]}}):
