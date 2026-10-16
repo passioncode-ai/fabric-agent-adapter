@@ -61,3 +61,7 @@ python3 test/native/hermes_hooks.py --python /path/to/hermes/runtime/python3
 ```
 
 The final bounded reader implementation passed this same native probe with empty stderr. The isolated probe writes only under a temporary home and uses a fixture MCP declaration that is never connected.
+
+## Current-runtime follow-up
+
+The installed host changed during final delivery: Homebrew 0.21.4 was replaced on PATH by native Hermes 0.21.5 (2026.9.24, upstream a928a959). Two isolated native checks replayed the fixture through the command returned by `hermes --print-runtime-command`, retaining its bootstrap before executing the fixture. Both passed discovery, boolean registration observation, prompt-section rendering and unload with zero model calls. Native stderr contained isolated-runtime dependency preparation; adapter context delivery passed. See the aggregate handoff for installed configuration and evidence limits.
