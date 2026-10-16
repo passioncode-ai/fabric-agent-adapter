@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.34.2 - 2026-10-16
+
+### Fixed
+
+- **Codex refused the session-start preamble** (FAA-48): `fabric_session.py hook session-start --host codex` printed
+  plain text starting with `[fabric-agent-adapter]`, which Codex parses as a JSON array and fails as "invalid session
+  start JSON output", so a Codex session never got the preamble. It now prints Codex's SessionStart hook JSON
+  (`hookSpecificOutput.additionalContext`). Kimi Code keeps plain text, which it reads as context.
+- **`install-host-hooks --host codex --remove`** names the SessionStart hook groups after ours that it moves: Codex
+  keys a hook's trust by its position, and asks the person to approve those again in `/hooks`.
+
 ## 0.34.1 - 2026-10-15
 
 A review of 0.33.0 and 0.34.0 found the profile and route rules disagreeing with the contract on JSON they never met in

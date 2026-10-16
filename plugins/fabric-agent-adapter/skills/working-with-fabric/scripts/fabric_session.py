@@ -60,7 +60,7 @@ WATCH_MAX_BACKOFF_S = 900
 SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 LOCAL_ORIGIN = re.compile(r'"origin": "http://(?:127\.0\.0\.1|localhost)')
-VERSION = "0.34.1"
+VERSION = "0.34.2"
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code"}
 # A session Fabric launched. FABRIC_LAUNCHED_SESSION=1 is the marker Fabric is asked to set (need D6); the others are
 # what Fabric already gives a launched session (fabric sessionBundle.ts): only their NAMES are looked at, never a value
@@ -443,7 +443,7 @@ def read_hook_input() -> Dict[str, Any]:
 
 def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None,
                        host: str = "claude") -> Optional[str]:
-    """What to print, or None: Claude Code's hook JSON, or plain text for Codex and Kimi Code. The preamble when the
+    """What to print, or None: hook JSON for Claude Code and Codex, plain text for Kimi Code. The preamble when the
     host has `fabric` registered (one line pointing at the broker when Fabric is down), and the machine's
     descriptor-count line when it has Fabric services. Silent in a session Fabric launched."""
     if host not in HOSTS or fabric_launched(env):
@@ -462,8 +462,12 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     if not parts or launched_by_ancestor(env):
         return None
     context = "\n".join(parts)
-    if host != "claude":
+    if host == "kimi":
+        # Kimi Code reads JSON output's `message`, not `additionalContext`, and takes stdout that is not JSON as text.
         return context
+    # Codex parses stdout that looks like JSON as JSON, and plain text starting with `[` (our prefix) looks like an
+    # array: it refused the preamble as "invalid session start JSON output" (FAA-48). Its SessionStart output schema
+    # is Claude Code's, so both get the hook JSON.
     return json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}})
 
 
@@ -1093,6 +1097,7 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
     else:
         path = _home(env) / ".kimi-code" / "config.toml"
     command = hook_command(str(args.script or default_hook_script(env)), args.host)
+    shifted = 0  # Codex hook groups after ours, whose position a removal moves
     try:
         data = _read_bytes(path)
         digest = _digest(data)
@@ -1106,11 +1111,15 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
                 if not present:
                     out("install-host-hooks: no Fabric preamble hook in %s; nothing to change" % path)
                     return 0
-                groups = []
-                for group in doc["hooks"]["SessionStart"]:
+                groups, dropped = [], None
+                for index, group in enumerate(doc["hooks"]["SessionStart"]):
                     kept = [h for h in group.get("hooks", []) if not _is_ours(h.get("command"), args.host)]
                     if kept or not group.get("hooks"):
                         groups.append(dict(group, hooks=kept) if kept != group.get("hooks") else group)
+                    elif dropped is None:
+                        dropped = index  # a group that held only our hook goes; the groups after it move up
+                if dropped is not None:
+                    shifted = len(doc["hooks"]["SessionStart"]) - dropped - 1
                 if groups:
                     doc["hooks"]["SessionStart"] = groups
                 else:
@@ -1168,6 +1177,11 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
                                               else "added the Fabric preamble hook to", path,
                                               "(backup: %s)" % backup if backup else "(new file)"))
         out("Undo: fabric_session.py install-host-hooks --host %s %s" % (args.host, "--apply" if args.remove else "--remove"))
+        if shifted:
+            # Codex keys a hook's trust by its event, group and index: the groups after ours moved up one, so Codex asks
+            # the person to trust them again in /hooks before they run.
+            out("Codex trusts a hook by its position: %d SessionStart hook group(s) after the removed one moved, and "
+                "Codex will ask you to approve them again in /hooks." % shifted)
         return 0
     except Refused as exc:
         err("install-host-hooks: refused — %s" % exc)

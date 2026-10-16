@@ -34,7 +34,10 @@ zero; a `degraded` board that still gives the count is read.
 
 `fabric_session.py hook session-start --host codex|kimi` prints the preamble as plain text when the host has `fabric`
 registered (`[mcp_servers.fabric]` in `$CODEX_HOME/config.toml`; `mcpServers.fabric` in `~/.kimi-code/mcp.json`),
-plus the service line. Nothing else: no turn observation and no unread line, because a rejoin needs the runtime
+plus the service line, as Codex's SessionStart hook JSON (`hookSpecificOutput.additionalContext`; Codex parses
+stdout that starts with `{` or `[` as JSON, so plain text with our `[fabric-agent-adapter]` prefix was refused) and as
+plain text for Kimi Code (which takes non-JSON stdout as text and reads JSON's `message`, not `additionalContext`).
+Nothing else: no turn observation and no unread line, because a rejoin needs the runtime
 session id Fabric keeps with the enrollment, which only Claude Code supplies today (D1).
 
 `install-host-hooks --host codex|kimi` is a dry run by default. It prints the file, its sha256, and the one entry it
@@ -42,7 +45,9 @@ would add — never a value already in the file — and the `--apply --expect-sh
 backs the file up (`<file>.<UTC stamp>.bak`, never overwriting an earlier backup), keeps the file's mode, refuses a
 file whose shape is not `{"hooks": {"<Event>": [{"hooks": [...]}]}}` (Codex) or an array of `[[hooks]]` tables
 (Kimi Code, read back with `tomllib`: Python 3.11+), and refuses one that changed since the dry run. `--remove` takes
-the entry out again. Codex may ask the person to trust a new hook (`/hooks`) before it runs. The hook runs the
+the entry out again. Codex may ask the person to trust a new hook (`/hooks`) before it runs. Codex keys that trust
+by event, group and index, so the entry is appended last; `--remove` names the SessionStart groups after it that it
+moves, which Codex asks the person to approve again. The hook runs the
 `fabric_session.py` of the skills install (`~/.agents/skills/working-with-fabric/`) when there is one, else this
 script's own path; a plugin cache path changes with each update, so pass `--script <a stable path>` there.
 

@@ -694,13 +694,14 @@ class ServicesLine(Base):
         line = self.NOTE.format(total=3, dir=directory, local=2)
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)})
         self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], line)
-        for host in ("codex", "kimi"):
-            done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", host])
-            self.assertEqual(done.stdout.strip(), line, host)
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
+        self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], line, "codex")
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "kimi"])
+        self.assertEqual(done.stdout.strip(), line, "kimi")
 
 
 class OtherHosts(Base):
-    def test_codex_gets_the_preamble_as_text_when_registered(self):
+    def test_codex_gets_the_preamble_as_session_start_json_when_registered(self):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
         self.assertEqual((done.returncode, done.stdout), (0, ""), "not registered: silent")
         codex = self.home / ".codex"
@@ -708,10 +709,28 @@ class OtherHosts(Base):
         (codex / "config.toml").write_text('[mcp_servers.fabric]\ncommand = "/opt/Fabric/resources/bin/fabric-mcp"\n')
         self.hub()
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
-        self.assertIn("this Codex has its MCP server `fabric`", done.stdout)
+        # FAA-48: Codex parses stdout that looks like JSON (it starts with `{` or `[`) as JSON, so the preamble, which
+        # starts with `[fabric-agent-adapter]`, failed as "invalid session start JSON output". It must be the hook
+        # JSON of Codex's SessionStart output schema: only hookSpecificOutput {hookEventName, additionalContext}.
+        out = json.loads(done.stdout)
+        self.assertEqual(set(out), {"hookSpecificOutput"})
+        self.assertEqual(set(out["hookSpecificOutput"]), {"hookEventName", "additionalContext"})
+        self.assertEqual(out["hookSpecificOutput"]["hookEventName"], "SessionStart")
+        context = out["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("this Codex has its MCP server `fabric`", context)
         for word in ("fabric_whoami", "com.status", "com.list", "com.submit"):
-            self.assertIn(word, done.stdout)
-        self.assertNotIn("hookSpecificOutput", done.stdout)
+            self.assertIn(word, context)
+
+    def test_kimi_keeps_plain_text(self):
+        """Kimi Code takes stdout that is not JSON as text and reads JSON output's `message`, not additionalContext."""
+        kimi = self.home / ".kimi-code"
+        kimi.mkdir()
+        (kimi / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "/x/fabric-mcp", "args": []}}}))
+        self.hub()
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "kimi"])
+        self.assertTrue(done.stdout.startswith("[fabric-agent-adapter]"))
+        with self.assertRaises(ValueError):
+            json.loads(done.stdout)
 
     def test_kimi_reads_its_own_mcp_json(self):
         kimi = self.home / ".kimi-code"
@@ -757,6 +776,22 @@ class InstallHostHooks(Base):
         self.assertIn(str(path), out)
         self.assertEqual(path.read_bytes(), before)
         self.assertEqual(list(path.parent.glob("*.bak")), [])
+
+    def test_codex_removal_names_the_hook_groups_it_moves(self):
+        """Codex trusts a hook by event, group and index: removing our group moves the groups after it, and the person
+        must re-approve them in /hooks. A removal that moves nothing says nothing about it."""
+        other = {"hooks": [{"type": "command", "command": "other", "timeout": 5}]}
+        later = {"hooks": [{"type": "command", "command": "later", "timeout": 5}]}
+        ours = {"hooks": [{"type": "command", "command": fs.hook_command(self.SCRIPT_PATH, "codex"), "timeout": 5}]}
+        path = self.codex_file({"hooks": {"SessionStart": [other, ours, later, later]}})
+        code, out, _ = self.install("codex", "--remove")
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 SessionStart hook group(s) after the removed one moved", out)
+        self.assertEqual(json.loads(path.read_text())["hooks"]["SessionStart"], [other, later, later])
+        path = self.codex_file({"hooks": {"SessionStart": [other, ours]}})
+        code, out, _ = self.install("codex", "--remove")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("after the removed one moved", out)
 
     def test_the_dry_run_prints_no_value_from_the_file(self):
         self.codex_file({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "timeout": 5,
