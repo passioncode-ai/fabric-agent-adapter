@@ -8,7 +8,7 @@ Evidence cut: 2026-10-16. Scope is the 30 IDs in Switchboard `catalog/agents.jso
 |---|---|---|
 | `claude-code` | Plugin SessionStart JSON; existing feature-gated lifecycle | Existing plugin + native schema checks; [native adapters](../../../../plugins/fabric-agent-adapter/skills/working-with-fabric/references/native-host-hooks.md). Final native receipt in handoff |
 | `codex` | SessionStart JSON | Native 0.162.1 reproduces old failure and accepts corrected context; [parser receipt](codex.md) |
-| `hermes` | Native frozen prompt section | Native 0.21.4 / 2026.9.21 fixture passed; [module](hermes.md) |
+| `hermes` | Native frozen prompt section | Native 0.21.4 / 2026.9.21 and current 0.21.5 / 2026.9.24 fixtures passed; [module](hermes.md) |
 | `opencode` | Native system transform | Native 1.19.0 loader/context fixture passed; [module](opencode-pi.md) |
 | `openclaw` | `before_prompt_build` / `prependContext` | Native 2026.10.4 fixture passed; permanent CLI subsequently installed, all three native permission cases passed; [module and permission negatives](openclaw.md) |
 | `pi` | `before_agent_start` structured prompt | Native 1.1.0 loader/context fixture passed; [module](opencode-pi.md) |
