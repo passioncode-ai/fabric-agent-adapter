@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.34.1"
+VERSION = "0.35.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -65,6 +65,10 @@ STDLIB_IMPORTS = {
     "ntpath", "posixpath",  # the lock name the Node kit holds, computed for either system (FAA-21)
     "ipaddress", "math", "struct",  # the delegation verifier: a loopback key-set URL, Ed25519 and claim checks (DEC-0039)
     "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
+    "collections", "queue",  # native bridge mappings and isolated no-model host probes (FAA-48)
+}
+NATIVE_HOST_IMPORTS = {
+    "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/hermes/__init__.py": {"hermes_cli.config"},
 }
 
 
@@ -340,7 +344,7 @@ def validate_python_imports(path: Path, errors: List[str]) -> None:
             root = name.split(".", 1)[0]
             if (path.parent / (root + ".py")).is_file():
                 continue  # a sibling module shipped in the same scripts directory
-            if root not in STDLIB_IMPORTS:
+            if root not in STDLIB_IMPORTS and name not in NATIVE_HOST_IMPORTS.get(path.relative_to(ROOT).as_posix(), set()):
                 errors.append("non-stdlib import in %s: %s" % (path.relative_to(ROOT), name))
 
 

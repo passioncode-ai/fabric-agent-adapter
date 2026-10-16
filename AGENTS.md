@@ -70,7 +70,9 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
   release a new version. Never copy a newer normative rule in while the old pin stays in metadata.
 - Write the intended behaviour and evidence first. Add or update the trigger and scenario evals
   before you change instructional prose.
-- Scripts use the Python standard library only and are non-destructive by default.
+- Scripts use the Python standard library only and are non-destructive by default. The Hermes native
+  plugin alone may import `hermes_cli.config` from its running host for read-only MCP registration;
+  it adds no pip dependency. `test/validate.py` scopes this exception to that adapter file.
 - Keep the marketplace, plugin, skill metadata and changelog versions in sync.
 - SKILL.md front matter must survive a strict YAML reader, not only Claude Code: a value holding
   `: ` or ` #` goes in a folded block (`description: >-`) or quotes. `test/validate.py` enforces it.

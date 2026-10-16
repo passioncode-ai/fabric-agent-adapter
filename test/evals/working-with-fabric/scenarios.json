@@ -144,9 +144,9 @@
     },
     {
       "id": "limit-stop-restarts-at-once",
-      "request": "Two of my workflow lanes stopped with \"You've hit your session limit · resets 5am\" and a subagent has written nothing for 20 minutes. What now?",
+      "request": "Two of my workflow lanes stopped with \"You've hit your session limit \u00b7 resets 5am\" and a subagent has written nothing for 20 minutes. What now?",
       "expected": [
-        "restarts at once instead of waiting for the reset: the workflow is stopped and resumed with the same run id and the same args; the subagent gets «resume» at its id",
+        "restarts at once instead of waiting for the reset: the workflow is stopped and resumed with the same run id and the same args; the subagent gets \u00abresume\u00bb at its id",
         "checks the silent subagent is not running a long command of its own before treating it as stalled",
         "retries on a 2, 5, 10, then 15-minute backoff only if a restart stops again at once, and does other work meanwhile",
         "does not retry a spend, credit or billing limit on a timer: it goes to the operator once as a human gate",
@@ -162,6 +162,17 @@
         "sends a problem as a structured finding (DEC-0080: severity, consequence, affects rows or tasks, a dedupeKey stable for that problem) only where the running Fabric's com.submit takes finding; otherwise a plain message",
         "uses an idempotency key of at least 128 random bits for a finding and keeps it on a retry; reads repeated: true as the standing finding already on the board, whose thread may differ",
         "reads settledBy: owner on a request as the estate owner's attestation, not the responder's"
+      ]
+    },
+    {
+      "id": "native-host-hooks-without-false-parity",
+      "request": "Fix invalid SessionStart JSON in Codex and make the same context available in Hermes, OpenCode, OpenClaw and Pi. Check all Switchboard hosts.",
+      "expected": [
+        "Codex uses hookSpecificOutput.additionalContext JSON; a leading bracket plaintext is not a valid JSON object",
+        "Hermes uses native system prompt sections, OpenCode system transform, OpenClaw before_prompt_build, Pi before_agent_start",
+        "Installs native shims only after source preflight, preserves unrelated configuration and explicit denial policy",
+        "Distinguishes installed loader, native context fixture and live Fabric admission; other hosts get sourced capability evidence, never invented event parity",
+        "Does not add unsupported Fabric runners or call rejoin lifecycle hooks from non-Claude hosts"
       ]
     }
   ]

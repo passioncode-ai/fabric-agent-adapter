@@ -1,0 +1,10 @@
+{
+  "name": "@passioncode-ai/fabric-agent-adapter-openclaw",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial",
+  "openclaw": {
+    "extensions": ["./index.mjs"],
+    "compat": { "pluginApi": ">=2026.10.4" }
+  }
+}

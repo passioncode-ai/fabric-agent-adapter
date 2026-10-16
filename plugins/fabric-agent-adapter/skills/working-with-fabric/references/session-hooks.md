@@ -32,7 +32,8 @@ zero; a `degraded` board that still gives the count is read.
 
 ## Codex and Kimi Code
 
-`fabric_session.py hook session-start --host codex|kimi` prints the preamble as plain text when the host has `fabric`
+`fabric_session.py hook session-start --host codex|kimi` emits structured SessionStart JSON for Codex and plain text
+for Kimi when the host has `fabric`
 registered (`[mcp_servers.fabric]` in `$CODEX_HOME/config.toml`; `mcpServers.fabric` in `~/.kimi-code/mcp.json`),
 plus the service line. Nothing else: no turn observation and no unread line, because a rejoin needs the runtime
 session id Fabric keeps with the enrollment, which only Claude Code supplies today (D1).
@@ -45,6 +46,9 @@ file whose shape is not `{"hooks": {"<Event>": [{"hooks": [...]}]}}` (Codex) or 
 the entry out again. Codex may ask the person to trust a new hook (`/hooks`) before it runs. The hook runs the
 `fabric_session.py` of the skills install (`~/.agents/skills/working-with-fabric/`) when there is one, else this
 script's own path; a plugin cache path changes with each update, so pass `--script <a stable path>` there.
+
+Native Hermes, OpenCode, OpenClaw and Pi bridges are described in [native host hooks](native-host-hooks.md).
+They consume the same context through their own APIs. They never use the Claude-only rejoin/turn lifecycle.
 
 ## `watch-mail`
 

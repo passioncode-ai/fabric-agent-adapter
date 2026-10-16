@@ -40,7 +40,10 @@ and the board's unread count; UserPromptSubmit adds one line only when that coun
 session left claimed. Stop, UserPromptSubmit and SessionEnd act only when the running Fabric advertises
 `session-hooks/1`. All are silent in a session Fabric launched, never block the session, read no token and always
 exit 0. `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks
---host codex|kimi` adds the session-start preamble to Codex or Kimi Code (a dry run unless `--apply`). The
+--host codex|kimi|hermes|opencode|openclaw|pi` installs each host's native context bridge (dry run unless `--apply`).
+Codex receives structured SessionStart JSON; Hermes, OpenCode, OpenClaw and Pi use native plugin APIs.
+See the [native host matrix](plugins/fabric-agent-adapter/skills/working-with-fabric/references/native-host-hooks.md)
+for activation, reload and verification limits. The
 [hooks reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/session-hooks.md) lists what
 they need from Fabric; the [board reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/project-board.md)
 is the board-first workflow.

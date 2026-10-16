@@ -1,0 +1,5 @@
+name: fabric-agent-adapter
+description: Bounded Fabric context frozen into the Hermes session prompt.
+kind: standalone
+requires_hermes: '>=0.21.4'
+license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial

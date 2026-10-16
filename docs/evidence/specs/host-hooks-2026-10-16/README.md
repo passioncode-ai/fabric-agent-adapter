@@ -17,7 +17,7 @@ No private case data, personal paths, tokens or agent names enter public fixture
 
 ## Harvest
 
-- Adapter origin/main 7ad8371, package 0.34.0: fabric_session.py supports claude/codex/kimi; line 464 returns plain text for non-Claude hosts. test_fabric_session.py explicitly expects Codex text.
+- Adapter origin/main 7ad8371, package 0.34.1: fabric_session.py supports claude/codex/kimi; line 464 returns plain text for non-Claude hosts. test_fabric_session.py explicitly expects Codex text.
 - AGENTS.md: stdlib Python, native plugin validation, source evidence first, shared registers leased, public privacy boundary.
 - Knowledge base agents-first.md: runtime rejoin only Claude; OpenCode/Pi missing runner catalogue as of that record. Verify live state; hooks alone do not add runners.
 - Knowledge base principles/how-to-work/rules: parallel bounded modules, isolated worktree, local gates, release acceptance separate from source.
@@ -41,3 +41,15 @@ Modules return evidence before implementations are assigned exclusive paths. Com
 ## Resume
 
 Read this brief, inspect the working branch and per-host evidence. Next: pin actual host versions/contracts, reproduce Codex JSON failure, then add adapters with tests before changing installed settings. Durable handoff will name every host status and exact next action.
+
+## Scope extension (operator, same session)
+
+Check Cline, OpenHands, Aider, Goose, Kilo Code, Zed and Tabby in addition to the named six and every Switchboard catalog host. The catalog at commit `db748f2d471570419c2fb0b62f1c53b1295dc241` has 30 entries; Tabby adds one. Stars and licenses in the supplied comparison are not hook capability evidence. Six named hosts require implementation/native acceptance; additional hosts receive primary-source capability checks and explicit gaps, without inventing a common SessionStart protocol. Root owns aggregate capability matrix. FAA-48 is the canonical task row.
+
+## Evidence index
+
+- [All 31 host capability checks](compatibility.md)
+- [Codex native parser regression](codex.md)
+- [Hermes native module](hermes.md)
+- [OpenCode and Pi native modules](opencode-pi.md)
+- [OpenClaw native module and permission failures](openclaw.md)
