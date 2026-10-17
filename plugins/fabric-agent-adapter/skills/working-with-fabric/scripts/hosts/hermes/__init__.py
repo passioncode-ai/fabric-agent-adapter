@@ -53,8 +53,11 @@ def _capture(command, payload):
     reader = threading.Thread(target=read_output, daemon=True)
     reader.start()
     try:
-        process.stdin.write(payload)
-        process.stdin.close()
+        try:
+            process.stdin.write(payload)
+            process.stdin.close()
+        except BrokenPipeError:
+            pass  # FAA-51: a helper may exit without reading its input; its output still counts
         process.wait(timeout=max(0.001, deadline - time.monotonic()))
         reader.join(timeout=max(0, deadline - time.monotonic()))
         if reader.is_alive() or invalid.is_set() or process.returncode != 0:
@@ -69,7 +72,10 @@ def _capture(command, payload):
         reader.join(timeout=0.2)
         if not reader.is_alive():
             process.stdout.close()
-        process.stdin.close()
+        try:
+            process.stdin.close()
+        except BrokenPipeError:
+            pass
 
 
 def fabric_registered(config=None):

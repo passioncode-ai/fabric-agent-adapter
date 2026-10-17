@@ -125,6 +125,16 @@
         "gives a lane that reads user content an open-vendor route: with `fallback: none` its first model is `open-vendor` in the catalogue, with `between-turns` at least one is (FAC-SEM-112); never a closed vendor alone",
         "does not choose the model itself or name a vendor list: which models are open-vendor is the catalogue's fact, and the profile is resolved in Fabric"
       ]
+    },
+    {
+      "id": "resilience-before-the-first-model-call",
+      "request": "Create a fabric-compatible example-agent that summarises support tickets with a model and posts the summary back to the ticket.",
+      "expected": [
+        "reads references/resilience-and-autonomy.md before designing the first stage that calls a model or spends money",
+        "designs a provider limit as a typed pause that resumes from the same stage, an accept() check for every model answer, and a fallback and checker from other vendors",
+        "keys the posting effect by an intent-derived idempotency key and stops as outcome_unknown on an uncertain write instead of resending",
+        "reports the reference's checklist with a file and a test per line, or NOT_RUN where the agent has no such stage"
+      ]
     }
   ]
 }

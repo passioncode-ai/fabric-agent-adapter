@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.35.1 - 2026-10-17
 
 ### Added
 
@@ -13,6 +13,8 @@
 
 ### Fixed
 
+- **The Hermes native adapter dropped a helper's answer** (FAA-51): a helper that exits without reading its input broke
+  the pipe while the payload was written, and the broken pipe discarded the helper's output. It no longer does.
 - **`test/validate.py` validated other checkouts as this tree** (FAA-50): its walks entered `.worktrees/` (git
   worktrees of this repository, git-ignored), so the main checkout failed the pin check — 442 errors — whenever a
   worktree of another branch sat beside it. Every walk now skips `.git` and `.worktrees`.
