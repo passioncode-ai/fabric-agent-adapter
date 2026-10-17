@@ -134,8 +134,9 @@ personal data or private path in a body or an artifact reference: name a vault s
 - Never enroll a second session from a hook or a script: a `fabric-mcp` started outside the agent's own connection
   enrolls a new session, and Fabric ends a binding's oldest live session past eight — the agent's own. The plugin's
   hooks and `watch-mail` only rejoin (`--rejoin-only`).
-- Never attach a folder to a Project, or create a Project, to make enrollment succeed. "The folder is not a project"
-  is the answer: tell the person; which Projects exist is their decision.
+- Never attach a folder or create a Project through a side channel to make enrollment succeed. Fabric's own
+  enrollment admits an eligible Git folder and records the Project it creates or attaches. If the answer is still
+  "the folder is not a project", report it; never write another product's registry or improvise a second admission path.
 
 ## Not yet available
 
