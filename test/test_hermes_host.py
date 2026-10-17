@@ -3,6 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -58,6 +59,17 @@ class HermesHostTests(unittest.TestCase):
             ctx = Context(str(script))
             host.register(ctx)
             self.assertEqual(ctx.sections[0][0][1]({"cwd": directory}), "native context")
+
+    def test_a_helper_that_never_reads_its_input_still_answers(self):
+        """FAA-51: the helper exits before the payload is written; the broken pipe is not a failure. The race is
+        likely, not certain (the input is capped at MAX_INPUT_BYTES), so the call repeats; the code before the fix
+        failed it in 2 of 3 runs."""
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / "helper.py"
+            script.write_text("import sys\nsys.stdout.write('native context')\n")
+            payload = b"x" * min(host.MAX_INPUT_BYTES, 1 << 20)
+            for _ in range(5):
+                self.assertEqual(host._capture([sys.executable, "-S", str(script)], payload), b"native context")
 
     def test_missing_helper_and_relative_override_are_silent(self):
         with patch.object(host, "_capture") as run:

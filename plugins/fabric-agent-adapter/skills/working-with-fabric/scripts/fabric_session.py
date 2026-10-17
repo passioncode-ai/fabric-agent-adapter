@@ -63,7 +63,7 @@ WATCH_MAX_BACKOFF_S = 900
 SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 LOCAL_ORIGIN = re.compile(r'"origin": "http://(?:127\.0\.0\.1|localhost)')
-VERSION = "0.35.0"
+VERSION = "0.35.1"
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
          "hermes": "Hermes", "opencode": "OpenCode", "openclaw": "OpenClaw", "pi": "Pi"}
 NATIVE_PLUGIN_HOSTS = frozenset(("hermes", "opencode", "openclaw", "pi"))
