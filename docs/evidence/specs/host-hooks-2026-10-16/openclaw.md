@@ -128,3 +128,7 @@ This proves native loading/registration plus focused handler behavior. It does
 not establish model consumption, Fabric enrollment, available MCP tools, global
 runtime installation, or an already-running Gateway's reload. Those remain
 separate acceptance layers owned by the aggregate installation matrix.
+
+## Permanent installation follow-up
+
+After the initial isolated-runtime receipt, OpenClaw 2026.10.4 (383c124) was installed permanently. The package-specific reviewed postinstall exited 0, `fs-safe` reported `ready`, and the pending lifecycle marker was absent. `python3 test/native/openclaw_hooks.py <installed CLI>` exited 0 for the positive case and both native permission denials. This supersedes the earlier PATH-absence observation and the unrun third native case; it does not claim a Gateway/model session or Fabric admission. Global adapter configuration is recorded in the aggregate handoff.
