@@ -420,6 +420,33 @@ class StopAndEndActive(Base):
             self.spool("turn")
         self.assertEqual(len(list(directory.glob("*-turn.json"))), fs.SPOOL_CAP)
 
+    def test_stale_session_folders_are_pruned_when_a_hook_spools(self):
+        """FAA-50: a folder whose worker failed, or whose session ended without SessionEnd, is never retried; the next
+        spooling hook removes folders older than SESSION_STALE_S, never its own, never one whose worker is running."""
+        root = fs.state_root(env=self.env) / "sessions"
+        old = time.time() - fs.SESSION_STALE_S - 60
+
+        def folder(name, locked=False, age=old):
+            path = root / name
+            path.mkdir(parents=True, exist_ok=True)
+            (path / "01791848106008551000-end.json").write_text("{}")
+            if locked:
+                (path / "worker.lock").write_text("1")
+            for item in list(path.iterdir()) + [path]:
+                os.utime(item, (age, age) if not (locked and item.name == "worker.lock") else None)
+            return path
+
+        stale = folder("11111111-1111-4111-8111-111111111111")
+        running = folder("22222222-2222-4222-8222-222222222222", locked=True)
+        fresh = folder("33333333-3333-4333-8333-333333333333", age=time.time())
+        own = folder(SID)
+        self.spool("turn")
+        self.assertFalse(stale.exists(), "a stale folder is removed")
+        self.assertTrue(running.exists(), "a folder whose worker holds the lock stays")
+        self.assertTrue(fresh.exists(), "a recent folder stays")
+        self.assertTrue((own / "01791848106008551000-end.json").exists(), "the spooling session's own folder stays")
+        self.assertEqual(fs.prune_stale_sessions(self.env), 0, "nothing else is stale")
+
     def test_the_detached_worker_runs_from_the_real_hook(self):
         done, elapsed = self.run_hook("stop", {"session_id": SID, "cwd": str(self.repo)})
         self.assertEqual((done.returncode, done.stdout), (0, ""))

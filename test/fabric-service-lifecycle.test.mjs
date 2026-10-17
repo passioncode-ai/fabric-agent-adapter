@@ -3,17 +3,17 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const kit = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs');
 
 function withTemp(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-life-'));
+  const dir = tempDir('fabric-life-');
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 }

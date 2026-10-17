@@ -2,13 +2,13 @@
 // whose expected answers come from the contract's own functions at the pin (make_profile_vectors.mjs).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as s from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-secrets.mjs';
 import * as p from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-profiles.mjs';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const V = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/profile-vectors.json'), 'utf8'));
@@ -27,7 +27,7 @@ test('every resolution and every rule case answers as the contract does', () => 
 });
 
 test('runnerCheck runs only the catalogued binary and argv, bounded, and reads the version and sign-in', { skip: process.platform === 'win32' }, () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-'));
+  const dir = tempDir('runner-');
   const tool = (body) => { const f = path.join(dir, 'example-code'); fs.writeFileSync(f, `#!/bin/sh\n${body}\n`); fs.chmodSync(f, 0o755); };
   const entry = (extra = {}) => ({ kind: 'example-code', binaries: ['example-code'], version: { argv: ['--version'], pattern: '^example (\\d+\\.\\d+\\.\\d+)', timeoutMs: 2000 }, ...extra });
   assert.equal(p.runnerCheck(entry(), { searchPath: dir }).installed, false);

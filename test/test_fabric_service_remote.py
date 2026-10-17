@@ -91,7 +91,9 @@ class RemotePlacement(unittest.TestCase):
         self.assertNotIn("Domain", h)
 
     def test_register_remote(self):
-        root = Path(tempfile.mkdtemp()) / "services"
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        root = temp / "services"
         local = {"protocol": fs.PROTOCOL, "id": "maker", "instance": "default", "name": "Maker", "origin": "http://127.0.0.1:8443",
                  "auth": {"tokenFile": "/tmp/m.token"}, "lifecycle": {"manager": "none"}, "paths": {"data": "/tmp/m", "logs": []},
                  "installedAt": fs.now_iso(), "installedBy": "test"}
@@ -159,6 +161,7 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
 
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir, True)
         self.cert, self.key = self.dir / "cert.pem", self.dir / "key.pem"
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=agent.example.com",
                         "-addext", "subjectAltName=DNS:agent.example.com", "-keyout", str(self.key), "-out", str(self.cert)],

@@ -3,6 +3,7 @@ fabric-service-feed-protocols.test.mjs. Held to the contract's answers (test/fix
 vendor_vectors.mjs)."""
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 
@@ -82,7 +83,9 @@ class FeedData(unittest.TestCase):
             self.assertNotIn("abc", str(caught.exception), "a refusal names the place, never the value")
 
     def test_the_log_keeps_data(self):
-        log = fs.JsonlEventLog(Path(tempfile.mkdtemp()) / "events.jsonl")
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        log = fs.JsonlEventLog(temp / "events.jsonl")
         log.append("job.done", "info", "A note was drafted.", data={"schema": "https://example.com/s.json", "value": {"notes": 1}})
         self.assertEqual(log.fetch(None, 10)[0]["data"]["value"], {"notes": 1})
 
@@ -94,7 +97,9 @@ class ProbeRules(unittest.TestCase):
         d = {"protocol": "fabric-service/0.1", "id": "example-agent", "instance": "default", "name": "Example Agent",
              "origin": "http://127.0.0.1:47299", "auth": {"tokenFile": "~/x.token"}, "lifecycle": {"manager": "none"},
              "paths": {"data": "~/x"}, "installedAt": "2026-10-13T08:00:00Z", "installedBy": "test"}
-        pr = probe.Probe(Path("/tmp/x.json"), d, Path(tempfile.mkdtemp()), skip_login=True)
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        pr = probe.Probe(Path("/tmp/x.json"), d, temp, skip_login=True)
         pr.token = "t" * 32
         pr.read_token = lambda: None
 

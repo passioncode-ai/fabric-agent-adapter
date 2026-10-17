@@ -5,15 +5,15 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import https from 'node:https';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
-const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-remote-'));
+const temp = () => tempDir('fabric-remote-');
 const remote = (over = {}) => ({
   protocol: k.PROTOCOL, id: 'example-agent', instance: 'default', name: 'Example Agent', placement: 'remote',
   origin: 'https://agent.example.com', auth: { tokenFile: '/tmp/x/t.token' }, lifecycle: { manager: 'none' },

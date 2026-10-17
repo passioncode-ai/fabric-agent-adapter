@@ -4,14 +4,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
-const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-supervisor-'));
+const temp = () => tempDir('fabric-supervisor-');
 const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'q'.repeat(24)}`;
 
 // Stands in for systemctl and schtasks: fails a call naming a word in `fail`, prints `out[word]` for one naming it.

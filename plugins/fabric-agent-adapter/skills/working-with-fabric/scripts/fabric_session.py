@@ -53,6 +53,9 @@ PS_TIMEOUT_S = 0.5
 LOG_CAP_BYTES = 1_000_000
 SPOOL_CAP = 50
 LOCK_STALE_S = 30.0
+#: A session folder untouched this long belongs to a session that will not spool again: its worker failed, or the
+#: session ended without SessionEnd. Nothing retries it, so the next spooling hook removes it (FAA-50).
+SESSION_STALE_S = 7 * 86400
 READ_CAP = 64 * 1024
 CONFIG_CAP = 32 * 1024 * 1024
 WATCH_MIN_INTERVAL_S = 10
@@ -413,6 +416,30 @@ def spool(directory: Path, entry: Dict[str, Any]) -> Path:
     return path
 
 
+def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[float] = None,
+                         keep: Optional[str] = None) -> int:
+    """Remove session folders whose newest file is older than SESSION_STALE_S (a running worker's lock is a fresh file,
+    so its folder is never stale); never the folder of the session `keep`. Returns how many were removed. Never
+    raises."""
+    now = time.time() if now is None else now
+    removed = 0
+    try:
+        folders = list((state_root(env=env) / "sessions").iterdir())
+    except OSError:
+        return 0
+    for folder in folders:
+        try:
+            if folder.name == keep or not SESSION_ID.fullmatch(folder.name) or not folder.is_dir():
+                continue
+            newest = max([folder.stat().st_mtime] + [f.stat().st_mtime for f in folder.iterdir()])
+            if now - newest > SESSION_STALE_S:
+                _remove_tree(folder)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 def lock_held(directory: Path) -> bool:
     lock = directory / "worker.lock"
     try:
@@ -528,6 +555,7 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
         return "skipped: launched by Fabric"
     entry = {"event": event, "runtimeSessionId": session_id, "cwd": str(cwd),
              "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+    prune_stale_sessions(env, keep=session_id)
     if event == "end" and isinstance(payload.get("reason"), str):
         entry["reason"] = payload["reason"][:64]
     spool(directory, entry)

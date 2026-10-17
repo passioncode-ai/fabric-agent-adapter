@@ -7,6 +7,7 @@ validator does not refuse, and that set is pinned so a new one is noticed."""
 import copy
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 
@@ -90,6 +91,7 @@ class Ports(unittest.TestCase):
 class Readers(unittest.TestCase):
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir, True)
         self.app = self.dir / "Example App.app"
         self.app.mkdir()
         self.desc = fixture("service-descriptor-person-app")
@@ -133,6 +135,7 @@ class Readers(unittest.TestCase):
 class Writers(unittest.TestCase):
     def test_register_remote_writes_who_installed_it_and_takes_runner_and_peer(self):
         services = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, services, True)
         path = fs.register_remote(service_id="example-inbox", name="Example Inbox", origin="https://inbox.example.com",
                                   token="t" * 32, directory=services)
         written = json.loads(path.read_text())
@@ -150,6 +153,7 @@ class Writers(unittest.TestCase):
     def test_the_sample_writes_the_object_form(self):
         sample = load("sample_service")
         services = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, services, True)
         args = sample.build_parser().parse_args(["register", "--port", "47299", "--data-dir", str(services / "data"), "--services-dir", str(services)])
         self.assertEqual(sample.register(args), 0)
         written = json.loads(next(services.glob("*.json")).read_text())

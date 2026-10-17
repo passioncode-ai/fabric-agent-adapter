@@ -3,6 +3,7 @@ contract's fixtures/vectors/identifiers.json (test/fixtures/contract/identifier-
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
 
@@ -54,6 +55,7 @@ class Writers(unittest.TestCase):
         fp = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(fp)
         temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
         manifest = temp / "fabric-agent.json"
         manifest.write_text(json.dumps({"provider": {"id": "https://agents.example/providers/example-agent"}, "capabilities": []}))
         entry = {"protocol": "fabric-provider/0.1", "id": "example-agent", "providerId": "HTTPS://Agents.Example/providers/%65xample-agent",

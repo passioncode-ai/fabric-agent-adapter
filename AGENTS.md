@@ -117,7 +117,7 @@ this repository both obeys it and ships its service layer
   start reads `~/.claude.json`, Fabric's `hub.json` and the services directory, and prints the preamble only when
   `fabric` is registered (plus one line when the machine has Fabric service descriptors). Stop and SessionEnd read
   `hub.json` first and return, writing nothing, unless the running Fabric advertises `session-hooks/1`; then they
-  write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**
+  write a spool entry (0600, at most 50 per session; a session folder untouched for 7 days is removed by the next spool) in the user's cache folder and start a **detached worker**
   (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` with a 10 s deadline, reads the board's unread
   count (`com.status`) after a turn, and exits. UserPromptSubmit reads two small files in that spool and calls
   nothing. Every one is silent in a session Fabric launched. Measured 2026-10-11 under a load average of about 220,

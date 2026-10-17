@@ -9,11 +9,12 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const fixture = (name) => JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/dec-0025-0027', `${name}.json`), 'utf8'));
-const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-backup-'));
+const temp = () => tempDir('fabric-backup-');
 const NOW = Date.UTC(2026, 9, 5, 2, 0, 0, 123);
 const DAY = 86_400_000;
 const TABLES = {
