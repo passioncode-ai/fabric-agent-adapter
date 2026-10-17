@@ -40,6 +40,10 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    the next one. Retries there stalled a waiting user. Stagger many resumes; bound each worker's
    working set (a narrow time window, a prefix), so one stop does not become a burst.
 
+8. **Move a refused request to another account at most once, and only before any byte reached the
+   client** — a replay after streaming began duplicated output. Persist a provider's `Retry-After`
+   across restarts; a check inside the hold answers the stored observation instead of probing.
+
 ## Model answers are untrusted until accepted
 
 1. **"Answered" is not "usable".** Each call site has its own `accept(text)` — the parser the
@@ -117,9 +121,17 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 6. **Background chores never hold a finished command open**, unattended runs skip them, and an
    unattended `--yes` never reverses a "no" a person saved.
 
+7. **When a peer waits on your decision, make it**, mark it reversible, record it where the work
+   lives and reply naming the record; a platform once built nothing for days waiting on a
+   definition. Release a coordination lease in the same step as the commit that used it, the
+   failure path included.
+8. **Hand work over only while it is alive**, and claim each hand-over exactly once by an exclusive
+   create; a forgotten workflow was handed over twice.
+
 ## Verification you can believe
 
-1. **A test counts once it was watched failing against a planted defect**; a mutation battery
+1. **A test counts once it was watched failing against a planted defect** (clear bytecode caches
+   first — stale bytecode reported mutants killed); a mutation battery
    asserts its own reach ("no tests ran" is not "all plants survived"). Exercise every guard
    with a must-catch and a must-pass case.
 2. **Write expectations out; never compute them from the code under test**, and run a reference
@@ -141,7 +153,9 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 9. **Probe live after every deploy on every consumer channel**, not the default one; read the
    nightly full-suite result first when resuming work, and release from a full local run, not a
    selected subset.
-10. **Read an external contract from its raw documentation or a recorded live snapshot**, never
+10. **Port a protocol from the contract's shared vectors, never its prose** — vendored with a hash
+   per file and run case by case; a prose port accepted a year-0000 date the vectors refused.
+11. **Read an external contract from its raw documentation or a recorded live snapshot**, never
    from a summarising fetch; fail closed on a field nobody documented.
 
 ## Operations that survive restarts
@@ -178,6 +192,10 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 11. **Admit work only when the machine can carry it** — free disk, swap, a cap on concurrent
    sessions — and say why when you defer.
 
+12. **Keep blocking work off the workers that answer requests**, never let a read wait behind a long
+   transaction, and log a transaction held long with the step that held it. Every blocking network
+   wait is interruptible from outside, with its deadline on the socket, not between frames.
+
 ## Secrets and confinement
 
 1. **A secret never enters an environment, argv, URL or log a child can read.** Hand it over a
@@ -197,6 +215,11 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    placeholder-shaped values, and a test renders the configuration without the value and expects
    an error.
 8. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
+
+9. **Bound every recursive parse of untrusted input** (a depth limit, tested at the limit and one
+   above). Revoke or retire by a content-addressed reference, never a reusable name: a re-keyed
+   machine keeps its key id. Never refresh a person's own credentials as a side effect; renew only
+   what you own.
 
 ## Checklist
 
