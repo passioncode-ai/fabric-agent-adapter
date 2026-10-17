@@ -5,11 +5,11 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const kit = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const python = process.platform === 'win32' ? 'python' : 'python3';
@@ -135,7 +135,7 @@ print(json.dumps([fs.lock_name(p, platform) for p, platform in json.loads(sys.ar
 // --- on the system itself ------------------------------------------------------------------
 
 const onLinuxOrWindows = !['linux', 'win32'].includes(process.platform) && 'needs Linux or Windows';
-const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-platform-'));
+const temp = () => tempDir('fabric-platform-');
 
 test('a Python copy is refused while a Node copy holds the lock, and the probe sees it', { skip: onLinuxOrWindows || (!hasPython && 'needs python') }, async () => {
   const dir = temp();

@@ -4,10 +4,10 @@
 // refuse, and that set is pinned so a new one is noticed.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(`./fixtures/contract/${name}`, import.meta.url), 'utf8'));
 const FIX = read('descriptor-fixtures.json');
@@ -16,7 +16,7 @@ const APP = read('app-descriptor-vectors.json');
 const LOCAL_CHANNEL = ['service-descriptor-channels-without-local', 'service-descriptor-local-channel-bad-sid', 'service-descriptor-local-channel-both',
   'service-descriptor-local-channel-home', 'service-descriptor-local-channel-multibyte', 'service-descriptor-remote-with-channel'];
 const fixture = (name) => structuredClone(FIX.descriptors.find((d) => d.name === name).descriptor);
-const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-descriptors-'));
+const temp = () => tempDir('fabric-descriptors-');
 
 test('every valid descriptor is accepted; every invalid one is refused but the local channel', () => {
   const valid = FIX.descriptors.filter((d) => d.valid);

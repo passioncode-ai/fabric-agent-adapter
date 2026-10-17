@@ -2,11 +2,11 @@
 // contract's own verifier at the pin (test/fixtures/delegation/make_vectors.mjs).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as d from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const V = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/delegation/vectors.json'), 'utf8'));
@@ -58,7 +58,7 @@ test('jti stores: memory prunes, the file store survives a restart, the store is
   assert.equal(mem.consume('a', 100, 50), true);
   assert.equal(mem.consume('a', 100, 60), false);
   assert.equal(mem.consume('a', 300, 100 + d.LEEWAY_SECONDS + 1), true);
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jti-')), 'jti.json');
+  const file = path.join(tempDir('jti-'), 'jti.json');
   assert.equal(new d.FileJtiStore(file).consume('a', 1000, 10), true);
   assert.equal(new d.FileJtiStore(file).consume('a', 1000, 20), false);
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
@@ -81,7 +81,7 @@ test('JwksCache follows DL-15: ten minutes, an unknown kid re-read at most once 
   const before = calls.length; await cache.get('estate-new'); assert.equal(calls.length, before, 'a failed read waits before the next try');
   now[0] += d.JWKS_RETRY_SECONDS; await cache.get('estate-new'); assert.equal(calls.length, before + 1);
   for (const bad of ['http://hub.example/jwks.json', 'ftp://x/j', 'https://u:p@hub.example/j', '']) assert.throws(() => new d.JwksCache(bad), /key set/);
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jwks-')), 'jwks.json');
+  const file = path.join(tempDir('jwks-'), 'jwks.json');
   fs.writeFileSync(file, JSON.stringify(V.jwks));
   assert.deepEqual(await new d.JwksCache(file).get('estate-new'), V.jwks);
 });
@@ -118,7 +118,7 @@ test('the gate refuses in the DL-19 shape and never echoes the token', async () 
 
 test('review findings: unreadable jti file, __proto__ as an id, a null header value', () => {
   const step = V.approvals[0].steps[0];
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jti-')), 'jti.json');
+  const file = path.join(tempDir('jti-'), 'jti.json');
   const store = new d.FileJtiStore(file);
   assert.equal(d.verifyApproval(step.approval, { ...step.options, jtiStore: store }).ok, true);
   fs.writeFileSync(file, '{');

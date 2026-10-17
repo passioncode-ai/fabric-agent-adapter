@@ -11,6 +11,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 
@@ -488,6 +489,29 @@ class PinTests(unittest.TestCase):
             ADAPTER.scaffold_project(Path(temp), scaffold_args('mcp'))
             lock = json.loads((Path(temp) / 'fabric-contract.lock.json').read_text())
             self.assertEqual({key: lock[key] for key in pin}, pin)
+
+
+class WorktreeTests(unittest.TestCase):
+    """FAA-50: a git worktree under `.worktrees/` is another checkout; validating it as this tree failed the main
+    checkout whenever a worktree of another branch sat beside it."""
+
+    def test_a_worktree_beside_the_tree_is_not_validated(self):
+        root = validate.ROOT
+        self.assertFalse(validate.in_this_tree(root / ".worktrees" / "other" / "CHANGELOG.md"))
+        self.assertFalse(validate.in_this_tree(root / ".git" / "config"))
+        self.assertTrue(validate.in_this_tree(root / "CHANGELOG.md"))
+        self.assertTrue(validate.in_this_tree(root / "docs" / "worktrees-notes.md"))
+
+    def test_the_pin_check_skips_a_worktree_with_another_revision(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "README.md").write_text("contract commit at the pin\n")
+            other = root / ".worktrees" / "old" / "README.md"
+            other.parent.mkdir(parents=True)
+            other.write_text("contract commit 0cacd08b0e95b6abf131eae1206b60792138bc3c\n")
+            self.assertEqual(validate.contract_pin_drift(root, validate.PIN_DEFAULT_COMMIT), [])
+            (root / "NOTES.md").write_text("contract commit 0cacd08b0e95b6abf131eae1206b60792138bc3c\n")
+            self.assertTrue(validate.contract_pin_drift(root, validate.PIN_DEFAULT_COMMIT))
 
 
 class BoardRowTests(unittest.TestCase):

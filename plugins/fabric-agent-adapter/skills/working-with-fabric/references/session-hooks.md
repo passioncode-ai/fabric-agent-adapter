@@ -95,7 +95,9 @@ only variable names are looked at, never a value (two of them carry the session'
 One line per event that did something, never content: `~/Library/Caches/ai.passioncode.fabric-agent-adapter/hooks.log`
 (macOS), `$XDG_CACHE_HOME/fabric-agent-adapter/hooks.log` (Linux, default `~/.cache`),
 `%LOCALAPPDATA%\fabric-agent-adapter\hooks.log` (Windows). Mode 0600, rotated at 1 MB to `hooks.log.1`. The
-per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, `board.json`, `board.shown`),
+per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, `board.json`, `board.shown`; a
+folder untouched for 7 days, whose worker failed or whose session ended without SessionEnd, is removed by the next
+spooling hook),
 removed at the session's end.
 
 Turn them off with Claude Code's own switch (`/hooks`, or `"disableAllHooks": true` in settings), or remove the

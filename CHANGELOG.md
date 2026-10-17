@@ -4,6 +4,16 @@
 
 ### Fixed
 
+- **`test/validate.py` validated other checkouts as this tree** (FAA-50): its walks entered `.worktrees/` (git
+  worktrees of this repository, git-ignored), so the main checkout failed the pin check — 442 errors — whenever a
+  worktree of another branch sat beside it. Every walk now skips `.git` and `.worktrees`.
+- **The tests left directories behind** (FAA-50): the Node tests made their temporary directories with `mkdtempSync`
+  and removed none, and five Python tests used `mkdtemp` without a cleanup, so every run left about 40 directories in
+  the system's temp folder. The Node tests take theirs from `test/temp-dir.mjs`, removed when the process exits; the
+  Python tests register `addCleanup`. A full run now leaves none.
+- **The session hooks' spool grew without bound** (FAA-50): a session folder was removed only when its worker delivered
+  the session's end, so a failed delivery or a session that ended without SessionEnd left its folder forever. The next
+  spooling hook now removes folders untouched for 7 days, never its own.
 - **`install-host-hooks --host codex --remove`** names the SessionStart hook groups after ours that it moves: Codex
   keys a hook's trust by its position, and asks the person to approve those again in `/hooks` (FAA-49).
 

@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import { spawnSync, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
-const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-kit-'));
+const temp = () => tempDir('fabric-kit-');
 const descriptor = (port, id = 'sample', instance = 'default') => ({
   protocol: k.PROTOCOL, id, instance, name: 'Sample', origin: `http://127.0.0.1:${port}`,
   auth: { tokenFile: '/tmp/x/service.token' }, lifecycle: { manager: 'none' },

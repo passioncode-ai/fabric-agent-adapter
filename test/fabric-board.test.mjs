@@ -4,12 +4,12 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as fb from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board.mjs';
 import * as fh from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs';
+import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const COMMS = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/comms-vectors.json'), 'utf8'));
@@ -18,7 +18,7 @@ const FIXTURES = Object.fromEntries(COMMS.fixtures.map((f) => [f.name, f]));
 
 // --- the fake hub as a process ---------------------------------------------------------------------------------------
 async function fakeHub(t, capabilities = ['video.render']) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faa12b-'));
+  const dir = tempDir('faa12b-');
   const root = path.join(dir, 'fabric');
   const args = [path.join(here, 'fake_fabric_hub.py'), 'serve', '--root', root, ...capabilities.flatMap((c) => ['--capability', c])];
   const child = spawn('python3', args, { stdio: ['pipe', 'pipe', 'inherit'] });
@@ -361,7 +361,7 @@ test('a board session never sends a tool outside the respond scope; shutdown rel
 });
 
 test('the Python and Node kits write a checkpoint each other reads', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'faa12b-cp-'));
+  const dir = tempDir('faa12b-cp-');
   const file = path.join(dir, 'cp.json');
   const cp = new fb.Checkpoint(file);
   cp.put({ request: 'req_000000001', step: 'claimed', keys: {} });

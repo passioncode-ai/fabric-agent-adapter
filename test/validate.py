@@ -318,9 +318,19 @@ def local_markdown_links(path: Path) -> List[str]:
             if not re.match(r"^[a-z]+://", target) and not target.startswith("#")]
 
 
+#: Directories that hold other checkouts, not this tree: `.git`, and `.worktrees/` (git worktrees of this repository,
+#: git-ignored). A walk that entered one validated another branch's files as this tree's (FAA-50).
+NOT_THIS_TREE = (".git", ".worktrees")
+
+
+def in_this_tree(path: Path, root: Path = ROOT) -> bool:
+    """Whether a path the walk found belongs to this checkout, not to `.git` or a worktree beside it."""
+    return not any(part in NOT_THIS_TREE for part in path.relative_to(root).parts)
+
+
 def validate_links(errors: List[str]) -> None:
     for path in ROOT.rglob("*.md"):
-        if ".git" in path.parts:
+        if not in_this_tree(path):
             continue
         for target in local_markdown_links(path):
             clean = target.split("#", 1)[0]
@@ -444,7 +454,7 @@ def contract_pin_drift(root: Path, commit: str) -> List[str]:
     drift: List[str] = []
     for path in sorted(root.rglob("*")):
         rel = path.relative_to(root).as_posix()
-        if not path.is_file() or ".git" in path.parts or any(rel == x or rel.startswith(x + "/") for x in PIN_EXCLUDED):
+        if not path.is_file() or not in_this_tree(path, root) or any(rel == x or rel.startswith(x + "/") for x in PIN_EXCLUDED):
             continue
         if path.suffix not in (".md", ".json", ".py", ".mjs", ".js", ".yml", ".yaml", ".toml", ".txt"):
             continue
@@ -593,7 +603,7 @@ def validate_repo() -> List[str]:
     validate_contract_pin(errors)
     errors.extend(malformed_board_rows((ROOT / "docs/backlog.md").read_text(encoding="utf-8")))
 
-    skill_files = sorted(path for path in ROOT.rglob("SKILL.md") if ".git" not in path.parts)
+    skill_files = sorted(path for path in ROOT.rglob("SKILL.md") if in_this_tree(path))
     if skill_files != sorted(SKILLS[name] / "SKILL.md" for name in SKILL_NAMES):
         errors.append("distribution must expose exactly the canonical SKILL.md files")
 
@@ -631,13 +641,13 @@ def validate_repo() -> List[str]:
         errors.append("top changelog version is out of sync")
 
     for path in ROOT.rglob("*.json"):
-        if ".git" not in path.parts and ".agent-sync" not in path.parts:
+        if in_this_tree(path) and ".agent-sync" not in path.parts:
             try:
                 json.loads(path.read_text(encoding="utf-8"))
             except json.JSONDecodeError as exc:
                 errors.append("invalid JSON in %s: %s" % (path.relative_to(ROOT), exc))
     for path in ROOT.rglob("*.py"):
-        if ".git" not in path.parts:
+        if in_this_tree(path):
             validate_python_imports(path, errors)
     validate_links(errors)
 
