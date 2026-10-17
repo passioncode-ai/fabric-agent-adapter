@@ -1105,6 +1105,7 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
     else:
         path = _home(env) / ".kimi-code" / "config.toml"
     command = hook_command(str(args.script or default_hook_script(env)), args.host)
+    shifted = 0  # Codex hook groups after ours, whose position a removal moves
     try:
         data = _read_bytes(path)
         digest = _digest(data)
@@ -1118,11 +1119,15 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
                 if not present:
                     out("install-host-hooks: no Fabric preamble hook in %s; nothing to change" % path)
                     return 0
-                groups = []
-                for group in doc["hooks"]["SessionStart"]:
+                groups, dropped = [], None
+                for index, group in enumerate(doc["hooks"]["SessionStart"]):
                     kept = [h for h in group.get("hooks", []) if not _is_ours(h.get("command"), args.host)]
                     if kept or not group.get("hooks"):
                         groups.append(dict(group, hooks=kept) if kept != group.get("hooks") else group)
+                    elif dropped is None:
+                        dropped = index  # a group that held only our hook goes; the groups after it move up
+                if dropped is not None:
+                    shifted = len(doc["hooks"]["SessionStart"]) - dropped - 1
                 if groups:
                     doc["hooks"]["SessionStart"] = groups
                 else:
@@ -1187,6 +1192,11 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
                                               else "added the Fabric preamble hook to", path,
                                               "(backup: %s)" % backup if backup else "(new file)"))
         out("Undo: fabric_session.py install-host-hooks --host %s %s" % (args.host, "--apply" if args.remove else "--remove"))
+        if shifted:
+            # Codex keys a hook's trust by its event, group and index: the groups after ours moved up one, so Codex asks
+            # the person to trust them again in /hooks before they run.
+            out("Codex trusts a hook by its position: %d SessionStart hook group(s) after the removed one moved, and "
+                "Codex will ask you to approve them again in /hooks." % shifted)
         return 0
     except Refused as exc:
         err("install-host-hooks: refused — %s" % exc)
