@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **`install-host-hooks --host codex --remove`** names the SessionStart hook groups after ours that it moves: Codex
+  keys a hook's trust by its position, and asks the person to approve those again in `/hooks` (FAA-49).
+
 ## 0.35.0 - 2026-10-16
 
 ### Fixed

@@ -775,6 +775,22 @@ class InstallHostHooks(Base):
         self.assertEqual(path.read_bytes(), before)
         self.assertEqual(list(path.parent.glob("*.bak")), [])
 
+    def test_codex_removal_names_the_hook_groups_it_moves(self):
+        """Codex trusts a hook by event, group and index: removing our group moves the groups after it, and the person
+        must re-approve them in /hooks. A removal that moves nothing says nothing about it."""
+        other = {"hooks": [{"type": "command", "command": "other", "timeout": 5}]}
+        later = {"hooks": [{"type": "command", "command": "later", "timeout": 5}]}
+        ours = {"hooks": [{"type": "command", "command": fs.hook_command(self.SCRIPT_PATH, "codex"), "timeout": 5}]}
+        path = self.codex_file({"hooks": {"SessionStart": [other, ours, later, later]}})
+        code, out, _ = self.install("codex", "--remove")
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 SessionStart hook group(s) after the removed one moved", out)
+        self.assertEqual(json.loads(path.read_text())["hooks"]["SessionStart"], [other, later, later])
+        path = self.codex_file({"hooks": {"SessionStart": [other, ours]}})
+        code, out, _ = self.install("codex", "--remove")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("after the removed one moved", out)
+
     def test_the_dry_run_prints_no_value_from_the_file(self):
         self.codex_file({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "timeout": 5,
                                                               "command": "env TOKEN=VALUE-SENTINEL other"}]}]}})
