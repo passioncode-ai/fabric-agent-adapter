@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **`creating-fabric-agents` → `references/resilience-and-autonomy.md`**: the rules that kept about twenty production
+  agents working through limits, model errors and restarts, from their retrospectives of 2026-10-17 — limits as
+  pauses and resume-first workers, an acceptance parser per model call, cross-vendor fallbacks and checkers, spend as
+  a persisted ledger with idempotency keys, decisions recorded instead of asked, tests watched failing, run ownership,
+  owner-tagged resources and secrets kept out of every child's environment. The skill reads it before the first
+  stage that calls a model or spends money and reports its checklist.
+
 ### Fixed
 
 - **`test/validate.py` validated other checkouts as this tree** (FAA-50): its walks entered `.worktrees/` (git

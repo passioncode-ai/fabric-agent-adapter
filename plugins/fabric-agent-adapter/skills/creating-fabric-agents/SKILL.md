@@ -201,6 +201,15 @@ the pinned `schemas/operator-channel-status.schema.json`; the channel's runtime 
 probe rule here yet, so report them `NOT_RUN`. An agent with neither stops nor notify
 events skips this step.
 
+## Resilience and autonomy
+
+Before the first stage that calls a model or spends money, read
+[resilience and autonomy](references/resilience-and-autonomy.md) and design its answers in:
+a limit pauses and resumes, every model answer passes the call site's own acceptance, fallbacks
+and checkers cross vendors, spend is a persisted ledger with idempotency keys, open questions
+become recorded decisions, and every fix has a test seen failing. Report its checklist with a
+file and a test per line, or `NOT_RUN` where the agent has no such stage.
+
 ## Completion format
 
 Report: capability, consumer, profile with the step-0 grill answers; the knowledge pack
