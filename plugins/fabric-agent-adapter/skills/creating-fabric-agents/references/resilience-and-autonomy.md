@@ -143,9 +143,15 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 6. **Every scheduled job leaves a trace when it dies, stalls or never starts**: a heartbeat at the
    start of each tick, a queryable error row, re-arming in `finally`, an alert when quiet for two
    intervals. Serialize every use of a connection threads share, reads included.
-7. **Every accumulating output has a cap in the code that writes it** — logs, receipts, caches —
+7. **Bound every wait on a shared lock and survive a lost connection.** A lock timeout (a few
+   seconds) answers a retryable "busy", never a crash or a deadlock; every pooled connection has
+   an error listener, and readiness reports the store while liveness reports the process, so a
+   database blip takes the instance out of traffic instead of restarting it.
+8. **Every accumulating output has a cap in the code that writes it** — logs, receipts, caches —
    with both bounds tested.
-8. **Log by error name and code**, never a driver's raw message, which can carry connection
+9. **Name the account and context on every cloud CLI call** and verify the account before a write;
+   a saved default context once pointed a correct token at another team.
+10. **Log by error name and code**, never a driver's raw message, which can carry connection
    details.
 
 ## Secrets and confinement
@@ -161,7 +167,10 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    the copy, so a file swapped between acceptance and use is never read.
 5. **Treat what a run wrote as untrusted** before the service copies, reads or renders it: a
    regular file whose real path is inside the run's own tree.
-6. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
+6. **An artefact missing a secret refuses to start**, never runs unauthenticated: validation rejects
+   placeholder-shaped values, and a test renders the configuration without the value and expects
+   an error.
+7. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
 
 ## Checklist
 
