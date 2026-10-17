@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.35.1 - 2026-10-17
+## 0.35.2 - 2026-10-18
 
 ### Added
 
@@ -9,6 +9,11 @@
   exactly-once hand-overs; protocols ported from shared vectors; bytecode cleared before mutation runs; blocking work
   off request workers and interruptible socket waits; bounded recursive parsing, content-addressed revocation, no
   refresh of a person's own credentials. From the same retrospective's later answers (2026-10-17/18).
+
+## 0.35.1 - 2026-10-17
+
+### Added
+
 - **`creating-fabric-agents` → `references/resilience-and-autonomy.md`**: the rules that kept about twenty production
   agents working through limits, model errors and restarts, from their retrospectives of 2026-10-17 — limits as
   pauses and resume-first workers, an acceptance parser per model call, cross-vendor fallbacks and checkers, spend as
