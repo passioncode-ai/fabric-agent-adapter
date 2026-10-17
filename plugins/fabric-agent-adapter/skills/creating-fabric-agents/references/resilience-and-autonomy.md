@@ -31,7 +31,12 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 5. **Count only the job's own failures toward its retry limit.** A lost lease, a busy lock or a
    provider outage is bounded by a time budget instead; five infrastructure stops a day ended a
    healthy phase as FAILED.
-6. **Inside a fallback chain, do not retry a provider that answered 429 or timed out** — move to
+6. **Match concurrency to the account's rate, and cool down after a 429** per provider door: ten
+   parallel workers met a 429 about hourly and each lost a whole batch; three to five heavy ones,
+   resumed in batches, did not. A "busy" or "still starting" dependency is retried a bounded number
+   of times with spacing (a handful, seconds apart, only on refusals classified as transient) —
+   never once, never forever.
+7. **Inside a fallback chain, do not retry a provider that answered 429 or timed out** — move to
    the next one. Retries there stalled a waiting user. Stagger many resumes; bound each worker's
    working set (a narrow time window, a prefix), so one stop does not become a burst.
 
@@ -103,8 +108,13 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    process memory died with every restart. A wait that must outlive a session (a credential that
    has not landed yet) is an operating-system job, not a session's background task.
 4. **Stop at the third round.** Tuning wording or patching one heuristic a third time means
-   splitting the change or replacing the heuristic with an explicit rule.
-5. **Background chores never hold a finished command open**, unattended runs skip them, and an
+   splitting the change or replacing the mechanism with one invariant and a property test.
+   Write a review's exit criterion before its rounds start, and block only on what breaks a
+   documented promise; the rest becomes a board row with its evidence.
+5. **Find the real cause before telling a person what to do** — a full disk once read as "the
+   service stopped" while the service was healthy; check free space and the service's own health
+   first.
+6. **Background chores never hold a finished command open**, unattended runs skip them, and an
    unattended `--yes` never reverses a "no" a person saved.
 
 ## Verification you can believe
@@ -112,23 +122,33 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 1. **A test counts once it was watched failing against a planted defect**; a mutation battery
    asserts its own reach ("no tests ran" is not "all plants survived"). Exercise every guard
    with a must-catch and a must-pass case.
-2. **After each wave, three blind readings** — the changed units, everything that reaches them,
+2. **Write expectations out; never compute them from the code under test**, and run a reference
+   function and its schema on the same inputs in one test — the most common defect a first reading
+   found was a function returning what its own schema refuses. A wall-clock bound sits far above a
+   loaded machine and far below the defect it guards.
+3. **Test against the real deployed instance behind its platform**, not a sample the same run
+   wrote: a probe passed the shipped sample and failed the first real service behind a router.
+4. **After each wave, three blind readings** — the changed units, everything that reaches them,
    and the documented behaviour — then one fix round. Green suites hid six to ten real breaks.
-3. **"Could not measure" is its own outcome.** An overloaded machine makes a gate refuse, and a
+5. **Read a gate's exit code directly**, never through a pipe in the same command (`| tail` hid a
+   failed gate as success): write the output to a file, take the status, then read the file.
+6. **"Could not measure" is its own outcome.** An overloaded machine makes a gate refuse, and a
    timeout under load is unmeasured, not failed or passed.
-4. **Measure noise before calling a regression**; release a retrieval change only with zero new
+7. **Measure noise before calling a regression**; release a retrieval change only with zero new
    confident wrong answers against the previous version.
-5. **Compute a status from the whole group**, never incrementally; verify a release by the
+8. **Compute a status from the whole group**, never incrementally; verify a release by the
    commit it serves, from a fresh checkout of that commit.
-6. **Probe live after every deploy on every consumer channel**, not the default one; read the
+9. **Probe live after every deploy on every consumer channel**, not the default one; read the
    nightly full-suite result first when resuming work, and release from a full local run, not a
    selected subset.
-7. **Read an external contract from its raw documentation or a recorded live snapshot**, never
+10. **Read an external contract from its raw documentation or a recorded live snapshot**, never
    from a summarising fetch; fail closed on a field nobody documented.
 
 ## Operations that survive restarts
 
-1. **One owner per run.** Only the holder of the run's lock changes its lifecycle; a copy that a
+1. **One owner per run, named.** Only the holder of the run's lock changes its lifecycle, and each
+   concurrent worker has its own identity; a refused claim names the run that holds the task, never
+   a guessed race against a lease that lapsed long ago; a copy that a
    supervisor started backs off on a held lock instead of exiting into a respawn loop. A failed
    lease renewal is not a lost lease — stop only when the remaining margin runs out.
 2. **Health treats "never finished" as a fault.** Age each phase from its last completion; a
@@ -152,7 +172,11 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 9. **Name the account and context on every cloud CLI call** and verify the account before a write;
    a saved default context once pointed a correct token at another team.
 10. **Log by error name and code**, never a driver's raw message, which can carry connection
-   details.
+   details. A failed command logs its cause — deadline, signal, exit code, missing program — never a
+   bare "command failed"; a watched dependency logs once when it fails and once when it recovers,
+   never on every poll.
+11. **Admit work only when the machine can carry it** — free disk, swap, a cap on concurrent
+   sessions — and say why when you defer.
 
 ## Secrets and confinement
 
@@ -163,14 +187,16 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    and treat prompt rules and command guards as tripwires, not boundaries.
 3. **Fail closed.** When a reduced view or a scope cannot be built, answer an error, never the
    wider view; a new matching rule fires only when every neighbouring input is on its allow-list.
-4. **Freeze every input at acceptance**, nested references included: copy it by hash and work on
+4. **Run the private-name gate chained before every public push** (`<gate> && git push`), not only
+   before merge: a `;` once let a private path reach a public branch.
+5. **Freeze every input at acceptance**, nested references included: copy it by hash and work on
    the copy, so a file swapped between acceptance and use is never read.
-5. **Treat what a run wrote as untrusted** before the service copies, reads or renders it: a
+6. **Treat what a run wrote as untrusted** before the service copies, reads or renders it: a
    regular file whose real path is inside the run's own tree.
-6. **An artefact missing a secret refuses to start**, never runs unauthenticated: validation rejects
+7. **An artefact missing a secret refuses to start**, never runs unauthenticated: validation rejects
    placeholder-shaped values, and a test renders the configuration without the value and expects
    an error.
-7. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
+8. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
 
 ## Checklist
 
