@@ -28,7 +28,7 @@
         "calls fabric_whoami before any other Fabric tool",
         "on a waiting answer tells the person the consent prompt is on their screen and does not loop",
         "on a denied answer stops and names Agent access as where the denial is cleared",
-        "on no-project names opening the folder as a project; never pretends to be connected"
+        "on no-project lets Fabric's own enrollment create or attach the Project for an eligible Git folder; never writes another product's registry or pretends to be connected; on an older Fabric names opening the folder as a project"
       ]
     },
     {

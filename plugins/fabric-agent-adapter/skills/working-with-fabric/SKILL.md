@@ -105,7 +105,7 @@ and its answer is an error that names what Fabric waits for — never a fake suc
 |---|---|---|
 | Fabric is not running, or its hub is closed | no live hub | Step 1; Settings → Agent access in Fabric says why a hub is closed |
 | Fabric's hub could not be verified | foreign protocol, dead pid, token outside Fabric's folder | send nothing; ask the person to open Fabric |
-| the folder is not a project | no project holds this folder | the person opens it in Fabric (+ Project → Open a project) |
+| the folder is not a project | no project holds this folder yet | Fabric with automatic project admission creates or attaches the Project during enrollment; an older Fabric needs the person to open it (+ Project → Open a project) |
 | waiting for the operator to allow this coding agent | the consent prompt is on their screen | tell the person; call again in a moment; never loop fast |
 | denied | the operator said no | stop; the denial stands until they clear it in Agent access |
 | connecting | enrollment in progress | call again in a moment |
