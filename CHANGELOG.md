@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`creating-fabric-agents`, resilience and autonomy, third pass**: a rerun calls read-only tools until its open
+  outcomes are reconciled; idempotency keys cover content as well as the run; every tool's input schema is pinned to
+  the domain schema by a test.
+
 ## 0.35.2 - 2026-10-18
 
 ### Added

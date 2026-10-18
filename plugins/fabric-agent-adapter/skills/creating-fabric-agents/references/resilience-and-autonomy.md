@@ -96,7 +96,10 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 7. **Reuse what was paid for.** A restarted stage looks up the job's successful call with the
    same route, prompt version and inputs before calling again (one restart made 117 paid calls
    where 49 sufficed). Cache keys are content plus definition, never an identity alone.
-8. **Deny spending tools by enumerated name, and test the list** — a provider's newer tools were
+8. **A rerun after an interruption calls read-only tools until its open outcomes are reconciled**;
+   an idempotency key covers the content as well as the run, so a retried run that asks a new
+   question is not refused as a conflict.
+9. **Deny spending tools by enumerated name, and test the list**: a provider's newer tools were
    missing from a deny list while older ones were denied.
 
 ## Autonomy: decide, record, continue
@@ -209,12 +212,14 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    before merge: a `;` once let a private path reach a public branch.
 5. **Freeze every input at acceptance**, nested references included: copy it by hash and work on
    the copy, so a file swapped between acceptance and use is never read.
-6. **Treat what a run wrote as untrusted** before the service copies, reads or renders it: a
+6. **Pin every tool's input schema to the domain schema with a test.** A save tool that silently
+   dropped unknown fields once stored an agent set to send without the guards it was given.
+7. **Treat what a run wrote as untrusted** before the service copies, reads or renders it: a
    regular file whose real path is inside the run's own tree.
-7. **An artefact missing a secret refuses to start**, never runs unauthenticated: validation rejects
+8. **An artefact missing a secret refuses to start**, never runs unauthenticated: validation rejects
    placeholder-shaped values, and a test renders the configuration without the value and expects
    an error.
-8. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
+9. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
 
 9. **Bound every recursive parse of untrusted input** (a depth limit, tested at the limit and one
    above). Revoke or retire by a content-addressed reference, never a reusable name: a re-keyed
