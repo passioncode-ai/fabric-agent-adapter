@@ -42,3 +42,12 @@ Receipts: [PR #135](https://github.com/passioncode-ai/fabric-agent-adapter/pull/
 FAA-57 (0.36.1's pairing and redeem
 content, now 0.37.1), the contract rows CT-18/28/42/51/52, and the adapter's own practices added to the knowledge base
 page under its lease.
+
+## Pending at the end of the session
+
+- Two practices were added to fabric-workspace `knowledge/agent-practices.md` (PR #297, merge `6daaf88`). Their
+  Observatory lessons were not recorded: the session's Observatory MCP server is stale (it runs 0.24.5, 0.25.0 is
+  installed; `observatory_lesson` answers `stale-server`). Next session, after the server restarts, record with
+  owner `agent:fabric-agent-adapter`, origin `{projectId: "p-b56d05190b34", commit: "0446fc3"}`:
+  classKey `planted-defect-survivor-names-missing-vector` and classKey `twin-implementations-shared-file-bytes`.
+  No watcher holds this; it rides on this handoff.
