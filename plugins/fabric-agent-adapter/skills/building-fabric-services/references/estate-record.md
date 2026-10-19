@@ -18,6 +18,7 @@ derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fab
 - Applying a revision
 - Trusting a delegation key
 - Contexts: one agent for you and for an organization
+- The estate ceremonies
 - Share grants into an organization
 - Checking a record you produce
 - What the kit does not do
@@ -116,6 +117,29 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
 answer the contract's contexts fixtures and variants of them (`test/fixtures/contract/estate-vectors.json`).
+
+## The estate ceremonies
+
+Contract DEC-0084: create a network, add a machine nearby (a six-digit comparison code) or headless (an enroll token),
+remove a machine, replace a machine's key. Fabric runs the ceremonies and signs every revision with the person's
+passkey; what a service applying the record checks is in the record itself:
+
+- **What a revision drops, it revokes in the same revision (FAC-SEM-114).** A removed machine is listed as
+  `machine <id>` in `revocations`, and its hub key as `hub-key <kid>`; a replaced device key is revoked by its key
+  reference, `<kid>@sha256:<hex of its octets>` (`device_key_ref` / `deviceKeyRef`), so the new key under the same kid
+  stays usable; a hub key certified anew takes a new kid. `verify_estate_record(record, at=..., parent=previous)` runs it
+  when you pass the parent; `estate_record_rules("estate-record-revision", {"parent", "next"})` alone.
+- **A device key's octets are canonical padded base64 (FAC-SEM-073),** the one form a key reference can name
+  (`device_key_fingerprint`), and a `device-key` revocation that holds `@` is a well-formed key reference (FAC-SEM-076).
+- **A headless machine joins with an `enroll-token/1`** (`fabric_ceremonies.py`, `fabric-ceremonies.mjs`). Read the token
+  from stdin or a file only your user can read, never from argv, a URL or a log. `verify_enroll_token(token, record=,
+  genesis=, at=)` checks it against the revision you applied and revision 1's digest; sign `enroll_join_input(token)`
+  with the machine's `#sig` key and present that proof with the token. The token gives the machine no trust: only the
+  passkey-signed revision that lists it does. `enroll_token_rules("enroll-token", token)` is FAC-SEM-113.
+
+The nearby pairing (`pairing-message/1`, the comparison code, the rendezvous) and the hub's single use of a token are
+Project Observatory's node and Fabric's hub; the kits port them in a later version (FAA-57). The relay's admission and
+session checks belong to the relay; the kits do not run a relay.
 
 ## Share grants into an organization
 

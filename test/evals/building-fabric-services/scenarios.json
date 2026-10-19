@@ -465,6 +465,18 @@
         "moving the share revokes the grant and mints a new id instead of re-pointing it",
         "a grant.usage carries the grant's own org: context, checked with share_rules('device-attribution', ...)"
       ]
+    },
+    {
+      "id": "estate-ceremonies",
+      "trap": "a revision replaced a machine's signing key and revoked the kid, so the new key under the same kid was refused too, and a headless machine read its enroll token from a command-line argument that landed in the shell history",
+      "request": "example-agent's service applies the estate record; a machine's key is replaced and a new headless machine joins with an enroll token.",
+      "expected": [
+        "the service verifies each revision with its parent (`verify_estate_record(..., parent=...)`), so FAC-SEM-114 refuses a revision that drops a machine or a key without revoking it",
+        "a replaced key is revoked by its key reference `<kid>@sha256:<hex>` (`device_key_ref`), never by the kid it keeps",
+        "the headless machine reads the token from stdin or a 0600 file, never argv, a URL or a log",
+        "it checks the token with `verify_enroll_token(token, record=, genesis=, at=)` and signs `enroll_join_input(token)` with its #sig key",
+        "the token gives no trust until a passkey-signed revision lists the machine"
+      ]
     }
   ]
 }

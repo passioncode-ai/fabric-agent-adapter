@@ -89,7 +89,8 @@ the verifier is [`scripts/fabric_delegation.py`](scripts/fabric_delegation.py) /
 [`scripts/fabric-delegation.mjs`](scripts/fabric-delegation.mjs). A service on the operator's machines that
 applies the estate record (DEC-0055) verifies each revision first and trusts only the keys it certifies, and runs an
 agent once per context, the person's or an organization's (DEC-0082), and checks a share grant into an organization
-with [`scripts/fabric_share.py`](scripts/fabric_share.py) (DEC-0086): read
+with [`scripts/fabric_share.py`](scripts/fabric_share.py) (DEC-0086); a revision's ceremonies and a headless
+machine's enroll token are in [`scripts/fabric_ceremonies.py`](scripts/fabric_ceremonies.py) (DEC-0084): read
 [the estate record reference](references/estate-record.md). When Fabric chooses the service's runner and models
 (DEC-0046), or a project routes its work through an ordered list of runners (DEC-0026: the doctor's closed probe
 results, the route checks FAC-SEM-028…034), read [the profiles reference](references/profiles.md).
