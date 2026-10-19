@@ -1,11 +1,11 @@
 ---
 name: creating-fabric-agents
-description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit — «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch". Runs the intake grill (capability, named consumer, workflow-or-agent, MCP/A2A/local-runner profile, effect declarations), distils source projects into a knowledge pack whose recorded failures become planted eval fixtures, scaffolds the pinned contract bundle, and sets the two-clock eval expectation with the conformance report. NOT for adapting an existing project (use adapting-projects-to-fabric), building the Fabric host or orchestrator, or generic agent design where Fabric compatibility is not part of the request.
+description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit, «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch", «агент в облаке организации», "which models and OpenRouter key for a new Fabric agent". Runs the intake grill (capability, named consumer, workflow-or-agent, MCP/A2A/local-runner profile, effect declarations, where it runs, models, who pays, how it learns), distils source projects into a knowledge pack whose recorded failures become planted eval fixtures, scaffolds the pinned contract bundle, and sets the two-clock eval expectation with the conformance report. NOT for adapting an existing project (use adapting-projects-to-fabric), building the Fabric host or orchestrator, or generic agent design where Fabric compatibility is not part of the request.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.36.0"
+  version: "0.37.0"
   contract-version: "0.1.0"
   contract-commit: "07042181bfae2a481aa0da1a5651f24c76669c48"
 ---
@@ -52,7 +52,10 @@ No file is created until every row has an answer. An answer of "later" fails the
 | **Workflow or agent?** | if every step can be named now, build a deterministic workflow behind the capability and skip the autonomy — an agent buys flexibility with latency, cost, and a new failure class, and that price needs a reason |
 | **Which profile?** | `mcp` when Fabric owns planning and retries and the capability has a schema; `a2a` when the provider owns its task lifecycle end to end; `local-runner` when it is a terminal agent Fabric drives. When unsure, the sibling skill's profile-selection reference is the decision record |
 | **What effects?** | declare anything money-, deletion-, or publication-adjacent now — the host's floor and grants are designed against these declarations, and one discovered late invalidates the admission |
-| **Which tenancy?** | record whether the agent assumes one operator; the assumption is cheap to write down and expensive to excavate |
+| **Where does it run, for whom?** | this machine, the person's cloud or an organization's, and in which contexts (`personal`, `org:<id>`): one instance per context, its secrets, spend and journal never crossing into another. Record which capabilities need the person's machine and what they answer when it is off (references/where-agents-run.md) |
+| **Which models?** | per lane (planning, replies, volume work, media): a primary, a fallback of another vendor, an open-vendor model where it reads what users send, the input kinds each reads, declared as classes in the profile (references/models-and-providers.md) |
+| **Who pays?** | one key per agent and context with its own ceiling, from the estate's key manager, read from the environment; checked before every call; a personal key never pays for an organization |
+| **How does it learn?** | decisions recorded with reasons, one trace per turn, every failure a planted fixture first, history replayed, learnings proposed and never self-approved (references/orchestration-and-learning.md) |
 | **Text for people?** | if it writes anything a person reads (a reply, a message, a post, a report, a UI string), its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in new output, from the first commit (the resilience reference, *Text for people*) |
 
 ## Step 1 — the knowledge intake
@@ -72,6 +75,20 @@ failures, a retro — distil it before writing code:
 Skipping this step because there is no prior art is legal; skipping it because reading
 is slower than generating is how the same collector truncates at the same row limit
 twice.
+
+Every new agent also starts from what the estate already learned, whether or not it has
+prior art of its own:
+
+- [practices.md](references/practices.md): the rules production agents taught us, each with
+  the check that catches it (judges and evals, numbers, money, people in the loop,
+  reliability, shipping). Organization members also read the knowledge base's
+  `knowledge/agent-practices.md` and add to it what this agent learns.
+- [where-agents-run.md](references/where-agents-run.md): this machine, a personal cloud, an
+  organization; contexts; connecting a machine; sharing into an organization; selling.
+- [models-and-providers.md](references/models-and-providers.md): lanes, a starting model
+  choice, several kinds of input and output, budgets, OpenRouter keys.
+- [orchestration-and-learning.md](references/orchestration-and-learning.md): the work graph,
+  calling other agents, stops for a person, learning loops, the loop guard.
 
 ## Step 2 — the project skeleton
 

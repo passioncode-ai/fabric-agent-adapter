@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.36.0"
+VERSION = "0.37.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -412,7 +412,20 @@ def validate_skill(name: str, errors: List[str]) -> None:
         if "U+2014" not in resilience or "no em dash" not in resilience.split("## Checklist", 1)[-1]:
             errors.append("%s: resilience-and-autonomy.md must state the no-em-dash rule (U+2014) "
                           "and ask for its check in the checklist" % name)
+        # FAA-58: the knowledge a new agent starts from (where it runs, models and keys, orchestration and learning,
+        # the practices), asked at the grill, linked from the skill, each reference closed by its checklist.
+        if not all(q in flat for q in ("Where does it run, for whom?", "Which models?", "Who pays?", "How does it learn?")):
+            errors.append("%s: SKILL.md's grill must ask where it runs, which models, who pays and how it learns" % name)
+        for ref in ("where-agents-run.md", "models-and-providers.md", "orchestration-and-learning.md", "practices.md"):
+            if "](references/%s)" % ref not in skill_text:
+                errors.append("%s: SKILL.md must link references/%s" % (name, ref))
+            path = skill_dir / "references" / ref
+            if ref != "practices.md" and (not path.is_file() or "## The checklist" not in path.read_text(encoding="utf-8")):
+                errors.append("%s: references/%s must end with its checklist" % (name, ref))
         scenarios_text = (ROOT / "test/evals" / name / "scenarios.json").read_text(encoding="utf-8")
+        if "agent-for-a-personal-and-an-organization-cloud" not in scenarios_text:
+            errors.append("%s: scenarios.json must cover an agent for clouds and models "
+                          "(scenario agent-for-a-personal-and-an-organization-cloud)" % name)
         if "text-for-people-carries-no-em-dash" not in scenarios_text:
             errors.append("%s: scenarios.json must cover text for people "
                           "(scenario text-for-people-carries-no-em-dash)" % name)

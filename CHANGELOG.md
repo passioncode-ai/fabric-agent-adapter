@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.37.0 - 2026-10-19
+
+### Added
+
+- **`creating-fabric-agents` carries what the estate learned about building agents** (FAA-58, the operator's request
+  of 2026-10-19): four new references every new agent starts from.
+  - `where-agents-run.md`: this machine, a personal cloud, an organization, Enterprise; contexts (`personal`,
+    `org:<id>`) with one instance per context and no secret, spend or journal crossing; connecting a machine (nearby
+    code, headless enroll token); sharing an agent into an organization; running while the laptop is closed; selling
+    an agent (a paid agent in its developer's organization, a partner's setup).
+  - `models-and-providers.md`: lanes with a fallback of another vendor and an open-vendor model where users' content is
+    read; a dated starting choice from the OpenRouter catalog; several kinds of input and output; budgets that survive
+    reasoning; one OpenRouter key per agent and context with its ceiling, read from the environment; measuring a choice.
+  - `orchestration-and-learning.md`: workflow first; the work graph of durable jobs with intent keys, effects observed,
+    limits as pauses (DEC-0087); calling other agents within a narrower grant and budget; stops for a person; learning
+    loops (decisions with reasons, one trace per turn, failures as planted fixtures first, history replayed, learnings
+    proposed and never self-approved); the loop guard.
+  - `practices.md`: the rules production agents taught us, each with its check: judges and evals, numbers, money,
+    people in the loop, reliability, shipping.
+- The intake grill asks **Where does it run, for whom?**, **Which models?**, **Who pays?** and **How does it learn?**;
+  the knowledge intake links the four references. `test/validate.py` holds the rows, the links and each reference's
+  checklist (`KnowledgePackTests`); eval scenario `agent-for-a-personal-and-an-organization-cloud`; three trigger
+  queries.
+
 ## 0.36.0 - 2026-10-19
 
 Repinned to Fabric Agent Contract `07042181bfae2a481aa0da1a5651f24c76669c48` (DEC-0084 to DEC-0088); `d8146cf` stays
