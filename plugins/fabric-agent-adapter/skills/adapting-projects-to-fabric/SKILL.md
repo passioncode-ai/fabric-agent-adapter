@@ -7,7 +7,7 @@ metadata:
   author: PassionCode.ai
   version: "0.35.4"
   contract-version: "0.1.0"
-  contract-commit: "d8146cfb0a1c74fc6432284c4356bb0c864b37b5"
+  contract-commit: "07042181bfae2a481aa0da1a5651f24c76669c48"
 ---
 
 # Adapting projects to Fabric
@@ -70,7 +70,7 @@ Use exactly:
 
 - contract version `0.1.0`;
 - repository `https://github.com/passioncode-ai/fabric-agent-contract`;
-- commit `d8146cfb0a1c74fc6432284c4356bb0c864b37b5`.
+- commit `07042181bfae2a481aa0da1a5651f24c76669c48`.
 
 This is the default for new bundles. When checking an issued legacy bundle, preserve its
 explicit supported lock and use that exact clean checkout. Never silently upgrade or
