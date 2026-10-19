@@ -323,6 +323,40 @@ class TextForPeopleTests(unittest.TestCase):
         self.assertIn("creating-fabric-agents: scenarios.json must cover text for people", out)
 
 
+class KnowledgePackTests(unittest.TestCase):
+    """FAA-58: a new agent starts from what the estate learned: where it runs (contexts, clouds), which models and
+    keys, how it orchestrates and learns, and the practices production agents taught us."""
+
+    _validate_copy = LicenseTests._validate_copy
+    SKILL = "plugins/fabric-agent-adapter/skills/creating-fabric-agents"
+
+    def _replace(self, rel, needle, by="a question"):
+        def mutate(copy):
+            path = copy / rel
+            path.write_text(path.read_text(encoding="utf-8").replace(needle, by), encoding="utf-8")
+        return self._validate_copy(mutate)
+
+    def test_a_grill_without_where_it_runs_fails(self):
+        code, out = self._replace(self.SKILL + "/SKILL.md", "Where does it run, for whom?")
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: SKILL.md's grill must ask where it runs, which models, who pays and how it learns", out)
+
+    def test_a_skill_that_does_not_link_a_knowledge_reference_fails(self):
+        code, out = self._replace(self.SKILL + "/SKILL.md", "](references/models-and-providers.md)", "]()")
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: SKILL.md must link references/models-and-providers.md", out)
+
+    def test_a_reference_without_its_checklist_fails(self):
+        code, out = self._replace(self.SKILL + "/references/where-agents-run.md", "## The checklist", "## The end")
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: references/where-agents-run.md must end with its checklist", out)
+
+    def test_evals_without_the_cloud_scenario_fail(self):
+        code, out = self._replace("test/evals/creating-fabric-agents/scenarios.json", "agent-for-a-personal-and-an-organization-cloud", "x")
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: scenarios.json must cover an agent for clouds and models", out)
+
+
 class PinTests(unittest.TestCase):
     """G-11: one contract pin. fabric-contract.lock.json is it; every live mention equals it."""
 

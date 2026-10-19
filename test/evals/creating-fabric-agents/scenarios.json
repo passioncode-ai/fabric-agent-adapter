@@ -146,6 +146,18 @@
         "makes the drafting call site's accept rewrite or refuse an answer that still holds U+2014 instead of sending it",
         "reports the resilience checklist's text-for-people line with the prompt file and the test"
       ]
+    },
+    {
+      "id": "agent-for-a-personal-and-an-organization-cloud",
+      "request": "Create a fabric-compatible example-agent that answers customer messages for the person and for two organizations they work with, runs while their laptop is closed, reads screenshots customers send, and uses OpenRouter models.",
+      "expected": [
+        "asks the grill's 'Where does it run, for whom?' row: a personal cloud machine joined to the estate with an enroll token read from stdin or a 0600 file, and one instance per context (personal, org:<id>) with its own secrets, spend and journal",
+        "asks 'Which models?': per lane a primary and a fallback of another vendor, an open-vendor model on the lane that reads customer messages (reads: user-content), a model whose catalog input_modalities include image for screenshots, declared as classes",
+        "asks 'Who pays?': one OpenRouter key per agent and context with its own ceiling, read from the environment, checked before each call; the person's personal key never pays for an organization",
+        "asks 'How does it learn?': decisions with reasons, one trace per turn, failures turned into planted fixtures before fixes, learnings proposed and not self-approved",
+        "names which capabilities need the person's machine and what they answer when it is off",
+        "reads references/where-agents-run.md, models-and-providers.md, orchestration-and-learning.md and practices.md before scaffolding"
+      ]
     }
   ]
 }

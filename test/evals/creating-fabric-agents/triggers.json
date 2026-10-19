@@ -21,6 +21,9 @@
     {"query": "Add this MCP server to my Claude Code config.", "shouldTrigger": false},
     {"query": "Wrap our terminal coding agent as a Fabric local runner.", "shouldTrigger": false},
     {"query": "Проведи общий аудит проекта и найди баги.", "shouldTrigger": false},
-    {"query": "Create a generic A2A server from scratch.", "shouldTrigger": false}
+    {"query": "Create a generic A2A server from scratch.", "shouldTrigger": false},
+    {"query": "Build a new Fabric agent that runs in our organization's cloud and picks its models on OpenRouter.", "shouldTrigger": true},
+    {"query": "создай агента под фабрику, который работает в облаке организации и сам учится на ошибках", "shouldTrigger": true},
+    {"query": "Which OpenRouter model is cheapest for classifying support tickets in my existing script?", "shouldTrigger": false}
   ]
 }
