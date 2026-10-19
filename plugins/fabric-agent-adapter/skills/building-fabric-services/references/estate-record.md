@@ -18,6 +18,7 @@ derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fab
 - Applying a revision
 - Trusting a delegation key
 - Contexts: one agent for you and for an organization
+- Share grants into an organization
 - Checking a record you produce
 - What the kit does not do
 
@@ -115,6 +116,26 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
 answer the contract's contexts fixtures and variants of them (`test/fixtures/contract/estate-vectors.json`).
+
+## Share grants into an organization
+
+Contract DEC-0086. A grant whose `context` is an organization's (`org:<orgId>`) is a share grant, and the organization
+server joins every `grant.usage` to the agent it runs through a share registration the sharer's node sends. Before you
+sign a revision that places one, run `fabric_share.py` (`fabric-share.mjs`):
+
+- `share_rules("org-share-grants", {"record": next, "parent": previous})`: FAC-SEM-117. The grant's `meta.id` is
+  `urn:fabric:share:` and 32 lower-case hex digits from a CSPRNG (`secrets.token_hex(16)`), never a name, an address or an
+  estate id; its window carries at most three fraction digits; the placements naming it run one `agentRef`; and against
+  `parent`, the latest earlier revision that placed it, that `agentRef` never changes. To move a share to another agent,
+  revoke the grant and mint a new id.
+- `share_rules("grant", grant)`: FAC-SEM-110 and 117 on one grant.
+- `share_rules("share-registration", doc)`: FAC-SEM-118 on a `share-registration/1` document you read or log.
+- `share_rules("device-attribution", {binding, batch})`: FAC-SEM-045's DEC-0086 clause, for a collector that sends
+  `grant.usage`: each carries its grant's own context, `org:` and the certificate's `org.id` as written.
+
+`share-registration.schema.json` beside the kit is the contract's schema with `shareGrantId`, `orgContextId`,
+`sha256` and `agentRef` brought in, so it validates offline. Deriving, sending, deciding and joining registrations are the
+sharer's node's and the organization server's, not this kit's.
 
 ## Checking a record you produce
 

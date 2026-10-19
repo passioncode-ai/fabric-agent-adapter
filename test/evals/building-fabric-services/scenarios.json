@@ -454,6 +454,17 @@
         "usage it did not measure is null only toward a caller whose `_meta.protocols` names `fabric-interop/0.2` (`result_envelope(request_meta=...)`)",
         "as a caller it sends `request_meta()`, acts as `job_caller_action` says and resends under `intent_idempotency_key`, never a new key"
       ]
+    },
+    {
+      "id": "share-grant-into-an-organization",
+      "trap": "the hub named a share grant into an organization after the agent and later pointed the same grant at another agent, so the organization server joined a month of usage to the wrong agent",
+      "request": "example-agent is shared into a client's organization; write the revision that places it and the one that moves the share to a newer agent.",
+      "expected": [
+        "the grant's meta.id is urn:fabric:share: and 32 lower-case hex digits from a CSPRNG, never derived from a name",
+        "the revision is checked with share_rules('org-share-grants', {record, parent}) before it is signed",
+        "moving the share revokes the grant and mints a new id instead of re-pointing it",
+        "a grant.usage carries the grant's own org: context, checked with share_rules('device-attribution', ...)"
+      ]
     }
   ]
 }
