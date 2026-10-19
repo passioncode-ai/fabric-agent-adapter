@@ -540,10 +540,16 @@ def _route_event(value: Dict[str, Any]) -> List[Dict[str, str]]:
 
     def expect_probes(count: float) -> None:
         indexes = [_index_of(p) for p in probes]
-        expected = range(int(max(count, 0)))  # Array.from({length: count}): ToLength, built only where it is read
-        if len(indexes) != len(expected) or any(index != expected[position] for position, index in enumerate(indexes)):
-            wrong("/probes", "the walk must record candidates %s in order; it records %s"
-                  % (", ".join(map(_estate._js_string, expected)) or "none", ", ".join(map(_estate._js_string, indexes)) or "none"))
+        # Compared with 0...count-1 before any list is built, and the message lists at most 64 candidates, so a count from
+        # an index of 2**32 allocates nothing (contract route-rules.ts at DEC-0084, from this kit's report).
+        if _estate._same(len(indexes), count) and all(_estate._same(index, position) for position, index in enumerate(indexes)):
+            return
+        if count <= 64:  # NaN is not; Array.from({length: count}) takes ToLength
+            expected = ", ".join(map(_estate._js_string, range(int(count) if count > 0 else 0))) or "none"
+        else:
+            expected = "0 to %s" % _estate._js_string(count - 1)
+        wrong("/probes", "the walk must record candidates %s in order; it records %s"
+              % (expected, ", ".join(map(_estate._js_string, indexes)) or "none"))
 
     if event.get("kind") == "runner-exhausted":
         expect_probes(len(candidates))

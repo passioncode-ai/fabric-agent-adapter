@@ -285,7 +285,9 @@ export function verifyEstateRecord(record, trust) {
   // A revision issued a moment ahead of this clock is admitted within the skew every relay time allows (DEC-0066).
   if (at < issuedAt - CLOCK_SKEW_SECONDS * 1000) return { ok: false, problem: 'not-yet-valid' };
   if (at > validUntil) return { ok: false, problem: 'expired' };
-  const codes = [...new Set(recordFindings(record).map((finding) => finding.code))];
+  // With a parent, what the revision drops it revokes (FAC-SEM-114, DEC-0084): a removed machine, a replaced key.
+  const dropped = isObject(trust.parent) ? droppedFindings(trust.parent, record) : [];
+  const codes = [...new Set([...recordFindings(record), ...dropped].map((finding) => finding.code))];
   if (codes.length > 0) return { ok: false, problem: 'rule-violation', codes };
   return { ok: true, digest, revision: record.revision, signedBy: credential.credentialId, signCount: assertion.signCount };
 }
@@ -389,6 +391,27 @@ function revisionChain(value) {
   return findings;
 }
 
+/** Standard base64 with its padding, the one form DEC-0053 records a device key's octets in. */
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+/** DEC-0084: a key reference, a device-key kid, `@sha256:` and 64 lower-case hex digits. */
+export const KEY_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}#(sig|kem)@sha256:[a-f0-9]{64}$/;
+
+/** A device key's fingerprint (DEC-0084): `sha256:` and the hex SHA-256 of its canonical base64 octets, or undefined. */
+export function deviceKeyFingerprint(key) {
+  const text = isObject(key) ? key.publicKey : undefined;
+  if (!isString(text) || text.length === 0 || !BASE64.test(text)) return undefined;
+  const raw = Buffer.from(text, 'base64');
+  if (raw.toString('base64') !== text) return undefined;
+  return `sha256:${sha256(raw).toString('hex')}`;
+}
+
+/** The `device-key` revocation reference of one key (DEC-0084): `<kid>@<fingerprint>`, or undefined. */
+export function deviceKeyRef(key) {
+  const fingerprint = deviceKeyFingerprint(key);
+  const kid = isObject(key) ? key.kid : undefined;
+  return fingerprint !== undefined && isString(kid) ? `${kid}@${fingerprint}` : undefined;
+}
+
 const validDeviceKey = (key) => {
   const raw = Buffer.from(show(key.publicKey ?? ''), 'base64');
   return key.alg === 'ed25519' ? raw.length === 32 && !smallOrder(raw) : isValidP256Key(raw);
@@ -408,7 +431,9 @@ function keys(value, flag) {
     const seen = new Set();
     deviceKeys.forEach((key, k) => {
       if (key.kid !== `${show(machine.id)}#${show(key.use)}`) flag(`${at}/deviceKeys/${k}/kid`, 'a device key is listed as <machine id>#sig or <machine id>#kem, by its role');
-      if (!validDeviceKey(key)) flag(`${at}/deviceKeys/${k}/publicKey`, 'an Ed25519 key is never of small order (DEC-0045) and a P-256 key is a valid point (SEC 1 §3.2.2)');
+      // A key with no canonical fingerprint could be read as two keys by two readers, and no key reference names it (DEC-0084).
+      if (deviceKeyFingerprint(key) === undefined) flag(`${at}/deviceKeys/${k}/publicKey`, "a device key's octets are written in canonical padded base64, the one form a key reference can name (DEC-0084)");
+      else if (!validDeviceKey(key)) flag(`${at}/deviceKeys/${k}/publicKey`, 'an Ed25519 key is never of small order (DEC-0045) and a P-256 key is a valid point (SEC 1 §3.2.2)');
       if (seen.has(key.publicKey)) flag(`${at}/deviceKeys/${k}/publicKey`, 'one key is never used for the other role');
       seen.add(key.publicKey);
     });
@@ -485,7 +510,8 @@ function grantsAndRevocations(value, flag) {
   const listed = new Map(Object.entries({
     authority: new Set(list(value.authorities).map((entry) => entry.credentialId)),
     machine: new Set(machines.map((machine) => machine.id)),
-    'device-key': new Set(machines.flatMap((machine) => list(machine.deviceKeys).map((key) => key.kid))),
+    // A kid, and each listed key's own reference (DEC-0084): revoking either while listing it is refused.
+    'device-key': new Set(machines.flatMap((machine) => list(machine.deviceKeys).flatMap((key) => [key.kid, deviceKeyRef(key)].filter((ref) => ref !== undefined)))),
     'hub-key': new Set(machines.flatMap((machine) => (isObject(machine.hubKey) ? [machine.hubKey.kid] : []))),
     'publisher-key': new Set(list(value.publisherKeys).map((key) => key.kid)),
     package: new Set(machines.flatMap((machine) => list(machine.packages).map((placement) => placement.digest))),
@@ -496,6 +522,9 @@ function grantsAndRevocations(value, flag) {
     const ref = revocation.kind === 'grant' ? grantKey(revocation.ref) : revocation.ref;
     const key = `${show(revocation.kind)} ${show(ref)}`;
     if (seen.has(key)) flag(`/revocations/${index}`, `the ${show(revocation.kind)} ${show(revocation.ref)} is revoked twice`);
+    if (revocation.kind === 'device-key' && typeof revocation.ref === 'string' && revocation.ref.includes('@') && !KEY_REFERENCE.test(revocation.ref)) {
+      flag(`/revocations/${index}/ref`, 'a device-key revocation names a kid or a key reference <kid>@sha256:<64 lower-case hex digits> (DEC-0084)');
+    }
     seen.add(key);
     if (listed.get(show(revocation.kind))?.has(ref)) flag(`/revocations/${index}/ref`, `the record still lists the ${show(revocation.kind)} it revokes: revocation outranks addition`);
   });
@@ -591,11 +620,45 @@ function installation(value) {
   return findings;
 }
 
+/**
+ * FAC-SEM-114 across two revisions (DEC-0084): what a revision drops, it revokes in the same revision. A removed machine
+ * as `machine <id>` and its hub key as `hub-key <kid>`; a replaced or dropped device key of a kept machine as `device-key`
+ * by its reference or its kid; a hub key no longer certified as it was as `hub-key <old kid>`.
+ */
+function droppedFindings(parent, next) {
+  const findings = [];
+  const flag = flagger(findings, 'FAC-SEM-114');
+  const revoked = (kind, ...refs) => list(next.revocations).some((entry) => entry.kind === kind && refs.some((ref) => ref !== undefined && entry.ref === ref));
+  const nextMachines = new Map();
+  for (const machine of list(next.machines)) if (!nextMachines.has(machine.id)) nextMachines.set(machine.id, machine);
+  indexed(parent.machines).forEach(([machine, m]) => {
+    const at = `/parent/machines/${m}`;
+    const hub = isObject(machine.hubKey) ? machine.hubKey : undefined;
+    const kept = nextMachines.get(machine.id);
+    if (!kept) {
+      if (!revoked('machine', machine.id)) flag(`${at}/id`, `machine ${show(machine.id)} is removed without its revocation: a revision that drops a machine lists machine ${show(machine.id)} in revocations`);
+      if (hub && !revoked('hub-key', hub.kid)) flag(`${at}/hubKey/kid`, `the hub key ${show(hub.kid)} of a removed machine is revoked in the same revision`);
+      return;
+    }
+    const listedRefs = new Set(list(kept.deviceKeys).map(deviceKeyRef).filter((ref) => ref !== undefined));
+    indexed(machine.deviceKeys).forEach(([key, k]) => {
+      const ref = deviceKeyRef(key);
+      if (ref === undefined || listedRefs.has(ref)) return;
+      if (!revoked('device-key', ref, key.kid)) flag(`${at}/deviceKeys/${k}`, `the device key ${show(key.kid)} is replaced or dropped without its revocation: the same revision lists device-key ${ref}`);
+    });
+    const nextHub = isObject(kept.hubKey) ? kept.hubKey : undefined;
+    if (hub && !(nextHub && nextHub.kid === hub.kid && nextHub.x === hub.x) && !revoked('hub-key', hub.kid)) {
+      flag(`${at}/hubKey/kid`, `the hub key ${show(hub.kid)} is no longer certified as it was: the same revision revokes hub-key ${show(hub.kid)}, and a re-certified hub key takes a new kid`);
+    }
+  });
+  return findings;
+}
+
 /** FAC-SEM-072…076 for an `estate-record`, an `estate-record-revision` `{parent, next}` or an `estate-placement`. */
 export function estateRecordRules(kind, value) {
   const doc = isObject(value) ? value : {};
   if (kind === 'estate-record') return recordFindings(doc);
-  if (kind === 'estate-record-revision') return revisionChain(doc);
+  if (kind === 'estate-record-revision') return [...revisionChain(doc), ...droppedFindings(isObject(doc.parent) ? doc.parent : {}, isObject(doc.next) ? doc.next : {})];
   if (kind === 'estate-placement') return installation(doc);
   return undefined;
 }

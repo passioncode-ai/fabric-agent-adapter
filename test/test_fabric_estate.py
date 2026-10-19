@@ -65,7 +65,7 @@ class ContractVectors(unittest.TestCase):
             with self.subTest(case["name"]):
                 self.assertEqual(fe.estate_record_rules(case["kind"], case["value"]), case.get("expected"))
         codes = {f["code"] for c in V["rules"] for f in (c.get("expected") or [])}
-        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076", "FAC-SEM-110", "FAC-SEM-111"})
+        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076", "FAC-SEM-110", "FAC-SEM-111", "FAC-SEM-114"})
 
     def test_a_grants_context_answers_as_the_contract_does(self):
         """FAC-SEM-110 (DEC-0082) on a grant of its own, against the contract's grant-context fixtures and variants."""

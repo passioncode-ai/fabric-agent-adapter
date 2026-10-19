@@ -11,6 +11,15 @@
     "activity-summary": [
       "1"
     ],
+    "enroll-token": [
+      "1"
+    ],
+    "entitlement": [
+      "1"
+    ],
+    "entitlement-key-set": [
+      "1"
+    ],
     "estate-record": [
       "1"
     ],
@@ -30,7 +39,8 @@
       "0.1"
     ],
     "fabric-interop": [
-      "0.1"
+      "0.1",
+      "0.2"
     ],
     "fabric-local-channel": [
       "0.1"
@@ -74,6 +84,9 @@
     "memory": [
       "0.1"
     ],
+    "pairing-message": [
+      "1"
+    ],
     "pipeline": [
       "0.1"
     ],
@@ -81,6 +94,12 @@
       "1"
     ],
     "session-handoff": [
+      "1"
+    ],
+    "share-registration": [
+      "1"
+    ],
+    "share-registration-receipt": [
       "1"
     ],
     "window-lease": [
