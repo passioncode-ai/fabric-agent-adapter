@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fabric.passioncode.ai/agent-contract/0.1.0/schemas/share-registration.schema.json",
+  "title": "Share registration, share-registration/1, and its receipt (DEC-0086)",
+  "description": "How an organization server learns which agent a share grant into it runs: the sharer's enrolled node registers each such grant over the device transport (devices.md, the DEC-0056 signature by the enrollment's #sig key), and the server answers a receipt or a typed refusal. The server takes the organization from the certificate and the registrant from the user bound to its epoch, never from the body, and keys what it holds by (that user, grantId). docs/specification/share-registration.md.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/registration"
+    },
+    {
+      "$ref": "#/$defs/receipt"
+    },
+    {
+      "$ref": "#/$defs/refusal"
+    }
+  ],
+  "$defs": {
+    "registration": {
+      "type": "object",
+      "description": "What the sharer's enrolled node sends to the organization server of one of its enrollments for one share grant into that organization (DEC-0086 items 1 to 3): active, with the grant's revision, the agentRef its placements run and the grant's window; or withdrawn, with the time it ended. Nothing else: no estate id or revision, machine, principal, issuer, project, capability, spend or free text.",
+      "required": [
+        "type",
+        "grantId",
+        "context",
+        "state"
+      ],
+      "properties": {
+        "type": {
+          "const": "share-registration/1"
+        },
+        "grantId": {
+          "$ref": "#/$defs/shareGrantId",
+          "description": "The share grant's meta.id, compared as written (FAC-SEM-117)."
+        },
+        "context": {
+          "$ref": "#/$defs/orgContextId",
+          "description": "The grant's own context, org:<orgId>: the receiver refuses one that is not org: and its certificate's org.id as written (wrong-organization)."
+        },
+        "state": {
+          "enum": [
+            "active",
+            "withdrawn"
+          ]
+        },
+        "grantRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "The grant's meta.revision in the estate revision the node applied. A higher one replaces the held registration; a lower one is stale-revision; the same one with other bytes revision-conflict."
+        },
+        "agentRef": {
+          "$ref": "#/$defs/agentRef",
+          "description": "The one agentRef every placement of the revision in this context that names the grant runs (FAC-SEM-117)."
+        },
+        "startsAt": {
+          "$ref": "#/$defs/instant",
+          "description": "The grant's startsAt, as written."
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/instant",
+          "description": "The grant's expiresAt, as written; after startsAt (FAC-SEM-118)."
+        },
+        "withdrawnAt": {
+          "$ref": "#/$defs/instant",
+          "description": "When the share ended: the earliest revokedAt of the grant's revocations in the revision or the applied delta entries, or the issuedAt of the revision that no longer lists the grant."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "active"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "grantRevision",
+              "agentRef",
+              "startsAt",
+              "expiresAt"
+            ],
+            "properties": {
+              "grantRevision": true,
+              "agentRef": true,
+              "startsAt": true,
+              "expiresAt": true,
+              "withdrawnAt": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "withdrawn"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "withdrawnAt"
+            ],
+            "properties": {
+              "withdrawnAt": true,
+              "grantRevision": false,
+              "agentRef": false,
+              "startsAt": false,
+              "expiresAt": false
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "receipt": {
+      "type": "object",
+      "description": "The receiver's 200 answer: what it holds now for the device's bound user and the grant.",
+      "required": [
+        "type",
+        "grantId",
+        "state",
+        "digest"
+      ],
+      "properties": {
+        "type": {
+          "const": "share-registration-receipt/1"
+        },
+        "grantId": {
+          "$ref": "#/$defs/shareGrantId"
+        },
+        "state": {
+          "enum": [
+            "registered",
+            "unchanged",
+            "withdrawn"
+          ],
+          "description": "registered: an active registration was taken; withdrawn: a withdrawal was taken; unchanged: the same bytes again, or a second withdrawal (of two, the earliest withdrawnAt is kept)."
+        },
+        "digest": {
+          "$ref": "#/$defs/sha256",
+          "description": "sha256: and the hex SHA-256 of the UTF-8 RFC 8785 form of the registration the receiver holds after this request (shareRegistrationDigest)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "refusal": {
+      "type": "object",
+      "description": "The receiver's refusal of a registration after the request authenticated (devices.md transport steps 0 to 8) and its revision is one it reads: 400 malformed, 403 wrong-organization or unassigned-device, 409 already-withdrawn, agent-mismatch, stale-revision or revision-conflict.",
+      "required": [
+        "error"
+      ],
+      "properties": {
+        "error": {
+          "type": "object",
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "enum": [
+                "malformed",
+                "wrong-organization",
+                "unassigned-device",
+                "already-withdrawn",
+                "agent-mismatch",
+                "stale-revision",
+                "revision-conflict"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "instant": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-5][0-9](\\.[0-9]{1,3})?([Zz]|[+-][0-9]{2}:[0-9]{2})$",
+      "description": "An RFC 3339 date-time with an offset, seconds 00 to 59 (no leap second, which date-time admits) and at most three fraction digits: every port compares the same instants, at millisecond precision (DEC-0085, DEC-0086)."
+    },
+    "orgContextId": {
+      "type": "string",
+      "pattern": "^org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+      "description": "DEC-0086: an organization's context, org:<orgId>: contextId without personal. What a share registration and a grant.usage carry, the grant's own context. Compared as written (docs/specification/contexts.md)."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "shareGrantId": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^urn:fabric:share:(?!0{32}$)[0-9a-f]{32}$",
+      "description": "DEC-0086, FAC-SEM-117: the meta.id of a share grant into an organization: urn:fabric:share: and 32 lower-case hex digits, 128 bits from a CSPRNG, never derived from a name, an address, an estate id, an agentRef or the organization, and never all zeros. The pattern admits only its own normal form (DEC-0076), so it is compared as written; it holds no person's name, address or estate id (docs/specification/share-registration.md)."
+    },
+    "agentRef": {
+      "type": "string",
+      "maxLength": 146,
+      "pattern": "^urn:fabric:agent:[a-z][a-z0-9]*(?:-[a-z0-9]+)*:[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "description": "urn:fabric:agent:<publisher>:<id> — one agent across its versions (FAC-SEM-066)."
+    }
+  }
+}

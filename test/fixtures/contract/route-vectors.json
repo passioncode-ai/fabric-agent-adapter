@@ -8778,6 +8778,2642 @@
       ]
     },
     {
+      "name": "hostile: the selected index 4294967296",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 4294967296,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate 4294967296 (hermes) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected index 9007199254740991",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 9007199254740991,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate 9007199254740991 (hermes) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected index 64",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 64,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate 64 (hermes) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected index 65",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 65,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate 65 (hermes) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected index 2.5",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": 2.5,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate 2.5 (hermes) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: the selected index -3",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "operator",
+          "id": "urn:event:route:1",
+          "kind": "runner-selected",
+          "selected": {
+            "index": -3,
+            "runnerKind": "hermes",
+            "provider": {
+              "id": "urn:fabric:provider:hermes-local",
+              "revision": 2,
+              "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+            },
+            "drive": "acp",
+            "session": "spawned",
+            "sessionRef": "urn:session:project-a:hermes:1",
+            "executionContext": {
+              "id": "urn:context:project-a:agent-chat:hermes",
+              "revision": 1,
+              "contentHash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+            },
+            "permissionMode": "ask"
+          },
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed",
+              "detail": "no catalogued binary codex on PATH"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "not-connected",
+              "detail": "kimi answered its version probe but is signed out"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/selected",
+          "message": "candidate -3 (hermes) is not that position of the route"
+        }
+      ]
+    },
+    {
+      "name": "hostile: an exhausted walk over 64 candidates recorded short",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "unattended",
+          "id": "urn:event:route:3",
+          "kind": "runner-exhausted",
+          "answer": "capability-unavailable",
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "quota-unknown"
+            },
+            {
+              "index": 3,
+              "runnerKind": "hermes",
+              "result": "not-responding",
+              "detail": "version probe timed out after 5000 ms"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes",
+          "message": "the walk must record candidates 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63 in order; it records 0, 1, 2, 3"
+        }
+      ]
+    },
+    {
+      "name": "hostile: an exhausted walk over 70 candidates recorded short",
+      "kind": "route-event",
+      "value": {
+        "route": {
+          "kind": "runner-route",
+          "meta": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+            "createdAt": "2026-10-07T09:00:00Z",
+            "createdBy": "urn:agent:pm:a"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "candidates": [
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "kimi-code",
+              "provider": {
+                "id": "urn:fabric:provider:kimi-code-local",
+                "revision": 1,
+                "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "hermes",
+              "provider": {
+                "id": "urn:fabric:provider:hermes-local",
+                "revision": 2,
+                "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+              },
+              "drive": "acp",
+              "session": {
+                "attach": "never",
+                "spawn": "allowed"
+              }
+            },
+            {
+              "runnerKind": "claude-code",
+              "provider": {
+                "id": "urn:fabric:provider:claude-code-local",
+                "revision": 1,
+                "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+              },
+              "session": {
+                "attach": "preferred",
+                "spawn": "never"
+              }
+            },
+            {
+              "runnerKind": "codex",
+              "provider": {
+                "id": "urn:fabric:provider:codex-local",
+                "revision": 3,
+                "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+              },
+              "drive": "codex-app-server",
+              "session": {
+                "attach": "preferred",
+                "spawn": "allowed"
+              }
+            }
+          ],
+          "exhausted": "capability-unavailable",
+          "recovery": "sticky"
+        },
+        "event": {
+          "at": "2026-10-07T09:05:00Z",
+          "route": {
+            "id": "urn:route:project-a:agent-chat",
+            "revision": 1,
+            "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          "project": "urn:project:a",
+          "capability": "urn:fabric:capability:agent-chat",
+          "run": "urn:run:project-a:42",
+          "conversation": "urn:conversation:project-a:7",
+          "launch": "unattended",
+          "id": "urn:event:route:3",
+          "kind": "runner-exhausted",
+          "answer": "capability-unavailable",
+          "probes": [
+            {
+              "index": 0,
+              "runnerKind": "claude-code",
+              "result": "no-held-session"
+            },
+            {
+              "index": 1,
+              "runnerKind": "codex",
+              "result": "not-installed"
+            },
+            {
+              "index": 2,
+              "runnerKind": "kimi-code",
+              "result": "quota-unknown"
+            },
+            {
+              "index": 3,
+              "runnerKind": "hermes",
+              "result": "not-responding",
+              "detail": "version probe timed out after 5000 ms"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "code": "FAC-SEM-034",
+          "instancePath": "/event/probes",
+          "message": "the walk must record candidates 0 to 69 in order; it records 0, 1, 2, 3"
+        }
+      ]
+    },
+    {
       "name": "hostile: a selected runner kind and index with their own toString",
       "kind": "route-event",
       "value": {

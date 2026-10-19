@@ -12,6 +12,7 @@ Contract DEC-0050 (format and digest), DEC-0051 (signatures), DEC-0071 and DEC-0
 - [sign](#sign)
 - [verify](#verify)
 - [A consumer agent](#a-consumer-agent)
+- [A partner's setup for a company](#a-partners-setup-for-a-company)
 - [What this version does not do](#what-this-version-does-not-do)
 
 ## What a package is
@@ -91,6 +92,18 @@ An agent that serves nothing and only calls MCP servers is `kind: agent` without
 by role and tools. A role names the secret slots that configure its server (`secrets`, DEC-0074), each declared in
 `secrets[]`, one slot to one role. Before installing, `consumer_placement(pkg, configured)` / `consumerPlacement(pkg,
 Map)` names each role the placement does not register and each tool its server lacks.
+
+## A partner's setup for a company
+
+A partner who builds agents for a company ships them without a new format (FAA-55, the partner channel's PA-07). Each
+agent is its own `kind: agent` package. The setup is one `kind: skill-set` package at `layer: org`: the company's own
+skills (house style, procedures), with `requires.packages` naming every agent it sets up by `publisher`, `id` and a
+version `range`. The partner packs and signs every package with its own publisher key (`sign --key`); the company's
+machine pins that key and `verify` refuses a package signed by any other. One signed package serves every company: what
+differs per company (a display name, a brand, an address) is placement configuration, never a second package.
+
+Still to come, each waiting on its owner: trusting a partner's key for one organization only (contract CT-58), a
+partner's own space in a catalog and publishing to it (FAA-44, Vesta PA-03).
 
 ## What this version does not do
 

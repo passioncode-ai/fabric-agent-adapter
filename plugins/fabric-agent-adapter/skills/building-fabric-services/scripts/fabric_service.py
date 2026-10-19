@@ -1356,13 +1356,15 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
 #: Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`, DEC-0067); a test
 #: holds it equal to the contract's register at the pin.
 PROTOCOL_REVISIONS: Dict[str, Tuple[str, ...]] = {
-    "access-log": ("1",), "approval": ("1",), "activity-summary": ("1",), "estate-record": ("1",), "execution-packet": ("1",),
+    "access-log": ("1",), "approval": ("1",), "activity-summary": ("1",), "enroll-token": ("1",), "entitlement": ("1",),
+    "entitlement-key-set": ("1",), "estate-record": ("1",), "execution-packet": ("1",),
     "fabric-activity": ("0.1",), "fabric-dashboard": ("0.1",), "fabric-delegation": ("0.1",), "fabric-device": ("0.1",),
-    "fabric-interop": ("0.1",), "fabric-local-channel": ("0.1",), "fabric-local-runner": ("0.1",),
+    "fabric-interop": ("0.1", "0.2"), "fabric-local-channel": ("0.1",), "fabric-local-runner": ("0.1",),
     "fabric-operator-channel": ("0.1",), "fabric-package": ("1",), "fabric-project-comms": ("0.1",), "fabric-proposal": ("1",),
     "fabric-provider": ("0.1",), "fabric-relay": ("0.1",), "fabric-secret-envelope": ("1",), "fabric-service": ("0.1",),
-    "fabric-settings-backup": ("1",), "heartbeat": ("1",), "learning-note": ("1",), "memory": ("0.1",), "pipeline": ("0.1",),
-    "revocation-delta": ("1",), "session-handoff": ("1",), "window-lease": ("1",),
+    "fabric-settings-backup": ("1",), "heartbeat": ("1",), "learning-note": ("1",), "memory": ("0.1",), "pairing-message": ("1",), "pipeline": ("0.1",),
+    "revocation-delta": ("1",), "session-handoff": ("1",), "share-registration": ("1",),
+    "share-registration-receipt": ("1",), "window-lease": ("1",),
 }
 MAX_PROTOCOLS = 64
 _REVISION = re.compile(r"([a-z][a-z0-9.-]{0,63})/([0-9]{1,4}(?:\.[0-9]{1,4}){0,2})", re.ASCII)

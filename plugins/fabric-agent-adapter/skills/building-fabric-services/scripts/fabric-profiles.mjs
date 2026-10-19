@@ -367,10 +367,11 @@ function routeEvent(value) {
   });
   const expectProbes = (count) => {
     const indexes = probes.map(indexOf);
-    const expected = Array.from({ length: Math.max(count, 0) }, (_, index) => index);
-    if (indexes.length !== expected.length || indexes.some((index, position) => index !== expected[position])) {
-      wrong('/probes', `the walk must record candidates ${expected.join(', ') || 'none'} in order; it records ${indexes.join(', ') || 'none'}`);
-    }
+    // Compared with 0…count−1 before any list is built, and the message lists at most 64 candidates, so a count from an
+    // index of 2**32 allocates nothing and never throws (contract route-rules.ts at DEC-0084, from this kit's report).
+    if (indexes.length === count && indexes.every((index, position) => index === position)) return;
+    const expected = count <= 64 ? Array.from({ length: count }, (_, index) => index).join(', ') || 'none' : `0 to ${count - 1}`;
+    wrong('/probes', `the walk must record candidates ${expected} in order; it records ${indexes.join(', ') || 'none'}`);
   };
   if (event.kind === 'runner-exhausted') {
     expectProbes(list.length);

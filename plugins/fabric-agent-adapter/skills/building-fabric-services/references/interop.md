@@ -23,6 +23,12 @@ The interop block sits in the manifest under the capability's `extensions`:
 
 That key has one spelling (the contract's `src/extensions.ts`); copy it, never retype it.
 
+## Contents
+
+- [The kit](#the-kit)
+- [Limits and uncertain effects](#limits-and-uncertain-effects)
+- [What the probe checks](#what-the-probe-checks)
+
 ## The kit
 
 ```python
@@ -41,7 +47,8 @@ response = server.handle(json_rpc_message)          # POST /mcp body in, JSON re
   stops for a person. Fabric answers through `fabric.job.get` with `inputResponses`; the
   server calls `on_input(job_id, answers, ctx)` with the answers that matched.
 - `jobs.complete(job_id, fi.result_envelope(outcome=..., producer=..., ...))`,
-  `jobs.fail(job_id, code, message)`, `jobs.cancel(job_id)`. A terminal job never changes
+  `jobs.fail(job_id, code, message, data=None)`, `jobs.cancel(job_id)`; a limit or an unseen effect has its own calls
+  ([Limits and uncertain effects](#limits-and-uncertain-effects)). A terminal job never changes
   again. A result with unverified claims is `partial`, never `succeeded`.
 - The envelope's `trace` is authoritative for a stored result (DEC-0017): `complete` fills
   it with the span of the call that started the job and refuses one naming another span,
@@ -76,6 +83,35 @@ claude -p "Reply with the single word OK." --strict-mcp-config --mcp-config "$TM
 ```
 
 The first `system/init` event lists `mcp_servers` (`connected`) and the `mcp__<server>__*` tools.
+
+## Limits and uncertain effects
+
+Contract DEC-0087 (`FAC-SEM-119`, `FAC-SEM-120`). A limit and an effect nobody saw are not ordinary failures: a caller
+that submits again pays twice. Both kits (`fabric_interop.py`, `fabric-interop.mjs`) carry the contract's functions,
+answer for answer (`test/fixtures/contract/job-limit-vectors.json`).
+
+As a provider:
+
+- **A limit paused the job and you will resume it:** `jobs.pause(job_id, resets_at=..., text=...)` keeps it `working`
+  with `statusMessage` `quota-exhausted until <UTC instant>: <text>` and sets `pollIntervalMs` to reach the reset,
+  at most an hour. An instant with an offset, more than three fraction digits or a day that does not exist is refused.
+- **A limit stopped it and you will not resume it:** `jobs.quota_exhausted(job_id, message, retryable, resets_at=None)`
+  ends it `failed` with `quota-exhausted` and `data: {retryable, resetsAt?}`; `resetsAt` only with `retryable: True`.
+- **The effect may have happened and you cannot see whether:** `jobs.outcome_unknown(job_id, message, data)`. Its key
+  never runs again; only an observed result settles it.
+- **Keys per caller.** `jobs.create(..., caller=<authenticated caller>, idempotency_key=<key>)` keeps the key for that
+  caller only. A key that already names a job starts nothing; `jobs.repeat(caller, key, now)` answers `new`, `same`
+  (answer with that job) or `run`: a `quota-exhausted` job runs again once its reset passed or you pass
+  `limit_holds=False`, a `limit-reached` job once `approval_granted=True`, and an `outcome-unknown` job never.
+- **Usage you did not measure is `null`, never 0,** but only toward a caller whose request `_meta.protocols` names
+  `fabric-interop/0.2`: pass `request_meta` to `result_envelope` (`usage_toward`). Toward any other caller the kit
+  writes the measured lower bound, as before.
+
+As a caller: send `request_meta(traceparent)` as your `_meta` (it names `fabric-interop/0.1` and `0.2`), act on every
+`fabric.job.get` answer as `job_caller_action(answer, now)` says, and resend only under
+`intent_idempotency_key({agentId, capability, input})`, never a new key. Node names are the camelCase twins
+(`jobs.quotaExhausted(id, message, {retryable, resetsAt})`, `jobCallerAction`, `intentIdempotencyKey`). The guidance
+for an agent's own design is in `creating-fabric-agents/references/resilience-and-autonomy.md`.
 
 ## What the probe checks
 

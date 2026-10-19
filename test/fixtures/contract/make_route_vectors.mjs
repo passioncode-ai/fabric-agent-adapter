@@ -133,6 +133,15 @@ add('event: the capability in another case of its NSS is another capability (DEC
   add('hostile: the selected runner kind null against one absent', 'route-event', { route: edit(route, (r) => { delete r.candidates[at].runnerKind; }), event: edit(selected, (e) => { e.selected.runnerKind = null; }) });
   add('hostile: the selected drive true against the candidate drive 1', 'route-event', { route: edit(route, (r) => { r.candidates[at].drive = 1; }), event: edit(selected, (e) => { e.selected.drive = true; }) });
   add('hostile: the event project and capability with their own toString', 'route-event', { route, event: edit(selected, (e) => { e.project = hostile; e.capability = { toString: 1 }; }) });
+  // DEC-0084's fix round: a selected index far past the route compares before any list is built and names the range.
+  for (const index of [2 ** 32, Number.MAX_SAFE_INTEGER, 64, 65, 2.5, -3]) {
+    add(`hostile: the selected index ${index}`, 'route-event', { route, event: edit(selected, (e) => { e.selected.index = index; }) });
+  }
+  // An exhausted walk over 64 or 70 candidates whose probes stop short: the message names the range past 64.
+  for (const length of [64, 70]) {
+    const long = edit(route, (r) => { r.candidates = Array.from({ length }, (_, i) => ({ ...r.candidates[i % r.candidates.length] })); });
+    add(`hostile: an exhausted walk over ${length} candidates recorded short`, 'route-event', { route: long, event: exhausted });
+  }
   add('hostile: a selected runner kind and index with their own toString', 'route-event', { route, event: edit(selected, (e) => { e.selected.runnerKind = hostile; e.selected.index = { toString: 1 }; }) });
 }
 

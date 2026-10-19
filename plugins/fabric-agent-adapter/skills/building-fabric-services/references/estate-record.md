@@ -18,6 +18,8 @@ derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fab
 - Applying a revision
 - Trusting a delegation key
 - Contexts: one agent for you and for an organization
+- The estate ceremonies
+- Share grants into an organization
 - Checking a record you produce
 - What the kit does not do
 
@@ -115,6 +117,49 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
 answer the contract's contexts fixtures and variants of them (`test/fixtures/contract/estate-vectors.json`).
+
+## The estate ceremonies
+
+Contract DEC-0084: create a network, add a machine nearby (a six-digit comparison code) or headless (an enroll token),
+remove a machine, replace a machine's key. Fabric runs the ceremonies and signs every revision with the person's
+passkey; what a service applying the record checks is in the record itself:
+
+- **What a revision drops, it revokes in the same revision (FAC-SEM-114).** A removed machine is listed as
+  `machine <id>` in `revocations`, and its hub key as `hub-key <kid>`; a replaced device key is revoked by its key
+  reference, `<kid>@sha256:<hex of its octets>` (`device_key_ref` / `deviceKeyRef`), so the new key under the same kid
+  stays usable; a hub key certified anew takes a new kid. `verify_estate_record(record, at=..., parent=previous)` runs it
+  when you pass the parent; `estate_record_rules("estate-record-revision", {"parent", "next"})` alone.
+- **A device key's octets are canonical padded base64 (FAC-SEM-073),** the one form a key reference can name
+  (`device_key_fingerprint`), and a `device-key` revocation that holds `@` is a well-formed key reference (FAC-SEM-076).
+- **A headless machine joins with an `enroll-token/1`** (`fabric_ceremonies.py`, `fabric-ceremonies.mjs`). Read the token
+  from stdin or a file only your user can read, never from argv, a URL or a log. `verify_enroll_token(token, record=,
+  genesis=, at=)` checks it against the revision you applied and revision 1's digest; sign `enroll_join_input(token)`
+  with the machine's `#sig` key and present that proof with the token. The token gives the machine no trust: only the
+  passkey-signed revision that lists it does. `enroll_token_rules("enroll-token", token)` is FAC-SEM-113.
+
+The nearby pairing (`pairing-message/1`, the comparison code, the rendezvous) and the hub's single use of a token are
+Project Observatory's node and Fabric's hub; the kits port them in a later version (FAA-57). The relay's admission and
+session checks belong to the relay; the kits do not run a relay.
+
+## Share grants into an organization
+
+Contract DEC-0086. A grant whose `context` is an organization's (`org:<orgId>`) is a share grant, and the organization
+server joins every `grant.usage` to the agent it runs through a share registration the sharer's node sends. Before you
+sign a revision that places one, run `fabric_share.py` (`fabric-share.mjs`):
+
+- `share_rules("org-share-grants", {"record": next, "parent": previous})`: FAC-SEM-117. The grant's `meta.id` is
+  `urn:fabric:share:` and 32 lower-case hex digits from a CSPRNG (`secrets.token_hex(16)`), never a name, an address or an
+  estate id; its window carries at most three fraction digits; the placements naming it run one `agentRef`; and against
+  `parent`, the latest earlier revision that placed it, that `agentRef` never changes. To move a share to another agent,
+  revoke the grant and mint a new id.
+- `share_rules("grant", grant)`: FAC-SEM-110 and 117 on one grant.
+- `share_rules("share-registration", doc)`: FAC-SEM-118 on a `share-registration/1` document you read or log.
+- `share_rules("device-attribution", {binding, batch})`: FAC-SEM-045's DEC-0086 clause, for a collector that sends
+  `grant.usage`: each carries its grant's own context, `org:` and the certificate's `org.id` as written.
+
+`share-registration.schema.json` beside the kit is the contract's schema with `shareGrantId`, `orgContextId`,
+`sha256` and `agentRef` brought in, so it validates offline. Deriving, sending, deciding and joining registrations are the
+sharer's node's and the organization server's, not this kit's.
 
 ## Checking a record you produce
 

@@ -7591,7 +7591,7 @@
         },
         "secrets": [
           {
-            "name": "AKIAIOSFODNN7EXAMPLE",
+            "name": "GHP_EXAMPLE0SLOT0NAME0NOT0A0TOKEN000000",
             "purpose": "Reads the mailbox the digest summarises"
           }
         ],
@@ -7696,7 +7696,7 @@
             "sha256": "sha256:052a28297edf6760ee10e648408bf5ff3104d4559cf57aaa114615bd09ced88d"
           }
         ],
-        "digest": "sha256:edd9b0c401aa8a7ec8e5c375d90245fc8e6ddff4a0a0dbce708755e6525e11d7",
+        "digest": "sha256:5263aa5227463b7ac6e1c2444ff3739d328068c35022b20d0fccde64828f7f5a",
         "signatures": [
           {
             "role": "publisher",

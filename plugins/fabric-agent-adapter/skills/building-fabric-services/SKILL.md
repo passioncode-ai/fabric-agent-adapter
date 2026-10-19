@@ -18,10 +18,10 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.35.4"
+  version: "0.36.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "d8146cfb0a1c74fc6432284c4356bb0c864b37b5"
+  extension-commit: "07042181bfae2a481aa0da1a5651f24c76669c48"
 ---
 
 # Building Fabric services
@@ -79,7 +79,8 @@ MCP registration into a client config, the login flow or the CSRF header.
 
 When other agents or Fabric call the service over MCP, it follows `fabric-interop/0.1`:
 each manifest capability is the tool of its name, long work is a job with a stable id,
-a question for a person is an elicitation, and every call carries one trace. Read
+a question for a person is an elicitation, and every call carries one trace. A job a limit stops or pauses, and an
+effect nobody saw, have their own codes and a key per caller (DEC-0087). Read
 [the interop reference](references/interop.md) before writing an MCP tool; the helpers
 are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
 [`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs). When the callers are agents of the estate, the
@@ -87,7 +88,9 @@ service checks each call's delegation token (DEC-0039): read [the delegation ref
 the verifier is [`scripts/fabric_delegation.py`](scripts/fabric_delegation.py) /
 [`scripts/fabric-delegation.mjs`](scripts/fabric-delegation.mjs). A service on the operator's machines that
 applies the estate record (DEC-0055) verifies each revision first and trusts only the keys it certifies, and runs an
-agent once per context, the person's or an organization's (DEC-0082): read
+agent once per context, the person's or an organization's (DEC-0082), and checks a share grant into an organization
+with [`scripts/fabric_share.py`](scripts/fabric_share.py) (DEC-0086); a revision's ceremonies and a headless
+machine's enroll token are in [`scripts/fabric_ceremonies.py`](scripts/fabric_ceremonies.py) (DEC-0084): read
 [the estate record reference](references/estate-record.md). When Fabric chooses the service's runner and models
 (DEC-0046), or a project routes its work through an ordered list of runners (DEC-0026: the doctor's closed probe
 results, the route checks FAC-SEM-028…034), read [the profiles reference](references/profiles.md).

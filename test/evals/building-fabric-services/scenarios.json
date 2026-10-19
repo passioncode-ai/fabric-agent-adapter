@@ -442,6 +442,41 @@
         "treats a content refusal or an empty answer to a non-empty request as a failed turn on that lane, so `between-turns` moves to the next model",
         "counts a model the catalogue does not hold, or whose row lacks `open-vendor`, as closed; closed_user_content_route / closedUserContentRoute names the models that would run"
       ]
+    },
+    {
+      "id": "job-limits-and-unseen-effects",
+      "trap": "a media order hit the provider's hourly quota and a payment call timed out after it was sent; the service failed both with a plain error, so the caller submitted each again under a new key and paid twice",
+      "request": "example-agent's order capability runs as a job and calls a paid provider with an hourly quota and a payment API that can time out; make it safe to call again.",
+      "expected": [
+        "a quota the service will wait out keeps the job working with `jobs.pause(job_id, resets_at=...)`, a quota it will not wait out ends it with `jobs.quota_exhausted(..., retryable, resets_at)`",
+        "a payment whose answer was lost ends `outcome-unknown` with `jobs.outcome_unknown`, never an ordinary failure",
+        "jobs are created with `caller=` the authenticated caller and `idempotency_key=`, and a repeated key is answered with `jobs.repeat`: an outcome-unknown job is never run again",
+        "usage it did not measure is null only toward a caller whose `_meta.protocols` names `fabric-interop/0.2` (`result_envelope(request_meta=...)`)",
+        "as a caller it sends `request_meta()`, acts as `job_caller_action` says and resends under `intent_idempotency_key`, never a new key"
+      ]
+    },
+    {
+      "id": "share-grant-into-an-organization",
+      "trap": "the hub named a share grant into an organization after the agent and later pointed the same grant at another agent, so the organization server joined a month of usage to the wrong agent",
+      "request": "example-agent is shared into a client's organization; write the revision that places it and the one that moves the share to a newer agent.",
+      "expected": [
+        "the grant's meta.id is urn:fabric:share: and 32 lower-case hex digits from a CSPRNG, never derived from a name",
+        "the revision is checked with share_rules('org-share-grants', {record, parent}) before it is signed",
+        "moving the share revokes the grant and mints a new id instead of re-pointing it",
+        "a grant.usage carries the grant's own org: context, checked with share_rules('device-attribution', ...)"
+      ]
+    },
+    {
+      "id": "estate-ceremonies",
+      "trap": "a revision replaced a machine's signing key and revoked the kid, so the new key under the same kid was refused too, and a headless machine read its enroll token from a command-line argument that landed in the shell history",
+      "request": "example-agent's service applies the estate record; a machine's key is replaced and a new headless machine joins with an enroll token.",
+      "expected": [
+        "the service verifies each revision with its parent (`verify_estate_record(..., parent=...)`), so FAC-SEM-114 refuses a revision that drops a machine or a key without revoking it",
+        "a replaced key is revoked by its key reference `<kid>@sha256:<hex>` (`device_key_ref`), never by the kid it keeps",
+        "the headless machine reads the token from stdin or a 0600 file, never argv, a URL or a log",
+        "it checks the token with `verify_enroll_token(token, record=, genesis=, at=)` and signs `enroll_join_input(token)` with its #sig key",
+        "the token gives no trust until a passkey-signed revision lists the machine"
+      ]
     }
   ]
 }

@@ -715,7 +715,9 @@ def verify_estate_record(record: Any, *, at: Any, parent: Any = _MISSING, author
     if now > valid_until:
         return {"ok": False, "problem": "expired"}
     codes: List[str] = []
-    for finding in _record_findings(record):
+    # With a parent, what the revision drops it revokes (FAC-SEM-114, DEC-0084): a removed machine, a replaced key.
+    dropped = _dropped_findings(parent, record) if isinstance(parent, dict) else []
+    for finding in _record_findings(record) + dropped:
         if finding["code"] not in codes:
             codes.append(finding["code"])
     if codes:
@@ -851,6 +853,32 @@ def _revision_chain(value: Dict[str, Any]) -> List[Dict[str, str]]:
     return findings
 
 
+#: Standard base64 with its padding, the one form DEC-0053 records a device key's octets in.
+_BASE64 = re.compile(r"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?\Z")
+#: DEC-0084: a key reference, a device-key kid, ``@sha256:`` and 64 lower-case hex digits.
+KEY_REFERENCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}#(sig|kem)@sha256:[a-f0-9]{64}\Z")
+
+
+def device_key_fingerprint(key: Any) -> Optional[str]:
+    """A device key's fingerprint (DEC-0084): ``sha256:`` and the hex SHA-256 of its octets, ``publicKey`` read as
+    canonical padded base64; None for any other form, so two readers never disagree on which key it names."""
+    text = key.get("publicKey") if isinstance(key, dict) else None
+    if not isinstance(text, str) or not text or not _BASE64.match(text):
+        return None
+    raw = base64.b64decode(text)
+    if base64.b64encode(raw).decode("ascii") != text:
+        return None
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def device_key_ref(key: Any) -> Optional[str]:
+    """The ``device-key`` revocation reference of one key (DEC-0084): ``<kid>@<fingerprint>``; None without a string kid
+    or a fingerprint. A replacement revokes the old key by it and leaves the next key under the same kid usable."""
+    fingerprint = device_key_fingerprint(key)
+    kid = key.get("kid") if isinstance(key, dict) else None
+    return "%s@%s" % (kid, fingerprint) if fingerprint is not None and isinstance(kid, str) else None
+
+
 def _valid_device_key(key: Dict[str, Any]) -> bool:
     public = _get(key, "publicKey")
     raw = _node_base64("" if public is _MISSING or public is None else _show(public))
@@ -877,7 +905,10 @@ def _keys(value: Dict[str, Any], flag) -> None:
         for key, k in _indexed(_get(machine, "deviceKeys")):
             if not _same(_get(key, "kid"), "%s#%s" % (_show(_get(machine, "id")), _show(_get(key, "use")))):
                 flag("%s/deviceKeys/%d/kid" % (at, k), "a device key is listed as <machine id>#sig or <machine id>#kem, by its role")
-            if not _valid_device_key(key):
+            # A key with no canonical fingerprint could be read as two keys by two readers, and no key reference names it (DEC-0084).
+            if device_key_fingerprint(key) is None:
+                flag("%s/deviceKeys/%d/publicKey" % (at, k), "a device key's octets are written in canonical padded base64, the one form a key reference can name (DEC-0084)")
+            elif not _valid_device_key(key):
                 flag("%s/deviceKeys/%d/publicKey" % (at, k), "an Ed25519 key is never of small order (DEC-0045) and a P-256 key is a valid point (SEC 1 §3.2.2)")
             if _contains(seen, _get(key, "publicKey")):
                 flag("%s/deviceKeys/%d/publicKey" % (at, k), "one key is never used for the other role")
@@ -966,7 +997,9 @@ def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
     listed = {
         "authority": [_get(e, "credentialId") for e in _list(_get(value, "authorities"))],
         "machine": [_get(m, "id") for m in machines],
-        "device-key": [_get(k, "kid") for m in machines for k in _list(_get(m, "deviceKeys"))],
+        # A kid, and each listed key's own reference (DEC-0084): revoking either while listing it is refused.
+        "device-key": [ref for m in machines for k in _list(_get(m, "deviceKeys"))
+                       for ref in ([_get(k, "kid")] if _get(k, "kid") is not _MISSING else []) + ([device_key_ref(k)] if device_key_ref(k) is not None else [])],
         "hub-key": [_get(m["hubKey"], "kid") for m in machines if isinstance(_get(m, "hubKey"), dict)],
         "publisher-key": [_get(k, "kid") for k in _list(_get(value, "publisherKeys"))],
         "package": [_get(p, "digest") for m in machines for p in _list(_get(m, "packages"))],
@@ -979,6 +1012,9 @@ def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
         key = "%s %s" % (kind, _show(ref))
         if key in seen:
             flag("/revocations/%d" % index, "the %s %s is revoked twice" % (kind, _show(_get(revocation, "ref"))))
+        raw_ref = _get(revocation, "ref")
+        if _get(revocation, "kind") == "device-key" and isinstance(raw_ref, str) and "@" in raw_ref and not KEY_REFERENCE.match(raw_ref):
+            flag("/revocations/%d/ref" % index, "a device-key revocation names a kid or a key reference <kid>@sha256:<64 lower-case hex digits> (DEC-0084)")
         seen.append(key)
         if _contains(listed.get(kind, []), ref):
             flag("/revocations/%d/ref" % index, "the record still lists the %s it revokes: revocation outranks addition" % kind)
@@ -1027,6 +1063,46 @@ def _placement_grants(value: Dict[str, Any], flag) -> None:
         for placement, p in _indexed(_get(machine, "packages")):
             for suffix, message in _placement_grant_problems(value, placement):
                 flag("/machines/%d/packages/%d%s" % (m, p, suffix), message)
+
+
+def _dropped_findings(parent: Dict[str, Any], nxt: Dict[str, Any]) -> List[Dict[str, str]]:
+    """FAC-SEM-114 across two revisions (DEC-0084): what a revision drops, it revokes in the same revision. A removed
+    machine as ``machine <id>`` and its hub key as ``hub-key <kid>``; a replaced or dropped device key of a kept machine
+    as ``device-key`` by its reference or its kid; a hub key no longer certified as it was as ``hub-key <old kid>``."""
+    findings: List[Dict[str, str]] = []
+    flag = _finding(findings, "FAC-SEM-114")
+    revocations = _list(_get(nxt, "revocations"))
+
+    def revoked(kind: str, *refs: Any) -> bool:
+        return any(_get(entry, "kind") == kind and any(ref is not _MISSING and _same(_get(entry, "ref"), ref) for ref in refs)
+                   for entry in revocations)
+
+    kept_machines: List[Tuple[Any, Dict[str, Any]]] = []
+    for machine in _list(_get(nxt, "machines")):
+        if not any(_same(ident, _get(machine, "id")) for ident, _ in kept_machines):
+            kept_machines.append((_get(machine, "id"), machine))
+    for machine, m in _indexed(_get(parent, "machines")):
+        at = "/parent/machines/%d" % m
+        hub = _get(machine, "hubKey") if isinstance(_get(machine, "hubKey"), dict) else None
+        kept = next((found for ident, found in kept_machines if _same(ident, _get(machine, "id"))), None)
+        if kept is None:
+            if not revoked("machine", _get(machine, "id")):
+                flag("%s/id" % at, "machine %s is removed without its revocation: a revision that drops a machine lists machine %s in revocations" % (_show(_get(machine, "id")), _show(_get(machine, "id"))))
+            if hub is not None and not revoked("hub-key", _get(hub, "kid")):
+                flag("%s/hubKey/kid" % at, "the hub key %s of a removed machine is revoked in the same revision" % _show(_get(hub, "kid")))
+            continue
+        listed = {ref for ref in (device_key_ref(key) for key in _list(_get(kept, "deviceKeys"))) if ref is not None}
+        for key, k in _indexed(_get(machine, "deviceKeys")):
+            ref = device_key_ref(key)
+            if ref is None or ref in listed:
+                continue
+            if not revoked("device-key", ref, _get(key, "kid")):
+                flag("%s/deviceKeys/%d" % (at, k), "the device key %s is replaced or dropped without its revocation: the same revision lists device-key %s" % (_show(_get(key, "kid")), ref))
+        next_hub = _get(kept, "hubKey") if isinstance(_get(kept, "hubKey"), dict) else None
+        same_hub = next_hub is not None and _same(_get(next_hub, "kid"), _get(hub, "kid") if hub else _MISSING) and _same(_get(next_hub, "x"), _get(hub, "x") if hub else _MISSING)
+        if hub is not None and not same_hub and not revoked("hub-key", _get(hub, "kid")):
+            flag("%s/hubKey/kid" % at, "the hub key %s is no longer certified as it was: the same revision revokes hub-key %s, and a re-certified hub key takes a new kid" % (_show(_get(hub, "kid")), _show(_get(hub, "kid"))))
+    return findings
 
 
 def _record_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -1095,7 +1171,9 @@ def estate_record_rules(kind: str, value: Any) -> Optional[List[Dict[str, str]]]
     if kind == "estate-record":
         return _record_findings(value)
     if kind == "estate-record-revision":
-        return _revision_chain(value)
+        parent = value["parent"] if isinstance(_get(value, "parent"), dict) else {}
+        nxt = value["next"] if isinstance(_get(value, "next"), dict) else {}
+        return _revision_chain(value) + _dropped_findings(parent, nxt)
     if kind == "estate-placement":
         return _installation(value)
     return None
