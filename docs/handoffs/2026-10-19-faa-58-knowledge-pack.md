@@ -33,8 +33,12 @@ learning loops, orchestrators, model choice, several kinds of input and output, 
 - `claude plugin validate ./plugins/fabric-agent-adapter --strict` and `claude plugin validate . --strict`: passed.
 - No U+2014 in any added line.
 
+## Release receipts
+
+Receipts: [PR #135](https://github.com/passioncode-ai/fabric-agent-adapter/pull/135) merged as `f159dcc`, CI on the exact head `22193c5` ([validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/39319536033)), tag `v0.37.0`, [release run](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/39320339368) success, npm `@passioncode-ai/fabric-agent-adapter@0.37.0`; launcher passioncode 0.2.13 ([PR #117](https://github.com/passioncode-ai/passioncode/pull/117), [release run](https://github.com/passioncode-ai/passioncode/actions/runs/39322461768)); local install byte-identical to the tag (91 files).
+
 ## Next task
 
-Release 0.37.0 (PR, CI on the exact head, tag, npm, launcher, local install). Then FAA-57 (0.36.1's pairing and redeem
+FAA-57 (0.36.1's pairing and redeem
 content, now 0.37.1), the contract rows CT-18/28/42/51/52, and the adapter's own practices added to the knowledge base
 page under its lease.
