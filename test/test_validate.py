@@ -149,7 +149,7 @@ class RepositorySkillFilesTests(unittest.TestCase):
     """Every SKILL.md the repository ships must survive the strict reader."""
 
     def skill_files(self):
-        files = sorted(p for p in ROOT.rglob("SKILL.md") if ".git" not in p.parts)
+        files = sorted(p for p in ROOT.rglob("SKILL.md") if validate.in_this_tree(p, ROOT))
         self.assertEqual(len(files), len(validate.SKILL_NAMES))
         return files
 
@@ -292,6 +292,35 @@ class RepositoryStandardTests(unittest.TestCase):
         code, out = self._validate_copy(mutate)
         self.assertEqual(code, 1)
         self.assertIn("creating-fabric-agents: SKILL.md must say an agent someone builds for themselves", out)
+
+
+class TextForPeopleTests(unittest.TestCase):
+    """FAA-52: a new agent that writes text for people carries the no-em-dash rule (U+2014) in its
+    prompt and a check that fails on it, from the grill, the resilience reference and an eval."""
+
+    _validate_copy = LicenseTests._validate_copy
+    SKILL = "plugins/fabric-agent-adapter/skills/creating-fabric-agents"
+
+    def _drop(self, rel, needle):
+        def mutate(copy):
+            path = copy / rel
+            path.write_text(path.read_text(encoding="utf-8").replace(needle, "a dash"), encoding="utf-8")
+        return self._validate_copy(mutate)
+
+    def test_a_grill_without_the_rule_fails(self):
+        code, out = self._drop(self.SKILL + "/SKILL.md", "U+2014")
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: SKILL.md's grill must ask whether the agent writes text people read", out)
+
+    def test_a_resilience_reference_without_the_rule_fails(self):
+        code, out = self._drop(self.SKILL + "/references/resilience-and-autonomy.md", "U+2014")
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: resilience-and-autonomy.md must state the no-em-dash rule", out)
+
+    def test_evals_without_the_scenario_fail(self):
+        code, out = self._drop("test/evals/creating-fabric-agents/scenarios.json", "text-for-people-carries-no-em-dash")
+        self.assertEqual(code, 1)
+        self.assertIn("creating-fabric-agents: scenarios.json must cover text for people", out)
 
 
 class PinTests(unittest.TestCase):

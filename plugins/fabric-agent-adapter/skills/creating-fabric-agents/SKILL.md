@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.35.2"
+  version: "0.35.3"
   contract-version: "0.1.0"
   contract-commit: "d8146cfb0a1c74fc6432284c4356bb0c864b37b5"
 ---
@@ -53,6 +53,7 @@ No file is created until every row has an answer. An answer of "later" fails the
 | **Which profile?** | `mcp` when Fabric owns planning and retries and the capability has a schema; `a2a` when the provider owns its task lifecycle end to end; `local-runner` when it is a terminal agent Fabric drives. When unsure, the sibling skill's profile-selection reference is the decision record |
 | **What effects?** | declare anything money-, deletion-, or publication-adjacent now — the host's floor and grants are designed against these declarations, and one discovered late invalidates the admission |
 | **Which tenancy?** | record whether the agent assumes one operator; the assumption is cheap to write down and expensive to excavate |
+| **Text for people?** | if it writes anything a person reads (a reply, a message, a post, a report, a UI string), its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in new output, from the first commit (the resilience reference, *Text for people*) |
 
 ## Step 1 — the knowledge intake
 
@@ -207,7 +208,8 @@ Before the first stage that calls a model or spends money, read
 [resilience and autonomy](references/resilience-and-autonomy.md) and design its answers in:
 a limit pauses and resumes, every model answer passes the call site's own acceptance, fallbacks
 and checkers cross vendors, spend is a persisted ledger with idempotency keys, open questions
-become recorded decisions, and every fix has a test seen failing. Report its checklist with a
+become recorded decisions, every fix has a test seen failing, and text a person reads carries no
+em dash (U+2014), held by its prompt and a test. Report its checklist with a
 file and a test per line, or `NOT_RUN` where the agent has no such stage.
 
 ## Completion format

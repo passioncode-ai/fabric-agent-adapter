@@ -135,6 +135,17 @@
         "keys the posting effect by an intent-derived idempotency key and stops as outcome_unknown on an uncertain write instead of resending",
         "reports the reference's checklist with a file and a test per line, or NOT_RUN where the agent has no such stage"
       ]
+    },
+    {
+      "id": "text-for-people-carries-no-em-dash",
+      "request": "Create a fabric-compatible example-agent that drafts weekly status emails for a team from their tracker and sends them after a person approves.",
+      "expected": [
+        "asks the grill's 'Text for people?' row and records that the agent writes text a person reads",
+        "puts the no-em-dash rule (U+2014 and its substitutes, with the exact exceptions) into the prompt of the lane that drafts the email",
+        "adds a test that fails on U+2014 in the drafted output and in every fixed template, and watches it fail on a planted dash before it passes",
+        "makes the drafting call site's accept rewrite or refuse an answer that still holds U+2014 instead of sending it",
+        "reports the resilience checklist's text-for-people line with the prompt file and the test"
+      ]
     }
   ]
 }
