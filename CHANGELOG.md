@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.35.4 - 2026-10-19
+
+### Changed
+
+- **The session hooks rejoin a session at most once a minute** (FAA-53). Every `fabric-mcp --rejoin-only` spends the
+  agent's Fabric request budget, which every session on the machine shares; with about forty Claude Code sessions,
+  agents waited minutes on "Fabric is rate limited". The worker marks a successful rejoin in the session's folder; a
+  turn within 60 s of it is spooled and delivered by the next worker, and the end of a session always starts one.
+  Fabric fixed its side in CO-334 (per-session charging, jitter after `Retry-After`) and advised this skip.
+- **`creating-fabric-agents` → resilience reference follows contract DEC-0087** (FAA-56, guidance part): the codes
+  are `quota-exhausted` and `outcome-unknown`; a job a limit only paused stays `working` with the pause grammar in its
+  `statusMessage`; a job its provider will not resume ends `failed` with `data: {retryable, resetsAt?}`; a caller acts
+  as `jobCallerAction` does. The kits' rules and vectors come with the repin (FAA-54).
+
 ## 0.35.3 - 2026-10-19
 
 ### Added

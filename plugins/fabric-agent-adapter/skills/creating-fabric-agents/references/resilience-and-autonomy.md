@@ -19,9 +19,14 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 
 ## Limits are pauses
 
-1. **A provider or subscription limit pauses the job; it never fails it.** Store a typed pause
-   (`quota_exhausted`, `retryable: true`, the reset time when known) and resume from the same
-   stage. Failing it cost callers whole jobs and resubmits.
+1. **A provider or subscription limit pauses the job; it never fails it.** Keep the job `working` and
+   write its `statusMessage` in the contract's pause grammar, `quota-exhausted` or
+   `quota-exhausted until <UTC instant>` (optionally `: <text>`, at most 500 characters), with
+   `pollIntervalMs` reaching the reset; resume from the same stage. Only a job its provider will not
+   resume ends `failed` with `error: {code: "quota-exhausted", message, data: {retryable, resetsAt?}}`:
+   `retryable: false` when a person must act, and `resetsAt` (UTC, `T` and `Z`, at most three
+   fraction digits) only when `retryable: true` (contract DEC-0087, `FAC-SEM-119`). Failing a job a
+   limit only paused cost callers whole jobs and resubmits.
 2. **Resume first.** Every worker reads its own state — checkpoint, worktree, branches, open
    pull requests, notes — before it acts, and continues from there. Relaunching from scratch
    after a limit recreated work over committed work and re-issued credentials already held.
@@ -88,7 +93,11 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 4. **A resend of an unknown outcome reuses its idempotency key — or does not happen.** Derive
    keys from the intent (action and entity, or run and step), never from a clock or a random
    value, and make them unique in storage: time-and-random keys let redelivered requests charge
-   again. A write whose effect is uncertain stops as `outcome_unknown`; a new key there pays twice.
+   again. A write whose effect is uncertain ends `failed` with the code `outcome-unknown`; only an
+   observed result settles it, and a new key there pays twice. A caller acts on each answer as the
+   contract's `jobCallerAction` does: wait out a pause, resend a retryable `quota-exhausted` under the
+   same key after `resetsAt`, hand a non-retryable one or `limit-reached` to a person, reconcile an
+   `outcome-unknown`, and never resend it.
 5. **A client error at submit is a rejection, not a lost task.** Settle it with known usage (zero
    if none), release the reserved money in the same transaction, and never resend the identical
    request; a 4xx while polling is still a lost task.

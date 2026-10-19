@@ -403,6 +403,38 @@ class StopAndEndActive(Base):
         self.assertIn("outcome=dropped", self.log_text())
         self.assertEqual(list(spawned[0].glob("*-turn.json")), [])
 
+    def test_a_turn_soon_after_a_rejoin_waits_for_the_next_worker(self):
+        # FAA-53: every rejoin costs the machine's shared Fabric budget; a session rejoins at most once a minute.
+        _, spawned = self.spool("turn")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertTrue((spawned[0] / "rejoined").is_file())
+        said, again = self.spool("turn")
+        self.assertEqual((said, again), ("spooled: rejoined recently", []))
+        self.assertEqual(len(list(spawned[0].glob("*-turn.json"))), 1, "the turn waits in the spool")
+        said, ended = self.spool("end")
+        self.assertEqual(said, "spooled: worker started", "the end always starts a worker")
+        fs.deliver(ended[0], self.env, deadline_s=8)
+        names = [c["name"] for c in self.records("call")]
+        self.assertEqual(names, ["fabric_session_observe", "com.status", "fabric_session_observe",
+                                 "fabric_work_release", "fabric_session_observe"])
+        self.assertEqual(len(self.records("argv")), 2, "two rejoins for three hook events")
+
+    def test_a_turn_after_the_interval_rejoins(self):
+        _, spawned = self.spool("turn")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        old = time.time() - fs.REJOIN_MIN_INTERVAL_S - 1
+        os.utime(spawned[0] / "rejoined", (old, old))
+        said, again = self.spool("turn")
+        self.assertEqual((said, len(again)), ("spooled: worker started", 1))
+
+    def test_a_rejoin_that_failed_marks_nothing(self):
+        self.env["FAKE_MCP_MODE"] = "never"
+        _, spawned = self.spool("turn")
+        fs.deliver(spawned[0], self.env, deadline_s=1.0)
+        self.assertFalse((spawned[0] / "rejoined").exists())
+        said, again = self.spool("turn")
+        self.assertEqual((said, len(again)), ("spooled: worker started", 1), "a failed rejoin is retried next turn")
+
     def test_one_worker_per_session_and_the_end_always_starts_one(self):
         directory = fs.session_dir(SID, self.env)
         directory.mkdir(parents=True)
@@ -484,10 +516,11 @@ class Active(Base):
         self.board.write_text(str(value))
 
     def turn(self):
-        spawned = []
-        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=spawned.append)
-        fs.deliver(spawned[0], self.env, deadline_s=8)
-        return spawned[0]
+        # A turn within REJOIN_MIN_INTERVAL_S of a rejoin starts no worker (FAA-53); deliver it by hand.
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=lambda directory: None)
+        directory = fs.session_dir(SID, self.env)
+        fs.deliver(directory, self.env, deadline_s=8)
+        return directory
 
     def prompt(self, extra_env=None):
         done, elapsed = self.run_hook("user-prompt-submit", {"session_id": SID, "cwd": str(self.repo), "prompt": "x"},
