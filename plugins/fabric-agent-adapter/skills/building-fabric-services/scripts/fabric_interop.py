@@ -173,27 +173,39 @@ def unknown_job_result(job_id: str, traceparent: Optional[str] = None) -> Dict[s
 
 # --- C3.2 the result envelope ------------------------------------------------------
 
-def _usage(usage: Any) -> Dict[str, Any]:
+def _usage(usage: Any, nulls: bool = False) -> Dict[str, Any]:
+    """A usage object as fabric-interop/0.1 reads it, or with `nulls` as 0.2 does: a number nobody measured is null and
+    `partial` a boolean (DEC-0087)."""
     if not isinstance(usage, dict):
         raise InteropError("usage must be an object.")
     for key in ("inputTokens", "outputTokens", "wallMs"):
         if key not in usage:
             raise InteropError("usage.%s is required." % key)
     for key, value in usage.items():
-        if key not in ("inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "costUsd", "wallMs"):
+        if nulls and key == "partial":
+            if not isinstance(value, bool):
+                raise InteropError("usage.partial must be a boolean.")
+            continue
+        if key not in USAGE_NUMBERS:
             raise InteropError("usage.%s is not a usage field." % key)
+        if nulls and value is None:
+            continue
         numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
         if not numeric or value < 0 or (key != "costUsd" and not isinstance(value, int)):
             raise InteropError("usage.%s must be a non-negative %s." % (key, "number" if key == "costUsd" else "integer"))
+    if nulls and usage_findings(usage, ""):
+        raise InteropError("usage.partial is false while a number is null: an unknown number makes the usage partial (FAC-SEM-119).")
     return dict(usage)
 
 
 def result_envelope(*, outcome: str, done: List[Dict[str, Any]], proof: List[Dict[str, Any]], scope: Dict[str, Any],
                     not_verified: List[Dict[str, Any]], output: Any, usage: Dict[str, Any], producer: Dict[str, Any],
                     artifacts: Optional[List[Dict[str, Any]]] = None, traceparent: Optional[str] = None,
-                    result_id: Optional[str] = None, created_at: Optional[str] = None) -> Dict[str, Any]:
+                    result_id: Optional[str] = None, created_at: Optional[str] = None,
+                    request_meta: Any = None) -> Dict[str, Any]:
     """The full result envelope (contract result.schema.json, DEC-0011, DEC-0017): the same shape a
-    synchronous call returns, with output, usage and — when the work was traced — its trace."""
+    synchronous call returns, with output, usage and, when the work was traced, its trace. `usage` may hold null for
+    a number nobody measured; it is written as `usage_toward` the caller whose request `_meta` is `request_meta`."""
     if outcome not in OUTCOMES:
         raise InteropError("outcome must be one of %s." % ", ".join(OUTCOMES))
     for label, value in (("done", done), ("proof", proof), ("notVerified", not_verified), ("artifacts", artifacts or [])):
@@ -207,11 +219,282 @@ def result_envelope(*, outcome: str, done: List[Dict[str, Any]], proof: List[Dic
         "id": result_id or "urn:fabric:result:" + secrets.token_hex(12), "contractVersion": CONTRACT_VERSION,
         "outcome": outcome, "done": list(done), "proof": list(proof), "scope": dict(scope),
         "notVerified": list(not_verified), "artifacts": list(artifacts or []), "createdAt": created_at or _fs.now_iso(),
-        "producer": dict(producer), "output": output, "usage": _usage(usage),
+        "producer": dict(producer), "output": output, "usage": usage_toward(usage, request_meta),
     }
     if parse_traceparent(traceparent):
         envelope["trace"] = {"traceparent": traceparent}
     return envelope
+
+
+# --- C3.2 limits and uncertain effects (DEC-0087) ------------------------------------------
+# #region job-limits-kit, docs: plugins/fabric-agent-adapter/skills/building-fabric-services/references/interop.md#limits-and-uncertain-effects
+# The contract's src/job-limits.ts, answer for answer (test/fixtures/contract/job-limit-vectors.json). Every function
+# here answers and never raises on malformed input.
+
+QUOTA_EXHAUSTED = "quota-exhausted"
+OUTCOME_UNKNOWN = "outcome-unknown"
+LIMIT_REACHED = "limit-reached"
+INTEROP_NULL_USAGE = "fabric-interop/0.2"
+#: The revisions this kit reads, named in a request's `_meta.protocols` (DEC-0067, DEC-0087).
+PROTOCOLS_READ = ("fabric-interop/0.1", INTEROP_NULL_USAGE)
+USAGE_NUMBERS = ("inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "costUsd", "wallMs")
+_UTC_INSTANT = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-5][0-9])(?:\.([0-9]{1,3}))?Z\Z")
+_PAUSE = re.compile(r"^quota-exhausted(?: until ([^ \t\n\r]+?))?(?:: ([ \t\n\r]*[^ \t\n\r][\s\S]*))?\Z")
+_ERROR_CODE = re.compile(r"^[a-z][a-z0-9-]{1,63}\Z")
+_MAX_STATUS_MESSAGE = 500
+_MAX_ERROR_MESSAGE = 2000
+_ABSENT = object()
+
+
+def _code_points(value: str) -> int:
+    """JSON Schema's length: code points. A Python str holds code points, a lone surrogate counting once as in JavaScript."""
+    return len(value)
+
+
+def _own(value: Any, key: str) -> Any:
+    return value.get(key, _ABSENT) if isinstance(value, dict) else _ABSENT
+
+
+def _days_from_civil(year: int, month: int, day: int) -> int:
+    year -= month <= 2
+    era = (year if year >= 0 else year - 399) // 400
+    yoe = year - era * 400
+    doy = (153 * (month + (-3 if month > 2 else 9)) + 2) // 5 + day - 1
+    return era * 146097 + yoe * 365 + yoe // 4 - yoe // 100 + doy - 719468
+
+
+def utc_time(value: Any) -> Optional[int]:
+    """A UTC instant (`interop-common#/$defs/utcInstant`) as milliseconds since the epoch, or None: the pattern and a
+    day that exists, as the contract's strictTime reads it."""
+    match = _UTC_INSTANT.match(value) if isinstance(value, str) else None
+    if not match:
+        return None
+    year, month, day, hour, minute, second = (int(part) for part in match.groups()[:6])
+    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
+    days = [31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if not 1 <= month <= 12 or not 1 <= day <= days[month - 1] or hour > 23 or minute > 59:
+        return None
+    millis = int((match.group(7) or "").ljust(3, "0"))
+    return ((_days_from_civil(year, month, day) * 24 + hour) * 60 + minute) * 60000 + second * 1000 + millis
+
+
+def quota_data_ok(data: Any) -> bool:
+    """Whether `data` is quota-exhausted's: closed, `retryable` a boolean, `resetsAt` a UTC instant, only with retryable true."""
+    retryable = _own(data, "retryable")
+    if not isinstance(data, dict) or not isinstance(retryable, bool):
+        return False
+    if any(name not in ("retryable", "resetsAt") for name in data):
+        return False
+    if "resetsAt" not in data:
+        return True
+    return retryable and utc_time(data["resetsAt"]) is not None
+
+
+def _job_of(answer: Any) -> Optional[Dict[str, Any]]:
+    job = _own(answer, "job")
+    job_id = _own(job, "id")
+    if not isinstance(job, dict) or not isinstance(job_id, str) or not job_id or _own(job, "status") not in JOB_STATES:
+        return None
+    return job
+
+
+def read_job_pause(answer: Any) -> Dict[str, Any]:
+    """Whether a fabric.job.get answer ({job}) is a job a limit paused: working, its statusMessage `quota-exhausted` or
+    `quota-exhausted until <UTC instant>`, either optionally followed by `: <text>`. One that starts quota-exhausted and
+    breaks the grammar is malformed."""
+    job = _job_of(answer)
+    message = _own(job, "statusMessage")
+    if job is None or job.get("status") != "working" or not isinstance(message, str) or not message.startswith(QUOTA_EXHAUSTED):
+        return {"paused": False}
+    match = _PAUSE.match(message)
+    if not match or _code_points(message) > _MAX_STATUS_MESSAGE:
+        return {"paused": False, "malformed": True}
+    until = match.group(1)
+    if until is None:
+        return {"paused": True}
+    return {"paused": True, "resetsAt": until} if utc_time(until) is not None else {"paused": False, "malformed": True}
+
+
+def job_caller_action(answer: Any, now: Any = _ABSENT) -> Dict[str, Any]:
+    """What a caller does with one fabric.job.get or fabric.job.cancel answer at `now`, a UTC instant: poll, wait, answer,
+    done, cancelled, resend (under the same key), person, reconcile, failed or invalid. Never "submit anew"."""
+    at = utc_time(now)
+    job = _job_of(answer)
+    if at is None or job is None:
+        return {"action": "invalid"}
+    status = job["status"]
+    if status == "working":
+        pause = read_job_pause(answer)
+        if "malformed" in pause:
+            return {"action": "invalid"}
+        if not pause["paused"]:
+            return {"action": "poll"}
+        if "resetsAt" not in pause:
+            return {"action": "wait"}
+        return {"action": "wait", "notBefore": pause["resetsAt"]} if utc_time(pause["resetsAt"]) > at else {"action": "poll"}
+    if status in ("input_required", "completed", "cancelled"):
+        return {"action": {"input_required": "answer", "completed": "done", "cancelled": "cancelled"}[status]}
+    error = _own(job, "error")
+    code = _own(error, "code")
+    message = _own(error, "message")
+    code_ok = (isinstance(code, str) and bool(_ERROR_CODE.match(code))) or _is_integer(code)
+    shape_ok = isinstance(error, dict) and all(name in ("code", "message", "data") for name in error)
+    if not shape_ok or not code_ok or not isinstance(message, str) or not message or _code_points(message) > _MAX_ERROR_MESSAGE:
+        return {"action": "invalid"}
+    if code == OUTCOME_UNKNOWN:
+        return {"action": "reconcile"}
+    if code == LIMIT_REACHED:
+        return {"action": "person"}
+    if code != QUOTA_EXHAUSTED:
+        return {"action": "failed"}
+    data = _own(error, "data")
+    if not quota_data_ok(data):
+        return {"action": "invalid"}
+    if not data["retryable"]:
+        return {"action": "person"}
+    if "resetsAt" in data and utc_time(data["resetsAt"]) > at:
+        return {"action": "resend", "notBefore": data["resetsAt"]}
+    return {"action": "resend"}
+
+
+def _is_integer(value: Any) -> bool:
+    """JavaScript's Number.isInteger for a JSON value."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    return isinstance(value, float) and value == value and value not in (float("inf"), float("-inf")) and value == int(value)
+
+
+def intent_idempotency_key(intent: Any) -> Optional[str]:
+    """The idempotency key of an intent {agentId, capability, input, request?}: a UUID of version 8 from the first 16
+    bytes of the SHA-256 of its RFC 8785 form. The same intent gives the same key on every resend and machine; None
+    for another shape or an input with no RFC 8785 form."""
+    import hashlib
+    import fabric_delegation as _fd  # noqa: E402 - beside this file: RFC 8785
+    names = ("agentId", "capability", "input", "request")
+    if not isinstance(intent, dict) or any(name not in names for name in intent):
+        return None
+    agent_id, capability, given = intent.get("agentId"), intent.get("capability"), intent.get("input")
+    if not isinstance(agent_id, str) or not agent_id or not isinstance(capability, str) or not capability or not isinstance(given, dict):
+        return None
+    form = {"agentId": agent_id, "capability": capability, "input": given}
+    if "request" in intent:
+        request = intent["request"]
+        if not isinstance(request, str) or not request or _code_points(request) > 256:
+            return None
+        form["request"] = request
+    try:
+        canonical = _fd.jcs(form)
+    except (TypeError, ValueError, RecursionError):
+        return None
+    raw = bytearray(hashlib.sha256(canonical.encode("utf-8")).digest()[:16])
+    raw[6] = (raw[6] & 0x0F) | 0x80
+    raw[8] = (raw[8] & 0x3F) | 0x80
+    hexed = raw.hex()
+    return "%s-%s-%s-%s-%s" % (hexed[:8], hexed[8:12], hexed[12:16], hexed[16:20], hexed[20:])
+
+
+def reads_null_usage(request_meta: Any) -> bool:
+    """Whether a provider may write null and partial in usage toward this caller: its _meta.protocols names fabric-interop/0.2."""
+    protocols = _own(request_meta, "protocols")
+    return isinstance(protocols, list) and INTEROP_NULL_USAGE in protocols
+
+
+def request_meta(traceparent: Optional[str] = None) -> Dict[str, Any]:
+    """A request's `_meta` from this kit as a caller: its trace, and the interop revisions it reads (DEC-0087)."""
+    meta: Dict[str, Any] = {"protocols": list(PROTOCOLS_READ)}
+    if parse_traceparent(traceparent):
+        meta["traceparent"] = traceparent
+    return meta
+
+
+def usage_findings(usage: Any, at: str) -> List[Dict[str, str]]:
+    """FAC-SEM-119 on a usage: partial false asserts every number known, so it stands beside no null."""
+    if not isinstance(usage, dict) or usage.get("partial", _ABSENT) is not False:
+        return []
+    unknown = [name for name in USAGE_NUMBERS if name in usage and usage[name] is None]
+    if not unknown:
+        return []
+    return [{"code": "FAC-SEM-119", "instancePath": "%s/partial" % at,
+             "message": "partial is false while %s is null: an unknown number makes the usage partial" % ", ".join(unknown)}]
+
+
+def usage_toward(usage: Any, request_meta: Any = None) -> Dict[str, Any]:
+    """The usage a provider writes toward a caller (the gate): toward a reader of fabric-interop/0.2, null for a number
+    nobody measured and partial true beside it; toward any other, the measured lower bound (null as 0, no partial)."""
+    if reads_null_usage(request_meta):
+        checked = _usage(usage, nulls=True)
+        if any(checked.get(name, 0) is None for name in USAGE_NUMBERS) and "partial" not in checked:
+            checked["partial"] = True
+        return checked
+    if not isinstance(usage, dict):
+        raise InteropError("usage must be an object.")
+    lower = {key: (0 if value is None else value) for key, value in usage.items() if key != "partial"}
+    return _usage(lower)
+
+
+def _job_findings(value: Any) -> List[Dict[str, str]]:
+    findings: List[Dict[str, str]] = []
+    if "malformed" in read_job_pause(value):
+        findings.append({"code": "FAC-SEM-119", "instancePath": "/job/statusMessage",
+                         "message": "a working job's message that starts quota-exhausted reads `quota-exhausted`, `quota-exhausted until <UTC instant>`, then optionally `: <text>`, at most 500 characters"})
+    error = _own(_own(value, "job"), "error")
+    data = _own(error, "data")
+    resets_at = _own(data, "resetsAt")
+    if _own(error, "code") == QUOTA_EXHAUSTED and isinstance(resets_at, str) and utc_time(resets_at) is None:
+        findings.append({"code": "FAC-SEM-119", "instancePath": "/job/error/data/resetsAt", "message": "resetsAt is a UTC instant on a day that exists"})
+    result = _own(_own(value, "job"), "result")
+    findings.extend(usage_findings(_own(result, "usage"), "/job/result/usage"))
+    return findings
+
+
+def job_limit_rules(kind: str, value: Any) -> Optional[List[Dict[str, str]]]:
+    """FAC-SEM-119 (kinds interop-job, usage and result) and FAC-SEM-120 (kind job-caller, {answer, now, action}: the
+    act equals job_caller_action's). None for another kind."""
+    if kind == "interop-job":
+        return _job_findings(value)
+    if kind == "usage":
+        return usage_findings(value, "")
+    if kind == "result":
+        return usage_findings(_own(value, "usage"), "/usage")
+    if kind == "job-caller":
+        expected = job_caller_action(_own(value, "answer"), _own(value, "now"))
+        if json.dumps(_own(value, "action"), sort_keys=True, default=str) == json.dumps(expected, sort_keys=True):
+            return []
+        return [{"code": "FAC-SEM-120", "instancePath": "/action", "message": "the caller answers %s as jobCallerAction does" % json.dumps(expected, separators=(",", ":"))}]
+    return None
+
+
+def pause_message(resets_at: Optional[str] = None, text: Optional[str] = None) -> str:
+    """A paused job's statusMessage in the pause grammar; raises InteropError for one a reader would call malformed."""
+    message = QUOTA_EXHAUSTED + ("" if resets_at is None else " until %s" % resets_at) + ("" if text is None else ": %s" % text)
+    if "malformed" in read_job_pause({"job": {"id": "x", "status": "working", "statusMessage": message}}):
+        raise InteropError("A pause reads quota-exhausted [until <UTC instant, Z, at most 3 fraction digits>][: <text>], at most 500 characters.")
+    return message
+
+
+def repeated_key_decision(job: Any, now: Any, limit_holds: Optional[bool] = None, approval_granted: bool = False) -> str:
+    """The provider's answer to a repeated key: "run" (the same intent runs again, once) or "same" (answer with that job).
+    A quota-exhausted job runs again once the limit no longer holds: `limit_holds` False when the provider knows it, else
+    retryable with its reset passed at `now`; a limit-reached job once its approval is granted; anything else, and
+    outcome-unknown above all, never."""
+    if not isinstance(job, dict) or job.get("status") != "failed":
+        return "same"
+    error = _own(job, "error")
+    code = _own(error, "code")
+    if code == LIMIT_REACHED:
+        return "run" if approval_granted is True else "same"
+    if code != QUOTA_EXHAUSTED:
+        return "same"
+    if limit_holds is not None:
+        return "run" if limit_holds is False else "same"
+    data = _own(error, "data")
+    at = utc_time(now)
+    if not quota_data_ok(data) or not data["retryable"] or at is None:
+        return "same"
+    return "run" if "resetsAt" not in data or utc_time(data["resetsAt"]) <= at else "same"
+# #endregion job-limits-kit
 
 
 # --- C3.3 awaiting a choice ------------------------------------------------------------
@@ -279,8 +562,19 @@ class JobStore:
         return dict(record["job"])
 
     def create(self, capability: str, arguments: Any, traceparent: Optional[str] = None,
-               poll_interval_ms: Optional[int] = None, delegation: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Start a job; returns the handle a job-capable tool puts in structuredContent."""
+               poll_interval_ms: Optional[int] = None, delegation: Optional[Dict[str, Any]] = None, *,
+               caller: Optional[str] = None, idempotency_key: Optional[str] = None, now: Optional[str] = None,
+               limit_holds: Optional[bool] = None, approval_granted: bool = False) -> Dict[str, Any]:
+        """Start a job; returns the handle a job-capable tool puts in structuredContent.
+
+        With `idempotency_key` the key is kept per `caller` (the authenticated caller, DEC-0087): a key that already names
+        a job starts nothing and raises InteropError, unless `repeat` would answer "run" (a limit no longer holds, an
+        approval granted); then the key names the new job."""
+        if idempotency_key is not None:
+            decision = self.repeat(caller, idempotency_key, now if now is not None else _fs.now_iso(),
+                                   limit_holds=limit_holds, approval_granted=approval_granted)
+            if decision["decision"] == "same":
+                raise InteropError("Key %s already names job %s; answer with that job (JobStore.repeat)." % (idempotency_key, decision["job"]["id"]))
         job_id = "job_" + secrets.token_hex(12)
         job: Dict[str, Any] = {"id": job_id, "status": "working"}
         if poll_interval_ms:
@@ -290,7 +584,31 @@ class JobStore:
         if delegation:  # DEC-0039: who started it; only they read, cancel or answer it
             private["delegation"] = {"principal": delegation.get("principal"), "caller": delegation.get("caller")}
         self._save({"job": job, "private": private})
+        if idempotency_key is not None:
+            _fs.atomic_write(self._key_path(caller, idempotency_key), (json.dumps({"job": job_id}) + "\n").encode(), 0o600)
         return {"job": {"id": job_id, "status": "working"}}
+
+    def _key_path(self, caller: Optional[str], key: str) -> Path:
+        import hashlib
+        if not isinstance(key, str) or not key:
+            raise InteropError("An idempotency key is a non-empty string.")
+        name = hashlib.sha256(json.dumps([caller, key]).encode("utf-8")).hexdigest()
+        directory = self.dir / "keys"
+        _fs.ensure_private_dir(directory)
+        return directory / ("%s.json" % name)
+
+    def repeat(self, caller: Optional[str], key: str, now: Any, limit_holds: Optional[bool] = None,
+               approval_granted: bool = False) -> Dict[str, Any]:
+        """The answer to a key this caller sent before (DEC-0087): {"decision": "new"|"same"|"run", "job": job or None}.
+        "same": answer with that job, never run it again (outcome-unknown above all); "run": the intent runs again, once."""
+        try:
+            job_id = json.loads(self._key_path(caller, key).read_text(encoding="utf-8"))["job"]
+            job = self.get(job_id)
+        except (FileNotFoundError, UnknownJob):
+            return {"decision": "new", "job": None}
+        except (ValueError, KeyError, TypeError):
+            raise InteropError("Key %s is unreadable on disk." % key) from None
+        return {"decision": repeated_key_decision(job, now, limit_holds, approval_granted), "job": job}
 
     def get(self, job_id: str) -> Dict[str, Any]:
         return dict(self._load(job_id)["job"])
@@ -352,8 +670,37 @@ class JobStore:
             envelope = dict(envelope, trace={"traceparent": stored})
         return self._transition(job_id, "completed", result=envelope)
 
-    def fail(self, job_id: str, code: Any, message: str) -> Dict[str, Any]:
-        return self._transition(job_id, "failed", error={"code": code, "message": message})
+    def fail(self, job_id: str, code: Any, message: str, data: Any = None) -> Dict[str, Any]:
+        error: Dict[str, Any] = {"code": code, "message": message}
+        if data is not None:
+            error["data"] = data
+        return self._transition(job_id, "failed", error=error)
+
+    def pause(self, job_id: str, resets_at: Optional[str] = None, text: Optional[str] = None) -> Dict[str, Any]:
+        """A job a limit paused and its provider will resume (DEC-0087): working, its statusMessage in the pause grammar,
+        and pollIntervalMs reaching the reset within its cap of one hour."""
+        message = pause_message(resets_at, text)
+        record = self._load(job_id)
+        if resets_at is not None:
+            wait = utc_time(resets_at) - utc_time(_fs.now_iso())
+            if wait > 0:
+                record["job"]["pollIntervalMs"] = int(min(wait, 3600000))
+                self._save(record)
+        return self._transition(job_id, "working", statusMessage=message)
+
+    def quota_exhausted(self, job_id: str, message: str, retryable: bool, resets_at: Optional[str] = None) -> Dict[str, Any]:
+        """A job a limit stopped and its provider will not resume: failed, quota-exhausted, data {retryable, resetsAt?}."""
+        data: Dict[str, Any] = {"retryable": retryable}
+        if resets_at is not None:
+            data["resetsAt"] = resets_at
+        if not quota_data_ok(data):
+            raise InteropError("quota-exhausted data is {retryable: boolean, resetsAt?: UTC instant}, resetsAt only with retryable true.")
+        return self.fail(job_id, QUOTA_EXHAUSTED, message, data)
+
+    def outcome_unknown(self, job_id: str, message: str, data: Any = None) -> Dict[str, Any]:
+        """A job whose effect may have happened and that its provider cannot observe: failed, outcome-unknown. Its key is
+        never run again; only an observed result settles it."""
+        return self.fail(job_id, OUTCOME_UNKNOWN, message, data)
 
     def cancel(self, job_id: str) -> Dict[str, Any]:
         return self._transition(job_id, "cancelled")
