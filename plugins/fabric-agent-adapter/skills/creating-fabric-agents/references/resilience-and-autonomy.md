@@ -14,6 +14,7 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 - Verification you can believe
 - Operations that survive restarts
 - Secrets and confinement
+- Text for people
 - Checklist
 
 ## Limits are pauses
@@ -221,15 +222,33 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    an error.
 9. **Widen an access configuration first, code second**, so nothing is over-scoped even briefly.
 
-9. **Bound every recursive parse of untrusted input** (a depth limit, tested at the limit and one
-   above). Revoke or retire by a content-addressed reference, never a reusable name: a re-keyed
-   machine keeps its key id. Never refresh a person's own credentials as a side effect; renew only
-   what you own.
+10. **Bound every recursive parse of untrusted input** (a depth limit, tested at the limit and one
+    above). Revoke or retire by a content-addressed reference, never a reusable name: a re-keyed
+    machine keeps its key id. Never refresh a person's own credentials as a side effect; renew only
+    what you own.
+
+## Text for people
+
+1. **Text a person reads carries no em dash** (U+2014) and no substitute for it: not `--`, not a
+   spaced hyphen used as a dash. The operator reads it as the mark of machine-written text. Use a
+   full stop, a comma, a colon or parentheses, or rewrite the sentence. This covers replies,
+   messages, posts, mail, reports, captions and UI strings, in every language.
+2. **Exceptions are exact, never stylistic:** exact quotations, code, commands, paths and
+   historical records keep the character as they are.
+3. **The rule lives in the prompt and in a test.** The prompt of every lane that writes for people
+   states it; a test feeds that lane's output (and every fixed template) through a check that
+   fails on U+2014, for example `assert "\u2014" not in text`, and is seen failing on a planted
+   dash. A spaced hyphen cannot be told from a range or a minus by a pattern: the prompt and a
+   reviewer carry that half, the check does not guess.
+4. **A model's slip is rewritten or refused, never shipped.** When an accepted answer still holds U+2014, the
+   call site's `accept` rewrites it or retries once, then refuses; it never sends the dash on.
 
 ## Checklist
 
-Before the first release, answer each with a file and a test: where a limit pauses and resumes;
-what `accept` each model call has; which vendors its fallback and checker use; where the attempt
-ledger and idempotency keys live; what happens to an unknown outcome; which waits are durable;
-who owns the run lock; what the next start sweeps; how a cancel reaches paid inner work; which
-outputs are capped; how a secret reaches a child; which test was seen failing for each fix.
+Before the first release, answer each with a file and a test: where a limit pauses and resumes; what
+`accept` each model call has; which vendors its fallback and checker use; where the attempt ledger
+and idempotency keys live; what happens to an unknown outcome; which waits are durable; who owns the
+run lock; what the next start sweeps; how a cancel reaches paid inner work; which outputs are
+capped; how a secret reaches a child; which test was seen failing for each fix; and, for an agent
+that writes text for people, where its prompt says no em dash and which test fails on U+2014 in its
+output.

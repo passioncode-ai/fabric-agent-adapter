@@ -7,6 +7,15 @@
 - **`creating-fabric-agents`, resilience and autonomy, third pass**: a rerun calls read-only tools until its open
   outcomes are reconciled; idempotency keys cover content as well as the run; every tool's input schema is pinned to
   the domain schema by a test.
+- **`creating-fabric-agents`, text for people** (FAA-52): the intake grill asks whether the agent writes text a person
+  reads; if it does, its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in
+  its output from the first commit. The resilience reference gains *Text for people* (the rule, its exact exceptions,
+  a portable check, `accept` rewriting or refusing a model's slip) and a checklist line; a new eval scenario covers it.
+  `test/validate.py` fails a tree where the grill, the reference or the scenario loses it.
+
+### Fixed
+
+- **The resilience reference numbered two rules 9** under *Secrets and confinement*; the second is 10.
 
 ## 0.35.2 - 2026-10-18
 

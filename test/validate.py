@@ -403,6 +403,19 @@ def validate_skill(name: str, errors: List[str]) -> None:
     if name in BUILDER_SKILLS and ("builds for themselves" not in flat or "its owner's choice" not in flat):
         errors.append("%s: SKILL.md must say an agent someone builds for themselves is outside the standard "
                       "and its licence is its owner's choice" % name)
+    if name == "creating-fabric-agents":
+        # FAA-52: an agent that writes text for people carries the no-em-dash rule from its first commit.
+        if "Text for people?" not in flat or "U+2014" not in flat:
+            errors.append("%s: SKILL.md's grill must ask whether the agent writes text people read "
+                          "and carry the no-em-dash rule (U+2014)" % name)
+        resilience = " ".join((skill_dir / "references/resilience-and-autonomy.md").read_text(encoding="utf-8").split())
+        if "U+2014" not in resilience or "no em dash" not in resilience.split("## Checklist", 1)[-1]:
+            errors.append("%s: resilience-and-autonomy.md must state the no-em-dash rule (U+2014) "
+                          "and ask for its check in the checklist" % name)
+        scenarios_text = (ROOT / "test/evals" / name / "scenarios.json").read_text(encoding="utf-8")
+        if "text-for-people-carries-no-em-dash" not in scenarios_text:
+            errors.append("%s: scenarios.json must cover text for people "
+                          "(scenario text-for-people-carries-no-em-dash)" % name)
 
     linked_refs = set(re.findall(r"\]\(references/([^)]+)\)", skill_text))
     actual_refs = {path.name for path in (skill_dir / "references").glob("*.md")}

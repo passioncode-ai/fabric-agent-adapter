@@ -43,8 +43,8 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
         return
 
 
-def probe(*args, cwd=None, env=None):
-    done = subprocess.run([NODE, str(PROBE), "--json"] + list(args), capture_output=True, text=True, timeout=240,
+def probe(*args, cwd=None, env=None, script=PROBE):
+    done = subprocess.run([NODE, str(script), "--json"] + list(args), capture_output=True, text=True, timeout=240,
                           cwd=cwd, env=dict(os.environ, **(env or {})))
     return done.returncode, json.loads(done.stdout or "{}"), done.stderr
 
@@ -54,7 +54,12 @@ class WithoutPlaywright(unittest.TestCase):
     def test_every_rule_is_not_run_with_the_reason(self):
         with tempfile.TemporaryDirectory() as empty:
             env = {"FABRIC_PLAYWRIGHT": "", "NODE_PATH": ""}
-            code, report, _ = probe("http://127.0.0.1:9/", "--playwright", empty, cwd=empty, env=env)
+            # A bare import('playwright') resolves upward from the script's own folder, so a Playwright
+            # installed in any parent (a home folder's node_modules) would be found. Run a copy from
+            # the empty folder: the probe imports node: modules only.
+            script = Path(empty).resolve() / PROBE.name
+            shutil.copy(PROBE, script)
+            code, report, _ = probe("http://127.0.0.1:9/", "--playwright", empty, cwd=empty, env=env, script=script)
         self.assertEqual(code, 0)
         self.assertEqual(report["failed"], 0)
         self.assertEqual({r["rule"] for r in report["results"]}, {"ED-1", "ED-2", "ED-3", "ED-4", "ED-5"})
