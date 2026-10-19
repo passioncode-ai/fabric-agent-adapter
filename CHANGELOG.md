@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.36.0 - 2026-10-19
+
+Repinned to Fabric Agent Contract `07042181bfae2a481aa0da1a5651f24c76669c48` (DEC-0084 to DEC-0088); `d8146cf` stays
+supported, so bundles issued under it stay valid. DEC-0085 and DEC-0088 (entitlements) are the platform's and the
+organization server's, not the kits'.
+
+### Added
+
+- **Jobs under limits and uncertain effects, in both interop kits** (FAA-56, contract DEC-0087, FAC-SEM-119/120): a job a
+  limit paused stays `working` with `quota-exhausted until <instant>` (`jobs.pause`); a job a limit stopped ends
+  `quota-exhausted` with `data: {retryable, resetsAt?}` (`jobs.quota_exhausted`); an effect nobody saw ends
+  `outcome-unknown` (`jobs.outcome_unknown`). Idempotency keys are kept per authenticated caller and a repeated key is
+  answered by its job (`jobs.repeat`): a limited job runs again once the limit no longer holds, an `outcome-unknown` one
+  never. Usage nobody measured is `null` only toward a caller that names `fabric-interop/0.2` (`usage_toward`). As a
+  caller: `request_meta`, `job_caller_action`, `intent_idempotency_key`. Held to the contract's `job-limits.json`.
+- **Share grants into an organization** (contract DEC-0086): new `fabric_share.py` / `fabric-share.mjs` with FAC-SEM-117
+  (a share grant id, a millisecond window, one agentRef kept against the parent revision), FAC-SEM-118 (a
+  `share-registration/1` document) and FAC-SEM-045's `grant.usage` context clause; `share-registration.schema.json`
+  vendored self-contained.
+- **The estate ceremonies** (contract DEC-0084): in both estate kits FAC-SEM-114 (what a revision drops it revokes in the
+  same revision), FAC-SEM-073 (a device key in canonical base64), FAC-SEM-076 (a key reference
+  `<kid>@sha256:<hex>`), `device_key_fingerprint`, `device_key_ref`, and `verify_estate_record(..., parent=)` runs
+  FAC-SEM-114. New `fabric_ceremonies.py` / `fabric-ceremonies.mjs`: `verify_enroll_token`, `enroll_join_input`,
+  FAC-SEM-113. Pairing and the hub's single use of a token follow in FAA-57.
+- **A partner's setup for a company** (FAA-55, the partner channel's PA-07): documented and tested as an org skill set
+  whose `requires.packages` names the agents, every package signed with the partner's key. No new format.
+
+### Changed
+
+- **FAC-SEM-034** in both profile kits compares the probes before it builds a list and names at most 64 candidates, so a
+  huge index allocates nothing (the contract's fix of this repository's report).
+- **The protocol register** in both service kits matches the contract's: `enroll-token`, `entitlement`,
+  `entitlement-key-set`, `pairing-message`, `share-registration`, `share-registration-receipt`, and `fabric-interop/0.2`.
+
 ## 0.35.4 - 2026-10-19
 
 ### Changed
