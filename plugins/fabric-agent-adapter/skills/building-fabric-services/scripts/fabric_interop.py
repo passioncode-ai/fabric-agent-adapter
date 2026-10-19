@@ -592,7 +592,7 @@ class JobStore:
         import hashlib
         if not isinstance(key, str) or not key:
             raise InteropError("An idempotency key is a non-empty string.")
-        name = hashlib.sha256(json.dumps([caller, key]).encode("utf-8")).hexdigest()
+        name = hashlib.sha256(json.dumps([caller, key], separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()  # as JSON.stringify writes it
         directory = self.dir / "keys"
         _fs.ensure_private_dir(directory)
         return directory / ("%s.json" % name)

@@ -140,6 +140,12 @@ class ProviderTests(unittest.TestCase):
         self.jobs.fail(done, "bad-input", "the brief is empty")
         self.assertEqual(self.jobs.repeat("caller-a", "k-3", self.NOW, limit_holds=False, approval_granted=True)["decision"], "same")
 
+    def test_the_key_file_is_the_one_the_node_kit_reads(self):
+        import hashlib
+        job_id = self.start(caller="caller-a", key="k-1")
+        name = hashlib.sha256('["caller-a","k-1"]'.encode()).hexdigest() + ".json"
+        self.assertEqual(json.loads((self.jobs.dir / "keys" / name).read_text()), {"job": job_id})
+
     def test_the_usage_gate(self):
         measured = {"inputTokens": 1200, "outputTokens": None, "wallMs": 5100, "costUsd": None}
         old = {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}
