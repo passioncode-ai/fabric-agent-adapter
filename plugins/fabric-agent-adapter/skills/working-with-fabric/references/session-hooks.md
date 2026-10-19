@@ -87,6 +87,9 @@ only variable names are looked at, never a value (two of them carry the session'
 - **Start a second Fabric session.** A `fabric-mcp` started on its own would enroll a new session, and Fabric ends a
   binding's oldest live session past eight (ADR-0134 amendment 2) — the agent's own. The worker and `watch-mail` run
   `fabric-mcp --rejoin-only --runtime-session-id <id>`, and only when Fabric advertises `session-hooks/1`.
+- **Rejoin more than once a minute.** Every rejoin spends the agent's Fabric request budget, which every session of
+  the machine shares. A turn within 60 s of the session's last successful rejoin (the worker marks it as `rejoined`
+  in the session's folder) is spooled and waits for the next worker; the end of a session always starts one (FAA-53).
 - **Retry in a loop.** A refused call is logged by its error code and dropped; an answer that never came is logged
   as `outcome=unknown`. The calls carry an `idempotencyKey`, so a repeat is the same event.
 

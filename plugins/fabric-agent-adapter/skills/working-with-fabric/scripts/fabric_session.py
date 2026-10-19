@@ -56,6 +56,9 @@ LOCK_STALE_S = 30.0
 #: A session folder untouched this long belongs to a session that will not spool again: its worker failed, or the
 #: session ended without SessionEnd. Nothing retries it, so the next spooling hook removes it (FAA-50).
 SESSION_STALE_S = 7 * 86400
+#: A session rejoins at most once in this span (FAA-53): every rejoin spends Fabric's per-agent request budget, which
+#: every session of the machine shares; a turn inside it waits in the spool for the next worker, an end never waits.
+REJOIN_MIN_INTERVAL_S = 60.0
 READ_CAP = 64 * 1024
 CONFIG_CAP = 32 * 1024 * 1024
 WATCH_MIN_INTERVAL_S = 10
@@ -63,7 +66,7 @@ WATCH_MAX_BACKOFF_S = 900
 SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 LOCAL_ORIGIN = re.compile(r'"origin": "http://(?:127\.0\.0\.1|localhost)')
-VERSION = "0.35.3"
+VERSION = "0.35.4"
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
          "hermes": "Hermes", "opencode": "OpenCode", "openclaw": "OpenClaw", "pi": "Pi"}
 NATIVE_PLUGIN_HOSTS = frozenset(("hermes", "opencode", "openclaw", "pi"))
@@ -559,10 +562,21 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
     if event == "end" and isinstance(payload.get("reason"), str):
         entry["reason"] = payload["reason"][:64]
     spool(directory, entry)
-    if event == "end" or not lock_held(directory):
-        spawn(directory)
-        return "spooled: worker started"
-    return "spooled: a worker is running"
+    if event != "end" and lock_held(directory):
+        return "spooled: a worker is running"
+    if event != "end" and rejoined_recently(directory):
+        return "spooled: rejoined recently"
+    spawn(directory)
+    return "spooled: worker started"
+
+
+def rejoined_recently(directory: Path, now: Optional[float] = None) -> bool:
+    """Whether this session's last rejoin succeeded within REJOIN_MIN_INTERVAL_S (the worker marks it)."""
+    try:
+        mark = (directory / "rejoined").stat().st_mtime
+    except OSError:
+        return False
+    return 0 <= (time.time() if now is None else now) - mark < REJOIN_MIN_INTERVAL_S
 
 
 def _remove_tree(directory: Path) -> None:
@@ -801,6 +815,7 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                                       "clientInfo": {"name": "fabric-agent-adapter-hooks", "version": VERSION}})
         client.notify("notifications/initialized")
         names = _wait_for_session_tools(client, deadline)
+        _write_private(directory / "rejoined", "")
         while entries:
             for path in entries:
                 entry = json.loads(read_small(path) or "{}")
