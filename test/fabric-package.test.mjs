@@ -226,6 +226,32 @@ test('sign then verify, a countersignature, re-signing, and a folder changed aft
   assert.equal(refused.ok, false, 'a folder that no longer matches its package is not signed');
 });
 
+test("a partner's setup is an org skill set that requires its agents, signed by the partner's key (FAA-55)", (t) => {
+  const dir = tempDir(t);
+  const root = path.join(dir, 'acme-setup');
+  const files = {
+    '.claude-plugin/plugin.json': `${JSON.stringify({ name: 'acme-setup', version: '1.0.0' })}\n`,
+    'skills/house-style/SKILL.md': '---\nname: house-style\ndescription: How this company writes.\n---\n',
+  };
+  for (const [p, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(root, p)), { recursive: true });
+    fs.writeFileSync(path.join(root, p), text);
+  }
+  const agents = [{ publisher: 'example', id: 'inbox-digest', range: '^1.0.0' }, { publisher: 'example', id: 'invoice-reader', range: '^2.1.0' }];
+  const draft = { schema: 'fabric-package/1', kind: 'skill-set', id: 'acme-setup', version: '1.0.0', publisher: 'example', licence: 'LicenseRef-Partner', layer: 'org', runners: ['claude-code'], skills: ['house-style'], requires: { packages: agents } };
+  fs.writeFileSync(path.join(root, k.PACKAGE_FILE), `${JSON.stringify(draft, null, 2)}\n`);
+  const packed = k.pack(root, { apply: true });
+  assert.ok(packed.ok, JSON.stringify(packed.problems));
+  assert.ok(!('agentRef' in packed.package), 'a skill set names no agent of its own');
+  assert.deepEqual(packed.package.requires.packages, agents, 'the agents it sets up, by publisher, id and range');
+  assert.ok(k.sign(root, keyFile(dir), { apply: true }).ok);
+  const partner = V.keys.publisher.jwk;
+  assert.ok(k.verify(root, { publisher: [partner] }).ok);
+  assert.equal(k.verify(root, { publisher: [V.keys.organization.jwk] }).ok, false, 'a machine that pins another publisher key refuses the setup');
+  fs.writeFileSync(path.join(root, 'skills/house-style/SKILL.md'), 'changed after signing\n');
+  assert.equal(k.verify(root, { publisher: [partner] }).ok, false, "a changed skill breaks the setup's signature");
+});
+
 test('the key file: mode, kid, x, alg, PEM, and a key openssl makes', (t) => {
   const dir = tempDir(t);
   const root = path.join(dir, 'pkg');

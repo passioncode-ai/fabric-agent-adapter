@@ -265,6 +265,36 @@ class PackTests(unittest.TestCase):
         self.assertFalse(refused["ok"], "a folder that no longer matches its package is not signed")
         self.assertFalse(refused["applied"])
 
+    def test_a_partner_setup_is_an_org_skill_set_that_requires_its_agents(self):
+        """FAA-55 (PA-07): a partner's setup for a company is no new format. It is a skill set at layer org (the
+        organization's skills) whose requires.packages names the agent packages, each signed by the partner's own
+        publisher key; the company's machine pins that key. Packed, signed and verified like any package."""
+        setup = Path(self.tmp.name) / "acme-setup"
+        files = {
+            ".claude-plugin/plugin.json": json.dumps({"name": "acme-setup", "version": "1.0.0"}) + "\n",
+            "skills/house-style/SKILL.md": "---\nname: house-style\ndescription: How this company writes.\n---\n",
+        }
+        for path, text in files.items():
+            (setup / path).parent.mkdir(parents=True, exist_ok=True)
+            (setup / path).write_text(text)
+        agents = [{"publisher": "example", "id": "inbox-digest", "range": "^1.0.0"},
+                  {"publisher": "example", "id": "invoice-reader", "range": "^2.1.0"}]
+        draft = {"schema": "fabric-package/1", "kind": "skill-set", "id": "acme-setup", "version": "1.0.0",
+                 "publisher": "example", "licence": "LicenseRef-Partner", "layer": "org", "runners": ["claude-code"],
+                 "skills": ["house-style"], "requires": {"packages": agents}}
+        (setup / fp.PACKAGE_FILE).write_text(json.dumps(draft, indent=2) + "\n")
+        packed = fp.pack(setup, apply=True)
+        self.assertTrue(packed["ok"], packed["problems"])
+        self.assertNotIn("agentRef", packed["package"], "a skill set names no agent of its own")
+        self.assertEqual(packed["package"]["requires"]["packages"], agents, "the agents it sets up, by publisher, id and range")
+        self.assertTrue(fp.sign(setup, self.key(), apply=True)["ok"])
+        partner = V["keys"]["publisher"]["jwk"]
+        self.assertTrue(fp.verify(setup, {"publisher": [partner]})["ok"])
+        self.assertFalse(fp.verify(setup, {"publisher": [V["keys"]["organization"]["jwk"]]})["ok"],
+                         "a machine that pins another publisher key refuses the setup")
+        (setup / "skills/house-style/SKILL.md").write_text("changed after signing\n")
+        self.assertFalse(fp.verify(setup, {"publisher": [partner]})["ok"], "a changed skill breaks the setup's signature")
+
     def test_the_key_file(self):
         write_agent(self.root)
         fp.pack(self.root, apply=True)
