@@ -30,7 +30,8 @@ The normative rules are the Fabric Agent Contract's, at the commit this plugin p
 
 Every step up is paid as cloud only: the person or the organization pays for the cloud its agents run in, and the
 order says which hosting it holds (`personal-cloud`, `org-cloud`, `enterprise-cloud` in `entitlement/1`). An agent never
-checks a price; it may read whether its context's entitlement is current and degrade honestly when it is not.
+checks a price; it may read whether its context's entitlement is current and degrade honestly when it is not. An agent placed
+into a customer's cloud is part of that customer's tier, not a product of its own.
 
 ## Contexts: one agent, the person and each organization
 
