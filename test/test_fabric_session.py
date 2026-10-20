@@ -251,14 +251,45 @@ class SessionStart(Base):
         self.assertNotIn("DOOR-TOKEN-SENTINEL", done.stdout)
         self.assertLess(elapsed, 2.0)
 
-    def test_one_line_when_registered_and_down(self):
+    def test_one_short_line_when_registered_down_and_the_project_uses_fabric(self):
         self.register()
         self.hub(pid=self.dead_pid())
-        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)})
+        (self.repo / "fabric-agent.json").write_text("{}")
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
         context = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertEqual(context, fs.DOWN_NOTICE)
+        self.assertEqual(len(context.splitlines()), 1)
+        self.assertLessEqual(len(context), 240)
         self.assertIn("not running", context)
+        self.assertIn("skip `fabric_whoami`", context)
         self.assertIn("lifecycle_ensure_running", context)
         self.assertIn("never launch it yourself", context)
+        self.assertNotIn("\u2014", context)
+
+    def test_silent_when_down_in_a_project_that_does_not_use_fabric(self):
+        self.register()  # user scope: every folder of the machine sees it, so it says nothing about this project
+        for hub in (lambda: None, lambda: self.hub(pid=self.dead_pid())):
+            hub()
+            for host in ("claude", "codex", "kimi"):
+                if host == "codex":
+                    (self.home / ".codex").mkdir(exist_ok=True)
+                    (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\ncommand = "fabric-mcp"\n')
+                done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
+                                        args=["--host", host])
+                self.assertEqual((done.returncode, done.stdout), (0, ""), host)
+
+    def test_compact_and_resume_are_silent(self):
+        self.register()
+        self.hub()
+        for source in ("compact", "resume"):
+            done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": source})
+            self.assertEqual((done.returncode, done.stdout), (0, ""), source)
+        for source in ("startup", "clear", None):
+            payload = {"session_id": SID, "cwd": str(self.repo)}
+            if source:
+                payload["source"] = source
+            done, _ = self.run_hook("session-start", payload)
+            self.assertIn("fabric_whoami", done.stdout, source)
 
     def test_bad_input_never_fails(self):
         self.register()
@@ -720,26 +751,36 @@ class LaunchedByFabric(Active):
         self.assertIn("fabric_whoami", done.stdout)
 
 
-class ServicesLine(Base):
-    NOTE = ("Fabric on this machine: {total} service descriptors in {dir} ({local} local on 127.0.0.1), protocol "
-            "fabric-service/0.1 — probe GET <origin>/.well-known/fabric-service, or call the fabric-dashboards MCP "
-            "list_services if connected. Never kill these services directly; their supervisor owns them.")
+class NoServicesLine(Base):
+    """The machine's descriptor-count line is gone: the host's own instructions carry how to read Fabric services."""
 
-    def services(self):
+    def services(self, origin="https://example.invalid"):
         directory = self.base / "svc"
-        directory.mkdir()
-        (directory / "a.default.json").write_text('{\n  "origin": "http://127.0.0.1:4100",\n  "auth": {}\n}')
+        directory.mkdir(exist_ok=True)
+        (directory / "a.default.json").write_text(json.dumps({
+            "origin": "http://127.0.0.1:4100", "id": "a", "instance": "default", "auth": {"tokenFile": "/x/TOKEN-PATH"},
+            "source": {"repository": origin}}))
         (directory / "b.default.json").write_text('{"origin": "http://localhost:4200"}')
-        (directory / "c.default.json").write_text('{"origin": "https://example.invalid"}')
         (directory / "notes.txt").write_text("not a descriptor")
-        (directory / ".a.default.json.tmp.json").write_text('{"origin": "http://127.0.0.1:1"}')  # hidden: not counted
         self.env["FABRIC_SERVICES_DIR"] = str(directory)
         return directory
 
-    def test_the_line_matches_the_machine_note(self):
-        self.assertIsNone(fs.services_line(self.env))
-        directory = self.services()
-        self.assertEqual(fs.services_line(self.env), self.NOTE.format(total=3, dir=directory, local=2))
+    def test_descriptors_alone_say_nothing_for_any_host(self):
+        self.services()
+        self.assertFalse(hasattr(fs, "services_line"))
+        self.assertFalse(hasattr(fs, "SERVICES_NOTE"))
+        for host in ("claude", "codex", "kimi", "hermes"):
+            done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", host])
+            self.assertEqual((done.returncode, done.stdout), (0, ""), host)
+
+    def test_the_preamble_carries_no_service_line(self):
+        self.services()
+        self.register()
+        self.hub()
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
+        context = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertEqual(context, fs.PREAMBLE.format(host="Claude Code"))
+        self.assertNotIn("TOKEN-PATH", done.stdout)
 
     def test_default_services_folder_per_os(self):
         self.assertEqual(fs.services_dir("darwin", {"HOME": "/Users/a"}),
@@ -749,15 +790,72 @@ class ServicesLine(Base):
                          Path("C:/L") / "passioncode-fabric" / "services")
         self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "/s"}), Path("/s"))
 
-    def test_session_start_carries_it_for_every_host(self):
-        directory = self.services()
-        line = self.NOTE.format(total=3, dir=directory, local=2)
-        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)})
-        self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], line)
-        for host in ("codex", "kimi"):
-            done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", host])
-            context = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"] if host == "codex" else done.stdout.strip()
-            self.assertEqual(context, line, host)
+
+
+class ProjectUsesFabric(Base):
+    """Which projects hear that Fabric is down: those with a Fabric contract file, a project-bound registration, or a
+    service descriptor that names their repository. Everything else is silent."""
+
+    def git_repo(self, origin=None):
+        subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
+        if origin:
+            subprocess.run(["git", "-C", str(self.repo), "config", "remote.origin.url", origin], check=True)
+        sub = self.repo / "pkg" / "deep"
+        sub.mkdir(parents=True)
+        return sub
+
+    def test_nothing_marks_a_plain_folder(self):
+        self.assertIsNone(fs.project_uses_fabric(self.repo, self.env))
+        self.assertIsNone(fs.project_uses_fabric(self.base / "missing", self.env))
+
+    def test_each_contract_file_anywhere_from_the_folder_to_the_checkout_root(self):
+        sub = self.git_repo()
+        for name in fs.FABRIC_MARKERS:
+            (self.repo / name).write_text("{}")
+            self.assertEqual(fs.project_uses_fabric(sub, self.env), name)
+            (self.repo / name).unlink()
+        (sub / "fabric-agent.json").write_text("{}")
+        self.assertEqual(fs.project_uses_fabric(sub, self.env), "fabric-agent.json")
+
+    def test_a_file_above_the_checkout_or_a_folder_by_that_name_does_not_count(self):
+        sub = self.git_repo()
+        (self.base / "fabric-agent.json").write_text("{}")  # the parent of the checkout: another project
+        (self.repo / "fabric-contract.lock.json").mkdir()
+        self.assertIsNone(fs.project_uses_fabric(sub, self.env))
+
+    def test_a_project_bound_registration_counts_and_a_user_one_does_not(self):
+        self.register(scope="user")
+        self.assertIsNone(fs.project_uses_fabric(self.repo, self.env, fs.claude_registration(self.repo, self.env)))
+        self.register(scope="local")
+        self.assertEqual(fs.project_uses_fabric(self.repo, self.env, fs.claude_registration(self.repo, self.env)),
+                         "registration")
+        (self.home / ".claude.json").unlink()
+        (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "fabric-mcp"}}}))
+        self.assertEqual(fs.project_uses_fabric(self.repo, self.env, fs.claude_registration(self.repo, self.env)),
+                         "registration")
+
+    def test_a_service_descriptor_naming_this_repository(self):
+        sub = self.git_repo("git@github.com:example/example-agent.git")
+        directory = self.base / "svc"
+        directory.mkdir()
+        self.env["FABRIC_SERVICES_DIR"] = str(directory)
+        (directory / "other.default.json").write_text(json.dumps({"source": {"repository": "https://github.com/x/y"}}))
+        (directory / "broken.default.json").write_text("{not json")
+        self.assertIsNone(fs.project_uses_fabric(sub, self.env))
+        (directory / "example-agent.default.json").write_text(json.dumps(
+            {"id": "example-agent", "source": {"repository": "https://github.com/Example/example-agent"}}))
+        self.assertEqual(fs.project_uses_fabric(sub, self.env), "service")
+
+    def test_down_line_for_each_sign_and_for_every_host(self):
+        self.register(scope="local")
+        self.hub(pid=self.dead_pid())
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
+        self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], fs.DOWN_NOTICE)
+        (self.repo / "fabric.package.json").write_text("{}")
+        (self.home / ".codex").mkdir()
+        (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\ncommand = "fabric-mcp"\n')
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
+        self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], fs.DOWN_NOTICE)
 
 
 class OtherHosts(Base):
@@ -795,6 +893,9 @@ class OtherHosts(Base):
         kimi.mkdir()
         (kimi / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "/x/fabric-mcp", "args": []}}}))
         self.hub(pid=self.dead_pid())
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "kimi"])
+        self.assertEqual(done.stdout, "", "a project that does not use Fabric hears nothing")
+        (self.repo / "fabric-contract.lock.json").write_text("{}")
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "kimi"])
         self.assertIn("Fabric is not running", done.stdout)
         self.assertIn("lifecycle_ensure_running", done.stdout)
@@ -1036,6 +1137,11 @@ class PluginHooks(unittest.TestCase):
             self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/working-with-fabric/scripts/fabric_session.py", hook["command"])
             self.assertTrue(hook["command"].endswith(tail), hook["command"])
             self.assertLessEqual(hook["timeout"], 5)
+
+    def test_session_start_runs_at_startup_and_clear_only(self):
+        hooks = json.loads(HOOKS.read_text(encoding="utf-8"))["hooks"]
+        (entry,) = [e for e in hooks["SessionStart"] if "fabric_session.py" in e["hooks"][0]["command"]]
+        self.assertEqual(entry.get("matcher"), "startup|clear", "compact and resume keep what the session already has")
 
 
 if __name__ == "__main__":

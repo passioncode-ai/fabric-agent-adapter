@@ -109,13 +109,15 @@ this repository both obeys it and ships its service layer
 **Background footprint (LC-09): five session hooks, nothing resident.** The plugin is skills plus
 `plugins/fabric-agent-adapter/hooks/hooks.json`:
 
-- `SessionStart` (matcher `startup|resume`): `dashboard_kit.py notice` reads the repository (`git rev-parse`,
-  `git ls-files`, `git grep`) and the services directory, prints one line when the repository's dashboard has no
-  dashboard kit or an older one, and exits 0 — always, within its 5 s timeout; it writes nothing. Measured under a
+- `SessionStart` (matcher `startup|clear`): `dashboard_kit.py notice` reads the repository (`git rev-parse`,
+  `git ls-files`, `git grep`) and the services directory, prints one line when the repository owns a service (a
+  descriptor names it as `source.repository`) whose dashboard has no dashboard kit or an older one, and exits 0, always, within its 5 s timeout; it writes nothing. Measured under a
   load average of about 50: median 294–443 ms per session start.
 - `SessionStart`, `Stop`, `UserPromptSubmit`, `SessionEnd`: `fabric_session.py hook …` (working-with-fabric). Session
-  start reads `~/.claude.json`, Fabric's `hub.json` and the services directory, and prints the preamble only when
-  `fabric` is registered (plus one line when the machine has Fabric service descriptors). Stop and SessionEnd read
+  start (matcher `startup|clear`) reads `~/.claude.json` and Fabric's `hub.json`, and prints the preamble only when
+  `fabric` is registered and Fabric runs; when Fabric is down, one line, and only in a project that uses Fabric (a
+  contract file up to the checkout root, a project-bound registration, or, read last, a service descriptor naming the
+  checkout's origin, one `git config` call). Stop and SessionEnd read
   `hub.json` first and return, writing nothing, unless the running Fabric advertises `session-hooks/1`; then they
   write a spool entry (0600, at most 50 per session; a session folder untouched for 7 days is removed by the next spool) in the user's cache folder and start a **detached worker**
   (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` with a 10 s deadline, reads the board's unread
@@ -135,8 +137,8 @@ long-lived process, `watch-mail`, runs only while an agent waits on the board, u
 |---|---|---|---|---|---|
 | `install.sh`, `npx @passioncode-ai/fabric-agent-adapter` | a person | on demand | nothing | exits when done | 0 |
 | `npx @passioncode-ai/fabric-agent-adapter pack\|sign\|verify`, `fabric_package.py`, `fabric-package.mjs` | a person or their agent | on demand | nothing | exits when done; writes only `fabric.package.json` in the folder named, and only with `--apply` | 0 |
-| `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or resume | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
-| `fabric_session.py hook session-start\|stop\|session-end` (plugin hooks) | Claude Code | per session start, per turn, per session end | nothing | exits when done (≤ 5 s timeout) | 0 |
+| `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or `/clear` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
+| `fabric_session.py hook session-start\|stop\|session-end` (plugin hooks) | Claude Code | per session start or `/clear`, per turn, per session end | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook user-prompt-submit` (plugin hook) | Claude Code | per prompt | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook session-start --host codex\|kimi` | Codex / Kimi Code, only after `install-host-hooks --apply` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py watch-mail` | a Claude Code agent, under its own background watcher, while it waits on the board | one look per interval (≥ 10 s, default 60 s ± 20 %; backoff to 15 min while Fabric is down) | nothing | its stdin's end, SIGTERM/SIGINT/SIGHUP, or its parent gone | 0 between looks (a sleeping process; each look one `fabric-mcp --rejoin-only` with a 10 s deadline) |

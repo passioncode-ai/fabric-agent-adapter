@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.38.0 - 2026-10-20
+
+### Changed
+
+- **Quieter session start** (FAA-59, the operator's audit of 2026-10-20). Measured on the operator's Mac (26 service
+  descriptors, `fabric` registered at user scope): with Fabric running the SessionStart context fell from 1,243
+  characters at every start, compact and resume to 893 at startup and `/clear` only; with Fabric down, from 678 in
+  every repository to nothing in one that does not use Fabric and one 217-character line in one that does.
+  - `fabric_session.py hook session-start` no longer adds the machine's Fabric-service count: the host's own
+    instructions say how to read Fabric services. `services_line` and `SERVICES_NOTE` are gone.
+  - Fabric down: one line, `skip fabric_whoami and the project board for now`, start Fabric through the lifecycle
+    broker only if the task needs it, and only in a project that uses Fabric (`project_uses_fabric`): `fabric`
+    registered at local or project scope, a `fabric-agent.json`, `fabric-contract.lock.json` or `fabric.package.json`
+    from the folder up to its checkout's root, or a service descriptor whose `source.repository` is the checkout's
+    origin. Before, every repository was told to start Fabric while the `fabric` MCP server said to call
+    `fabric_whoami` first.
+  - Both SessionStart hooks run on `startup|clear`, never on compact or resume; the session-start script also ignores
+    `source: compact|resume` for every host.
+  - `dashboard_kit.py notice` speaks only in a repository that owns a service (a descriptor names it as
+    `source.repository`), names only that repository's services, and offers the upgrade as one the agent may make
+    itself; it no longer says "tell the operator". `references/dashboard-kit.md` and its scenario eval say the same.
+
 ## 0.37.1 - 2026-10-20
 
 ### Added

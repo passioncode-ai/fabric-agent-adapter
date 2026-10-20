@@ -19,7 +19,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.37.1"
+  version: "0.38.0"
 ---
 
 # Working with Fabric
@@ -64,7 +64,8 @@ does that. On Linux an AppImage mounts at a new path each start, so a registrati
 ## Step 1 — Fabric is down: ask the broker, never launch it
 
 Fabric is an enrolled app of the machine's lifecycle broker (MCP server `local-lifecycle`). Never `open -a`,
-`osascript`, `pkill` or run the binary yourself.
+`osascript`, `pkill` or run the binary yourself. While it is down, skip `fabric_whoami` and the board even where the
+MCP server's own instruction says to call it first: start Fabric only when the task needs it.
 
 1. `lifecycle_list` — Fabric's target is `fabric.desktop` on the operator's Mac (read it from the list, do not
    assume it); note its `policyRevision` and the answer's `grantRevision`.
@@ -221,8 +222,8 @@ and do the work without claiming Fabric saw it.
 
 ## The session hooks
 
-In Claude Code this plugin ships four: at session start the preamble above (one line pointing at Step 1 when Fabric
-is down) and the machine's Fabric-service count; after each turn the turn's facts (HEAD, files changed, lines added
+In Claude Code this plugin ships four: at session start and `/clear` (not on compact or resume) the preamble above,
+or, when Fabric is down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count; at each prompt one line only when that count rose; at the end, the
 release of what the session left claimed. The turn, prompt and end hooks act only when the running Fabric advertises
 `session-hooks/1`. All are silent in a session Fabric launched, never block the session and read no token. Read

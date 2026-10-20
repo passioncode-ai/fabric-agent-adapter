@@ -140,9 +140,12 @@ the scroll position: say so in the report. A `NOT_RUN` is not a pass.
 
 ## Upgrading an existing dashboard
 
-A session that starts in a repository whose dashboard has no kit or an older one gets one line from
-the plugin's SessionStart hook. That line is a notice, not an instruction to act: **tell the
-operator and update only with their go-ahead** — the page is theirs and may be open while you work.
+A session that starts (or is cleared) in a repository that owns a service, whose dashboard has no
+kit or an older one, gets one line from the plugin's SessionStart hook. A repository owns a service
+when a descriptor names it as `source.repository`; nowhere else does the line appear, and it names
+only that repository's services. **The upgrade is yours to make** when your task lets you change
+this repository: do it, keep the service's own edits (step 3), and say in your report what changed.
+In the middle of an unrelated task, finish that first or record the upgrade as a next task.
 
 1. `dashboard_kit.py status` names each copy: `current`, `older`, `changed` (edited after it was
    copied) or `unmarked`, and the services built from this repository.

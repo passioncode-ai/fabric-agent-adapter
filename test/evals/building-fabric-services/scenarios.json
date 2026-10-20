@@ -196,7 +196,8 @@
       "request": "The session start said this repository's dashboard kit is out of date. Deal with it.",
       "expected": [
         "runs dashboard_kit.py status to name the installed and the current kit versions and the files that differ",
-        "asks the operator before updating, and updates with dashboard_kit.py install, which refuses to overwrite a copied file the service changed unless the operator says --force",
+        "upgrades it itself when the task lets it change this repository (the notice comes only in a repository that owns the service) and says what it changed, rather than handing the step to the operator",
+        "updates with dashboard_kit.py install, which refuses to overwrite a copied file the service changed: moves those edits into the page's own files first, and never reaches for --force to get past the refusal",
         "follows the reference's upgrade section: the page's own tokens move into a theme or local overrides, the declared kit version in the well-known document is raised",
         "proves the result with check_dashboard_layout.mjs and check_service.py (dashboard.declared) before calling it done"
       ]

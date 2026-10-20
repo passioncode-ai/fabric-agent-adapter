@@ -293,22 +293,23 @@ def status(repo: Path, manifest: Optional[Dict[str, Any]] = None, directory: Opt
 
 
 def notice_line(report: Dict[str, Any], script: Path) -> Optional[str]:
-    """One line for the session, or None. Only an older (or unmarked) copy, or a service of this
-    repository with a dashboard and no kit at all, earns it."""
+    """One line for the session, or None. Only a repository that owns a service (a descriptor names
+    it as `source.repository`) hears it, and only for an older (or unmarked) copy or a dashboard
+    with no kit at all. It names that repository's services and nothing else."""
+    if not report["services"]:
+        return None
     current = report["kit"].split("@", 1)[1]
     stale = [c for c in report["copies"] if c["state"] in ("older", "unmarked")]
-    where = ", ".join(report["services"]) or "this repository's dashboard"
-    command = 'python3 "%s" status' % script
-    tail = ("fabric-dashboard/0.1, contract DEC-0036. Do not change it on your own: tell the operator, and with "
-            "their go-ahead run `%s`, then follow building-fabric-services references/dashboard-kit.md, "
-            "\"Upgrading an existing dashboard\"." % command)
+    where = "%s (this repository)" % ", ".join(report["services"])
+    tail = ("You may upgrade it yourself: `python3 \"%s\" status`, then building-fabric-services "
+            "references/dashboard-kit.md, \"Upgrading an existing dashboard\"." % script)
     if stale:
         versions = sorted({c["version"] or "unmarked" for c in stale})
-        return "[fabric-agent-adapter] %s is built from %s %s; %s is current (%s" % (
-            where, KIT_NAME, " and ".join(versions), current, tail + ")")
-    if not report["copies"] and report["dashboard"] and report["services"]:
-        return "[fabric-agent-adapter] %s has a dashboard without %s; %s is current (%s" % (
-            where, KIT_NAME, current, tail + ")")
+        return "[fabric-agent-adapter] %s is built from %s %s; %s is current. %s" % (
+            where, KIT_NAME, " and ".join(versions), current, tail)
+    if not report["copies"] and report["dashboard"]:
+        return "[fabric-agent-adapter] %s has a dashboard without %s; %s is current. %s" % (
+            where, KIT_NAME, current, tail)
     return None
 
 
