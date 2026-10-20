@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.37.1 - 2026-10-20
+
+### Added
+
+- **The rest of contract DEC-0084 in both kits** (FAA-57), in `fabric_ceremonies.py` / `fabric-ceremonies.mjs`: the
+  nearby pairing (`pairing_commit`, `check_reveal`, `comparison_code`, `checked_comparison_code`, `estate_fingerprint`,
+  `rendezvous_verdict`, `join_listed`, `own_keys_decision`, `machine_of_keys`) held to the contract's `pairing.json`
+  (116 cases in eight groups), and the hub's single use of a token (`redeem_enroll_token`, with the `enroll-join/1`
+  proof as ES256 r and s low S or Ed25519) held to `enroll-token.json` group `redeem` and a high-S variant. 26 planted
+  defects across both kits, all caught. `fabric-estate.mjs` exports `validDeviceKey`.
+
+### Changed
+
+- **`building-fabric-services` → remote placement:** which `installedBy` form an agent installer writes (the string
+  form, or `{by: "person", role: "operator", tool}` when a person asked it), and that a TypeScript app must name its
+  `.well-known` route folder in `tsconfig` `include`, which skips dot folders. Both reported by an agent that built a
+  remote service in a Next.js app.
+
 ## 0.37.0 - 2026-10-19
 
 ### Added

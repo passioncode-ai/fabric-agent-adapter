@@ -412,7 +412,7 @@ export function deviceKeyRef(key) {
   return fingerprint !== undefined && isString(kid) ? `${kid}@${fingerprint}` : undefined;
 }
 
-const validDeviceKey = (key) => {
+export const validDeviceKey = (key) => {
   const raw = Buffer.from(show(key.publicKey ?? ''), 'base64');
   return key.alg === 'ed25519' ? raw.length === 32 && !smallOrder(raw) : isValidP256Key(raw);
 };

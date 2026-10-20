@@ -17,9 +17,11 @@ const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) =>
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = args.out ?? here;
 const enroll = await import(pathToFileURL(path.join(args['contract-src'], 'enroll-token.ts')).href);
+const pairing = await import(pathToFileURL(path.join(args['contract-src'], 'pairing.ts')).href);
 const read = (file) => JSON.parse(fs.readFileSync(path.join(args.contract, file), 'utf8'));
 const clone = (v) => JSON.parse(JSON.stringify(v));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const check = (group, c, actual, expected) => { if (!same(actual, expected)) throw new Error(`the contract's ${group} case "${c.name}" no longer answers as written`); };
 
 const vectors = read('fixtures/vectors/enroll-token.json');
 const record = read(vectors.record);
@@ -75,5 +77,39 @@ for (const [name, edit] of [
   ['no expiry', (t) => { delete t.statement.expiresAt; }],
 ]) { const value = clone(good); edit(value); rules.push({ name: `hostile: ${name}`, kind: 'enroll-token', value, expected: enroll.enrollTokenRules('enroll-token', value) }); }
 
-fs.writeFileSync(path.join(out, 'ceremony-vectors.json'), `${JSON.stringify({ about: vectors.about, source: 'fixtures/vectors/enroll-token.json (verify) and fixtures/semantic/enroll-token-*.json', record, genesis: vectors.genesis, verify, rules }, null, 2)}\n`);
-console.log(`ceremony-vectors.json: ${verify.length} verify cases, ${rules.length} rule cases`);
+// The hub's single use of a token (redeem): the ledger is a list of [nonce, entry] pairs, a Map in the contract.
+const redeem = vectors.redeem.map((c) => {
+  check('redeem', c, enroll.redeemEnrollToken(c.token, c.machineKey, c.proof, new Map(c.ledger)), c.answer);
+  return c;
+});
+
+// A high-S twin of the first ES256 proof: the same signature with s' = n - s verifies under plain ECDSA, and the
+// contract refuses it (low-S only, as relay-auth/1).
+{
+  const N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
+  const base = vectors.redeem.find((c) => c.answer.ok === true && c.machineKey.alg === 'es256');
+  const raw = Buffer.from(base.proof, 'base64url');
+  const high = N - BigInt(`0x${raw.subarray(32).toString('hex')}`);
+  const proof = Buffer.concat([raw.subarray(0, 32), Buffer.from(high.toString(16).padStart(64, '0'), 'hex')]).toString('base64url');
+  const answer = enroll.redeemEnrollToken(base.token, base.machineKey, proof, new Map());
+  if (answer.ok) throw new Error('the contract accepted a high-S proof');
+  redeem.push({ name: 'hostile: the same ES256 proof in its high-S form', token: base.token, machineKey: base.machineKey, proof, ledger: [], answer });
+}
+
+// The nearby pairing (fixtures/vectors/pairing.json), every group re-answered by src/pairing.ts.
+const pv = read('fixtures/vectors/pairing.json');
+const date = (text) => new Date(text);
+const groups = {
+  commits: (c) => pairing.pairingCommit(c.side),
+  reveals: (c) => pairing.checkReveal(c.commit, c.reveal, c.expected ?? undefined),
+  codes: (c) => pairing.comparisonCode(c.new, c.trusted),
+  checkedCodes: (c) => pairing.checkedComparisonCode(c.newCommit, c.new, c.trustedCommit, c.trusted),
+  fingerprints: (c) => pairing.estateFingerprint(c.digest),
+  rendezvous: (c) => pairing.rendezvousVerdict(c.openedAt, c.messages, date(c.at)),
+  join: (c) => pairing.joinListed(c.record, c.new, c.trusted, c.genesis),
+  ownKeys: (c) => pairing.ownKeysDecision(c.record, c.machine, c.held),
+};
+const pairingCases = Object.fromEntries(Object.entries(groups).map(([group, run]) => [group, pv[group].map((c) => { check(group, c, run(c), c.answer); return c; })]));
+
+fs.writeFileSync(path.join(out, 'ceremony-vectors.json'), `${JSON.stringify({ about: vectors.about, source: 'fixtures/vectors/enroll-token.json (verify) and fixtures/semantic/enroll-token-*.json', record, genesis: vectors.genesis, verify, rules, redeem, pairing: pairingCases, pairingAbout: pv.about }, null, 2)}\n`);
+console.log(`ceremony-vectors.json: ${verify.length} verify, ${rules.length} rule, ${redeem.length} redeem, ${Object.entries(pairingCases).map(([g, l]) => `${l.length} ${g}`).join(', ')}`);

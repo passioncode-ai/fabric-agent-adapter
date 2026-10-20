@@ -137,9 +137,19 @@ passkey; what a service applying the record checks is in the record itself:
   with the machine's `#sig` key and present that proof with the token. The token gives the machine no trust: only the
   passkey-signed revision that lists it does. `enroll_token_rules("enroll-token", token)` is FAC-SEM-113.
 
-The nearby pairing (`pairing-message/1`, the comparison code, the rendezvous) and the hub's single use of a token are
-Project Observatory's node and Fabric's hub; the kits port them in a later version (FAA-57). The relay's admission and
-session checks belong to the relay; the kits do not run a relay.
+- **A machine nearby pairs by a comparison code.** Each side commits (`pairing_commit`), then reveals; each checks the
+  other's reveal against its commitment, and both screens show the same six digits only when nothing sat in the middle
+  (`checked_comparison_code`, never `comparison_code` on unchecked reveals). The one-time rendezvous burns on the first
+  repeat, out-of-order message, mismatch, abort or after 600 s (`rendezvous_verdict`). Before it pins the estate, the new
+  machine checks that the revision lists it with the keys it revealed and the trusted machine with its `#sig` key
+  (`join_listed`), and shows `estate_fingerprint` of revision 1 for the person to compare. On each later revision it
+  runs `own_keys_decision`: apply and retire the keys the record dropped, or stop when it was removed or another holder
+  carries its key.
+- **The hub binds a token once** (`redeem_enroll_token`): the joining machine's proof is its `#sig` key's signature over
+  `enroll_join_input(token)` (ES256 as 64 bytes r and s, low S; Ed25519), and a second use, by any key, is refused and
+  logged.
+
+The relay's admission and session checks belong to the relay; the kits do not run a relay.
 
 ## Share grants into an organization
 

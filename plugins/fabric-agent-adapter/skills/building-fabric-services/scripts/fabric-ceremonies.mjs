@@ -8,7 +8,7 @@
 
 import crypto from 'node:crypto';
 import { jcs } from './fabric-delegation.mjs';
-import { CLOCK_SKEW_SECONDS, estateTime, isSigningRpId, originWithin, verifyAssertion } from './fabric-estate.mjs';
+import { CLOCK_SKEW_SECONDS, deviceKeyFingerprint, deviceKeyRef, estateTime, isSigningRpId, isValidP256Key, originWithin, validDeviceKey, verifyAssertion } from './fabric-estate.mjs';
 
 export const ENROLL_TOKEN_SCHEMA = 'enroll-token/1';
 export const ENROLL_TOKEN_TYPE = 'enroll-token/1';
@@ -125,5 +125,214 @@ function tokenFindings(value) {
 export function enrollTokenRules(kind, value) {
   if (kind === 'enroll-token') return tokenFindings(isObject(value) ? value : {});
   return undefined;
+}
+// --- the hub's single use of a token (DEC-0084) ------------------------------------------------------------------------
+
+const PROOF = /^[A-Za-z0-9_-]{85}[AQgw]$/;
+const P256_HALF_N = 0x7fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8n;
+
+function es256Raw(octets, message, raw) {
+  if (octets.length !== 65 || octets[0] !== 4 || !isValidP256Key(octets) || raw.length !== 64) return false;
+  if (BigInt(`0x${raw.subarray(32).toString('hex')}`) > P256_HALF_N) return false;
+  const jwk = { kty: 'EC', crv: 'P-256', x: octets.subarray(1, 33).toString('base64url'), y: octets.subarray(33).toString('base64url') };
+  try { return crypto.verify('sha256', Buffer.from(message, 'utf8'), { key: jwk, format: 'jwk', dsaEncoding: 'ieee-p1363' }, raw); } catch { return false; }
+}
+
+function proves(key, message, proof) {
+  if (!isString(proof) || !PROOF.test(proof)) return false;
+  const octets = Buffer.from(key.publicKey, 'base64');
+  const signature = Buffer.from(proof, 'base64url');
+  if (key.alg === 'es256') return es256Raw(octets, message, signature);
+  try {
+    const publicKey = crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: octets.toString('base64url') }, format: 'jwk' });
+    return crypto.verify(null, Buffer.from(message, 'utf8'), publicKey, signature);
+  } catch { return false; }
+}
+
+/** The hub's single use of a verified token; `ledger` is a Map from nonce to {state: redeemed, fingerprint} or {state: revoked}. */
+export function redeemEnrollToken(token, machineKey, proof, ledger) {
+  const input = enrollJoinInput(token);
+  if (input === undefined || !(ledger instanceof Map)) return { ok: false, problem: 'malformed' };
+  const { nonce } = statementFields(token);
+  if (machineOfKeys([machineKey]) === undefined) return { ok: false, problem: 'bad-key' };
+  if (!proves(machineKey, input, proof)) return { ok: false, problem: 'bad-proof' };
+  const fingerprint = deviceKeyFingerprint(machineKey);
+  const entry = ledger.get(nonce);
+  if (isObject(entry) && entry.state === 'revoked') return { ok: false, problem: 'revoked' };
+  if (entry !== undefined) return { ok: false, problem: 'reused', log: { nonce, presented: fingerprint, boundTo: isObject(entry) ? show(entry.fingerprint) : show(entry) } };
+  return { ok: true, record: { nonce, state: 'redeemed', fingerprint } };
+}
+
+// --- the nearby pairing (DEC-0084) ---------------------------------------------------------------------------------------
+
+export const PAIRING_SCHEMA = 'pairing-message/1';
+export const COMMIT_TYPE = 'fabric-enroll-commit/1';
+export const CODE_TYPE = 'fabric-enroll-code/1';
+export const FINGERPRINT_TYPE = 'estate-fingerprint/1';
+export const CODE_DIGITS = 6;
+export const FINGERPRINT_GROUPS = 5;
+export const FINGERPRINT_GROUP_DIGITS = 5;
+export const RENDEZVOUS_SECONDS = 600;
+const MACHINE_ID = /^[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}$/;
+const KEY_MEMBERS = 'alg,kid,publicKey,use';
+const ALGORITHMS = new Map([['sig', ['es256', 'ed25519']], ['kem', ['ecdh-p256']]]);
+const sha = (text) => crypto.createHash('sha256').update(Buffer.from(text, 'utf8')).digest();
+const uint40 = (digest, offset) => digest.readUIntBE(offset, 5);
+const own = (value, key) => (isObject(value) && Object.hasOwn(value, key) ? value[key] : undefined);
+const isRole = (value) => value === 'new' || value === 'trusted';
+function jsonEqual(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => jsonEqual(item, b[i]));
+  if (isObject(a) || isObject(b)) {
+    if (!isObject(a) || !isObject(b)) return false;
+    const keys = Object.keys(a);
+    return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && jsonEqual(a[key], b[key]));
+  }
+  return a === b;
+}
+
+/** The machine a key list belongs to, or undefined (one sig key, at most one kem key, one machine id, valid keys). */
+export function machineOfKeys(keys) {
+  if (!Array.isArray(keys) || keys.length < 1 || keys.length > 2) return undefined;
+  const ids = new Set(); const uses = new Set(); const octets = new Set();
+  for (const key of keys) {
+    if (!isObject(key) || Object.keys(key).sort().join() !== KEY_MEMBERS) return undefined;
+    const { use, kid } = key;
+    if (!isString(use) || !isString(kid) || !isString(key.alg) || !ALGORITHMS.get(use)?.includes(key.alg)) return undefined;
+    const id = kid.endsWith(`#${use}`) ? kid.slice(0, -(use.length + 1)) : '';
+    if (!MACHINE_ID.test(id) || uses.has(use) || deviceKeyFingerprint(key) === undefined || !validDeviceKey(key) || octets.has(key.publicKey)) return undefined;
+    ids.add(id); uses.add(use); octets.add(key.publicKey);
+  }
+  const [id] = [...ids];
+  return ids.size === 1 && uses.has('sig') ? id : undefined;
+}
+
+function sideProblem(side) {
+  if (!isObject(side)) return 'malformed';
+  const role = own(side, 'role');
+  if (!isRole(role)) return 'bad-role';
+  if (!matches(NONCE32, own(side, 'nonce'))) return 'bad-nonce';
+  if (machineOfKeys(own(side, 'keys')) === undefined) return 'bad-keys';
+  const genesis = own(side, 'genesis');
+  if (role === 'trusted' ? !matches(SHA256, genesis) : Object.hasOwn(side, 'genesis')) return 'bad-genesis';
+  return undefined;
+}
+const covered = (side) => (side.role === 'trusted' ? { keys: side.keys, nonce: side.nonce, genesis: side.genesis } : { keys: side.keys, nonce: side.nonce });
+
+/** A side's commitment over {type, role, keys, nonce, genesis?}. */
+export function pairingCommit(side) {
+  const problem = sideProblem(side);
+  if (problem) return { ok: false, problem };
+  return { ok: true, commit: `sha256:${sha(jcs({ type: COMMIT_TYPE, role: side.role, ...covered(side) })).toString('hex')}` };
+}
+
+function message(value, step) {
+  if (!isObject(value) || own(value, 'schema') !== PAIRING_SCHEMA || own(value, 'step') !== step) return undefined;
+  const members = Object.keys(value).sort().join();
+  if (step === 'commit') return members === 'commit,role,schema,step' && matches(SHA256, value.commit) ? value : undefined;
+  return members === 'keys,nonce,role,schema,step' || members === 'genesis,keys,nonce,role,schema,step' ? value : undefined;
+}
+
+/** Check the other side's reveal against its commitment; answers the revealing machine's id. */
+export function checkReveal(commit, reveal, expected) {
+  const c = message(commit, 'commit');
+  const r = message(reveal, 'reveal');
+  if (!c || !r) return { ok: false, problem: 'malformed' };
+  if (r.role !== c.role || (expected !== undefined && expected !== null && r.role !== expected)) return { ok: false, problem: 'role-mismatch' };
+  const { schema: _schema, step: _step, ...side } = r;
+  const made = pairingCommit(side);
+  if (!made.ok) return made;
+  if (made.commit !== c.commit) return { ok: false, problem: 'commit-mismatch' };
+  return { ok: true, machine: machineOfKeys(r.keys) };
+}
+
+/** The six-digit code both screens show. */
+export function comparisonCode(newReveal, trustedReveal) {
+  const a = message(newReveal, 'reveal');
+  const b = message(trustedReveal, 'reveal');
+  if (!a || !b) return { ok: false, problem: 'malformed' };
+  if (a.role !== 'new' || b.role !== 'trusted') return { ok: false, problem: isRole(a.role) && isRole(b.role) ? 'role-mismatch' : 'bad-role' };
+  const problem = sideProblem(a) ?? sideProblem(b);
+  if (problem) return { ok: false, problem };
+  if (machineOfKeys(a.keys) === machineOfKeys(b.keys)) return { ok: false, problem: 'same-machine' };
+  const value = uint40(sha(jcs({ type: CODE_TYPE, new: covered(a), trusted: covered(b) })), 0) % 10 ** CODE_DIGITS;
+  return { ok: true, code: String(value).padStart(CODE_DIGITS, '0') };
+}
+
+/** The estate's fingerprint from revision 1's digest. */
+export function estateFingerprint(digest) {
+  if (!matches(SHA256, digest)) return { ok: false, problem: 'malformed' };
+  const f = sha(jcs({ type: FINGERPRINT_TYPE, digest }));
+  return { ok: true, fingerprint: Array.from({ length: FINGERPRINT_GROUPS }, (_, i) => String(uint40(f, 5 * i) % 10 ** FINGERPRINT_GROUP_DIGITS).padStart(FINGERPRINT_GROUP_DIGITS, '0')).join(' ') };
+}
+
+/** The comparison code only after each reveal opened its own commitment. */
+export function checkedComparisonCode(newCommit, newReveal, trustedCommit, trustedReveal) {
+  const a = checkReveal(newCommit, newReveal, 'new');
+  if (!a.ok) return a;
+  const b = checkReveal(trustedCommit, trustedReveal, 'trusted');
+  if (!b.ok) return b;
+  return comparisonCode(newReveal, trustedReveal);
+}
+
+/** A one-time rendezvous after its messages at `at` (a Date): open, complete, or burned with its reason and index. */
+export function rendezvousVerdict(openedAt, messages, at) {
+  const opened = estateTime(openedAt);
+  const now = at instanceof Date ? at.getTime() : Number.NaN;
+  if (!Number.isFinite(opened) || !Number.isFinite(now) || !Array.isArray(messages)) return { state: 'burned', reason: 'malformed', index: -1 };
+  if (now > opened + RENDEZVOUS_SECONDS * 1000 || now < opened - CLOCK_SKEW_SECONDS * 1000) return { state: 'burned', reason: 'expired', index: -1 };
+  const commits = new Map();
+  const revealed = new Set();
+  for (const [index, item] of messages.entries()) {
+    const burn = (reason) => ({ state: 'burned', reason, index });
+    if (isObject(item) && own(item, 'schema') === PAIRING_SCHEMA && own(item, 'step') === 'abort' && Object.keys(item).sort().join() === 'role,schema,step' && isRole(item.role)) return burn('aborted');
+    if (revealed.size === 2) return burn('closed');
+    const commit = message(item, 'commit');
+    const reveal = message(item, 'reveal');
+    const role = (commit ?? reveal)?.role;
+    if (!isRole(role)) return burn('malformed');
+    if (commit) {
+      if (commits.has(role)) return burn('repeated');
+      commits.set(role, commit);
+      continue;
+    }
+    if (revealed.has(role)) return burn('repeated');
+    if (commits.size < 2) return burn('out-of-order');
+    const checked = checkReveal(commits.get(role), reveal, role);
+    if (!checked.ok) return burn(checked.problem === 'commit-mismatch' ? 'commit-mismatch' : 'malformed');
+    revealed.add(role);
+  }
+  return revealed.size === 2 ? { state: 'complete' } : { state: 'open' };
+}
+
+const machineOf = (record, id) => (Array.isArray(record.machines) ? record.machines.find((machine) => isObject(machine) && machine.id === id) : undefined);
+const machineRevoked = (record, id) => Array.isArray(record.revocations) && record.revocations.some((entry) => isObject(entry) && entry.kind === 'machine' && entry.ref === id);
+const sameKeys = (a, b) => a.length === b.length && a.every((key) => b.some((other) => jsonEqual(key, other)));
+
+/** What the new machine checks before it pins and applies a revision that adds it. */
+export function joinListed(record, newReveal, trustedReveal, genesis) {
+  const a = message(newReveal, 'reveal');
+  const b = message(trustedReveal, 'reveal');
+  if (!isObject(record) || !a || !b || a.role !== 'new' || b.role !== 'trusted' || sideProblem(a) || sideProblem(b)) return { ok: false, problem: 'malformed' };
+  if (b.genesis !== genesis) return { ok: false, problem: 'other-estate' };
+  const newId = machineOfKeys(a.keys);
+  const trustedId = machineOfKeys(b.keys);
+  const machine = machineOf(record, newId);
+  if (!machine || machineRevoked(record, newId)) return { ok: false, problem: 'not-listed' };
+  if (!Array.isArray(machine.deviceKeys) || !sameKeys(machine.deviceKeys, a.keys)) return { ok: false, problem: 'other-keys' };
+  const trusted = machineOf(record, trustedId);
+  const sig = b.keys.find((key) => key.use === 'sig');
+  if (!trusted || machineRevoked(record, trustedId) || !Array.isArray(trusted.deviceKeys) || !trusted.deviceKeys.some((key) => jsonEqual(key, sig))) return { ok: false, problem: 'trusted-not-listed' };
+  return { ok: true };
+}
+
+/** What a node does with a verified revision when its own keys are in question. */
+export function ownKeysDecision(record, machineId, held) {
+  if (!isObject(record) || !isString(machineId) || !Array.isArray(held)) return { action: 'malformed' };
+  const machine = machineOf(record, machineId);
+  if (!machine || machineRevoked(record, machineId)) return { action: 'stop', reason: 'removed' };
+  const listed = Array.isArray(machine.deviceKeys) ? machine.deviceKeys : [];
+  if (listed.length === 0 || !listed.every((key) => held.some((mine) => jsonEqual(key, mine)))) return { action: 'stop', reason: 'keys-replaced' };
+  const retire = held.filter((key) => !listed.some((other) => jsonEqual(key, other))).map(deviceKeyRef).filter(isString);
+  return { action: 'apply', retire };
 }
 // #endregion ceremonies-kit-node

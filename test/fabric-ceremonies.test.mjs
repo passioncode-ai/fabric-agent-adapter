@@ -29,3 +29,26 @@ test('hostile input never throws', () => {
     k.enrollTokenRules('enroll-token', value);
   }
 });
+
+test('every redeem case answers as the contract does (FAA-57)', () => {
+  for (const c of V.redeem) assert.deepEqual(k.redeemEnrollToken(c.token, c.machineKey, c.proof, new Map(c.ledger)), c.answer, c.name);
+  assert.deepEqual(k.redeemEnrollToken(V.verify[0].token, {}, '', []), { ok: false, problem: 'malformed' });
+});
+
+test('every pairing case answers as the contract does (FAA-57)', () => {
+  const P = V.pairing;
+  const runs = {
+    commits: (c) => k.pairingCommit(c.side),
+    reveals: (c) => k.checkReveal(c.commit, c.reveal, c.expected ?? undefined),
+    codes: (c) => k.comparisonCode(c.new, c.trusted),
+    checkedCodes: (c) => k.checkedComparisonCode(c.newCommit, c.new, c.trustedCommit, c.trusted),
+    fingerprints: (c) => k.estateFingerprint(c.digest),
+    rendezvous: (c) => k.rendezvousVerdict(c.openedAt, c.messages, new Date(c.at)),
+    join: (c) => k.joinListed(c.record, c.new, c.trusted, c.genesis),
+    ownKeys: (c) => k.ownKeysDecision(c.record, c.machine, c.held),
+  };
+  for (const [group, run] of Object.entries(runs)) {
+    assert.ok(P[group].length > 0, group);
+    for (const c of P[group]) assert.deepEqual(run(c), c.answer, `${group}: ${c.name}`);
+  }
+});

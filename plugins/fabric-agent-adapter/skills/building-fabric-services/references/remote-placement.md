@@ -30,6 +30,16 @@ same objects — well-known document, events feed, login code — at the same pa
   literal; not `localhost`, `*.local`, `*.internal`, `*.home.arpa`, `*.lan`, `*.localdomain`.
 - `lifecycle.manager` is `none`, with no `label` or `plist`. `paths` is optional.
 - `commands` may carry `doctor` (a local executable); never `update`.
+- `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or
+  `{by, role?, tool}` where `by` is `person`, `node` or `organization` and `role` (`operator`, `administrator`) is a
+  person's only. There is no `agent` kind: an agent that registers a service writes the string form, or
+  `{by: "person", role: "operator", tool: "<agent> <version>"}` when a person asked it to. `registerRemote` defaults to
+  the person form with `tool: "fabric-service register-remote"`.
+
+**A TypeScript app (Next.js and the like):** TypeScript's `include` and typescript-eslint skip dot folders by default,
+so `app/.well-known/fabric-service/route.ts` is neither type-checked nor linted until the project names it, for example
+`"include": [..., "src/app/.well-known/**/*.ts"]` in `tsconfig.json`. Check it is: put a type error in the route and
+watch the gate fail.
 
 ## On the platform
 
