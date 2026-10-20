@@ -73,3 +73,17 @@ new hooks at their next start.
 ## Next task
 
 FAA-60: decide whether the running-Fabric preamble follows `project_uses_fabric`.
+
+## Session close (2026-10-20, resumed after an account limit)
+
+- State: `main` at `c241038`, released 0.38.0 (npm and launcher `family.json` ref `v0.38.0`), local install 0.38.0. No
+  lease held by this project's sessions (only the unrelated `AUTO-PROJECT-REGISTRATION`); merged branches
+  `agent/quiet-session-start` and `backlog/faa-59-receipts` deleted; no worktree of this repository left.
+- The operator's call to every coding agent to finish its tasks went to all 34 projects on the board on 2026-10-20
+  (threads `a2a3206a`, `c7694582`, `13f3d7da`, `516a4633`).
+- Disk: old adapter plugin caches 0.6.3 to 0.37.0 removed (47 MB to 3.7 MB; kept 0.38.0 active and 0.37.1).
+- Waits, no watcher (the board answered `unavailable` at close): answers on the 0.37.1 announcement (thread `67c3a5e0`)
+  and the call threads; two Observatory lessons pending a fresh Observatory MCP server (arguments in
+  `2026-10-19-faa-58-knowledge-pack.md`).
+- Next task: read those threads at the next session start; the open backlog rows (FAA-10, FAA-26..29, FAA-44) wait on
+  their owners.
