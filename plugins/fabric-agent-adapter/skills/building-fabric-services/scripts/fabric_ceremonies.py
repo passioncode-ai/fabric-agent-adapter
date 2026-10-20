@@ -10,6 +10,9 @@ no trust; only a passkey-signed revision that lists it does. Its ``genesis`` aut
 - ``verify_enroll_token(token, record=, genesis=, at=)``: the reference verifier, the hub's and the node's.
 - ``enroll_join_input(token)``: the ``enroll-join/1`` statement the joining machine signs with its ``#sig`` key.
 - ``enroll_token_rules("enroll-token", token)``: FAC-SEM-113.
+- ``redeem_enroll_token(token, machine_key, proof, ledger)``: the hub's single use of a verified token.
+- The nearby pairing: ``pairing_commit``, ``check_reveal``, ``comparison_code``, ``checked_comparison_code``,
+  ``estate_fingerprint``, ``rendezvous_verdict``, ``join_listed``, ``own_keys_decision`` (``machine_of_keys``).
 
 Every function answers and never raises on malformed input. Normative source: the contract's src/enroll-token.ts,
 src/signing-challenges.ts and docs/specification/ceremonies.md.
@@ -18,6 +21,7 @@ src/signing-challenges.ts and docs/specification/ceremonies.md.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import re
 import sys
@@ -191,4 +195,298 @@ def enroll_token_rules(kind: str, value: Any) -> Optional[List[Dict[str, str]]]:
     if kind == "enroll-token":
         return _token_findings(value if isinstance(value, dict) else {})
     return None
+# --- the hub's single use of a token (DEC-0084) ----------------------------------------------------------------------
+
+_PROOF = re.compile(r"[A-Za-z0-9_-]{85}[AQgw]\Z")
+
+
+def _b64url(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def _es256_raw(octets: bytes, message: bytes, raw: bytes) -> bool:
+    """ECDSA P-256 over SHA-256 with a 64-byte r || s signature, low-S only (relay-auth/1's form)."""
+    if len(octets) != 65 or octets[0] != 4 or not _estate.is_valid_p256_key(octets) or len(raw) != 64:
+        return False
+    r, s = int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:], "big")
+    n = _estate._N
+    if not (1 <= r < n and 1 <= s <= n // 2):
+        return False
+    e = int.from_bytes(hashlib.sha256(message).digest(), "big")
+    w = pow(s, -1, n)
+    point = _estate._shamir(e * w % n, r * w % n, (int.from_bytes(octets[1:33], "big"), int.from_bytes(octets[33:], "big")))
+    return point is not None and point[0] % n == r
+
+
+def _proves(key: Dict[str, Any], message: str, proof: Any) -> bool:
+    """Whether ``proof`` is the presented key's signature over ``message``: 64 bytes in their one canonical base64url
+    form, ES256 as r || s low-S, Ed25519 as itself."""
+    if not isinstance(proof, str) or not _PROOF.match(proof):
+        return False
+    octets = base64.b64decode(key["publicKey"])
+    signature = _b64url(proof)
+    if key.get("alg") == "es256":
+        return _es256_raw(octets, message.encode("utf-8"), signature)
+    return _delegation.ed25519_verify(octets, message.encode("utf-8"), signature)
+
+
+def redeem_enroll_token(token: Any, machine_key: Any, proof: Any, ledger: Any) -> Dict[str, Any]:
+    """The hub's single use of a token verify_enroll_token accepted. ``machine_key`` is the joining machine's #sig key,
+    ``proof`` its signature over ``enroll_join_input(token)``, ``ledger`` the hub's dict from nonce to entry
+    (``{"state": "redeemed", "fingerprint"}`` or ``{"state": "revoked"}``). The first failure answers: malformed,
+    bad-key, bad-proof, revoked, reused (with the log the hub records); the first use answers the record to store."""
+    join = enroll_join_input(token)
+    if join is None or not isinstance(ledger, dict):
+        return {"ok": False, "problem": "malformed"}
+    nonce = _statement_fields(token)["nonce"]
+    if machine_of_keys([machine_key]) is None:
+        return {"ok": False, "problem": "bad-key"}
+    if not _proves(machine_key, join, proof):
+        return {"ok": False, "problem": "bad-proof"}
+    fingerprint = _estate.device_key_fingerprint(machine_key)
+    entry = ledger.get(nonce, _estate._MISSING)
+    if isinstance(entry, dict) and entry.get("state") == "revoked":
+        return {"ok": False, "problem": "revoked"}
+    if entry is not _estate._MISSING:
+        bound = _estate._show(entry.get("fingerprint", _estate._MISSING)) if isinstance(entry, dict) else _estate._show(entry)
+        return {"ok": False, "problem": "reused", "log": {"nonce": nonce, "presented": fingerprint, "boundTo": bound}}
+    return {"ok": True, "record": {"nonce": nonce, "state": "redeemed", "fingerprint": fingerprint}}
+
+
+# --- the nearby pairing (DEC-0084) ------------------------------------------------------------------------------------
+
+PAIRING_SCHEMA = "pairing-message/1"
+COMMIT_TYPE = "fabric-enroll-commit/1"
+CODE_TYPE = "fabric-enroll-code/1"
+FINGERPRINT_TYPE = "estate-fingerprint/1"
+CODE_DIGITS = 6
+FINGERPRINT_GROUPS = 5
+FINGERPRINT_GROUP_DIGITS = 5
+RENDEZVOUS_SECONDS = 600
+_MACHINE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}\Z")
+_KEY_MEMBERS = ["alg", "kid", "publicKey", "use"]
+_ALGORITHMS = {"sig": ("es256", "ed25519"), "kem": ("ecdh-p256",)}
+
+
+def _json_equal(a: Any, b: Any) -> bool:
+    """The contract's jsonEqual: arrays in order, objects by their members, primitives as JavaScript's ===."""
+    if isinstance(a, list) or isinstance(b, list):
+        return isinstance(a, list) and isinstance(b, list) and len(a) == len(b) and all(_json_equal(x, y) for x, y in zip(a, b))
+    if isinstance(a, dict) or isinstance(b, dict):
+        return isinstance(a, dict) and isinstance(b, dict) and len(a) == len(b) and all(k in b and _json_equal(a[k], b[k]) for k in a)
+    return _estate._same(a, b)
+
+
+def _is_role(value: Any) -> bool:
+    return value in ("new", "trusted") and isinstance(value, str)
+
+
+def machine_of_keys(keys: Any) -> Optional[str]:
+    """The machine a key list belongs to, or None: one or two keys, each exactly {kid, use, alg, publicKey}, one sig
+    (es256 or ed25519) and at most one kem (ecdh-p256), each kid <id>#<use> for one machine id, each key valid and in
+    canonical padded base64, no key in both roles."""
+    if not isinstance(keys, list) or not 1 <= len(keys) <= 2:
+        return None
+    ids, uses, octets = set(), set(), set()
+    for key in keys:
+        if not isinstance(key, dict) or sorted(key) != _KEY_MEMBERS:
+            return None
+        use, kid, alg = key["use"], key["kid"], key["alg"]
+        if not isinstance(use, str) or not isinstance(kid, str) or not isinstance(alg, str) or alg not in _ALGORITHMS.get(use, ()):
+            return None
+        machine = kid[: -(len(use) + 1)] if kid.endswith("#" + use) else ""
+        if (not _MACHINE_ID.match(machine) or use in uses or _estate.device_key_fingerprint(key) is None
+                or not _estate._valid_device_key(key) or key["publicKey"] in octets):
+            return None
+        ids.add(machine)
+        uses.add(use)
+        octets.add(key["publicKey"])
+    return next(iter(ids)) if len(ids) == 1 and "sig" in uses else None
+
+
+def _side_problem(side: Any) -> Optional[str]:
+    if not isinstance(side, dict):
+        return "malformed"
+    role = side.get("role")
+    if not _is_role(role):
+        return "bad-role"
+    if not _matches(_NONCE32, side.get("nonce")):
+        return "bad-nonce"
+    if machine_of_keys(side.get("keys")) is None:
+        return "bad-keys"
+    if role == "trusted":
+        if not _matches(_SHA256, side.get("genesis")):
+            return "bad-genesis"
+    elif "genesis" in side:
+        return "bad-genesis"
+    return None
+
+
+def _covered(side: Dict[str, Any]) -> Dict[str, Any]:
+    if side["role"] == "trusted":
+        return {"keys": side["keys"], "nonce": side["nonce"], "genesis": side["genesis"]}
+    return {"keys": side["keys"], "nonce": side["nonce"]}
+
+
+def _sha_hex(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def pairing_commit(side: Any) -> Dict[str, Any]:
+    """A side's commitment: sha256 of the RFC 8785 form of {type: fabric-enroll-commit/1, role, keys, nonce, genesis?}."""
+    problem = _side_problem(side)
+    if problem:
+        return {"ok": False, "problem": problem}
+    return {"ok": True, "commit": "sha256:" + _sha_hex(_delegation.jcs(dict({"type": COMMIT_TYPE, "role": side["role"]}, **_covered(side))))}
+
+
+def _message(value: Any, step: str) -> Optional[Dict[str, Any]]:
+    if not isinstance(value, dict) or value.get("schema") != PAIRING_SCHEMA or value.get("step") != step:
+        return None
+    members = ",".join(sorted(value))
+    if step == "commit":
+        return value if members == "commit,role,schema,step" and _matches(_SHA256, value.get("commit")) else None
+    return value if members in ("keys,nonce,role,schema,step", "genesis,keys,nonce,role,schema,step") else None
+
+
+def check_reveal(commit: Any, reveal: Any, expected: Optional[str] = None) -> Dict[str, Any]:
+    """Check the other side's reveal against its commitment; answers the revealing machine's id."""
+    c, r = _message(commit, "commit"), _message(reveal, "reveal")
+    if c is None or r is None:
+        return {"ok": False, "problem": "malformed"}
+    if not _estate._same(r["role"], c["role"]) or (expected is not None and not _estate._same(r["role"], expected)):
+        return {"ok": False, "problem": "role-mismatch"}
+    made = pairing_commit({k: v for k, v in r.items() if k not in ("schema", "step")})
+    if not made["ok"]:
+        return made
+    if made["commit"] != c["commit"]:
+        return {"ok": False, "problem": "commit-mismatch"}
+    return {"ok": True, "machine": machine_of_keys(r["keys"])}
+
+
+def comparison_code(new_reveal: Any, trusted_reveal: Any) -> Dict[str, Any]:
+    """The six-digit code both screens show, over both reveals' keys, nonces and the estate's genesis."""
+    a, b = _message(new_reveal, "reveal"), _message(trusted_reveal, "reveal")
+    if a is None or b is None:
+        return {"ok": False, "problem": "malformed"}
+    if not _estate._same(a["role"], "new") or not _estate._same(b["role"], "trusted"):
+        return {"ok": False, "problem": "role-mismatch" if _is_role(a["role"]) and _is_role(b["role"]) else "bad-role"}
+    problem = _side_problem(a) or _side_problem(b)
+    if problem:
+        return {"ok": False, "problem": problem}
+    if machine_of_keys(a["keys"]) == machine_of_keys(b["keys"]):
+        return {"ok": False, "problem": "same-machine"}
+    digest = hashlib.sha256(_delegation.jcs({"type": CODE_TYPE, "new": _covered(a), "trusted": _covered(b)}).encode("utf-8")).digest()
+    return {"ok": True, "code": str(int.from_bytes(digest[:5], "big") % 10 ** CODE_DIGITS).zfill(CODE_DIGITS)}
+
+
+def estate_fingerprint(digest: Any) -> Dict[str, Any]:
+    """The estate's fingerprint from revision 1's digest: five groups of five digits a person compares."""
+    if not _matches(_SHA256, digest):
+        return {"ok": False, "problem": "malformed"}
+    f = hashlib.sha256(_delegation.jcs({"type": FINGERPRINT_TYPE, "digest": digest}).encode("utf-8")).digest()
+    groups = [str(int.from_bytes(f[5 * i:5 * i + 5], "big") % 10 ** FINGERPRINT_GROUP_DIGITS).zfill(FINGERPRINT_GROUP_DIGITS) for i in range(FINGERPRINT_GROUPS)]
+    return {"ok": True, "fingerprint": " ".join(groups)}
+
+
+def checked_comparison_code(new_commit: Any, new_reveal: Any, trusted_commit: Any, trusted_reveal: Any) -> Dict[str, Any]:
+    """The comparison code only after each reveal opened its own commitment."""
+    a = check_reveal(new_commit, new_reveal, "new")
+    if not a["ok"]:
+        return a
+    b = check_reveal(trusted_commit, trusted_reveal, "trusted")
+    if not b["ok"]:
+        return b
+    return comparison_code(new_reveal, trusted_reveal)
+
+
+def rendezvous_verdict(opened_at: Any, messages: Any, at: Any) -> Dict[str, Any]:
+    """A one-time rendezvous after the messages it carried, at ``at`` (an aware datetime or epoch seconds): open,
+    complete, or burned with the reason and the index of the message that burned it."""
+    opened = _estate.estate_time(opened_at)
+    now = _estate._clock(at)
+    if not _finite(opened) or not _finite(now) or not isinstance(messages, list):
+        return {"state": "burned", "reason": "malformed", "index": -1}
+    if now > opened + RENDEZVOUS_SECONDS * 1000 or now < opened - _estate.CLOCK_SKEW_SECONDS * 1000:
+        return {"state": "burned", "reason": "expired", "index": -1}
+    commits: Dict[str, Any] = {}
+    revealed: set = set()
+    for index, item in enumerate(messages):
+        def burn(reason: str) -> Dict[str, Any]:
+            return {"state": "burned", "reason": reason, "index": index}
+        if (isinstance(item, dict) and item.get("schema") == PAIRING_SCHEMA and item.get("step") == "abort"
+                and sorted(item) == ["role", "schema", "step"] and _is_role(item.get("role"))):
+            return burn("aborted")
+        if len(revealed) == 2:
+            return burn("closed")
+        commit, reveal = _message(item, "commit"), _message(item, "reveal")
+        role = (commit or reveal or {}).get("role")
+        if not _is_role(role):
+            return burn("malformed")
+        if commit is not None:
+            if role in commits:
+                return burn("repeated")
+            commits[role] = commit
+            continue
+        if role in revealed:
+            return burn("repeated")
+        if len(commits) < 2:
+            return burn("out-of-order")
+        checked = check_reveal(commits.get(role), reveal, role)
+        if not checked["ok"]:
+            return burn("commit-mismatch" if checked["problem"] == "commit-mismatch" else "malformed")
+        revealed.add(role)
+    return {"state": "complete"} if len(revealed) == 2 else {"state": "open"}
+
+
+def _machine_of(record: Dict[str, Any], machine_id: Any) -> Optional[Dict[str, Any]]:
+    machines = record.get("machines")
+    if not isinstance(machines, list):
+        return None
+    return next((m for m in machines if isinstance(m, dict) and _estate._same(m.get("id", _estate._MISSING), machine_id)), None)
+
+
+def _machine_revoked(record: Dict[str, Any], machine_id: Any) -> bool:
+    revocations = record.get("revocations")
+    return isinstance(revocations, list) and any(isinstance(e, dict) and e.get("kind") == "machine"
+                                                 and _estate._same(e.get("ref", _estate._MISSING), machine_id) for e in revocations)
+
+
+def join_listed(record: Any, new_reveal: Any, trusted_reveal: Any, genesis: Any) -> Dict[str, Any]:
+    """What the new machine checks before it pins and applies: the estate is the one the code bound, and the record
+    lists it with exactly the keys it revealed and the trusted machine with its revealed #sig key, revoking neither."""
+    a, b = _message(new_reveal, "reveal"), _message(trusted_reveal, "reveal")
+    if (not isinstance(record, dict) or a is None or b is None or not _estate._same(a["role"], "new")
+            or not _estate._same(b["role"], "trusted") or _side_problem(a) or _side_problem(b)):
+        return {"ok": False, "problem": "malformed"}
+    if not isinstance(genesis, str) or b["genesis"] != genesis:
+        return {"ok": False, "problem": "other-estate"}
+    new_id, trusted_id = machine_of_keys(a["keys"]), machine_of_keys(b["keys"])
+    machine = _machine_of(record, new_id)
+    if machine is None or _machine_revoked(record, new_id):
+        return {"ok": False, "problem": "not-listed"}
+    listed = machine.get("deviceKeys")
+    if not isinstance(listed, list) or len(listed) != len(a["keys"]) or not all(any(_json_equal(k, o) for o in a["keys"]) for k in listed):
+        return {"ok": False, "problem": "other-keys"}
+    trusted = _machine_of(record, trusted_id)
+    sig = next(k for k in b["keys"] if k["use"] == "sig")
+    if (trusted is None or _machine_revoked(record, trusted_id) or not isinstance(trusted.get("deviceKeys"), list)
+            or not any(_json_equal(k, sig) for k in trusted["deviceKeys"])):
+        return {"ok": False, "problem": "trusted-not-listed"}
+    return {"ok": True}
+
+
+def own_keys_decision(record: Any, machine_id: Any, held: Any) -> Dict[str, Any]:
+    """What a node does with a verified revision when its own keys are in question: apply (retiring the held keys the
+    record no longer lists, by key reference), stop as removed, stop as keys-replaced, or malformed."""
+    if not isinstance(record, dict) or not isinstance(machine_id, str) or not isinstance(held, list):
+        return {"action": "malformed"}
+    machine = _machine_of(record, machine_id)
+    if machine is None or _machine_revoked(record, machine_id):
+        return {"action": "stop", "reason": "removed"}
+    listed = machine.get("deviceKeys") if isinstance(machine.get("deviceKeys"), list) else []
+    if not listed or not all(any(_json_equal(k, mine) for mine in held) for k in listed):
+        return {"action": "stop", "reason": "keys-replaced"}
+    retire = [ref for ref in (_estate.device_key_ref(k) for k in held if not any(_json_equal(k, o) for o in listed)) if isinstance(ref, str)]
+    return {"action": "apply", "retire": retire}
 # #endregion ceremonies-kit
