@@ -102,8 +102,13 @@ version `range`. The partner packs and signs every package with its own publishe
 machine pins that key and `verify` refuses a package signed by any other. One signed package serves every company: what
 differs per company (a display name, a brand, an address) is placement configuration, never a second package.
 
-Still to come, each waiting on its owner: trusting a partner's key for one organization only (contract CT-58), a
-partner's own space in a catalog and publishing to it (FAA-44, Vesta PA-03).
+The company's estate record trusts the partner's key for that company only (DEC-0090): `publisherScopes[]` names the
+key, the partner and the organization contexts, and `placement_trust` / `placementTrust` hand the key to a placement in
+one of those contexts and to no other (FAC-SEM-122, [the estate record reference](estate-record.md)). The partner's own
+agents call the company's agents with the partner innermost in the delegation chain ([delegation](delegation.md)).
+
+Still to come, each waiting on its owner: a partner's own space in a catalog and publishing to it (FAA-44, Vesta
+PA-03).
 
 ## What this version does not do
 
