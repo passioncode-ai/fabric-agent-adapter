@@ -40,7 +40,7 @@ that agents act and report.
 | Fabric running, any start incl. compact/resume | 1,243 chars | 893 at startup or `/clear`; 0 on compact/resume |
 | Fabric down, repository without Fabric (`sshlg-skills`) | 678 | 0 |
 | Fabric down, Fabric repository (`asset-foundry`) | 678 | 217 |
-| Dashboard notice (`asset-foundry`) | 480 at startup and resume | about 390 (installed path) at startup and `/clear` |
+| Dashboard notice (`asset-foundry`) | 480 at startup and resume | 401 (installed path) at startup and `/clear` |
 
 ## Checks run
 
@@ -56,7 +56,20 @@ that agents act and report.
 
 - FAA-60: with Fabric running the 893-character preamble still reaches every folder under a user-scope registration.
 
+## Release receipts
+
+[PR #141](https://github.com/passioncode-ai/fabric-agent-adapter/pull/141) merged as `15dfe52`, CI on the exact head
+`3d8624f` ([validate](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/39368510283)); the merge
+also carries PR #140 (docs only), and `python3 test/validate.py` plus the two hook suites passed on `15dfe52` before
+the tag. Tag `v0.38.0`, [release run](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/39368744156)
+success, npm `@passioncode-ai/fabric-agent-adapter@0.38.0`. Launcher passioncode 0.2.15
+([PR #121](https://github.com/passioncode-ai/passioncode/pull/121), merge `a28fa5b`,
+[release run](https://github.com/passioncode-ai/passioncode/actions/runs/39370021607), npm 0.2.15).
+`npx --yes @passioncode-ai/passioncode@latest update` installed `fabric-agent-adapter@passioncode` 0.38.0; the cache
+is byte-identical to `git archive v0.38.0 plugins/fabric-agent-adapter` (91 files, `diff -r -q` empty), both matchers
+read `startup|clear`, and the installed hooks print 893 / 0 (startup / compact) in `sshlg-skills`. Sessions load the
+new hooks at their next start.
+
 ## Next task
 
-Release receipts for 0.38.0 (tag, release run, npm, passioncode launcher pin, local install bytes) go into FAA-59's
-row; then FAA-60.
+FAA-60: decide whether the running-Fabric preamble follows `project_uses_fabric`.
