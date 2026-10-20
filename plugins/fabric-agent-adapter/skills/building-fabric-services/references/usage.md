@@ -36,6 +36,10 @@ ledger.record(k.makeUsageReceipt('openrouter', model, { inputTokens, outputToken
   records `cost_usd=None`. The report counts it in `unpricedCalls`, and a host shows a lower bound
   («≥ $x») or «unknown». A call that is really free (a template, a cached answer) records
   `cost_usd=0.0` with `price-list`.
+- **Unknown tokens are named too** (DEC-0091). When the provider gave no token count (a stream cut off, a local
+  model without a counter), pass `tokens_measured=False` / `tokensMeasured: false` with the tokens you have (often 0).
+  The receipt carries `tokensMeasured: false`, and the report counts the call in `unmeasuredCalls` on its day and model
+  row, never more than `calls`; a host then shows the token totals as a lower bound.
 - **No content.** A receipt carries no prompt, output, caller or user id. The kits accept only the
   fields above.
 - If the service already keeps a ledger (a jobs table with token counts), build the receipts from

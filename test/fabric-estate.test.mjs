@@ -27,7 +27,7 @@ test('every verify case answers as the contract does', () => {
 test('every rule case answers as the contract does (FAC-SEM-072…076)', () => {
   for (const c of V.rules) assert.deepEqual(e.estateRecordRules(c.kind, c.value), c.expected, c.name);
   const codes = new Set(V.rules.flatMap((c) => (c.expected ?? []).map((f) => f.code)));
-  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114']);
+  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114', 'FAC-SEM-122']);
 });
 
 test('the digest, the challenge, placement trust, P-256 keys and passkey keys', () => {

@@ -300,7 +300,15 @@ export function placementTrust(record, machineId, agentRef, context = PERSONAL_C
   const machine = list(record.machines).find((entry) => entry.id === machineId);
   const placement = list(machine?.packages).find((entry) => entry.agentRef === agentRef && contextOf(entry) === context);
   if (!placement) return undefined;
+  // DEC-0090: a partner's key is trusted only in the contexts its scope names.
+  if (!scopeAdmits(record, placement.publisherKid, context)) return { publisher: [] };
   return { publisher: list(record.publisherKeys).filter((key) => key.kid === placement.publisherKid) };
+}
+
+/** Whether a placement in `context` under `kid` may use that key (DEC-0090): an unscoped key anywhere, a scoped one only in its contexts. */
+function scopeAdmits(record, kid, context) {
+  const scopes = list(record.publisherScopes).filter((scope) => scope.kid === kid);
+  return scopes.length === 0 || scopes.some((scope) => Array.isArray(scope.contexts) && scope.contexts.includes(context));
 }
 
 const MAX_WINDOW_MS = MAX_VALIDITY_SECONDS * 1000;
@@ -472,6 +480,27 @@ function placements(value, flag) {
   });
 }
 
+/**
+ * FAC-SEM-122 on one record (DEC-0090): a partner's publisher key is scoped once, to a key the record pins, and a
+ * placement under it is in one of the organization contexts its scope names, never `personal` or another.
+ */
+function partnerScopes(value, flag) {
+  const pinned = new Set(list(value.publisherKeys).map((key) => key.kid));
+  const scoped = new Set();
+  indexed(value.publisherScopes).forEach(([scope, index]) => {
+    if (scoped.has(scope.kid)) flag(`/publisherScopes/${index}/kid`, `publisher key ${show(scope.kid)} is scoped twice`);
+    scoped.add(scope.kid);
+    if (!pinned.has(scope.kid)) flag(`/publisherScopes/${index}/kid`, `publisher key ${show(scope.kid)} is not in publisherKeys, so the scope limits no key`);
+  });
+  indexed(value.machines).forEach(([machine, m]) => {
+    indexed(machine.packages).forEach(([placement, p]) => {
+      if (!scopeAdmits(value, placement.publisherKid, contextOf(placement))) {
+        flag(`/machines/${m}/packages/${p}/publisherKid`, `publisher key ${show(placement.publisherKid)} is a partner's, trusted only in the contexts its scope names, not in ${show(contextOf(placement))}`);
+      }
+    });
+  });
+}
+
 function secretReferences(value, flag) {
   const machineIds = new Set(list(value.machines).map((machine) => machine.id));
   indexed(value.machines).forEach(([machine, m]) => {
@@ -573,6 +602,7 @@ function recordFindings(value) {
   revisionWhole(value, flagger(findings, 'FAC-SEM-072'));
   keys(value, flagger(findings, 'FAC-SEM-073'));
   placements(value, flagger(findings, 'FAC-SEM-074'));
+  partnerScopes(value, flagger(findings, 'FAC-SEM-122'));
   secretReferences(value, flagger(findings, 'FAC-SEM-075'));
   grantsAndRevocations(value, flagger(findings, 'FAC-SEM-076'));
   indexed(value.shareGrants).forEach(([grant, index]) => findings.push(...grantContextFindings(grant, `/shareGrants/${index}`)));
@@ -613,6 +643,9 @@ function installation(value) {
   indexed(machine.secrets).forEach(([secret, index]) => {
     if (secret.agentRef === pkg.agentRef && contextOf(secret) === context && !declared.has(secret.slot)) flag075(`/record/machines/${machineIndex}/secrets/${index}/slot`, `the package declares no slot ${show(secret.slot)}: a secret goes only where a placed package declares it`);
   });
+  if (placement && !scopeAdmits(record, placement.publisherKid, context)) {
+    flagger(findings, 'FAC-SEM-122')(`/record/machines/${machineIndex}/packages/${placementIndex}/publisherKid`, `publisher key ${show(placement.publisherKid)} is a partner's, not trusted in ${show(context)}`);
+  }
   if (placement) {
     const flag111 = flagger(findings, 'FAC-SEM-111');
     for (const [suffix, message] of placementGrantProblems(record, placement)) flag111(`/record/machines/${machineIndex}/packages/${placementIndex}${suffix}`, message);

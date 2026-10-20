@@ -41,6 +41,13 @@ test('headers, canonical JSON and digests', () => {
   for (const bad of [NaN, Infinity, '\ud800', new Date(0), new Map(), undefined, () => 1]) assert.throws(() => d.jcs(bad), TypeError);
 });
 
+test('chain depth, a partner actor innermost only (DEC-0090)', () => {
+  for (const c of V.chainDepths) {
+    const depth = d.chainDepth(c.act ?? undefined);
+    assert.equal(Number.isFinite(depth) ? depth : null, c.expected, c.name);
+  }
+});
+
 test("the contract's canonical vectors (DEC-0043)", () => {
   const doc = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/canonical.json'), 'utf8')).rfc8785;
   const double = (hex) => Buffer.from(hex, 'hex').readDoubleBE(0);

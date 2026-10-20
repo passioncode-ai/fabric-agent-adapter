@@ -40,7 +40,7 @@ class Attribution(unittest.TestCase):
 
 class UsageRules(unittest.TestCase):
     def test_fac_sem_025_answers_as_the_contract_does(self):
-        self.assertEqual(len(V["usage"]), 21)
+        self.assertEqual(len(V["usage"]), 25)
         for c in V["usage"]:
             with self.subTest(c["name"]):
                 self.assertEqual([(f["code"], f["instancePath"]) for f in fs.usage_findings(c["report"])],

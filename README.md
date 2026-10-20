@@ -95,7 +95,9 @@ checks the interop rules. A job a provider limit paused or stopped, and an effec
 (`quota-exhausted`, `outcome-unknown`) and keys per caller (contract DEC-0087). The estate kits check share grants into
 an organization (`scripts/fabric_share.py`, DEC-0086) and the estate ceremonies: a revision's record rules, a headless
 machine's enroll token, the nearby pairing by a comparison code and the hub's single use of a token
-(`scripts/fabric_ceremonies.py`, DEC-0084); each has a Node twin. An agent that is not a service is announced with a provider
+(`scripts/fabric_ceremonies.py`, DEC-0084); each has a Node twin. A partner's publisher key is trusted only in the
+organization contexts its scope names, and a partner may sit innermost in a delegation chain (DEC-0090); a usage report
+counts calls whose tokens are unknown in `unmeasuredCalls` (DEC-0091). An agent that is not a service is announced with a provider
 entry: `adapting-projects-to-fabric/scripts/fabric_provider.py`.
 
 For provider bundles the adapting skill helps an agent author:
@@ -260,7 +262,7 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 The default pin for new bundles is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `07042181bfae2a481aa0da1a5651f24c76669c48`
+- commit: `c55f2d5a11c9a0197e958e87212fca7ae1154769`
 
 Every other mention of the default contract revision — this section, the skills' metadata, the
 skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree

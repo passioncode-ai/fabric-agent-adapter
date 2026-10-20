@@ -334,11 +334,22 @@ def _authentic(token: Any, jwks: Dict[str, Any], typ: str) -> Dict[str, Any]:
     return {"compact": compact, "kid": kid, "x": found["x"]}
 
 
+_ORG_CONTEXT = re.compile(r"org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}\Z")
+
+
+def is_partner_actor(node: Any) -> bool:
+    """DEC-0090: a partner actor is exactly {partner: org:<id>}, never with a sub, a session or an act."""
+    return isinstance(node, dict) and len(node) == 1 and isinstance(node.get("partner"), str) and _ORG_CONTEXT.match(node["partner"]) is not None
+
+
 def chain_depth(act: Any) -> float:
-    """Depth of an actor chain; infinity for a chain that is not one (a missing or non-string sub at any level)."""
+    """Depth of an actor chain; infinity for a chain that is not one (a missing or non-string sub at any level). A
+    partner actor ends the chain and counts, never begins it (DEC-0090)."""
     depth = 0
     node = act
     while node is not _MISSING:
+        if depth > 0 and is_partner_actor(node):
+            return depth + 1
         if not isinstance(node, dict) or not _is_string(node.get("sub")):
             return math.inf
         depth += 1
@@ -352,8 +363,8 @@ def _chain_of(act: Dict[str, Any]) -> List[str]:
     chain = []
     node: Any = act
     while isinstance(node, dict):
-        chain.append(node["sub"])
-        node = node.get("act")
+        chain.append(node["partner"] if "partner" in node else node["sub"])  # the contract's chainOf, partner first
+        node = node.get("act") if "act" in node else None
     return chain
 
 
@@ -379,6 +390,8 @@ def _actor_chain_depth(act: Any) -> Optional[int]:
     depth = 0
     node = act
     while node is not _MISSING:
+        if depth > 0 and is_partner_actor(node):  # DEC-0090: innermost only, it ends the chain
+            return depth + 1
         if not isinstance(node, dict) or not _full(AGENT_ID, node.get("sub")):
             return None
         if "session" in node and not _full(OPAQUE_ID, node["session"]):

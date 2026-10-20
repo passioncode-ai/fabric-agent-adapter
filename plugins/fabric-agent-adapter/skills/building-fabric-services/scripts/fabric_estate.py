@@ -734,7 +734,16 @@ def placement_trust(record: Dict[str, Any], machine_id: str, agent_ref: str, con
                       if _same(_get(p, "agentRef"), agent_ref) and _same(_context_of(p), context)), None)
     if placement is None:
         return None
+    if not _scope_admits(record, _get(placement, "publisherKid"), context):  # DEC-0090: a partner's key, in its contexts only
+        return {"publisher": []}
     return {"publisher": [k for k in _list(_get(record, "publisherKeys")) if _same(_get(k, "kid"), _get(placement, "publisherKid"))]}
+
+
+def _scope_admits(record: Any, kid: Any, context: Any) -> bool:
+    """DEC-0090: a key no `publisherScopes[]` entry names is trusted in any context; a partner's key, only in a context
+    one of its scopes lists."""
+    scopes = [s for s in _list(_get(record, "publisherScopes")) if _same(_get(s, "kid"), kid)]
+    return not scopes or any(isinstance(_get(s, "contexts"), list) and _contains(s["contexts"], context) for s in scopes)
 
 
 #: v4 §7, Freshness: an estate revision's window is at most 30 days (DEC-0055 item 2).
@@ -953,6 +962,25 @@ def _placements(value: Dict[str, Any], flag) -> None:
                 flag("%s/publisherKid" % at, "publisher key %s is not in publisherKeys, so the machine pins no key to verify the package under" % _show(_get(placement, "publisherKid")))
 
 
+def _partner_scopes(value: Dict[str, Any], flag) -> None:
+    """FAC-SEM-122 on one record (DEC-0090): a partner's publisher key is scoped once, to a key the record pins, and a
+    placement under it is in one of the organization contexts its scope names, never ``personal`` or another."""
+    pinned = [_get(k, "kid") for k in _list(_get(value, "publisherKeys"))]
+    scoped: List[Any] = []
+    for scope, index in _indexed(_get(value, "publisherScopes")):
+        if _contains(scoped, _get(scope, "kid")):
+            flag("/publisherScopes/%d/kid" % index, "publisher key %s is scoped twice" % _show(_get(scope, "kid")))
+        scoped.append(_get(scope, "kid"))
+        if not _contains(pinned, _get(scope, "kid")):
+            flag("/publisherScopes/%d/kid" % index, "publisher key %s is not in publisherKeys, so the scope limits no key" % _show(_get(scope, "kid")))
+    for machine, m in _indexed(_get(value, "machines")):
+        for placement, p in _indexed(_get(machine, "packages")):
+            if not _scope_admits(value, _get(placement, "publisherKid"), _context_of(placement)):
+                flag("/machines/%d/packages/%d/publisherKid" % (m, p),
+                     "publisher key %s is a partner's, trusted only in the contexts its scope names, not in %s"
+                     % (_show(_get(placement, "publisherKid")), _show(_context_of(placement))))
+
+
 def _secret_references(value: Dict[str, Any], flag) -> None:
     machine_ids = [_get(m, "id") for m in _list(_get(value, "machines"))]
     for machine, m in _indexed(_get(value, "machines")):
@@ -1110,6 +1138,7 @@ def _record_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
     _revision_whole(value, _finding(findings, "FAC-SEM-072"))
     _keys(value, _finding(findings, "FAC-SEM-073"))
     _placements(value, _finding(findings, "FAC-SEM-074"))
+    _partner_scopes(value, _finding(findings, "FAC-SEM-122"))
     _secret_references(value, _finding(findings, "FAC-SEM-075"))
     _grants_and_revocations(value, _finding(findings, "FAC-SEM-076"))
     for grant, index in _indexed(_get(value, "shareGrants")):  # FAC-SEM-110 (DEC-0082)
@@ -1156,6 +1185,9 @@ def _installation(value: Dict[str, Any]) -> List[Dict[str, str]]:
         if _same(_get(secret, "agentRef"), _get(pkg, "agentRef")) and _same(_context_of(secret), context) and not _contains(declared, _get(secret, "slot")):
             flag075("/record/machines/%d/secrets/%d/slot" % (machine_index, index),
                     "the package declares no slot %s: a secret goes only where a placed package declares it" % _show(_get(secret, "slot")))
+    if placement is not None and not _scope_admits(record, _get(placement, "publisherKid"), context):
+        _finding(findings, "FAC-SEM-122")("/record/machines/%d/packages/%d/publisherKid" % (machine_index, placement_index),
+                                          "publisher key %s is a partner's, not trusted in %s" % (_show(_get(placement, "publisherKid")), _show(context)))
     if placement is not None:
         flag111 = _finding(findings, "FAC-SEM-111")
         for suffix, message in _placement_grant_problems(record, placement):

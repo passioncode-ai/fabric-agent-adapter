@@ -862,13 +862,13 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
 
 /** Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`); a test holds it equal to the contract's. */
 export const PROTOCOL_REVISIONS = new Map(Object.entries({
-  'access-log': ['1'], approval: ['1'], 'activity-summary': ['1'], 'enroll-token': ['1'], entitlement: ['1'], 'entitlement-key-set': ['1'], 'estate-record': ['1'], 'execution-packet': ['1'],
+  'access-log': ['1'], approval: ['1'], 'activity-summary': ['1'], 'coding-agents': ['1'], 'enroll-token': ['1'], entitlement: ['1'], 'entitlement-key-set': ['1'], 'estate-record': ['1'], 'execution-packet': ['1'],
   'fabric-activity': ['0.1'], 'fabric-dashboard': ['0.1'], 'fabric-delegation': ['0.1'], 'fabric-device': ['0.1'],
   'fabric-interop': ['0.1', '0.2'], 'fabric-local-channel': ['0.1'], 'fabric-local-runner': ['0.1'], 'fabric-operator-channel': ['0.1'],
   'fabric-package': ['1'], 'fabric-project-comms': ['0.1'], 'fabric-proposal': ['1'], 'fabric-provider': ['0.1'], 'fabric-relay': ['0.1'],
   'fabric-secret-envelope': ['1'], 'fabric-service': ['0.1'], 'fabric-settings-backup': ['1'], heartbeat: ['1'], 'learning-note': ['1'],
   memory: ['0.1'], 'pairing-message': ['1'], pipeline: ['0.1'], 'revocation-delta': ['1'], 'session-handoff': ['1'],
-  'share-registration': ['1'], 'share-registration-receipt': ['1'], 'window-lease': ['1'],
+  'share-registration': ['1'], 'share-registration-receipt': ['1'], 'support-quality-daily': ['1'], 'window-lease': ['1'],
 }));
 export const MAX_PROTOCOLS = 64;
 const REVISION = /^([a-z][a-z0-9.-]{0,63})\/([0-9]{1,4}(?:\.[0-9]{1,4}){0,2})$/;
@@ -1023,7 +1023,9 @@ const COUNTS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTok
  * One model call. `projectId` (a URI, kept in its normal form, DEC-0076) and `taskRunId` (the service's own run id) attribute
  * it to the project the service ran it for (DEC-0065); they never name a caller, session or person.
  */
-export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0, costUsd = null, costBasis, at, route, projectId, taskRunId } = {}) {
+// tokensMeasured: false marks a call whose token counts are a lower bound or unknown (DEC-0091): the report counts it
+// in unmeasuredCalls and its token totals are a lower bound.
+export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0, costUsd = null, costBasis, at, route, projectId, taskRunId, tokensMeasured = true } = {}) {
   if (!PROVIDER.test(provider ?? '')) throw new ServiceError('provider must be a lowercase name such as anthropic or openrouter.');
   model = String(model ?? '').trim();
   if (!model || model.length > 128) throw new ServiceError('model must be 1 to 128 characters.');
@@ -1033,10 +1035,11 @@ export function makeUsageReceipt(provider, model, { inputTokens, outputTokens, c
   const basis = costBasis ?? (costUsd === null ? 'unknown' : 'provider');
   if (!COST_BASES.includes(basis) || (costUsd === null) !== (basis === 'unknown')) throw new ServiceError('costBasis is provider or price-list with a cost, unknown without one.');
   if (route !== undefined && !USAGE_ROUTES.includes(route)) throw new ServiceError('route is subscription, key or platform-metered (DEC-0046, DEC-0061).');
+  if (tokensMeasured !== true && tokensMeasured !== false) throw new ServiceError('tokensMeasured is true or false.');
   if (taskRunId !== undefined && projectId === undefined) throw new ServiceError('a task run belongs to a project: give projectId with taskRunId.');
   if (projectId !== undefined && !(typeof projectId === 'string' && /^[A-Za-z][A-Za-z0-9+.-]*:\S+$/.test(projectId))) throw new ServiceError('projectId is the URI of the project the service ran the call for.');
   if (taskRunId !== undefined && !(typeof taskRunId === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(taskRunId))) throw new ServiceError("taskRunId is the service's own run id: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$.");
-  return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis, ...(route === undefined ? {} : { route }),
+  return { at: at ?? nowIso(), provider, model, ...counts, costUsd, costBasis: basis, ...(tokensMeasured ? {} : { tokensMeasured: false }), ...(route === undefined ? {} : { route }),
     ...(projectId === undefined ? {} : { projectId: normalIdentifier(projectId) }), ...(taskRunId === undefined ? {} : { taskRunId }) };
 }
 
@@ -1104,6 +1107,8 @@ function pricedRow(row, at) {
   const calls = usageCount(row.calls), unpriced = usageCount(row.unpricedCalls);
   const flag = (p, message) => [{ code: 'FAC-SEM-025', instancePath: p, message }];
   if (unpriced > calls) return flag(`${at}/unpricedCalls`, 'more unpriced calls than calls');
+  // DEC-0091: calls whose token count is unknown are some of the calls, never more.
+  if (usageCount(row.unmeasuredCalls) > calls) return flag(`${at}/unmeasuredCalls`, 'more calls with unknown tokens than calls');
   if (calls > 0 && unpriced === calls && row.costUsd !== null) return flag(`${at}/costUsd`, 'every call is unpriced, so the cost is unknown (null), not a number');
   if (unpriced < calls && row.costUsd === null) return flag(`${at}/costUsd`, 'priced calls carry a cost; null is only for a row with no priced call');
   return [];
@@ -1133,7 +1138,7 @@ export function usageFindings(report) {
       if (spent) flag(`${at}/byModel`, 'a day with calls, tokens or cost names the models they belong to');
       return;
     }
-    for (const field of ['calls', 'unpricedCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) {
+    for (const field of ['calls', 'unpricedCalls', 'unmeasuredCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) {
       const sum = models.reduce((n, m) => n + Number(m[field] ?? 0), 0);
       if (Number(day[field] ?? 0) !== sum) flag(`${at}/${field}`, `the day's ${field} is not the sum of its models (${String(day[field] ?? 0)} ≠ ${sum})`);
     }
@@ -1272,6 +1277,7 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
     row.calls += 1;
     for (const c of COUNTS) row[c] += Number(r[c] ?? 0);
     if (r.costUsd === null || r.costUsd === undefined) row.unpricedCalls += 1; else row.cost += r.costUsd;
+    if (r.tokensMeasured === false) row.unmeasuredCalls = (row.unmeasuredCalls ?? 0) + 1; // absent is 0 (DEC-0091)
     row.bases.add(r.costBasis ?? 'unknown');
   }
   const outDays = [...days.keys()].sort().map((date) => {
@@ -1281,6 +1287,7 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
     const day = emptyRow({ date });
     for (const m of models) {
       for (const c of ['calls', 'unpricedCalls', ...COUNTS]) day[c] += m[c];
+      if (m.unmeasuredCalls) day.unmeasuredCalls = (day.unmeasuredCalls ?? 0) + m.unmeasuredCalls;
       day.cost += m.costUsd ?? 0;
     }
     return { ...closeRow(day), byModel: models };

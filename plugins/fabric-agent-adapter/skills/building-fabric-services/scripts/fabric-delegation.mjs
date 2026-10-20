@@ -179,10 +179,15 @@ function authentic(token, jwks, typ) {
 }
 
 /** Depth of an actor chain; Infinity for a chain that is not one (a missing or non-string sub at any level). */
+const ORG_CONTEXT = /^org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+/** DEC-0090: a partner actor is exactly {partner: org:<id>}, never with a sub, a session or an act. */
+export const isPartnerActor = (node) => isObject(node) && typeof node.partner === 'string' && ORG_CONTEXT.test(node.partner) && Object.keys(node).length === 1;
+
 export function chainDepth(act) {
   let depth = 0;
   let node = act;
   while (node !== undefined) {
+    if (depth > 0 && isPartnerActor(node)) return depth + 1; // a partner actor ends the chain, never begins it
     if (!isObject(node) || !isString(node.sub)) return Number.POSITIVE_INFINITY;
     depth += 1;
     if (depth > 64) return depth;
@@ -193,7 +198,7 @@ export function chainDepth(act) {
 
 function chainOf(act) {
   const chain = [];
-  for (let node = act; node; node = node.act) chain.push(node.sub);
+  for (let node = act; node; node = 'act' in node ? node.act : undefined) chain.push('partner' in node ? node.partner : node.sub);
   return chain;
 }
 
@@ -212,6 +217,7 @@ function actorChainDepth(act) {
   if (act === undefined) return undefined;
   let depth = 0;
   for (let node = act; node !== undefined; node = node.act) {
+    if (depth > 0 && isPartnerActor(node)) return depth + 1; // DEC-0090: innermost only, it ends the chain
     if (!isObject(node) || typeof node.sub !== 'string' || !AGENT_ID.test(node.sub)) return undefined;
     if (node.session !== undefined && !(typeof node.session === 'string' && OPAQUE_ID.test(node.session))) return undefined;
     depth += 1;

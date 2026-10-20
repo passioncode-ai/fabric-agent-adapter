@@ -154,6 +154,10 @@ const usageCases = [...usagePositive,
   edited('days out of order', (r) => { r.days.reverse(); }),
   edited("a day's calls are not its models' sum", (r) => { r.days[0].calls += 1; }),
   edited("a day's cost is not its models' known costs", (r) => { r.days[0].costUsd += 0.5; }),
+  // DEC-0091: unmeasuredCalls is bounded by calls in every row, and a day's is the sum of its models'.
+  edited('a model row with more unmeasured calls than calls', (r) => { const m = r.days[0].byModel[0]; m.unmeasuredCalls = m.calls + 1; r.days[0].unmeasuredCalls = m.calls + 1; }),
+  edited("a day's unmeasured calls are not its models' sum", (r) => { r.days[0].unmeasuredCalls = 1; }),
+  edited('unmeasured calls written on the day and its model', (r) => { r.days[0].byModel[0].unmeasuredCalls = 1; r.days[0].unmeasuredCalls = 1; }),
 ].map(([name, report]) => ({ name, report, findings: usageRulesModule.usageRules(report).map((f) => ({ code: f.code, instancePath: f.instancePath })) }));
 write('usage-attribution-vectors.json', { about: "DEC-0065: OpenRouter attribution's cases and FAC-SEM-025 over reports, answered by the contract's attributionHeaders and usageRules.",
   source: 'fixtures/vectors/openrouter-attribution.json, src/usage-rules.ts, fixtures/positive/service-usage*.json', attribution: attributionVectors.cases, usage: usageCases });

@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.39.0 - 2026-10-20
+
+### Changed
+
+- **Pinned to contract `c55f2d5`** (FAA-61; DEC-0089 to DEC-0095). `0704218` (0.36.0 to 0.38.0) joins the supported
+  revisions. Every new vector is answered by the contract's own functions at the pin.
+
+### Added
+
+- **Unmeasured tokens are named** (DEC-0091, contract CT-62). `make_usage_receipt(..., tokens_measured=False)` /
+  `makeUsageReceipt(..., { tokensMeasured: false })` writes `tokensMeasured: false`; the report counts such calls in
+  `unmeasuredCalls` on the day and the model row, and FAC-SEM-025 in both kits and `check_service.py` refuses a row
+  with more unmeasured calls than calls or a day whose count is not its models' sum. Three new usage vectors (25).
+- **A partner in the delegation chain** (DEC-0090, contract CT-58). Both verifiers take `{partner: "org:<id>"}` as the
+  innermost actor under at least one agent: it counts toward the depth limit and ends the chain, and the checked chain
+  lists it by its `org:` id. Outermost, with an `act` beneath, `personal` or an `ORG:` prefix is `malformed-chain`.
+  `is_partner_actor` / `isPartnerActor` are exported. Eight new delegation vectors (90) and thirteen `chainDepths`
+  vectors held by both kits.
+- **A partner's publisher key, per organization context** (DEC-0090, FAC-SEM-122). The estate kits read
+  `publisherScopes[]`: `placement_trust` / `placementTrust` answer no key for a placement outside its key's scope, and
+  `estate-record` and `estate-placement` flag a key scoped twice, a scope over a key `publisherKeys` does not pin, and a
+  placement in a context its key's scope does not name. Seven new rule cases (137) and 45 placementTrust cases (64).
+- **Protocol register at the pin**: `coding-agents/1` and `support-quality-daily/1` (DEC-0093, DEC-0095).
+
+### Not here
+
+- Minting a partner's token and its grant (FAC-SEM-124) are the issuer's; the kits verify, never mint.
+- `partnerUsage` and FAC-SEM-123 (a partner's access-log reads) are the organization server's.
+- DEC-0089 (folder attribution, FAC-SEM-121) and DEC-0092 (`fabric.project.resolve`) are Fabric's; DEC-0094 (a device
+  key in a file, FAC-SEM-125) is the device's and its server's. No kit reads them.
+
 ## 0.38.0 - 2026-10-20
 
 ### Changed

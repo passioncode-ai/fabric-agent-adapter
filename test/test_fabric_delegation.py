@@ -93,6 +93,11 @@ class CanonicalJsonTests(unittest.TestCase):
         for case in VECTORS["digests"]:
             self.assertEqual(dl.action_digest(json.loads(case["input"])), case["expected"])
 
+    def test_chain_depth_takes_a_partner_innermost_only(self):  # DEC-0090
+        for case in VECTORS["chainDepths"]:
+            depth = dl.chain_depth(dl._MISSING if case["act"] is None else case["act"])
+            self.assertEqual(None if depth == float("inf") else depth, case["expected"], case["name"])
+
     def test_the_contracts_canonical_vectors(self):
         """DEC-0043: fixtures/vectors/canonical.json at the pin, copied to test/fixtures/contract/."""
         import struct
