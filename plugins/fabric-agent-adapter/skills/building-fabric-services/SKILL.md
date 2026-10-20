@@ -18,7 +18,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.37.1"
+  version: "0.38.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "07042181bfae2a481aa0da1a5651f24c76669c48"
@@ -231,8 +231,8 @@ theme followed (`fabric-dashboard/0.1`, contract DEC-0036). **Build it from the 
 (`assets/dashboard-kit/`: `dashboard_kit.py install <static dir>`, seven AA themes, light and dark)
 and declare it with `extensions=fs.dashboard_extension()`. Read
 [the dashboard kit reference](references/dashboard-kit.md) for the markup, the themes, the
-declaration and how to upgrade a dashboard built before the kit — only with the operator's
-go-ahead, which the plugin's session-start notice reminds you of.
+declaration and how to upgrade a dashboard built before the kit: an upgrade you may make yourself,
+which the plugin's session-start notice offers in a repository that owns the service.
 
 The events feed is a **view over the log you already keep** — a jobs table, a JSONL
 journal — not a second store. Each event is one sentence a person reads; set

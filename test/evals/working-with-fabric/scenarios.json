@@ -12,6 +12,16 @@
       ]
     },
     {
+      "id": "down-notice-skips-whoami",
+      "trap": "the session start said Fabric is not running, yet the agent called fabric_whoami and com.status first, as the MCP server's instruction says, and spent its opening turns on calls that could not succeed",
+      "request": "Fix the failing test in this repository. (The session start said: Fabric is not running: skip `fabric_whoami` and the project board for now.)",
+      "expected": [
+        "does not call fabric_whoami, com.status or com.list while Fabric is down, and does not report the board as empty",
+        "works on the task without Fabric; starts Fabric through the lifecycle broker only if the task itself needs it, never by launching it",
+        "says once, in its report, that the project board was not read because Fabric was not running"
+      ]
+    },
+    {
       "id": "register-once-without-a-secret",
       "request": "Set up Fabric's MCP in Claude Code and Codex on this Mac.",
       "expected": [

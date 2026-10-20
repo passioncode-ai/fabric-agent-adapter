@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.37.1` |
+| Version | `0.38.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `07042181bfae2a481aa0da1a5651f24c76669c48` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -24,7 +24,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.37.1` |
+| Version | `0.38.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `07042181bfae2a481aa0da1a5651f24c76669c48` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
@@ -46,7 +46,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.37.1` |
+| Version | `0.38.0` |
 | Plugin | `fabric-agent-adapter` |
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `07042181bfae2a481aa0da1a5651f24c76669c48`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
@@ -66,14 +66,14 @@ provider manifest (the adapting skill) or the Fabric Dashboards app.
 
 | Field | Value |
 |---|---|
-| Version | `0.37.1` |
+| Version | `0.38.0` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | the desktop app 0.4.0 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
 | Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, coordinate, report, link backlog rows, release |
 | Inputs | the agent's folder; Fabric's `hub.json`; the agent's MCP configuration (read, not written, by the status script) |
 | Outputs | `fabric_session.py status`: Fabric's state, the registrations and one next action; `watch-mail`: one line each time the board's unread count rises |
 | Mutations | none by `status` or `watch-mail`; the hooks write only their own log and spool in the user's cache folder; `install-host-hooks --apply` edits Codex's `hooks.json` or Kimi Code's `config.toml` after a backup, only on the person's go-ahead |
-| Hooks | Claude Code: SessionStart (preamble when `fabric` is registered, the Fabric-service count), Stop (turn facts and the unread count), UserPromptSubmit (one line when the count rose), SessionEnd (release), the last three only when Fabric advertises `session-hooks/1`; Codex and Kimi Code: the SessionStart preamble only. Silent in a session Fabric launched; never block, always exit 0 |
+| Hooks | Claude Code: SessionStart at startup and `/clear` (preamble when `fabric` is registered and Fabric runs; one line when it is down, only in a project that uses Fabric), Stop (turn facts and the unread count), UserPromptSubmit (one line when the count rose), SessionEnd (release), the last three only when Fabric advertises `session-hooks/1`; Codex and Kimi Code: the SessionStart preamble only. Silent in a session Fabric launched; never block, always exit 0 |
 | Network | none of its own; Fabric is reached only through `fabric-mcp` |
 | Secrets | never read: the door token and credentials stay with `fabric-mcp`; nothing secret in argv or logs |
 

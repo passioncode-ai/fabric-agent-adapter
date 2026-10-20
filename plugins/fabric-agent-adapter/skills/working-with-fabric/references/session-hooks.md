@@ -19,11 +19,17 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 
 | Event | When it acts | What it does |
 |---|---|---|
-| SessionStart (every source) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running: adds the preamble — `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric down: one line pointing at the lifecycle broker. Not registered: no preamble. |
-| SessionStart, any host | the machine has `fabric-service/0.1` descriptors | adds one line: how many descriptors, where, how many on 127.0.0.1, how to probe them, never kill them (the same text as the machine's `fabric-session-note.sh`; hidden files are not counted) |
+| SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running: adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric down, in a project that uses Fabric (below): one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
 | Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | spools one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}`, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
 | UserPromptSubmit | the session's spool holds a count | adds ONE line, `N unread on the project board — com.list`, only when the count rose since the last line; a fall or the same count says nothing. It reads two small files and never calls Fabric. |
 | SessionEnd | as for Stop | spools the end; the worker sends `fabric_work_release {claims: "session", outcome: "let-go", …}`, then `fabric_session_observe {event: "end", reason}`, and removes the session's spool |
+
+**A project that uses Fabric** (`project_uses_fabric`), cheapest sign first: `fabric` registered at local or project
+scope for the folder (user scope is every folder's, so it says nothing about this one); a `fabric-agent.json`,
+`fabric-contract.lock.json` or `fabric.package.json` file from the folder up to its checkout's root (the folder alone
+outside a checkout; never above it); or a service descriptor whose `source.repository` is the checkout's
+`remote.origin.url`. The machine's service descriptors are no longer counted into the session: the host's own
+instructions say how to read Fabric services (since 0.38.0).
 
 Without `session-hooks/1`, Stop and SessionEnd read `hub.json`, return, and write nothing, so UserPromptSubmit has
 nothing to show; `fabric_session.py status` says "Session hooks: inert". That is every Fabric before the release
@@ -35,7 +41,7 @@ zero; a `degraded` board that still gives the count is read.
 `fabric_session.py hook session-start --host codex|kimi` emits structured SessionStart JSON for Codex and plain text
 for Kimi when the host has `fabric`
 registered (`[mcp_servers.fabric]` in `$CODEX_HOME/config.toml`; `mcpServers.fabric` in `~/.kimi-code/mcp.json`),
-plus the service line. Nothing else: no turn observation and no unread line, because a rejoin needs the runtime
+under the same rules. Nothing else: no turn observation and no unread line, because a rejoin needs the runtime
 session id Fabric keeps with the enrollment, which only Claude Code supplies today (D1).
 
 `install-host-hooks --host codex|kimi` is a dry run by default. It prints the file, its sha256, and the one entry it

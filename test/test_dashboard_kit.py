@@ -360,16 +360,40 @@ class Cli(unittest.TestCase):
 
     def test_notice_for_an_older_copy_and_silence_when_current(self):
         repo = self.make_repo()
+        services = self.services("https://github.com/example/example-agent")
         (repo / "web/fabric-dashboard.css").write_text("/* fabric-dashboard-kit@0.9.0 */\n")
-        done, elapsed = self.notice(repo, self.base / "none")
+        done, elapsed = self.notice(repo, services)
         self.assertEqual(done.returncode, 0)
         self.assertEqual(len(done.stdout.strip().splitlines()), 1)
-        self.assertIn("fabric-dashboard-kit 0.9.0; %s is current" % CURRENT, done.stdout)
-        self.assertIn("tell the operator", done.stdout)
+        self.assertIn("example-agent.default (this repository) is built from fabric-dashboard-kit 0.9.0; %s is current"
+                      % CURRENT, done.stdout)
         self.assertLess(elapsed, 2.0)
         (repo / "web/fabric-dashboard.css").write_bytes((KIT / "fabric-dashboard.css").read_bytes())
-        done, _ = self.notice(repo, self.base / "none")
+        done, _ = self.notice(repo, services)
         self.assertEqual((done.returncode, done.stdout), (0, ""))
+
+    def test_notice_is_silent_when_the_repository_owns_no_service(self):
+        repo = self.make_repo()
+        (repo / "web/fabric-dashboard.css").write_text("/* fabric-dashboard-kit@0.9.0 */\n")
+        (repo / "server.py").write_text('SURFACES = {"dashboard": {"path": "/", "login": True}}\n')
+        done, _ = self.notice(repo, self.base / "none")
+        self.assertEqual((done.returncode, done.stdout), (0, ""), "no service of this repository: nothing to say")
+        done, _ = self.notice(repo, self.services("https://github.com/example/another-agent"))
+        self.assertEqual((done.returncode, done.stdout), (0, ""), "another repository's service is never named")
+
+    def test_notice_is_an_action_the_agent_may_take(self):
+        repo = self.make_repo()
+        (repo / "web/fabric-dashboard.js").write_text("/* fabric-dashboard-kit@0.9.0 */\n")
+        done, _ = self.notice(repo, self.services("git@github.com:example/example-agent.git"))
+        line = done.stdout.strip()
+        self.assertIn("You may upgrade it yourself", line)
+        self.assertIn("dashboard_kit.py\" status`", line)
+        self.assertIn("Upgrading an existing dashboard", line)
+        for phrase in ("tell the operator", "go-ahead", "Do not change it"):
+            self.assertNotIn(phrase, line)
+        self.assertNotIn("\u2014", line)
+        script = str((ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/dashboard_kit.py").resolve())
+        self.assertLessEqual(len(line) - len(script), 300, "short, apart from the path it has to name")
 
     def test_notice_for_a_service_with_a_dashboard_and_no_kit(self):
         repo = self.make_repo("https://github.com/example/example-agent")
@@ -378,7 +402,7 @@ class Cli(unittest.TestCase):
         self.assertEqual(done.stdout, "", "no dashboard surface in the code yet: silent")
         (repo / "server.py").write_text('SURFACES = {"dashboard": {"path": "/", "login": True}}\n')
         done, _ = self.notice(repo, services)
-        self.assertIn("example-agent.default has a dashboard without fabric-dashboard-kit", done.stdout)
+        self.assertIn("example-agent.default (this repository) has a dashboard without fabric-dashboard-kit", done.stdout)
 
     def test_notice_is_silent_outside_a_repository_and_on_bad_input(self):
         outside = self.base / "plain"
@@ -399,6 +423,7 @@ class Cli(unittest.TestCase):
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/skills/building-fabric-services/scripts/dashboard_kit.py", hook["command"])
         self.assertTrue(hook["command"].endswith(" notice"))
         self.assertLessEqual(hook.get("timeout", 60), 10)
+        self.assertEqual(entry.get("matcher"), "startup|clear", "a resumed or compacted session already heard it")
 
     def test_build_check_reports_drift(self):
         kit = self.base / "kit"

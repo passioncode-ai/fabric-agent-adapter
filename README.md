@@ -33,9 +33,10 @@ next action:
 python3 plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py status
 ```
 
-In Claude Code the plugin adds four session hooks: SessionStart puts that preamble into the session when the MCP
-server `fabric` is registered (one line pointing at the broker when Fabric is down), with the machine's
-Fabric-service count; Stop records each turn's facts (HEAD, files changed, lines added and removed — never content)
+In Claude Code the plugin adds four session hooks: SessionStart (at startup and `/clear`, never on compact or
+resume) puts that preamble into the session when the MCP server `fabric` is registered and Fabric runs; when Fabric
+is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
+project that uses Fabric; Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
 and the board's unread count; UserPromptSubmit adds one line only when that count rose; SessionEnd releases what the
 session left claimed. Stop, UserPromptSubmit and SessionEnd act only when the running Fabric advertises
 `session-hooks/1`. All are silent in a session Fabric launched, never block the session, read no token and always
@@ -72,9 +73,10 @@ box, sticky chrome at most 120 px — with seven WCAG AA themes (light and dark)
 `fabric_appearance` cookie. `scripts/dashboard_kit.py install|status` copies and checks it,
 `scripts/check_dashboard_layout.mjs` measures a rendered page in WebKit at 360, 480, 768 and 1280 px
 (Playwright; `NOT_RUN` without it), and the probe's `dashboard.declared` checks the declaration. The
-plugin's dashboard-kit hook (SessionStart) prints a single line in a repository whose dashboard has no kit or an
-older one, and nothing anywhere else; the [kit reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-kit.md)
-has the upgrade steps, taken only with the operator's go-ahead.
+plugin's dashboard-kit hook (SessionStart, at startup and `/clear`) prints a single line in a repository that owns
+a service (a descriptor names it as `source.repository`) whose dashboard has no kit or an older one, and nothing
+anywhere else; the [kit reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-kit.md)
+has the upgrade steps, which the agent may take itself.
 
 Dashboard handoffs use the host-generated `open_link` as the primary action. The
 three builder skills carry the same [consumer procedure](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-links.md)
