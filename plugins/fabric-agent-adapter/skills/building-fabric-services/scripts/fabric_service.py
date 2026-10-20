@@ -1356,7 +1356,7 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
 #: Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`, DEC-0067); a test
 #: holds it equal to the contract's register at the pin.
 PROTOCOL_REVISIONS: Dict[str, Tuple[str, ...]] = {
-    "access-log": ("1",), "approval": ("1",), "activity-summary": ("1",), "enroll-token": ("1",), "entitlement": ("1",),
+    "access-log": ("1",), "approval": ("1",), "activity-summary": ("1",), "coding-agents": ("1",), "enroll-token": ("1",), "entitlement": ("1",),
     "entitlement-key-set": ("1",), "estate-record": ("1",), "execution-packet": ("1",),
     "fabric-activity": ("0.1",), "fabric-dashboard": ("0.1",), "fabric-delegation": ("0.1",), "fabric-device": ("0.1",),
     "fabric-interop": ("0.1", "0.2"), "fabric-local-channel": ("0.1",), "fabric-local-runner": ("0.1",),
@@ -1364,7 +1364,7 @@ PROTOCOL_REVISIONS: Dict[str, Tuple[str, ...]] = {
     "fabric-provider": ("0.1",), "fabric-relay": ("0.1",), "fabric-secret-envelope": ("1",), "fabric-service": ("0.1",),
     "fabric-settings-backup": ("1",), "heartbeat": ("1",), "learning-note": ("1",), "memory": ("0.1",), "pairing-message": ("1",), "pipeline": ("0.1",),
     "revocation-delta": ("1",), "session-handoff": ("1",), "share-registration": ("1",),
-    "share-registration-receipt": ("1",), "window-lease": ("1",),
+    "share-registration-receipt": ("1",), "support-quality-daily": ("1",), "window-lease": ("1",),
 }
 MAX_PROTOCOLS = 64
 _REVISION = re.compile(r"([a-z][a-z0-9.-]{0,63})/([0-9]{1,4}(?:\.[0-9]{1,4}){0,2})", re.ASCII)
@@ -1622,8 +1622,12 @@ def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_t
                        cache_read_tokens: int = 0, cache_write_tokens: int = 0,
                        cost_usd: Optional[float] = None, cost_basis: Optional[str] = None,
                        at: Optional[str] = None, route: Optional[str] = None,
-                       project_id: Optional[str] = None, task_run_id: Optional[str] = None) -> Dict[str, Any]:
+                       project_id: Optional[str] = None, task_run_id: Optional[str] = None,
+                       tokens_measured: bool = True) -> Dict[str, Any]:
     """One model call, from the provider's own usage numbers. No prompt, output or caller.
+
+    `tokens_measured=False` marks a call whose token counts are a lower bound or unknown (the provider returned none,
+    the stream was cut): the report counts it in `unmeasuredCalls` and its token totals are a lower bound (DEC-0091).
 
     `project_id` (a URI, kept in its normal form, DEC-0076) and `task_run_id` (the service's own run id) attribute the
     call to the project the service ran it for (DEC-0065); they never name a caller, session or person.
@@ -1650,6 +1654,10 @@ def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_t
         raise ServiceError("route is subscription, key or platform-metered (DEC-0046, DEC-0061).")
     receipt = {"at": at or now_iso(), "provider": provider, "model": model, **counts,
                "costUsd": None if cost_usd is None else float(cost_usd), "costBasis": basis}
+    if tokens_measured is not True:
+        if tokens_measured is not False:
+            raise ServiceError("tokens_measured is True or False.")
+        receipt["tokensMeasured"] = False
     if route is not None:
         receipt["route"] = route  # the operator's own login in its vendor's runner, an issued key, or the platform's metered models
     if task_run_id is not None and project_id is None:
@@ -1703,6 +1711,8 @@ def _by_project(receipts: List[Dict[str, Any]], first: str, last: str) -> List[D
 
 def _add_totals(row: Dict[str, Any], receipt: Dict[str, Any]) -> None:
     row["calls"] += 1
+    if receipt.get("tokensMeasured") is False:
+        row["unmeasuredCalls"] = row.get("unmeasuredCalls", 0) + 1  # written only when above 0: absent is 0 (DEC-0091)
     for name in ("inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
         row[name] += int(receipt.get(name) or 0)
     if receipt.get("costUsd") is None:
@@ -1760,6 +1770,8 @@ def _priced_row(row: Dict[str, Any], at: str) -> List[Dict[str, str]]:
     flag = lambda path, message: [{"code": "FAC-SEM-025", "instancePath": path, "message": message}]  # noqa: E731
     if unpriced > calls:
         return flag(at + "/unpricedCalls", "more unpriced calls than calls")
+    if _usage_count(row.get("unmeasuredCalls")) > calls:  # DEC-0091: unknown token counts are some of the calls
+        return flag(at + "/unmeasuredCalls", "more calls with unknown tokens than calls")
     if calls > 0 and unpriced == calls and row.get("costUsd", _MISSING_COST) is not None:
         return flag(at + "/costUsd", "every call is unpriced, so the cost is unknown (null), not a number")
     if unpriced < calls and row.get("costUsd", _MISSING_COST) is None:
@@ -1800,7 +1812,7 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
             if spent:
                 flag(at + "/byModel", "a day with calls, tokens or cost names the models they belong to")
             continue
-        for field in ("calls", "unpricedCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
+        for field in ("calls", "unpricedCalls", "unmeasuredCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
             total = sum(m.get(field) or 0 for m in models if isinstance(m.get(field) or 0, (int, float)))
             if (day.get(field) or 0) != total:
                 flag("%s/%s" % (at, field), "the day's %s is not the sum of its models (%s ≠ %s)" % (field, day.get(field) or 0, total))
@@ -2001,6 +2013,8 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
         for m in models:
             for name in ("calls", "unpricedCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
                 day[name] += m[name]
+            if m.get("unmeasuredCalls"):
+                day["unmeasuredCalls"] = day.get("unmeasuredCalls", 0) + m["unmeasuredCalls"]
             day["_cost"] += m["costUsd"] or 0.0
         day = _close_totals(day)
         day["byModel"] = models

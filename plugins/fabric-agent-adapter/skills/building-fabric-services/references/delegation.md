@@ -63,6 +63,14 @@ job's own capability and effect, and only for the principal and caller that star
 `scope-not-granted`); `on_input` gets the checked delegation on its context. Start jobs with `ctx.start_job()` so the
 job records who started it.
 
+**A partner in the chain** (DEC-0090). A token a partner's agent presents for a customer organization carries the
+partner as the innermost actor: `{partner: "org:<id>"}`, exactly that member, under at least one agent. It counts
+toward the depth limit and ends the chain; outermost, with an `act` beneath, or as `personal` it is
+`malformed-chain`. A node with a `sub` beside `partner` is an agent, checked as one. `ctx.delegation["chain"]` lists a
+node with `partner` by its `org:` id. `chain_depth(act)` /
+`chainDepth(act)` answer the contract's depth, infinity for a chain that is not one. Minting a partner's token (its
+grant, FAC-SEM-124) is the issuer's, not the kit's.
+
 ## Approvals
 
 An action with an external effect may need the operator's approval (DL-17, DL-18). The order is fixed: the token,

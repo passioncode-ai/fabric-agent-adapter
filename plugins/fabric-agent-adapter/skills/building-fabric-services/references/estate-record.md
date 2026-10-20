@@ -56,7 +56,7 @@ It checks, in the order of the ER table:
 7. **The window.** At most 30 days. A revision may be issued up to 60 s ahead of the verifier's clock (DEC-0066,
    `CLOCK_SKEW_SECONDS`); earlier than that it is `not-yet-valid`.
 8. **The record's own rules.** A violation is `rule-violation` with its `codes`, `FAC-SEM-072…076`, `FAC-SEM-110`,
-   `FAC-SEM-111` and `FAC-SEM-092`
+   `FAC-SEM-111`, `FAC-SEM-122` and `FAC-SEM-092`
    (each passkey the record lists is a signing credential, its origins within its RP ID).
 
 Dates are strict RFC 3339: a `T`, an offset, and a day that exists. `:60` and a space are refused. Passkey JWK `x`
@@ -113,6 +113,10 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
 - **A share grant is never personal** (FAC-SEM-110). A grant to a principal outside the estate (`principalKind:
   external`) is used in that principal's organization; `context: "personal"` on it is a finding, and an absent one
   means not stated. `grant_context_findings(grant, at)` / `grantContextFindings(grant, at)` check one grant on its own.
+- **A partner's publisher key is trusted only where its scope says** (DEC-0090, FAC-SEM-122). `publisherScopes[]`
+  names the keys that are a partner's (`kid`, `partner: org:<id>`, `contexts`); a placement under such a key is in one
+  of the organization contexts listed, never `personal` or another organization. A key is scoped once, and only a key
+  `publisherKeys` pins. A key no scope names keeps DEC-0051's meaning, trusted in any context.
 
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
@@ -174,14 +178,15 @@ sharer's node's and the organization server's, not this kit's.
 ## Checking a record you produce
 
 `estate_record_rules(kind, value)` / `estateRecordRules(kind, value)` are the contract's rules, finding for finding:
-- `estate-record` (FAC-SEM-072…076, 110, 111);
+- `estate-record` (FAC-SEM-072…076, 110, 111, 122);
 - `estate-record-revision` `{parent, next}` (072);
-- `estate-placement` `{record, machine, package, context?}` (074, 075, 111): the package placed on that machine in that
+- `estate-placement` `{record, machine, package, context?}` (074, 075, 111, 122): the package placed on that machine in that
   context, `personal` when `context` is absent.
 
 `placement_trust(record, machine, agentRef, context="personal")` / `placementTrust(record, machine, agentRef, context)`
 names the publisher keys a package verifier trusts for the package placed in that context. A caller that passes no
-context gets the personal placement, as before contexts.
+context gets the personal placement, as before contexts. A partner's key placed outside the contexts its scope names
+answers `{publisher: []}`: the placement exists, and no key may verify it (DEC-0090).
 
 ## What the kit does not do
 

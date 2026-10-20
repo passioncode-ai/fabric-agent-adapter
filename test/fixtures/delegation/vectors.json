@@ -2455,6 +2455,311 @@
    }
   },
   {
+   "name": "partner innermost under an agent",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwiYWN0Ijp7InBhcnRuZXIiOiJvcmc6cGFydG5lci0xIn19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.FKu6rhn6oAG94ck-C-FUUXESYrYjXNGAR3DXuPEYaDU5oUkKG4bQ3q0-f3dXstN-gk38siVgzXdeObWxOvPeDg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": true,
+    "principal": "urn:person:operator",
+    "caller": "example-media",
+    "chain": [
+     "example-media",
+     "org:partner-1"
+    ],
+    "kid": "estate-new"
+   }
+  },
+  {
+   "name": "partner innermost of a chain of four",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJhZ2VudC0xIiwiYWN0Ijp7InN1YiI6ImFnZW50LTIiLCJhY3QiOnsic3ViIjoiYWdlbnQtMyIsImFjdCI6eyJwYXJ0bmVyIjoib3JnOnBhcnRuZXItMSJ9fX19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.FCyLsWieOiOg9H6RJ1fdPXQQxp0RduPlTmemgJnr7p0ryZzU-O2G8QkoTG-gUn1WI_3ntfC7tbDmVU-TWelgAg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": true,
+    "principal": "urn:person:operator",
+    "caller": "agent-1",
+    "chain": [
+     "agent-1",
+     "agent-2",
+     "agent-3",
+     "org:partner-1"
+    ],
+    "kid": "estate-new"
+   }
+  },
+  {
+   "name": "partner innermost of a chain of five",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJhZ2VudC0xIiwiYWN0Ijp7InN1YiI6ImFnZW50LTIiLCJhY3QiOnsic3ViIjoiYWdlbnQtMyIsImFjdCI6eyJzdWIiOiJhZ2VudC00IiwiYWN0Ijp7InBhcnRuZXIiOiJvcmc6cGFydG5lci0xIn19fX19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.1vWyjqqu8su-Nbf2NFX-lBMBfAbaknw8YMloNUgZ9Yqk2wmLAPb8RNlh17spwGqHZBoPZv2eBYXTOYuNfRw3AA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "chain-too-deep",
+    "detail": "depth-5"
+   }
+  },
+  {
+   "name": "partner as the outermost actor",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJwYXJ0bmVyIjoib3JnOnBhcnRuZXItMSJ9LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.Apnx0sV0a1_QXlQxSAdAXU1Z58eGqjFIGVvCMsdzTK1cOI1d7nDZ8l-bmQTsmyykNdSaM9IG6hNPMgyrgRoVBg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-chain"
+   }
+  },
+  {
+   "name": "partner with an act beneath it",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwiYWN0Ijp7InBhcnRuZXIiOiJvcmc6cGFydG5lci0xIiwiYWN0Ijp7InN1YiI6ImFnZW50LTIifX19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.MbtAdItShgfHTTR7SCuX8gJzrhqnae1AkygRObW65lBz8cQS0FJf2yp-7_p5KsTg-jWqfVv1Z6ckixNNPs-7BA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-chain"
+   }
+  },
+  {
+   "name": "partner with a sub beside it",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwiYWN0Ijp7InBhcnRuZXIiOiJvcmc6cGFydG5lci0xIiwic3ViIjoiYWdlbnQtMiJ9fSwiYXVkIjoiZXhhbXBsZS13cml0ZXIiLCJzY29wZSI6IndyaXRlci53cml0ZSB3cml0ZXIuY2hlY2siLCJlZmZlY3QiOlsiZHJhZnQiXSwiZ3JhbnQiOlsidXJuOmdyYW50OnByb2plY3QtYTpleGFtcGxlLW1lZGlhLXdyaXRlciMzIl0sInNwZW5kIjp7Im1vZGUiOiJsaW1pdGVkIiwicmVtYWluaW5nIjpbeyJ3aW5kb3ciOiJ0YXNrIiwicmVtYWluaW5nVXNkIjoxLjV9LHsid2luZG93IjoiZGF5IiwicmVtYWluaW5nVXNkIjo0LjJ9LHsid2luZG93IjoibW9udGgiLCJyZW1haW5pbmdVc2QiOjM4fV0sInBlckNhbGxNYXhVc2QiOjAuNX0sInByb2plY3QiOiJ1cm46cHJvamVjdDphIiwiaWF0IjoxNzkxNzIwMDAwLCJleHAiOjE3OTE3MjA2MDAsImp0aSI6IjAxSkE3WTVRM0MySzlNOE40UDZSMFMxVDJWIn0.DzI6RjN915rduyye8Y5l_ShdPxSJIf_sx0wjn3fZYC3ueET_gWSjTzPnKeVS_zzShEqfo-9vrU084KE3sc6DAw",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": true,
+    "principal": "urn:person:operator",
+    "caller": "example-media",
+    "chain": [
+     "example-media",
+     "org:partner-1"
+    ],
+    "kid": "estate-new"
+   }
+  },
+  {
+   "name": "partner that is personal",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwiYWN0Ijp7InBhcnRuZXIiOiJwZXJzb25hbCJ9fSwiYXVkIjoiZXhhbXBsZS13cml0ZXIiLCJzY29wZSI6IndyaXRlci53cml0ZSB3cml0ZXIuY2hlY2siLCJlZmZlY3QiOlsiZHJhZnQiXSwiZ3JhbnQiOlsidXJuOmdyYW50OnByb2plY3QtYTpleGFtcGxlLW1lZGlhLXdyaXRlciMzIl0sInNwZW5kIjp7Im1vZGUiOiJsaW1pdGVkIiwicmVtYWluaW5nIjpbeyJ3aW5kb3ciOiJ0YXNrIiwicmVtYWluaW5nVXNkIjoxLjV9LHsid2luZG93IjoiZGF5IiwicmVtYWluaW5nVXNkIjo0LjJ9LHsid2luZG93IjoibW9udGgiLCJyZW1haW5pbmdVc2QiOjM4fV0sInBlckNhbGxNYXhVc2QiOjAuNX0sInByb2plY3QiOiJ1cm46cHJvamVjdDphIiwiaWF0IjoxNzkxNzIwMDAwLCJleHAiOjE3OTE3MjA2MDAsImp0aSI6IjAxSkE3WTVRM0MySzlNOE40UDZSMFMxVDJWIn0.4O6X7vwHZfs023i712gOrdwLW5tftgzCxIjxLRVOSjFVMjflKmrwUqICNgX0xQgU_zQuSLAEQ4TtUvKrlGr-BQ",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-chain"
+   }
+  },
+  {
+   "name": "partner org id in upper case prefix",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwiYWN0Ijp7InBhcnRuZXIiOiJPUkc6cGFydG5lci0xIn19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.6dgRy_RjFIlCigiQyYmwzhVK194Jh9JXVSSG9plJVFY6KcfUlBmJlJzGzkNblcTLYy_IA9tudatGY4gaDDraAw",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-chain"
+   }
+  },
+  {
    "name": "capability not in scope",
    "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.LZ-qHB9-dLYnTDi8wSZPx6x50p3IgtJivgY3O4Q29Ka7hIPvRZxwjgxxIrtIftI1iV2fjcMPXnOvW7_oX3Y6Bg",
    "options": {
@@ -3827,6 +4132,133 @@
   {
    "input": "{\"input\":{\"store\":\"app-store\",\"hash\":\"sha256:abababababababababababababababababababababababababababababababab\",\"app\":\"example-app\"},\"capability\":\"publisher.push\"}",
    "expected": "sha256:921d6afae6e119d4b0c2d2e69a5cb0298489d4ff175e0e17025cdb2b5b09eae4"
+  }
+ ],
+ "chainDepths": [
+  {
+   "name": "no actor",
+   "act": null,
+   "expected": 0
+  },
+  {
+   "name": "one agent",
+   "act": {
+    "sub": "a"
+   },
+   "expected": 1
+  },
+  {
+   "name": "two agents",
+   "act": {
+    "sub": "a",
+    "act": {
+     "sub": "b"
+    }
+   },
+   "expected": 2
+  },
+  {
+   "name": "agent then partner",
+   "act": {
+    "sub": "a",
+    "act": {
+     "partner": "org:partner-1"
+    }
+   },
+   "expected": 2
+  },
+  {
+   "name": "three agents then partner",
+   "act": {
+    "sub": "a",
+    "act": {
+     "sub": "b",
+     "act": {
+      "sub": "c",
+      "act": {
+       "partner": "org:partner-1"
+      }
+     }
+    }
+   },
+   "expected": 4
+  },
+  {
+   "name": "partner alone",
+   "act": {
+    "partner": "org:partner-1"
+   },
+   "expected": null
+  },
+  {
+   "name": "partner outermost",
+   "act": {
+    "partner": "org:partner-1",
+    "act": {
+     "sub": "a"
+    }
+   },
+   "expected": null
+  },
+  {
+   "name": "partner with a sub beside",
+   "act": {
+    "sub": "a",
+    "act": {
+     "partner": "org:partner-1",
+     "sub": "b"
+    }
+   },
+   "expected": 2
+  },
+  {
+   "name": "partner beside an act",
+   "act": {
+    "sub": "a",
+    "act": {
+     "partner": "org:partner-1",
+     "act": {
+      "sub": "b"
+     }
+    }
+   },
+   "expected": null
+  },
+  {
+   "name": "partner personal",
+   "act": {
+    "sub": "a",
+    "act": {
+     "partner": "personal"
+    }
+   },
+   "expected": null
+  },
+  {
+   "name": "partner ORG prefix",
+   "act": {
+    "sub": "a",
+    "act": {
+     "partner": "ORG:partner-1"
+    }
+   },
+   "expected": null
+  },
+  {
+   "name": "a missing sub",
+   "act": {
+    "sub": "a",
+    "act": {}
+   },
+   "expected": null
+  },
+  {
+   "name": "not an object",
+   "act": {
+    "sub": "a",
+    "act": 7
+   },
+   "expected": null
   }
  ],
  "ed25519": [

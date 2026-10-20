@@ -49,6 +49,11 @@ const agentPkg = read(path.join(args.positive, 'fabric-package-agent.json'));
 for (const [name, kind, value] of [['positive/estate-record-first', 'estate-record', first], ['positive/estate-record-second', 'estate-record', second],
   ['positive revision first → second', 'estate-record-revision', { parent: first, next: second }],
   ['positive placement', 'estate-placement', { record: first, machine: first.machines[0].id, package: agentPkg }],
+  // DEC-0090: a partner's package installed in a context its key's scope names, and in one it does not (FAC-SEM-122).
+  ['a partner placement in its scoped context', 'estate-placement', { record: read(path.join(args.semantic, 'estate-partner-key-ok.json')).input, machine: 'm-4c1e',
+    package: { ...agentPkg, agentRef: 'urn:fabric:agent:acme:setup-desk' }, context: 'org:org_7kq2m4xw' }],
+  ['a partner placement outside its scoped context', 'estate-placement', { record: read(path.join(args.semantic, 'estate-partner-key-other-context.json')).input, machine: 'm-4c1e',
+    package: { ...agentPkg, agentRef: 'urn:fabric:agent:acme:setup-desk' }, context: 'org:org_3fh9p1zc' }],
   ['a kind the rules do not know', 'estate-something', first],
   ['a hub key of the wrong length', 'estate-record', (() => { const r = clone(first); r.machines[0].hubKey.x = 'AAAA'; return r; })()],
   ['dates in lower case', 'estate-record', (() => { const r = clone(first); r.issuedAt = r.issuedAt.replace('T', 't').replace('Z', 'z'); return r; })()],
@@ -144,6 +149,19 @@ for (const machine of contexts.machines ?? []) {
   for (const p of machine.packages ?? []) {
     for (const context of [p.context ?? 'personal', 'personal', 'org:nobody', 'Personal']) {
       trusts.push({ record: contexts, machine: machine.id, agentRef: p.agentRef, context, expected: estate.placementTrust(contexts, machine.id, p.agentRef, context) ?? null });
+    }
+  }
+}
+
+// DEC-0090: a partner's publisher key is trusted only in the organization contexts its scope names; every other context
+// of the same placement answers no publisher key, and a context with no placement still answers null.
+for (const file of ['estate-partner-key-ok.json', 'estate-partner-key-other-context.json', 'estate-partner-key-personal.json']) {
+  const record = read(path.join(args.semantic, file)).input;
+  for (const machine of record.machines ?? []) {
+    for (const p of machine.packages ?? []) {
+      for (const context of [p.context ?? 'personal', 'personal', 'org:nobody']) {
+        trusts.push({ record, machine: machine.id, agentRef: p.agentRef, context, expected: estate.placementTrust(record, machine.id, p.agentRef, context) ?? null });
+      }
     }
   }
 }

@@ -920,12 +920,14 @@ def usage_problems(report: Any, service_id: str, instance: str) -> List[str]:
     days = report.get("days")
     if not isinstance(days, list) or len(days) > fs.USAGE_DAYS:
         return out + ["days is not a list of at most 31"]
-    fields = ("calls", "unpricedCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")
+    fields = ("calls", "unpricedCalls", "unmeasuredCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")
 
     def priced(row: Dict[str, Any], at: str) -> None:
         calls, unpriced, cost = row.get("calls", 0), row.get("unpricedCalls", 0), row.get("costUsd")
         if unpriced > calls:
             out.append("%s: more unpriced calls than calls" % at)
+        if row.get("unmeasuredCalls", 0) > calls:
+            out.append("%s: more calls with unknown tokens than calls (DEC-0091)" % at)
         if calls and unpriced == calls and cost is not None:
             out.append("%s: every call is unpriced, so the cost must be null, not %r" % (at, cost))
         if unpriced < calls and cost is None:

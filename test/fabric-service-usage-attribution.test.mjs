@@ -11,7 +11,7 @@ const receipt = (extra = {}) => k.makeUsageReceipt('openrouter', 'example-model'
 test('attribution and FAC-SEM-025 answer as the contract does', () => {
   assert.equal(V.attribution.length, 34);
   for (const c of V.attribution) assert.deepEqual(k.attributionHeaders(c.setting, c.request), c.expect, c.name);
-  assert.equal(V.usage.length, 21);
+  assert.equal(V.usage.length, 25);
   for (const c of V.usage) assert.deepEqual(k.usageFindings(c.report).map((f) => [f.code, f.instancePath]), c.findings.map((f) => [f.code, f.instancePath]), c.name);
 });
 
