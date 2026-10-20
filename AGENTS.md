@@ -22,7 +22,7 @@ agent becomes one Fabric can bind; it also works on its own. It ships as a Claud
 carries four skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
 and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service
-that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`).
+that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`; job limits per DEC-0087), and checks the estate record, share grants and the estate ceremonies (`fabric_estate.py`, `fabric_share.py`, `fabric_ceremonies.py` and their Node twins).
 Agents that are not services get a `fabric-provider/0.1` entry from
 `adapting-projects-to-fabric/scripts/fabric_provider.py`. The fourth, `working-with-fabric`, is the
 other side: a coding agent opened outside Fabric working in a project through it (Fabric 0.4.0 REQ-07),

@@ -82,14 +82,18 @@ and a portable `scripts/check_dashboard_link.py` gate for generated renderers.
 It rejects primary HTTP when the host is available, failed-host browser fallback,
 and local links addressed to another device. A skill install alone does not filter
 every provider's final answer; the renderer must invoke the gate with trusted host
-context. This checkout contains the change; published package 0.5.6 does not.
+context.
 
 Services and agents that other agents call follow `fabric-interop/0.1`: each capability
 is the MCP tool of its name, long work is a job with a stable id (`fabric.job.get`,
 `fabric.job.cancel`), a question for a person is an elicitation, and every call carries
 one W3C trace. The kits ship the helpers (`scripts/fabric_interop.py`,
 `scripts/fabric-interop.mjs`), the sample service serves a job end to end, and the probe
-checks the interop rules. An agent that is not a service is announced with a provider
+checks the interop rules. A job a provider limit paused or stopped, and an effect nobody saw, carry their own codes
+(`quota-exhausted`, `outcome-unknown`) and keys per caller (contract DEC-0087). The estate kits check share grants into
+an organization (`scripts/fabric_share.py`, DEC-0086) and the estate ceremonies: a revision's record rules, a headless
+machine's enroll token, the nearby pairing by a comparison code and the hub's single use of a token
+(`scripts/fabric_ceremonies.py`, DEC-0084); each has a Node twin. An agent that is not a service is announced with a provider
 entry: `adapting-projects-to-fabric/scripts/fabric_provider.py`.
 
 For provider bundles the adapting skill helps an agent author:
