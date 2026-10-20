@@ -44,9 +44,13 @@ that agents act and report.
 
 ## Checks run
 
-See the PR description for exact counts: `python3 -m unittest discover -s test`, `node --test 'test/*.test.mjs'`,
-`python3 test/validate.py`, `claude plugin validate ./plugins/fabric-agent-adapter --strict`,
-`claude plugin validate . --strict`; red first (16 failing tests before the change), then green.
+- Red first: the new tests failed against 0.37.1 code (11 failures, 5 errors in `test_dashboard_kit` and
+  `test_fabric_session`), then passed.
+- `python3 -m unittest discover -s test`: 716 tests, OK (22 skipped).
+- `node --test 'test/*.test.mjs'`: 244 tests, 236 pass, 0 fail, 8 skipped.
+- `python3 test/validate.py`: OK at 0.38.0.
+- `claude plugin validate ./plugins/fabric-agent-adapter --strict` and `claude plugin validate . --strict`: passed.
+- No U+2014 in any added line (`git diff -U0 origin/main | grep '^+'` piped to the em dash check: 0).
 
 ## Open
 
