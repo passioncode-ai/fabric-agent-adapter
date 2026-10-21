@@ -340,7 +340,7 @@
    "imports": [
     "fabric_jsvalue"
    ],
-   "sha256": "33a07d9556e0061321f0ad8a69106fcef6ccd1f5987084ed7cf39576679fed28"
+   "sha256": "8b8c2fe1b39fac6037b5cc9b54975e509d7f60befa320410d7a7567344b62fcd"
   },
   {
    "module": "fabric_openrouter",
@@ -351,7 +351,7 @@
     "fabric_time",
     "fabric_usage"
    ],
-   "sha256": "47aca21bff85f6d6627a40690666e3dd25936b5eab28067f17721c7226548eee"
+   "sha256": "2017d898c17001d7275f58267de653be7ecf6acd17ad8d9b24ecb7a43e5617d4"
   }
  ],
  "node": [
@@ -682,7 +682,7 @@
    "file": "fabric-http.mjs",
    "layer": "L4",
    "imports": [],
-   "sha256": "fae3a6dfb797867edff00e6a2c32729c3833c6e938e268a7ff26930bb9498684"
+   "sha256": "f886bcb49c4353d039387ac9568738dda26697a94dd07fc6a6204500f0bc27bf"
   },
   {
    "module": "fabric-openrouter",
@@ -694,7 +694,7 @@
     "fabric-time",
     "fabric-usage"
    ],
-   "sha256": "293e1f2f874d144c76262177e15c4e3643f232db5c981643e8012fe075039da6"
+   "sha256": "f8f0168691f968b7cd85f36aa98e2167e88cc44f1104ff514fd0c7699b339253"
   }
  ],
  "history": {
@@ -1481,8 +1481,8 @@
    "fabric_board_session.py": "7a352e6442d8ab4c31ba401bc55670e0e7b54495d793d08652114c6eba706917",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "c9600d24552a858f0bef8a0a7dd3fd05759c90c36e6b31f282aa01ae2d7698eb",
-   "fabric_http.py": "33a07d9556e0061321f0ad8a69106fcef6ccd1f5987084ed7cf39576679fed28",
-   "fabric_openrouter.py": "47aca21bff85f6d6627a40690666e3dd25936b5eab28067f17721c7226548eee",
+   "fabric_http.py": "8b8c2fe1b39fac6037b5cc9b54975e509d7f60befa320410d7a7567344b62fcd",
+   "fabric_openrouter.py": "2017d898c17001d7275f58267de653be7ecf6acd17ad8d9b24ecb7a43e5617d4",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
    "fabric-identifiers.mjs": "a18c2a501a4aa170bfd3d99e571ad6b7662649b4d3b9d2a540c002ea42811bbf",
@@ -1513,8 +1513,8 @@
    "fabric-board-session.mjs": "f08c00647fd308d25448f4bd4563a092d8605a4e07e64671a375e16feff0f8db",
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
    "fabric-board.mjs": "87ae681a3c991c9aed40fb71289c19cd6da33ad6ebbec6858e51f031e8a7ab7b",
-   "fabric-http.mjs": "fae3a6dfb797867edff00e6a2c32729c3833c6e938e268a7ff26930bb9498684",
-   "fabric-openrouter.mjs": "293e1f2f874d144c76262177e15c4e3643f232db5c981643e8012fe075039da6",
+   "fabric-http.mjs": "f886bcb49c4353d039387ac9568738dda26697a94dd07fc6a6204500f0bc27bf",
+   "fabric-openrouter.mjs": "f8f0168691f968b7cd85f36aa98e2167e88cc44f1104ff514fd0c7699b339253",
    "fabric-package.schema.json": "6b688152984e294b806ffaf3483e6fa2e55cd0d9205bb5cba85f646868d90d58",
    "share-registration.schema.json": "82ef3e8703dd6653b84ba9fdbaec2f366e062596da981b1823be3804fcb65b90"
   }

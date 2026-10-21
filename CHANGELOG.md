@@ -69,6 +69,12 @@ copies the kit now installs it with `fabric_kit.py install` (one file is no long
   byte for byte as `JSON.stringify` (numbers and key order too, through the core's `json_stringify`); loopback edge
   forms agree in both twins; the recipe's dash check covers U+2E3A, U+2E3B, U+FE58 and no-break spaces, and no longer
   flags `1 - 2`.
+- **Found by the third review round and fixed:** an answer with no usage was counted at the next call's worst case
+  (now at its own); image, audio and file parts could be sent past the bound (only text content is sent); Python
+  raised outside `OpenRouterError` and kept no receipt on a 400-digit count or cost or JSON nested too deep (both read
+  as unmeasured now); Python's deadline could be held by trickled headers (a watchdog shuts the socket at the
+  deadline); `Response.json()` reads a byte order mark and refuses `NaN` as `JSON.parse` does; a `Retry-After` year
+  before 1000 is no date in either twin.
 - **A usage receipt's project id is checked the same way in both kits.** `fabric_service.py` defined its URI pattern
   twice and the second won: Python accepted `project_id="urn:"` where Node refused it. Now one pattern per module, and
   both kits refuse it (a test in each).

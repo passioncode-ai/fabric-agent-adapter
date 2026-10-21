@@ -35,8 +35,8 @@ python3 $K/fabric_kit.py build [--check]                            # maintainer
   imports and followed through the modules it would install: that copy would fail when that code path runs. A folder
   holding only the 0.40.0 `fabric_service.py` gets one line for each of the 16 modules it needs; a 0.39.1 copy is
   asked only for what it imports (`test_an_older_copy_is_judged_by_its_own_imports`).
-- Exit codes: 0 done or every copy current, 1 a problem (a copy missing, `older` or `modified`, an install refused),
-  2 usage (an unknown `--module` included).
+- Exit codes: 0 done or every copy current, 1 a problem (a copy missing, `older` or `modified`, no kit module in the
+  folder at all, an install refused), 2 usage (an unknown `--module` included).
 - Every kit module puts its own folder on `sys.path` before it imports a sibling, so a service that loads a kit file
   by its path from another working directory gets its siblings too (`test_every_module_loads_by_path_from_any_folder`).
 - `build --check` is what CI runs: `kit.json` must be what the sources say.
@@ -93,7 +93,9 @@ public name 0.39.1 had, in both languages (the snapshot is `test/fixtures/kit-ap
 name fails `test_kit_api`), and the Python facade the private names other code reached through it (`_number`,
 `_DAY_MS`, `_utc_date_ms` from the core). `fabric_board` and `fabric-board.mjs` are
 facades the same way. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
-install with `fabric_kit.py install` and `status` names what is missing. A service that imported a module-private
+install with `fabric_kit.py install` and `status` names what is missing. A test or service that replaced a function
+by assigning it on the facade (`fabric_service.X = ...`) no longer changes what the kit does: the code reads its own
+module's name, so patch the module that defines it (`fabric_lock.X`, `fabric_session_env.X`). A service that imported a module-private
 helper (`_x`) of the Node twin should import it from its module now.
 
 ## Dates and times

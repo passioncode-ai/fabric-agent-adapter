@@ -184,8 +184,11 @@ class Install(unittest.TestCase):
             self.assertNotIn("fabric_base.py", needs, "a module only the 0.40.0 file imports is not asked of it")
 
     def test_an_older_release_and_an_edited_copy_are_told_apart(self):
-        old = subprocess.run(["git", "show", "v0.39.1:plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_share.py"],
-                             capture_output=True, cwd=ROOT, check=True).stdout
+        shown = subprocess.run(["git", "show", "v0.39.1:plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_share.py"],
+                               capture_output=True, cwd=ROOT)
+        if shown.returncode:
+            self.skipTest("the v0.39.1 tag is not in this clone (CI checks out one commit)")
+        old = shown.stdout
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "fabric_share.py").write_bytes(old)
             self.assertEqual(fabric_kit.state_of(Path(tmp) / "fabric_share.py", KIT)["version"], "0.39.1")

@@ -50,7 +50,14 @@ function price(value) {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-const count = (v) => (Number.isInteger(v) && v >= 0 ? v : null);
+const count = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : null); // as fabric_openrouter.py: 0 to 2**53 - 1
+
+// Every message's content is text: a string, null, or parts that are all {type: 'text'}. An image, audio or file part is
+// billed in ways a byte count cannot bound, so the client does not send it.
+function textOnly(messages) {
+  return messages.every((m) => isObject(m) && (m.content === null || m.content === undefined || typeof m.content === 'string'
+    || (Array.isArray(m.content) && m.content.every((p) => isObject(p) && p.type === 'text'))));
+}
 
 // {model: {prompt, completion, request}} in USD per token (per request) from GET /api/v1/models; a model without a
 // readable prompt or completion price is left out, so the client refuses it rather than guessing.
@@ -158,14 +165,16 @@ export class Client {
 
   release(amount) { this.inFlight = Math.max(0, this.inFlight - amount); }
 
-  receipt(asked, body, taskRunId) {
+  receipt(asked, body, taskRunId, worst) {
     const served = typeof body.model === 'string' && body.model.trim() ? body.model : asked;
     const usage = isObject(body.usage) ? body.usage : null;
     const common = { at: time.formatRfc3339(Math.trunc(this.now() * 1000)), route: 'key', projectId: this.projectId, taskRunId };
     const prompt = usage ? count(usage.prompt_tokens) : null;
     const completion = usage ? count(usage.completion_tokens) : null;
     if (prompt === null || completion === null) {
-      return makeUsageReceipt('openrouter', served.slice(0, 128), { inputTokens: 0, outputTokens: 0, tokensMeasured: false, ...common });
+      const unmeasured = makeUsageReceipt('openrouter', served.slice(0, 128), { inputTokens: 0, outputTokens: 0, tokensMeasured: false, ...common });
+      this.rememberUnmeasured(unmeasured, worst);
+      return unmeasured;
     }
     const details = isObject(usage.prompt_tokens_details) ? usage.prompt_tokens_details : {};
     const cached = count(details.cached_tokens) ?? 0;
@@ -186,9 +195,13 @@ export class Client {
   unmeasured(asked, taskRunId, worst) {
     const receipt = makeUsageReceipt('openrouter', asked.slice(0, 128), { inputTokens: 0, outputTokens: 0, tokensMeasured: false,
       at: time.formatRfc3339(Math.trunc(this.now() * 1000)), route: 'key', projectId: this.projectId, taskRunId });
+    this.rememberUnmeasured(receipt, worst);
+    return receipt;
+  }
+
+  rememberUnmeasured(receipt, worst) {
     const key = `${receipt.at} ${receipt.model}`;
     this.unmeasuredWorst.set(key, (this.unmeasuredWorst.get(key) ?? 0) + worst);
-    return receipt;
   }
 
   key() {
@@ -207,6 +220,9 @@ export class Client {
 
   async chat(messages, { model, fallback, maxTokens, taskRunId, ...params } = {}) {
     if (!Array.isArray(messages) || messages.length === 0) throw new OpenRouterError('messages is a non-empty list', { kind: 'config' });
+    if (!textOnly(messages)) {
+      throw new OpenRouterError('only text content is sent: an image, audio or file part has a cost the ceiling cannot bound', { kind: 'config' });
+    }
     if (!vendor(model) || !vendor(fallback) || vendor(model) === vendor(fallback)) {
       throw new OpenRouterError(`the fallback is a model of another vendor than ${model}`, { kind: 'config' });
     }
@@ -285,7 +301,13 @@ export class Client {
       this.ledger.record(this.unmeasured(asked, taskRunId, worst));
       return { outcome: 'bad-answer', status };
     }
-    const receipt = this.receipt(asked, parsed, taskRunId);
+    let receipt;
+    try {
+      receipt = this.receipt(asked, parsed, taskRunId, worst);
+    } catch {
+      this.ledger.record(this.unmeasured(asked, taskRunId, worst)); // a billed answer it cannot read still counts
+      return { outcome: 'bad-answer', status };
+    }
     this.ledger.record(receipt);
     const choice = Array.isArray(parsed.choices) && isObject(parsed.choices[0]) ? parsed.choices[0] : {};
     const message = isObject(choice.message) ? choice.message : {};

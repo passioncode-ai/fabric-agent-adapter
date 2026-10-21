@@ -40,6 +40,8 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 | Header names must be tokens; a value with a line break or NUL is refused | | header injection |
 | A JSON body is written as `JSON.stringify` writes it: a lone surrogate escaped, NaN and Infinity refused | | both twins send the same bytes |
 | Whatever the transport throws is a connection error, in both languages; a timeout is a timeout | | |
+| The deadline is held across the whole response: a watchdog shuts the socket when it passes, so trickled headers or a trickled chunk cannot hold the caller | | |
+| `Response.json()` reads as `JSON.parse` does: a byte order mark skipped, `NaN` and `Infinity` refused | | |
 
 Every answer comes back as a `Response`, whatever its status; `HttpError` means no usable answer came, with `kind`
 `connection`, `timeout`, `too-large` or `refused`, the status when there was one, and the URL redacted to scheme,
@@ -67,12 +69,14 @@ const answer = await client.chat(messages, { model, fallback, maxTokens: 800 });
 | The ceiling, before every attempt | the window's spend (ledger receipts in the UTC `day` or `month`) plus calls in flight plus this attempt's worst case must stay within `ceiling_usd`; otherwise kind `ceiling`, nothing sent. Retries and the fallback are checked the same way |
 | The worst case | the input at one token per two UTF-8 bytes of the messages and every param (tools, response_format) as compact JSON (`prompt_tokens_bound`), `max_tokens` of output, at the model's price, plus a per-request price. `models`, `route`, `plugins`, `web_search_options` and `n` are refused (they change what is billed), and so is `max_completion_tokens` (the client sets the output budget) |
 | A model without a price | never called (kind `unpriced`): its spend could not be bounded. Prices come from `GET https://openrouter.ai/api/v1/models` through `prices_from_catalog`; a price is a plain decimal string or a number, and anything else (blank, hex, a list) is no price |
-| A receipt without a cost in the window | counted at the worst case of the attempt that wrote it while this client runs; one written before it started counts as `unmeasured_call_usd`, by default the current attempt's worst case |
+| A receipt without a cost in the window | an unmeasured attempt, or an answer that came with no usage, counted at the worst case of the attempt that wrote it while this client runs; one written before it started counts as `unmeasured_call_usd`, by default the current attempt's worst case |
 | Receipts | every status-200 answer records one, and so does an attempt that may have been billed without an answer to read (a timeout, a cut or refused connection, a 200 over the size cap or not JSON: no tokens, `costUsd: null`, `tokensMeasured: false`; over-counting a refused connection is the safe side): the served model, the provider's tokens (cache reads and writes kept apart), `costUsd` from `usage.cost`, else from the price list (`costBasis: price-list`), else `null` with `tokensMeasured: false`; `route: key`, the client's `project_id` and the call's `task_run_id`. A request the provider answered with a 4xx or 5xx records nothing: it was not billed |
 | What is an answer | `finish_reason` `stop` or `tool_calls` with content or tool calls; `error` is retried on the same model; `length` (the budget ran out, reasoning included), `content_filter` and empty content go to the fallback |
 | Retries | 408, 425, 429, 500, 502, 503, 504 and connection errors on the same model, `retries` times (default 1), `Retry-After` honoured, within one deadline (`deadline_s` 120) for the whole call |
 | Stop at once | 401, 402 and 403 (kinds `auth`, `payment`): a key, credit or permission problem is the same on every model |
 | The fallback | required, of another vendor (the part before `/` differs) |
+| Content | text only: a string, null, or parts that are all `{"type": "text"}`; an image, audio or file part is refused (`config`), because what it is billed cannot be bounded from its bytes |
+| What the ceiling does not cover | the `provider` routing param can send a call to a provider priced above the catalog; two `Client` objects sharing one ledger each hold only their own calls in flight, so give an agent one client per key |
 | Attribution | off unless an `attribution` setting is given (FAC-SEM-098, `fabric_usage.attribution_headers`) |
 | Request body | `model`, `messages`, `max_tokens`, `usage: {include: true}` and your params (temperature, reasoning, response_format, tools); `stream`, `model`, `messages`, `max_tokens` and `usage` as params are refused |
 

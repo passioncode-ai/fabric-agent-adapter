@@ -95,7 +95,7 @@ export function retryAfterS(value, { now } = {}) {
   const [day, month, year, hh, mm, ss] = [Number(m[2]), MONTHS.indexOf(m[3]), Number(m[4]), Number(m[5]),
     Number(m[6]), Number(m[7])];
   const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  if (hh > 23 || mm > 59 || ss > 60 || day < 1 || day > lastDay) return null;
+  if (hh > 23 || mm > 59 || ss > 60 || day < 1 || day > lastDay || year < 1000) return null; // Date.UTC maps 0-99
   const when = Date.UTC(year, month, day, hh, mm, Math.min(ss, 59)) / 1000;
   return Math.max(0, when - (now ?? Date.now() / 1000));
 }

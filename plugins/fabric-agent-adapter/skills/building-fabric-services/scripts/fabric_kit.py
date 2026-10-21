@@ -220,7 +220,7 @@ def main(argv: List[str]) -> int:
                 print("missing   %s, which %s imports" % (m["needs"], m["file"]))
             if not report["files"]:
                 print("no kit module in %s" % args.dir)
-        bad = report["missing"] or any(f["state"] != "current" for f in report["files"])
+        bad = not report["files"] or report["missing"] or any(f["state"] != "current" for f in report["files"])
         return 1 if bad else 0
     lang = LANGS[args.lang]
     known = [e["module"] for e in load_manifest()[lang]]

@@ -59,7 +59,7 @@ def run(case):
     seen, ledger = [], Ledger(case.get("ledger", []))
     c, sleeps = client(case, seen, ledger)
     try:
-        answer = c.chat(MESSAGES, model=case.get("model", "a/one"), fallback=case.get("fallback", "b/two"),
+        answer = c.chat(case.get("messages", MESSAGES), model=case.get("model", "a/one"), fallback=case.get("fallback", "b/two"),
                         max_tokens=100, **case.get("params", {}))
         got = {"content": answer["content"], "model": answer["model"],
                "outcomes": [a["outcome"] for a in answer["attempts"]], "sleeps": sleeps}
@@ -252,6 +252,16 @@ class Rules(unittest.TestCase):
         with self.assertRaises(fo.OpenRouterError) as caught:
             c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=10)  # up to 0.000116 more
         self.assertEqual(caught.exception.kind, "ceiling", "the timed-out call is counted at 0.002016, not 0.000116")
+
+    def test_an_answer_without_usage_counts_at_its_own_worst_case(self):
+        prices = {"a/one": {"prompt": 0.000001, "completion": 0.001}, "b/two": {"prompt": 0.000002, "completion": 0.002}}
+        ok = json.dumps({"choices": [{"finish_reason": "stop", "message": {"content": "x"}}]}).encode()
+        c = fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=prices, environ={"OPENROUTER_API_KEY": KEY},
+                      transport=lambda *a: (200, {}, ok), now=lambda: NOW)
+        c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=900)  # up to about $0.90, answered with no usage
+        with self.assertRaises(fo.OpenRouterError) as caught:
+            c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=200)  # up to about $0.20 more
+        self.assertEqual(caught.exception.kind, "ceiling")
 
     def test_totals(self):
         self.assertEqual(fo.totals([{"costUsd": 0.5}, {"costUsd": None}, {"costUsd": 0.25}]),

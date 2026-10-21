@@ -33,6 +33,8 @@ import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
+if str(Path(__file__).resolve().parent) not in sys.path:  # the kit installed beside it, under `python3 -I` too
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     import fabric_openrouter
 except ImportError:  # in the adapter's repository: the kit is two folders up

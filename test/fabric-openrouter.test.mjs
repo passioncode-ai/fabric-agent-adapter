@@ -44,7 +44,7 @@ async function run(c) {
   const { cl, sleeps } = client(c, seen, ledger);
   let got;
   try {
-    const a = await cl.chat(MESSAGES, { model: c.model ?? 'a/one', fallback: c.fallback ?? 'b/two', maxTokens: 100, ...(c.params ?? {}) });
+    const a = await cl.chat(c.messages ?? MESSAGES, { model: c.model ?? 'a/one', fallback: c.fallback ?? 'b/two', maxTokens: 100, ...(c.params ?? {}) });
     got = { content: a.content, model: a.model, outcomes: a.attempts.map((x) => x.outcome), sleeps };
   } catch (err) {
     if (!(err instanceof fo.OpenRouterError)) throw err;
@@ -176,4 +176,13 @@ test('an unmeasured attempt counts at its own worst case', async () => {
   const { cl } = client({ ceilingUsd: 0.0021, steps: [{ error: 'timeout' }] }, [], new Ledger(), { retries: 0 });
   await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 200 }));
   await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 10 }), (e) => e.kind === 'ceiling');
+});
+
+test('an answer without usage counts at its own worst case', async () => {
+  const prices = { 'a/one': { prompt: 0.000001, completion: 0.001 }, 'b/two': { prompt: 0.000002, completion: 0.002 } };
+  const ok = new TextEncoder().encode(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'x' } }] }));
+  const cl = new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices, env: { OPENROUTER_API_KEY: KEY }, now: () => NOW,
+    transport: async () => ({ status: 200, headers: {}, body: ok }) });
+  await cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 900 });
+  await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 200 }), (e) => e.kind === 'ceiling');
 });

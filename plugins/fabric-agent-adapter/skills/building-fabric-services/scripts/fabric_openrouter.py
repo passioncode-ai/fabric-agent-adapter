@@ -86,7 +86,10 @@ def _price(value: Any) -> Optional[float]:
         value = float(value)
     if not isinstance(value, (int, float)):
         return None
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError:  # an integer too large for a double is no price
+        return None
     return number if math.isfinite(number) and number >= 0 else None
 
 
@@ -115,7 +118,23 @@ def prompt_tokens_bound(value: Any) -> int:
 
 
 def _count(value: Any) -> Optional[int]:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+    """A token count: an integer from 0 to 2**53 - 1 (what a JavaScript number holds exactly), else None."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 2 ** 53 - 1 else None
+
+
+def _text_only(messages: Any) -> bool:
+    """Whether every message's content is text: a string, null, or parts that are all `{"type": "text"}`. An image,
+    audio or file part is billed by the provider in ways a byte count cannot bound, so the client does not send it."""
+    for message in messages:
+        if not isinstance(message, Mapping):
+            return False
+        content = message.get("content")
+        if isinstance(content, list):
+            if not all(isinstance(part, Mapping) and part.get("type") == "text" for part in content):
+                return False
+        elif content is not None and not isinstance(content, str):
+            return False
+    return True
 
 
 def _check_attribution(project_id: Optional[str], task_run_id: Optional[str]) -> None:
@@ -226,7 +245,7 @@ class Client:
             self._in_flight = max(0.0, self._in_flight - amount)
 
     # -- receipts ------------------------------------------------------------------------------------------------
-    def _receipt(self, asked: str, body: Mapping[str, Any], task_run_id: Optional[str]) -> Dict[str, Any]:
+    def _receipt(self, asked: str, body: Mapping[str, Any], task_run_id: Optional[str], worst: float) -> Dict[str, Any]:
         served = body.get("model") if isinstance(body.get("model"), str) and body.get("model").strip() else asked
         usage = body.get("usage") if isinstance(body.get("usage"), dict) else None
         at = fabric_time.format_rfc3339(fabric_time.now_ms(self._now))
@@ -234,8 +253,10 @@ class Client:
         prompt = _count(usage.get("prompt_tokens")) if usage else None
         completion = _count(usage.get("completion_tokens")) if usage else None
         if prompt is None or completion is None:
-            return fabric_usage.make_usage_receipt("openrouter", served[:128], input_tokens=0, output_tokens=0,
-                                                   tokens_measured=False, **common)
+            receipt = fabric_usage.make_usage_receipt("openrouter", served[:128], input_tokens=0, output_tokens=0,
+                                                      tokens_measured=False, **common)
+            self._remember_unmeasured(receipt, worst)
+            return receipt
         details = usage.get("prompt_tokens_details") if isinstance(usage.get("prompt_tokens_details"), dict) else {}
         cached = _count(details.get("cached_tokens")) or 0
         written = _count(details.get("cache_write_tokens")) or 0
@@ -259,10 +280,13 @@ class Client:
             "openrouter", asked[:128], input_tokens=0, output_tokens=0, tokens_measured=False,
             at=fabric_time.format_rfc3339(fabric_time.now_ms(self._now)), route="key", project_id=self.project_id,
             task_run_id=task_run_id)
+        self._remember_unmeasured(receipt, worst)
+        return receipt
+
+    def _remember_unmeasured(self, receipt: Mapping[str, Any], worst: float) -> None:
         with self._lock:
             key = (receipt["at"], receipt["model"])
             self._unmeasured_worst[key] = self._unmeasured_worst.get(key, 0.0) + worst
-        return receipt
 
     # -- the call ------------------------------------------------------------------------------------------------
     def _key(self) -> str:
@@ -285,6 +309,9 @@ class Client:
         response_format, tools...)."""
         if not isinstance(messages, list) or not messages:
             raise OpenRouterError("messages is a non-empty list", kind="config")
+        if not _text_only(messages):
+            raise OpenRouterError("only text content is sent: an image, audio or file part has a cost the ceiling "
+                                  "cannot bound", kind="config")
         if not vendor(model) or not vendor(fallback) or vendor(model) == vendor(fallback):
             raise OpenRouterError("the fallback is a model of another vendor than %s" % model, kind="config")
         if not (isinstance(max_tokens, int) and not isinstance(max_tokens, bool) and 1 <= max_tokens <= 200_000):
@@ -367,7 +394,11 @@ class Client:
         if not isinstance(parsed, dict):
             self.ledger.record(self._unmeasured(asked, task_run_id, worst))
             return "bad-answer", status, None, None
-        receipt = self._receipt(asked, parsed, task_run_id)
+        try:
+            receipt = self._receipt(asked, parsed, task_run_id, worst)
+        except Exception:  # noqa: BLE001 - a billed answer the client cannot read still counts, never as $0
+            self.ledger.record(self._unmeasured(asked, task_run_id, worst))
+            return "bad-answer", status, None, None
         self.ledger.record(receipt)
         choices = parsed.get("choices")
         choice = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}

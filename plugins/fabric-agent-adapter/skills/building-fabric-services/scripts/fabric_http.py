@@ -33,6 +33,7 @@ import json
 import re
 import socket
 import random as _random
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -86,7 +87,14 @@ class Response:
         return self.body.decode("utf-8", "replace")
 
     def json(self) -> Any:
-        return json.loads(self.body.decode("utf-8"))
+        """The body as JSON, read as `JSON.parse` reads it: a UTF-8 byte order mark skipped, `NaN` and `Infinity`
+        refused; anything unreadable (nesting too deep included) is a ValueError."""
+        def refuse(token: str) -> Any:
+            raise ValueError("%s is not JSON" % token)
+        try:
+            return json.loads(self.body.decode("utf-8-sig"), parse_constant=refuse)
+        except RecursionError:
+            raise ValueError("the JSON is nested too deep")
 
 
 _SURROGATE = re.compile("[\ud800-\udfff]")
@@ -181,7 +189,7 @@ def retry_after_s(value: Optional[str], *, now: Optional[float] = None) -> Optio
     if not m:
         return None
     day, month, year, hh, mm, ss = int(m[2]), _MONTHS.index(m[3]) + 1, int(m[4]), int(m[5]), int(m[6]), int(m[7])
-    if hh > 23 or mm > 59 or ss > 60:
+    if hh > 23 or mm > 59 or ss > 60 or year < 1000:  # a year before 1000 is no HTTP date (and Date.UTC maps 0-99)
         return None
     try:
         when = _dt.datetime(year, month, day, hh, mm, min(ss, 59), tzinfo=_dt.timezone.utc).timestamp()
@@ -220,7 +228,48 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect)
+class _Watchdog:
+    """Shuts a request's socket down when its deadline passes, so a server that trickles its headers or a chunk-size
+    line cannot hold the caller past it (a socket timeout bounds one read, not a whole response)."""
+
+    def __init__(self, end: float):
+        self.end = end
+        self.fired = False
+        self._timer: Optional[threading.Timer] = None
+
+    def arm(self, sock: Any) -> None:
+        def fire() -> None:
+            self.fired = True
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+        self._timer = threading.Timer(max(0.0, self.end - time.monotonic()), fire)
+        self._timer.daemon = True
+        self._timer.start()
+
+    def cancel(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
+
+
+def _watched(base: type, watchdog: _Watchdog) -> type:
+    class Watched(base):  # type: ignore[misc, valid-type]
+        def connect(self) -> None:
+            super().connect()
+            watchdog.arm(self.sock)
+    return Watched
+
+
+def _opener(watchdog: _Watchdog) -> urllib.request.OpenerDirector:
+    class Http(urllib.request.HTTPHandler):
+        def http_open(self, req):
+            return self.do_open(_watched(http.client.HTTPConnection, watchdog), req)
+
+    class Https(urllib.request.HTTPSHandler):
+        def https_open(self, req):
+            return self.do_open(_watched(http.client.HTTPSConnection, watchdog), req, context=self._context)
+    return urllib.request.build_opener(_NoRedirect, Http, Https)
 
 
 def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optional[bytes], timeout_s: float,
@@ -228,8 +277,21 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
     """The default transport: urllib, no redirects followed, the body read to one byte past `max_bytes`."""
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
     end = time.monotonic() + timeout_s  # one deadline from the first byte sent, headers and body included
+    watchdog = _Watchdog(end)
     try:
-        resp = _OPENER.open(req, timeout=timeout_s)
+        return _send(req, timeout_s, max_bytes, end, watchdog)
+    except (OSError, http.client.HTTPException) as exc:
+        if watchdog.fired:
+            raise TimeoutError("the answer did not arrive within the deadline")
+        raise exc if isinstance(exc, OSError) else ConnectionError(type(exc).__name__)
+    finally:
+        watchdog.cancel()
+
+
+def _send(req: urllib.request.Request, timeout_s: float, max_bytes: int, end: float,
+          watchdog: _Watchdog) -> Tuple[int, Dict[str, str], bytes]:
+    try:
+        resp = _opener(watchdog).open(req, timeout=timeout_s)
     except urllib.error.HTTPError as answer:  # a status outside 2xx is an answer, not a failure of the transport
         resp = answer
     except urllib.error.URLError as exc:
