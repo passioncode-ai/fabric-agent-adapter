@@ -26,7 +26,7 @@ Standard library only. Part of the service kit (FAA-65, layer L4).
 """
 from __future__ import annotations
 
-import calendar
+import datetime as _dt
 import http.client
 import ipaddress
 import json
@@ -148,9 +148,12 @@ def retry_after_s(value: Optional[str], *, now: Optional[float] = None) -> Optio
     if not m:
         return None
     day, month, year, hh, mm, ss = int(m[2]), _MONTHS.index(m[3]) + 1, int(m[4]), int(m[5]), int(m[6]), int(m[7])
-    if hh > 23 or mm > 59 or ss > 60 or not 1 <= day <= calendar.monthrange(year, month)[1]:
+    if hh > 23 or mm > 59 or ss > 60:
         return None
-    when = calendar.timegm((year, month, day, hh, mm, min(ss, 59), 0, 0, 0))
+    try:
+        when = _dt.datetime(year, month, day, hh, mm, min(ss, 59), tzinfo=_dt.timezone.utc).timestamp()
+    except ValueError:  # a day the month does not have
+        return None
     return float(max(0.0, when - (time.time() if now is None else now)))
 
 
