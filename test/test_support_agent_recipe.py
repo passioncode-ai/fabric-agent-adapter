@@ -147,6 +147,9 @@ class Recipe(unittest.TestCase):
         self.assertEqual(sa.script_of("Привет, world"), "cyrillic")
         self.assertEqual(sa.script_of("hello [KB:пароль] https://пример.рф"), "latin")
         self.assertIsNone(sa.script_of("123 !?"))
+        for text, dash in (("a \u2013 b", True), ("a\u00a0\u2013\u00a0b", True), ("a \u2e3a b", True), ("1 - 2", False),
+                           ("well-known", False), ("a - b", True)):
+            self.assertEqual(bool(sa._DASHES.search(text)), dash, text)
         ids = [e["id"] for e in self.knowledge.lookup("reset password please")]
         self.assertEqual(ids[0], "password-reset")
         self.assertEqual(self.knowledge.lookup("the of and"), [])

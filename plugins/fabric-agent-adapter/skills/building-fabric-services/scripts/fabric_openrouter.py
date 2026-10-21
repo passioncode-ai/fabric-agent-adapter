@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import random as _random
 import threading
 import time
@@ -52,9 +53,9 @@ import fabric_usage
 BASE_URL = "https://openrouter.ai/api/v1"
 ANSWERED = ("stop", "tool_calls")
 _STOP_AT_ONCE = {401: "auth", 402: "payment", 403: "auth"}
-_RESERVED_PARAMS = ("model", "messages", "max_tokens", "stream", "usage")
+_RESERVED_PARAMS = ("model", "messages", "max_tokens", "max_completion_tokens", "stream", "usage")
 #: Params that change what a call is billed for (other models, plugins, web search): the ceiling could not bound them.
-_UNBOUNDED_PARAMS = ("models", "route", "plugins", "web_search_options")
+_UNBOUNDED_PARAMS = ("models", "route", "plugins", "web_search_options", "n")
 
 
 class OpenRouterError(Exception):
@@ -71,14 +72,21 @@ def vendor(model: str) -> str:
     return str(model).split("/", 1)[0] if "/" in str(model) else ""
 
 
+_DECIMAL = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?", re.ASCII)
+
+
 def _price(value: Any) -> Optional[float]:
-    """A catalog price (a decimal string or a number, USD per token) as a float; None when not a finite number >= 0."""
-    if isinstance(value, bool) or value is None or value == "":
+    """A catalog price (a plain decimal string such as "0.000001", or a number; USD per token) as a float; None for
+    anything else (blank, hex, a list, negative, not finite), exactly as the Node twin reads it."""
+    if isinstance(value, bool):
         return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
+    if isinstance(value, str):
+        if not _DECIMAL.fullmatch(value):
+            return None
+        value = float(value)
+    if not isinstance(value, (int, float)):
         return None
+    number = float(value)
     return number if math.isfinite(number) and number >= 0 else None
 
 
@@ -155,6 +163,7 @@ class Client:
         self._sleep, self._clock, self._now, self._rand = sleep, clock, now, rand
         self._lock = threading.Lock()
         self._in_flight = 0.0
+        self._unmeasured_worst: Dict[Any, float] = {}  # (at, model) of an unmeasured receipt -> that attempt's worst case
 
     # -- money ---------------------------------------------------------------------------------------------------
     def _priced(self, model: str) -> Optional[Dict[str, float]]:
@@ -192,7 +201,10 @@ class Client:
                 continue
             cost = receipt.get("costUsd")
             measured = isinstance(cost, (int, float)) and _price(cost) is not None
-            total += float(cost) if measured else unmeasured_usd
+            if measured:
+                total += float(cost)
+            else:  # this process knows what such an attempt could cost; one from before it counts as unmeasured_usd
+                total += self._unmeasured_worst.get((receipt.get("at"), receipt.get("model")), unmeasured_usd)
         return total
 
     def _reserve(self, model: str, messages: Any, max_tokens: int, params: Mapping[str, Any]) -> float:
@@ -240,12 +252,17 @@ class Client:
             cache_read_tokens=cached, cache_write_tokens=written, cost_usd=cost,
             cost_basis=basis if cost is not None else None, **common)
 
-    def _unmeasured(self, asked: str, task_run_id: Optional[str]) -> Dict[str, Any]:
-        """A receipt for an attempt that may have been billed with no usage to read: no tokens, no cost."""
-        return fabric_usage.make_usage_receipt(
+    def _unmeasured(self, asked: str, task_run_id: Optional[str], worst: float) -> Dict[str, Any]:
+        """A receipt for an attempt that may have been billed with no usage to read: no tokens, no cost. While this
+        client runs, the ceiling counts it at that attempt's own worst case."""
+        receipt = fabric_usage.make_usage_receipt(
             "openrouter", asked[:128], input_tokens=0, output_tokens=0, tokens_measured=False,
             at=fabric_time.format_rfc3339(fabric_time.now_ms(self._now)), route="key", project_id=self.project_id,
             task_run_id=task_run_id)
+        with self._lock:
+            key = (receipt["at"], receipt["model"])
+            self._unmeasured_worst[key] = self._unmeasured_worst.get(key, 0.0) + worst
+        return receipt
 
     # -- the call ------------------------------------------------------------------------------------------------
     def _key(self) -> str:
@@ -282,8 +299,9 @@ class Client:
                                   % ", ".join(sorted(unbounded)), kind="config")
         try:
             prompt_tokens_bound(dict(params, messages=messages))
-        except ValueError:
-            raise OpenRouterError("the request holds a number JSON cannot write (NaN or Infinity)", kind="config")
+        except (ValueError, TypeError):
+            raise OpenRouterError("the request holds a value JSON cannot write (NaN, Infinity or a non-JSON type)",
+                                  kind="config")
         headers = self._headers(self._key())
         url = self.base_url + "/chat/completions"
         end = self._clock() + self.deadline_s
@@ -303,7 +321,7 @@ class Client:
                     raise
                 wait: Optional[float] = None
                 try:
-                    outcome, status, wait, answer = self._attempt(url, headers, body, left, current, task_run_id)
+                    outcome, status, wait, answer = self._attempt(url, headers, body, left, current, task_run_id, held)
                 finally:
                     self._release(held)
                 attempts.append({"model": current, "status": status, "outcome": outcome})
@@ -323,16 +341,17 @@ class Client:
         raise OpenRouterError("no answer from %s or %s" % (model, fallback), kind="failed", attempts=attempts)
 
     def _attempt(self, url: str, headers: Dict[str, str], body: Dict[str, Any], left: float, asked: str,
-                 task_run_id: Optional[str]):
+                 task_run_id: Optional[str], worst: float):
         """One request: (outcome, status, wait_s, answer or None). Outcomes: answered, retry, error, length,
         filtered, empty, refused, bad-answer, auth, payment."""
         try:
             response = fabric_http.request("POST", url, headers=headers, body=body, deadline_s=left, retries=0,
                                            transport=self._transport, clock=self._clock)
         except fabric_http.HttpError as err:
-            if err.kind == "timeout" or (err.kind == "too-large" and err.status == 200):
-                # the provider may have billed a call whose answer never arrived whole: counted, never as $0
-                self.ledger.record(self._unmeasured(asked, task_run_id))
+            if err.kind in ("timeout", "connection") or (err.kind == "too-large" and err.status == 200):
+                # the provider may have billed a call whose answer never arrived whole (a cut connection looks the
+                # same as a refused one from here): counted, never as $0; over-counting is the safe side
+                self.ledger.record(self._unmeasured(asked, task_run_id, worst))
             return ("retry" if err.kind in ("connection", "timeout") else "refused"), err.status, None, None
         status = response.status
         if status in _STOP_AT_ONCE:
@@ -346,7 +365,7 @@ class Client:
         except ValueError:
             parsed = None
         if not isinstance(parsed, dict):
-            self.ledger.record(self._unmeasured(asked, task_run_id))
+            self.ledger.record(self._unmeasured(asked, task_run_id, worst))
             return "bad-answer", status, None, None
         receipt = self._receipt(asked, parsed, task_run_id)
         self.ledger.record(receipt)

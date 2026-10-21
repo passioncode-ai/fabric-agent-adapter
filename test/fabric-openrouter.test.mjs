@@ -171,3 +171,9 @@ test('unencodable requests and answers over the cap', async () => {
   assert.equal(ledger.rows[0].tokensMeasured, false);
   assert.equal(ledger.rows[0].costUsd, null);
 });
+
+test('an unmeasured attempt counts at its own worst case', async () => {
+  const { cl } = client({ ceilingUsd: 0.0021, steps: [{ error: 'timeout' }] }, [], new Ledger(), { retries: 0 });
+  await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 200 }));
+  await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 10 }), (e) => e.kind === 'ceiling');
+});

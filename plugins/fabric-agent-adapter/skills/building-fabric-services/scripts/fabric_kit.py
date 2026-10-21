@@ -127,7 +127,11 @@ def status(service_dir: Path) -> Dict:
             report["files"].append({"file": e["file"], **state_of(service_dir / e["file"], manifest)})
         names = {e["module"] for e in present}
         by_name = {e["module"]: e for e in entries}
-        reader = python_imports if lang == "python" else node_imports
+        def reader(path: Path, modules: List[str]) -> List[str]:
+            try:
+                return (python_imports if lang == "python" else node_imports)(path, modules)
+            except (SyntaxError, ValueError):  # a copy someone broke is already `modified`; its imports are unknown
+                return []
         # What each copy imports is read from the copy itself (an older release imports other modules than this one);
         # a module it lacks would be installed at this release, so that module's own imports are followed too.
         queue = [(e["file"], reader(service_dir / e["file"], list(by_name))) for e in present]
@@ -147,6 +151,10 @@ def status(service_dir: Path) -> Dict:
                     continue
                 reported.add(dep)
                 report["missing"].append({"file": importer, "needs": by_name[dep]["file"]})
+                for d in by_name[dep].get("data", []):  # the data a missing module reads at run time
+                    if not (service_dir / d).is_file() and d not in reported:
+                        reported.add(d)
+                        report["missing"].append({"file": by_name[dep]["file"], "needs": d})
                 queue.append((by_name[dep]["file"], by_name[dep]["imports"]))
     return report
 

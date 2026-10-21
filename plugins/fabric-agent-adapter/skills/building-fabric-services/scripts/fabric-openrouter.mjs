@@ -23,9 +23,9 @@ import { attributionHeaders, makeUsageReceipt } from './fabric-usage.mjs';
 export const BASE_URL = 'https://openrouter.ai/api/v1';
 export const ANSWERED = Object.freeze(['stop', 'tool_calls']);
 const STOP_AT_ONCE = { 401: 'auth', 402: 'payment', 403: 'auth' };
-const RESERVED_PARAMS = ['model', 'messages', 'max_tokens', 'maxTokens', 'stream', 'usage'];
+const RESERVED_PARAMS = ['model', 'messages', 'max_tokens', 'max_completion_tokens', 'maxTokens', 'stream', 'usage'];
 // Params that change what a call is billed for (other models, plugins, web search): the ceiling could not bound them.
-const UNBOUNDED_PARAMS = ['models', 'route', 'plugins', 'web_search_options'];
+const UNBOUNDED_PARAMS = ['models', 'route', 'plugins', 'web_search_options', 'n'];
 
 export class OpenRouterError extends Error {
   constructor(message, { kind, attempts = [] } = {}) {
@@ -38,9 +38,15 @@ export class OpenRouterError extends Error {
 
 export const vendor = (model) => (String(model).includes('/') ? String(model).split('/', 1)[0] : '');
 
+const DECIMAL = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?$/;
+
+// A catalog price (a plain decimal string such as "0.000001", or a number) or null: blank, hex, a list, negative or
+// not finite are null, exactly as fabric_openrouter.py reads them.
 function price(value) {
-  if (typeof value === 'boolean' || value === null || value === undefined || value === '') return null;
-  const n = Number(value);
+  let n;
+  if (typeof value === 'string') n = DECIMAL.test(value) ? Number(value) : Number.NaN;
+  else if (typeof value === 'number') n = value;
+  else return null;
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
@@ -99,6 +105,7 @@ export class Client {
     this.now = now;
     this.rand = rand;
     this.inFlight = 0;
+    this.unmeasuredWorst = new Map(); // `${at} ${model}` of an unmeasured receipt -> that attempt's worst case
   }
 
   priced(model) {
@@ -128,7 +135,8 @@ export class Client {
     let total = 0;
     for (const r of this.ledger.receipts()) {
       if (!isObject(r) || !this.inWindow(r.at, today)) continue;
-      total += price(r.costUsd) !== null && typeof r.costUsd === 'number' ? r.costUsd : unmeasuredUsd;
+      if (typeof r.costUsd === 'number' && price(r.costUsd) !== null) total += r.costUsd;
+      else total += this.unmeasuredWorst.get(`${r.at} ${r.model}`) ?? unmeasuredUsd; // known here, else unmeasuredUsd
     }
     return total;
   }
@@ -175,9 +183,12 @@ export class Client {
   }
 
   // A receipt for an attempt that may have been billed with no usage to read: no tokens, no cost.
-  unmeasured(asked, taskRunId) {
-    return makeUsageReceipt('openrouter', asked.slice(0, 128), { inputTokens: 0, outputTokens: 0, tokensMeasured: false,
+  unmeasured(asked, taskRunId, worst) {
+    const receipt = makeUsageReceipt('openrouter', asked.slice(0, 128), { inputTokens: 0, outputTokens: 0, tokensMeasured: false,
       at: time.formatRfc3339(Math.trunc(this.now() * 1000)), route: 'key', projectId: this.projectId, taskRunId });
+    const key = `${receipt.at} ${receipt.model}`;
+    this.unmeasuredWorst.set(key, (this.unmeasuredWorst.get(key) ?? 0) + worst);
+    return receipt;
   }
 
   key() {
@@ -232,7 +243,7 @@ export class Client {
         }
         let result;
         try {
-          result = await this.attempt(url, headers, body, left, current, taskRunId);
+          result = await this.attempt(url, headers, body, left, current, taskRunId, held);
         } finally {
           this.release(held);
         }
@@ -250,14 +261,15 @@ export class Client {
     throw new OpenRouterError(`no answer from ${model} or ${fallback}`, { kind: 'failed', attempts });
   }
 
-  async attempt(url, headers, body, left, asked, taskRunId) {
+  async attempt(url, headers, body, left, asked, taskRunId, worst) {
     let response;
     try {
       response = await http.request('POST', url, { headers, body, deadlineS: left, retries: 0, transport: this.transport, clock: this.clock });
     } catch (err) {
       if (!(err instanceof http.HttpError)) throw err;
-      if (err.kind === 'timeout' || (err.kind === 'too-large' && err.status === 200)) {
-        this.ledger.record(this.unmeasured(asked, taskRunId)); // may have been billed: counted, never as $0
+      if (['timeout', 'connection'].includes(err.kind) || (err.kind === 'too-large' && err.status === 200)) {
+        // may have been billed (a cut connection looks like a refused one from here): counted, never as $0
+        this.ledger.record(this.unmeasured(asked, taskRunId, worst));
       }
       return { outcome: ['connection', 'timeout'].includes(err.kind) ? 'retry' : 'refused', status: err.status };
     }
@@ -270,7 +282,7 @@ export class Client {
     let parsed = null;
     try { parsed = response.json(); } catch { /* read as no answer below */ }
     if (!isObject(parsed)) {
-      this.ledger.record(this.unmeasured(asked, taskRunId));
+      this.ledger.record(this.unmeasured(asked, taskRunId, worst));
       return { outcome: 'bad-answer', status };
     }
     const receipt = this.receipt(asked, parsed, taskRunId);

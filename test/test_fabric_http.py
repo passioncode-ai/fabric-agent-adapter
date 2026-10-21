@@ -210,6 +210,33 @@ class DefaultTransport(unittest.TestCase):
         self.assertEqual(caught.exception.kind, "timeout")
         self.assertLess(_time.monotonic() - start, 2.8, "the deadline covers the body, not each read")
 
+    def test_slow_headers_count_toward_the_deadline(self):
+        import socket
+        import time as _time
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+
+        def slow():
+            conn, _ = server.accept()
+            conn.recv(65536)
+            try:
+                _time.sleep(0.8)
+                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n")
+                for _ in range(4):
+                    _time.sleep(0.3)
+                    conn.sendall(b"x")
+            except OSError:
+                pass
+            conn.close()
+        threading.Thread(target=slow, daemon=True).start()
+        start = _time.monotonic()
+        with self.assertRaises(fh.HttpError) as caught:
+            fh.request("GET", "http://127.0.0.1:%d/" % server.getsockname()[1], deadline_s=1, retries=0)
+        server.close()
+        self.assertEqual(caught.exception.kind, "timeout")
+        self.assertLess(_time.monotonic() - start, 1.5, "the headers' wait counts toward the deadline")
+
     def test_a_transport_bug_is_a_connection_error_as_in_node(self):
         def broken(*args):
             raise RuntimeError("bug")

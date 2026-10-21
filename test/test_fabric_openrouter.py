@@ -244,6 +244,15 @@ class Rules(unittest.TestCase):
         self.assertEqual(ledger.rows[0]["tokensMeasured"], False)
         self.assertIsNone(ledger.rows[0]["costUsd"])
 
+    def test_an_unmeasured_attempt_counts_at_its_own_worst_case(self):
+        steps = [{"error": "timeout"}]
+        c, _ = client({"ceilingUsd": 0.0021, "steps": steps}, [], Ledger(), retries=0)
+        with self.assertRaises(fo.OpenRouterError):
+            c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=200)  # a/one up to 0.002016, then timed out
+        with self.assertRaises(fo.OpenRouterError) as caught:
+            c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=10)  # up to 0.000116 more
+        self.assertEqual(caught.exception.kind, "ceiling", "the timed-out call is counted at 0.002016, not 0.000116")
+
     def test_totals(self):
         self.assertEqual(fo.totals([{"costUsd": 0.5}, {"costUsd": None}, {"costUsd": 0.25}]),
                          {"calls": 3, "spentUsd": 0.75, "unpricedCalls": 1})

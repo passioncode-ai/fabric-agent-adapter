@@ -60,6 +60,15 @@ copies the kit now installs it with `fabric_kit.py install` (one file is no long
   `_DAY_MS` and `_utc_date_ms`; `install-host-hooks` requires the session helper's new modules; the recipe hands off a
   message holding bytes a terminal could not decode instead of exiting, and its dash check also catches U+2012 and
   U+2015.
+- **Found by the second review round and fixed:** a connection cut after a call may have been billed left no receipt
+  (every connection error now records an unmeasured one); `max_completion_tokens` and `n` could raise the output past
+  the bound (refused); an unmeasured call was counted at the current call's worst case (now at its own, while the
+  client runs); Node read a blank or hex price as a number (both twins now read a plain decimal or a number only);
+  Python's deadline started after the headers (it now covers them); `fabric_kit.py status` raised on a copy it could
+  not parse (it reports it `modified`) and now names a missing module's data files; `fabric_http` writes a JSON body
+  byte for byte as `JSON.stringify` (numbers and key order too, through the core's `json_stringify`); loopback edge
+  forms agree in both twins; the recipe's dash check covers U+2E3A, U+2E3B, U+FE58 and no-break spaces, and no longer
+  flags `1 - 2`.
 - **A usage receipt's project id is checked the same way in both kits.** `fabric_service.py` defined its URI pattern
   twice and the second won: Python accepted `project_id="urn:"` where Node refused it. Now one pattern per module, and
   both kits refuse it (a test in each).

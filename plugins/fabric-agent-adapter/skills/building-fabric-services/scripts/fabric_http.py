@@ -39,6 +39,12 @@ import urllib.parse
 import urllib.request
 from typing import Any, Callable, Dict, Mapping, Optional, Tuple
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from fabric_jsvalue import json_stringify  # noqa: E402 - beside this file
+
 RETRY_STATUSES = (408, 425, 429, 500, 502, 503, 504)
 IDEMPOTENT_METHODS = ("GET", "HEAD", "OPTIONS", "PUT", "DELETE")
 DEFAULT_MAX_BYTES = 8 * 1024 * 1024
@@ -92,10 +98,11 @@ def utf8(text: str) -> bytes:
 
 
 def json_bytes(value: Any) -> bytes:
-    """Compact JSON as `JSON.stringify` writes it, in UTF-8: a lone surrogate escaped as `\\uXXXX`, and NaN or
-    Infinity refused (`ValueError`) rather than written as a token no JSON reader accepts."""
-    text = json.dumps(value, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
-    return _SURROGATE.sub(lambda m: "\\u%04x" % ord(m.group()), text).encode("utf-8")
+    """Compact JSON byte for byte as `JSON.stringify` writes it (numbers, key order, a lone surrogate escaped as
+    `\\uXXXX`), in UTF-8; NaN or Infinity refused (`ValueError`) rather than written as null, and a value JSON has no
+    form for refused (`TypeError`)."""
+    json.dumps(value, allow_nan=False)  # raises on NaN, Infinity and types JSON cannot hold
+    return json_stringify(value).encode("utf-8")
 
 
 def redact_url(url: str) -> str:
@@ -120,12 +127,18 @@ def redact_url(url: str) -> str:
 
 
 def _is_loopback(host: str) -> bool:
+    """Loopback as a WHATWG URL parser leaves the host: one trailing dot dropped from an IPv4 address, no whitespace,
+    and an IPv4-mapped IPv6 address not counted (Node writes it in hex and the Node twin refuses it)."""
     if host == "localhost" or host.endswith(".localhost"):
         return True
+    if not host or any(c.isspace() for c in host):
+        return False
     try:
-        return ipaddress.ip_address(host).is_loopback
+        address = ipaddress.ip_address(host)
+        return address.is_loopback and not getattr(address, "ipv4_mapped", None)
     except ValueError:
         pass
+    host = host[:-1] if host.endswith(".") else host
     try:  # the short IPv4 forms a WHATWG URL also reads (127.1, 2130706433, 0x7f.1)
         return socket.inet_aton(host)[0] == 127
     except (OSError, ValueError):
@@ -214,6 +227,7 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
                      max_bytes: int) -> Tuple[int, Dict[str, str], bytes]:
     """The default transport: urllib, no redirects followed, the body read to one byte past `max_bytes`."""
     req = urllib.request.Request(url, data=body, method=method, headers=headers)
+    end = time.monotonic() + timeout_s  # one deadline from the first byte sent, headers and body included
     try:
         resp = _OPENER.open(req, timeout=timeout_s)
     except urllib.error.HTTPError as answer:  # a status outside 2xx is an answer, not a failure of the transport
@@ -223,7 +237,6 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
         raise reason if isinstance(reason, OSError) else ConnectionError(str(reason))
     except (http.client.HTTPException, ValueError) as exc:
         raise ConnectionError(type(exc).__name__)
-    end = time.monotonic() + timeout_s
     try:
         chunks, size = [], 0
         while size <= max_bytes:
@@ -269,8 +282,8 @@ def request(method: str, url: str, *, headers: Optional[Mapping[str, str]] = Non
     elif isinstance(body, (dict, list)):
         try:
             data = json_bytes(body)
-        except ValueError:
-            raise HttpError("the body holds a number JSON cannot write (NaN or Infinity)", kind="refused")
+        except (ValueError, TypeError):
+            raise HttpError("the body holds a value JSON cannot write (NaN, Infinity or a non-JSON type)", kind="refused")
         if not any(k.lower() == "content-type" for k in sent):
             sent["Content-Type"] = "application/json"
     elif isinstance(body, str):

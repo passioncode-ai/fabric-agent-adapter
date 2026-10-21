@@ -67,6 +67,29 @@
       "prompt": "1",
       "completion": "1"
      }
+    },
+    {
+     "id": "f/blank",
+     "pricing": {
+      "prompt": " ",
+      "completion": "0.1"
+     }
+    },
+    {
+     "id": "g/hex",
+     "pricing": {
+      "prompt": "0x10",
+      "completion": "0.1"
+     }
+    },
+    {
+     "id": "h/list",
+     "pricing": {
+      "prompt": [
+       1
+      ],
+      "completion": "0.1"
+     }
     }
    ]
   },
@@ -819,7 +842,7 @@
    }
   },
   {
-   "name": "a refused connection is not billed: no receipt",
+   "name": "a cut or refused connection may have been billed: an unmeasured receipt, then a retry",
    "steps": [
     {
      "error": "connection"
@@ -853,7 +876,17 @@
     "sleeps": [
      0.5
     ],
-    "receiptCount": 1
+    "receipts": [
+     {
+      "model": "a/one",
+      "costUsd": null,
+      "tokensMeasured": false
+     },
+     {
+      "model": "a/one",
+      "costUsd": 1e-05
+     }
+    ]
    }
   },
   {
@@ -898,6 +931,30 @@
       "costBasis": "price-list"
      }
     ]
+   }
+  },
+  {
+   "name": "max_completion_tokens is the client's to set",
+   "params": {
+    "max_completion_tokens": 100000
+   },
+   "steps": [],
+   "expect": {
+    "error": "config",
+    "outcomes": [],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "n multiplies the output and is refused",
+   "params": {
+    "n": 4
+   },
+   "steps": [],
+   "expect": {
+    "error": "config",
+    "outcomes": [],
+    "receiptCount": 0
    }
   }
  ]

@@ -42,7 +42,7 @@ import fabric_paths
 import fabric_usage
 
 EM_DASH = "\u2014"
-_DASHES = re.compile(r"[\u2012\u2014\u2015]|--|(?<=\w) [-\u2013] (?=\w)")
+_DASHES = re.compile(r"[\u2012\u2014\u2015\u2e3a\u2e3b\ufe58]|--|(?<=[^\W\d_])[ \u00a0][-\u2013]\s(?=[^\W\d_])")
 _CITATION = re.compile(r"\[KB:([A-Za-z0-9][A-Za-z0-9._-]{0,63})\]")
 _WORD = re.compile(r"\w+", re.UNICODE)
 _URL = re.compile(r"https?://\S+")
