@@ -158,6 +158,18 @@ const usageCases = [...usagePositive,
   edited('a model row with more unmeasured calls than calls', (r) => { const m = r.days[0].byModel[0]; m.unmeasuredCalls = m.calls + 1; r.days[0].unmeasuredCalls = m.calls + 1; }),
   edited("a day's unmeasured calls are not its models' sum", (r) => { r.days[0].unmeasuredCalls = 1; }),
   edited('unmeasured calls written on the day and its model', (r) => { r.days[0].byModel[0].unmeasuredCalls = 1; r.days[0].unmeasuredCalls = 1; }),
+  // A day with no model rows may carry nothing: a cost alone (a number or a numeric string) still names no model.
+  ...[['a day with only a cost and no models', 0.5], ['a day with only a cost written as a string and no models', '0.5'], ['a day with no models and a zero cost', 0]].map(([name, cost]) =>
+    edited(name, (r) => { const d = r.days[0]; for (const f of ['calls', 'unpricedCalls', 'unmeasuredCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) d[f] = 0; d.byModel = []; d.costUsd = cost; })),
+  // Every count of a day and of its first model, set to a value the schema refuses: the rules read it as the contract's
+  // toNumber does (a numeric string is a number, an object is NaN) and never throw. A count added to the contract's list
+  // gets these cases by the next regeneration.
+  ...['calls', 'unpricedCalls', 'unmeasuredCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'costUsd'].flatMap((field) =>
+    [['the string "2"', '2'], ['a padded hex string', ' 0x1 '], ['a word', 'abc'], ['null', null], ['true', true], ['an empty array', []], ['a one-item array', [1]],
+      ['an object', {}], ['an object whose toString is not a function', { toString: 1 }], ['a fraction', 1.5], ['a negative number', -1]].flatMap(([label, value]) => [
+      edited(`the day's ${field} is ${label}`, (r) => { r.days[0][field] = value; }),
+      edited(`the first model's ${field} is ${label}`, (r) => { r.days[0].byModel[0][field] = value; }),
+    ])),
 ].map(([name, report]) => ({ name, report, findings: usageRulesModule.usageRules(report).map((f) => ({ code: f.code, instancePath: f.instancePath })) }));
 write('usage-attribution-vectors.json', { about: "DEC-0065: OpenRouter attribution's cases and FAC-SEM-025 over reports, answered by the contract's attributionHeaders and usageRules.",
   source: 'fixtures/vectors/openrouter-attribution.json, src/usage-rules.ts, fixtures/positive/service-usage*.json', attribution: attributionVectors.cases, usage: usageCases });

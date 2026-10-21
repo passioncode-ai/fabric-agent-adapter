@@ -8,7 +8,7 @@
 
 **Fabric Agent Adapter** makes any agent Fabric-compatible. Fabric is PassionCode.ai's
 product, the CEO AI agent: you talk to Fabric, and it chooses, binds and runs the agents that
-do the work. This adapter is how an agent becomes one Fabric can bind — four Agent Skills,
+do the work. This adapter is how an agent becomes one Fabric can bind: four Agent Skills,
 Python and Node reference kits and a live conformance probe for the
 [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract). It also works
 on its own: the skills, kits and probe need no Fabric install.
@@ -51,8 +51,8 @@ is the board-first workflow.
 
 `building-fabric-services` makes an agent a long-lived local service with a dashboard
 that is always alive, runs as one copy, keeps its state through a reinstall and appears
-in Fabric Dashboards by itself — the `fabric-service/0.1` extension. It also makes an **online** agent
-or dashboard — an `https` origin on a platform — a Fabric service (the remote placement, DEC-0019): the same
+in Fabric Dashboards by itself: the `fabric-service/0.1` extension. It also makes an **online** agent
+or dashboard (an `https` origin on a platform) a Fabric service (the remote placement, DEC-0019): the same
 four routes behind the token, a `__Host-` session cookie, and one descriptor on the operator's computer;
 `scripts/sample-remote-service.mjs` is the complete example. It ships Python and
 Node reference kits (`scripts/fabric_service.py`, `scripts/fabric-service.mjs`), a
@@ -68,8 +68,8 @@ python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/che
 
 The dashboard itself is built from the **dashboard kit** (`assets/dashboard-kit/`, `fabric-dashboard/0.1`,
 contract DEC-0036): one stylesheet and one script that keep the page usable from 360 CSS px inside a host
-pane beside the agent console — navigation that folds into a More menu, wide tables in their own scroll
-box, sticky chrome at most 120 px — with seven WCAG AA themes (light and dark) that follow the host's
+pane beside the agent console (navigation that folds into a More menu, wide tables in their own scroll
+box, sticky chrome at most 120 px) with seven WCAG AA themes (light and dark) that follow the host's
 `fabric_appearance` cookie. `scripts/dashboard_kit.py install|status` copies and checks it,
 `scripts/check_dashboard_layout.mjs` measures a rendered page in WebKit at 360, 480, 768 and 1280 px
 (Playwright; `NOT_RUN` without it), and the probe's `dashboard.declared` checks the declaration. The
@@ -117,7 +117,7 @@ yet ship the host registry/runtime needed to connect and authorize a live provid
 ### Install
 
 With the [PassionCode.ai launcher](https://github.com/passioncode-ai/passioncode) the adapter
-comes with every other PassionCode.ai skill — `npx @passioncode-ai/passioncode@latest update`,
+comes with every other PassionCode.ai skill: `npx @passioncode-ai/passioncode@latest update`,
 then restart your agents. Alone, without any account:
 
 ```bash
@@ -175,8 +175,8 @@ kill %1
 
 Verified 2026-10-01 from the published npm package 0.5.4 (`npx` into a throwaway hub, `KIT`
 pointing at the installed skill) with Claude Code 2.1.286: the probe reported 27 rules, 0 FAIL;
-the CLI connected to the sample over streamable HTTP, called `sample.echo` and printed `ping`. The probe prints one line per rule —
-`PASS`, `FAIL` or `NOT_RUN` with its evidence — and exits 1 on any `FAIL`; run it against your
+the CLI connected to the sample over streamable HTTP, called `sample.echo` and printed `ping`. The probe prints one line per rule
+(`PASS`, `FAIL` or `NOT_RUN` with its evidence) and exits 1 on any `FAIL`; run it against your
 own service by its id once its installer has written the descriptor.
 `FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py` repeats the connection check
 (every sample tool listed, no model call) in the test suite.
@@ -264,8 +264,8 @@ The default pin for new bundles is [`fabric-contract.lock.json`](fabric-contract
 - version: `0.1.0`
 - commit: `c55f2d5a11c9a0197e958e87212fca7ae1154769`
 
-Every other mention of the default contract revision — this section, the skills' metadata, the
-skill card, `adapt_project.py` — must equal it; `python3 test/validate.py` fails a tree
+Every other mention of the default contract revision (this section, the skills' metadata, the
+skill card, `adapt_project.py`) must equal it; `python3 test/validate.py` fails a tree
 where one does not. The sole live legacy exception is the immutable
 `SUPPORTED_CONTRACT_COMMITS` declaration in the scaffolder: previously issued bundles
 keep their selected legacy lock and require that exact clean contract checkout. The
@@ -288,14 +288,16 @@ FABRIC_CONTRACT_OLD=/path/to/legacy-contract FABRIC_CONTRACT_NEW=/path/to/curren
   python3 -m unittest discover -s test -p test_contract_revisions.py -v
 ```
 
-Without both environment variables, those tests explicitly skip as `NOT_RUN`.
-This source checkout is 0.21.0. 0.20.0 is the latest published GitHub/npm release (2026-10-12; 0.7.0 and 0.11.0
-were never released); 0.21.0 is published by its `v0.21.0` tag. Source delivery does not update installed skills or live sessions.
+`FABRIC_CONTRACT_OLD` is a checkout of the legacy fixtures' revision (`OLD` in `test/test_contract_revisions.py`) and
+`FABRIC_CONTRACT_NEW` one of the pin; each needs `pnpm install --frozen-lockfile` in its own folder (pnpm refuses a
+symlinked `node_modules`). Without both environment variables, those tests explicitly skip as `NOT_RUN`, naming the
+two revisions. What each version changed and when it was released is in [CHANGELOG.md](CHANGELOG.md). Source delivery
+does not update installed skills or live sessions.
 
 ## License
 
 Open source under the [GNU AGPL-3.0](LICENSE). A [commercial license](COMMERCIAL-LICENSE.md) is
-available for use that does not meet the AGPL's terms — [passioncode.ai/business](https://passioncode.ai/business/).
+available for use that does not meet the AGPL's terms: [passioncode.ai/business](https://passioncode.ai/business/).
 Versions before 0.5.3 were released under PolyForm Noncommercial or Internal Use (v0.4.3 to
 v0.5.2) and MIT (v0.4.2 and earlier); each keeps the licence it was released under.
 Contributions are accepted under [CLA.md](CLA.md) ([CONTRIBUTING.md](CONTRIBUTING.md)).

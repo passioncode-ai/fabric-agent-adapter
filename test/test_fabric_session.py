@@ -600,14 +600,14 @@ class BoardUnread(Active):
         self.assertIsNone(self.prompt(), "no count yet: silent")
         self.unread(2)
         self.turn()
-        self.assertEqual(self.prompt(), "2 unread on the project board — com.list")
+        self.assertEqual(self.prompt(), "2 unread on the project board: com.list")
         self.assertIsNone(self.prompt(), "the same count is not repeated")
         self.unread(1)
         self.turn()
         self.assertIsNone(self.prompt(), "a fall is not news")
         self.unread(4)
         self.turn()
-        self.assertEqual(self.prompt(), "4 unread on the project board — com.list")
+        self.assertEqual(self.prompt(), "4 unread on the project board: com.list")
         self.unread(0)
         self.turn()
         self.assertIsNone(self.prompt())
@@ -642,7 +642,7 @@ class WatchMail(Active):
         counts = iter([0, 2, 2, 1, 3])
         code, printed, sleeps = self.watch(5, poll=lambda: ("ok", next(counts)))
         self.assertEqual(code, 0)
-        self.assertEqual(printed, ["2 unread on the project board — com.list", "3 unread on the project board — com.list"])
+        self.assertEqual(printed, ["2 unread on the project board: com.list", "3 unread on the project board: com.list"])
         self.assertEqual(sleeps, [60.0] * 5)
 
     def test_jitter_stays_within_twenty_percent(self):
@@ -662,7 +662,7 @@ class WatchMail(Active):
         answers = iter([("down", "x"), ("down", "x"), ("ok", 1), ("ok", 1)])
         _, printed, sleeps = self.watch(4, poll=lambda: next(answers))
         self.assertEqual(sleeps, [120.0, 240.0, 60.0, 60.0])
-        self.assertEqual(printed[-1], "1 unread on the project board — com.list")
+        self.assertEqual(printed[-1], "1 unread on the project board: com.list")
 
     def test_the_interval_has_a_floor_so_it_never_spins(self):
         _, _, sleeps = self.watch(2, interval=0, poll=lambda: ("ok", 0))
@@ -691,7 +691,7 @@ class WatchMail(Active):
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
                                 env=dict(self.env, CLAUDE_CODE_SESSION_ID=SID))
         line = proc.stdout.readline()
-        self.assertEqual(line.strip(), "1 unread on the project board — com.list")
+        self.assertEqual(line.strip(), "1 unread on the project board: com.list")
         started = time.perf_counter()
         proc.stdin.close()
         self.assertEqual(proc.wait(timeout=10), 0)

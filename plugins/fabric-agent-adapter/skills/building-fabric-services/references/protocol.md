@@ -1,4 +1,4 @@
-# fabric-service/0.1 — wire reference
+# fabric-service/0.1: wire reference
 
 Pinned to `fabric-agent-contract` commit `c55f2d5a11c9a0197e958e87212fca7ae1154769`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
@@ -14,13 +14,13 @@ this page is the working summary. Extension key:
 
 ## Contents
 
-- Descriptor — written by the installer
+- Descriptor: written by the installer
 - Well-known document
 - Events page
 - Login code and the operator session
 - Semantic rules a host applies
 
-## Descriptor — written by the installer
+## Descriptor: written by the installer
 
 Directory: macOS `~/Library/Application Support/ai.passioncode.fabric/services/`,
 Linux `${XDG_DATA_HOME:-~/.local/share}/passioncode-fabric/services/`, Windows
@@ -33,13 +33,13 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `id`, `instance` | `^[a-z][a-z0-9-]{1,62}$`, `^[a-z][a-z0-9-]{0,31}$` (default `default`); the pair is unique per machine |
 | `name`, `summary` | ≤ 80 and ≤ 200 characters |
 | `origin` | `http://127.0.0.1:<port>`; the port is a machine-wide claim. Optional for an app's descriptor only (`manager: "person"`, DEC-0069): its live origin and process id are in the app's own liveness file, and a descriptor without an origin claims no port (`FAC-SEM-010`) |
-| `auth` | `tokenFile` (0600; on Windows a protected ACL — owner and every granting entry the current user, SYSTEM or Administrators: service.md *Windows token files*, DEC-0032, DEC-0033); `header` default `Authorization` with `scheme` `Bearer`; any other header carries the raw token with `scheme: "none"` |
+| `auth` | `tokenFile` (0600; on Windows a protected ACL: owner and every granting entry the current user, SYSTEM or Administrators: service.md *Windows token files*, DEC-0032, DEC-0033); `header` default `Authorization` with `scheme` `Bearer`; any other header carries the raw token with `scheme: "none"` |
 | `lifecycle` | `manager` `launchd` (then `label` and `plist`), `systemd` (then `unit`, a `systemctl --user` unit), `task-scheduler` (then `task`, a per-user Scheduled Task), `node` (Project Observatory's node supervises it as its child, with no supervisor file, DEC-0061), `person` (an app a person installs and starts, then `app`, the installed app, DEC-0069) or `none`; `unit` and `task` are refused beside any other manager (DEC-0032), `label` and `plist` beside any but `launchd` (DEC-0057), `app` beside any but `person`. Both kits and the probe accept all six; both kits write the unit and the task (`systemd_unit`, `task_xml` / `systemdUnit`, `taskXml`). An app's descriptor says it is installed, never that it runs: the probe checks `app` is still there (`descriptor.app-installed`) and reads no well-known document; a reader that finds the app gone treats the descriptor as stale (`app_descriptor_stale` / `appDescriptorStale`), and an app that writes its own descriptor rewrites it only when `app_descriptor_action` / `appDescriptorAction` says `write` |
 | `paths` | `data` (required), `logs[]`, optional `config`, `cache` |
-| `commands` | only `doctor` and `update`, argument arrays whose first item is an absolute or `~/` path (Windows: also `C:\…`, `C:/…` or `~\…`, never a network share — DEC-0032) |
+| `commands` | only `doctor` and `update`, argument arrays whose first item is an absolute or `~/` path (Windows: also `C:\…`, `C:/…` or `~\…`, never a network share; DEC-0032) |
 | `source.repository`, `fabricManifest` | optional |
-| `installedAt`, `installedBy` | when, and who installed it: the installer and its version as a string, or `{by, role?, tool}` (DEC-0061) — `by` `person` (with `role` `operator` or `administrator`), `node` or `organization`; `role` for a person only; `tool` the installer and its version. It names a role, never a person. An app's descriptor uses the object form with `by: "person"`. `register_remote` / `registerRemote` and the sample write the object form |
-| `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none` — a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
+| `installedAt`, `installedBy` | when, and who installed it: the installer and its version as a string, or `{by, role?, tool}` (DEC-0061): `by` `person` (with `role` `operator` or `administrator`), `node` or `organization`; `role` for a person only; `tool` the installer and its version. It names a role, never a person. An app's descriptor uses the object form with `by: "person"`. `register_remote` / `registerRemote` and the sample write the object form |
+| `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none`: a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
 | `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed` or `personal`; `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
 
 ## Identifier equality (DEC-0076)
@@ -53,7 +53,7 @@ and a value that is not a string is compared as it is. The kits compare by it in
 events), FAC-SEM-076 (estate grants and their revocations) and FAC-SEM-014 (a provider entry's `providerId`), and they
 write the identifiers they scaffold in normal form.
 
-## Well-known document — `GET /.well-known/fabric-service`
+## Well-known document: `GET /.well-known/fabric-service`
 
 No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
 
@@ -83,8 +83,8 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
 - `build` needs `commit` or `digest` (`sha256:<64 hex>`).
 - `summary`: at most six tiles; `attention: true` counts toward the host's badge.
 - `surfaces.events` is required; `dashboard` and `mcp` when the service has them; `usage`
-  (DEC-0021) when the service reports its spend — see [the usage reference](usage.md);
-  `operatorChannel.path` (DEC-0034) when the service has an operator channel — its status
+  (DEC-0021) when the service reports its spend (see [the usage reference](usage.md));
+  `operatorChannel.path` (DEC-0034) when the service has an operator channel; its status
   document follows the contract's `operator-channel-status.schema.json` and is token-protected
   like the events feed. The kits do not serve it yet.
 - `extensions` MAY carry the embedded dashboard declaration under
@@ -98,7 +98,7 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   token is not an MCP credential: a host and the probe never call `/mcp` with it as a caller.
   The kits verify them with `fabric_delegation` / `fabric-delegation.mjs` ([delegation](delegation.md)).
 
-## Events page — `GET /fabric/v1/events?after=<cursor>&limit=<n>`
+## Events page: `GET /fabric/v1/events?after=<cursor>&limit=<n>`
 
 Token required. `limit` default 50, maximum 200. Without `after`: the newest `limit`,
 ascending. `cursor` is the last id returned, or the `after` you sent when the page is
@@ -134,7 +134,7 @@ reading it further (HTTP 400, or an MCP `isError` result's `structuredContent`);
 own fault `no-accepted-revisions`. `PROTOCOL_REVISIONS` is the contract's register; `check_service.py` reads
 `well-known.protocols`.
 
-## Login code and the operator session — `POST /fabric/v1/login-code`
+## Login code and the operator session: `POST /fabric/v1/login-code`
 
 Token required → `{ "url": "/fabric/v1/login?code=<16–256 url-safe chars>", "expiresAt": "…" }`,
 single use, at most 120 s, recorded as used before it is honoured. `GET` that URL →
@@ -151,4 +151,4 @@ ended session answers `401` on the dashboard page.
 | `FAC-SEM-010` | no two descriptors claim one port or one `id.instance` |
 | `FAC-SEM-011` | `ready` carries no degraded source |
 | `FAC-SEM-012` | commands start with an absolute or `~/` executable |
-| `FAC-SEM-025` | a usage report adds up; an all-unpriced row costs `null`, not `0` (DEC-0021) |
+| `FAC-SEM-025` | a usage report adds up; an all-unpriced row costs `null`, not `0` (DEC-0021); unmeasured calls are within calls and a day's are its models' sum (DEC-0091) |

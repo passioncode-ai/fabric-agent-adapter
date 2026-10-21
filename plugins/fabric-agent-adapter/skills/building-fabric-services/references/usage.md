@@ -1,4 +1,4 @@
-# Usage report — what the agent spent (DEC-0021)
+# Usage report: what the agent spent (DEC-0021)
 
 Fabric Agent Contract DEC-0021, `docs/specification/service.md` → *Usage report*, schema
 `schemas/service-usage.schema.json`. Optional. A service that calls paid models or tools should
@@ -39,7 +39,8 @@ ledger.record(k.makeUsageReceipt('openrouter', model, { inputTokens, outputToken
 - **Unknown tokens are named too** (DEC-0091). When the provider gave no token count (a stream cut off, a local
   model without a counter), pass `tokens_measured=False` / `tokensMeasured: false` with the tokens you have (often 0).
   The receipt carries `tokensMeasured: false`, and the report counts the call in `unmeasuredCalls` on its day and model
-  row, never more than `calls`; a host then shows the token totals as a lower bound.
+  row, never more than `calls`; a host then shows the token totals as a lower bound. A job whose usage you send as
+  `null` or `partial` ([interop](interop.md)) is such a call.
 - **No content.** A receipt carries no prompt, output, caller or user id. The kits accept only the
   fields above.
 - If the service already keeps a ledger (a jobs table with token counts), build the receipts from
@@ -63,7 +64,7 @@ left out.
 it, and the host only shows it.
 
 **Every limit (DEC-0027).** Pass `budgets` to list every spending limit the service applies,
-enforced or not, so the spend view shows all of them — the operator asked for that on 2026-10-07:
+enforced or not, so the spend view shows all of them; the operator asked for that on 2026-10-07:
 
 ```python
 ledger.report(service_id=ID, budget={"period": "month", "limitUsd": 100}, budgets=[
@@ -78,7 +79,7 @@ ledger.report(service_id=ID, budget={"period": "month", "limitUsd": 100}, budget
   way `budget` is, so `budget` and its twin in `budgets` never disagree. A per-order limit
   (`per_job`, `approval`) gets `spentUsd: null`. Every other limit states its own spend.
 - `scope` is `machine`, `project`, `pool` or `job`; a `project` or `pool` limit names its
-  `subject`. A limit has at most one window — `period`, `windowSeconds` or `since` — and it agrees
+  `subject`. A limit has at most one window (`period`, `windowSeconds` or `since`), and it agrees
   with the kind (`daily`: the day or 86400 s; `monthly`: the month or 28–31 days; `velocity`: a
   rolling window). `tripped: true` (work stopped by it now) needs `enforced: true`. An unknown
   kind is shown generically, never refused.

@@ -21,7 +21,7 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 |---|---|---|
 | SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running: adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric down, in a project that uses Fabric (below): one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
 | Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | spools one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}`, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
-| UserPromptSubmit | the session's spool holds a count | adds ONE line, `N unread on the project board — com.list`, only when the count rose since the last line; a fall or the same count says nothing. It reads two small files and never calls Fabric. |
+| UserPromptSubmit | the session's spool holds a count | adds ONE line, `N unread on the project board: com.list`, only when the count rose since the last line; a fall or the same count says nothing. It reads two small files and never calls Fabric. |
 | SessionEnd | as for Stop | spools the end; the worker sends `fabric_work_release {claims: "session", outcome: "let-go", …}`, then `fabric_session_observe {event: "end", reason}`, and removes the session's spool |
 
 **A project that uses Fabric** (`project_uses_fabric`), cheapest sign first: `fabric` registered at local or project
@@ -33,7 +33,7 @@ instructions say how to read Fabric services (since 0.38.0).
 
 Without `session-hooks/1`, Stop and SessionEnd read `hub.json`, return, and write nothing, so UserPromptSubmit has
 nothing to show; `fabric_session.py status` says "Session hooks: inert". That is every Fabric before the release
-that ships the dependencies below. A board that cannot be read (`unavailable`, a refusal) leaves no count — never a
+that ships the dependencies below. A board that cannot be read (`unavailable`, a refusal) leaves no count, never a
 zero; a `degraded` board that still gives the count is read.
 
 ## Codex and Kimi Code
@@ -45,7 +45,7 @@ under the same rules. Nothing else: no turn observation and no unread line, beca
 session id Fabric keeps with the enrollment, which only Claude Code supplies today (D1).
 
 `install-host-hooks --host codex|kimi` is a dry run by default. It prints the file, its sha256, and the one entry it
-would add — never a value already in the file — and the `--apply --expect-sha256 <digest>` command. With `--apply` it
+would add (never a value already in the file) and the `--apply --expect-sha256 <digest>` command. With `--apply` it
 backs the file up (`<file>.<UTC stamp>.bak`, never overwriting an earlier backup), keeps the file's mode, refuses a
 file whose shape is not `{"hooks": {"<Event>": [{"hooks": [...]}]}}` (Codex) or an array of `[[hooks]]` tables
 (Kimi Code, read back with `tomllib`: Python 3.11+), and refuses one that changed since the dry run. `--remove` takes
@@ -69,10 +69,10 @@ or when its parent is gone. It refuses to start in a session Fabric launched, an
 
 ## A session Fabric launched
 
-Every hook, and `watch-mail`, is silent there: Fabric briefed that session itself. The signals, cheapest first —
+Every hook, and `watch-mail`, is silent there: Fabric briefed that session itself. The signals, cheapest first;
 only variable names are looked at, never a value (two of them carry the session's credential):
 
-1. `FABRIC_LAUNCHED_SESSION=1` — the marker Fabric is asked to set (D6). `0` or empty is not the marker.
+1. `FABRIC_LAUNCHED_SESSION=1`: the marker Fabric is asked to set (D6). `0` or empty is not the marker.
 2. What Fabric already gives (`apps/desktop/src/main/sessionBundle.ts`): `FABRIC_ACP_SESSION` (ACP sessions),
    `FABRIC_BRIDGE_URL` (the stdio bridge), `KILO_CONFIG_CONTENT` (Kilo), and `CODEX_HOME` inside
    `<Fabric's folder>/sessions/` (Codex).
@@ -88,10 +88,10 @@ only variable names are looked at, never a value (two of them carry the session'
 - **Read a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
   those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log.
 - **Send or read content.** A turn is the HEAD commit, the number of files that differ from it (untracked included)
-  and the lines added and removed against it — no path, branch name, commit message or diff text. The board is read
+  and the lines added and removed against it; no path, branch name, commit message or diff text. The board is read
   as a count (`com.status`), never a message. Git runs with `--no-optional-locks`.
 - **Start a second Fabric session.** A `fabric-mcp` started on its own would enroll a new session, and Fabric ends a
-  binding's oldest live session past eight (ADR-0134 amendment 2) — the agent's own. The worker and `watch-mail` run
+  binding's oldest live session past eight (ADR-0134 amendment 2): the agent's own. The worker and `watch-mail` run
   `fabric-mcp --rejoin-only --runtime-session-id <id>`, and only when Fabric advertises `session-hooks/1`.
 - **Rejoin more than once a minute.** Every rejoin spends the agent's Fabric request budget, which every session of
   the machine shares. A turn within 60 s of the session's last successful rejoin (the worker marks it as `rejoined`
@@ -110,7 +110,7 @@ spooling hook),
 removed at the session's end.
 
 Turn them off with Claude Code's own switch (`/hooks`, or `"disableAllHooks": true` in settings), or remove the
-`fabric` MCP server — the preamble and the Fabric calls stop without it. Uninstalling the plugin removes them; delete
+`fabric` MCP server; the preamble and the Fabric calls stop without it. Uninstalling the plugin removes them; delete
 the cache folder above to leave nothing behind. Codex and Kimi Code: `install-host-hooks --host <host> --remove`.
 
 ## What they need from Fabric

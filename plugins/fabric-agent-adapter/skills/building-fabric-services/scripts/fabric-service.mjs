@@ -17,7 +17,7 @@ export const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/exten
 // The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
 // document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
-export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.0';
+export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.1';
 export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 export const EXIT_ALREADY_RUNNING = 75;
 // Lifecycle rules: references/lifecycle.md (the rule for this kit's users; it implements the public
@@ -1119,6 +1119,25 @@ function pricedRow(row, at) {
  * date exists, not after `generatedAt`'s UTC date, at most 30 days before it) and the project attribution (each project
  * once by its normal form, each task run once; calls, priced calls and known costs bounded). Never throws.
  */
+/** The contract's `toNumber` (src/findings.ts): `Number()` without its throw on an object such as {"toString": 1}. */
+function toNumber(value) {
+  try {
+    return Number(value);
+  } catch {
+    return Number.NaN;
+  }
+}
+
+/** The contract's `show`: `String()`, or the value's JSON where `String()` would throw. */
+function show(value) {
+  if (typeof value === 'string') return value;
+  try {
+    return String(value);
+  } catch {
+    return JSON.stringify(value) ?? typeof value;
+  }
+}
+
 export function usageFindings(report) {
   const value = typeof report === 'object' && report !== null && !Array.isArray(report) ? report : {};
   const findings = [];
@@ -1134,13 +1153,13 @@ export function usageFindings(report) {
     const models = usageList(day.byModel);
     models.forEach((m, j) => findings.push(...pricedRow(m, `${at}/byModel/${j}`)));
     if (!models.length) {
-      const spent = ['calls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'].some((f) => Number(day[f] ?? 0) > 0) || Number(day.costUsd ?? 0) > 0;
+      const spent = ['calls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'].some((f) => toNumber(day[f] ?? 0) > 0) || toNumber(day.costUsd ?? 0) > 0;
       if (spent) flag(`${at}/byModel`, 'a day with calls, tokens or cost names the models they belong to');
       return;
     }
     for (const field of ['calls', 'unpricedCalls', 'unmeasuredCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) {
-      const sum = models.reduce((n, m) => n + Number(m[field] ?? 0), 0);
-      if (Number(day[field] ?? 0) !== sum) flag(`${at}/${field}`, `the day's ${field} is not the sum of its models (${String(day[field] ?? 0)} ≠ ${sum})`);
+      const sum = models.reduce((n, m) => n + toNumber(m[field] ?? 0), 0);
+      if (toNumber(day[field] ?? 0) !== sum) flag(`${at}/${field}`, `the day's ${field} is not the sum of its models (${show(day[field] ?? 0)} ≠ ${sum})`);
     }
     const known = models.map((m) => (typeof m.costUsd === 'number' ? m.costUsd : null)).filter((x) => x !== null).reduce((n, x) => n + x, 0);
     if (typeof day.costUsd === 'number' && Math.abs(day.costUsd - known) > 0.000001 + 1e-9 * Math.max(Math.abs(day.costUsd), Math.abs(known))) flag(`${at}/costUsd`, "the day's cost is not the sum of its models' known costs");

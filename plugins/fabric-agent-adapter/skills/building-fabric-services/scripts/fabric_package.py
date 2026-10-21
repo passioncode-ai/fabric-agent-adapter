@@ -648,7 +648,7 @@ def read_folder(folder: Any) -> Dict[str, bytes]:
                 continue
             files[rel] = full.read_bytes()
     if refused:
-        raise PackageError("Not packed: remove these or pack a clean copy — " + "; ".join(sorted(refused)))
+        raise PackageError("Not packed: remove these or pack a clean copy: " + "; ".join(sorted(refused)))
     return files
 
 

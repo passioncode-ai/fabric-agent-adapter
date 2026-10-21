@@ -364,7 +364,7 @@ def _chain_of(act: Dict[str, Any]) -> List[str]:
     node: Any = act
     while isinstance(node, dict):
         chain.append(node["partner"] if "partner" in node else node["sub"])  # the contract's chainOf, partner first
-        node = node.get("act") if "act" in node else None
+        node = node.get("act")
     return chain
 
 

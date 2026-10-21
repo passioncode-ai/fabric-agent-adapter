@@ -8,7 +8,7 @@ Order matters: each step leaves the service answering.
 2. **Add the well-known route and the build identity.** Read-only, no risk.
 3. **Add the events view** over the existing log, then the login-code routes. Keep the
    service's old login path until the operator has switched.
-4. **Move the lock to the top of startup** — before the startup hook that resumes jobs.
+4. **Move the lock to the top of startup**, before the startup hook that resumes jobs.
    Test: a second copy exits 75 and the first copy's running jobs are untouched.
 5. **Move state out of the code tree** if it lives there: copy to the OS data
    directory, switch the paths, keep the old tree read-only for one release, then

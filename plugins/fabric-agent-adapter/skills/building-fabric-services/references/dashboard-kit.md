@@ -1,4 +1,4 @@
-# The dashboard kit — `fabric-dashboard/0.1`
+# The dashboard kit: `fabric-dashboard/0.1`
 
 Fabric Dashboards shows a service's page in a pane beside its sidebar and the agent console, and the
 operator drags the console wider whenever they need it. The page never knows how much room it will
@@ -97,12 +97,12 @@ service. Load it after the stylesheet, with ids only:
   scroll. The mark and the word *Fabric*, the mark alone below 480 px; the accessible name is always *Open Fabric*;
   `--ink` on `--panel` with an `--edge` boundary, the pairs the themes are measured on.
 - **Links (FL-1…FL-6):** built with the kit's port of the contract's `buildFabricLink`; a value outside the grammar
-  — or one shaped like a credential — means no button, never a bad link. A press opens a view in Fabric and starts
+  (or one shaped like a credential) means no button, never a bad link. A press opens a view in Fabric and starts
   nothing (FB-8).
 - **The host (FB-6):** when the host's `fabric_button` cookie says `owner=host`, the page hides its own button.
 - **Fabric absent (FB-5):** when the cookie says `fabric=absent`, or `data-fabric="absent"`, or when the page is still
-  visible and focused 1.5 s after a link was followed, the menu says "Fabric is not installed — get it at
-  passioncode.ai/fabric". Nothing downloads, nothing retries. A local service's server decides `data-fabric` with
+  visible and focused 1.5 s after a link was followed, the menu says that Fabric is not installed and names
+  passioncode.ai/fabric to get it. Nothing downloads, nothing retries. A local service's server decides `data-fabric` with
   `fabric_button_presence()` / `fabricButtonPresence()`: `present` while Fabric's own descriptor
   (`services/fabric.default.json`, Fabric ADR-0139) is registered and, for an app's descriptor (`manager: "person"`,
   DEC-0069), its app is still installed; `absent` otherwise. A press only follows a link, so the button never reads

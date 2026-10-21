@@ -13,7 +13,7 @@ The feed is a view: never copy rows into a second store that can drift from the 
 
 ## Reading a feed (FAC-SEM-036)
 
-A client of `GET /fabric/v1/events` — or of any token-protected route — sends the token in the
+A client of `GET /fabric/v1/events` (or of any token-protected route) sends the token in the
 header the descriptor's `auth.header` names, in the form `auth.scheme` names: the raw token for
 `none`, `Bearer <token>` for `Bearer`. Never assume `Authorization: Bearer`: a client that did
 was refused on every poll and silently dropped every notify event. `token_header(auth, token)` /
@@ -27,7 +27,7 @@ in the URL.
 - `level`: `info` (routine), `notice` (the operator may want to look), `warning`
   (something is degrading), `error` (something failed and needs action).
 - `text`: one sentence, in the operator's language, with the object named and the
-  number stated — "The Q3 report draft is ready for your approval (12 sections, 3
+  number stated: "The Q3 report draft is ready for your approval (12 sections, 3
   languages)." Never a machine id, never a stack trace.
 - `subject`: what it is about (`{type: "report", id: "q3", label: "Q3 report"}`), so a host
   can group.
@@ -42,11 +42,11 @@ lands on what matters:
 
 | The operator… | Event | `notify` |
 |---|---|---|
-| must decide or act — a choice, an approval, a key to enter | kind says it: `job.awaiting_choice`, `plan.awaiting_approval`, `human_step.opened`; level `notice` | `true` |
-| lost work — a job failed after its retries, a key expired | level `error`; kind `*.failed`, `*.expired` | `true` |
-| will lose work soon — a degraded source that blocks orders | level `warning`, `service.degraded`, **once when it starts** | `true` |
+| must decide or act: a choice, an approval, a key to enter | kind says it: `job.awaiting_choice`, `plan.awaiting_approval`, `human_step.opened`; level `notice` | `true` |
+| lost work: a job failed after its retries, a key expired | level `error`; kind `*.failed`, `*.expired` | `true` |
+| will lose work soon: a degraded source that blocks orders | level `warning`, `service.degraded`, **once when it starts** | `true` |
 | asked to be told when a long job finishes | `job.delivered`, level `notice` | `true` only if that person asked; a host may still keep it in Activity |
-| only needs the record — progress, retries, recoveries, syncs | `job.started`, `service.recovered`, `*.cleared`, level `info` or `notice` | `false` |
+| only needs the record: progress, retries, recoveries, syncs | `job.started`, `service.recovered`, `*.cleared`, level `info` or `notice` | `false` |
 
 - **One episode, one request.** Notify on the transition, never on each poll: a source that
   flaps between degraded and healthy sends `service.degraded` with `notify: true` once, and later

@@ -1,4 +1,4 @@
-# Dashboard links — producer and consumer rule
+# Dashboard links: producer and consumer rule
 
 Read when an agent creates a dashboard, implements `<tool> dashboard`, or hands
 an existing Fabric service dashboard to a person. This also applies to generated

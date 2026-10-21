@@ -161,7 +161,7 @@ test('in WebKit: placement, name, menu and keyboard, the host cookie, Fabric abs
     await p.getByRole('button', { name: 'Open Fabric' }).click();
     const get = p.locator('.fd-fabric-button-get');
     assert.equal(await get.isVisible(), true);
-    assert.equal(await p.locator('.fd-fabric-button-note').textContent(), 'Fabric is not installed — get it at passioncode.ai/fabric');
+    assert.equal(await p.locator('.fd-fabric-button-note').textContent(), 'Fabric is not installed. Get it at passioncode.ai/fabric');
     assert.deepEqual([await get.getAttribute('href'), await get.getAttribute('rel'), await get.getAttribute('target')], ['https://passioncode.ai/fabric', 'noopener', '_blank']);
     // FB-5: with no signal, following a link that nothing takes leaves the page focused: the note shows after 1.5 s.
     await context.clearCookies();

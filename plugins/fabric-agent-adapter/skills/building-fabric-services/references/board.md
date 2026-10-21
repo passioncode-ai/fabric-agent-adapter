@@ -63,12 +63,12 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 
 | Step | Board call | Checkpoint written first |
 |---|---|---|
-| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | — |
+| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | none |
 | take a request | `com.claim`, the same key while nothing is claimable | `claimed` |
-| read it | `com.get`: the digest must equal the claim's, and the request must name this Project and capability | — |
+| read it | `com.get`: the digest must equal the claim's, and the request must name this Project and capability | none |
 | accept | `com.accept` with the claim's exact fence (request, generation, attempt, digest, revision) | `accepting`, then `accepted` |
 | act | `com.effect_begin`, only when the handler calls `ctx.begin_effect()` | `effect-beginning`, then `in-progress` |
-| while working | `com.renew` at about 20 s; `com.progress` for `ctx.progress(note)` | — |
+| while working | `com.renew` at about 20 s; `com.progress` for `ctx.progress(note)` | none |
 | answer | `com.reply` (fenced) when the outcome carries `reply` | `replying` |
 | settle | `com.complete {state, observed, summary?, evidence?}` | `completing`, then the entry is dropped |
 
@@ -82,12 +82,12 @@ own monotonic clock and never reasons from `leaseExpiresAt`.
 `admit(request)` is required: it is the service's own input gate. It answers `None` to admit or one sentence saying
 why not; a refusal accepts the request and completes it `failed_known` with that sentence, so the requester learns it
 and the request does not bounce. A redacted body is refused the same way. The kit never hands a body to a model, a
-shell or a tool; what the handler does with an admitted body — and the checks it needs before a model, a tool or a
-spend sees it — is the service's own responsibility. A message never carries an approval.
+shell or a tool; what the handler does with an admitted body (and the checks it needs before a model, a tool or a
+spend sees it) is the service's own responsibility. A message never carries an approval.
 
 ## Effects, observation, evidence and the reply
 
-- Call `ctx.begin_effect(summary)` — and let it return — before the handler spends, writes outside the service or calls
+- Call `ctx.begin_effect(summary)`, and let it return, before the handler spends, writes outside the service or calls
   anything that acts. If it raises `Stopped`, act no further.
 - After an effect began, the outcome must be observed (`observed: true`): the kit never sends an unobserved result; the
   request stays unknown and is reconciled later.
@@ -130,7 +130,7 @@ contract's matrix, held to its vectors (`test/fixtures/contract/comms-hold-vecto
 | `com.enroll`, `com.claim`, `com.responder_replace` | the slot pauses: asked again after 15 s, then 30 s, doubling to 15 minutes; one `board.slot.held` event per capability, and `board.slot.released` when an enroll succeeds again |
 | `com.accept` (the hold came after the claim) | nothing was done: the entry is dropped, the claim lapses and the request waits on the board (`board.request.waiting`); the slot pauses |
 | `com.effect_begin` | the effect has not begun: the handler waits (same idempotency key, the pause doubling) while the tick keeps renewing the lease, then begins once the hold is lifted; `ctx.stopped` ends the wait |
-| accepted work at restart under a hold | kept as `lapsed`, then taken back with `com.responder_replace` and a transfer once the hold is lifted — never claimed back |
+| accepted work at restart under a hold | kept as `lapsed`, then taken back with `com.responder_replace` and a transfer once the hold is lifted, never claimed back |
 
 A hold is not an outage: no `board.down`, no notify. Work already accepted keeps running and completes.
 
@@ -143,7 +143,7 @@ whose responder was gone. Read it as the owner's attestation, not the responder'
 A board session (`fabric.board.join`) is served the respond scope only: `com.status`, `com.list`, `com.get`,
 `com.reply` (the fenced form), `com.enroll`, `com.claim`, `com.renew`, `com.accept`, `com.progress`,
 `com.effect_begin`, `com.complete`, `com.reconcile`, `com.responder_replace`. `BoardSession.call` refuses anything else
-locally (`not-in-scope`) — never `com.submit`, `com.cancel`, `com.read_ack` or `com.directory`.
+locally (`not-in-scope`): never `com.submit`, `com.cancel`, `com.read_ack` or `com.directory`.
 
 The idempotency epoch comes from `com.status`. A Fabric built before its board-session fix tells a board session none:
 the kit fails closed (`no-epoch`, `board.blocked`) instead of guessing one.
@@ -152,13 +152,13 @@ the kit fails closed (`no-epoch`, `board.blocked`) instead of guessing one.
 
 The directory belongs to a Project session (a coding agent's, or a launched one). Before looking a Project up in a
 `com.directory` page, `find_project(page, project_id, capability=None)` / `findProject` checks the page: closed shapes
-(no count, holder or generation) and FAC-SEM-107 — each Project once, each capability once per Project. Project ids and
+(no count, holder or generation) and FAC-SEM-107: each Project once, each capability once per Project. Project ids and
 capability names compare **exactly as written** (DEC-0077; they are not URIs, so not by normal form). A page that fails
 raises `directory-invalid` rather than answering; an unlisted Project may still be addressed by an id already held.
 
 ## Events, the probe and the live smoke
 
-Events go to `emit(kind, level, text, notify=…, data=…)` — `JsonlEventLog.append` fits — with `data {schema, value}`
+Events go to `emit(kind, level, text, notify=…, data=…)` (`JsonlEventLog.append` fits) with `data {schema, value}`
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.access.needed`, `board.blocked`, `board.down`, each
@@ -167,10 +167,10 @@ notifying episode said once.
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
 `NOT_RUN` when the well-known `protocols` names no `fabric-project-comms` revision; `FAIL` for a revision this kit does
 not read or a fixture conversation that goes wrong; `PASS` when the kit's `self_check()` / `selfCheck()` passes (the
-whole conversation, a fenced accept, a session without an epoch — no Fabric touched).
+whole conversation, a fenced accept, a session without an epoch; no Fabric touched).
 
 The live smoke runs only against a disposable Fabric (built app and its own stack), never an operator's estate: Fabric's
-COM-03 packet (`docs/evidence/plans/2026-10-04-project-communications.md`) has the exact commands — register
+COM-03 packet (`docs/evidence/plans/2026-10-04-project-communications.md`) has the exact commands: register
 `fabric-mcp` for Claude Code and Codex, the operator allows `session.enroll` and `board.respond`
 (`board:<example-agent project>/<capability>`), Claude submits a request, the responder enrolls, claims, accepts and
 completes, then is killed mid-claim and replaced. Without that Fabric, report it `NOT_RUN`.

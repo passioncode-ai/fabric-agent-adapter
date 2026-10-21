@@ -16,13 +16,13 @@
   the estate's delegation tokens; declare `auth.delegation {issuer, jwks}` in the well-known
   document. The probe treats it like `own` and checks the declaration
   (`auth.delegation-declared`). The kits verify the tokens: put `delegation_gate` /
-  `delegationGate` in front of the tools — see [the delegation reference](delegation.md).
+  `delegationGate` in front of the tools (see [the delegation reference](delegation.md)).
 - Register it into a client config with the service's own command
   (`<tool> mcp-register`), which writes `{"type":"http","url":"http://127.0.0.1:<port>/mcp","headers":{...}}`
   atomically, aborts if the file changed meanwhile, and keeps one 0600 backup. The token
-  goes in `headers`, never in the URL — every log that records a URL prints its query
+  goes in `headers`, never in the URL: every log that records a URL prints its query
   string. An HTTP registration starts nothing per session: every client session talks to the
-  one resident service (LC-19). A stdio server, by contrast, is a process per session — keep
+  one resident service (LC-19). A stdio server, by contrast, is a process per session; keep
   one only at project scope.
 - Ship server `instructions` that tell a caller where to start and that every answer
   carries `degraded`.
@@ -39,7 +39,7 @@ a sign-in link only when stdout is a terminal.
 ## A2A for remote agents
 
 Remote reach goes through A2A `1.0` over HTTPS or an authenticated gateway in front of
-MCP — never by binding a LAN address. A tunnel (Tailscale Serve and the like) is an
+MCP, never by binding a LAN address. A tunnel (Tailscale Serve and the like) is an
 outward surface with its own token lifetime; watch it like a service, because nothing
 else will notice it expire.
 
@@ -50,7 +50,7 @@ else will notice it expire.
 - Compared in constant time (`token_matches`).
 - Rotation is an operator act: write a new file, restart, re-run `mcp-register`.
 - Same-user processes can read it. The protocol defends against web pages and
-  mistakes, not against hostile code running as the operator — say so in SECURITY.md.
+  mistakes, not against hostile code running as the operator; say so in SECURITY.md.
 
 ## Dashboard session
 

@@ -30,7 +30,7 @@
       "shouldTrigger": true
     },
     {
-      "query": "How should other agents talk to this local agent — MCP or CLI — and how do they authenticate?",
+      "query": "How should other agents talk to this local agent (MCP or CLI), and how do they authenticate?",
       "shouldTrigger": true
     },
     {
@@ -118,7 +118,7 @@
       "shouldTrigger": true
     },
     {
-      "query": "Дашборд агента ломается в узкой панели Fabric Dashboards рядом с консолью — поправь вёрстку и подключи темы.",
+      "query": "Дашборд агента ломается в узкой панели Fabric Dashboards рядом с консолью. Поправь вёрстку и подключи темы.",
       "shouldTrigger": true
     },
     {
@@ -134,11 +134,11 @@
       "shouldTrigger": true
     },
     {
-      "query": "В отчёте о расходах example-agent видно только месячный бюджет, а он ещё режет заказы дороже $2 и проекты по $5 в день — покажи все лимиты.",
+      "query": "В отчёте о расходах example-agent видно только месячный бюджет, а он ещё режет заказы дороже $2 и проекты по $5 в день. Покажи все лимиты.",
       "shouldTrigger": true
     },
     {
-      "query": "Our agent chat should fall back from Claude Code to Codex to Hermes in the project's order, and its doctor must say which runner is signed out — wire the runner route checks.",
+      "query": "Our agent chat should fall back from Claude Code to Codex to Hermes in the project's order, and its doctor must say which runner is signed out. Wire the runner route checks.",
       "shouldTrigger": true
     },
     {
@@ -146,7 +146,7 @@
       "shouldTrigger": true
     },
     {
-      "query": "Our render service should answer video.render requests other Projects post on Fabric's project board — enroll, claim, accept and complete them from inside the service.",
+      "query": "Our render service should answer video.render requests other Projects post on Fabric's project board: enroll, claim, accept and complete them from inside the service.",
       "shouldTrigger": true
     },
     {

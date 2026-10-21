@@ -1,4 +1,4 @@
-# Delegation — checking who acts for whom (DEC-0039)
+# Delegation: checking who acts for whom (DEC-0039)
 
 A service that other agents of the estate call checks each call offline with the kit's verifier: the estate hub
 signs a delegation token naming the person (`sub`), the actor chain (`act`), this service (`aud`), the
@@ -22,7 +22,7 @@ contract's own verifier does.
 ## Declaring it
 
 In the well-known document: `surfaces.mcp.auth: "delegation"` (only delegation tokens) and
-`auth.delegation: {issuer, jwks}` — the `iss` you trust (`urn:fabric:estate:<id>`) and where the key set is read.
+`auth.delegation: {issuer, jwks}`: the `iss` you trust (`urn:fabric:estate:<id>`) and where the key set is read.
 The descriptor's token stays the host's: it is never a caller's credential on `/mcp` (DL-12). The probe checks
 the declaration (`auth.delegation-declared`) and that `/mcp` refuses the descriptor token.
 
@@ -34,7 +34,7 @@ keys = fd.JwksCache(well_known["auth"]["delegation"]["jwks"])          # https, 
 gate = fd.delegation_gate(audience="example-agent", jwks=keys, issuer=well_known["auth"]["delegation"]["issuer"],  # required
                           effects={"example.write": "draft", "example.publish": "publish"})   # each tool's manifest effect
 server = fi.McpToolServer("example-agent", VERSION, authorize=gate)    # pass the request headers to handle()
-# in a handler: ctx.delegation["principal"], ["caller"], ["chain"] — record the chain with the work
+# in a handler: ctx.delegation["principal"], ["caller"], ["chain"]; record the chain with the work
 ```
 
 ```js
@@ -50,7 +50,7 @@ if (!verdict.ok) return refusalToolResult(verdict);
 DL-25 places each caller in a tier by its origin: **T0** a loopback caller under the owner's account that the
 service's own local floor (the descriptor token, the Host guard) has authenticated; **T1** an enrolled machine of
 the same owner; **T2** everyone else, and any call relayed onto loopback from off the machine (a tunnel, a proxy, the
-hub forwarding a T2 caller). DL-26: a T0 or T1 caller is never required to present a token — pass the tier,
+hub forwarding a T2 caller). DL-26: a T0 or T1 caller is never required to present a token; pass the tier,
 `gate(tool, headers, tier="T0")` or `server.handle(message, headers, tier="T0")`, and the call passes with no
 delegation. A token such a caller presents is still verified and refused when invalid. A T2 caller takes the whole
 profile. Money limits and human gates bind at every tier.
@@ -66,8 +66,10 @@ job records who started it.
 **A partner in the chain** (DEC-0090). A token a partner's agent presents for a customer organization carries the
 partner as the innermost actor: `{partner: "org:<id>"}`, exactly that member, under at least one agent. It counts
 toward the depth limit and ends the chain; outermost, with an `act` beneath, or as `personal` it is
-`malformed-chain`. A node with a `sub` beside `partner` is an agent, checked as one. `ctx.delegation["chain"]` lists a
-node with `partner` by its `org:` id. `chain_depth(act)` /
+`malformed-chain`. A node with a `sub` beside `partner` is checked as an agent, yet `ctx.delegation["chain"]` lists it
+by its `org:` id, as the contract's `chainOf` does; the schema refuses such a node, so a correct issuer never mints one
+(raised with the contract, FAA-64). Job ownership and idempotency keys follow `(principal, caller)` and do not include
+the partner (FAA-64). `chain_depth(act)` /
 `chainDepth(act)` answer the contract's depth, infinity for a chain that is not one. Minting a partner's token (its
 grant, FAC-SEM-124) is the issuer's, not the kit's.
 
@@ -76,19 +78,19 @@ grant, FAC-SEM-124) is the issuer's, not the kit's.
 An action with an external effect may need the operator's approval (DL-17, DL-18). The order is fixed: the token,
 then the grant check where there is one, then `verify_approval` / `verifyApproval`, which consumes the approval's
 `jti` last, then the action. Without an approval, answer `approval-required` with
-`action_digest(action)` / `actionDigest(action)` — the SHA-256 of the action's RFC 8785 form (`jcs`) — so the caller
+`action_digest(action)` / `actionDigest(action)` (the SHA-256 of the action's RFC 8785 form, `jcs`) so the caller
 can ask the hub. When the meter denies a grant check, answer `refusal_from_denial(denial)` /
 `refusalFromDenial(denial)`: the meter's code unchanged, its window and level in `error.data` (DL-21 step 6). Keep consumed ids in `FileJtiStore` (0600, survives a restart); `MemoryJtiStore` is for tests
 and `UNSAFE_NO_JTI_STORE` exists only by name. No store at all, or a store file that cannot be read, is
-`unknown-state` — never a pass.
+`unknown-state`, never a pass.
 
 ## What a refusal looks like
 
-DL-19: an MCP tool answers `refusal_tool_result(r)` / `refusalToolResult(r)` — `isError: true` and
+DL-19: an MCP tool answers `refusal_tool_result(r)` / `refusalToolResult(r)`: `isError: true` and
 `structuredContent: {error: {code, message, data: {detail}}}`; an HTTP route answers `refusal_http(r)` /
 `refusalHttp(r)` with the code's status (401 for `unauthenticated`, `token-expired`, `principal-unproven`, with
 `WWW-Authenticate: Bearer error="invalid_token"`; 503 for `issuer-unavailable` and `unknown-state`; 403 for the
-rest). A published key the service cannot use — of small order, for another use, or published twice — is the
+rest). A published key the service cannot use (of small order, for another use, or published twice) is the
 issuer's fault, `issuer-unavailable` (DEC-0045); a gate without a trusted issuer refuses everything as
 `no-trusted-issuer`. `detail` is a short machine word; the token, the approval and the keys never appear in a result or a log.
 
@@ -120,4 +122,4 @@ current verified revision as `estate=` / `{ estate }`, as a value or as a functi
 ## What the kit does not do
 
 It does not mint tokens, check attenuation against a parent (the issuer's rule, DL-5), check a grant or a spend
-window (the meter's, DL-21), or decide which actions need an approval — the service decides that.
+window (the meter's, DL-21), or decide which actions need an approval; the service decides that.

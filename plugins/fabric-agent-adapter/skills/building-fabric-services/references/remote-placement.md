@@ -1,4 +1,4 @@
-# The remote placement — online agents and dashboards
+# The remote placement: online agents and dashboards
 
 Normative source: `fabric-agent-contract` `docs/specification/service.md` → *Remote placement*,
 DEC-0019, at the commit this skill pins. This page is the how-to.
@@ -7,7 +7,7 @@ DEC-0019, at the commit this skill pins. This page is the how-to.
 
 It is, when it runs outside the operator's computer and the operator wants it in Fabric beside
 the local services: a hosted dashboard, an agent on a server, a bot's web console. It keeps the
-same objects — well-known document, events feed, login code — at the same paths.
+same objects (well-known document, events feed, login code) at the same paths.
 
 ## The descriptor
 
@@ -47,7 +47,7 @@ watch the gate fail.
   the same value is written on the operator's computer by `registerRemote`. Compare in constant
   time (`tokenMatches`).
 - **Session key**: 32 random bytes, a separate secret; rotating it signs every operator out.
-- **Codes and sessions**: `MemoryCodeStore` — a restart forgets every outstanding code, so none
+- **Codes and sessions**: `MemoryCodeStore`: a restart forgets every outstanding code, so none
   can be replayed, and every session record, so a deploy signs the operator out (DEC-0039: the
   server keeps each session's last use and logout). The host signs in again on the page's `401`.
   To keep sessions across a deploy, pass a durable store (any object with `load()` and `save()`).
@@ -68,7 +68,7 @@ reach the service, and still need its own `403`.
 
 | Situation | Host |
 |---|---|
-| `401` on the well-known document | `down` — the service refused the token; never `foreign` |
+| `401` on the well-known document | `down`: the service refused the token; never `foreign` |
 | answer names another `id.instance` | `foreign`; the token is not sent again until the descriptor changes |
 | certificate invalid or for another name | `down`, the reason names TLS |
 | redirect | not followed; `down` |

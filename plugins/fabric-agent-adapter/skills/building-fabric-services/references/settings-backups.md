@@ -1,8 +1,8 @@
-# Settings backups — what the operator decided survives the data directory (DEC-0025)
+# Settings backups: what the operator decided survives the data directory (DEC-0025)
 
 Fabric Agent Contract DEC-0025, `docs/specification/service.md` → *Settings backup*, schema
 `schemas/settings-backup.schema.json`, rule `FAC-SEM-035`. A service whose store holds what the operator
-decided — which projects it serves, how each is bound, which secret slot each binding uses, their overrides —
+decided (which projects it serves, how each is bound, which secret slot each binding uses, their overrides)
 SHOULD keep settings backups, so a lost, purged or wrongly migrated data directory costs the operator nothing.
 
 ## Where
@@ -61,7 +61,7 @@ plan = fs.restore_plan(doc, {"projects": {"columns": [...], "key": ["id"], "requ
 # plan["tables"]["projects"]: insert, present, droppedColumns, defaultedColumns, missingRequired, refused
 ```
 
-- **Automatic restore** only on a *fresh* database — no domain records **and** the service has never started —
+- **Automatic restore** only on a *fresh* database (no domain records **and** the service has never started),
   so a restart never undoes a deletion. Insert `plan[...]["insert"]` and add every row the database refuses to
   `refused` with its key and reason.
 - **Manual restore** shows the plan first; applying it is the operator's act, never an agent's.

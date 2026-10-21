@@ -7,9 +7,9 @@
     {"query": "Новый агент под Fabric: исследователь трендов, профиль MCP.", "shouldTrigger": true},
     {"query": "Design a brand-new Fabric provider for campaign reporting and scaffold its bundle.", "shouldTrigger": true},
     {"query": "Start a new fabric-compatible marketing agent; its consumer is the weekly review routine.", "shouldTrigger": true},
-    {"query": "Сделай нового агента для фабрики: возможность collect.spend, потребитель — портфельный обсервер.", "shouldTrigger": true},
+    {"query": "Сделай нового агента для фабрики: возможность collect.spend, потребитель: портфельный обсервер.", "shouldTrigger": true},
     {"query": "Greenfield: build a content-drafting agent that must pass Fabric admission later.", "shouldTrigger": true},
-    {"query": "New Fabric provider from zero — run the intake grill and create the skeleton.", "shouldTrigger": true},
+    {"query": "New Fabric provider from zero: run the intake grill and create the skeleton.", "shouldTrigger": true},
     {"query": "Спроектируй с нуля fabric-совместимого агента поддержки и заведи ему knowledge pack.", "shouldTrigger": true},
 
     {"query": "Adapt this existing MCP server to the Fabric Agent Contract.", "shouldTrigger": false},

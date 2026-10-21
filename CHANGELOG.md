@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.39.1 - 2026-10-21
+
+### Fixed
+
+- **The probe no longer crashes on a count that is not a number** (FAA-64). `check_service.py` compared
+  `unpricedCalls` and `unmeasuredCalls` raw, so `null` or a string stopped the whole probe with a `TypeError` before
+  its other rules ran. Its FAC-SEM-025 arithmetic is now the kit's `usage_findings`, one implementation held to the
+  contract's vectors.
+- **The Python and Node kits read FAC-SEM-025's counts as the contract does.** Both read each count as the contract's
+  `toNumber(x ?? 0)` and write it with `show`: a numeric string is a number, an object is no number. Python compared
+  raw values and Node threw on an object such as `{"toString": 1}`. 179 new generated vectors (204 usage cases),
+  answered by the contract's `usageRules`: every count of a day and of its first model set to eleven values the schema
+  refuses (176; a count the contract adds gets them at the next regeneration), and three days with no model rows.
+- **Messages a person reads carry no em dash**: the probe, the dashboard-kit notice, the board's retry hint, the
+  package refusal, the sample service's page and the session hooks' unread line (`2 unread on the project board:
+  com.list`) and the dashboard kit's Fabric button (`Fabric is not installed. Get it at passioncode.ai/fabric`; kit
+  **1.1.1**, so a service's kit copy is offered the upgrade). The live documentation and evals were rewritten the same
+  way, and `test/validate.py` now fails on U+2014 in them.
+
+### Added
+
+- Tests for the producer side of DEC-0091 in both kits: receipts with `tokens_measured=False` through
+  `usage_report`, the day and model `unmeasuredCalls`, none on `byProject`, the probe clean, and the refusal of a
+  non-boolean flag.
+- Evals: the spend scenario expects unknown tokens in `unmeasuredCalls`; a new scenario covers a partner's package
+  and calls (DEC-0090).
+- `interop.md` and `usage.md` say a job whose usage is sent as `null` or `partial` is recorded with
+  `tokens_measured=False`; `estate-record.md` says a service updates its copied kit before a revision carries
+  `publisherScopes` (an older copy trusts a partner's key in every context); FAC-SEM-122 in its header and DEC-0091 in
+  protocol.md's FAC-SEM-025 row.
+- `test/validate.py` fails when README states which version a checkout is or which release is the latest (it said
+  0.21.0 until now); the compiled-revision tests name the two contract revisions they need when they skip.
+
+### Raised with the contract (not changed here)
+
+- `chainOf` names a `{sub, partner}` node by its `org:` id, and job ownership and idempotency keys do not include the
+  partner. The kits follow `c55f2d5` until the contract decides (board thread `6e66a023`, FAA-64).
+
 ## 0.39.0 - 2026-10-20
 
 ### Changed
@@ -12,7 +50,8 @@
 - **Unmeasured tokens are named** (DEC-0091, contract CT-62). `make_usage_receipt(..., tokens_measured=False)` /
   `makeUsageReceipt(..., { tokensMeasured: false })` writes `tokensMeasured: false`; the report counts such calls in
   `unmeasuredCalls` on the day and the model row, and FAC-SEM-025 in both kits and `check_service.py` refuses a row
-  with more unmeasured calls than calls or a day whose count is not its models' sum. Three new usage vectors (25).
+  with more unmeasured calls than calls or a day whose count is not its models' sum. Four new usage vectors (25; this
+  line said three until 0.39.1).
 - **A partner in the delegation chain** (DEC-0090, contract CT-58). Both verifiers take `{partner: "org:<id>"}` as the
   innermost actor under at least one agent: it counts toward the depth limit and ends the chain, and the checked chain
   lists it by its `org:` id. Outermost, with an `act` beneath, `personal` or an `ORG:` prefix is `malformed-chain`.

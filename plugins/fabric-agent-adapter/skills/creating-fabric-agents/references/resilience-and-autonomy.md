@@ -1,6 +1,6 @@
-# Resilience and autonomy — what kept agents working
+# Resilience and autonomy: what kept agents working
 
-Read when designing an agent's loop, its model calls, its spend and its stops — before the first
+Read when designing an agent's loop, its model calls, its spend and its stops, before the first
 stage that calls a model or spends money. These rules come from a retrospective of about twenty
 production agents (2026-10-17): each rule names the failure that taught it, generalized, and the
 mechanism that held after the fix. Every rule is cheaper to build in than to retrofit.
@@ -27,8 +27,8 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    `retryable: false` when a person must act, and `resetsAt` (UTC, `T` and `Z`, at most three
    fraction digits) only when `retryable: true` (contract DEC-0087, `FAC-SEM-119`). Failing a job a
    limit only paused cost callers whole jobs and resubmits.
-2. **Resume first.** Every worker reads its own state — checkpoint, worktree, branches, open
-   pull requests, notes — before it acts, and continues from there. Relaunching from scratch
+2. **Resume first.** Every worker reads its own state (checkpoint, worktree, branches, open
+   pull requests, notes) before it acts, and continues from there. Relaunching from scratch
    after a limit recreated work over committed work and re-issued credentials already held.
 3. **A silent worker is a limit until proven otherwise.** A watcher that sees no progress for N
    minutes, or limit text in the last output, resumes the run with the *same* run id.
@@ -40,19 +40,19 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 6. **Match concurrency to the account's rate, and cool down after a 429** per provider door: ten
    parallel workers met a 429 about hourly and each lost a whole batch; three to five heavy ones,
    resumed in batches, did not. A "busy" or "still starting" dependency is retried a bounded number
-   of times with spacing (a handful, seconds apart, only on refusals classified as transient) —
+   of times with spacing (a handful, seconds apart, only on refusals classified as transient):
    never once, never forever.
-7. **Inside a fallback chain, do not retry a provider that answered 429 or timed out** — move to
+7. **Inside a fallback chain, do not retry a provider that answered 429 or timed out**: move to
    the next one. Retries there stalled a waiting user. Stagger many resumes; bound each worker's
    working set (a narrow time window, a prefix), so one stop does not become a burst.
 
 8. **Move a refused request to another account at most once, and only before any byte reached the
-   client** — a replay after streaming began duplicated output. Persist a provider's `Retry-After`
+   client**: a replay after streaming began duplicated output. Persist a provider's `Retry-After`
    across restarts; a check inside the hold answers the stored observation instead of probing.
 
 ## Model answers are untrusted until accepted
 
-1. **"Answered" is not "usable".** Each call site has its own `accept(text)` — the parser the
+1. **"Answered" is not "usable".** Each call site has its own `accept(text)`: the parser the
    result must pass. Empty content, a refusal, a truncation (`finish_reason: length`) or an
    unparseable answer is a failure, and only an accepted answer may be cached. A cached
    unreadable answer once served "0 labelled" for hours.
@@ -61,13 +61,13 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    with no other-vendor route, and act on a new fallback only after measuring it.
 3. **The checker is never the drafter's vendor.** Choose it per turn from the model that
    *actually* drafted (a fallback may have), in the router, not in configuration. No checker
-   left, or a checker outage, means hold or stay silent — never ship unchecked.
+   left, or a checker outage, means hold or stay silent, never ship unchecked.
 4. **Size the output budget for the answer, not the input.** Reasoning tokens eat `max_tokens`:
    a judge capped at 800 tokens returned no JSON in 8 of 14 calls. Give judges room or turn
    reasoning off for that route; on `length`, retry once with a larger cap.
 5. **Run code checks before model checks**, and degrade to a fixed safe reply with a reason code.
 6. **A model's word verifies nothing.** A fact is verified by stored source text (or two truly
-   independent sources); an effect by the system of record it lands in — never by the page, a
+   independent sources); an effect by the system of record it lands in, never by the page, a
    flag the model set, or its "done".
 7. **A coding agent runs only on a model it knows.** One CLI agent on an unfamiliar vendor's model
    read its instructions and ended its turn with nothing written; measure each (agent, model)
@@ -78,19 +78,19 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 
 ## Money is a ledger
 
-1. **Unknown is unknown, never zero** — in cost, in verdicts, in health — and nothing acts on it.
+1. **Unknown is unknown, never zero** (in cost, in verdicts, in health), and nothing acts on it.
    A missing price is a high estimate, a missing field is `NOT_RUN`, never a pass; a probe that
    timed out is "unreadable", not "credential rejected"; a cooldown that could not be read is not
    "never sent". An owner's refusal inside a successful response (`ok: false` over a 200) is a
    refusal, never an empty result.
-2. **Persist the attempt before dispatch** — its route and a hash of its prompt — and finalize it
+2. **Persist the attempt before dispatch** (its route and a hash of its prompt) and finalize it
    in `finally`; spend is Σ actual + Σ estimate for attempts without an actual. In-memory counters
    reset on every resume. A call that broke before the provider answered is reconciled against
    the provider's own history by that route and hash, never guessed; one provider request id
    belongs to exactly one ledger row.
 3. **Check the cap before every HTTP attempt, retries included**, with one stop rule; record the
    provider's own reported cost per call; count reserved or held tokens as spent.
-4. **A resend of an unknown outcome reuses its idempotency key — or does not happen.** Derive
+4. **A resend of an unknown outcome reuses its idempotency key, or does not happen.** Derive
    keys from the intent (action and entity, or run and step), never from a clock or a random
    value, and make them unique in storage: time-and-random keys let redelivered requests charge
    again. A write whose effect is uncertain ends `failed` with the code `outcome-unknown`; only an
@@ -102,7 +102,7 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    if none), release the reserved money in the same transaction, and never resend the identical
    request; a 4xx while polling is still a lost task.
 6. **A failed outer job cancels the paid work it started**, and a cancel is a row the worker reads
-   at every claim and checkpoint — never an in-memory flag that a restart forgets.
+   at every claim and checkpoint, never an in-memory flag that a restart forgets.
 7. **Reuse what was paid for.** A restarted stage looks up the job's successful call with the
    same route, prompt version and inputs before calling again (one restart made 117 paid calls
    where 49 sufficed). Cache keys are content plus definition, never an identity alone.
@@ -121,14 +121,14 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 2. **Nothing in a user's path waits for a human approval.** Send now or not at all; when unsure,
    say so, open a recorded question, and answer again automatically when the knowledge changes.
    Drafts awaiting approval waited for days.
-3. **Every wait lives in durable storage**, rebuilt on start from a "debt" query — timers in
+3. **Every wait lives in durable storage**, rebuilt on start from a "debt" query; timers in
    process memory died with every restart. A wait that must outlive a session (a credential that
    has not landed yet) is an operating-system job, not a session's background task.
 4. **Stop at the third round.** Tuning wording or patching one heuristic a third time means
    splitting the change or replacing the mechanism with one invariant and a property test.
    Write a review's exit criterion before its rounds start, and block only on what breaks a
    documented promise; the rest becomes a board row with its evidence.
-5. **Find the real cause before telling a person what to do** — a full disk once read as "the
+5. **Find the real cause before telling a person what to do**: a full disk once read as "the
    service stopped" while the service was healthy; check free space and the service's own health
    first.
 6. **Background chores never hold a finished command open**, unattended runs skip them, and an
@@ -144,17 +144,17 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 ## Verification you can believe
 
 1. **A test counts once it was watched failing against a planted defect** (clear bytecode caches
-   first — stale bytecode reported mutants killed); a mutation battery
+   first: stale bytecode reported mutants killed); a mutation battery
    asserts its own reach ("no tests ran" is not "all plants survived"). Exercise every guard
    with a must-catch and a must-pass case.
 2. **Write expectations out; never compute them from the code under test**, and run a reference
-   function and its schema on the same inputs in one test — the most common defect a first reading
+   function and its schema on the same inputs in one test; the most common defect a first reading
    found was a function returning what its own schema refuses. A wall-clock bound sits far above a
    loaded machine and far below the defect it guards.
 3. **Test against the real deployed instance behind its platform**, not a sample the same run
    wrote: a probe passed the shipped sample and failed the first real service behind a router.
-4. **After each wave, three blind readings** — the changed units, everything that reaches them,
-   and the documented behaviour — then one fix round. Green suites hid six to ten real breaks.
+4. **After each wave, three blind readings** (the changed units, everything that reaches them,
+   and the documented behaviour), then one fix round. Green suites hid six to ten real breaks.
 5. **Read a gate's exit code directly**, never through a pipe in the same command (`| tail` hid a
    failed gate as success): write the output to a file, take the status, then read the file.
 6. **"Could not measure" is its own outcome.** An overloaded machine makes a gate refuse, and a
@@ -166,7 +166,7 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 9. **Probe live after every deploy on every consumer channel**, not the default one; read the
    nightly full-suite result first when resuming work, and release from a full local run, not a
    selected subset.
-10. **Port a protocol from the contract's shared vectors, never its prose** — vendored with a hash
+10. **Port a protocol from the contract's shared vectors, never its prose**, vendored with a hash
    per file and run case by case; a prose port accepted a year-0000 date the vectors refused.
 11. **Read an external contract from its raw documentation or a recorded live snapshot**, never
    from a summarising fetch; fail closed on a field nobody documented.
@@ -177,11 +177,11 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    concurrent worker has its own identity; a refused claim names the run that holds the task, never
    a guessed race against a lease that lapsed long ago; a copy that a
    supervisor started backs off on a held lock instead of exiting into a respawn loop. A failed
-   lease renewal is not a lost lease — stop only when the remaining margin runs out.
+   lease renewal is not a lost lease; stop only when the remaining margin runs out.
 2. **Health treats "never finished" as a fault.** Age each phase from its last completion; a
    phase that only ever yielded looked healthy for fifteen days.
 3. **Everything a run creates carries its owner** (run id, pid); the next start sweeps what a dead
-   owner left — markers, test databases, temp roots, container volumes. Nothing a long job needs
+   owner left: markers, test databases, temp roots, container volumes. Nothing a long job needs
    lives in a temp directory; a cleaner removed a test database mid-deploy.
 4. **Check disk and load before heavy work**, and serialize heavy suites behind a lock held for
    the whole run. A disk cleanup never deletes files version control tracks.
@@ -194,16 +194,16 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
    seconds) answers a retryable "busy", never a crash or a deadlock; every pooled connection has
    an error listener, and readiness reports the store while liveness reports the process, so a
    database blip takes the instance out of traffic instead of restarting it.
-8. **Every accumulating output has a cap in the code that writes it** — logs, receipts, caches —
+8. **Every accumulating output has a cap in the code that writes it** (logs, receipts, caches),
    with both bounds tested.
 9. **Name the account and context on every cloud CLI call** and verify the account before a write;
    a saved default context once pointed a correct token at another team.
 10. **Log by error name and code**, never a driver's raw message, which can carry connection
-   details. A failed command logs its cause — deadline, signal, exit code, missing program — never a
+   details. A failed command logs its cause (deadline, signal, exit code, missing program), never a
    bare "command failed"; a watched dependency logs once when it fails and once when it recovers,
    never on every poll.
-11. **Admit work only when the machine can carry it** — free disk, swap, a cap on concurrent
-   sessions — and say why when you defer.
+11. **Admit work only when the machine can carry it** (free disk, swap, a cap on concurrent
+   sessions) and say why when you defer.
 
 12. **Keep blocking work off the workers that answer requests**, never let a read wait behind a long
    transaction, and log a transaction held long with the step that held it. Every blocking network

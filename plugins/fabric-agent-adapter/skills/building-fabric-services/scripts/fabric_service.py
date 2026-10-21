@@ -46,7 +46,7 @@ EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/service
 # The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
 # document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.0"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.1"
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
 EXIT_ALREADY_RUNNING = 75
 # Lifecycle rules: references/lifecycle.md, the rule for this kit's users, which implements the public
@@ -1806,16 +1806,22 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
         models = _usage_list(day.get("byModel"))
         for j, m in enumerate(models):
             findings.extend(_priced_row(m, "%s/byModel/%d" % (at, j)))
+        # The contract reads every count as `toNumber(x ?? 0)` and writes it with `show`: a string count is read as a
+        # number, and what is no number (an object, "abc") is NaN, which equals no sum, so it is a finding.
+        number = lambda row, f: fabric_estate._js_to_number(row.get(f))  # noqa: E731 - None and absent read as 0
         if not models:
-            spent = any((day.get(f) or 0) > 0 for f in ("calls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")
-                        if isinstance(day.get(f) or 0, (int, float))) or (isinstance(day.get("costUsd"), (int, float)) and day["costUsd"] > 0)
+            spent = any(number(day, f) > 0 for f in ("calls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")) \
+                or number(day, "costUsd") > 0
             if spent:
                 flag(at + "/byModel", "a day with calls, tokens or cost names the models they belong to")
             continue
         for field in ("calls", "unpricedCalls", "unmeasuredCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"):
-            total = sum(m.get(field) or 0 for m in models if isinstance(m.get(field) or 0, (int, float)))
-            if (day.get(field) or 0) != total:
-                flag("%s/%s" % (at, field), "the day's %s is not the sum of its models (%s ≠ %s)" % (field, day.get(field) or 0, total))
+            total = 0.0
+            for m in models:
+                total += number(m, field)  # in order, in doubles, as JavaScript adds
+            if number(day, field) != total:
+                shown = fabric_estate._show(0 if day.get(field) is None else day[field])
+                flag("%s/%s" % (at, field), "the day's %s is not the sum of its models (%s ≠ %s)" % (field, shown, fabric_estate._js_string(total)))
         known = sum(m["costUsd"] for m in models if isinstance(m.get("costUsd"), (int, float)) and not isinstance(m.get("costUsd"), bool))
         day_cost = day.get("costUsd")
         if isinstance(day_cost, (int, float)) and not isinstance(day_cost, bool) and abs(day_cost - known) > 0.000001 + 1e-9 * max(abs(day_cost), abs(known)):

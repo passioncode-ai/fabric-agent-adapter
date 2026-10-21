@@ -90,12 +90,12 @@ def marker_problem(plist: dict) -> Optional[str]:
     fix = ("a copy that finds the lock held exits 75 at once and KeepAlive respawns it every ThrottleInterval; "
            "regenerate the plist with launchd_plist / launchdPlist and reinstall")
     if marker["kind"] == "conflict":
-        return "%s — %s" % (fs.marker_conflict_message(marker), fix)
+        return "%s: %s" % (fs.marker_conflict_message(marker), fix)
     if marker["kind"] == "supervised":
-        return "the marker names %s, not launchd — %s" % (marker["manager"], fix)
+        return "the marker names %s, not launchd: %s" % (marker["manager"], fix)
     if marker.get("unreadable") is not None:
-        return "the marker %r names no supervisor — %s" % (marker["unreadable"], fix)
-    return "no %s=launchd — %s" % (fs.SUPERVISOR_ENV, fix)
+        return "the marker %r names no supervisor: %s" % (marker["unreadable"], fix)
+    return "no %s=launchd: %s" % (fs.SUPERVISOR_ENV, fix)
 
 
 def priority_problems(plist: dict) -> list:
@@ -729,7 +729,7 @@ class Probe:
                  marker or "%s: %s=launchd, so a copy that finds the lock held backs off" % (plist_path.name, fs.SUPERVISOR_ENV))
         slow = priority_problems(plist)
         self.add("lifecycle.priority", "FAIL" if slow else "PASS",
-                 "; ".join(slow) + " — macOS may starve the service under load and hosts then see an outage; use ProcessType Standard"
+                 "; ".join(slow) + ". macOS may starve the service under load and hosts then see an outage; use ProcessType Standard"
                  if slow else "%s: scheduled as a standard process" % plist_path.name)
         if sys.platform != "darwin" or not shutil.which("launchctl"):
             self.add("lifecycle.one-copy", "NOT_RUN", "launchctl is not available")
@@ -920,51 +920,23 @@ def usage_problems(report: Any, service_id: str, instance: str) -> List[str]:
     days = report.get("days")
     if not isinstance(days, list) or len(days) > fs.USAGE_DAYS:
         return out + ["days is not a list of at most 31"]
-    fields = ("calls", "unpricedCalls", "unmeasuredCalls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")
-
-    def priced(row: Dict[str, Any], at: str) -> None:
-        calls, unpriced, cost = row.get("calls", 0), row.get("unpricedCalls", 0), row.get("costUsd")
-        if unpriced > calls:
-            out.append("%s: more unpriced calls than calls" % at)
-        if row.get("unmeasuredCalls", 0) > calls:
-            out.append("%s: more calls with unknown tokens than calls (DEC-0091)" % at)
-        if calls and unpriced == calls and cost is not None:
-            out.append("%s: every call is unpriced, so the cost must be null, not %r" % (at, cost))
-        if unpriced < calls and cost is None:
-            out.append("%s: priced calls carry a cost" % at)
-        if cost is not None and (not isinstance(cost, (int, float)) or cost < 0):
-            out.append("%s: costUsd is not a non-negative number" % at)
-
-    previous = ""
+    # The arithmetic of FAC-SEM-025 is the kit's `usage_findings`, the contract's `usageRules` held to its vectors: one
+    # implementation, so the probe never disagrees with the kit and never throws on a count that is not a number.
     for i, day in enumerate(days):
-        at = "days[%d]" % i
-        date = str(day.get("date", "")) if isinstance(day, dict) else ""
-        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date) or date <= previous:
-            out.append("%s: dates must run forward" % at)
-        previous = date
-        priced(day, at)
-        models = day.get("byModel") if isinstance(day, dict) else None
-        if not isinstance(models, list):
-            out.append("%s: byModel missing" % at)
+        if not isinstance(day, dict) or not isinstance(day.get("byModel"), list):
+            out.append("days[%d]: byModel missing" % i)
             continue
-        for j, m in enumerate(models):
-            priced(m, "%s.byModel[%d]" % (at, j))
-        for f in fields:
-            if day.get(f, 0) != sum(m.get(f, 0) for m in models):
-                out.append("%s: %s is not the sum of its models" % (at, f))
-        known = sum(m["costUsd"] for m in models if isinstance(m.get("costUsd"), (int, float)))
-        if isinstance(day.get("costUsd"), (int, float)) and abs(day["costUsd"] - known) > 1e-6:
-            out.append("%s: costUsd is not the sum of its models' known costs" % at)
-        for j, m in enumerate(models):
+        for row, at in [(day, "days[%d]" % i)] + [(m, "days[%d].byModel[%d]" % (i, j)) for j, m in enumerate(day["byModel"]) if isinstance(m, dict)]:
+            cost = row.get("costUsd")
+            if cost is not None and (isinstance(cost, bool) or not isinstance(cost, (int, float)) or cost < 0):
+                out.append("%s: costUsd is not a non-negative number" % at)
+        for j, m in enumerate(day["byModel"]):
             # DEC-0046, DEC-0061: a row's route is a login in its vendor's runner, an issued key, or the platform's
             # own metered models (a listing in the cloud).
-            if "route" in m and m["route"] not in fs.USAGE_ROUTES:
-                out.append("%s.byModel[%d]: route %r is not subscription, key or platform-metered" % (at, j, m["route"]))
-    # DEC-0065: the window and the project attribution, as the contract's usageRules reads them (FAC-SEM-025).
+            if isinstance(m, dict) and "route" in m and m["route"] not in fs.USAGE_ROUTES:
+                out.append("days[%d].byModel[%d]: route %r is not subscription, key or platform-metered" % (i, j, m["route"]))
     for finding in fs.usage_findings(report):
-        path, message = finding["instancePath"], finding["message"]
-        if path.startswith(("/byProject", "/generatedAt")) or "generatedAt" in message or "exists in its month" in message:
-            out.append("%s: %s" % (path or "/", message))
+        out.append("%s: %s" % (finding["instancePath"] or "/", finding["message"]))
     return out
 
 
