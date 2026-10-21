@@ -90,7 +90,7 @@ class Descriptors(unittest.TestCase):
 
     def test_windows_paths_expand(self):
         with mock.patch.object(fs.os.path, "expanduser", side_effect=lambda p: p), \
-                mock.patch.object(fs, "Path", side_effect=lambda p: mock.Mock(is_absolute=lambda: True)):
+                mock.patch.object(sys.modules["fabric_base"], "Path", side_effect=lambda p: mock.Mock(is_absolute=lambda: True)):  # expand lives there (FAA-65)
             fs.expand("C:\\Users\\x\\data")
             fs.expand("~\\AppData\\Local\\x")
         with self.assertRaises(fs.ServiceError):
@@ -184,7 +184,7 @@ class LockName(unittest.TestCase):
     def test_the_probe_looks_and_never_takes_the_name(self):
         # Taking the name, even for a moment, would make a service starting at that moment exit 75.
         with tempfile.TemporaryDirectory() as temp, \
-                mock.patch.object(fs, "_hold_lock_name", side_effect=AssertionError("the probe took the name")):
+                mock.patch.object(sys.modules["fabric_lock"], "_hold_lock_name", side_effect=AssertionError("the probe took the name")):  # (FAA-65)
             self.assertFalse(fs.lock_name_held(Path(temp) / "service.lock"))
 
     @unittest.skipUnless((sys.platform.startswith("linux") or os.name == "nt") and shutil.which("node"), "needs Linux or Windows, and node")

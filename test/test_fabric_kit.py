@@ -25,7 +25,7 @@ fabric_kit = load("fabric_kit")
 
 MAX_LINES = 1000
 #: Modules over MAX_LINES while FAA-65 splits them; an entry leaves when its module is split, and none is ever added.
-OVERSIZE = {"fabric_service.py", "fabric-service.mjs", "fabric_board.py", "fabric-board.mjs", "fabric_session.py"}
+OVERSIZE = {"fabric_board.py", "fabric-board.mjs", "fabric_session.py"}
 #: Scripts beside the kit that are programs or tools, not library modules a service copies.
 NOT_KIT = {"check_service.py", "sample_service.py", "dashboard_kit.py", "check_dashboard_link.py", "fabric_kit.py",
            "sample-remote-service.mjs", "check_dashboard_layout.mjs"}
@@ -125,7 +125,8 @@ class Install(unittest.TestCase):
                 "print('ok', sorted(m for m in sys.modules if m.startswith('fabric_')))\n", encoding="utf-8")
             run = subprocess.run([sys.executable, "-E", "-s", str(smoke)], capture_output=True, text=True, cwd=tmp)
             self.assertEqual(run.returncode, 0, run.stderr)
-            self.assertIn("fabric_estate", run.stdout)
+            self.assertIn("fabric_usage", run.stdout)
+            self.assertNotIn("fabric_estate", run.stdout, "the service needs no estate reader since FAA-65")
             self.assertEqual(self.run_kit("status", tmp).returncode, 0, self.run_kit("status", tmp).stdout)
 
     def test_the_node_closure_runs_alone(self):
@@ -143,7 +144,7 @@ class Install(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "fabric_service.py").write_bytes((SCRIPTS / "fabric_service.py").read_bytes())
             report = fabric_kit.status(Path(tmp))
-            self.assertIn("fabric_estate.py", [m["needs"] for m in report["missing"]])
+            self.assertIn("fabric_usage.py", [m["needs"] for m in report["missing"]])
             self.assertEqual(self.run_kit("status", tmp).returncode, 1)
 
     def test_an_older_release_and_an_edited_copy_are_told_apart(self):

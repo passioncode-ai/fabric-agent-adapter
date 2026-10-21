@@ -99,7 +99,8 @@ class ProjectAttribution(unittest.TestCase):
                 fs.make_usage_receipt("openrouter", "model-a", input_tokens=0, output_tokens=0, at=at, tokens_measured=bad)
 
     def test_receipt_refusals(self):
-        for bad in (dict(project_id="no uri"), dict(task_run_id="run-1"), dict(project_id="urn:project:a", task_run_id="-bad")):
+        # "urn:" is no URI: something follows the scheme (the Python kit accepted it until FAA-65 split a shadowed _URI).
+        for bad in (dict(project_id="no uri"), dict(project_id="urn:"), dict(task_run_id="run-1"), dict(project_id="urn:project:a", task_run_id="-bad")):
             with self.subTest(bad=bad), self.assertRaises(fs.ServiceError):
                 receipt(**bad)
 
