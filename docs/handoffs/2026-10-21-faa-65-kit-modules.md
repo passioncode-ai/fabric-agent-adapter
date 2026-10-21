@@ -45,10 +45,24 @@ Brief and design: [brief](../evidence/specs/2026-10-21-faa-65-kit-modules-brief.
 - Only text content is sent: image, audio and file parts are billed in ways a byte count cannot bound.
 - Recipes may import kit modules listed in `kit.json` (`test/validate.py`), nothing else.
 
+## Released
+
+PR #149 merged as `e778a22` after CI on the exact head `662c39b` (run 39676626184: python, windows, claude-plugin
+success; the run before it, on `2164214`, failed the two Linux trickle tests, fixed in `662c39b` and verified in a
+Linux container first). Tag `v0.40.0`, release run 39676912200 success, npm `@passioncode-ai/fabric-agent-adapter@0.40.0`.
+Launcher passioncode 0.2.19 (PR #129, merge `7c87742`, release run 39678127978); `npx --yes
+@passioncode-ai/passioncode@0.2.19 update` installed the adapter byte-identical to `v0.40.0` (145 of 145 files). Wiki
+card `projects/fabric-agent-adapter/` (vault commit `a05fbc46`). Roll call answered on board thread `1316a045`.
+
 ## Open
 
-Filled in at release.
+- Notes from review round 3 left as notes (not blocking): the `provider` routing param is not refused (documented);
+  two `Client` objects on one ledger each reserve only their own calls (documented: one client per key); `redact_url`
+  keeps path parameters (documented as scheme, host, port and path).
+- Services that vendor the kit (asset-foundry, cmo-creative-agent, observatory, brand-agent) keep their copies until
+  they update with `fabric_kit.py install`; their owners decide when.
 
 ## Next task
 
-Filled in at release.
+FAA-66: a data or analytics agent recipe on the kit (numbers computed by code, never by the model; receipts through
+`fabric_openrouter`), then FAA-67 after `telegram-dev` decides whether a Telegram connector belongs in this kit.
