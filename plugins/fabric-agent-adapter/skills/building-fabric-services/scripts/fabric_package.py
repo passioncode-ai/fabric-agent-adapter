@@ -65,12 +65,12 @@ def package_digest(pkg: Dict[str, Any]) -> str:
     """SHA-256 over the UTF-8 RFC 8785 form of the package without ``digest`` and ``signatures`` (DEC-0050).
     Raises TypeError for a value with no RFC 8785 form."""
     covered = {k: v for k, v in pkg.items() if k not in ("digest", "signatures")}
-    return sha256_of(fd.jcs(covered))
+    return sha256_of(_jsv.jcs(covered))
 
 
 def package_signing_input(digest: str, role: str) -> bytes:
     """The bytes a package signature covers (DEC-0051); the role is inside, so no signature stands for another role."""
-    return fd.jcs({"type": SIGNATURE_STATEMENT, "role": role, "digest": digest}).encode("utf-8")
+    return _jsv.jcs({"type": SIGNATURE_STATEMENT, "role": role, "digest": digest}).encode("utf-8")
 
 
 # --- Ed25519 signing (RFC 8032 §5.1.6) ------------------------------------------------------------------
@@ -88,21 +88,20 @@ def ed25519_public_key(seed: bytes) -> bytes:
     if len(seed) != 32:
         raise PackageError("An Ed25519 private key is 32 bytes.")
     a, _ = _secret_scalar(seed)
-    return fd._encode_point(fd._mul(a, fd._G))
+    return _crypto._ed_encode_point(_crypto._ed_mul(a, _crypto._ED_G))
 
 
 def ed25519_sign(seed: bytes, message: bytes) -> bytes:
     """A deterministic Ed25519 signature; the same seed and message give the bytes Node's crypto.sign gives."""
     a, prefix = _secret_scalar(seed)
-    public = fd._encode_point(fd._mul(a, fd._G))
-    r = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little") % fd._L
-    big_r = fd._encode_point(fd._mul(r, fd._G))
-    k = int.from_bytes(hashlib.sha512(big_r + public + message).digest(), "little") % fd._L
-    return big_r + ((r + k * a) % fd._L).to_bytes(32, "little")
+    public = _crypto._ed_encode_point(_crypto._ed_mul(a, _crypto._ED_G))
+    r = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little") % _crypto._ED_L
+    big_r = _crypto._ed_encode_point(_crypto._ed_mul(r, _crypto._ED_G))
+    k = int.from_bytes(hashlib.sha512(big_r + public + message).digest(), "little") % _crypto._ED_L
+    return big_r + ((r + k * a) % _crypto._ED_L).to_bytes(32, "little")
 
 
-def _b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+from fabric_crypto import b64url as _b64url  # noqa: E402 - the core's (FAA-65)
 
 
 def public_jwk(seed: bytes, kid: str) -> Dict[str, str]:
@@ -132,7 +131,7 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
             raise PackageError("The key file must be an Ed25519 private JWK (kty OKP, crv Ed25519, with d).")
         if jwk.get("alg", "EdDSA") != "EdDSA":
             raise PackageError("The key names alg %r; a package signature is EdDSA (DEC-0051)." % jwk.get("alg"))
-        seed = fd._b64decode(jwk["d"]) if _B64URL.match(jwk["d"]) else b""
+        seed = _crypto.b64url_decode(jwk["d"]) if _B64URL.match(jwk["d"]) else b""
         if len(seed) != 32:
             raise PackageError("The key's d is not a 32-byte Ed25519 private key.")
         if isinstance(jwk.get("x"), str) and jwk["x"] != _b64url(ed25519_public_key(seed)):
@@ -168,16 +167,7 @@ def _schema() -> Dict[str, Any]:
     return _SCHEMA_CACHE["s"]
 
 
-def _json_equal(a: Any, b: Any) -> bool:
-    if isinstance(a, bool) or isinstance(b, bool):
-        return isinstance(a, bool) and isinstance(b, bool) and a == b
-    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-        return a == b
-    if isinstance(a, list) and isinstance(b, list):
-        return len(a) == len(b) and all(_json_equal(x, y) for x, y in zip(a, b))
-    if isinstance(a, dict) and isinstance(b, dict):
-        return a.keys() == b.keys() and all(_json_equal(a[k], b[k]) for k in a)
-    return type(a) is type(b) and a == b
+from fabric_jsvalue import json_equal as _json_equal  # noqa: E402 - the core's (FAA-65)
 
 
 def _type_of(value: Any) -> str:
@@ -373,7 +363,7 @@ def _whole(value: Dict[str, Any]) -> List[Dict[str, str]]:
     return out
 
 
-_UNDEFINED = object()
+from fabric_jsvalue import MISSING as _UNDEFINED  # noqa: E402 - the core's absent value (FAA-65)
 
 
 def _same_member(obj: Dict[str, Any], name: str, other: Any) -> bool:
@@ -386,21 +376,9 @@ def _same_member(obj: Dict[str, Any], name: str, other: Any) -> bool:
     return _json_equal(mine, other)
 
 
-def _js_string(value: Any) -> str:
-    """JavaScript's ``String(value)`` for a JSON value, as the contract's messages print it."""
-    if value is _UNDEFINED:
-        return "undefined"
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)):
-        return fd.jcs(value)
-    if isinstance(value, list):
-        return ",".join("" if item is None else _js_string(item) for item in value)
-    if isinstance(value, dict):
-        return "[object Object]"
-    return value
+from fabric_jsvalue import js_string as _js_string  # noqa: E402 - the core's (FAA-65)
+import fabric_jsvalue as _jsv  # noqa: E402 - the core (FAA-65)
+import fabric_crypto as _crypto  # noqa: E402 - the core (FAA-65)
 
 
 def _no_secret(value: Dict[str, Any]) -> List[Dict[str, str]]:
@@ -540,10 +518,10 @@ def _key_for(keys: Any, kid: str, alg: str) -> Dict[str, Any]:
     if (jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or not isinstance(x, str) or not _B64URL.match(x)
             or "d" in jwk or ("use" in jwk and jwk["use"] != "sig")):
         return {"problem": "unusable-key"}
-    raw = fd._b64decode(x)
+    raw = _crypto.b64url_decode(x)
     if len(raw) != 32:
         return {"problem": "unusable-key"}
-    if fd.is_small_order_key(raw):  # DEC-0045: refused before any verification
+    if _crypto.is_small_order_key(raw):  # DEC-0045: refused before any verification
         return {"problem": "small-order-key"}
     return {"key": raw}
 
@@ -580,8 +558,8 @@ def verify_package(pkg: Any, trust: Dict[str, Any], countersigned: bool = False)
             continue
         if "problem" in found:
             return {"ok": False, "problem": found["problem"], "signature": index}
-        signature = fd._b64decode(entry["sig"])
-        if len(signature) != 64 or not fd.ed25519_verify(found["key"], package_signing_input(digest, entry["role"]), signature):
+        signature = _crypto.b64url_decode(entry["sig"])
+        if len(signature) != 64 or not _crypto.ed25519_verify(found["key"], package_signing_input(digest, entry["role"]), signature):
             return {"ok": False, "problem": "bad-signature", "signature": index}
         signers.append({"role": entry["role"], "kid": entry["kid"]})
     if countersigned is True and not any(s["role"] == "organization" for s in signers):
@@ -670,12 +648,12 @@ def dumps(value: Any, indent: str = "") -> str:
     if isinstance(value, dict):
         if not value:
             return "{}"
-        return "{\n" + ",\n".join(inner + fd._string(k) + ": " + dumps(v, inner) for k, v in value.items()) + "\n" + indent + "}"
+        return "{\n" + ",\n".join(inner + _jsv.json_string_literal(k) + ": " + dumps(v, inner) for k, v in value.items()) + "\n" + indent + "}"
     if isinstance(value, list):
         if not value:
             return "[]"
         return "[\n" + ",\n".join(inner + dumps(v, inner) for v in value) + "\n" + indent + "]"
-    return fd.jcs(value)
+    return _jsv.jcs(value)
 
 
 def compose(draft: Dict[str, Any], files: Dict[str, bytes]) -> Tuple[Dict[str, Any], List[str]]:

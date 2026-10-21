@@ -142,7 +142,8 @@ class KitFiles(unittest.TestCase):
             self.assertEqual(dk.claimed_version_text(text), self.manifest["version"])
 
     def test_both_kits_name_the_same_kit_and_themes(self):
-        mjs = (SCRIPTS / "fabric-service.mjs").read_text(encoding="utf-8")
+        # The Node kit's constants live in one of its modules since FAA-65; read them all.
+        mjs = "\n".join(p.read_text(encoding="utf-8") for p in sorted(SCRIPTS.glob("fabric-*.mjs")))
         self.assertIn("export const DASHBOARD_KIT = '%s';" % fs.DASHBOARD_KIT, mjs)
         self.assertIn("export const REFERENCE_THEMES = %s;" % json.dumps(list(fs.REFERENCE_THEMES)).replace('"', "'"), mjs)
         self.assertEqual(self.manifest["themes"], list(fs.REFERENCE_THEMES))

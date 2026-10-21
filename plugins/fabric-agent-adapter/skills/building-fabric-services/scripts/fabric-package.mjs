@@ -31,9 +31,8 @@ const SECRET_FILE = /^(\.env(\..+)?|.*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|d
 const SECRET_FILE_OK = /^\.env\.(example|sample|template)$/;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const PKCS8_ED25519 = Buffer.from('302e020100300506032b657004220420', 'hex');
-const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const isString = (v) => typeof v === 'string';
-const objects = (v) => (Array.isArray(v) ? v.filter(isObject) : []);
+import { isObject, objects, jsonEqual } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
+import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 
 /** A refusal a person can act on; the message names what to change. */
 export class PackageError extends Error {}
@@ -116,15 +115,6 @@ export function readSigningKey(file, kid) {
 let schemaCache;
 const schema = () => (schemaCache ??= JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8')));
 
-function jsonEqual(a, b) {
-  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => jsonEqual(x, b[i]));
-  if (isObject(a) || isObject(b)) {
-    if (!isObject(a) || !isObject(b)) return false;
-    const ka = Object.keys(a);
-    return ka.length === Object.keys(b).length && ka.every((k) => Object.hasOwn(b, k) && jsonEqual(a[k], b[k]));
-  }
-  return a === b;
-}
 
 const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v === 'number' ? (Number.isInteger(v) ? 'integer' : 'number') : typeof v);
 const DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?([Zz]|[+-](\d{2}):(\d{2}))$/;

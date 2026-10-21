@@ -10,6 +10,7 @@ import importlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import threading
@@ -800,13 +801,12 @@ class SelfCheckAndProbeTests(unittest.TestCase):
     def test_rule_fails_a_broken_copy_of_the_kit(self):
         with tempfile.TemporaryDirectory() as tmp:
             scripts = HERE.parent / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"
-            for name in ("fabric_hub.py", "fabric_service.py", "fabric_identifiers.py", "fabric_secrets.py", "fabric_estate.py", "fabric_delegation.py"):
-                (Path(tmp) / name).write_text((scripts / name).read_text())
-            text = (scripts / "fabric_board.py").read_text()
+            # The board's closure, installed as a service would (FAA-65), then a defect planted in the responder.
+            subprocess.run([sys.executable, str(scripts / "fabric_kit.py"), "install", tmp, "--module", "fabric_board"], check=True, capture_output=True)
+            text = (Path(tmp) / "fabric_board_session.py").read_text()
             planted = text.replace("        if not self._accept(entry):\n            return\n", "        self._accept(entry)  # planted: a lost claim is ignored\n")
             self.assertNotEqual(planted, text)
-            text = planted
-            (Path(tmp) / "fabric_board.py").write_text(text)
+            (Path(tmp) / "fabric_board_session.py").write_text(planted)
             verdict, evidence = self.cs.board_responder_verdict({"protocols": ["fabric-project-comms/0.1"]}, str(Path(tmp) / "fabric_board.py"))
         self.assertEqual(verdict, "FAIL", evidence)
 

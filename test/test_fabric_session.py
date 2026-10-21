@@ -901,7 +901,7 @@ class OtherHosts(Base):
         self.assertIn("lifecycle_ensure_running", done.stdout)
 
     def test_no_rejoin_for_other_hosts(self):
-        source = SCRIPT.read_text(encoding="utf-8")
+        source = "\n".join(p.read_text(encoding="utf-8") for p in sorted(SCRIPT.parent.glob("fabric_session*.py")))  # FAA-65
         self.assertIn('RUNNER = "claude-code"', source)
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "other"])
         self.assertEqual((done.returncode, done.stdout), (0, ""))
@@ -909,6 +909,12 @@ class OtherHosts(Base):
 
 class InstallHostHooks(Base):
     SCRIPT_PATH = "/opt/skills/working-with-fabric/scripts/fabric_session.py"
+
+    def test_the_default_script_is_the_entry_point(self):
+        # FAA-65: the code moved into modules beside fabric_session.py; a hook must still run fabric_session.py.
+        script = fs.default_hook_script({"HOME": str(self.base / "no-home")})
+        self.assertEqual(script.name, "fabric_session.py")
+        self.assertTrue(script.is_file())
 
     def install(self, host, *flags, config=None):
         argv = ["install-host-hooks", "--host", host, "--script", self.SCRIPT_PATH] + list(flags)
@@ -1069,12 +1075,13 @@ class InstallHostHooks(Base):
 
     def test_kimi_apply_without_a_toml_reader_is_refused(self):
         path = self.kimi_file('default_model = "m"\n')
-        saved = fs.tomllib
-        fs.tomllib = None
+        hosts = sys.modules["fabric_session_hosts"]  # the module that reads it (FAA-65)
+        saved = hosts.tomllib
+        hosts.tomllib = None
         try:
             code, _, err = self.install("kimi", "--apply")
         finally:
-            fs.tomllib = saved
+            hosts.tomllib = saved
         self.assertEqual(code, 1)
         self.assertIn("3.11", err)
         self.assertEqual(path.read_text(), 'default_model = "m"\n')
@@ -1087,11 +1094,12 @@ class InstallHostHooks(Base):
 class Status(Base):
     def setUp(self):
         super().setUp()
-        self.saved = fs.fabric_bin_candidates
-        fs.fabric_bin_candidates = lambda platform=None, env=None: [self.base / "no-fabric" / "fabric-mcp"]
+        self.env_module = sys.modules["fabric_session_env"]  # find_fabric_bin reads it there (FAA-65)
+        self.saved = self.env_module.fabric_bin_candidates
+        self.env_module.fabric_bin_candidates = lambda platform=None, env=None: [self.base / "no-fabric" / "fabric-mcp"]
 
     def tearDown(self):
-        fs.fabric_bin_candidates = self.saved
+        self.env_module.fabric_bin_candidates = self.saved
         super().tearDown()
 
     def test_one_next_action_per_state(self):

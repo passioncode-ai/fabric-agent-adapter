@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.39.1"
+VERSION = "0.40.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -67,6 +67,9 @@ STDLIB_IMPORTS = {
     "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
     "collections", "queue",  # native bridge mappings and isolated no-model host probes (FAA-48)
 }
+RECIPES = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes"
+KIT_MODULES = {e["module"] for e in json.loads(
+    (ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/kit.json").read_text(encoding="utf-8"))["python"]}
 NATIVE_HOST_IMPORTS = {
     "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/hermes/__init__.py": {"hermes_cli.config"},
 }
@@ -354,6 +357,8 @@ def validate_python_imports(path: Path, errors: List[str]) -> None:
             root = name.split(".", 1)[0]
             if (path.parent / (root + ".py")).is_file():
                 continue  # a sibling module shipped in the same scripts directory
+            if root in KIT_MODULES and RECIPES in path.parents:
+                continue  # a recipe runs on the service kit: fabric_kit.py install copies these beside it (FAA-65)
             if root not in STDLIB_IMPORTS and name not in NATIVE_HOST_IMPORTS.get(path.relative_to(ROOT).as_posix(), set()):
                 errors.append("non-stdlib import in %s: %s" % (path.relative_to(ROOT), name))
 
@@ -711,7 +716,7 @@ def validate_repo() -> List[str]:
         if needle not in license_section:
             errors.append("README.md ## License must carry the licensing wording: %r" % needle)
     # Release state is CHANGELOG.md's and the GitHub releases': prose that says which version a checkout is, or which one
-    # is the latest published, is stale by the next release (README said 0.21.0 until 0.39.1).
+    # is the latest published, is stale by the next release (README said 0.21.0 until 0.40.0).
     for stale in re.finditer(r"(?:source checkout is|latest published[^.\n]*release)", readme_text, re.IGNORECASE):
         errors.append("README.md states release state (%r): link CHANGELOG.md instead" % stale.group(0))
     # The operator's rule: text a person reads carries no em dash (U+2014). CHANGELOG.md and docs/ are dated records.

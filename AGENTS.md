@@ -53,6 +53,12 @@ with `--strict-mcp-config` and a temporary config.
 
 - `plugins/fabric-agent-adapter/`: the plugin, its four skills and `hooks/hooks.json`. `.claude-plugin/marketplace.json`
   holds the marketplace entry.
+- The service kit: `building-fabric-services/scripts/`, layered modules in Python and Node twins, listed in dependency
+  order in `kit.json` (a module imports only modules listed before it; none over 1000 lines; the core defined once;
+  all enforced by `test/test_fabric_kit.py`). After changing a kit module run `python3 .../fabric_kit.py build`; CI
+  fails a stale `kit.json` (`test_kit_json_is_what_the_sources_say`). The map, the layers and the rule for a new module: `references/kit-modules.md`. Recipes on the
+  kit: `building-fabric-services/recipes/`. `fabric_session.py` in working-with-fabric is a facade over
+  `fabric_session_{env,mcp,mail,hosts,cli}.py`; hooks and workers always run the facade.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
   `test/evals/<skill>/`.
 - `docs/evidence/`: specs, plans, evals, reports and retrospectives. The scaffold's write set is

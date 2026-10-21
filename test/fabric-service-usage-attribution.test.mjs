@@ -28,7 +28,7 @@ test('the report writes byProject in normal form and passes FAC-SEM-025', () => 
   assert.deepEqual(a.taskRuns.map((r) => [r.taskRunId, r.calls, r.costUsd]), [['run-1', 2, 0.75], ['run-2', 1, null]]);
   assert.deepEqual(k.usageFindings(report), []);
   assert.equal('byProject' in k.usageReport([receipt({ costUsd: 1 })], { id: 'example-agent', now: NOW }), false);
-  for (const bad of [{ projectId: 'no uri' }, { taskRunId: 'run-1' }, { projectId: 'urn:project:a', taskRunId: '-bad' }]) assert.throws(() => receipt(bad));
+  for (const bad of [{ projectId: 'no uri' }, { projectId: 'urn:' }, { taskRunId: 'run-1' }, { projectId: 'urn:project:a', taskRunId: '-bad' }]) assert.throws(() => receipt(bad));
 });
 
 test('unmeasured tokens are counted, never guessed (DEC-0091)', () => {

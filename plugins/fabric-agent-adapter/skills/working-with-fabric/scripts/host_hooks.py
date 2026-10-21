@@ -143,6 +143,7 @@ def main(argv=None, env=None, out=print, err=print):
                         'opencode':['hosts/context.mjs','hosts/opencode/fabric.mjs'],
                         'pi':['hosts/context.mjs','hosts/pi/fabric.mjs'],
                         'openclaw':['hosts/context.mjs','hosts/openclaw/index.mjs','hosts/openclaw/package.json','hosts/openclaw/openclaw.plugin.json']}[args.host]
+            required += ['fabric_session_env.py','fabric_session_mcp.py','fabric_session_mail.py','fabric_session_hosts.py','fabric_session_cli.py']  # the helper's own modules (FAA-65)
             if any(not (script.parent/p).is_file() for p in required):
                 raise fs.Refused('native adapter source is missing; update the complete skill before installing hooks')
         path=Path(args.config).expanduser().absolute() if args.config else destination(args.host,env)

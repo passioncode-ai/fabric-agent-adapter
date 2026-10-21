@@ -30,8 +30,39 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import fabric_delegation as _delegation  # noqa: E402 - beside this file: RFC 8785, Ed25519, small-order keys
+from fabric_crypto import ed25519_verify, is_small_order_key  # noqa: E402 - beside this file (FAA-65)
+from fabric_jsvalue import jcs  # noqa: E402 - beside this file (FAA-65)
 import fabric_secrets as _secrets  # noqa: E402 - beside this file: the contract's credential detector
+from fabric_crypto import (  # noqa: E402 - the core (FAA-65)
+    _P256_B as _B,
+    _P256_N as _N,
+    _P256_P as _P,
+    _der_signature,
+    b64url as _b64url,
+    b64url_bytes as _b64url_bytes,
+    es256_verify,
+    is_valid_p256_key,
+    node_base64 as _node_base64,
+    sha256 as _sha256,
+)
+from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
+    MISSING as _MISSING,
+    contains as _contains,
+    get as _get,
+    get_string as _s,
+    indexed_objects as _indexed,
+    js_string as _js_string,
+    js_to_number as _js_to_number,
+    key_of as _key_of,
+    objects as _list,
+    safe_integer as _safe_integer,
+    same as _same,
+    show as _show,
+)
+from fabric_time import (  # noqa: E402 - the core (FAA-65)
+    clock_ms as _clock,
+    parse_rfc3339_ms as estate_time,
+)
 
 ESTATE_RECORD_SCHEMA = "estate-record/1"
 ESTATE_CHALLENGE_TYPE = "estate-revision/1"
@@ -41,201 +72,11 @@ MAX_VALIDITY_SECONDS = 30 * 24 * 60 * 60
 CLOCK_SKEW_SECONDS = 60
 ASSERTION_ALGORITHMS = ("ES256", "EdDSA")
 FLAGS = {"UP": 0x01, "UV": 0x04, "BE": 0x08, "BS": 0x10, "AT": 0x40, "ED": 0x80}
-_MISSING = object()
 _B64URL = re.compile(r"[A-Za-z0-9_-]+")
 _SURROGATE = re.compile("[\ud800-\udfff]")
 
 
 # --- JavaScript's view of JSON values, which the contract's answers are written in ---------------------------------
-
-def _js_string(value: Any) -> str:
-    """String(value) for a JSON value."""
-    if value is _MISSING:
-        return "undefined"
-    if value is None:
-        return "null"
-    if value is True:
-        return "true"
-    if value is False:
-        return "false"
-    if isinstance(value, float):
-        if math.isnan(value):
-            return "NaN"
-        if math.isinf(value):
-            return "Infinity" if value > 0 else "-Infinity"
-        return _delegation._number(value)
-    if isinstance(value, int):
-        if abs(value) < 2 ** 53:
-            return str(value)
-        try:
-            return _delegation._number(float(value))
-        except OverflowError:  # a JSON number beyond a double is Infinity in JavaScript
-            return "Infinity" if value > 0 else "-Infinity"
-    if isinstance(value, dict):
-        return "[object Object]"
-    if isinstance(value, list):
-        return ",".join("" if item is None else _js_string(item) for item in value)
-    return str(value)
-
-
-def _get(value: Any, key: str) -> Any:
-    return value.get(key, _MISSING) if isinstance(value, dict) else _MISSING
-
-
-def _s(value: Any, key: str) -> str:
-    return _js_string(_get(value, key))
-
-
-def _number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-
-def _double(value: Any) -> float:
-    """A JSON number as JavaScript holds it: the nearest double, and an integer beyond the double range ±Infinity."""
-    try:
-        return float(value)
-    except OverflowError:
-        return math.inf if value > 0 else -math.inf
-
-
-def _same(a: Any, b: Any) -> bool:
-    """JavaScript's === (and a Set's SameValueZero) on parsed JSON: an object equals only itself."""
-    if a is _MISSING or b is _MISSING:
-        return a is b
-    if isinstance(a, (dict, list)) or isinstance(b, (dict, list)):
-        return a is b
-    if isinstance(a, bool) or isinstance(b, bool):
-        return isinstance(a, bool) and isinstance(b, bool) and a == b
-    if _number(a) and _number(b):
-        return _double(a) == _double(b)  # 2**53 + 1 is 2**53 in JavaScript
-    return type(a) is type(b) and a == b
-
-
-def _contains(items: List[Any], value: Any) -> bool:
-    return any(_same(item, value) for item in items)
-
-
-#: The characters JavaScript's StringToNumber trims: WhiteSpace and LineTerminator (ECMA-262 §12.2, §12.3).
-_JS_SPACE = "\t\n\v\f\r                  　﻿"
-_JS_DECIMAL = re.compile(r"[+-]?(?:(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|Infinity)", re.ASCII)
-_JS_RADIX = re.compile(r"0(?:[xX](?P<x>[0-9a-fA-F]+)|[oO](?P<o>[0-7]+)|[bB](?P<b>[01]+))", re.ASCII)
-
-
-def _js_to_number(value: Any) -> float:
-    """Number(value) for a JSON value, as JavaScript reads it; NaN for what it cannot read as a number."""
-    if value is _MISSING:
-        return math.nan
-    if value is None:
-        return 0.0
-    if isinstance(value, bool):
-        return 1.0 if value else 0.0
-    if _number(value):
-        try:
-            return float(value)
-        except OverflowError:
-            return math.inf if value > 0 else -math.inf
-    if isinstance(value, list):
-        return _js_to_number(_js_string(value))  # Number([2]) is Number("2"); Number([]) is 0
-    if isinstance(value, str):
-        text = value.strip(_JS_SPACE)
-        if text == "":
-            return 0.0
-        if _JS_DECIMAL.fullmatch(text):
-            return float(text.replace("Infinity", "inf"))
-        radix = _JS_RADIX.fullmatch(text)
-        if radix:
-            digits, base = next((radix.group(k), b) for k, b in (("x", 16), ("o", 8), ("b", 2)) if radix.group(k))
-            return _double(int(digits, base))
-    return math.nan
-
-
-def _safe_integer(value: Any) -> bool:
-    if isinstance(value, int) and not isinstance(value, bool):
-        return abs(value) <= 2 ** 53 - 1  # checked before any float: a 400-digit integer would overflow
-    return isinstance(value, float) and math.isfinite(value) and value.is_integer() and abs(value) <= 2 ** 53 - 1
-
-
-def _list(value: Any) -> List[Dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
-
-
-def _indexed(value: Any) -> List[Tuple[Dict[str, Any], int]]:
-    """The object items of an array with their index in the array as written, so an instancePath names the item it
-    flags even when a non-object precedes it (the contract's ``indexed``)."""
-    return [(item, i) for i, item in enumerate(value) if isinstance(item, dict)] if isinstance(value, list) else []
-
-
-class _Unshowable(Exception):
-    pass
-
-
-def _strict_string(value: Any) -> str:
-    """String(value), raising where JavaScript's String() throws: an object whose own ``toString`` is not a function
-    (every own member of parsed JSON is data), directly or inside an array it joins."""
-    if isinstance(value, dict):
-        if "toString" in value:
-            raise _Unshowable()
-        return "[object Object]"
-    if isinstance(value, list):
-        return ",".join("" if item is None else _strict_string(item) for item in value)
-    return _js_string(value)
-
-
-_INDEX_KEY = re.compile(r"0|[1-9][0-9]*", re.ASCII)
-
-
-def _js_keys(value: Dict[str, Any]) -> List[str]:
-    """An object's own keys in the order JavaScript lists them: array-index keys ("0" … "4294967294", no leading zero)
-    ascending, then the others in the order written."""
-    index = sorted((k for k in value if _INDEX_KEY.fullmatch(k) and int(k) <= 2 ** 32 - 2), key=int)
-    taken = set(index)
-    return index + [k for k in value if k not in taken]
-
-
-def _js_json_string(text: str) -> str:
-    """JSON.stringify of a string (well-formed, ES2019): a lone surrogate is escaped as \\uXXXX, never refused."""
-    out = ['"']
-    for ch in text:
-        code = ord(ch)
-        if ch in _delegation._ESCAPES:
-            out.append(_delegation._ESCAPES[ch])
-        elif code < 0x20 or 0xD800 <= code <= 0xDFFF:
-            out.append("\\u%04x" % code)
-        else:
-            out.append(ch)
-    out.append('"')
-    return "".join(out)
-
-
-def _json_stringify(value: Any) -> str:
-    """JSON.stringify for a parsed JSON value: members in JavaScript's key order, numbers as JavaScript writes them, a
-    lone surrogate escaped."""
-    if isinstance(value, dict):
-        return "{" + ",".join(_js_json_string(k) + ":" + _json_stringify(value[k]) for k in _js_keys(value)) + "}"
-    if isinstance(value, list):
-        return "[" + ",".join(_json_stringify(v) for v in value) + "]"
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if _number(value):
-        text = _js_string(value)
-        return "null" if text in ("NaN", "Infinity", "-Infinity") else text
-    return _js_json_string(value)
-
-
-def _show(value: Any) -> str:
-    """The contract's ``show``: String(value), or the value's JSON where String() would throw."""
-    try:
-        return _strict_string(value)
-    except _Unshowable:
-        return _json_stringify(value)
-
-
-def _key_of(*parts: Any) -> str:
-    """The contract's ``keyOf``: a collision-free key over JSON values, JSON.stringify of the parts (an absent value
-    is null inside an array, as JavaScript writes it)."""
-    return _json_stringify([None if part is _MISSING else part for part in parts])
 
 
 #: DEC-0082: the personal context, and an organization's context ``org:<orgId>`` (the contract's ``context-route.ts``).
@@ -264,160 +105,7 @@ def _context_of(entry: Any) -> Any:
     return PERSONAL_CONTEXT if context is _MISSING else context
 
 
-def _b64url_bytes(text: str) -> bytes:
-    """Buffer.from(text, "base64url") for text of the base64url alphabet: a dangling sixth bit group is ignored."""
-    return _delegation._b64decode(text)
-
-
-def _b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def _node_base64(text: str) -> bytes:
-    """Buffer.from(text, "base64"): either alphabet, other characters skipped, stops at the first "=", a dangling
-    sixth bit group ignored."""
-    kept = []
-    for ch in text:
-        if ch == "=":
-            break
-        if ch.isascii() and (ch.isalnum() or ch in "+/-_"):
-            kept.append({"-": "+", "_": "/"}.get(ch, ch))
-    body = "".join(kept)
-    if len(body) % 4 == 1:
-        body = body[:-1]
-    return base64.b64decode(body + "=" * (-len(body) % 4))
-
-
-def _sha256(data: bytes) -> bytes:
-    return hashlib.sha256(data).digest()
-
-
 # --- P-256 (DEC-0053; SEC 1 v2, FIPS 186-5) ------------------------------------------------------------------------
-
-_P = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-_A = _P - 3
-_B = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B
-_N = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
-_GX = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296
-_GY = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5
-
-
-def is_valid_p256_key(raw: bytes) -> bool:
-    """SEC 1 §3.2.2 for an uncompressed point: 0x04 ‖ X ‖ Y, X and Y below p, on y² = x³ − 3x + b. The cofactor is 1."""
-    if len(raw) != 65 or raw[0] != 0x04:
-        return False
-    x = int.from_bytes(raw[1:33], "big")
-    y = int.from_bytes(raw[33:], "big")
-    if x >= _P or y >= _P:
-        return False
-    return (y * y - (x * x * x + _A * x + _B)) % _P == 0
-
-
-def _jacobian_double(p: Tuple[int, int, int]) -> Tuple[int, int, int]:
-    x, y, z = p
-    if y == 0 or z == 0:
-        return (0, 1, 0)
-    ysq = y * y % _P
-    s = 4 * x * ysq % _P
-    zsq = z * z % _P
-    m = 3 * (x - zsq) * (x + zsq) % _P  # a = −3
-    nx = (m * m - 2 * s) % _P
-    ny = (m * (s - nx) - 8 * ysq * ysq) % _P
-    nz = 2 * y * z % _P
-    return (nx, ny, nz)
-
-
-def _jacobian_add(p: Tuple[int, int, int], q: Tuple[int, int, int]) -> Tuple[int, int, int]:
-    if p[2] == 0:
-        return q
-    if q[2] == 0:
-        return p
-    z1z1 = p[2] * p[2] % _P
-    z2z2 = q[2] * q[2] % _P
-    u1 = p[0] * z2z2 % _P
-    u2 = q[0] * z1z1 % _P
-    s1 = p[1] * q[2] * z2z2 % _P
-    s2 = q[1] * p[2] * z1z1 % _P
-    if u1 == u2:
-        return _jacobian_double(p) if s1 == s2 else (0, 1, 0)
-    h = (u2 - u1) % _P
-    r = (s2 - s1) % _P
-    hh = h * h % _P
-    hhh = h * hh % _P
-    v = u1 * hh % _P
-    nx = (r * r - hhh - 2 * v) % _P
-    ny = (r * (v - nx) - s1 * hhh) % _P
-    nz = h * p[2] * q[2] % _P
-    return (nx, ny, nz)
-
-
-def _shamir(u1: int, u2: int, q: Tuple[int, int]) -> Optional[Tuple[int, int]]:
-    """u1·G + u2·Q in affine form, or None at infinity."""
-    g = (_GX, _GY, 1)
-    qj = (q[0], q[1], 1)
-    both = _jacobian_add(g, qj)
-    out = (0, 1, 0)
-    for bit in range(max(u1.bit_length(), u2.bit_length()) - 1, -1, -1):
-        out = _jacobian_double(out)
-        a, b = (u1 >> bit) & 1, (u2 >> bit) & 1
-        if a and b:
-            out = _jacobian_add(out, both)
-        elif a:
-            out = _jacobian_add(out, g)
-        elif b:
-            out = _jacobian_add(out, qj)
-    if out[2] == 0:
-        return None
-    zinv = pow(out[2], -1, _P)
-    return (out[0] * zinv * zinv % _P, out[1] * zinv * zinv * zinv % _P)
-
-
-def _der_integer(data: bytes, at: int) -> Tuple[Optional[int], int]:
-    if at + 2 > len(data) or data[at] != 0x02:
-        return None, at
-    length = data[at + 1]
-    start = at + 2
-    if length == 0 or length > 33 or start + length > len(data):
-        return None, at
-    body = data[start:start + length]
-    if body[0] & 0x80:
-        return None, at  # negative
-    if length > 1 and body[0] == 0 and not body[1] & 0x80:
-        return None, at  # not minimal
-    return int.from_bytes(body, "big"), start + length
-
-
-def _der_signature(signature: bytes) -> Optional[Tuple[int, int]]:
-    """An ASN.1 DER Ecdsa-Sig-Value (RFC 3279 §2.2.3), strictly: one SEQUENCE of two minimal positive INTEGERs."""
-    if len(signature) < 8 or signature[0] != 0x30:
-        return None
-    if signature[1] & 0x80:
-        return None  # a P-256 signature fits a short-form length
-    if signature[1] != len(signature) - 2:
-        return None
-    r, at = _der_integer(signature, 2)
-    if r is None:
-        return None
-    s, at = _der_integer(signature, at)
-    if s is None or at != len(signature):
-        return None
-    return r, s
-
-
-def es256_verify(x: bytes, y: bytes, message: bytes, signature: bytes) -> bool:
-    """ECDSA P-256 with SHA-256 over `message`, the signature in DER (FIPS 186-5 §6.4.2). False, never an exception."""
-    if not is_valid_p256_key(b"\x04" + x + y):
-        return False
-    parsed = _der_signature(signature)
-    if parsed is None:
-        return False
-    r, s = parsed
-    if not (1 <= r < _N and 1 <= s < _N):
-        return False
-    e = int.from_bytes(_sha256(message), "big")
-    w = pow(s, -1, _N)
-    point = _shamir(e * w % _N, r * w % _N, (int.from_bytes(x, "big"), int.from_bytes(y, "big")))
-    return point is not None and point[0] % _N == r
 
 
 # --- WebAuthn Level 3 §7.2, offline (src/webauthn.ts) ----------------------------------------------------------------
@@ -451,7 +139,7 @@ def credential_key(public_key: Any, alg: str) -> Dict[str, Any]:
     raw = _b64url_bytes(public_key["x"])
     if len(raw) != 32:
         return {"problem": "unusable-key"}
-    if _delegation.is_small_order_key(raw):
+    if is_small_order_key(raw):
         return {"problem": "small-order-key"}  # DEC-0045 (CT-29): refused before any use
     return {"key": ("EdDSA", raw)}
 
@@ -522,7 +210,7 @@ def verify_assertion(assertion: Any, credential: Dict[str, Any], challenge: byte
     signature = _b64url_bytes(sig)
     key = found["key"]
     good = (es256_verify(key[1], key[2], signed, signature) if key[0] == "ES256"
-            else len(signature) == 64 and _delegation.ed25519_verify(key[1], signed, signature))
+            else len(signature) == 64 and ed25519_verify(key[1], signed, signature))
     if not good:
         return fail("bad-signature")
     return {"ok": True, "flags": flags, "signCount": int.from_bytes(auth_data[33:37], "big")}
@@ -534,65 +222,16 @@ def estate_record_digest(record: Dict[str, Any]) -> str:
     """`sha256:` and the hex SHA-256 of the UTF-8 RFC 8785 form of the record without `digest` and `signature`.
     Raises TypeError for a value RFC 8785 has no form for."""
     covered = {k: v for k, v in record.items() if k not in ("digest", "signature")}
-    return "sha256:" + hashlib.sha256(_delegation.jcs(covered).encode("utf-8")).hexdigest()
+    return "sha256:" + hashlib.sha256(jcs(covered).encode("utf-8")).hexdigest()
 
 
 def estate_challenge_input(digest: str) -> bytes:
-    return _delegation.jcs({"type": ESTATE_CHALLENGE_TYPE, "digest": digest}).encode("utf-8")
+    return jcs({"type": ESTATE_CHALLENGE_TYPE, "digest": digest}).encode("utf-8")
 
 
 def estate_challenge(digest: str) -> bytes:
     """The WebAuthn challenge a signer passes to navigator.credentials.get(): SHA-256 of estate_challenge_input."""
     return _sha256(estate_challenge_input(digest))
-
-
-# ASCII digits only: Python's \d also matches other scripts' digits, which Date.parse never reads.
-_RFC3339 = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?([Zz]|([+-])([0-9]{2}):([0-9]{2}))", re.ASCII)
-
-
-def _days_from_civil(year: int, month: int, day: int) -> int:
-    year -= month <= 2
-    era = (year if year >= 0 else year - 399) // 400
-    yoe = year - era * 400
-    doy = (153 * (month + (-3 if month > 2 else 9)) + 2) // 5 + day - 1
-    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
-    return era * 146097 + doe - 719468
-
-
-def estate_time(value: Any) -> float:
-    """An RFC 3339 date-time as milliseconds since the epoch, or NaN: `T`, an offset and a day that exists are required;
-    a space and a leap second `:60` are refused (ER-10). Fractions count to the millisecond, as Date.parse reads them."""
-    match = _RFC3339.fullmatch(value) if isinstance(value, str) else None
-    if not match:
-        return math.nan
-    year, month, day, hour, minute, second = (int(match.group(i)) for i in range(1, 7))
-    leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
-    days_in = [31, 29 if leap else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    if not (1 <= month <= 12 and 1 <= day <= days_in[month - 1]) or hour > 23 or minute > 59 or second > 59:
-        return math.nan
-    if match.group(9):
-        oh, om = int(match.group(10)), int(match.group(11))
-        if oh > 23 or om > 59:
-            return math.nan
-        offset = (oh * 60 + om) * (1 if match.group(9) == "+" else -1)
-    else:
-        offset = 0
-    millis = int((match.group(7) or ".")[1:4].ljust(3, "0"))
-    seconds = _days_from_civil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second - offset * 60
-    return float(seconds * 1000 + millis)
-
-
-def _clock(at: Any) -> float:
-    """The verifier's clock as milliseconds: a timezone-aware datetime or epoch seconds; NaN for anything else."""
-    if isinstance(at, _dt.datetime) and at.tzinfo is not None:
-        return at.timestamp() * 1000.0
-    if _number(at):
-        try:
-            seconds = float(at)
-        except OverflowError:
-            return math.nan
-        return seconds * 1000.0 if math.isfinite(seconds) else math.nan
-    return math.nan
 
 
 _LABEL = "[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
@@ -892,7 +531,7 @@ def _valid_device_key(key: Dict[str, Any]) -> bool:
     public = _get(key, "publicKey")
     raw = _node_base64("" if public is _MISSING or public is None else _show(public))
     if _get(key, "alg") == "ed25519":
-        return len(raw) == 32 and not _delegation.is_small_order_key(raw)
+        return len(raw) == 32 and not is_small_order_key(raw)
     return is_valid_p256_key(raw)
 
 
@@ -932,7 +571,7 @@ def _keys(value: Dict[str, Any], flag) -> None:
             hub_keys.append(_get(hub, "x"))
             x = _get(hub, "x")
             raw = _node_base64("" if x is _MISSING or x is None else _js_string(x))
-            if _delegation.is_small_order_key(raw):
+            if is_small_order_key(raw):
                 flag("%s/hubKey/x" % at, "a hub key of small order verifies forged tokens and is never certified (DEC-0045)")
     credentials: List[Any] = []
     for authority, index in _indexed(_get(value, "authorities")):
@@ -1151,7 +790,7 @@ def _record_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
 
 def _package_digest(pkg: Dict[str, Any]) -> str:
     covered = {k: v for k, v in pkg.items() if k not in ("digest", "signatures")}
-    return "sha256:" + hashlib.sha256(_delegation.jcs(covered).encode("utf-8")).hexdigest()
+    return "sha256:" + hashlib.sha256(jcs(covered).encode("utf-8")).hexdigest()
 
 
 def _installation(value: Dict[str, Any]) -> List[Dict[str, str]]:

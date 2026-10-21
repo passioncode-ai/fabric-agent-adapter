@@ -120,8 +120,9 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
   `publisherKeys` pins. A key no scope names keeps DEC-0051's meaning, trusted in any context.
 - **Update a copied kit before a revision carries `publisherScopes`.** A service runs the copy of the kit it was built
   with; a copy older than 0.39.0 does not read `publisherScopes`, so it trusts a partner's key in every context and
-  finds no rule broken. A service that applies the estate record updates its copy of `fabric_estate.py` /
-  `fabric-estate.mjs` to 0.39.0 or later first.
+  finds no rule broken. A service that applies the estate record updates its copy first:
+  `fabric_kit.py install <dir> --module fabric_estate` (or `--lang node --module fabric-estate`). Since 0.40.0 the
+  estate reader imports the kit's core modules, so the one file alone no longer loads ([kit modules](kit-modules.md)).
 
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits

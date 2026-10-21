@@ -18,7 +18,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.39.1"
+  version: "0.40.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "c55f2d5a11c9a0197e958e87212fca7ae1154769"
@@ -144,12 +144,23 @@ The request body is data behind the service's own input gate. Read [the board re
 
 ## Step 3: build it with the kit
 
-Copy the kit into the service (each is one self-contained file): Python
-[`scripts/fabric_service.py`](scripts/fabric_service.py), Node
-[`scripts/fabric-service.mjs`](scripts/fabric-service.mjs). Both share file formats, and
+Install the kit into the service with its manifest: `python3 scripts/fabric_kit.py install
+<service-dir> --module fabric_service --module fabric_interop` (Python: the service and its MCP
+surface, with every module they need; add `--module fabric_board` for a board responder, as
+the sample has) or `--lang node` with the same names in `-`;
+`fabric_kit.py status <service-dir>` says per file whether a copy is current, older or edited,
+and what is missing. The kit is layered modules behind the `fabric_service` /
+`fabric-service.mjs` facades, which keep every 0.39 import working; read
+[the kit modules reference](references/kit-modules.md) for the map, the dates API and
+installing more (`--module fabric_openrouter`). Both languages share file formats, and
 their locks exclude each other. The complete worked example is
 [`scripts/sample_service.py`](scripts/sample_service.py); read it before writing a
 handler.
+
+Calling out: [the connectors reference](references/connectors.md) (`fabric_http` with one
+deadline, safe retries and a size cap; `fabric_openrouter` with the agent's own key, a
+spend ceiling before every attempt, receipts and a fallback). A ready support agent on the
+kit: [`recipes/support-agent/`](recipes/support-agent/README.md).
 
 Startup order is the part that goes wrong; keep it exactly:
 

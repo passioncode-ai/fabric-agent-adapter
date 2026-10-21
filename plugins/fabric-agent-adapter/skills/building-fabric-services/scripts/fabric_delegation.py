@@ -31,6 +31,21 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 import urllib.error
 import urllib.parse
 import urllib.request
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from fabric_crypto import (  # noqa: E402 - the core (FAA-65)
+    SMALL_ORDER_ENCODINGS,
+    _ED_P as _P,
+    _ed_decode_point as _decode_point,
+    b64url_decode as _b64decode,
+    ed25519_verify,
+    is_small_order_key,
+)
+from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
+    jcs,
+)
 
 REFUSAL_CODES = (
     "unauthenticated", "token-expired", "wrong-audience", "scope-not-granted", "effect-above-ceiling", "no-grant",
@@ -85,22 +100,7 @@ _URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:\S+$")
 _JTI = re.compile(r"^[A-Za-z0-9._~-]{16,128}$")
 _SCOPE = re.compile(r"^[a-z][a-z0-9._-]{1,127}( [a-z][a-z0-9._-]{1,127})*$")
 _SPEND_WINDOWS = ("total", "task", "project", "day", "week", "month")
-# The small-order points of edwards25519 and their non-canonical encodings, sign bit cleared (the contract's
-# src/ed25519.ts; libsodium's has_small_order list).
-SMALL_ORDER_ENCODINGS = (
-    "0000000000000000000000000000000000000000000000000000000000000000", "0100000000000000000000000000000000000000000000000000000000000000",
-    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
-    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-)
 _MISSING = object()
-
-
-def is_small_order_key(raw: bytes) -> bool:
-    """Whether a 32-byte Ed25519 public key is a point of small order, in any encoding (CT-29)."""
-    if len(raw) != 32:
-        return True
-    return (raw[:31] + bytes([raw[31] & 0x7F])).hex() in SMALL_ORDER_ENCODINGS
 
 
 def _full(pattern: "re.Pattern[str]", value: Any) -> bool:
@@ -128,89 +128,8 @@ def _is_time(value: Any) -> bool:
 
 # --- Ed25519 (RFC 8032 §5.1) ----------------------------------------------------------------------------
 
-_P = 2 ** 255 - 19
-_L = 2 ** 252 + 27742317777372353535851937790883648493
-_D = (-121665 * pow(121666, _P - 2, _P)) % _P
-_SQRT_M1 = pow(2, (_P - 1) // 4, _P)
-
-
-def _add(a: Tuple[int, int, int, int], b: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-    x1, y1, z1, t1 = a
-    x2, y2, z2, t2 = b
-    aa = (y1 - x1) * (y2 - x2) % _P
-    bb = (y1 + x1) * (y2 + x2) % _P
-    cc = 2 * t1 * t2 * _D % _P
-    dd = 2 * z1 * z2 % _P
-    e, f, g, h = bb - aa, dd - cc, dd + cc, bb + aa
-    return (e * f % _P, g * h % _P, f * g % _P, e * h % _P)
-
-
-def _mul(scalar: int, point: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-    result = (0, 1, 1, 0)
-    while scalar:
-        if scalar & 1:
-            result = _add(result, point)
-        point = _add(point, point)
-        scalar >>= 1
-    return result
-
-
-def _decode_point(data: bytes) -> Optional[Tuple[int, int, int, int]]:
-    if len(data) != 32:
-        return None
-    y = int.from_bytes(data, "little")
-    sign = y >> 255
-    y &= (1 << 255) - 1
-    if y >= _P:
-        return None
-    x2 = (y * y - 1) * pow(_D * y * y + 1, _P - 2, _P) % _P
-    if x2 == 0:
-        if sign:
-            return None
-        return (0, y, 1, 0)
-    x = pow(x2, (_P + 3) // 8, _P)
-    if (x * x - x2) % _P:
-        x = x * _SQRT_M1 % _P
-    if (x * x - x2) % _P:
-        return None
-    if x & 1 != sign:
-        x = _P - x
-    return (x, y, 1, x * y % _P)
-
-
-def _encode_point(point: Tuple[int, int, int, int]) -> bytes:
-    x, y, z, _ = point
-    zi = pow(z, _P - 2, _P)
-    x, y = x * zi % _P, y * zi % _P
-    return (y | ((x & 1) << 255)).to_bytes(32, "little")
-
-
-_G = _decode_point(bytes.fromhex("5866666666666666666666666666666666666666666666666666666666666666"))
-_IDENTITY = (1).to_bytes(32, "little")
-
-
-def ed25519_verify(public_key: bytes, message: bytes, signature: bytes) -> bool:
-    """RFC 8032 §5.1.7, cofactorless: [S]B == R + [k]A, compared by R's encoding. False, never an exception."""
-    if len(public_key) != 32 or len(signature) != 64:
-        return False
-    s = int.from_bytes(signature[32:], "little")
-    if s >= _L:
-        return False
-    a = _decode_point(public_key)
-    if a is None or _encode_point(_mul(8, a)) == _IDENTITY:
-        return False  # a small-order key would accept R = [S]B for a quarter or more of all messages; OpenSSL refuses it
-    k = int.from_bytes(hashlib.sha512(signature[:32] + public_key + message).digest(), "little") % _L
-    neg_a = ((-a[0]) % _P, a[1], a[2], (-a[3]) % _P)
-    return secrets.compare_digest(_encode_point(_add(_mul(s, _G), _mul(k, neg_a))), signature[:32])
-
 
 # --- the compact document ------------------------------------------------------------------------------
-
-def _b64decode(segment: str) -> bytes:
-    """Base64url without padding, as Node reads it: a dangling sixth bit group is ignored."""
-    if len(segment) % 4 == 1:
-        segment = segment[:-1]
-    return base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4))
 
 
 class _Duplicate(ValueError):
@@ -680,90 +599,6 @@ def read_delegation_token(headers: Any) -> Optional[Dict[str, str]]:
 
 
 # --- RFC 8785 canonical JSON --------------------------------------------------------------------------------
-
-def _number(value: float) -> str:
-    """ECMAScript Number::toString, which RFC 8785 §3.2.2.3 prescribes."""
-    if value == 0:
-        return "0"
-    if value < 0:
-        return "-" + _number(-value)
-    digits, exponent = _shortest(value)
-    k, n = len(digits), len(digits) + exponent
-    if k <= n <= 21:
-        return digits + "0" * (n - k)
-    if 0 < n <= 21:
-        return digits[:n] + "." + digits[n:]
-    if -6 < n <= 0:
-        return "0." + "0" * (-n) + digits
-    e = n - 1
-    mantissa = digits if k == 1 else digits[0] + "." + digits[1:]
-    return "%se%s%d" % (mantissa, "+" if e >= 0 else "-", abs(e))
-
-
-def _shortest(value: float) -> Tuple[str, int]:
-    """The shortest round-trip digits of a positive finite double (Python's repr is shortest round-trip)."""
-    text = repr(value)
-    mantissa, _, exp = text.partition("e")
-    whole, _, frac = mantissa.partition(".")
-    digits = (whole + frac).lstrip("0")
-    exponent = (int(exp) if exp else 0) - len(frac)
-    if not digits:
-        return "0", 0
-    stripped = digits.rstrip("0")
-    exponent += len(digits) - len(stripped)
-    return stripped, exponent
-
-
-_ESCAPES = {'"': '\\"', "\\": "\\\\", "\b": "\\b", "\f": "\\f", "\n": "\\n", "\r": "\\r", "\t": "\\t"}
-
-
-def _string(value: str) -> str:
-    out = ['"']
-    for ch in value:
-        code = ord(ch)
-        if 0xD800 <= code <= 0xDFFF:
-            raise TypeError("a lone surrogate has no canonical form")
-        if ch in _ESCAPES:
-            out.append(_ESCAPES[ch])
-        elif code < 0x20:
-            out.append("\\u%04x" % code)
-        else:
-            out.append(ch)
-    out.append('"')
-    return "".join(out)
-
-
-def jcs(value: Any) -> str:
-    """RFC 8785: members sorted by UTF-16 code units, numbers in ECMAScript form, strings as JSON.stringify
-    escapes them. Refuses what has no canonical form: a non-finite number, a lone surrogate, a non-JSON value.
-    A JSON number is a double: an integer beyond 2**53 is written as JavaScript would write it."""
-    if value is None:
-        return "null"
-    if value is True:
-        return "true"
-    if value is False:
-        return "false"
-    if isinstance(value, int):
-        if abs(value) < 2 ** 53:
-            return str(value)
-        try:
-            return _number(float(value))
-        except OverflowError:
-            raise TypeError("a number beyond a double has no canonical form") from None
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise TypeError("a non-finite number has no canonical form")
-        return _number(value)
-    if isinstance(value, str):
-        return _string(value)
-    if isinstance(value, list):
-        return "[" + ",".join(jcs(item) for item in value) + "]"
-    if isinstance(value, dict):
-        if not all(isinstance(key, str) for key in value):
-            raise TypeError("only string member names have a canonical form")
-        keys = sorted(value, key=lambda key: key.encode("utf-16-be", "surrogatepass"))
-        return "{" + ",".join(_string(key) + ":" + jcs(value[key]) for key in keys) + "}"
-    raise TypeError("%s has no canonical form" % type(value).__name__)
 
 
 def action_digest(action: Any) -> str:

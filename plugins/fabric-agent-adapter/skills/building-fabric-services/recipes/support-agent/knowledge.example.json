@@ -1,0 +1,13 @@
+{
+  "entries": [
+    {"id": "password-reset", "question": "How do I reset my password?",
+     "answer": "Open Settings, then Account, then Reset password. A link arrives by email within five minutes.",
+     "tags": ["password", "login", "account"]},
+    {"id": "refund-window", "question": "Can I get a refund?",
+     "answer": "Purchases can be refunded within 14 days through the store you bought from.",
+     "tags": ["refund", "money", "purchase"]},
+    {"id": "password-reset-ru", "question": "Как сбросить пароль?",
+     "answer": "Откройте Настройки, затем Аккаунт, затем Сбросить пароль. Ссылка придёт на почту в течение пяти минут.",
+     "tags": ["пароль", "вход", "аккаунт"]}
+  ]
+}

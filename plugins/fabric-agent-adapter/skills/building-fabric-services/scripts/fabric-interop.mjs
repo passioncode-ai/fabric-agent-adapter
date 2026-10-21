@@ -147,8 +147,8 @@ const ERROR_CODE = /^[a-z][a-z0-9-]{1,63}$/;
 const MAX_STATUS_MESSAGE = 500;
 const MAX_ERROR_MESSAGE = 2000;
 const codePoints = (value) => [...value].length;
-const isString = (value) => typeof value === 'string';
-const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
+import { isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 const own = (value, key) => (isObject(value) && Object.hasOwn(value, key) ? value[key] : undefined);
 
 /** A UTC instant as milliseconds, or NaN: the pattern and a day that exists, as the contract's strictTime reads it. */
