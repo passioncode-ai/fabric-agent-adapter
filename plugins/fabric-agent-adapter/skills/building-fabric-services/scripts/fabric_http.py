@@ -309,6 +309,8 @@ def _send(req: urllib.request.Request, timeout_s: float, max_bytes: int, end: fl
             if sock is not None:
                 sock.settimeout(left)  # each read waits at most what is left of the deadline
             chunk = resp.read1(min(65536, max_bytes + 1 - size))
+            if watchdog.fired:  # Linux reads a shut socket as a clean end: a cut answer is never a whole one
+                raise TimeoutError("the body did not arrive within the deadline")
             if not chunk:
                 break
             chunks.append(chunk)

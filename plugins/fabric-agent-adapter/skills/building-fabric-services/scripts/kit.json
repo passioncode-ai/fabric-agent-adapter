@@ -340,7 +340,7 @@
    "imports": [
     "fabric_jsvalue"
    ],
-   "sha256": "8b8c2fe1b39fac6037b5cc9b54975e509d7f60befa320410d7a7567344b62fcd"
+   "sha256": "679954d16a433c47889ec858c1e13de4ae0b682e6901d69bc23990cc610fdf20"
   },
   {
    "module": "fabric_openrouter",
@@ -1481,7 +1481,7 @@
    "fabric_board_session.py": "7a352e6442d8ab4c31ba401bc55670e0e7b54495d793d08652114c6eba706917",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "c9600d24552a858f0bef8a0a7dd3fd05759c90c36e6b31f282aa01ae2d7698eb",
-   "fabric_http.py": "8b8c2fe1b39fac6037b5cc9b54975e509d7f60befa320410d7a7567344b62fcd",
+   "fabric_http.py": "679954d16a433c47889ec858c1e13de4ae0b682e6901d69bc23990cc610fdf20",
    "fabric_openrouter.py": "2017d898c17001d7275f58267de653be7ecf6acd17ad8d9b24ecb7a43e5617d4",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",

@@ -17,6 +17,9 @@ Brief and design: [brief](../evidence/specs/2026-10-21-faa-65-kit-modules-brief.
 | 4 | `6f40599`, `9fa9a2c` | `fabric_http` and `fabric_openrouter`, both languages, shared cases |
 | 5 | `b12cda5` | `recipes/support-agent/` |
 | 6 | `fe0f202` | `kit-modules.md`, `connectors.md`, SKILL.md step 3, README, AGENTS.md, CHANGELOG, backlog FAA-66 and FAA-67 |
+| review 1 | `f8d7cd4` | blind unit, seam, product readings: ceiling bypass through params, lost receipts for maybe-billed attempts, a facade not loadable by path, `status` on old copies, doc errors |
+| review 2 | `72fb085` | a cut connection kept no receipt, `max_completion_tokens`/`n`, unmeasured calls counted too low, strict prices, Python deadline before headers |
+| review 3 | `2164214` | an answer with no usage counted too low, image/file parts refused, Python overflow and deep JSON, a watchdog for trickled headers, the CI-only `git show v0.39.1` test |
 
 ## Checks actually run
 
@@ -26,6 +29,9 @@ Brief and design: [brief](../evidence/specs/2026-10-21-faa-65-kit-modules-brief.
 - Planted defects watched fail: API snapshot, core defined once, stale manifest, upward import, whole-float count,
   entry-point paths (wave 3); seven connector defects (wave 4); five recipe defects (wave 5); a missing module-map row
   (wave 6).
+- After the fixes: full local gate on `72fb085` (782 Python OK, 262 Node, both `plugin validate`), the full Python
+  suite in a depth-1 clone of `2164214` (785 OK, as CI checks out), and every module installed alone and loaded from
+  outside the repo in both languages (seam round 3).
 - Installed closures run alone: `fabric_kit.py install --module fabric_openrouter` (9 files per language), imported
   under `python3 -E -s` and `node`.
 
@@ -33,8 +39,10 @@ Brief and design: [brief](../evidence/specs/2026-10-21-faa-65-kit-modules-brief.
 
 - The brief's deferrals stay deferred: a data or analytics agent recipe (FAA-66), a Telegram connector (FAA-67,
   routed through `telegram-dev` first).
-- `fabric_openrouter` counts a receipt without a cost at this attempt's worst case unless `unmeasured_call_usd` says
-  otherwise: a ceiling that ignored unmeasured calls could be passed silently.
+- `fabric_openrouter` counts an attempt that may have been billed without usage (a timeout, a cut connection, an
+  unreadable or usage-free 200) at that attempt's own worst case while the client runs, and at `unmeasured_call_usd`
+  (default: the current attempt's worst case) after a restart: over-counting is the safe side of a spend ceiling.
+- Only text content is sent: image, audio and file parts are billed in ways a byte count cannot bound.
 - Recipes may import kit modules listed in `kit.json` (`test/validate.py`), nothing else.
 
 ## Open
