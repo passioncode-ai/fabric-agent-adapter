@@ -1,0 +1,15 @@
+{
+  "knowledge": "knowledge.example.json",
+  "stateDir": "state",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "fallback": "qwen/qwen3.8-flash",
+  "keyEnv": "OPENROUTER_API_KEY",
+  "ceilingUsd": 1.0,
+  "window": "day",
+  "maxTokens": 600,
+  "maxChars": 1200,
+  "prices": {
+    "deepseek/deepseek-v4.1-flash": {"prompt": 0.0000002, "completion": 0.0000008},
+    "qwen/qwen3.8-flash": {"prompt": 0.0000001, "completion": 0.0000004}
+  }
+}

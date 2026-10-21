@@ -67,6 +67,9 @@ STDLIB_IMPORTS = {
     "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
     "collections", "queue",  # native bridge mappings and isolated no-model host probes (FAA-48)
 }
+RECIPES = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes"
+KIT_MODULES = {e["module"] for e in json.loads(
+    (ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/kit.json").read_text(encoding="utf-8"))["python"]}
 NATIVE_HOST_IMPORTS = {
     "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/hermes/__init__.py": {"hermes_cli.config"},
 }
@@ -354,6 +357,8 @@ def validate_python_imports(path: Path, errors: List[str]) -> None:
             root = name.split(".", 1)[0]
             if (path.parent / (root + ".py")).is_file():
                 continue  # a sibling module shipped in the same scripts directory
+            if root in KIT_MODULES and RECIPES in path.parents:
+                continue  # a recipe runs on the service kit: fabric_kit.py install copies these beside it (FAA-65)
             if root not in STDLIB_IMPORTS and name not in NATIVE_HOST_IMPORTS.get(path.relative_to(ROOT).as_posix(), set()):
                 errors.append("non-stdlib import in %s: %s" % (path.relative_to(ROOT), name))
 
