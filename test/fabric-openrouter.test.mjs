@@ -1,0 +1,153 @@
+// FAA-65 REQ-07: fabric-openrouter.mjs, on the cases fabric_openrouter.py reads too. No test opens the network or holds
+// a real key.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import test from 'node:test';
+import * as fo from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-openrouter.mjs';
+import { makeUsageReceipt } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-usage.mjs';
+
+const CASES = JSON.parse(fs.readFileSync(new URL('./fixtures/kit-openrouter-cases.json', import.meta.url), 'utf8'));
+const NOW = 1792584000; // 2026-10-21T12:00:00Z
+const KEY = 'sk-or-v1-test-only-not-a-key';
+const MESSAGES = [{ role: 'user', content: 'hi' }];
+
+class Ledger {
+  constructor(rows = []) { this.rows = [...rows]; }
+  record(r) { this.rows.push(r); }
+  receipts() { return [...this.rows]; }
+}
+
+function scripted(steps, seen) {
+  const left = [...steps];
+  return async ({ url, headers, body }) => {
+    seen.push({ url, headers, body: JSON.parse(new TextDecoder().decode(body)) });
+    const step = left.shift();
+    return { status: step.status, headers: step.headers ?? {}, body: new TextEncoder().encode(JSON.stringify(step.body ?? {})) };
+  };
+}
+
+function client(c, seen, ledger, extra = {}) {
+  const sleeps = [];
+  let now = 0;
+  const cl = new fo.Client({ ceilingUsd: c.ceilingUsd ?? 1, ledger, prices: CASES.prices,
+    env: c.noKey ? {} : { OPENROUTER_API_KEY: KEY }, transport: scripted(c.steps ?? [], seen),
+    sleep: async (s) => { sleeps.push(s); now += s; }, clock: () => now, now: () => NOW, rand: () => 0.5, ...extra });
+  return { cl, sleeps };
+}
+
+async function run(c) {
+  const seen = [];
+  const ledger = new Ledger(c.ledger ?? []);
+  const { cl, sleeps } = client(c, seen, ledger);
+  let got;
+  try {
+    const a = await cl.chat(MESSAGES, { model: c.model ?? 'a/one', fallback: c.fallback ?? 'b/two', maxTokens: 100 });
+    got = { content: a.content, model: a.model, outcomes: a.attempts.map((x) => x.outcome), sleeps };
+  } catch (err) {
+    if (!(err instanceof fo.OpenRouterError)) throw err;
+    got = { error: err.kind, outcomes: err.attempts.map((x) => x.outcome), message: err.message };
+  }
+  return { got, ledger, seen };
+}
+
+test('the prompt bound and the catalog', () => {
+  for (const [messages, expected] of CASES.promptBound) assert.equal(fo.promptTokensBound(messages), expected);
+  assert.deepEqual(fo.pricesFromCatalog(CASES.catalog.in), CASES.catalog.out);
+  assert.deepEqual(fo.pricesFromCatalog(null), {});
+});
+
+test('the shared scenarios', async () => {
+  for (const c of CASES.scenarios) {
+    const { got, ledger } = await run(c);
+    const { receipts, receiptCount, ...expect } = c.expect;
+    delete got.message;
+    assert.deepEqual(got, expect, c.name);
+    if (receipts) {
+      assert.equal(ledger.rows.length, receipts.length, c.name);
+      receipts.forEach((wanted, i) => {
+        const actual = ledger.rows[i];
+        for (const [key, value] of Object.entries(wanted)) {
+          if (key === 'costUsd' && value !== null) assert.ok(Math.abs(actual[key] - value) < 1e-12, `${c.name} ${key}`);
+          else assert.deepEqual(actual[key], value, `${c.name} ${key}`);
+        }
+        const rebuilt = makeUsageReceipt(actual.provider, actual.model, { inputTokens: actual.inputTokens,
+          outputTokens: actual.outputTokens, cacheReadTokens: actual.cacheReadTokens, cacheWriteTokens: actual.cacheWriteTokens,
+          costUsd: actual.costUsd, costBasis: actual.costBasis, at: actual.at, route: actual.route,
+          tokensMeasured: actual.tokensMeasured ?? true });
+        assert.deepEqual(rebuilt, actual, 'a receipt the kit itself would build');
+      });
+    }
+    if (receiptCount !== undefined) assert.equal(ledger.rows.length, receiptCount, c.name);
+  }
+});
+
+test('the request, no key in an error, attribution off by default', async () => {
+  const { got, seen } = await run({ steps: [{ status: 503 }, { status: 503 }, { status: 400 }] });
+  assert.equal(got.error, 'failed');
+  assert.ok(!got.message.includes(KEY));
+  assert.equal(seen[0].url, 'https://openrouter.ai/api/v1/chat/completions');
+  assert.equal(seen[0].headers.Authorization, `Bearer ${KEY}`);
+  assert.deepEqual(seen[0].body, { model: 'a/one', messages: MESSAGES, max_tokens: 100, usage: { include: true } });
+  assert.equal(seen[2].body.model, 'b/two');
+  for (const h of Object.keys(seen[0].headers)) assert.ok(!['http-referer', 'x-openrouter-title', 'x-title'].includes(h.toLowerCase()));
+  const attributed = [];
+  const { cl } = client({ steps: [{ status: 200, body: { choices: [{ finish_reason: 'stop', message: { content: 'x' } }] } }] },
+    attributed, new Ledger(), { attribution: { product: 'example-agent', title: 'Example Agent', categories: ['cloud-agent'] } });
+  await cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100 });
+  assert.equal(attributed[0].headers['HTTP-Referer'], 'https://passioncode.ai/example-agent/');
+});
+
+test('params, refusals and receipts that name a project', async () => {
+  const seen = [];
+  const ok = { status: 200, body: { choices: [{ finish_reason: 'stop', message: { content: 'x' } }] } };
+  const { cl } = client({ steps: [ok] }, seen, new Ledger());
+  await cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100, temperature: 0, reasoning: { effort: 'low' } });
+  assert.equal(seen[0].body.temperature, 0);
+  await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100, taskRunId: 'run-1' }),
+    (e) => e.kind === 'config' && seen.length === 1);
+  for (const bad of [{ stream: true }, { usage: {} }, { max_tokens: 5 }]) {
+    await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100, ...bad }), fo.OpenRouterError);
+  }
+  for (const opts of [{ maxTokens: 0 }, { maxTokens: 1.5 }, { fallback: 'nofallback' }]) {
+    await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100, ...opts }), fo.OpenRouterError);
+  }
+  await assert.rejects(cl.chat([], { model: 'a/one', fallback: 'b/two', maxTokens: 100 }), fo.OpenRouterError);
+  const ledger = new Ledger();
+  const named = client({ steps: [ok] }, [], ledger, { projectId: 'urn:example:project' }).cl;
+  await named.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100, taskRunId: 'run-1' });
+  assert.equal(ledger.rows[0].projectId, 'urn:example:project');
+  assert.equal(ledger.rows[0].taskRunId, 'run-1');
+});
+
+test('unmeasured calls, calls in flight and the month window count toward the ceiling', async () => {
+  const unmeasured = { at: '2026-10-21T01:00:00Z', provider: 'openrouter', model: 'a/one', inputTokens: 0, outputTokens: 0,
+    cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: null, costBasis: 'unknown', tokensMeasured: false };
+  assert.equal((await run({ ceilingUsd: 0.002, ledger: [unmeasured], steps: [] })).got.error, 'ceiling');
+  const ok = { status: 200, body: { choices: [{ finish_reason: 'stop', message: { content: 'x' } }] } };
+  const free = client({ ceilingUsd: 0.002, steps: [ok] }, [], new Ledger([unmeasured]), { unmeasuredCallUsd: 0 }).cl;
+  assert.equal((await free.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100 })).content, 'x');
+
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const slow = new fo.Client({ ceilingUsd: 0.0015, ledger: new Ledger(), prices: CASES.prices, env: { OPENROUTER_API_KEY: KEY },
+    now: () => NOW, transport: async () => { await gate; return { status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify(ok.body)) }; } });
+  const first = slow.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100 });
+  await assert.rejects(slow.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100 }), (e) => e.kind === 'ceiling');
+  release();
+  assert.equal((await first).content, 'x');
+  assert.equal(slow.inFlight, 0);
+
+  const old = { at: '2026-10-02T01:00:00Z', costUsd: 0.0015 };
+  assert.equal((await run({ ceilingUsd: 0.002, ledger: [old], steps: [ok] })).got.content, 'x');
+  const monthly = client({ ceilingUsd: 0.002 }, [], new Ledger([old]), { window: 'month' }).cl;
+  await assert.rejects(monthly.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100 }), (e) => e.kind === 'ceiling');
+});
+
+test('config refusals and totals', () => {
+  for (const opts of [{ ceilingUsd: -1 }, { ceilingUsd: Number.NaN }, { ceilingUsd: true }, { window: 'week' }, { retries: 9 },
+    { ledger: {} }, { baseUrl: 'http://openrouter.ai/api/v1' }]) {
+    assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, ...opts }), Error, JSON.stringify(opts));
+  }
+  assert.deepEqual(fo.totals([{ costUsd: 0.5 }, { costUsd: null }, { costUsd: 0.25 }]), { calls: 3, spentUsd: 0.75, unpricedCalls: 1 });
+  assert.deepEqual(fo.totals([{ costUsd: null }]), { calls: 1, spentUsd: null, unpricedCalls: 1 });
+});
