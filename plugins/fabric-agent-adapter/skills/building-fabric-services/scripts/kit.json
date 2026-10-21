@@ -290,15 +290,46 @@
    "sha256": "13a78794b97aa5c8d4628199cc8e20fe2d5448d9c04b58eed3322f994e15ff7f"
   },
   {
+   "module": "fabric_board_shapes",
+   "file": "fabric_board_shapes.py",
+   "layer": "L4",
+   "imports": [
+    "fabric_identifiers"
+   ],
+   "sha256": "9ace72f05e3290940037bc5c9f834cf1c50d4123434857b286acbb75ac34f784"
+  },
+  {
+   "module": "fabric_board_session",
+   "file": "fabric_board_session.py",
+   "layer": "L4",
+   "imports": [
+    "fabric_board_shapes",
+    "fabric_hub",
+    "fabric_service"
+   ],
+   "sha256": "a45973ddb1a36e3aeff4c4954645ea1f7257f02a59735c6e25237fbff4ab4f24"
+  },
+  {
+   "module": "fabric_board_fixture",
+   "file": "fabric_board_fixture.py",
+   "layer": "L4",
+   "imports": [
+    "fabric_board_session",
+    "fabric_board_shapes",
+    "fabric_hub"
+   ],
+   "sha256": "0a66f207035c1f66d9c87b853df7b2fe59bdec24f7101875fe4135dbb4ddbb81"
+  },
+  {
    "module": "fabric_board",
    "file": "fabric_board.py",
    "layer": "L4",
    "imports": [
-    "fabric_hub",
-    "fabric_identifiers",
-    "fabric_service"
+    "fabric_board_fixture",
+    "fabric_board_session",
+    "fabric_board_shapes"
    ],
-   "sha256": "1897bc8c7bdf688902b6ac38cc1301b08dab731fb834e63002ea5c0f314bf3f9"
+   "sha256": "c9600d24552a858f0bef8a0a7dd3fd05759c90c36e6b31f282aa01ae2d7698eb"
   }
  ],
  "node": [
@@ -583,15 +614,46 @@
    "sha256": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070"
   },
   {
+   "module": "fabric-board-shapes",
+   "file": "fabric-board-shapes.mjs",
+   "layer": "L4",
+   "imports": [
+    "fabric-identifiers"
+   ],
+   "sha256": "8bc697bf222d8178905540e97f951957772a1135369d52da99f7d1e91c7ca413"
+  },
+  {
+   "module": "fabric-board-session",
+   "file": "fabric-board-session.mjs",
+   "layer": "L4",
+   "imports": [
+    "fabric-board-shapes",
+    "fabric-hub",
+    "fabric-service"
+   ],
+   "sha256": "f08c00647fd308d25448f4bd4563a092d8605a4e07e64671a375e16feff0f8db"
+  },
+  {
+   "module": "fabric-board-fixture",
+   "file": "fabric-board-fixture.mjs",
+   "layer": "L4",
+   "imports": [
+    "fabric-board-session",
+    "fabric-board-shapes",
+    "fabric-hub"
+   ],
+   "sha256": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e"
+  },
+  {
    "module": "fabric-board",
    "file": "fabric-board.mjs",
    "layer": "L4",
    "imports": [
-    "fabric-hub",
-    "fabric-identifiers",
-    "fabric-service"
+    "fabric-board-fixture",
+    "fabric-board-session",
+    "fabric-board-shapes"
    ],
-   "sha256": "3947beb97b046aec1409875eb057671b52167c30fab9a892f6a14f0ac5d9a90a"
+   "sha256": "87ae681a3c991c9aed40fb71289c19cd6da33ad6ebbec6858e51f031e8a7ab7b"
   }
  ],
  "history": {
@@ -1374,7 +1436,10 @@
    "fabric_profiles.py": "f853ca67ff14c2e224b4189cbdadffa040934cc7036b12f45ac4d3122f5dc6c9",
    "fabric_interop.py": "b30d24972242cbbe6c69a9ce45d0ee5acf7666ce7dcc93e0a75feb2d5d0d4dce",
    "fabric_hub.py": "13a78794b97aa5c8d4628199cc8e20fe2d5448d9c04b58eed3322f994e15ff7f",
-   "fabric_board.py": "1897bc8c7bdf688902b6ac38cc1301b08dab731fb834e63002ea5c0f314bf3f9",
+   "fabric_board_shapes.py": "9ace72f05e3290940037bc5c9f834cf1c50d4123434857b286acbb75ac34f784",
+   "fabric_board_session.py": "a45973ddb1a36e3aeff4c4954645ea1f7257f02a59735c6e25237fbff4ab4f24",
+   "fabric_board_fixture.py": "0a66f207035c1f66d9c87b853df7b2fe59bdec24f7101875fe4135dbb4ddbb81",
+   "fabric_board.py": "c9600d24552a858f0bef8a0a7dd3fd05759c90c36e6b31f282aa01ae2d7698eb",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
    "fabric-identifiers.mjs": "a18c2a501a4aa170bfd3d99e571ad6b7662649b4d3b9d2a540c002ea42811bbf",
@@ -1401,7 +1466,10 @@
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop.mjs": "5cf7b5c63062198abb379b1024f74e30bf9f4ca7a07fb6d065f6ee05760c79c4",
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
-   "fabric-board.mjs": "3947beb97b046aec1409875eb057671b52167c30fab9a892f6a14f0ac5d9a90a",
+   "fabric-board-shapes.mjs": "8bc697bf222d8178905540e97f951957772a1135369d52da99f7d1e91c7ca413",
+   "fabric-board-session.mjs": "f08c00647fd308d25448f4bd4563a092d8605a4e07e64671a375e16feff0f8db",
+   "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
+   "fabric-board.mjs": "87ae681a3c991c9aed40fb71289c19cd6da33ad6ebbec6858e51f031e8a7ab7b",
    "fabric-package.schema.json": "6b688152984e294b806ffaf3483e6fa2e55cd0d9205bb5cba85f646868d90d58",
    "share-registration.schema.json": "82ef3e8703dd6653b84ba9fdbaec2f366e062596da981b1823be3804fcb65b90"
   }

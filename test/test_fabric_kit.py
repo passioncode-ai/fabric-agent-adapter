@@ -24,10 +24,10 @@ from test_fabric_service import load  # noqa: E402
 fabric_kit = load("fabric_kit")
 
 MAX_LINES = 1000
-#: Modules over MAX_LINES while FAA-65 splits them; an entry leaves when its module is split, and none is ever added.
-OVERSIZE = {"fabric_board.py", "fabric-board.mjs", "fabric_session.py"}
+#: Modules over MAX_LINES. FAA-65 split every one; an entry may only be added with a backlog row that splits it.
+OVERSIZE = set()
 #: Scripts beside the kit that are programs or tools, not library modules a service copies.
-NOT_KIT = {"check_service.py", "sample_service.py", "dashboard_kit.py", "check_dashboard_link.py", "fabric_kit.py",
+NOT_KIT = {"check_service.py", "check_service_rules.py", "sample_service.py", "dashboard_kit.py", "check_dashboard_link.py", "fabric_kit.py",
            "sample-remote-service.mjs", "check_dashboard_layout.mjs"}
 #: The core's home modules, and the local definitions that keep their own on purpose.
 CORE_PY = ("fabric_jsvalue.py", "fabric_time.py", "fabric_crypto.py")
@@ -86,7 +86,8 @@ class Manifest(unittest.TestCase):
 class Shape(unittest.TestCase):
     def test_no_module_over_the_line_ceiling(self):
         files = [SCRIPTS / e["file"] for e in KIT["python"] + KIT["node"]] + [SCRIPTS / n for n in ("check_service.py",)]
-        files.append(ROOT / "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py")
+        files += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/scripts/*.py"))  # every script, kit or not
+        files += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/scripts/*.mjs"))
         over = sorted(f.name for f in files if len(f.read_text(encoding="utf-8").splitlines()) > MAX_LINES)
         self.assertEqual(sorted(set(over) - OVERSIZE), [], "split it, or it would join the shrinking OVERSIZE list")
         self.assertEqual(sorted(OVERSIZE - set(over)), [], "a split module leaves OVERSIZE")
