@@ -719,6 +719,9 @@ def validate_repo() -> List[str]:
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/SKILL.md"))
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/references/*.md"))
     people += sorted((ROOT / "test/evals").glob("*/*.json"))
+    # What the installer, the CLI and the kit's demo print or show to a person (code comments elsewhere are not scanned).
+    people += [ROOT / "install.sh", ROOT / "bin/fabric-agent-adapter.js"]
+    people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/assets/**/*.html"))
     for path in people:
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if path.is_file() else ():
             if "\u2014" in line:

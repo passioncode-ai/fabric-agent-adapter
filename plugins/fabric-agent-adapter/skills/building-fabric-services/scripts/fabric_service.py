@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import http.server
 import json
+import math
 import ntpath
 import os
 from pathlib import Path, PurePath
@@ -1734,11 +1735,21 @@ _DAY_MS = 86_400_000
 
 
 def _usage_count(value: Any) -> int:
-    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 2 ** 53 - 1 else 0
+    """The contract's `count`: Number.isSafeInteger and not negative, so 5.0 (which JavaScript reads as 5) counts."""
+    import fabric_estate  # noqa: E402
+    return int(value) if not isinstance(value, bool) and fabric_estate._safe_integer(value) and value >= 0 else 0
+
+
+def _usage_money(value: Any) -> Optional[float]:
+    """A JSON number as JavaScript holds it (an integer beyond a double is Infinity), or None for anything else."""
+    import fabric_estate  # noqa: E402
+    return fabric_estate._double(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 def _usage_cost(value: Any) -> float:
-    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and value == value and value >= 0 and value != float("inf") else 0.0
+    """The contract's `cost`: a known, finite, non-negative cost, or 0."""
+    money = _usage_money(value)
+    return money if money is not None and math.isfinite(money) and money >= 0 else 0.0
 
 
 def _exceeds(a: float, b: float) -> bool:
@@ -1797,8 +1808,7 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
     previous = ""
     for i, day in enumerate(days):
         at = "/days/%d" % i
-        date = day.get("date")
-        date = "" if date is None else (date if isinstance(date, str) else json.dumps(date))
+        date = fabric_estate._show("" if day.get("date") is None else day["date"])  # the contract's show(day.date ?? "")
         if date <= previous:
             flag(at + "/date", "days must run forward without a repeat (%s after %s)" % (date, previous))
         previous = date
@@ -1822,9 +1832,13 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
             if number(day, field) != total:
                 shown = fabric_estate._show(0 if day.get(field) is None else day[field])
                 flag("%s/%s" % (at, field), "the day's %s is not the sum of its models (%s ≠ %s)" % (field, shown, fabric_estate._js_string(total)))
-        known = sum(m["costUsd"] for m in models if isinstance(m.get("costUsd"), (int, float)) and not isinstance(m.get("costUsd"), bool))
-        day_cost = day.get("costUsd")
-        if isinstance(day_cost, (int, float)) and not isinstance(day_cost, bool) and abs(day_cost - known) > 0.000001 + 1e-9 * max(abs(day_cost), abs(known)):
+        known = 0.0
+        for m in models:
+            money = _usage_money(m.get("costUsd"))
+            known += money if money is not None else 0.0
+        day_cost = _usage_money(day.get("costUsd"))
+        # The contract's !close(day, known): Infinity or NaN is never close, so it is a finding.
+        if day_cost is not None and not abs(day_cost - known) <= 0.000001 + 1e-9 * max(abs(day_cost), abs(known)):
             flag(at + "/costUsd", "the day's cost is not the sum of its models' known costs")
     # The window.
     if days:
@@ -1871,7 +1885,7 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
                 run_priced += max(0, _usage_count(run.get("calls")) - _usage_count(run.get("unpricedCalls")))
                 findings.extend(_priced_row(run, "%s/taskRuns/%d" % (at, r)))
             project_priced = max(0, _usage_count(project.get("calls")) - _usage_count(project.get("unpricedCalls")))
-            known_cost = isinstance(project.get("costUsd"), (int, float)) and not isinstance(project.get("costUsd"), bool) and _usage_cost(project.get("costUsd")) == project.get("costUsd")
+            known_cost = _usage_cost(project.get("costUsd")) == _usage_money(project.get("costUsd"))  # as JavaScript holds it
             if run_calls > _usage_count(project.get("calls")):
                 flag(at + "/taskRuns", "a project's task runs hold more calls than the project (%d > %d)" % (run_calls, _usage_count(project.get("calls"))))
             elif run_priced > project_priced:

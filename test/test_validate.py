@@ -194,6 +194,29 @@ class LicenseTests(unittest.TestCase):
             run = subprocess.run([sys.executable, str(copy / "test/validate.py")], capture_output=True, text=True)
             return run.returncode, run.stdout + run.stderr
 
+    def test_an_em_dash_in_text_people_read_fails(self):  # FAA-64: the operator's rule, held here
+        for rel in ("README.md", "plugins/fabric-agent-adapter/skills/building-fabric-services/references/usage.md",
+                    "test/evals/building-fabric-services/scenarios.json", "install.sh", "bin/fabric-agent-adapter.js",
+                    "plugins/fabric-agent-adapter/skills/building-fabric-services/assets/dashboard-kit/demo.html"):
+            def mutate(copy, rel=rel):
+                path = copy / rel
+                path.write_text(path.read_text(encoding="utf-8").replace("the", "the \u2014", 1), encoding="utf-8")
+            with self.subTest(rel):
+                code, out = self._validate_copy(mutate)
+                self.assertNotEqual(code, 0, out)
+                self.assertIn("%s:" % rel, out)
+                self.assertIn("U+2014", out)
+
+    def test_release_state_in_the_readme_fails(self):  # FAA-64: README said 0.21.0 until 0.39.1
+        for sentence in ("This source checkout is 0.1.0.", "0.1.0 is the latest published npm release."):
+            def mutate(copy, sentence=sentence):
+                path = copy / "README.md"
+                path.write_text(path.read_text(encoding="utf-8") + "\n" + sentence + "\n", encoding="utf-8")
+            with self.subTest(sentence):
+                code, out = self._validate_copy(mutate)
+                self.assertNotEqual(code, 0, out)
+                self.assertIn("release state", out)
+
     def test_the_expression_is_the_organizations(self):
         self.assertEqual(validate.LICENSE_SPDX, "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial")
 

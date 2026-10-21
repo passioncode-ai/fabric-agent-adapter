@@ -40,14 +40,17 @@ class Attribution(unittest.TestCase):
 
 class UsageRules(unittest.TestCase):
     def test_fac_sem_025_answers_as_the_contract_does(self):
-        self.assertEqual(len(V["usage"]), 204)
-        for c in V["usage"]:
-            with self.subTest(c["name"]):
-                self.assertEqual([(f["code"], f["instancePath"]) for f in fs.usage_findings(c["report"])],
-                                 [(f["code"], f["instancePath"]) for f in c["findings"]])
+        self.assertEqual((len(V["usage"]), len(V["usageText"])), (208, 8))
+        # Each report as an object, and each as the JSON text both languages parse their own way: code, path and message.
+        cases = [(c["name"], c["report"], c["findings"]) for c in V["usage"]]
+        cases += [(c["name"], json.loads(c["text"]), c["findings"]) for c in V["usageText"]]
+        for name, report, expected in cases:
+            with self.subTest(name):
+                self.assertEqual([(f["code"], f["instancePath"], f["message"]) for f in fs.usage_findings(report)],
+                                 [(f["code"], f["instancePath"], f["message"]) for f in expected])
 
     def test_the_probe_reads_window_projects_and_routes(self):
-        for c in V["usage"]:
+        for c in V["usage"] + [dict(c, report=json.loads(c["text"])) for c in V["usageText"]]:
             r = c["report"]
             with self.subTest(c["name"]):
                 problems = probe.usage_problems(r, r["service"]["id"], r["service"]["instance"])

@@ -1146,7 +1146,7 @@ export function usageFindings(report) {
   let previous = '';
   days.forEach((day, i) => {
     const at = `/days/${i}`;
-    const date = String(day.date ?? '');
+    const date = show(day.date ?? '');
     if (date <= previous) flag(`${at}/date`, `days must run forward without a repeat (${date} after ${previous})`);
     previous = date;
     findings.push(...pricedRow(day, at));
@@ -1162,7 +1162,8 @@ export function usageFindings(report) {
       if (toNumber(day[field] ?? 0) !== sum) flag(`${at}/${field}`, `the day's ${field} is not the sum of its models (${show(day[field] ?? 0)} ≠ ${sum})`);
     }
     const known = models.map((m) => (typeof m.costUsd === 'number' ? m.costUsd : null)).filter((x) => x !== null).reduce((n, x) => n + x, 0);
-    if (typeof day.costUsd === 'number' && Math.abs(day.costUsd - known) > 0.000001 + 1e-9 * Math.max(Math.abs(day.costUsd), Math.abs(known))) flag(`${at}/costUsd`, "the day's cost is not the sum of its models' known costs");
+    // The contract's !close(day, known): Infinity or NaN is never close, so it is a finding.
+    if (typeof day.costUsd === 'number' && !(Math.abs(day.costUsd - known) <= 0.000001 + 1e-9 * Math.max(Math.abs(day.costUsd), Math.abs(known)))) flag(`${at}/costUsd`, "the day's cost is not the sum of its models' known costs");
   });
   if (days.length) {
     const generated = strictTime(value.generatedAt);
@@ -1186,8 +1187,8 @@ export function usageFindings(report) {
       const at = `/byProject/${p}`;
       const normal = normalIdentifier(project.projectId);
       if (normal !== undefined) {
-        if (seen.has(normal)) flag(`${at}/projectId`, `each project is one row: ${String(project.projectId)} names the project ${seen.get(normal)} already names`);
-        else seen.set(normal, String(project.projectId));
+        if (seen.has(normal)) flag(`${at}/projectId`, `each project is one row: ${show(project.projectId)} names the project ${seen.get(normal)} already names`);
+        else seen.set(normal, show(project.projectId));
       }
       projectCalls += usageCount(project.calls);
       projectCost += usageCost(project.costUsd);

@@ -1341,8 +1341,8 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
 
 def print_status(report: Dict[str, Any]) -> None:
     hub = report["hub"]
-    line = {"running": "running (process %s)" % hub.get("pid"), "not-running": "not running — %s" % hub.get("reason"),
-            "not-a-hub": "not verified — %s" % hub.get("reason")}[hub["state"]]
+    line = {"running": "running (process %s)" % hub.get("pid"), "not-running": "not running: %s" % hub.get("reason"),
+            "not-a-hub": "not verified: %s" % hub.get("reason")}[hub["state"]]
     claude = report["claudeCode"]
     print("Fabric: %s" % line)
     print("fabric-mcp: %s" % (report["fabricMcp"] or "not found at the default install locations"))

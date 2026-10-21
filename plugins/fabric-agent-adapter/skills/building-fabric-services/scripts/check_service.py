@@ -923,7 +923,10 @@ def usage_problems(report: Any, service_id: str, instance: str) -> List[str]:
     # The arithmetic of FAC-SEM-025 is the kit's `usage_findings`, the contract's `usageRules` held to its vectors: one
     # implementation, so the probe never disagrees with the kit and never throws on a count that is not a number.
     for i, day in enumerate(days):
-        if not isinstance(day, dict) or not isinstance(day.get("byModel"), list):
+        if not isinstance(day, dict):
+            out.append("days[%d]: not an object" % i)
+            continue
+        if not isinstance(day.get("byModel"), list):
             out.append("days[%d]: byModel missing" % i)
             continue
         for row, at in [(day, "days[%d]" % i)] + [(m, "days[%d].byModel[%d]" % (i, j)) for j, m in enumerate(day["byModel"]) if isinstance(m, dict)]:
