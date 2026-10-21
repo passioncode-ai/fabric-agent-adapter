@@ -62,8 +62,8 @@ def _finite(value: float) -> bool:
 def _register_ok(kind: str, fields: Dict[str, Any]) -> bool:
     if kind == ENROLL_TOKEN_TYPE:
         return (_matches(_ESTATE_SCOPE, fields["scope"]) and _matches(_SHA256, fields["genesis"]) and fields["purpose"] == ENROLL_PURPOSE
-                and (fields["ceiling"] is None or _matches(_SHA256, fields["ceiling"])) and _finite(_estate.estate_time(fields["notBefore"]))
-                and _finite(_estate.estate_time(fields["expiresAt"])) and _matches(_NONCE32, fields["nonce"]) and _is_one(fields["uses"]))
+                and (fields["ceiling"] is None or _matches(_SHA256, fields["ceiling"])) and _finite(_ftime.parse_rfc3339_ms(fields["notBefore"]))
+                and _finite(_ftime.parse_rfc3339_ms(fields["expiresAt"])) and _matches(_NONCE32, fields["nonce"]) and _is_one(fields["uses"]))
     return _matches(_SHA256, fields["digest"]) and _matches(_NONCE32, fields["nonce"])
 
 
@@ -77,7 +77,7 @@ def signing_statement(kind: str, fields: Any) -> Optional[bytes]:
     if not _register_ok(kind, fields):
         return None
     try:
-        return _delegation.jcs(dict(fields, type=kind)).encode("utf-8")
+        return _jsv.jcs(dict(fields, type=kind)).encode("utf-8")
     except (TypeError, ValueError):
         return None
 
@@ -100,7 +100,7 @@ def verify_enroll_token(token: Any, *, record: Any, genesis: Any, at: Any) -> Di
     clock (an aware datetime or epoch seconds). The first failure answers: no-clock, malformed, wrong-estate, the passkey
     (no-trusted-authority, revoked-authority, duplicate-authority, unknown-authority), the assertion, then the window
     (too-long-lived, not-yet-valid, expired). Success: ``{"ok": True, "nonce", "expiresAt", "signedBy"}``."""
-    now = _estate._clock(at)
+    now = _ftime.clock_ms(at)
     if not _finite(now):
         return {"ok": False, "problem": "no-clock"}
     fields = _statement_fields(token)
@@ -112,31 +112,31 @@ def verify_enroll_token(token: Any, *, record: Any, genesis: Any, at: Any) -> Di
         return {"ok": False, "problem": "malformed"}
     if fields["scope"] != "estate:%s" % record["estate"] or not isinstance(genesis, str) or fields["genesis"] != genesis:
         return {"ok": False, "problem": "wrong-estate"}
-    authorities = _estate._list(record.get("authorities"))
+    authorities = _jsv.objects(record.get("authorities"))
     if not authorities:
         return {"ok": False, "problem": "no-trusted-authority"}
     credential_id = signature["credentialId"]
-    if any(entry.get("kind") == "authority" and _estate._same(entry.get("ref", _estate._MISSING), credential_id) for entry in _estate._list(record.get("revocations"))):
+    if any(entry.get("kind") == "authority" and _jsv.same(entry.get("ref", _jsv.MISSING), credential_id) for entry in _jsv.objects(record.get("revocations"))):
         return {"ok": False, "problem": "revoked-authority"}
-    matches = [entry for entry in authorities if _estate._same(entry.get("credentialId", _estate._MISSING), credential_id)]
+    matches = [entry for entry in authorities if _jsv.same(entry.get("credentialId", _jsv.MISSING), credential_id)]
     if len(matches) > 1:
         return {"ok": False, "problem": "duplicate-authority"}
     if not matches:
         return {"ok": False, "problem": "unknown-authority"}
     authority = matches[0]
     origins = authority.get("origins")
-    rp_id = _estate._show(authority.get("rpId", _estate._MISSING))
+    rp_id = _jsv.show(authority.get("rpId", _jsv.MISSING))
     if not _estate.is_signing_rp_id(rp_id):
         return {"ok": False, "problem": "wrong-rp"}
-    credential = {"credentialId": credential_id, "alg": _estate._show(authority.get("alg", _estate._MISSING)),
+    credential = {"credentialId": credential_id, "alg": _jsv.show(authority.get("alg", _jsv.MISSING)),
                   "publicKey": authority["publicKey"] if isinstance(authority.get("publicKey"), dict) else {}, "rpId": rp_id,
                   "origins": [o for o in origins if isinstance(o, str) and _estate.origin_within(o, rp_id)] if isinstance(origins, list) else []}
     challenge = hashlib.sha256(signing_statement(ENROLL_TOKEN_TYPE, fields)).digest()
     assertion = _estate.verify_assertion(signature, credential, challenge)
     if not assertion["ok"]:
         return {"ok": False, "problem": assertion["problem"]}
-    not_before = _estate.estate_time(fields["notBefore"])
-    expires_at = _estate.estate_time(fields["expiresAt"])
+    not_before = _ftime.parse_rfc3339_ms(fields["notBefore"])
+    expires_at = _ftime.parse_rfc3339_ms(fields["expiresAt"])
     if expires_at <= not_before or expires_at - not_before > MAX_ENROLL_TOKEN_SECONDS * 1000:
         return {"ok": False, "problem": "too-long-lived"}
     if now < not_before - _estate.CLOCK_SKEW_SECONDS * 1000:
@@ -177,8 +177,8 @@ def _token_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
         flag("/statement/purpose", "an enroll token's purpose is agent-host")
     if not _is_one(statement.get("uses")):
         flag("/statement/uses", "an enroll token is used once: uses is 1, and the hub binds its nonce on the first use")
-    not_before = _estate.estate_time(statement.get("notBefore"))
-    expires_at = _estate.estate_time(statement.get("expiresAt"))
+    not_before = _ftime.parse_rfc3339_ms(statement.get("notBefore"))
+    expires_at = _ftime.parse_rfc3339_ms(statement.get("expiresAt"))
     rest = {name: v for name, v in statement.items() if name != "type"}
     named = not extra and not missing and statement.get("purpose") == ENROLL_PURPOSE and _is_one(statement.get("uses")) and _finite(not_before) and _finite(expires_at)
     if named and signing_statement(ENROLL_TOKEN_TYPE, rest) is None:
@@ -201,20 +201,21 @@ _PROOF = re.compile(r"[A-Za-z0-9_-]{85}[AQgw]\Z")
 
 
 def _b64url(text: str) -> bytes:
+    """Strict base64url decode: a length the alphabet cannot produce raises, as the ceremony's readers expect."""
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
 def _es256_raw(octets: bytes, message: bytes, raw: bytes) -> bool:
     """ECDSA P-256 over SHA-256 with a 64-byte r || s signature, low-S only (relay-auth/1's form)."""
-    if len(octets) != 65 or octets[0] != 4 or not _estate.is_valid_p256_key(octets) or len(raw) != 64:
+    if len(octets) != 65 or octets[0] != 4 or not _crypto.is_valid_p256_key(octets) or len(raw) != 64:
         return False
     r, s = int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:], "big")
-    n = _estate._N
+    n = _crypto._P256_N
     if not (1 <= r < n and 1 <= s <= n // 2):
         return False
     e = int.from_bytes(hashlib.sha256(message).digest(), "big")
     w = pow(s, -1, n)
-    point = _estate._shamir(e * w % n, r * w % n, (int.from_bytes(octets[1:33], "big"), int.from_bytes(octets[33:], "big")))
+    point = _crypto._shamir(e * w % n, r * w % n, (int.from_bytes(octets[1:33], "big"), int.from_bytes(octets[33:], "big")))
     return point is not None and point[0] % n == r
 
 
@@ -227,7 +228,7 @@ def _proves(key: Dict[str, Any], message: str, proof: Any) -> bool:
     signature = _b64url(proof)
     if key.get("alg") == "es256":
         return _es256_raw(octets, message.encode("utf-8"), signature)
-    return _delegation.ed25519_verify(octets, message.encode("utf-8"), signature)
+    return _crypto.ed25519_verify(octets, message.encode("utf-8"), signature)
 
 
 def redeem_enroll_token(token: Any, machine_key: Any, proof: Any, ledger: Any) -> Dict[str, Any]:
@@ -244,11 +245,11 @@ def redeem_enroll_token(token: Any, machine_key: Any, proof: Any, ledger: Any) -
     if not _proves(machine_key, join, proof):
         return {"ok": False, "problem": "bad-proof"}
     fingerprint = _estate.device_key_fingerprint(machine_key)
-    entry = ledger.get(nonce, _estate._MISSING)
+    entry = ledger.get(nonce, _jsv.MISSING)
     if isinstance(entry, dict) and entry.get("state") == "revoked":
         return {"ok": False, "problem": "revoked"}
-    if entry is not _estate._MISSING:
-        bound = _estate._show(entry.get("fingerprint", _estate._MISSING)) if isinstance(entry, dict) else _estate._show(entry)
+    if entry is not _jsv.MISSING:
+        bound = _jsv.show(entry.get("fingerprint", _jsv.MISSING)) if isinstance(entry, dict) else _jsv.show(entry)
         return {"ok": False, "problem": "reused", "log": {"nonce": nonce, "presented": fingerprint, "boundTo": bound}}
     return {"ok": True, "record": {"nonce": nonce, "state": "redeemed", "fingerprint": fingerprint}}
 
@@ -268,13 +269,10 @@ _KEY_MEMBERS = ["alg", "kid", "publicKey", "use"]
 _ALGORITHMS = {"sig": ("es256", "ed25519"), "kem": ("ecdh-p256",)}
 
 
-def _json_equal(a: Any, b: Any) -> bool:
-    """The contract's jsonEqual: arrays in order, objects by their members, primitives as JavaScript's ===."""
-    if isinstance(a, list) or isinstance(b, list):
-        return isinstance(a, list) and isinstance(b, list) and len(a) == len(b) and all(_json_equal(x, y) for x, y in zip(a, b))
-    if isinstance(a, dict) or isinstance(b, dict):
-        return isinstance(a, dict) and isinstance(b, dict) and len(a) == len(b) and all(k in b and _json_equal(a[k], b[k]) for k in a)
-    return _estate._same(a, b)
+from fabric_jsvalue import json_equal as _json_equal  # noqa: E402,F401 - moved (FAA-65)
+import fabric_time as _ftime  # noqa: E402 - the core (FAA-65)
+import fabric_jsvalue as _jsv  # noqa: E402 - the core (FAA-65)
+import fabric_crypto as _crypto  # noqa: E402 - the core (FAA-65)
 
 
 def _is_role(value: Any) -> bool:
@@ -337,7 +335,7 @@ def pairing_commit(side: Any) -> Dict[str, Any]:
     problem = _side_problem(side)
     if problem:
         return {"ok": False, "problem": problem}
-    return {"ok": True, "commit": "sha256:" + _sha_hex(_delegation.jcs(dict({"type": COMMIT_TYPE, "role": side["role"]}, **_covered(side))))}
+    return {"ok": True, "commit": "sha256:" + _sha_hex(_jsv.jcs(dict({"type": COMMIT_TYPE, "role": side["role"]}, **_covered(side))))}
 
 
 def _message(value: Any, step: str) -> Optional[Dict[str, Any]]:
@@ -354,7 +352,7 @@ def check_reveal(commit: Any, reveal: Any, expected: Optional[str] = None) -> Di
     c, r = _message(commit, "commit"), _message(reveal, "reveal")
     if c is None or r is None:
         return {"ok": False, "problem": "malformed"}
-    if not _estate._same(r["role"], c["role"]) or (expected is not None and not _estate._same(r["role"], expected)):
+    if not _jsv.same(r["role"], c["role"]) or (expected is not None and not _jsv.same(r["role"], expected)):
         return {"ok": False, "problem": "role-mismatch"}
     made = pairing_commit({k: v for k, v in r.items() if k not in ("schema", "step")})
     if not made["ok"]:
@@ -369,14 +367,14 @@ def comparison_code(new_reveal: Any, trusted_reveal: Any) -> Dict[str, Any]:
     a, b = _message(new_reveal, "reveal"), _message(trusted_reveal, "reveal")
     if a is None or b is None:
         return {"ok": False, "problem": "malformed"}
-    if not _estate._same(a["role"], "new") or not _estate._same(b["role"], "trusted"):
+    if not _jsv.same(a["role"], "new") or not _jsv.same(b["role"], "trusted"):
         return {"ok": False, "problem": "role-mismatch" if _is_role(a["role"]) and _is_role(b["role"]) else "bad-role"}
     problem = _side_problem(a) or _side_problem(b)
     if problem:
         return {"ok": False, "problem": problem}
     if machine_of_keys(a["keys"]) == machine_of_keys(b["keys"]):
         return {"ok": False, "problem": "same-machine"}
-    digest = hashlib.sha256(_delegation.jcs({"type": CODE_TYPE, "new": _covered(a), "trusted": _covered(b)}).encode("utf-8")).digest()
+    digest = hashlib.sha256(_jsv.jcs({"type": CODE_TYPE, "new": _covered(a), "trusted": _covered(b)}).encode("utf-8")).digest()
     return {"ok": True, "code": str(int.from_bytes(digest[:5], "big") % 10 ** CODE_DIGITS).zfill(CODE_DIGITS)}
 
 
@@ -384,7 +382,7 @@ def estate_fingerprint(digest: Any) -> Dict[str, Any]:
     """The estate's fingerprint from revision 1's digest: five groups of five digits a person compares."""
     if not _matches(_SHA256, digest):
         return {"ok": False, "problem": "malformed"}
-    f = hashlib.sha256(_delegation.jcs({"type": FINGERPRINT_TYPE, "digest": digest}).encode("utf-8")).digest()
+    f = hashlib.sha256(_jsv.jcs({"type": FINGERPRINT_TYPE, "digest": digest}).encode("utf-8")).digest()
     groups = [str(int.from_bytes(f[5 * i:5 * i + 5], "big") % 10 ** FINGERPRINT_GROUP_DIGITS).zfill(FINGERPRINT_GROUP_DIGITS) for i in range(FINGERPRINT_GROUPS)]
     return {"ok": True, "fingerprint": " ".join(groups)}
 
@@ -403,8 +401,8 @@ def checked_comparison_code(new_commit: Any, new_reveal: Any, trusted_commit: An
 def rendezvous_verdict(opened_at: Any, messages: Any, at: Any) -> Dict[str, Any]:
     """A one-time rendezvous after the messages it carried, at ``at`` (an aware datetime or epoch seconds): open,
     complete, or burned with the reason and the index of the message that burned it."""
-    opened = _estate.estate_time(opened_at)
-    now = _estate._clock(at)
+    opened = _ftime.parse_rfc3339_ms(opened_at)
+    now = _ftime.clock_ms(at)
     if not _finite(opened) or not _finite(now) or not isinstance(messages, list):
         return {"state": "burned", "reason": "malformed", "index": -1}
     if now > opened + RENDEZVOUS_SECONDS * 1000 or now < opened - _estate.CLOCK_SKEW_SECONDS * 1000:
@@ -443,21 +441,21 @@ def _machine_of(record: Dict[str, Any], machine_id: Any) -> Optional[Dict[str, A
     machines = record.get("machines")
     if not isinstance(machines, list):
         return None
-    return next((m for m in machines if isinstance(m, dict) and _estate._same(m.get("id", _estate._MISSING), machine_id)), None)
+    return next((m for m in machines if isinstance(m, dict) and _jsv.same(m.get("id", _jsv.MISSING), machine_id)), None)
 
 
 def _machine_revoked(record: Dict[str, Any], machine_id: Any) -> bool:
     revocations = record.get("revocations")
     return isinstance(revocations, list) and any(isinstance(e, dict) and e.get("kind") == "machine"
-                                                 and _estate._same(e.get("ref", _estate._MISSING), machine_id) for e in revocations)
+                                                 and _jsv.same(e.get("ref", _jsv.MISSING), machine_id) for e in revocations)
 
 
 def join_listed(record: Any, new_reveal: Any, trusted_reveal: Any, genesis: Any) -> Dict[str, Any]:
     """What the new machine checks before it pins and applies: the estate is the one the code bound, and the record
     lists it with exactly the keys it revealed and the trusted machine with its revealed #sig key, revoking neither."""
     a, b = _message(new_reveal, "reveal"), _message(trusted_reveal, "reveal")
-    if (not isinstance(record, dict) or a is None or b is None or not _estate._same(a["role"], "new")
-            or not _estate._same(b["role"], "trusted") or _side_problem(a) or _side_problem(b)):
+    if (not isinstance(record, dict) or a is None or b is None or not _jsv.same(a["role"], "new")
+            or not _jsv.same(b["role"], "trusted") or _side_problem(a) or _side_problem(b)):
         return {"ok": False, "problem": "malformed"}
     if not isinstance(genesis, str) or b["genesis"] != genesis:
         return {"ok": False, "problem": "other-estate"}

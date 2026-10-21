@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.39.1"
+VERSION = "0.40.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -711,7 +711,7 @@ def validate_repo() -> List[str]:
         if needle not in license_section:
             errors.append("README.md ## License must carry the licensing wording: %r" % needle)
     # Release state is CHANGELOG.md's and the GitHub releases': prose that says which version a checkout is, or which one
-    # is the latest published, is stale by the next release (README said 0.21.0 until 0.39.1).
+    # is the latest published, is stale by the next release (README said 0.21.0 until 0.40.0).
     for stale in re.finditer(r"(?:source checkout is|latest published[^.\n]*release)", readme_text, re.IGNORECASE):
         errors.append("README.md states release state (%r): link CHANGELOG.md instead" % stale.group(0))
     # The operator's rule: text a person reads carries no em dash (U+2014). CHANGELOG.md and docs/ are dated records.

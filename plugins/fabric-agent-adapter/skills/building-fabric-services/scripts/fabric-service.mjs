@@ -10,6 +10,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { normalIdentifier } from './fabric-identifiers.mjs';
+import { show, toNumber } from './fabric-jsvalue.mjs';
 import { credentialName, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 
 export const PROTOCOL = 'fabric-service/0.1';
@@ -1066,7 +1067,7 @@ function byProject(receipts, first, last) {
   });
 }
 
-const utcDate = (ms) => new Date(ms).toISOString().slice(0, 10);
+import { parseRfc3339Ms as strictTime, utcDateMs, utcDay as utcDate } from './fabric-time.mjs'; // the core's (FAA-65)
 const emptyRow = (extra = {}) => ({ ...extra, calls: 0, unpricedCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0 });
 function closeRow(row) {
   const { cost, ...rest } = row;
@@ -1085,24 +1086,6 @@ const usageCost = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 
 const exceeds = (a, b) => a - b > 0.000001 + 1e-9 * Math.max(Math.abs(a), Math.abs(b));
 const usd = (v) => String(Math.round(v * 1e6) / 1e6);
 const usageList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'object' && x !== null && !Array.isArray(x)) : []);
-const RFC3339_TIME = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$/;
-function strictTime(value) {
-  const m = typeof value === 'string' ? RFC3339_TIME.exec(value) : null;
-  if (!m) return NaN;
-  const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number);
-  const date = new Date(0);
-  date.setUTCFullYear(y, mo - 1, d);
-  if (date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d || h > 23 || mi > 59 || s > 59) return NaN;
-  return Date.parse(value);
-}
-function utcDateMs(value) {
-  const m = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
-  if (!m) return NaN;
-  const [y, mo, d] = m.slice(1).map(Number);
-  const ms = Date.UTC(y, mo - 1, d);
-  const date = new Date(ms);
-  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d ? ms : NaN;
-}
 function pricedRow(row, at) {
   const calls = usageCount(row.calls), unpriced = usageCount(row.unpricedCalls);
   const flag = (p, message) => [{ code: 'FAC-SEM-025', instancePath: p, message }];
@@ -1119,25 +1102,6 @@ function pricedRow(row, at) {
  * date exists, not after `generatedAt`'s UTC date, at most 30 days before it) and the project attribution (each project
  * once by its normal form, each task run once; calls, priced calls and known costs bounded). Never throws.
  */
-/** The contract's `toNumber` (src/findings.ts): `Number()` without its throw on an object such as {"toString": 1}. */
-function toNumber(value) {
-  try {
-    return Number(value);
-  } catch {
-    return Number.NaN;
-  }
-}
-
-/** The contract's `show`: `String()`, or the value's JSON where `String()` would throw. */
-function show(value) {
-  if (typeof value === 'string') return value;
-  try {
-    return String(value);
-  } catch {
-    return JSON.stringify(value) ?? typeof value;
-  }
-}
-
 export function usageFindings(report) {
   const value = typeof report === 'object' && report !== null && !Array.isArray(report) ? report : {};
   const findings = [];

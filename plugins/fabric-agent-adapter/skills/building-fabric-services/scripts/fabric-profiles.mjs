@@ -18,43 +18,12 @@ const BARE_BINARY = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export class ProfileError extends Error {}
 
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
+import { isObject, objects as list, indexed, show, jsonEqual, toNumber } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 const strings = (value) => (Array.isArray(value) ? value.filter((item) => typeof item === 'string') : []);
-/** The object items of an array with their index as written, so an instancePath names the item even after a non-object. */
-const indexed = (value) => (Array.isArray(value) ? value.flatMap((item, index) => (isObject(item) ? [[item, index]] : [])) : []);
 /** DEC-0083: the model class of a model whose vendor publishes its weights openly — descriptive: a policy admits and
  * excludes nothing by it — and what a lane reads when it reads what a member, a client or the public sends. */
 export const OPEN_VENDOR = 'open-vendor';
 export const USER_CONTENT = 'user-content';
-/** The contract's `show`: String(value), or its JSON where String() throws (an object whose own `toString` is data). */
-const show = (value) => {
-  if (typeof value === 'string') return value;
-  try {
-    return String(value);
-  } catch {
-    return JSON.stringify(value) ?? typeof value;
-  }
-};
-/** The contract's jsonEqual: arrays by item, objects by own member whatever the order, anything else by ===, so 1 and
- * true differ and NaN equals nothing (a JSON.stringify comparison would call NaN and null equal). */
-function jsonEqual(a, b) {
-  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => jsonEqual(item, b[i]));
-  if (isObject(a) || isObject(b)) {
-    if (!isObject(a) || !isObject(b)) return false;
-    const keys = Object.keys(a);
-    return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && jsonEqual(a[key], b[key]));
-  }
-  return a === b;
-}
-/** The contract's toNumber: Number(value), or NaN where Number() throws (an object whose own toString is data). */
-const toNumber = (value) => {
-  try {
-    return Number(value);
-  } catch {
-    return Number.NaN;
-  }
-};
 
 /** FAC-SEM-060: the request's profile, else the agent's, else the binding's or project's, else the estate default. */
 export function resolveModelProfile({ catalogue, profiles, choices = {}, policy } = {}) {

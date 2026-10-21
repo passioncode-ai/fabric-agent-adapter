@@ -1731,19 +1731,19 @@ def _close_totals(row: Dict[str, Any]) -> Dict[str, Any]:
 # --- FAC-SEM-025 whole (DEC-0021, DEC-0065, CT-40, DEC-0076): the contract's `usageRules` -----------------------------
 
 _USAGE_WINDOW_DAYS = 31
-_DAY_MS = 86_400_000
+from fabric_time import DAY_MS as _DAY_MS  # noqa: E402 - FAA-65
 
 
 def _usage_count(value: Any) -> int:
     """The contract's `count`: Number.isSafeInteger and not negative, so 5.0 (which JavaScript reads as 5) counts."""
     import fabric_estate  # noqa: E402
-    return int(value) if not isinstance(value, bool) and fabric_estate._safe_integer(value) and value >= 0 else 0
+    return int(value) if not isinstance(value, bool) and _jsv.safe_integer(value) and value >= 0 else 0
 
 
 def _usage_money(value: Any) -> Optional[float]:
     """A JSON number as JavaScript holds it (an integer beyond a double is Infinity), or None for anything else."""
     import fabric_estate  # noqa: E402
-    return fabric_estate._double(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    return _jsv.double(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 def _usage_cost(value: Any) -> float:
@@ -1761,15 +1761,7 @@ def _usd(value: float) -> str:
     return str(int(rounded)) if rounded == int(rounded) else repr(rounded)
 
 
-def _utc_date_ms(value: Any) -> float:
-    match = re.fullmatch(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", value, re.ASCII) if isinstance(value, str) else None
-    if not match:
-        return float("nan")
-    try:
-        day = _dt.date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
-    except ValueError:
-        return float("nan")
-    return float((day - _dt.date(1970, 1, 1)).days * _DAY_MS)
+from fabric_time import utc_date_ms as _utc_date_ms  # noqa: E402 - FAA-65
 
 
 def _usage_list(value: Any) -> List[Dict[str, Any]]:
@@ -1808,7 +1800,7 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
     previous = ""
     for i, day in enumerate(days):
         at = "/days/%d" % i
-        date = fabric_estate._show("" if day.get("date") is None else day["date"])  # the contract's show(day.date ?? "")
+        date = _jsv.show("" if day.get("date") is None else day["date"])  # the contract's show(day.date ?? "")
         if date <= previous:
             flag(at + "/date", "days must run forward without a repeat (%s after %s)" % (date, previous))
         previous = date
@@ -1818,7 +1810,7 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
             findings.extend(_priced_row(m, "%s/byModel/%d" % (at, j)))
         # The contract reads every count as `toNumber(x ?? 0)` and writes it with `show`: a string count is read as a
         # number, and what is no number (an object, "abc") is NaN, which equals no sum, so it is a finding.
-        number = lambda row, f: fabric_estate._js_to_number(row.get(f))  # noqa: E731 - None and absent read as 0
+        number = lambda row, f: _jsv.js_to_number(row.get(f))  # noqa: E731 - None and absent read as 0
         if not models:
             spent = any(number(day, f) > 0 for f in ("calls", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens")) \
                 or number(day, "costUsd") > 0
@@ -1830,8 +1822,8 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
             for m in models:
                 total += number(m, field)  # in order, in doubles, as JavaScript adds
             if number(day, field) != total:
-                shown = fabric_estate._show(0 if day.get(field) is None else day[field])
-                flag("%s/%s" % (at, field), "the day's %s is not the sum of its models (%s ≠ %s)" % (field, shown, fabric_estate._js_string(total)))
+                shown = _jsv.show(0 if day.get(field) is None else day[field])
+                flag("%s/%s" % (at, field), "the day's %s is not the sum of its models (%s ≠ %s)" % (field, shown, _jsv.js_string(total)))
         known = 0.0
         for m in models:
             money = _usage_money(m.get("costUsd"))
@@ -1842,7 +1834,7 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
             flag(at + "/costUsd", "the day's cost is not the sum of its models' known costs")
     # The window.
     if days:
-        generated = fabric_estate.estate_time(value.get("generatedAt"))
+        generated = _ftime.parse_rfc3339_ms(value.get("generatedAt"))
         if generated != generated:
             flag("/generatedAt", "generatedAt is an RFC 3339 date-time with an offset, so the window can be read")
         else:
@@ -2113,8 +2105,9 @@ def _is_timestamp(value: Any) -> bool:
     return hour <= 23 and minute <= 59 and second <= 60 and offset_ok
 
 
-def _number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+from fabric_jsvalue import is_number as _number  # noqa: E402 - the core's (FAA-65)
+import fabric_time as _ftime  # noqa: E402 - the core (FAA-65)
+import fabric_jsvalue as _jsv  # noqa: E402 - the core (FAA-65)
 
 
 def usage_limit_problems(report: Dict[str, Any]) -> List[str]:

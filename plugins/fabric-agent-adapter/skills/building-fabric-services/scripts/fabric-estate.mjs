@@ -11,7 +11,7 @@
 // Node's own crypto: ES256 through createPublicKey (JWK) and verify (DER), EdDSA through Ed25519.
 
 import crypto from 'node:crypto';
-import { jcs } from './fabric-delegation.mjs';
+import { jcs } from './fabric-jsvalue.mjs';
 import { normalIdentifier } from './fabric-identifiers.mjs';
 import { secretValue } from './fabric-secrets.mjs';
 
@@ -23,28 +23,7 @@ export const CLOCK_SKEW_SECONDS = 60;
 export const ASSERTION_ALGORITHMS = Object.freeze(['ES256', 'EdDSA']);
 export const FLAGS = Object.freeze({ UP: 0x01, UV: 0x04, BE: 0x08, BS: 0x10, AT: 0x40, ED: 0x80 });
 
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-const isString = (value) => typeof value === 'string';
-const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
-/** The object items of an array with their index as written, so an instancePath names the item even after a non-object. */
-const indexed = (value) => (Array.isArray(value) ? value.flatMap((item, index) => (isObject(item) ? [[item, index]] : [])) : []);
-/** The contract's `show`: String(value), or its JSON where String() throws (an object whose own `toString` is data). */
-const show = (value) => {
-  if (typeof value === 'string') return value;
-  try {
-    return String(value);
-  } catch {
-    return JSON.stringify(value) ?? typeof value;
-  }
-};
-/** The contract's `toNumber`: Number(value), or NaN where Number() throws. */
-const toNumber = (value) => {
-  try {
-    return Number(value);
-  } catch {
-    return Number.NaN;
-  }
-};
+import { isObject, isString, objects as list, indexed, show, toNumber, keyOf } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 /** DEC-0082: the personal context, and an organization's context `org:<orgId>` (the contract's `context-route.ts`). */
 export const PERSONAL_CONTEXT = 'personal';
 export const ORG_CONTEXT_PREFIX = 'org:';
@@ -59,43 +38,15 @@ export function parseContext(value) {
 }
 /** A placement's or a secret placement's context: its `context`, `personal` when absent (DEC-0082). */
 const contextOf = (entry) => (entry.context === undefined ? PERSONAL_CONTEXT : entry.context);
-/** A collision-free key over JSON values. */
-const keyOf = (...parts) => JSON.stringify(parts);
-const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest();
+import { sha256, isSmallOrderOrMalformed as smallOrder, isValidP256Key } from './fabric-crypto.mjs'; // the core's (FAA-65)
+export { isValidP256Key };
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const bytes = (text) => Buffer.from(text, 'base64url');
 const canonical = (text) => Buffer.from(text, 'base64url').toString('base64url') === text;
 
-const SMALL_ORDER = new Set([
-  '0000000000000000000000000000000000000000000000000000000000000000', '0100000000000000000000000000000000000000000000000000000000000000',
-  '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05', 'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
-  'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f', 'edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
-  'eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
-]);
-/** The contract's isSmallOrderKey: a key that is not 32 bytes counts as one too. */
-function smallOrder(raw) {
-  if (raw.length !== 32) return true;
-  const cleared = Buffer.from(raw);
-  cleared[31] &= 0x7f;
-  return SMALL_ORDER.has(cleared.toString('hex'));
-}
 
-// ---- P-256 (DEC-0053; SEC 1 v2 §3.2.2) ----
 
-const P = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffffn;
-const B = 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604bn;
-const toBig = (part) => BigInt(`0x${Buffer.from(part).toString('hex')}`);
 
-/** Whether `raw` is a valid uncompressed P-256 public key: 0x04 ‖ X ‖ Y, both below p, on the curve. */
-export function isValidP256Key(raw) {
-  if (raw.length !== 65 || raw[0] !== 0x04) return false;
-  const x = toBig(raw.subarray(1, 33));
-  const y = toBig(raw.subarray(33, 65));
-  if (x >= P || y >= P) return false;
-  const left = (y * y) % P;
-  const right = (((x * x) % P) * x - 3n * x + B) % P;
-  return left === ((right % P) + P) % P;
-}
 
 // ---- WebAuthn Level 3 §7.2, offline ----
 
@@ -180,17 +131,8 @@ export const estateChallengeInput = (digest) => Buffer.from(jcs({ type: ESTATE_C
 /** The WebAuthn challenge a signer passes to navigator.credentials.get(): SHA-256 of estateChallengeInput. */
 export const estateChallenge = (digest) => sha256(estateChallengeInput(digest));
 
-const RFC3339 = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$/;
-/** An RFC 3339 date-time as milliseconds, or NaN: `T`, an offset and a day that exists; a space and `:60` refused (ER-10). */
-export function estateTime(value) {
-  const match = isString(value) ? RFC3339.exec(value) : null;
-  if (!match) return Number.NaN;
-  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
-  const date = new Date(0);
-  date.setUTCFullYear(year, month - 1, day);
-  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59) return Number.NaN;
-  return Date.parse(value);
-}
+import { parseRfc3339Ms as estateTime, clockMs as clockOf } from './fabric-time.mjs'; // the core's (FAA-65)
+export { estateTime };
 const LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
 /** `sign.` and at least two more labels, lower case: a signing RP ID is never a bare `sign.<tld>` (DEC-0063). */
 const SIGNING_RP = new RegExp(`^sign(?:\\.${LABEL}){2,}$`);
@@ -220,7 +162,6 @@ function signingCredential(credential, path, flag) {
 }
 
 const revocationKey = (entry) => `${String(entry.kind)} ${String(entry.ref)}`;
-const clockOf = (at) => (at instanceof Date ? at.getTime() : (typeof at === 'number' && Number.isFinite(at) ? at * 1000 : Number.NaN));
 
 /**
  * The reference verifier, in the order of estate-record.md's ER table. `at` is the clock (a Date, or epoch seconds); pass

@@ -21,14 +21,8 @@ const ESTATE_SCOPE = /^estate:[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}$/;
 const NONCE32 = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 const ASSERTION_MEMBERS = 'alg,authenticatorData,clientDataJSON,credentialId,format,sig';
 
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-const isString = (value) => typeof value === 'string';
+import { isObject, isString, objects as list, show, jsonEqual } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 const matches = (pattern, value) => isString(value) && pattern.test(value);
-const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
-const show = (value) => {
-  if (typeof value === 'string') return value;
-  try { return String(value); } catch { return JSON.stringify(value) ?? typeof value; }
-};
 const REGISTER = new Map([
   [ENROLL_TOKEN_TYPE, { fields: ENROLL_TOKEN_FIELDS, check: (f) => matches(ESTATE_SCOPE, f.scope) && matches(SHA256, f.genesis) && f.purpose === ENROLL_PURPOSE
     && (f.ceiling === null || matches(SHA256, f.ceiling)) && Number.isFinite(estateTime(f.notBefore)) && Number.isFinite(estateTime(f.expiresAt)) && matches(NONCE32, f.nonce) && f.uses === 1 }],
@@ -180,15 +174,6 @@ const sha = (text) => crypto.createHash('sha256').update(Buffer.from(text, 'utf8
 const uint40 = (digest, offset) => digest.readUIntBE(offset, 5);
 const own = (value, key) => (isObject(value) && Object.hasOwn(value, key) ? value[key] : undefined);
 const isRole = (value) => value === 'new' || value === 'trusted';
-function jsonEqual(a, b) {
-  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => jsonEqual(item, b[i]));
-  if (isObject(a) || isObject(b)) {
-    if (!isObject(a) || !isObject(b)) return false;
-    const keys = Object.keys(a);
-    return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && jsonEqual(a[key], b[key]));
-  }
-  return a === b;
-}
 
 /** The machine a key list belongs to, or undefined (one sig key, at most one kem key, one machine id, valid keys). */
 export function machineOfKeys(keys) {

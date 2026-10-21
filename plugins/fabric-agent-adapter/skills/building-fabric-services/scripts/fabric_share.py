@@ -50,9 +50,9 @@ def _objects(value: Any) -> List[Any]:
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
 
 
-def _indexed(value: Any) -> List[Any]:
-    """The object items of a list with their index as written, so an instancePath names the item after a non-object."""
-    return [(item, index) for index, item in enumerate(value) if isinstance(item, dict)] if isinstance(value, list) else []
+from fabric_jsvalue import indexed_objects as _indexed  # noqa: E402 - the core's (FAA-65)
+import fabric_time as _ftime  # noqa: E402 - the core (FAA-65)
+import fabric_jsvalue as _jsv  # noqa: E402 - the core (FAA-65)
 
 
 def is_share_grant_id(value: Any) -> bool:
@@ -91,8 +91,8 @@ def grant_findings(grant: Any, at: str = "") -> List[Dict[str, str]]:
 def _agents_under(record: Dict[str, Any], context: Any, grant_id: Any) -> set:
     """The agentRefs the placements of ``record`` in ``context`` run under the grant ``grant_id`` (by normal form)."""
     placements = [placement for machine in _objects(record.get("machines")) for placement in _objects(machine.get("packages"))]
-    return {_estate._show(placement.get("agentRef", _estate._MISSING)) for placement in placements
-            if _estate._same(placement.get("context", _estate._MISSING), context)
+    return {_jsv.show(placement.get("agentRef", _jsv.MISSING)) for placement in placements
+            if _jsv.same(placement.get("context", _jsv.MISSING), context)
             and isinstance(grant_id, str) and _ids.same_identifier(placement.get("grant"), grant_id)}
 
 
@@ -116,7 +116,7 @@ def org_share_grants_findings(value: Any) -> List[Dict[str, str]]:
         if parent is None:
             continue
         before = next((old for old in _objects(parent.get("shareGrants"))
-                       if _estate._same(old.get("context", _estate._MISSING), grant["context"]) and isinstance(old.get("meta"), dict)
+                       if _jsv.same(old.get("context", _jsv.MISSING), grant["context"]) and isinstance(old.get("meta"), dict)
                        and isinstance(grant_id, str) and _ids.same_identifier(old["meta"].get("id"), grant_id)), None)
         earlier = _agents_under(parent, before.get("context"), grant_id) if before is not None else set()
         if earlier and any(ref not in earlier for ref in refs):
@@ -126,7 +126,7 @@ def org_share_grants_findings(value: Any) -> List[Dict[str, str]]:
 
 def _time(value: Any) -> float:
     """An instant as milliseconds, or NaN: the schema's pattern and a day that exists."""
-    return _estate.estate_time(value) if isinstance(value, str) and _INSTANT.match(value) else float("nan")
+    return _ftime.parse_rfc3339_ms(value) if isinstance(value, str) and _INSTANT.match(value) else float("nan")
 
 
 def registration_findings(value: Any) -> List[Dict[str, str]]:
@@ -152,7 +152,7 @@ def grant_usage_context_findings(value: Any) -> List[Dict[str, str]]:
     for position, event in enumerate(_objects(batch.get("events"))):  # the index among the objects, as the contract counts it
         if event.get("kind") != "grant.usage":
             continue
-        context = event["data"].get("context", _estate._MISSING) if isinstance(event.get("data"), dict) else _estate._MISSING
+        context = event["data"].get("context", _jsv.MISSING) if isinstance(event.get("data"), dict) else _jsv.MISSING
         if not isinstance(org, str) or not isinstance(context, str) or context != "org:" + org:
             findings.append(_finding("FAC-SEM-045", "/batch/events/%d/data/context" % position, "a grant's usage carries its grant's own context, org: and the client certificate's org.id; another organization's is refused as attribution"))
     return findings

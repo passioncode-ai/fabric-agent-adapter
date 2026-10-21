@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.40.0 - 2026-10-21
+
+The kits as production modules (FAA-65). Every name a kit module made public at 0.39.1 is still there.
+
+### Added
+
+- **A shared core, once per language** (layer L0 and L1): `fabric_jsvalue` / `fabric-jsvalue.mjs` (JavaScript's view
+  of JSON values: `show`, `js_to_number`, `same`, `json_equal`, `jcs` and the rest), `fabric_time` / `fabric-time.mjs`
+  (strict RFC 3339, UTC days, day windows, an injectable clock) and `fabric_crypto` / `fabric-crypto.mjs` (Ed25519 and
+  P-256 checks, small-order keys, base64url, sha256). They used to live, twice, inside the estate and delegation
+  readers; every reader now imports them.
+- **The kit is a manifest-listed set, installable as one.** `kit.json` lists every module in dependency order, with the
+  kit modules it imports, its sha256 and the sha256 of every release since 0.8.0. `fabric_kit.py install <dir>`
+  copies a module's closure (data files included); `status <dir>` says `current`, `older` (with its release) or
+  `modified`, and names a module a copy imports but lacks. SKILL.md said the kit was "one self-contained file"; it was
+  not, and a one-file copy of `fabric_service.py` failed in `usage_findings`.
+
+### Changed
+
+- No import cycle is left: `fabric_estate` no longer imports `fabric_delegation`, in both languages.
+
 ## 0.39.1 - 2026-10-21
 
 Fixes from two rounds of blind review of 0.39.0 (FAA-64).

@@ -16,14 +16,7 @@ export const ORG_CONTEXT = /^org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const INSTANT = /^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-5][0-9](?:\.[0-9]{1,3})?(?:[Zz]|[+-][0-9]{2}:[0-9]{2})$/;
 const SUB_MILLISECOND = /:[0-9]{2}\.[0-9]{4,}/;
 
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-const isString = (value) => typeof value === 'string';
-const list = (value) => (Array.isArray(value) ? value.filter(isObject) : []);
-const indexed = (value) => (Array.isArray(value) ? value.flatMap((item, index) => (isObject(item) ? [[item, index]] : [])) : []);
-const show = (value) => {
-  if (typeof value === 'string') return value;
-  try { return String(value); } catch { return JSON.stringify(value) ?? typeof value; }
-};
+import { isObject, isString, objects as list, indexed, show } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 const finding = (code, instancePath, message) => ({ code, instancePath, message });
 const isOrg = (value) => isString(value) && value.startsWith('org:');
 

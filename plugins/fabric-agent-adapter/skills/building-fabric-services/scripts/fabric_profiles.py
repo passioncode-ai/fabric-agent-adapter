@@ -39,27 +39,20 @@ class ProfileError(ValueError):
     pass
 
 
-def _list(value: Any) -> List[Dict[str, Any]]:
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+from fabric_jsvalue import objects as _list  # noqa: E402 - the core's (FAA-65)
+from fabric_jsvalue import json_equal as _json_equal  # noqa: E402 - the core's (FAA-65)
+from fabric_jsvalue import indexed_objects as _indexed  # noqa: E402 - the core's (FAA-65)
+import fabric_jsvalue as _jsv  # noqa: E402 - the core (FAA-65)
 
 
-_MISSING_KEY = _estate._MISSING
+_MISSING_KEY = _jsv.MISSING
 
 
 def _at(value: Any, key: str) -> Any:
     """value[key] as JavaScript reads a member: absent is distinct from null (``_MISSING_KEY``)."""
-    return _estate._get(value, key)
+    return _jsv.get(value, key)
 
 
-def _json_equal(a: Any, b: Any) -> bool:
-    """The contract's jsonEqual on parsed JSON: arrays by item, objects by member whatever the order, anything else by
-    ===, so 1 and true differ and NaN equals nothing."""
-    if isinstance(a, list) or isinstance(b, list):
-        return isinstance(a, list) and isinstance(b, list) and len(a) == len(b) and all(_json_equal(x, y) for x, y in zip(a, b))
-    if isinstance(a, dict) or isinstance(b, dict):
-        return (isinstance(a, dict) and isinstance(b, dict) and len(a) == len(b)
-                and all(k in b and _json_equal(v, b[k]) for k, v in a.items()))
-    return _estate._same(a, b)  # NaN != NaN in Python too
 
 
 def _without_nan(value: Any) -> Any:
@@ -71,10 +64,6 @@ def _without_nan(value: Any) -> Any:
     return None if isinstance(value, float) and not math.isfinite(value) else value
 
 
-def _indexed(value: Any) -> List[tuple]:
-    """The object items of an array with their index as written, so an instancePath names the item even after a
-    non-object (the contract's ``indexed``)."""
-    return [(item, i) for i, item in enumerate(value) if isinstance(item, dict)] if isinstance(value, list) else []
 
 
 def _set_key(value: Any) -> Any:
@@ -87,7 +76,7 @@ def _set_key(value: Any) -> Any:
     if isinstance(value, bool):
         return ("boolean", value)
     if isinstance(value, (int, float)):
-        return ("number", _estate._double(value))
+        return ("number", _jsv.double(value))
     if isinstance(value, str):
         return ("string", value)
     return ("object", id(value))
@@ -138,7 +127,7 @@ def _resolve(*, catalogue: Any = None, profiles: Any = None, choices: Any = None
         return {"from": level, "profile": profile_id, "models": within}
     meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
     return {"refused": "model-classes-empty", "profile": profile_id,
-            "policy": {"id": _estate._show(_at(meta, "id")), "revision": _estate._js_to_number(_at(meta, "revision"))}}
+            "policy": {"id": _jsv.show(_at(meta, "id")), "revision": _jsv.js_to_number(_at(meta, "revision"))}}
 
 
 def _finding(code: str, path: str, message: str) -> Dict[str, str]:
@@ -171,16 +160,16 @@ def _model_profiles(value: Dict[str, Any]) -> List[Dict[str, str]]:
 def _runner_profile(value: Dict[str, Any]) -> List[Dict[str, str]]:
     findings = []
     if value.get("route") == "subscription" and isinstance(value.get("subscription"), dict):
-        login = _estate._show(_at(value["subscription"], "login"))
+        login = _jsv.show(_at(value["subscription"], "login"))
         runner = SUBSCRIPTION_RUNNER.get(login, _MISSING_KEY)
-        if not _estate._same(runner, _at(value, "runnerKind")):
+        if not _jsv.same(runner, _at(value, "runnerKind")):
             findings.append(_finding("FAC-SEM-059", "/runnerKind", "a %s subscription runs only in %s, not in %s; another runner takes the key route"
-                                     % (login, runner if runner is not _MISSING_KEY else "its vendor's runner", _estate._show(_at(value, "runnerKind")))))
+                                     % (login, runner if runner is not _MISSING_KEY else "its vendor's runner", _jsv.show(_at(value, "runnerKind")))))
     if value.get("route") == "key" and isinstance(value.get("key"), dict):
         key = value["key"]
-        if not _estate._same(_at(key, "modelAllowList"), _at(value, "modelProfile")):
+        if not _jsv.same(_at(key, "modelAllowList"), _at(value, "modelProfile")):
             findings.append(_finding("FAC-SEM-059", "/key/modelAllowList", "the key admits the models of %s, but the profile runs %s"
-                                     % (_estate._show(_at(key, "modelAllowList")), _estate._show(_at(value, "modelProfile")))))
+                                     % (_jsv.show(_at(key, "modelAllowList")), _jsv.show(_at(value, "modelProfile")))))
         if isinstance(key.get("ref"), str) and _secrets.secret_value(key["ref"]):
             findings.append(_finding("FAC-SEM-059", "/key/ref", "the key is named by its secret reference, never by its value"))
     return findings
@@ -206,7 +195,7 @@ def _profile_resolution(value: Dict[str, Any]) -> List[Dict[str, str]]:
     choices = value.get("choices") if isinstance(value.get("choices"), dict) else {}
     expected = _resolve(catalogue=catalogue, profiles=value.get("profiles"), choices=choices, policy=value.get("policy"))
     if not _json_equal(_at(value, "resolved"), expected):
-        findings.append(_finding("FAC-SEM-060", "/resolved", "the resolution is %s" % _estate._json_stringify(_without_nan(expected))))
+        findings.append(_finding("FAC-SEM-060", "/resolved", "the resolution is %s" % _jsv.json_stringify(_without_nan(expected))))
     return findings
 
 
@@ -223,7 +212,7 @@ def closed_user_content_route(profile: Any, catalogue: Any) -> Optional[List[str
                 if isinstance(row.get("id"), str) and OPEN_VENDOR in _strings(row.get("classes"))}
     if any(isinstance(model, str) and model in open_ids for model in route):
         return None
-    return [_estate._show(model) for model in route]
+    return [_jsv.show(model) for model in route]
 
 
 def _closed_route(fallback: Any, closed: List[str]) -> str:
@@ -257,7 +246,7 @@ def _open_vendor_routes(value: Dict[str, Any]) -> List[Dict[str, str]]:
     policy = value.get("policy")
     meta = policy.get("meta") if isinstance(policy, dict) and isinstance(policy.get("meta"), dict) else {}
     findings.append(_finding("FAC-SEM-112", "/resolved/models", "the policy %s leaves profile %s's lane on closed vendors alone: of the "
-                             "models it admits, %s open-vendor in the catalogue" % (_estate._show(meta["id"]) if "id" in meta else "undefined",
+                             "models it admits, %s open-vendor in the catalogue" % (_jsv.show(meta["id"]) if "id" in meta else "undefined",
                                                                                     _show_id(profile), _closed_route(profile.get("fallback"), closed))))
     return findings
 
@@ -265,7 +254,7 @@ def _open_vendor_routes(value: Dict[str, Any]) -> List[Dict[str, str]]:
 
 def _show_id(profile: Dict[str, Any]) -> str:
     """show(profile.id), where an absent id is JavaScript's undefined."""
-    return _estate._show(profile["id"]) if "id" in profile else "undefined"
+    return _jsv.show(profile["id"]) if "id" in profile else "undefined"
 
 
 def profile_problems(kind: str, value: Dict[str, Any]) -> Optional[List[Dict[str, str]]]:
@@ -350,11 +339,11 @@ def model_usable(model: str, catalogue: Any, policy: Any = None) -> List[str]:
     # The last row of an id wins, as a JavaScript Map built from the rows; only a string id can match a model's name.
     rows = {row["id"]: row for row in _list(catalogue.get("models") if isinstance(catalogue, dict) else None) if isinstance(row.get("id"), str)}
     if not isinstance(model, str) or model not in rows:
-        return ["model %s is not in the model catalogue" % _estate._show(model)]
+        return ["model %s is not in the model catalogue" % _jsv.show(model)]
     if isinstance(policy, dict) and isinstance(policy.get("modelClasses"), list):
         allowed = set(_strings(policy["modelClasses"]))
         meta = policy.get("meta") if isinstance(policy.get("meta"), dict) else {}
-        policy_id = _estate._show(_at(meta, "id"))
+        policy_id = _jsv.show(_at(meta, "id"))
         admission = [c for c in _strings(rows[model].get("classes")) if c != OPEN_VENDOR]  # DEC-0083: descriptive
         if not admission:
             return ["model %s has no class but %s, which admits nothing, so policy %s does not allow it" % (model, OPEN_VENDOR, policy_id)]
@@ -406,7 +395,7 @@ _MISSING = object()
 def _field(value: Dict[str, Any], key: str) -> str:
     """The contract's show(value[key]): `undefined` for a missing key, `null` for null, and an object whose own
     `toString` is data as its JSON, where String() would throw."""
-    return _estate._show(_at(value, key))
+    return _jsv.show(_at(value, key))
 
 
 def _object_at(value: Any, key: str) -> Dict[str, Any]:
@@ -501,7 +490,7 @@ def _index_of(ref: Dict[str, Any]) -> float:
     index = ref.get("index")
     if isinstance(index, bool) or not isinstance(index, (int, float)):
         return -1
-    number = _estate._double(index)
+    number = _jsv.double(index)
     return number if math.isfinite(number) and number.is_integer() else -1
 
 
@@ -524,7 +513,7 @@ def _route_event(value: Dict[str, Any]) -> List[Dict[str, str]]:
     def candidate_at(ref: Dict[str, Any], path: str) -> Optional[Dict[str, Any]]:
         index = _index_of(ref)
         candidate = candidates[int(index)] if 0 <= index < len(candidates) else None
-        if (candidate is None or not _estate._same(_at(candidate, "runnerKind"), _at(ref, "runnerKind"))
+        if (candidate is None or not _jsv.same(_at(candidate, "runnerKind"), _at(ref, "runnerKind"))
                 or ("provider" in ref and not _same_ref(candidate.get("provider"), ref["provider"]))):
             wrong(path, "candidate %s (%s) is not that position of the route" % (_field(ref, "index"), _field(ref, "runnerKind")))
             return None
@@ -542,14 +531,14 @@ def _route_event(value: Dict[str, Any]) -> List[Dict[str, str]]:
         indexes = [_index_of(p) for p in probes]
         # Compared with 0...count-1 before any list is built, and the message lists at most 64 candidates, so a count from
         # an index of 2**32 allocates nothing (contract route-rules.ts at DEC-0084, from this kit's report).
-        if _estate._same(len(indexes), count) and all(_estate._same(index, position) for position, index in enumerate(indexes)):
+        if _jsv.same(len(indexes), count) and all(_jsv.same(index, position) for position, index in enumerate(indexes)):
             return
         if count <= 64:  # NaN is not; Array.from({length: count}) takes ToLength
-            expected = ", ".join(map(_estate._js_string, range(int(count) if count > 0 else 0))) or "none"
+            expected = ", ".join(map(_jsv.js_string, range(int(count) if count > 0 else 0))) or "none"
         else:
-            expected = "0 to %s" % _estate._js_string(count - 1)
+            expected = "0 to %s" % _jsv.js_string(count - 1)
         wrong("/probes", "the walk must record candidates %s in order; it records %s"
-              % (expected, ", ".join(map(_estate._js_string, indexes)) or "none"))
+              % (expected, ", ".join(map(_jsv.js_string, indexes)) or "none"))
 
     if event.get("kind") == "runner-exhausted":
         expect_probes(len(candidates))
@@ -565,7 +554,7 @@ def _route_event(value: Dict[str, Any]) -> List[Dict[str, str]]:
             wrong("/selected/session", "%s has attach: never, so the host cannot attach it" % _field(selected, "runnerKind"))
         if selected.get("session") == "spawned" and session.get("spawn") != "allowed":
             wrong("/selected/session", "%s has spawn: never, so the host cannot spawn it" % _field(selected, "runnerKind"))
-        if "drive" in chosen and "drive" in selected and not _estate._same(selected["drive"], chosen["drive"]):
+        if "drive" in chosen and "drive" in selected and not _jsv.same(selected["drive"], chosen["drive"]):
             wrong("/selected/drive", "the route runs %s through %s, not %s" % (_field(selected, "runnerKind"), _field(chosen, "drive"), _field(selected, "drive")))
         if event.get("sticky") is True:
             # A sticky relaunch keeps the conversation's runner and walks nothing above it.

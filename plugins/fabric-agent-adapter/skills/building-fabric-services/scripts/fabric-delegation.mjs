@@ -67,8 +67,10 @@ const SCOPE = /^[a-z][a-z0-9._-]{1,127}( [a-z][a-z0-9._-]{1,127})*$/;
 const SPEND_WINDOWS = ['total', 'task', 'project', 'day', 'week', 'month'];
 const isUri = (value) => typeof value === 'string' && URI.test(value);
 const isAmount = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
-const isObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
-const isString = (value) => typeof value === 'string' && value.length > 0;
+import { jcs, isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
+export { jcs };
+/** A string with at least one character (the token's claims refuse an empty one). */
+const isNonEmptyString = (value) => typeof value === 'string' && value.length > 0;
 const isTime = (value) => typeof value === 'number' && Number.isInteger(value) && value >= 0;
 
 /** Whether a JSON text repeats a member name in one object: refused, never resolved (RFC 7515 §5.2, RFC 8725 §3.2). */
@@ -122,7 +124,7 @@ function parseCompact(token) {
 function headerProblem(header, typ) {
   if (header.alg !== 'EdDSA') return 'alg-not-eddsa';
   if (header.typ !== typ) return 'wrong-typ';
-  if (!isString(header.kid)) return 'no-kid';
+  if (!isNonEmptyString(header.kid)) return 'no-kid';
   for (const member of ['crit', 'jku', 'jwk', 'x5u', 'x5c']) if (header[member] !== undefined) return `header-${member}`;
   return undefined;
 }
@@ -134,7 +136,7 @@ function keyFor(jwks, kid) {
   if (!jwk) return { problem: 'unknown-key' };
   // A key published for another use or algorithm is never a candidate (RFC 7517 §4.2, §4.4).
   if ((jwk.use !== undefined && jwk.use !== 'sig') || (jwk.alg !== undefined && jwk.alg !== 'EdDSA')) return { problem: 'key-not-for-signing' };
-  if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || !isString(jwk.x) || jwk.d !== undefined) return { problem: 'unusable-key' };
+  if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || !isNonEmptyString(jwk.x) || jwk.d !== undefined) return { problem: 'unusable-key' };
   const raw = Buffer.from(jwk.x, 'base64url');
   if (raw.length !== 32) return { problem: 'unusable-key' };
   if (isSmallOrderKey(raw)) return { problem: 'small-order-key' }; // before any verification (DEC-0045, CT-29)
@@ -145,22 +147,8 @@ function keyFor(jwks, kid) {
   }
 }
 
-// The small-order points of edwards25519 and their non-canonical encodings, compared with the sign bit cleared
-// (libsodium's has_small_order list). Under such a key, R = [S]B verifies for a quarter or more of all messages, and
-// Node before 26 lets OpenSSL accept it: the kit refuses these keys itself rather than trust the runtime.
-const SMALL_ORDER = [
-  '0000000000000000000000000000000000000000000000000000000000000000', '0100000000000000000000000000000000000000000000000000000000000000',
-  '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05', 'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
-  'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f', 'edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
-  'eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
-];
-/** Whether a 32-byte Ed25519 public key is a point of small order (in any encoding). */
-export function isSmallOrderKey(key) {
-  if (!Buffer.isBuffer(key) || key.length !== 32) return false;
-  const cleared = Buffer.from(key);
-  cleared[31] &= 0x7f;
-  return SMALL_ORDER.includes(cleared.toString('hex'));
-}
+import { isSmallOrderKey } from './fabric-crypto.mjs'; // the core's (FAA-65)
+export { isSmallOrderKey };
 
 const hasKeys = (jwks) => isObject(jwks) && Array.isArray(jwks.keys) && jwks.keys.length > 0;
 
@@ -189,7 +177,7 @@ export function chainDepth(act) {
   let node = act;
   while (node !== undefined) {
     if (depth > 0 && isPartnerActor(node)) return depth + 1; // a partner actor ends the chain, never begins it
-    if (!isObject(node) || !isString(node.sub)) return Number.POSITIVE_INFINITY;
+    if (!isObject(node) || !isNonEmptyString(node.sub)) return Number.POSITIVE_INFINITY;
     depth += 1;
     if (depth > 64) return depth;
     node = node.act;
@@ -251,7 +239,7 @@ function delegationShape(payload) {
 
 function approvalShape(payload) {
   const { iss, actionDigest: digest, aud, approver, method, iat, exp, jti } = payload;
-  if (!isString(iss) || !isString(digest) || !isString(aud) || !isString(approver) || !isString(jti) || !isTime(iat) || !isTime(exp)) return undefined;
+  if (!isNonEmptyString(iss) || !isNonEmptyString(digest) || !isNonEmptyString(aud) || !isNonEmptyString(approver) || !isNonEmptyString(jti) || !isTime(iat) || !isTime(exp)) return undefined;
   if (method !== 'prompt' && method !== 'operator-channel') return undefined; // DEC-0045: `device` is removed
   return payload;
 }
@@ -292,7 +280,7 @@ function estateProblem({ estate, estateApplied, estateRevocations }, kid, x, now
 export function verifyDelegation(token, { audience, jwks, now, capability, effect, issuer, readOnly, estate, estateApplied, estateRevocations } = {}) {
   // Before row 1: every time row compares against the clock, and a comparison with NaN is always false.
   if (!readableClock(now)) return refuse('unknown-state', 'no-clock');
-  if (!isString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
+  if (!isNonEmptyString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
   if (!hasKeys(jwks)) return refuse('issuer-unavailable', 'no-published-keys');
   const checked = authentic(token, jwks, DELEGATION_TYP);
   if ('problem' in checked) return refuse(checked.issuer ? 'issuer-unavailable' : 'unauthenticated', checked.problem);
@@ -320,7 +308,7 @@ export function verifyApproval(approval, { audience, jwks, now, actionDigest: ex
   if (approval === undefined || approval === null || approval === '') return refuse('approval-required', 'no-approval', { actionDigest: expected });
   if (!isObject(jtiStore) || typeof jtiStore.consume !== 'function') return refuse('unknown-state', 'no-jti-store');
   if (!readableClock(now)) return refuse('unknown-state', 'no-clock');
-  if (!isString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
+  if (!isNonEmptyString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
   if (!hasKeys(jwks)) return refuse('issuer-unavailable', 'no-published-keys');
   const checked = authentic(approval, jwks, APPROVAL_TYP);
   if ('problem' in checked) return refuse(checked.issuer ? 'issuer-unavailable' : 'approval-invalid', checked.problem);
@@ -404,26 +392,6 @@ export function readDelegationToken(headers) {
   return undefined;
 }
 
-/** RFC 8785: members sorted by UTF-16 code units, numbers in ECMAScript form; refuses what has no canonical form. */
-export function jcs(value) {
-  if (value === null || typeof value === 'boolean') return JSON.stringify(value);
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new TypeError('a non-finite number has no canonical form');
-    return JSON.stringify(value);
-  }
-  if (typeof value === 'string') {
-    if (/\p{Surrogate}/u.test(value)) throw new TypeError('a lone surrogate has no canonical form');
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) return `[${Array.from(value, (item) => jcs(item)).join(',')}]`;
-  if (isObject(value)) {
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) throw new TypeError('only plain JSON objects have a canonical form');
-    const keys = Object.keys(value).sort();
-    return `{${keys.map((key) => `${jcs(key)}:${jcs(value[key])}`).join(',')}}`;
-  }
-  throw new TypeError(`${typeof value} has no canonical form`);
-}
 
 /** The digest an approval binds: sha256: and the hex SHA-256 of the action's RFC 8785 form. */
 export const actionDigest = (action) => `sha256:${crypto.createHash('sha256').update(jcs(action), 'utf8').digest('hex')}`;
@@ -492,7 +460,7 @@ export const TIERS = Object.freeze(['T0', 'T1', 'T2']);
  * with no delegation. A present token is verified at every tier. `issuer` (auth.delegation.issuer) is required.
  */
 export function delegationGate({ audience, jwks, effects, issuer, readOnly = false, clock = () => Date.now() / 1000, estate, estateApplied, estateRevocations }) {
-  if (!isString(issuer)) throw new Error('the gate needs the issuer it trusts (auth.delegation.issuer)');
+  if (!isNonEmptyString(issuer)) throw new Error('the gate needs the issuer it trusts (auth.delegation.issuer)');
   return async (tool, headers, tier = 'T2') => {
     const effect = effects?.[tool];
     if (!EFFECT_CLASSES.includes(effect)) return refuse('unknown-state', 'no-declared-effect');

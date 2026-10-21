@@ -255,12 +255,7 @@ def _own(value: Any, key: str) -> Any:
     return value.get(key, _ABSENT) if isinstance(value, dict) else _ABSENT
 
 
-def _days_from_civil(year: int, month: int, day: int) -> int:
-    year -= month <= 2
-    era = (year if year >= 0 else year - 399) // 400
-    yoe = year - era * 400
-    doy = (153 * (month + (-3 if month > 2 else 9)) + 2) // 5 + day - 1
-    return era * 146097 + yoe * 365 + yoe // 4 - yoe // 100 + doy - 719468
+from fabric_time import days_from_civil as _days_from_civil  # noqa: E402 - the core's (FAA-65)
 
 
 def utc_time(value: Any) -> Optional[int]:
