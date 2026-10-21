@@ -3,12 +3,12 @@
 ## Read first
 
 1. The organization's
-   [roadmap](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/roadmap.md) —
+   [roadmap](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/roadmap.md):
    every major feature and release across PassionCode.ai as `RM-*` tracks with owner, phase and
    state. It is the entry point: a task here that serves a track names it, and the track's status
    is edited only in the roadmap.
-2. The PassionCode.ai knowledge base — `fabric-workspace/knowledge/` in your clone (org-index
-   `scripts/clone_all.sh` makes it) or https://wiki.passioncode.ai/knowledge — at least its
+2. The PassionCode.ai knowledge base, `fabric-workspace/knowledge/` in your clone (org-index
+   `scripts/clone_all.sh` makes it) or https://wiki.passioncode.ai/knowledge: at least its
    [README](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/README.md),
    vision, principles and how-to-work.
 3. This file, then the organization's
@@ -17,7 +17,7 @@
 ## What this repository is
 
 Fabric Agent Adapter: makes any agent or existing project Fabric-compatible (a Provider under
-the Fabric Agent Contract) — Agent Skills, reference kits and a conformance probe. It is how an
+the Fabric Agent Contract): Agent Skills, reference kits and a conformance probe. It is how an
 agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm package (`@passioncode-ai/fabric-agent-adapter`): the skills installer, and since 0.31.0 the `pack`, `sign` and `verify` commands for a `fabric-package/1` folder (contract DEC-0050, DEC-0051; `building-fabric-services/scripts/fabric_package.py`, `fabric-package.mjs`). It
 carries four skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
@@ -44,7 +44,7 @@ claude plugin validate . --strict
 <SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs all four in two jobs
 (`python`, `claude-plugin`). `.github/workflows/release.yml` validates, creates a GitHub release
 and publishes to npm on a `v*` tag, but only when the repository variables `RELEASE_ENABLED` and
-`PUBLISH_NPMJS` are `"true"` — off by default in a fork, both `true` here
+`PUBLISH_NPMJS` are `"true"`; off by default in a fork, both `true` here
 (`gh variable list -R passioncode-ai/fabric-agent-adapter`). MCP (register + proving call): the
 README's "Quick start → MCP" runs the sample service and calls `sample.echo` from `claude -p`
 with `--strict-mcp-config` and a temporary config.
@@ -159,8 +159,8 @@ built with the kit prune their own releases with `prune_releases` (current + pre
 
 ## Organisation
 
-This repository is one of the `passioncode-ai` repositories. The organization's rules —
-branches, commits, CI, leases, secrets, handoffs — live in the knowledge base,
+This repository is one of the `passioncode-ai` repositories. The organization's rules
+(branches, commits, CI, leases, secrets, handoffs) live in the knowledge base,
 [`knowledge/rules.md`](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/rules.md)
 (Fabric ADR-0093); the repository map and onboarding are in
 [passioncode-ai/org-index](https://github.com/passioncode-ai/org-index) (both private; readable

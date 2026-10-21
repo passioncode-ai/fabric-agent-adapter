@@ -4,14 +4,14 @@ Normative source: the Fabric Agent Contract's `docs/specification/interop.md` (D
 at the commit this plugin pins. This page says how the kit implements it; where the two
 differ, the contract is right.
 
-A service that other agents — and Fabric — call does five things. Each has one helper in
+A service that other agents (and Fabric) call does five things. Each has one helper in
 `scripts/fabric_interop.py` (Python) and `scripts/fabric-interop.mjs` (Node).
 
 | Rule | What the service does | Helper |
 |---|---|---|
-| C3.1 capability = tool | serves each `mcp` capability of its manifest as the MCP tool of the same name, with the manifest's input schema unchanged, its output schema unchanged — or, for a job, wrapped as `oneOf[result envelope, job handle]` — and annotations from the effect | `tool_for_capability` / `toolForCapability`, `job_tool_output_schema`, `expected_annotations` |
+| C3.1 capability = tool | serves each `mcp` capability of its manifest as the MCP tool of the same name, with the manifest's input schema unchanged, its output schema unchanged (or, for a job, wrapped as `oneOf[result envelope, job handle]`) and annotations from the effect | `tool_for_capability` / `toolForCapability`, `job_tool_output_schema`, `expected_annotations` |
 | C3.2 long work = job | a capability whose work can outlive one request declares `"job": true` in its interop block, returns `{"job": {"id", "status": "working"}}`, and serves `fabric.job.get` and `fabric.job.cancel` | `JobStore`, `McpToolServer` (Python), `unknown_job_result` |
-| C3.2 result | a completed job carries the full result envelope — the shape a synchronous call returns: `id`, `contractVersion`, `outcome`, `done`, `proof`, `scope`, `notVerified`, `artifacts`, `createdAt`, `producer`, `output`, `usage`, and its `trace` | `result_envelope` / `resultEnvelope` |
+| C3.2 result | a completed job carries the full result envelope, the shape a synchronous call returns: `id`, `contractVersion`, `outcome`, `done`, `proof`, `scope`, `notVerified`, `artifacts`, `createdAt`, `producer`, `output`, `usage`, and its `trace` | `result_envelope` / `resultEnvelope` |
 | C3.3 a person decides | the job goes `input_required` with an elicitation: a titled single-select in form mode, and URL mode for anything secret | `choice_request`, `form_request`, `url_request` |
 | C3.4 trace | every call runs as a child span of the caller's `_meta.traceparent`; outgoing calls carry the same trace; the result envelope records it; events about traced work carry `traceId` and `spanId`, events about untraced work none | `child_traceparent`, `trace_ids`, `make_event(..., trace_id=, span_id=)` |
 
@@ -61,7 +61,7 @@ response = server.handle(json_rpc_message)          # POST /mcp body in, JSON re
 open with a handshake, and a server that refuses it is marked failed), `server/discover`,
 `tools/list` and `tools/call` with JSON responses. Every tool's `outputSchema` must be
 rooted at `type: object` (DEC-0018): `add_tool` refuses any other root, because a client may
-drop the whole tool list over one bad schema — an SDK-level test will not show it, so check
+drop the whole tool list over one bad schema; an SDK-level test will not show it, so check
 with the real client (below). A service already on an MCP SDK keeps
 the SDK and uses only the helpers. The Node kit has the helpers and the same job file
 format, without the dispatcher. `scripts/sample_service.py` is the worked example:
@@ -73,7 +73,7 @@ DEC-0017 amended by DEC-0018), so its `structuredContent` always conforms; an ev
 untraced work carries no trace pair.
 
 **Check with a real client**, never only an SDK: `FABRIC_REAL_CLIENT=1 python3 -m unittest
-test.test_real_client` in the adapter repository, or by hand — a throwaway directory, a
+test.test_real_client` in the adapter repository, or by hand: a throwaway directory, a
 temporary `--mcp-config` (mode 600, the token in a header) and `--strict-mcp-config`, so
 the operator's own configuration is not touched:
 
@@ -105,7 +105,9 @@ As a provider:
   `limit_holds=False`, a `limit-reached` job once `approval_granted=True`, and an `outcome-unknown` job never.
 - **Usage you did not measure is `null`, never 0,** but only toward a caller whose request `_meta.protocols` names
   `fabric-interop/0.2`: pass `request_meta` to `result_envelope` (`usage_toward`). Toward any other caller the kit
-  writes the measured lower bound, as before.
+  writes the measured lower bound, as before. Either way, record that call's usage receipt with
+  `tokens_measured=False` / `tokensMeasured: false` and the tokens you have, so your own usage report counts it in
+  `unmeasuredCalls` and does not show the lower bound as complete (DEC-0091, [usage](usage.md)).
 
 As a caller: send `request_meta(traceparent)` as your `_meta` (it names `fabric-interop/0.1` and `0.2`), act on every
 `fabric.job.get` answer as `job_caller_action(answer, now)` says, and resend only under

@@ -11,8 +11,11 @@ const receipt = (extra = {}) => k.makeUsageReceipt('openrouter', 'example-model'
 test('attribution and FAC-SEM-025 answer as the contract does', () => {
   assert.equal(V.attribution.length, 34);
   for (const c of V.attribution) assert.deepEqual(k.attributionHeaders(c.setting, c.request), c.expect, c.name);
-  assert.equal(V.usage.length, 25);
-  for (const c of V.usage) assert.deepEqual(k.usageFindings(c.report).map((f) => [f.code, f.instancePath]), c.findings.map((f) => [f.code, f.instancePath]), c.name);
+  assert.deepEqual([V.usage.length, V.usageText.length], [208, 8]);
+  // Each report as an object, and each as the JSON text both languages parse their own way: code, path and message.
+  for (const c of [...V.usage, ...V.usageText.map((t) => ({ ...t, report: JSON.parse(t.text) }))]) {
+    assert.deepEqual(k.usageFindings(c.report).map((f) => [f.code, f.instancePath, f.message]), c.findings.map((f) => [f.code, f.instancePath, f.message]), c.name);
+  }
 });
 
 test('the report writes byProject in normal form and passes FAC-SEM-025', () => {
@@ -26,4 +29,22 @@ test('the report writes byProject in normal form and passes FAC-SEM-025', () => 
   assert.deepEqual(k.usageFindings(report), []);
   assert.equal('byProject' in k.usageReport([receipt({ costUsd: 1 })], { id: 'example-agent', now: NOW }), false);
   for (const bad of [{ projectId: 'no uri' }, { taskRunId: 'run-1' }, { projectId: 'urn:project:a', taskRunId: '-bad' }]) assert.throws(() => receipt(bad));
+});
+
+test('unmeasured tokens are counted, never guessed (DEC-0091)', () => {
+  const at = '2026-10-13T09:00:00Z';
+  const receipts = [k.makeUsageReceipt('openrouter', 'model-a', { inputTokens: 0, outputTokens: 0, at, tokensMeasured: false }),
+    k.makeUsageReceipt('openrouter', 'model-a', { inputTokens: 10, outputTokens: 5, at, costUsd: 0.1 }),
+    k.makeUsageReceipt('openrouter', 'model-b', { inputTokens: 7, outputTokens: 0, at, tokensMeasured: false, projectId: 'urn:project:a' }),
+    k.makeUsageReceipt('openrouter', 'model-b', { inputTokens: 1, outputTokens: 1, at, tokensMeasured: true })];
+  assert.deepEqual(receipts.map((r) => r.tokensMeasured), [false, undefined, false, undefined], 'written only when false');
+  const report = k.usageReport(receipts, { id: 'example-agent', now: NOW });
+  const day = report.days.at(-1);
+  assert.deepEqual([day.calls, day.unmeasuredCalls, day.inputTokens], [4, 2, 18]);
+  assert.deepEqual(Object.fromEntries(day.byModel.map((m) => [m.model, m.unmeasuredCalls])), { 'model-a': 1, 'model-b': 1 });
+  assert.equal('unmeasuredCalls' in report.byProject[0], false, 'the schema has no unmeasuredCalls on a project');
+  assert.deepEqual(k.usageFindings(report), []);
+  const measured = k.usageReport([receipts[1], receipts[3]], { id: 'example-agent', now: NOW });
+  assert.equal('unmeasuredCalls' in measured.days.at(-1), false, 'absent when every call was measured');
+  for (const bad of [0, 1, null, 'false']) assert.throws(() => k.makeUsageReceipt('openrouter', 'model-a', { inputTokens: 0, outputTokens: 0, at, tokensMeasured: bad }));
 });

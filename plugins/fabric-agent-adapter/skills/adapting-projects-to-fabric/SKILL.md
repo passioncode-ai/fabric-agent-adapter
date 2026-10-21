@@ -1,11 +1,11 @@
 ---
 name: adapting-projects-to-fabric
-description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract—choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility; also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or a brand-new agent — that is creating-fabric-agents.
+description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract (choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility); also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or a brand-new agent (that is creating-fabric-agents).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.39.0"
+  version: "0.39.1"
   contract-version: "0.1.0"
   contract-commit: "c55f2d5a11c9a0197e958e87212fca7ae1154769"
 ---
@@ -23,9 +23,9 @@ Use this skill to adapt or assess a provider project. Do not use it to:
 - design the Fabric host, registry, scheduler, admission service, or project binding runtime;
 - add an MCP server to Claude Code, Codex, or an agent gateway;
 - answer wire-level MCP or A2A questions (transports, sessions, auth handshakes, task
-  states on the wire) — that is `agent-interop` (agent-stack); the pinned contract stays
+  states on the wire): that is `agent-interop` (agent-stack); the pinned contract stays
   normative for what Fabric requires;
-- design a new agent from scratch — that is the sibling skill creating-fabric-agents;
+- design a new agent from scratch: that is the sibling skill creating-fabric-agents;
 - claim admission merely because generated files or a valid manifest exist.
 
 If the project has only a browser interface and no stable API, MCP/A2A surface, or CLI,
@@ -133,14 +133,14 @@ Preserve the chosen ownership boundary:
   heartbeat, and partial results without relying on ambient accounts.
 
 Keep model selection and provider-internal reasoning outside the Fabric contract. Expose
-typed outcomes, evidence, artifacts, and protocol-visible state—not chain-of-thought.
+typed outcomes, evidence, artifacts, and protocol-visible state, not chain-of-thought.
 Treat all provider output as untrusted until schemas and semantic assertions pass.
 
 ### 4b. Announce an agent that is not a service
 
 An agent Fabric reaches as a CLI or a stdio MCP server gets a provider entry, written by
 its installer with [`scripts/fabric_provider.py`](scripts/fabric_provider.py) and removed
-by its uninstaller — argv arrays only, env values as `secret-ref:` references, never the
+by its uninstaller: argv arrays only, env values as `secret-ref:` references, never the
 id of an existing service, and a `providerId` equal to the manifest's `provider.id`. Load [provider entries](references/provider-entry.md). An
 agent that runs as a service uses a descriptor instead (`building-fabric-services`).
 
@@ -174,8 +174,8 @@ python3 <skill-dir>/scripts/adapt_project.py check <project-root> \
 ```
 
 The local check also refuses two lifecycle faults (LC-19, LC-21): a Claude Code plugin in
-the project that declares a stdio MCP server — it starts in every session that enables the
-plugin; serve it over HTTP from one resident process or register it at project scope — and a
+the project that declares a stdio MCP server (it starts in every session that enables the
+plugin; serve it over HTTP from one resident process or register it at project scope), and a
 credential in a launch argument or a URL query, where every process and every log can read it.
 Fix both at their cause; never weaken the check.
 
@@ -214,11 +214,11 @@ operator's four steps:
 4. type the code it shows in the chat with the bot.
 
 In a group shared with other bots the channel follows OC-14…OC-17 (DEC-0035): it stays silent
-unless addressed — `/command@ThisBot`, a reply to its own message or a press of its own button; a
-bare `/command` in a group is not addressed — and a channel nobody receives on is `degraded`
+unless addressed (`/command@ThisBot`, a reply to its own message or a press of its own button; a
+bare `/command` in a group is not addressed), and a channel nobody receives on is `degraded`
 (`receiver-missing`). Say so in the proposal when the operator means to bind a shared group.
 
-Record the answer — `accepted`, `declined` or `later` — in the agent's state and the
+Record the answer (`accepted`, `declined` or `later`) in the agent's state and the
 conformance report, and do not ask again; an agent that serves `surfaces.operatorChannel` also
 shows it as `proposal` in its status document. Creating the bot, storing the token and enabling the
 channel are the operator's action: never create the bot, ask for or store the token's value, or
@@ -246,7 +246,7 @@ first commit:
 org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
 choice, nothing about it is published or listed by the organization, and none of these files is
-required of it — though the verified MCP quick start is still how anyone learns to drive it.
+required of it, though the verified MCP quick start is still how anyone learns to drive it.
 
 ## Completion format
 
@@ -263,7 +263,7 @@ Report:
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates
 passed against a real provider and the project binding is valid.
 
-## Dashboard handoff — also for consumers
+## Dashboard handoff: also for consumers
 
 When handing a registered service dashboard to a person, or writing the generated
 agent's completion/notification instructions, read and apply

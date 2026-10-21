@@ -89,7 +89,8 @@ class RevisionTests(unittest.TestCase):
 
 
 @unittest.skipUnless(os.environ.get('FABRIC_CONTRACT_OLD') and os.environ.get('FABRIC_CONTRACT_NEW'),
-                     'NOT_RUN: set FABRIC_CONTRACT_OLD and FABRIC_CONTRACT_NEW to exact installed checkouts')
+                     'NOT_RUN: set FABRIC_CONTRACT_OLD to an installed checkout of %s (the legacy fixtures) and '
+                     'FABRIC_CONTRACT_NEW to one of %s (the pin)' % (OLD, NEW))
 class CompiledRevisionTests(unittest.TestCase):
     def setUp(self):
         self.old = Path(os.environ['FABRIC_CONTRACT_OLD'])

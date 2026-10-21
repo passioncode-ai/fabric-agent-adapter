@@ -65,7 +65,7 @@ WATCH_MIN_INTERVAL_S = 10
 WATCH_MAX_BACKOFF_S = 900
 SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
-VERSION = "0.39.0"
+VERSION = "0.39.1"
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
          "hermes": "Hermes", "opencode": "OpenCode", "openclaw": "OpenClaw", "pi": "Pi"}
 NATIVE_PLUGIN_HOSTS = frozenset(("hermes", "opencode", "openclaw", "pi"))
@@ -98,7 +98,7 @@ DOWN_NOTICE = (
 FABRIC_MARKERS = ("fabric-agent.json", "fabric-contract.lock.json", "fabric.package.json")
 #: SessionStart sources that keep what the session already holds: a resumed transcript and a compacted one.
 QUIET_SOURCES = frozenset(("compact", "resume"))
-UNREAD_LINE = "%d unread on the project board — com.list"
+UNREAD_LINE = "%d unread on the project board: com.list"
 
 
 # --- where things are -----------------------------------------------------------
@@ -1131,7 +1131,7 @@ def _codex_has(doc: Dict[str, Any], host: str) -> bool:
 
 def _kimi_hooks(data: Optional[bytes]) -> List[Any]:
     if tomllib is None:
-        raise Refused("reading config.toml safely needs Python 3.11 (tomllib); nothing was changed — "
+        raise Refused("reading config.toml safely needs Python 3.11 (tomllib); nothing was changed; "
                       "add the block above by hand, or run this with Python 3.11 or later")
     try:
         doc = tomllib.loads((data or b"").decode("utf-8"))
@@ -1306,7 +1306,7 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
                 "Codex will ask you to approve them again in /hooks." % shifted)
         return 0
     except Refused as exc:
-        err("install-host-hooks: refused — %s" % exc)
+        err("install-host-hooks: refused: %s" % exc)
         return 1
     except OSError as exc:
         err("install-host-hooks: %s could not be written (%s); nothing was changed" % (path, type(exc).__name__))
@@ -1341,8 +1341,8 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
 
 def print_status(report: Dict[str, Any]) -> None:
     hub = report["hub"]
-    line = {"running": "running (process %s)" % hub.get("pid"), "not-running": "not running — %s" % hub.get("reason"),
-            "not-a-hub": "not verified — %s" % hub.get("reason")}[hub["state"]]
+    line = {"running": "running (process %s)" % hub.get("pid"), "not-running": "not running: %s" % hub.get("reason"),
+            "not-a-hub": "not verified: %s" % hub.get("reason")}[hub["state"]]
     claude = report["claudeCode"]
     print("Fabric: %s" % line)
     print("fabric-mcp: %s" % (report["fabricMcp"] or "not found at the default install locations"))

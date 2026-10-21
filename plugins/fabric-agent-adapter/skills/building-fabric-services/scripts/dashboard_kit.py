@@ -408,7 +408,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             for c in report["copies"]:
                 print("  %-8s %s (%s)" % (c["state"], c["path"], c["version"] or "no version marker"))
             if not report["copies"]:
-                print("  no kit copy" + (" — services %s declare a dashboard" % ", ".join(report["services"])
+                print("  no kit copy" + (" (services %s declare a dashboard)" % ", ".join(report["services"])
                                          if report["dashboard"] and report["services"] else ""))
             if report["services"]:
                 print("  services from this repository: %s" % ", ".join(report["services"]))

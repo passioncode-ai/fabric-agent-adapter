@@ -178,11 +178,12 @@ function authentic(token, jwks, typ) {
   return { compact, kid, x: found.x };
 }
 
-/** Depth of an actor chain; Infinity for a chain that is not one (a missing or non-string sub at any level). */
 const ORG_CONTEXT = /^org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 /** DEC-0090: a partner actor is exactly {partner: org:<id>}, never with a sub, a session or an act. */
 export const isPartnerActor = (node) => isObject(node) && typeof node.partner === 'string' && ORG_CONTEXT.test(node.partner) && Object.keys(node).length === 1;
 
+/** Depth of an actor chain; Infinity for a chain that is not one (a missing or non-string sub at any level). A partner
+ * actor ends the chain and counts, never begins it (DEC-0090). */
 export function chainDepth(act) {
   let depth = 0;
   let node = act;

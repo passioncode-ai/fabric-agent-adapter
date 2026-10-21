@@ -258,7 +258,7 @@ def make_handler(svc: Service):
             if url.path == "/":
                 if not self._session_ok():
                     return self._send(401, "Open this dashboard from Fabric Dashboards.", content_type="text/plain")
-                rows = "".join("<li>%s — %s</li>" % (html.escape(e["at"]), html.escape(e["text"]))
+                rows = "".join("<li>%s: %s</li>" % (html.escape(e["at"]), html.escape(e["text"]))
                                for e in reversed(svc.log.fetch(None, 20)))
                 return self._send(200, PAGE.format(name=html.escape(svc.name), agent=html.escape("%s.%s" % (svc.id, svc.instance)), status="ready", rows=rows),
                                   content_type="text/html; charset=utf-8")

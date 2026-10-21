@@ -56,7 +56,7 @@
         "answers fabric.job.get for an unknown id with isError and unknown-job, never a fresh job",
         "completes with the result envelope: done, proof, scope, notVerified, output and usage",
         "declares the job tool's outputSchema as oneOf[result envelope, job handle] (job_tool_output_schema), while the manifest keeps the pure output schema",
-        "completes with the full result envelope — id, contractVersion, outcome, artifacts, createdAt, producer, output, usage — the same shape a synchronous call returns"
+        "completes with the full result envelope (id, contractVersion, outcome, artifacts, createdAt, producer, output, usage), the same shape a synchronous call returns"
       ]
     },
     {
@@ -176,7 +176,8 @@
         "records one usage receipt per model call from the provider's own usage numbers, without prompts, outputs or caller identities",
         "declares surfaces.usage in the well-known document and answers the usage report behind the service token (DEC-0021)",
         "reports up to 31 UTC days per provider and model; a call without a price counts in unpricedCalls and its cost is null, never 0",
-        "states its own budget in the report only if it enforces one, and keeps the receipts bounded to the reported window"
+        "states its own budget in the report only if it enforces one, and keeps the receipts bounded to the reported window",
+        "records a call whose token count it does not know with tokens_measured=False and the tokens it has; the report counts it in unmeasuredCalls, never as complete tokens (DEC-0091)"
       ]
     },
     {
@@ -264,7 +265,7 @@
       "expected": [
         "uses the kit's fabric-button.js (FB-7) with data-service, data-service-name and, when the page knows it, data-project and data-project-name; never a hand-built link",
         "links carry ids only (FL-4): no token, login code, prompt or message; a value the grammar refuses means no button, not a bad link",
-        "hides its own button when the host's fabric_button cookie says owner=host, and shows 'Fabric is not installed — get it at passioncode.ai/fabric' when Fabric is absent (FB-5, FB-6)",
+        "hides its own button when the host's fabric_button cookie says owner=host, and shows a note that Fabric is not installed, naming passioncode.ai/fabric to get it, when Fabric is absent (FB-5, FB-6)",
         "a press opens a view in Fabric and starts nothing by itself (FB-8)"
       ]
     },
@@ -309,7 +310,7 @@
       "trap": "the service's doctor said a runner was 'broken' in its own words, so Fabric could not tell signed out from not installed; and it accepted a route whose second candidate could neither attach nor spawn, then logged a walk that skipped a candidate",
       "request": "example-agent chats through whichever terminal agent the project's route prefers; report each runner's state the way Fabric's walk does and check the route and its events.",
       "expected": [
-        "reports each runner's state with the kit's runner_check / runnerCheck `probe`: not-installed, not-responding or not-connected (the catalogue's auth probe), or null when it can serve — the contract's closed probe results, in the walk's order",
+        "reports each runner's state with the kit's runner_check / runnerCheck `probe`: not-installed, not-responding or not-connected (the catalogue's auth probe), or null when it can serve: the contract's closed probe results, in the walk's order",
         "checks a route with route_problems / routeProblems before pinning it: one candidate per runner kind (FAC-SEM-028), every candidate able to attach or spawn (029)",
         "checks the bundle a host pins: every candidate's provider revision admitted for the capability by id, revision and hash (030), the binding agreeing with the route (032), every kind and drive in the runner catalogue (033)",
         "checks every route event: it names this route, its candidates by position, probes every candidate above the selection in order (all for an exhausted walk), and obeys the session, hold and recovery policy (FAC-SEM-034)",
@@ -318,7 +319,7 @@
     },
     {
       "id": "estate-record-and-certified-keys",
-      "trap": "the service applied an estate revision it had only parsed — a signer the parent had revoked, a validUntil 90 days out, a hub key of small order — and its delegation gate kept trusting a hub key the newest revision no longer certified",
+      "trap": "the service applied an estate revision it had only parsed (a signer the parent had revoked, a validUntil 90 days out, a hub key of small order), and its delegation gate kept trusting a hub key the newest revision no longer certified",
       "request": "example-agent runs on several of the operator's machines; apply only estate revisions the operator signed, and trust a delegation token only under a hub key the current revision certifies.",
       "expected": [
         "checks a revision against estate-record.schema.json, then verify_estate_record / verifyEstateRecord with the verified parent (or, for revision 1, the passkeys pinned at enrollment) and the machine's clock; applies it only on ok",
@@ -331,7 +332,7 @@
     {
       "id": "supervised-by-argument",
       "trap": "the service was installed as a Windows Scheduled Task and by the node; the kit read only FABRIC_SERVICE_SUPERVISOR, which a task's action cannot carry, so every restart exited 75 at once against the old copy's lock, and the service's own argparse exited 2 on --fabric-supervisor",
-      "request": "Make example-agent wait for its old copy under every supervisor — launchd, systemd, the Task Scheduler and the node — and never under a start by hand.",
+      "request": "Make example-agent wait for its old copy under every supervisor (launchd, systemd, the Task Scheduler and the node) and never under a start by hand.",
       "expected": [
         "lets the kit's writers write the marker: launchd_plist and systemd_unit set FABRIC_SERVICE_SUPERVISOR unconditionally, task_xml / taskXml put --fabric-supervisor task-scheduler in the task's Arguments before any --; the node sets either form",
         "reads the marker with supervisor_marker / supervisorMarker: both forms, the managers launchd, systemd, task-scheduler and node, the = spelling, a bare flag that consumes no --… token and stops at --; never infers it from the parent process",
@@ -395,7 +396,7 @@
         "asks once for the board.respond grant (fabric_hub.request_board_access / requestBoardAccess, resource board:<project>/video.render), keeps the credential in a 0600 file (poll_access), and joins with fabric.board.join after re-reading hub.json and checking its pid",
         "runs fabric_board.Responder / Responder in the service process: enroll, claim on a 15 s ± 5 s tick, accept the exact digest the claim returned, effect_begin only before it spends or acts, complete with an observed outcome and at most 8 sha256 artifacts",
         "passes its own input gate as admit: a request body is data, never a prompt or an instruction; a refused request is completed failed_known with the gate's sentence",
-        "stops acting on fenced, lease_expired and authority_changed; checkpoints (fsync) before each step; on restart reconciles unknown outcomes from observe and takes accepted work back only through com.responder_replace's transferred attempts (DEC-0078), leaving it held when Fabric does not answer them — never a com.claim read-back",
+        "stops acting on fenced, lease_expired and authority_changed; checkpoints (fsync) before each step; on restart reconciles unknown outcomes from observe and takes accepted work back only through com.responder_replace's transferred attempts (DEC-0078), leaving it held when Fabric does not answer them, never a com.claim read-back",
         "never sends com.submit, com.cancel, com.read_ack or com.directory through a board session, fails closed when com.status names no idempotency epoch, and checks a directory page with FAC-SEM-107 before looking a Project up",
         "checks it with check_service.py (board.responder) and names the live board smoke NOT_RUN without a disposable Fabric"
       ]
@@ -477,6 +478,17 @@
         "the headless machine reads the token from stdin or a 0600 file, never argv, a URL or a log",
         "it checks the token with `verify_enroll_token(token, record=, genesis=, at=)` and signs `enroll_join_input(token)` with its #sig key",
         "the token gives no trust until a passkey-signed revision lists the machine"
+      ]
+    },
+    {
+      "id": "partner-agent-in-a-customer-organization",
+      "trap": "a partner's publisher key was trusted on every machine of the estate, in the person's own context too, and the partner's agent called a customer's service with no trace of the partner in the chain",
+      "request": "A partner builds example-agent for org:example-org. Make our service verify the partner's package and calls the right way.",
+      "expected": [
+        "the estate record scopes the partner's key in publisherScopes to org:example-org; placement_trust / placementTrust hands that key only to a placement in that context and answers no key elsewhere (DEC-0090, FAC-SEM-122)",
+        "a record whose placement uses the partner's key in another context, a key scoped twice, or a scope over a key publisherKeys does not pin is refused as a rule violation",
+        "the partner's token carries {partner: org:<id>} innermost under the partner's agent; the verifier counts it toward the depth limit, refuses it outermost or as personal (malformed-chain), and the checked chain names it by its org: id",
+        "minting the partner's token and its grant (FAC-SEM-124) stay with the issuer; the service verifies and never mints"
       ]
     }
   ]

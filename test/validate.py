@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.39.0"
+VERSION = "0.39.1"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -710,6 +710,23 @@ def validate_repo() -> List[str]:
                    "https://passioncode.ai/business/", "Versions before %s were released under" % FIRST_AGPL_VERSION):
         if needle not in license_section:
             errors.append("README.md ## License must carry the licensing wording: %r" % needle)
+    # Release state is CHANGELOG.md's and the GitHub releases': prose that says which version a checkout is, or which one
+    # is the latest published, is stale by the next release (README said 0.21.0 until 0.39.1).
+    for stale in re.finditer(r"(?:source checkout is|latest published[^.\n]*release)", readme_text, re.IGNORECASE):
+        errors.append("README.md states release state (%r): link CHANGELOG.md instead" % stale.group(0))
+    # The operator's rule: text a person reads carries no em dash (U+2014). CHANGELOG.md and docs/ are dated records.
+    people = [ROOT / n for n in ("README.md", "AGENTS.md", "SKILL-CARD.md", "CONTRIBUTING.md", "SECURITY.md")]
+    people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/SKILL.md"))
+    people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/references/*.md"))
+    people += sorted((ROOT / "test/evals").glob("*/*.json"))
+    # What the installer, the CLI and the kit's demo print or show to a person (code comments elsewhere are not scanned).
+    people += [ROOT / "install.sh", ROOT / "bin/fabric-agent-adapter.js"]
+    people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/assets/**/*.html"))
+    for path in people:
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if path.is_file() else ():
+            if "\u2014" in line:
+                errors.append("%s:%d carries an em dash (U+2014); use a full stop, comma, colon or parentheses"
+                              % (path.relative_to(ROOT), lineno))
     pr_template = (ROOT / ".github/pull_request_template.md").read_text(encoding="utf-8")
     if "means you agree to the repository's `CLA.md`" not in pr_template:
         errors.append("the PR template must say that opening the pull request means agreeing to CLA.md")

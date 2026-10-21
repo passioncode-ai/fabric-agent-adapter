@@ -26,7 +26,7 @@ Usage:
   npx @passioncode-ai/fabric-agent-adapter [--force]
       install every skill into the agents hub ~/.agents/skills
   npx @passioncode-ai/fabric-agent-adapter --target claude [--force]
-      plain copy into ~/.claude/skills — refused while the plugin is installed
+      plain copy into ~/.claude/skills (refused while the plugin is installed)
   npx @passioncode-ai/fabric-agent-adapter --prune-shadow
       remove plain ~/.claude/skills copies that shadow the installed plugin
   npx @passioncode-ai/fabric-agent-adapter --help
@@ -124,7 +124,7 @@ function main(argv) {
 
   const { skillRoot, names } = skillNames();
   if (!names.length) {
-    console.error(`error: no skills found under ${skillRoot} — corrupted package?`);
+    console.error(`error: no skills found under ${skillRoot}; corrupted package?`);
     return 1;
   }
   const home = os.homedir();
@@ -132,7 +132,7 @@ function main(argv) {
 
   if (prune) {
     if (!hasPlugin) {
-      console.error(`error: the ${PLUGIN_ID} plugin is not installed, so a copy in ~/.claude/skills is not a shadow — nothing removed.`);
+      console.error(`error: the ${PLUGIN_ID} plugin is not installed, so a copy in ~/.claude/skills is not a shadow; nothing removed.`);
       return 1;
     }
     pruneShadows(home, names);
@@ -151,8 +151,8 @@ function main(argv) {
       // One owner per artefact on disk: a plain copy over someone else's link freezes the skill
       // at this version, and its owner stops updating it. --force does not override this.
       console.log(owner === 'launcher'
-        ? `skip: ${name} at ${dest} is managed by the PassionCode launcher — update it with: npx @passioncode-ai/passioncode@latest update`
-        : `skip: ${name} at ${dest} is a link managed elsewhere — remove the link first to install a copy here`);
+        ? `skip: ${name} at ${dest} is managed by the PassionCode launcher; update it with: npx @passioncode-ai/passioncode@latest update`
+        : `skip: ${name} at ${dest} is a link managed elsewhere; remove the link first to install a copy here`);
       continue;
     }
     if (fs.existsSync(dest) && !force) {
@@ -166,7 +166,7 @@ function main(argv) {
   if (target === 'agents' && !hasPlugin) {
     console.log(`Claude Code reads plugins, not the hub:\n  claude plugin marketplace add ${REPO} && claude plugin install ${PLUGIN_ID}`);
   }
-  console.log('Restart your agent — skills load at session start.');
+  console.log('Restart your agent: skills load at session start.');
   return 0;
 }
 

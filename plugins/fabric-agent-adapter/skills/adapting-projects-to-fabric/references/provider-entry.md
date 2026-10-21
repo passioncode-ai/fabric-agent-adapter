@@ -3,7 +3,7 @@
 Normative source: the Fabric Agent Contract's `docs/specification/provider.md`
 (`fabric-provider/0.1`, DEC-0016, rulings DEC-0017) at the commit this plugin pins.
 
-An agent Fabric reaches as a CLI or a stdio MCP server — not a long-running service —
+An agent Fabric reaches as a CLI or a stdio MCP server (not a long-running service)
 is announced by one entry, `providers/<id>.json`, in the same root as the services
 directory:
 
@@ -34,17 +34,17 @@ python3 scripts/fabric_provider.py remove example-agent      # the uninstaller
 
 `--stdio` takes the rest of the line as the argument array; there is no shell string. An entry may carry
 `run.mcp.stdio.scope` (DEC-0044): `project` (started for the sessions of a project that binds it) or `on-demand`;
-`session` — a server in every coding session — is refused (FAC-SEM-056, LC-19). The validator accepts the field; the
+`session` (a server in every coding session) is refused (FAC-SEM-056, LC-19). The validator accepts the field; the
 writer does not set it until Fabric reads it. An argument that carries a credential is refused
 (LC-21, FAC-SEM-057): a key goes in `env` as a `secret-ref:<name>`, never in argv.
 
 It refuses, with one sentence that never quotes a value:
 
 - a manifest that does not resolve, or whose `provider.id` is not the entry's
-  `providerId` — the two URIs are compared as URIs (FAC-SEM-014);
+  `providerId`: the two URIs are compared as URIs (FAC-SEM-014);
 - an id that is already a service in `services/` (FAC-SEM-013);
 - an env value that is not `secret-ref:<name>`, or a reference that has the shape of a
-  credential itself — a token prefix, a private key, a JWT (FAC-SEM-015: a value is
+  credential itself: a token prefix, a private key, a JWT (FAC-SEM-015: a value is
   checked by its form; name patterns apply to names);
 - a URL other than `http://127.0.0.1:<port>/mcp`, a manifest path that is not an
   absolute or `~/` path to `fabric-agent.json`, a shell-string command, unknown fields.

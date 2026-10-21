@@ -1,4 +1,4 @@
-# Lifecycle — supervisor, install, release layout, state
+# Lifecycle: supervisor, install, release layout, state
 
 **This page is the rule** for anyone who builds, installs or runs a `fabric-service/0.1` service with this
 skill. Everything you must follow is stated here or in the public Fabric Agent Contract's
@@ -56,17 +56,17 @@ that document until `service.id` matches (at most 40 s) before it calls the serv
 | Id | Rule | Here | Kit (Python / Node) |
 |---|---|---|---|
 | LC-01 | **Quit reaches exit within a deadline.** Every trigger (`SIGTERM`, `SIGINT`, logout, the app's own quit) ends the process: within 5 s idle, within 10 s with work in flight, then a hard exit. Nothing starts after quit begins | [Shutdown](#shutdown) | `Drain` / `Drain` |
-| LC-02 | **Every child has an owner, a deadline and a process group.** No subprocess without a timeout; on timeout or the parent's exit the whole group goes; no orphan survives. Locks and shared resources are released in `finally` | your own code | — |
+| LC-02 | **Every child has an owner, a deadline and a process group.** No subprocess without a timeout; on timeout or the parent's exit the whole group goes; no orphan survives. Locks and shared resources are released in `finally` | your own code | none |
 | LC-03 | **A job is bounded and exclusive.** One copy holds `service.lock`; a scheduled job has a watchdog shorter than its interval, shares its lock with every manual entry point, bounds every network call and records each run's outcome. Long work is journalled before it starts | [One copy under a supervisor](#one-copy-under-a-supervisor) | `hold_single_instance` / `holdSingleInstance` |
-| LC-04 | **Credentials are silent after setup.** No background prompt; a credential read that is denied or absent is cached and backs off until a person acts | [Directories](#directories) (secret files 0600) | — |
-| LC-05 | **Identity is stable across updates.** The supervisor runs a stable executable inside a release directory, never an interpreter by a versioned package-manager path; signed builds are pinned by team and identifier | [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes) | — |
+| LC-04 | **Credentials are silent after setup.** No background prompt; a credential read that is denied or absent is cached and backs off until a person acts | [Directories](#directories) (secret files 0600) | none |
+| LC-05 | **Identity is stable across updates.** The supervisor runs a stable executable inside a release directory, never an interpreter by a versioned package-manager path; signed builds are pinned by team and identifier | [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes) | none |
 | LC-09 | **The footprint is declared.** The service's `AGENTS.md` names every resident process, its supervisor label, unit or task and its port, who starts each and who stops it | the descriptor and the supervisor file | `write_descriptor`, `launchd_plist`, `systemd_unit` / `systemdUnit`, `task_xml` / `taskXml` |
 | LC-11 | **An update is a lifecycle event.** An upgrade writes a new immutable release and restarts through the supervisor; the previous release is kept for rollback, older ones are pruned | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `prune_releases` / `pruneReleases` |
 | LC-12 | **Every file is bounded.** Logs rotate by size (5 × 5 MB), mode 0600, never in `/tmp`; temporary leftovers are swept at start | [Logs](#logs) | `RotatingLog`, `cap_stdout_log` / `RotatingLog`, `capStdoutLog` |
 | LC-14 | **The operator's intent wins; uninstall is symmetric.** No install or upgrade re-enables what the operator turned off; uninstall removes what install added (supervisor file, override, descriptor), and data goes only on an explicit purge | [Install, upgrade, uninstall](#install-upgrade-uninstall), [Linux and Windows](#linux-and-windows) | `launchd_install` / `launchdInstall`, `launchd_uninstall` / `launchdUninstall`; `systemd_install` / `systemdInstall`, `task_install` / `taskInstall` and their uninstalls |
 | LC-15 | **Builds clean up after themselves.** At most the current release and the one before it remain; the prune runs inside the installer, not later | [Install, upgrade, uninstall](#install-upgrade-uninstall) | `prune_releases` / `pruneReleases` |
 | LC-21 | **A secret never travels in a command line.** Keys reach the process through its environment, a 0600 file or a vault, never argv; a supervisor file carries no secret | [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes), [Linux and Windows](#linux-and-windows) | the supervisor-file writers refuse a secret-shaped value |
-| LC-22 | **Work survives a restart.** Work started but not finished is journalled on disk, without secrets, before it starts; the restarted service takes it back or cleans it up | [Shutdown](#shutdown) | — (the service's own journal) |
+| LC-22 | **Work survives a restart.** Work started but not finished is journalled on disk, without secrets, before it starts; the restarted service takes it back or cleans it up | [Shutdown](#shutdown) | none (the service's own journal) |
 
 ## launchd plist (generate it with `launchd_plist` or `launchdPlist`; both kits write the same bytes)
 
@@ -78,8 +78,8 @@ that document until `service.id` matches (at most 40 s) before it calls the serv
 | `KeepAlive` | `true` | `{SuccessfulExit:false}` leaves a cleanly exited service down |
 | `ThrottleInterval` | `10` | bounds a crash loop |
 | `ExitTimeOut` | above the drain and its hard exit (15 s default; `Drain` ends by 10 s) | SIGKILL arrives after it, so it must never come first |
-| `ProcessType` | `Standard` — never `Background`, and no `Nice` > 0 or `LowPriorityIO` | a host probes the service and agents call it while the Mac is busy; a background job is starved for tens of seconds under load and every host reports an outage that never happened (the probe's `lifecycle.priority` rule fails it) |
-| `EnvironmentVariables` | `PATH` set explicitly; `*_FILE` paths to secrets; `FABRIC_SERVICE_SUPERVISOR=launchd` | never a secret value — the plist is world-readable in backups; the supervisor marker is how the lock knows to back off (the probe's `lifecycle.supervisor-marker` rule fails a plist without it: a copy that finds the lock held would exit 75 at once into a respawn every `ThrottleInterval`) |
+| `ProcessType` | `Standard`, never `Background`, and no `Nice` > 0 or `LowPriorityIO` | a host probes the service and agents call it while the Mac is busy; a background job is starved for tens of seconds under load and every host reports an outage that never happened (the probe's `lifecycle.priority` rule fails it) |
+| `EnvironmentVariables` | `PATH` set explicitly; `*_FILE` paths to secrets; `FABRIC_SERVICE_SUPERVISOR=launchd` | never a secret value: the plist is world-readable in backups; the supervisor marker is how the lock knows to back off (the probe's `lifecycle.supervisor-marker` rule fails a plist without it: a copy that finds the lock held would exit 75 at once into a respawn every `ThrottleInterval`) |
 | `StandardOutPath`/`StandardErrorPath` | `~/Library/Logs/<id>/service.log` | one place the host tails |
 
 ## Install, upgrade, uninstall
@@ -103,13 +103,13 @@ that document until `service.id` matches (at most 40 s) before it calls the serv
 rewrites the plist, so the new release is what starts once they turn it back on, and
 answers `{"disabled": true, ...}` instead of the well-known document. `force_enable=True`
 is for an operator who asked for the service to be switched on. The service never
-implements these verbs itself — its CLI calls launchctl the same way.
+implements these verbs itself; its CLI calls launchctl the same way.
 
 **Uninstall is symmetric.** `launchd_uninstall` boots the job out and **waits** until
 launchd reports it gone (it raises, removing nothing, if the job is still loaded at the
 timeout), removes the plist, and resets the override to `enabled`. launchctl has no verb
 that deletes an override, and a leftover `disabled` would make a later fresh install stay
-off. Tests use a throwaway label or a fake `launchctl` first on `PATH` — never the
+off. Tests use a throwaway label or a fake `launchctl` first on `PATH`, never the
 operator's real jobs.
 
 ## One copy under a supervisor
@@ -118,7 +118,7 @@ Started by hand, a copy that finds `service.lock` held prints one sentence namin
 holder (or saying the holder is unknown, when its pid cannot be read) and exits 75 at once.
 Under launchd that exit is a respawn every `ThrottleInterval` (10 s), forever, and under
 systemd one every `RestartSec`. So a copy its supervisor started, and that says so with the
-**supervisor marker**, backs off in-process — 0.5 s doubling to 30 s, 300 s in all — takes over
+**supervisor marker**, backs off in-process (0.5 s doubling to 30 s, 300 s in all), takes over
 if the holder leaves, and exits 75 only when the wait runs out: a few starts an hour instead of
 360. It touches nothing while it waits. Two installs sharing one data directory are still the
 defect to remove; the back-off only stops the loop from costing the machine.
@@ -136,8 +136,8 @@ never infers supervision from its parent process.
   `supervised` (with the manager), `manual` or `conflict`. Only an empty variable counts as no
   marker; a bare `--fabric-supervisor` (followed by nothing, by `--` or by another `--…` flag,
   none of which it consumes) names no manager.
-- Markers that disagree — the variable and the argument with different values, the argument
-  twice, or a bare or empty argument beside the variable — exit 75 at once, before the lock and
+- Markers that disagree (the variable and the argument with different values, the argument
+  twice, or a bare or empty argument beside the variable) exit 75 at once, before the lock and
   whether or not it is held, naming both markers.
 - A service's own argument parser accepts the flag in both spellings and ignores it: in Python,
   `add_supervisor_argument(parser)` (argparse otherwise exits 2 on an unknown flag); the sample
@@ -152,8 +152,8 @@ never infers supervision from its parent process.
 `"lifecycle": {"manager": "person", "app": "<the installed bundle or executable>"}`, `installedBy {by: "person", role,
 tool}` and no `origin`: it says the app is installed, never that it runs. The installer writes it; where there is none
 (a macOS app dragged into Applications), the app writes it on a start when `app_descriptor_action` /
-`appDescriptorAction` answers `write` — no descriptor yet, another version in `installedBy.tool`, or another path than
-`lifecycle.app` — and never from an App Translocation path. Its live origin and process id go in its own liveness file,
+`appDescriptorAction` answers `write` (no descriptor yet, another version in `installedBy.tool`, or another path than
+`lifecycle.app`), and never from an App Translocation path. Its live origin and process id go in its own liveness file,
 rewritten on every start and removed on quit; a caller that sends anything reads that file and checks the process.
 `write_descriptor` claims no port for it, and a reader that finds `lifecycle.app` gone treats the descriptor as stale.
 
@@ -179,8 +179,8 @@ anything the operator would miss belongs in data.
 
 ## Logs
 
-One structured log (JSON lines) rotated by size — `RotatingLog(dirs["logs"] / "service.jsonl")`,
-5 × 5 MB by default, files 0600 in a 0700 directory — plus the launchd stdout file, which
+One structured log (JSON lines) rotated by size (`RotatingLog(dirs["logs"] / "service.jsonl")`,
+5 × 5 MB by default, files 0600 in a 0700 directory), plus the launchd stdout file, which
 `cap_stdout_log` copies to `.1` and truncates at start once it passes 5 MB (launchd holds it
 open for append, so it is truncated in place, never renamed). Configure logging once, in the
 entry point. Never log a token, a cookie, a login code or a request body that may carry one.
@@ -189,7 +189,7 @@ entry point. Never log a token, a cookie, a login code or a request body that ma
 
 On `SIGTERM`: stop accepting new work, append a `service.stopping` event, drain
 in-flight work, persist what was interrupted so the next start resumes it, release the
-lock, exit 0 — within 10 s with work in flight (LC-01). `Drain` does the timing:
+lock, exit 0, within 10 s with work in flight (LC-01). `Drain` does the timing:
 
 ```python
 drain = fs.Drain()                       # drain 8 s, hard exit 2 s later (EXIT_HARD_STOP, 70)
@@ -208,8 +208,8 @@ A host may run a lifecycle broker: one always-on per-user service that agents as
 stop and restart products, instead of launching or killing them themselves. A product it manages
 has to survive being driven from outside:
 
-- **Quit reaches exit through both doors.** A broker asks the platform's own quit first — on
-  macOS `NSRunningApplication.terminate()`, the path Cmd+Q and the Dock take — and `SIGTERM` a few
+- **Quit reaches exit through both doors.** A broker asks the platform's own quit first (on
+  macOS `NSRunningApplication.terminate()`, the path Cmd+Q and the Dock take) and `SIGTERM` a few
   seconds later. Handle both and exit inside the deadline (LC-01). A desktop app
   that answers `SIGTERM` by closing its window and staying alive is stopped late or not at all.
 - **A background launch stays in the background.** A broker opens the app non-activating
@@ -219,8 +219,8 @@ has to survive being driven from outside:
 - **Identity is the designated requirement.** A broker pins the app by team + bundle id, so an
   update signed by the same team keeps working and anything else is refused (LC-05). Never ship an
   ad-hoc or differently signed build to a machine that pins you.
-- **Starting is not ready.** Expose readiness the broker can probe without a person — the
-  well-known document for a service, a process-level answer for a plain app — and keep it honest
+- **Starting is not ready.** Expose readiness the broker can probe without a person (the
+  well-known document for a service, a process-level answer for a plain app) and keep it honest
   while the app is still starting.
 
 ## Linux and Windows
@@ -230,7 +230,7 @@ Both kits write and install the supervisor file the contract names (DEC-0032, se
 secret: the writers refuse a credential-shaped argument, environment name or value, and any
 control character (a line break would end a unit line early).
 
-**Linux — a systemd user unit.** `systemd_unit(unit, argv, working_directory=…)` /
+**Linux: a systemd user unit.** `systemd_unit(unit, argv, working_directory=…)` /
 `systemdUnit(unit, argv, {workingDirectory})` writes `Restart=always`, `RestartSec=10`,
 `TimeoutStopSec` above the drain (15 s default), `KillMode=mixed`, `WantedBy=default.target`
 and `FABRIC_SERVICE_SUPERVISOR=systemd` (always, whatever the caller passed), quoting every argument (`%` → `%%`, `$` → `$$`).
@@ -247,7 +247,7 @@ descriptor says `"lifecycle": {"manager": "systemd", "unit": "<id>.<instance>.se
 A user unit runs while the person is logged in; one that must run without a session needs
 `loginctl enable-linger <user>`, which is the operator's decision, not the installer's.
 
-**Windows — a per-user Scheduled Task.** `task_xml(task, argv, working_directory=…)` /
+**Windows: a per-user Scheduled Task.** `task_xml(task, argv, working_directory=…)` /
 `taskXml(task, argv, {workingDirectory})` writes a task with a logon trigger for the current
 user, `InteractiveToken` and `LeastPrivilege` (no administrator rights), restart on failure
 every minute, no execution time limit and `MultipleInstancesPolicy` `IgnoreNew`, its settings in the
@@ -269,16 +269,16 @@ starting a second copy. Measured (FAA-38, [report](https://github.com/passioncod
 that still exits 75 stays down until the next logon.
 
 **One copy on each system.** The Python kit takes `flock` (Linux) or a locked byte
-(Windows); the Node kit cannot, so it holds a name instead — an abstract unix socket on Linux,
+(Windows); the Node kit cannot, so it holds a name instead: an abstract unix socket on Linux,
 a named pipe on Windows (`lock_name` / `lockName`), each gone with the process. The Python kit
 holds the same name beside its file lock, so the two kits exclude each other everywhere, and
 `check_service.py` reports the lock held when either is. The probe only looks (`/proc/net/unix`,
 `WaitNamedPipeW`); it never takes the name, so it cannot make a service that is starting fail.
 
 **Token files on Windows.** The privacy of `service.token` is its ACL (service.md *Windows
-token files*): the kits write a protected list — the user, SYSTEM and Administrators, set before the
+token files*): the kits write a protected list: the user, SYSTEM and Administrators, set before the
 token's bytes go in, any entry already there dropped. On read, `windows_token_acl_problem` /
-`windowsTokenAclProblem` decide over what was read — the file's flags, its owner SID and each ACE
+`windowsTokenAclProblem` decide over what was read: the file's flags, its owner SID and each ACE
 as `{type, sid, mask}` (DEC-0057, `FAC-SEM-079`, held to the contract's
 `fixtures/vectors/windows-token.json`): a reparse point, a directory, a real path outside the
 profile, another owner, an allow ACE with a non-zero mask for any other SID, an ACE of another type

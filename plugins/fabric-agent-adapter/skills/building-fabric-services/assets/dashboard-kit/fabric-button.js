@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.0 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+/* fabric-dashboard-kit@1.1.1 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
    Load it same-origin, after fabric-dashboard.css, with the service it opens Fabric on:
      <script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
              data-project="project-a" data-project-name="Project A"></script>
@@ -10,7 +10,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '1.1.0';
+  var VERSION = '1.1.1';
   var COOKIE = 'fabric_button';
   var GET_FABRIC = 'https://passioncode.ai/fabric';
   var ABSENT_AFTER_MS = 1500;
@@ -212,7 +212,7 @@
       return a;
     });
     var note = el(doc, 'p', { 'class': 'fd-fabric-button-note', role: 'note' });
-    note.appendChild(doc.createTextNode('Fabric is not installed — get it at '));
+    note.appendChild(doc.createTextNode('Fabric is not installed. Get it at '));
     note.appendChild(el(doc, 'a', { href: GET_FABRIC, target: '_blank', rel: 'noopener', 'class': 'fd-fabric-button-get' }, 'passioncode.ai/fabric'));
     note.hidden = !absent;
     menu.appendChild(note);

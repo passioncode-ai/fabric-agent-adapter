@@ -483,7 +483,7 @@ class BoardSession:
             return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session, timeout=self.timeout,
                              method=method, protocol_version=self.protocol_version if self.mcp_session else None)
         except _hub.HubError as exc:
-            raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored — send it again with "
+            raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored, so send it again with "
                              "the same idempotency key.", True) from exc
 
     def open(self) -> None:

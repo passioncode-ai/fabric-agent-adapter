@@ -420,7 +420,7 @@ export function readFolder(folder) {
     }
   };
   walk(folder, '');
-  if (refused.length) throw new PackageError(`Not packed: remove these or pack a clean copy — ${refused.sort().join('; ')}`);
+  if (refused.length) throw new PackageError(`Not packed: remove these or pack a clean copy: ${refused.sort().join('; ')}`);
   return files;
 }
 

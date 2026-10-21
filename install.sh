@@ -25,9 +25,9 @@ for SRC in "$SRC_ROOT"/*/; do
   if [ -L "$DEST" ]; then
     case "$(readlink "$DEST")" in
       *"/.passioncode/"*)
-        echo "skip: ${NAME} at $DEST is managed by the PassionCode launcher — update it with: npx @passioncode-ai/passioncode@latest update" ;;
+        echo "skip: ${NAME} at $DEST is managed by the PassionCode launcher; update it with: npx @passioncode-ai/passioncode@latest update" ;;
       *)
-        echo "skip: ${NAME} at $DEST is a link managed elsewhere — remove the link first to install a copy here" ;;
+        echo "skip: ${NAME} at $DEST is a link managed elsewhere; remove the link first to install a copy here" ;;
     esac
     continue
   fi
@@ -37,4 +37,4 @@ for SRC in "$SRC_ROOT"/*/; do
   echo "Installed ${NAME} skill -> $DEST"
 done
 echo "Claude Code: claude plugin marketplace add passioncode-ai/fabric-agent-adapter && claude plugin install fabric-agent-adapter@fabric-agent-adapter"
-echo "Restart your agent — skills load at session start."
+echo "Restart your agent: skills load at session start."

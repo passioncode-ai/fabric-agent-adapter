@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.39.1 - 2026-10-21
+
+Fixes from two rounds of blind review of 0.39.0 (FAA-64).
+
+### Fixed
+
+- **The probe no longer crashes on a usage report it is checking.** `check_service.py` compared `unpricedCalls` and
+  `unmeasuredCalls` raw, so `null` or a string raised `TypeError`, and a 400-digit cost raised `OverflowError`; either
+  stopped the whole probe before its other rules ran. Its FAC-SEM-025 arithmetic is now the kit's `usage_findings`, one
+  implementation held to the contract's vectors.
+- **The Python and Node kits answer FAC-SEM-025 as the contract does, message for message.** Both read each count as
+  the contract's `toNumber(x ?? 0)`, each date and project id with `show`, a cost as JavaScript holds the number (an
+  integer beyond a double is Infinity, which is never close to a sum), and a whole number written `5.0` as a count.
+  Python compared raw values and read `5.0` as 0; Node threw on an object such as `{"toString": 1}` in a count, a date
+  or a project id. The vectors now carry each finding's message and both kits compare it: 183 new report cases (208)
+  set every count and the cost of a day and of its first model to eleven values the schema refuses, plus three days
+  with no model rows and four dates and ids that are objects or numbers; eight new cases are the report's JSON text,
+  which each kit parses itself (a 400-digit integer, `1e400`, `2^53 + 1`, `5.0`). The field list is the contract's at this pin,
+  written in the generator.
+- **Messages a person reads carry no em dash**: the probe, the dashboard-kit notice, the board's retry hint and the
+  package refusal (Python and Node alike), the installer and the `npx` CLI, the sample service's page, the session
+  hooks' unread and status lines (`2 unread on the project board: com.list`) and the dashboard kit's Fabric button
+  (`Fabric is not installed. Get it at passioncode.ai/fabric`; kit **1.1.1**, so a service's kit copy is offered the
+  upgrade). The live documentation, evals and the kit's demo page were rewritten the same way.
+
+### Added
+
+- Tests for the producer side of DEC-0091 in both kits: receipts with `tokens_measured=False` through
+  `usage_report`, the day and model `unmeasuredCalls`, none on `byProject`, the probe clean, and the refusal of a
+  non-boolean flag.
+- Evals: the spend scenario expects unknown tokens in `unmeasuredCalls`; a new scenario covers a partner's package
+  and calls (DEC-0090).
+- `interop.md` and `usage.md` say a job whose usage is sent as `null` or `partial` is recorded with
+  `tokens_measured=False`; `estate-record.md` says a service updates its copied kit before a revision carries
+  `publisherScopes` (an older copy trusts a partner's key in every context); FAC-SEM-122 in its header and DEC-0091 in
+  protocol.md's FAC-SEM-025 row.
+- `test/validate.py` fails on U+2014 in the live documentation, the evals, the installer, the CLI and the kit's demo,
+  and when README states which version a checkout is or which release is the latest (it said 0.21.0 until now); both
+  checks have tests. The compiled-revision tests name the two contract revisions they need when they skip.
+
+### Raised with the contract (not changed here)
+
+- `chainOf` names a `{sub, partner}` node by its `org:` id, and job ownership and idempotency keys do not include the
+  partner. The kits follow `c55f2d5` until the contract decides (board thread `6e66a023`, FAA-64).
+
 ## 0.39.0 - 2026-10-20
 
 ### Changed
@@ -12,7 +57,8 @@
 - **Unmeasured tokens are named** (DEC-0091, contract CT-62). `make_usage_receipt(..., tokens_measured=False)` /
   `makeUsageReceipt(..., { tokensMeasured: false })` writes `tokensMeasured: false`; the report counts such calls in
   `unmeasuredCalls` on the day and the model row, and FAC-SEM-025 in both kits and `check_service.py` refuses a row
-  with more unmeasured calls than calls or a day whose count is not its models' sum. Three new usage vectors (25).
+  with more unmeasured calls than calls or a day whose count is not its models' sum. Four new usage vectors (25; this
+  line said three until 0.39.1).
 - **A partner in the delegation chain** (DEC-0090, contract CT-58). Both verifiers take `{partner: "org:<id>"}` as the
   innermost actor under at least one agent: it counts toward the depth limit and ends the chain, and the checked chain
   lists it by its `org:` id. Outermost, with an `act` beneath, `personal` or an `ORG:` prefix is `malformed-chain`.

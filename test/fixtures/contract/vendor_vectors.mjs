@@ -158,9 +158,45 @@ const usageCases = [...usagePositive,
   edited('a model row with more unmeasured calls than calls', (r) => { const m = r.days[0].byModel[0]; m.unmeasuredCalls = m.calls + 1; r.days[0].unmeasuredCalls = m.calls + 1; }),
   edited("a day's unmeasured calls are not its models' sum", (r) => { r.days[0].unmeasuredCalls = 1; }),
   edited('unmeasured calls written on the day and its model', (r) => { r.days[0].byModel[0].unmeasuredCalls = 1; r.days[0].unmeasuredCalls = 1; }),
-].map(([name, report]) => ({ name, report, findings: usageRulesModule.usageRules(report).map((f) => ({ code: f.code, instancePath: f.instancePath })) }));
+  // A day with no model rows may carry nothing: a cost alone (a number or a numeric string) still names no model.
+  ...[['a day with only a cost and no models', 0.5], ['a day with only a cost written as a string and no models', '0.5'], ['a day with no models and a zero cost', 0]].map(([name, cost]) =>
+    edited(name, (r) => { const d = r.days[0]; for (const f of ['calls', 'unpricedCalls', 'unmeasuredCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens']) d[f] = 0; d.byModel = []; d.costUsd = cost; })),
+  // Every count of a day and of its first model, and its cost, set to a value the schema refuses: the rules read it as
+  // the contract's toNumber does (a numeric string is a number, an object is NaN) and never throw. The field list is the
+  // contract's at this pin, written here: a count the contract adds is added here at the repin that brings it.
+  ...[['a day whose date is an object whose toString is not a function', (r) => { r.days[0].date = { toString: 1 }; }],
+    ['two days whose dates are objects', (r) => { r.days[0].date = { a: 1 }; r.days[1].date = { a: 2 }; }],
+    ['a day whose date is a number', (r) => { r.days[0].date = 20261001; }],
+    ['a project id that is an object whose toString is not a function', (r) => { r.byProject[0].projectId = { toString: 1 }; }]].map(([name, change]) => edited(name, change)),
+  ...['calls', 'unpricedCalls', 'unmeasuredCalls', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'costUsd'].flatMap((field) =>
+    [['the string "2"', '2'], ['a padded hex string', ' 0x1 '], ['a word', 'abc'], ['null', null], ['true', true], ['an empty array', []], ['a one-item array', [1]],
+      ['an object', {}], ['an object whose toString is not a function', { toString: 1 }], ['a fraction', 1.5], ['a negative number', -1]].flatMap(([label, value]) => [
+      edited(`the day's ${field} is ${label}`, (r) => { r.days[0][field] = value; }),
+      edited(`the first model's ${field} is ${label}`, (r) => { r.days[0].byModel[0][field] = value; }),
+    ])),
+].map(([name, report]) => ({ name, report, findings: usageRulesModule.usageRules(report).map((f) => ({ code: f.code, instancePath: f.instancePath, message: f.message })) }));
+// Numbers JavaScript and Python read differently from the same JSON text: a 400-digit integer (Infinity in JavaScript, an
+// exact integer in Python), 1e400 (Infinity in both, read differently on the way) and a whole number written with a
+// fraction (5 in JavaScript, 5.0 in Python). Each case is the report's text: the contract answers JSON.parse of it and a
+// kit parses the same text itself.
+const BIG = '1' + '0'.repeat(400);
+const usageText = [
+  ['a day and its model cost a 400-digit integer', (r) => { r.days[0].costUsd = '@N@'; r.days[0].byModel[0].costUsd = '@N@'; }, BIG],
+  ['a project costs a 400-digit integer', (r) => { r.byProject[0].costUsd = '@N@'; }, BIG],
+  ['a task run costs a 400-digit integer', (r) => { const p = r.byProject.find((x) => x.taskRuns?.length); p.taskRuns[0].costUsd = '@N@'; }, BIG],
+  ['a day and its model cost 1e400', (r) => { r.days[0].costUsd = '@N@'; r.days[0].byModel[0].costUsd = '@N@'; }, '1e400'],
+  ["a day's calls are a 400-digit integer", (r) => { r.days[0].calls = '@N@'; }, BIG],
+  ['a project costs 2^53 + 1 and its task run 1e16', (r) => { const p = r.byProject.find((x) => x.taskRuns?.length); p.costUsd = '@N@'; p.taskRuns[0].costUsd = 1e16; }, '9007199254740993'],
+  ['every call unpriced, written as 5.0, with a cost', (r) => { const m = r.days[0].byModel[0]; m.calls = 5; m.unpricedCalls = '@N@'; m.costUsd = 0.1; }, '5.0'],
+  ['calls and unpriced calls written as 5.0', (r) => { const m = r.days[0].byModel[0]; m.calls = '@N@'; m.unpricedCalls = '@N@'; m.costUsd = null; r.days[0].calls = r.days[0].byModel.reduce((n, x, j) => n + (j === 0 ? 5 : x.calls), 0); r.days[0].unpricedCalls = r.days[0].byModel.reduce((n, x, j) => n + (j === 0 ? 5 : (x.unpricedCalls ?? 0)), 0); }, '5.0'],
+].map(([name, change, literal]) => {
+  const r = JSON.parse(JSON.stringify(byProject));
+  change(r);
+  const text = JSON.stringify(r).replaceAll('"@N@"', literal);
+  return { name, text, findings: usageRulesModule.usageRules(JSON.parse(text)).map((f) => ({ code: f.code, instancePath: f.instancePath, message: f.message })) };
+});
 write('usage-attribution-vectors.json', { about: "DEC-0065: OpenRouter attribution's cases and FAC-SEM-025 over reports, answered by the contract's attributionHeaders and usageRules.",
-  source: 'fixtures/vectors/openrouter-attribution.json, src/usage-rules.ts, fixtures/positive/service-usage*.json', attribution: attributionVectors.cases, usage: usageCases });
+  source: 'fixtures/vectors/openrouter-attribution.json, src/usage-rules.ts, fixtures/positive/service-usage*.json', attribution: attributionVectors.cases, usage: usageCases, usageText });
 console.log(`${attributionVectors.cases.length} attribution cases, ${usageCases.length} usage reports`);
 console.log(`${peer.cases.length} peer cases, ${app.action.length + app.stale.length} app-descriptor cases, ${descriptors.length} descriptor fixtures, ${semanticDescriptors.length} semantic`);
 

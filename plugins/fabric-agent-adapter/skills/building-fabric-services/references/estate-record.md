@@ -1,7 +1,8 @@
-# The estate record — what the operator's machines are, signed by their passkey (DEC-0055)
+# The estate record: what the operator's machines are, signed by their passkey (DEC-0055)
 
 Fabric Agent Contract DEC-0055, `docs/specification/estate-record.md`, schema `schemas/estate-record.schema.json`,
-rules `FAC-SEM-072…076`, with contexts (DEC-0082, `docs/specification/contexts.md`, `FAC-SEM-110`, `FAC-SEM-111`).
+rules `FAC-SEM-072…076`, with contexts (DEC-0082, `docs/specification/contexts.md`, `FAC-SEM-110`, `FAC-SEM-111`) and a
+partner's scoped publisher key (DEC-0090, `docs/specification/partner-channel.md`, `FAC-SEM-122`).
 One revision of one person's estate lists:
 - the passkeys that sign it;
 - the machines, with their device keys and a certificate of each machine's hub key;
@@ -78,13 +79,13 @@ gate = fd.delegation_gate(audience=..., jwks=keys, issuer=..., effects=..., esta
                           estate_revocations=lambda: delta_entries)
 ```
 
-- **The token's fault** — no such certification, another key under that `kid`, a `kid` on two machines, a revoked hub
-  key or machine — is `unauthenticated` (for an approval, `approval-invalid`) with detail `kid-not-certified`.
+- **The token's fault** (no such certification, another key under that `kid`, a `kid` on two machines, a revoked hub
+  key or machine) is `unauthenticated` (for an approval, `approval-invalid`) with detail `kid-not-certified`.
 - **The trust source's fault** is `issuer-unavailable`: `estate-unreadable` (a source that throws or answers nothing
   readable, a revision without a number or digest, a window of zero or over 30 days, dates read strictly, `machines` or
   `revocations` not arrays), `estate-outside-window`, `estate-rolled-back` (lower than the applied revision) and
   `estate-forked` (the applied number with another digest). A caller cannot cure these by minting again.
-- An unreadable clock — not a finite number of seconds a `Date` can hold — is refused `unknown-state` `no-clock`
+- An unreadable clock (not a finite number of seconds a `Date` can hold) is refused `unknown-state` `no-clock`
   before row 1, in every verifier.
 - Only an absent `estate` skips the check. In the Node kit `null` is an unreadable source; in Python, where `None` is
   the absent value, pass a function returning `None` for a source that has nothing.
@@ -117,6 +118,10 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
   names the keys that are a partner's (`kid`, `partner: org:<id>`, `contexts`); a placement under such a key is in one
   of the organization contexts listed, never `personal` or another organization. A key is scoped once, and only a key
   `publisherKeys` pins. A key no scope names keeps DEC-0051's meaning, trusted in any context.
+- **Update a copied kit before a revision carries `publisherScopes`.** A service runs the copy of the kit it was built
+  with; a copy older than 0.39.0 does not read `publisherScopes`, so it trusts a partner's key in every context and
+  finds no rule broken. A service that applies the estate record updates its copy of `fabric_estate.py` /
+  `fabric-estate.mjs` to 0.39.0 or later first.
 
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits

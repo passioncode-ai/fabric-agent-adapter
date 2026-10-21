@@ -1,4 +1,4 @@
-# Packing, signing and verifying — `fabric-package/1`
+# Packing, signing and verifying: `fabric-package/1`
 
 Contract DEC-0050 (format and digest), DEC-0051 (signatures), DEC-0071 and DEC-0074 (a consumer agent), rules
 `FAC-SEM-064`…`066` and `FAC-SEM-102`, all at this plugin's pin. The kit: `scripts/fabric_package.py` and
@@ -117,4 +117,5 @@ PA-03).
 - **The organization's countersignature as a passkey assertion.** It waits for `org-countersign/1` and
   `org-authority/1`; this version's countersignature is a detached Ed25519 signature.
 - **Fabric recording packages by `agentRef`.** It waits for the ADR-0138 D2b amendment.
-- **`publish --to org`** (FAA-28).
+- **`publish --to org`** (FAA-28; an organization cloud's import API is FAA-63, under FAA-28's rule that publishing to
+  an organization is the person's own act).

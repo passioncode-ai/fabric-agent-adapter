@@ -688,7 +688,7 @@ class UsageCheckTests(unittest.TestCase):
     def test_zero_for_unknown_wrong_service_and_bad_sums_fail(self):
         r = self.report()
         [m for m in r["days"][1]["byModel"] if m["provider"] == "local"][0]["costUsd"] = 0
-        self.assertTrue(any("must be null" in p for p in check.usage_problems(r, "example-agent", "default")))
+        self.assertTrue(any("unknown (null)" in p for p in check.usage_problems(r, "example-agent", "default")))
         self.assertTrue(any("reports for" in p for p in check.usage_problems(self.report(), "example-agent", "preview")))
         r = self.report()
         r["days"][0]["inputTokens"] += 1
