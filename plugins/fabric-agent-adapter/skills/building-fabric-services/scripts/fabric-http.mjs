@@ -100,6 +100,17 @@ export function retryAfterS(value, { now } = {}) {
   return Math.max(0, when - (now ?? Date.now() / 1000));
 }
 
+// Compact JSON in UTF-8, NaN and Infinity refused (JSON.stringify would write null): the twin of json_bytes.
+export function jsonBytes(value) {
+  const text = JSON.stringify(value, (key, v) => {
+    if (typeof v === 'number' && !Number.isFinite(v)) {
+      throw new HttpError('the body holds a number JSON cannot write (NaN or Infinity)', { kind: 'refused' });
+    }
+    return v;
+  });
+  return new TextEncoder().encode(text);
+}
+
 export function backoffS(attempt, { baseS, maxS, rand }) {
   return Math.min(maxS, baseS * 2 ** attempt) * (0.5 + rand);
 }
@@ -161,13 +172,14 @@ export async function request(method, url, {
   }
   if (!(deadlineS > 0 && maxBytes > 0)) throw new HttpError('deadlineS and maxBytes are positive', { kind: 'refused' });
   checkUrl(url, { insecure });
-  const sent = checkHeaders(headers);
+  const sent = checkHeaders(headers ?? {});
   let data = null;
   if (body === null || body === undefined) data = null;
   else if (body instanceof Uint8Array) data = body;
+  else if (body instanceof ArrayBuffer) data = new Uint8Array(body);
   else if (typeof body === 'string') data = new TextEncoder().encode(body);
   else if (typeof body === 'object') {
-    data = new TextEncoder().encode(JSON.stringify(body));
+    data = jsonBytes(body);
     if (!Object.keys(sent).some((k) => k.toLowerCase() === 'content-type')) sent['Content-Type'] = 'application/json';
   } else throw new HttpError('the body is bytes, a string, an object or an array', { kind: 'refused' });
   const where = redactUrl(url);

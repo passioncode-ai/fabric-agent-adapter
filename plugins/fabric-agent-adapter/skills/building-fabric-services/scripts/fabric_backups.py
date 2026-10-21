@@ -12,6 +12,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from fabric_base import (
     ServiceError,
     _ID,

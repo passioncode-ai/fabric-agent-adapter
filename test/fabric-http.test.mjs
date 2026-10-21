@@ -103,3 +103,17 @@ test('the default transport: answers, redirects and the cap', async () => {
     server.close();
   }
 });
+
+test('bodies and transport bugs, as the Python twin', async () => {
+  for (const [value, text] of CASES.jsonBody) assert.equal(new TextDecoder().decode(fh.jsonBytes(value)), text);
+  for (const [value, text] of CASES.textBody) assert.equal(new TextDecoder().decode(new TextEncoder().encode(value)), text);
+  for (const bad of [Number.NaN, Infinity]) {
+    await assert.rejects(fh.request('POST', 'https://api.example/', { body: { n: bad }, transport: scripted([], []) }), (e) => e.kind === 'refused');
+  }
+  await assert.rejects(fh.request('GET', 'https://api.example/', { transport: async () => { throw new RangeError('bug'); }, retries: 0 }),
+    (e) => e.kind === 'connection');
+  const seen = [];
+  await run({ method: 'POST', body: new TextEncoder().encode('ab').buffer, steps: [{ status: 200 }] }, seen);
+  assert.equal(new TextDecoder().decode(seen[0].body), 'ab');
+  await run({ method: 'GET', headers: null, steps: [{ status: 200 }] });
+});

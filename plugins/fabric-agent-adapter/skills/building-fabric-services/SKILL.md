@@ -145,7 +145,9 @@ The request body is data behind the service's own input gate. Read [the board re
 ## Step 3: build it with the kit
 
 Install the kit into the service with its manifest: `python3 scripts/fabric_kit.py install
-<service-dir>` (Python, `fabric_service` and the modules it needs) or `--lang node`;
+<service-dir> --module fabric_service --module fabric_interop` (Python: the service and its MCP
+surface, with every module they need; add `--module fabric_board` for a board responder, as
+the sample has) or `--lang node` with the same names in `-`;
 `fabric_kit.py status <service-dir>` says per file whether a copy is current, older or edited,
 and what is missing. The kit is layered modules behind the `fabric_service` /
 `fabric-service.mjs` facades, which keep every 0.39 import working; read

@@ -1,91 +1,904 @@
 {
-  "about": "FAA-65 REQ-07: one set of cases for fabric_openrouter.py and fabric-openrouter.mjs. Every case runs at now = 2026-10-21T12:00:00Z, rand() = 0.5, a clock that moves only when the client sleeps, the key in OPENROUTER_API_KEY, messages [{role: user, content: 'hi'}] (prompt bound 16 tokens), model a/one, fallback b/two, max_tokens 100, retries 1, unless the case says otherwise.",
-  "prices": {"a/one": {"prompt": 0.000001, "completion": 0.00001}, "b/two": {"prompt": 0.000002, "completion": 0.00002}},
-  "promptBound": [
-    [[{"role": "user", "content": "hi"}], 16],
-    [[{"role": "user", "content": "привет"}], 21]
-  ],
-  "catalog": {
-    "in": {"data": [
-      {"id": "a/one", "pricing": {"prompt": "0.000001", "completion": "0.00001"}},
-      {"id": "c/free", "pricing": {"prompt": "0", "completion": "0", "request": "0"}},
-      {"id": "d/broken", "pricing": {"prompt": "n/a", "completion": "0.1"}},
-      {"id": "e/neg", "pricing": {"prompt": "-1", "completion": "0.1"}},
-      {"pricing": {"prompt": "1", "completion": "1"}}
-    ]},
-    "out": {"a/one": {"prompt": 0.000001, "completion": 0.00001, "request": 0}, "c/free": {"prompt": 0, "completion": 0, "request": 0}}
+ "about": "FAA-65 REQ-07: one set of cases for fabric_openrouter.py and fabric-openrouter.mjs. Every case runs at now = 2026-10-21T12:00:00Z, rand() = 0.5, a clock that moves only when the client sleeps, the key in OPENROUTER_API_KEY, messages [{role: user, content: 'hi'}] (prompt bound 16 tokens), model a/one, fallback b/two, max_tokens 100, retries 1, unless the case says otherwise.",
+ "prices": {
+  "a/one": {
+   "prompt": 1e-06,
+   "completion": 1e-05
   },
-  "scenarios": [
-    {"name": "an answer with the provider's cost",
-     "steps": [{"status": 200, "body": {"model": "a/one", "choices": [{"finish_reason": "stop", "message": {"role": "assistant", "content": "hello"}}],
-                "usage": {"prompt_tokens": 10, "completion_tokens": 3, "cost": 0.00004, "prompt_tokens_details": {"cached_tokens": 4}}}}],
-     "expect": {"content": "hello", "model": "a/one", "outcomes": ["answered"], "sleeps": [],
-                "receipts": [{"model": "a/one", "inputTokens": 6, "outputTokens": 3, "cacheReadTokens": 4, "cacheWriteTokens": 0, "costUsd": 0.00004, "costBasis": "provider", "route": "key"}]}},
-    {"name": "tokens without a cost are priced from the list",
-     "steps": [{"status": 200, "body": {"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}], "usage": {"prompt_tokens": 10, "completion_tokens": 3}}}],
-     "expect": {"content": "ok", "model": "a/one", "outcomes": ["answered"], "sleeps": [],
-                "receipts": [{"model": "a/one", "inputTokens": 10, "outputTokens": 3, "costUsd": 0.00004, "costBasis": "price-list"}]}},
-    {"name": "an answer without usage is unmeasured and unpriced",
-     "steps": [{"status": 200, "body": {"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}]}}],
-     "expect": {"content": "ok", "model": "a/one", "outcomes": ["answered"], "sleeps": [],
-                "receipts": [{"model": "a/one", "inputTokens": 0, "outputTokens": 0, "costUsd": null, "costBasis": "unknown", "tokensMeasured": false}]}},
-    {"name": "429 then an answer on the same model, Retry-After honoured",
-     "steps": [{"status": 429, "headers": {"Retry-After": "2"}, "body": {"error": {"code": 429, "message": "slow down"}}},
-               {"status": 200, "body": {"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.00001}}}],
-     "expect": {"content": "ok", "model": "a/one", "outcomes": ["retry", "answered"], "sleeps": [2], "receiptCount": 1}},
-    {"name": "retries spent on the primary, the fallback answers",
-     "steps": [{"status": 503}, {"status": 502},
-               {"status": 200, "body": {"model": "b/two", "choices": [{"finish_reason": "stop", "message": {"content": "from b"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.00002}}}],
-     "expect": {"content": "from b", "model": "b/two", "outcomes": ["retry", "retry", "answered"], "sleeps": [0.5], "receiptCount": 1}},
-    {"name": "an empty answer is not success: the fallback answers",
-     "steps": [{"status": 200, "body": {"choices": [{"finish_reason": "stop", "message": {"content": "  "}}], "usage": {"prompt_tokens": 1, "completion_tokens": 0, "cost": 0}}},
-               {"status": 200, "body": {"choices": [{"finish_reason": "stop", "message": {"content": "real"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.00002}}}],
-     "expect": {"content": "real", "model": "b/two", "outcomes": ["empty", "answered"], "sleeps": [], "receiptCount": 2}},
-    {"name": "a budget spent on reasoning is length, billed, and goes to the fallback",
-     "steps": [{"status": 200, "body": {"choices": [{"finish_reason": "length", "message": {"content": ""}}], "usage": {"prompt_tokens": 5, "completion_tokens": 100, "cost": 0.001}}},
-               {"status": 200, "body": {"choices": [{"finish_reason": "stop", "message": {"content": "short"}}], "usage": {"prompt_tokens": 5, "completion_tokens": 2, "cost": 0.0001}}}],
-     "expect": {"content": "short", "model": "b/two", "outcomes": ["length", "answered"], "sleeps": [], "receiptCount": 2}},
-    {"name": "finish_reason error is retried on the same model",
-     "steps": [{"status": 200, "body": {"choices": [{"finish_reason": "error", "error": {"code": 502, "message": "provider down"}, "message": {"content": ""}}]}},
-               {"status": 200, "body": {"choices": [{"finish_reason": "stop", "message": {"content": "back"}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.00001}}}],
-     "expect": {"content": "back", "model": "a/one", "outcomes": ["error", "answered"], "sleeps": [0.5], "receiptCount": 2}},
-    {"name": "tool calls are an answer",
-     "steps": [{"status": 200, "body": {"choices": [{"finish_reason": "tool_calls", "message": {"content": null, "tool_calls": [{"id": "t1", "type": "function", "function": {"name": "lookup", "arguments": "{}"}}]}}], "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.00001}}}],
-     "expect": {"content": "", "model": "a/one", "outcomes": ["answered"], "sleeps": [], "receiptCount": 1}},
-    {"name": "402 stops at once",
-     "steps": [{"status": 402, "body": {"error": {"code": 402, "message": "insufficient credits"}}}],
-     "expect": {"error": "payment", "outcomes": ["payment"], "receiptCount": 0}},
-    {"name": "401 stops at once",
-     "steps": [{"status": 401}],
-     "expect": {"error": "auth", "outcomes": ["auth"], "receiptCount": 0}},
-    {"name": "a 400 on both models fails with every attempt listed",
-     "steps": [{"status": 400}, {"status": 404}],
-     "expect": {"error": "failed", "outcomes": ["refused", "refused"], "receiptCount": 0}},
-    {"name": "the ceiling refuses before the first attempt",
-     "ceilingUsd": 0.0005,
-     "steps": [],
-     "expect": {"error": "ceiling", "outcomes": [], "receiptCount": 0}},
-    {"name": "spend earlier today counts; yesterday's does not",
-     "ceilingUsd": 0.002,
-     "ledger": [{"at": "2026-10-21T01:00:00Z", "provider": "openrouter", "model": "a/one", "inputTokens": 1, "outputTokens": 1, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costUsd": 0.0015, "costBasis": "provider"},
-                {"at": "2026-10-20T23:00:00Z", "provider": "openrouter", "model": "a/one", "inputTokens": 1, "outputTokens": 1, "cacheReadTokens": 0, "cacheWriteTokens": 0, "costUsd": 5, "costBasis": "provider"}],
-     "steps": [],
-     "expect": {"error": "ceiling", "outcomes": [], "receiptCount": 2}},
-    {"name": "the ceiling is checked before the fallback too",
-     "ceilingUsd": 0.0015,
-     "steps": [{"status": 200, "body": {"choices": [{"finish_reason": "length", "message": {"content": ""}}], "usage": {"prompt_tokens": 5, "completion_tokens": 100, "cost": 0.001}}}],
-     "expect": {"error": "ceiling", "outcomes": ["length"], "receiptCount": 1}},
-    {"name": "an unpriced model is not called",
-     "model": "z/unpriced", "fallback": "b/two",
-     "steps": [],
-     "expect": {"error": "unpriced", "outcomes": [], "receiptCount": 0}},
-    {"name": "a fallback of the same vendor is refused",
-     "model": "a/one", "fallback": "a/two",
-     "steps": [],
-     "expect": {"error": "config", "outcomes": [], "receiptCount": 0}},
-    {"name": "no key is refused before anything is sent",
-     "noKey": true,
-     "steps": [],
-     "expect": {"error": "config", "outcomes": [], "receiptCount": 0}}
+  "b/two": {
+   "prompt": 2e-06,
+   "completion": 2e-05
+  }
+ },
+ "promptBound": [
+  [
+   [
+    {
+     "role": "user",
+     "content": "hi"
+    }
+   ],
+   16
+  ],
+  [
+   [
+    {
+     "role": "user",
+     "content": "привет"
+    }
+   ],
+   21
   ]
+ ],
+ "catalog": {
+  "in": {
+   "data": [
+    {
+     "id": "a/one",
+     "pricing": {
+      "prompt": "0.000001",
+      "completion": "0.00001"
+     }
+    },
+    {
+     "id": "c/free",
+     "pricing": {
+      "prompt": "0",
+      "completion": "0",
+      "request": "0"
+     }
+    },
+    {
+     "id": "d/broken",
+     "pricing": {
+      "prompt": "n/a",
+      "completion": "0.1"
+     }
+    },
+    {
+     "id": "e/neg",
+     "pricing": {
+      "prompt": "-1",
+      "completion": "0.1"
+     }
+    },
+    {
+     "pricing": {
+      "prompt": "1",
+      "completion": "1"
+     }
+    }
+   ]
+  },
+  "out": {
+   "a/one": {
+    "prompt": 1e-06,
+    "completion": 1e-05,
+    "request": 0
+   },
+   "c/free": {
+    "prompt": 0,
+    "completion": 0,
+    "request": 0
+   }
+  }
+ },
+ "scenarios": [
+  {
+   "name": "an answer with the provider's cost",
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "model": "a/one",
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "role": "assistant",
+         "content": "hello"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 10,
+       "completion_tokens": 3,
+       "cost": 4e-05,
+       "prompt_tokens_details": {
+        "cached_tokens": 4
+       }
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "hello",
+    "model": "a/one",
+    "outcomes": [
+     "answered"
+    ],
+    "sleeps": [],
+    "receipts": [
+     {
+      "model": "a/one",
+      "inputTokens": 6,
+      "outputTokens": 3,
+      "cacheReadTokens": 4,
+      "cacheWriteTokens": 0,
+      "costUsd": 4e-05,
+      "costBasis": "provider",
+      "route": "key"
+     }
+    ]
+   }
+  },
+  {
+   "name": "tokens without a cost are priced from the list",
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "ok"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 10,
+       "completion_tokens": 3
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "ok",
+    "model": "a/one",
+    "outcomes": [
+     "answered"
+    ],
+    "sleeps": [],
+    "receipts": [
+     {
+      "model": "a/one",
+      "inputTokens": 10,
+      "outputTokens": 3,
+      "costUsd": 4e-05,
+      "costBasis": "price-list"
+     }
+    ]
+   }
+  },
+  {
+   "name": "an answer without usage is unmeasured and unpriced",
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "ok"
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "expect": {
+    "content": "ok",
+    "model": "a/one",
+    "outcomes": [
+     "answered"
+    ],
+    "sleeps": [],
+    "receipts": [
+     {
+      "model": "a/one",
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": null,
+      "costBasis": "unknown",
+      "tokensMeasured": false
+     }
+    ]
+   }
+  },
+  {
+   "name": "429 then an answer on the same model, Retry-After honoured",
+   "steps": [
+    {
+     "status": 429,
+     "headers": {
+      "Retry-After": "2"
+     },
+     "body": {
+      "error": {
+       "code": 429,
+       "message": "slow down"
+      }
+     }
+    },
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "ok"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 1e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "ok",
+    "model": "a/one",
+    "outcomes": [
+     "retry",
+     "answered"
+    ],
+    "sleeps": [
+     2
+    ],
+    "receiptCount": 1
+   }
+  },
+  {
+   "name": "retries spent on the primary, the fallback answers",
+   "steps": [
+    {
+     "status": 503
+    },
+    {
+     "status": 502
+    },
+    {
+     "status": 200,
+     "body": {
+      "model": "b/two",
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "from b"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 2e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "from b",
+    "model": "b/two",
+    "outcomes": [
+     "retry",
+     "retry",
+     "answered"
+    ],
+    "sleeps": [
+     0.5
+    ],
+    "receiptCount": 1
+   }
+  },
+  {
+   "name": "an empty answer is not success: the fallback answers",
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "  "
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 0,
+       "cost": 0
+      }
+     }
+    },
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "real"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 2e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "real",
+    "model": "b/two",
+    "outcomes": [
+     "empty",
+     "answered"
+    ],
+    "sleeps": [],
+    "receiptCount": 2
+   }
+  },
+  {
+   "name": "a budget spent on reasoning is length, billed, and goes to the fallback",
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "length",
+        "message": {
+         "content": ""
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 5,
+       "completion_tokens": 100,
+       "cost": 0.001
+      }
+     }
+    },
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "short"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 5,
+       "completion_tokens": 2,
+       "cost": 0.0001
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "short",
+    "model": "b/two",
+    "outcomes": [
+     "length",
+     "answered"
+    ],
+    "sleeps": [],
+    "receiptCount": 2
+   }
+  },
+  {
+   "name": "finish_reason error is retried on the same model",
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "error",
+        "error": {
+         "code": 502,
+         "message": "provider down"
+        },
+        "message": {
+         "content": ""
+        }
+       }
+      ]
+     }
+    },
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "back"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 1e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "back",
+    "model": "a/one",
+    "outcomes": [
+     "error",
+     "answered"
+    ],
+    "sleeps": [
+     0.5
+    ],
+    "receiptCount": 2
+   }
+  },
+  {
+   "name": "tool calls are an answer",
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "tool_calls",
+        "message": {
+         "content": null,
+         "tool_calls": [
+          {
+           "id": "t1",
+           "type": "function",
+           "function": {
+            "name": "lookup",
+            "arguments": "{}"
+           }
+          }
+         ]
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 1e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "",
+    "model": "a/one",
+    "outcomes": [
+     "answered"
+    ],
+    "sleeps": [],
+    "receiptCount": 1
+   }
+  },
+  {
+   "name": "402 stops at once",
+   "steps": [
+    {
+     "status": 402,
+     "body": {
+      "error": {
+       "code": 402,
+       "message": "insufficient credits"
+      }
+     }
+    }
+   ],
+   "expect": {
+    "error": "payment",
+    "outcomes": [
+     "payment"
+    ],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "401 stops at once",
+   "steps": [
+    {
+     "status": 401
+    }
+   ],
+   "expect": {
+    "error": "auth",
+    "outcomes": [
+     "auth"
+    ],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "a 400 on both models fails with every attempt listed",
+   "steps": [
+    {
+     "status": 400
+    },
+    {
+     "status": 404
+    }
+   ],
+   "expect": {
+    "error": "failed",
+    "outcomes": [
+     "refused",
+     "refused"
+    ],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "the ceiling refuses before the first attempt",
+   "ceilingUsd": 0.0005,
+   "steps": [],
+   "expect": {
+    "error": "ceiling",
+    "outcomes": [],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "spend earlier today counts; yesterday's does not",
+   "ceilingUsd": 0.002,
+   "ledger": [
+    {
+     "at": "2026-10-21T01:00:00Z",
+     "provider": "openrouter",
+     "model": "a/one",
+     "inputTokens": 1,
+     "outputTokens": 1,
+     "cacheReadTokens": 0,
+     "cacheWriteTokens": 0,
+     "costUsd": 0.0015,
+     "costBasis": "provider"
+    },
+    {
+     "at": "2026-10-20T23:00:00Z",
+     "provider": "openrouter",
+     "model": "a/one",
+     "inputTokens": 1,
+     "outputTokens": 1,
+     "cacheReadTokens": 0,
+     "cacheWriteTokens": 0,
+     "costUsd": 5,
+     "costBasis": "provider"
+    }
+   ],
+   "steps": [],
+   "expect": {
+    "error": "ceiling",
+    "outcomes": [],
+    "receiptCount": 2
+   }
+  },
+  {
+   "name": "the ceiling is checked before the fallback too",
+   "ceilingUsd": 0.0015,
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "length",
+        "message": {
+         "content": ""
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 5,
+       "completion_tokens": 100,
+       "cost": 0.001
+      }
+     }
+    }
+   ],
+   "expect": {
+    "error": "ceiling",
+    "outcomes": [
+     "length"
+    ],
+    "receiptCount": 1
+   }
+  },
+  {
+   "name": "an unpriced model is not called",
+   "model": "z/unpriced",
+   "fallback": "b/two",
+   "steps": [],
+   "expect": {
+    "error": "unpriced",
+    "outcomes": [],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "a fallback of the same vendor is refused",
+   "model": "a/one",
+   "fallback": "a/two",
+   "steps": [],
+   "expect": {
+    "error": "config",
+    "outcomes": [],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "no key is refused before anything is sent",
+   "noKey": true,
+   "steps": [],
+   "expect": {
+    "error": "config",
+    "outcomes": [],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "params are input too: a large tools list counts toward the ceiling",
+   "ceilingUsd": 0.0015,
+   "params": {
+    "tools": [
+     {
+      "type": "function",
+      "function": {
+       "name": "lookup",
+       "description": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+     }
+    ]
+   },
+   "steps": [],
+   "expect": {
+    "error": "ceiling",
+    "outcomes": [],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "the same call without tools fits the ceiling",
+   "ceilingUsd": 0.0015,
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "ok"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 1e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "ok",
+    "model": "a/one",
+    "outcomes": [
+     "answered"
+    ],
+    "sleeps": [],
+    "receiptCount": 1
+   }
+  },
+  {
+   "name": "params that change what is billed are refused",
+   "params": {
+    "models": [
+     "c/three"
+    ]
+   },
+   "steps": [],
+   "expect": {
+    "error": "config",
+    "outcomes": [],
+    "receiptCount": 0
+   }
+  },
+  {
+   "name": "a 200 that is not JSON may be billed: an unmeasured receipt, then the fallback",
+   "steps": [
+    {
+     "status": 200,
+     "raw": "<html>oops"
+    },
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "b"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 2e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "b",
+    "model": "b/two",
+    "outcomes": [
+     "bad-answer",
+     "answered"
+    ],
+    "sleeps": [],
+    "receipts": [
+     {
+      "model": "a/one",
+      "costUsd": null,
+      "tokensMeasured": false
+     },
+     {
+      "model": "b/two",
+      "costUsd": 2e-05
+     }
+    ]
+   }
+  },
+  {
+   "name": "a timed-out attempt may be billed: an unmeasured receipt, then a retry",
+   "steps": [
+    {
+     "error": "timeout"
+    },
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "ok"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 1e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "ok",
+    "model": "a/one",
+    "outcomes": [
+     "retry",
+     "answered"
+    ],
+    "sleeps": [
+     0.5
+    ],
+    "receipts": [
+     {
+      "model": "a/one",
+      "costUsd": null,
+      "tokensMeasured": false
+     },
+     {
+      "model": "a/one",
+      "costUsd": 1e-05
+     }
+    ]
+   }
+  },
+  {
+   "name": "a refused connection is not billed: no receipt",
+   "steps": [
+    {
+     "error": "connection"
+    },
+    {
+     "status": 200,
+     "body": {
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "ok"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 1,
+       "completion_tokens": 1,
+       "cost": 1e-05
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "ok",
+    "model": "a/one",
+    "outcomes": [
+     "retry",
+     "answered"
+    ],
+    "sleeps": [
+     0.5
+    ],
+    "receiptCount": 1
+   }
+  },
+  {
+   "name": "a served model with a broken price falls back to the asked model's price",
+   "prices": {
+    "c/served": {
+     "prompt": "n/a",
+     "completion": 0.1
+    }
+   },
+   "steps": [
+    {
+     "status": 200,
+     "body": {
+      "model": "c/served",
+      "choices": [
+       {
+        "finish_reason": "stop",
+        "message": {
+         "content": "ok"
+        }
+       }
+      ],
+      "usage": {
+       "prompt_tokens": 10,
+       "completion_tokens": 3
+      }
+     }
+    }
+   ],
+   "expect": {
+    "content": "ok",
+    "model": "c/served",
+    "outcomes": [
+     "answered"
+    ],
+    "sleeps": [],
+    "receipts": [
+     {
+      "model": "c/served",
+      "costUsd": 4e-05,
+      "costBasis": "price-list"
+     }
+    ]
+   }
+  }
+ ]
 }

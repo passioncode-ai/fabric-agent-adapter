@@ -122,3 +122,8 @@ errors-and-debugging, guides/best-practices/reasoning-tokens):
 - reasoning shares `max_tokens`: a too small budget returns `finish_reason: "length"` with empty content, still billed.
 Python stdlib (`urllib.request`, `http.client`, `socket.timeout`) and Node 20 `fetch` with `AbortSignal.timeout` are the
 transports; both are in the floors the README states.
+
+## Amendment 2026-10-21 (build)
+
+The layer table above puts `fabric_profiles` and `fabric_interop` at L2; they import the service modules, so they sit
+at L3 in `kit.json` and `references/kit-modules.md`, which are the source of truth for layers.

@@ -1,103 +1,571 @@
 {
-  "about": "FAA-65 REQ-06: one set of cases for fabric_http.py and fabric-http.mjs. Scenarios run with rand() = 0.5 (no jitter) and a clock that moves only when the client sleeps.",
-  "redact": [
-    ["https://user:pass@api.example:8443/v1/items?key=sk-secret#frag", "https://api.example:8443/v1/items"],
-    ["https://API.Example/v1", "https://api.example/v1"],
-    ["https://api.example:443/x?token=1", "https://api.example/x"],
-    ["http://127.0.0.1:8080", "http://127.0.0.1:8080/"],
-    ["http://[::1]:9000/a", "http://[::1]:9000/a"]
+ "about": "FAA-65 REQ-06: one set of cases for fabric_http.py and fabric-http.mjs. Scenarios run with rand() = 0.5 (no jitter) and a clock that moves only when the client sleeps.",
+ "redact": [
+  [
+   "https://user:pass@api.example:8443/v1/items?key=sk-secret#frag",
+   "https://api.example:8443/v1/items"
   ],
-  "checkUrl": [
-    ["https://api.example/v1", false, false],
-    ["http://127.0.0.1:8080/x", false, false],
-    ["http://localhost:8080/x", false, false],
-    ["http://[::1]:8080/x", false, false],
-    ["http://api.example/v1", false, true],
-    ["http://api.example/v1", true, false],
-    ["ftp://api.example/v1", false, true],
-    ["file:///etc/passwd", false, true],
-    ["https://user:pass@api.example/v1", false, true],
-    ["https://:pass@api.example/v1", false, true],
-    ["not a url", false, true]
+  [
+   "https://API.Example/v1",
+   "https://api.example/v1"
   ],
-  "retryAfter": [
-    ["120", 0, 120],
-    ["0", 0, 0],
-    [" 7 ", 0, 7],
-    ["-1", 0, null],
-    ["1.5", 0, null],
-    ["Sun, 06 Nov 1994 08:49:37 GMT", 784111767, 10],
-    ["Sun, 06 Nov 1994 08:49:37 GMT", 784111787, 0],
-    ["Sun, 31 Feb 1994 08:49:37 GMT", 0, null],
-    ["Sunday, 06-Nov-94 08:49:37 GMT", 0, null],
-    ["Sun Nov  6 08:49:37 1994", 0, null],
-    ["soon", 0, null],
-    [null, 0, null]
+  [
+   "https://api.example:443/x?token=1",
+   "https://api.example/x"
   ],
-  "mayRetry": [
-    ["GET", {}, 503, true],
-    ["GET", {}, 404, false],
-    ["GET", {}, null, true],
-    ["POST", {}, 503, false],
-    ["POST", {}, null, false],
-    ["POST", {}, 429, true],
-    ["POST", {"Idempotency-Key": "k1"}, 503, true],
-    ["POST", {"idempotency-key": "k1"}, null, true],
-    ["PUT", {}, 500, true],
-    ["DELETE", {}, 502, true],
-    ["PATCH", {}, 504, false]
+  [
+   "http://127.0.0.1:8080",
+   "http://127.0.0.1:8080/"
   ],
-  "backoff": [
-    [0, 0.5, 8, 0.5, 0.5],
-    [1, 0.5, 8, 0.5, 1],
-    [5, 0.5, 8, 0.5, 8],
-    [0, 0.5, 8, 0, 0.25],
-    [0, 0.5, 8, 1, 0.75]
-  ],
-  "scenarios": [
-    {"name": "an answer on the first try", "method": "GET", "steps": [{"status": 200, "body": "{\"a\":1}"}],
-     "expect": {"status": 200, "attempts": 1, "sleeps": []}},
-    {"name": "two 503 then 200 with backoff", "method": "GET", "retries": 2,
-     "steps": [{"status": 503}, {"status": 503}, {"status": 200}],
-     "expect": {"status": 200, "attempts": 3, "sleeps": [0.5, 1]}},
-    {"name": "retries spent: the last answer stands", "method": "GET", "retries": 1,
-     "steps": [{"status": 502}, {"status": 502}],
-     "expect": {"status": 502, "attempts": 2, "sleeps": [0.5]}},
-    {"name": "Retry-After replaces the backoff", "method": "GET",
-     "steps": [{"status": 429, "headers": {"Retry-After": "3"}}, {"status": 200}],
-     "expect": {"status": 200, "attempts": 2, "sleeps": [3]}},
-    {"name": "Retry-After over the cap is not waited", "method": "GET", "maxRetryAfterS": 30,
-     "steps": [{"status": 503, "headers": {"Retry-After": "120"}}],
-     "expect": {"status": 503, "attempts": 1, "sleeps": []}},
-    {"name": "a wait past the deadline is not taken", "method": "GET", "deadlineS": 5,
-     "steps": [{"status": 429, "headers": {"Retry-After": "6"}}],
-     "expect": {"status": 429, "attempts": 1, "sleeps": []}},
-    {"name": "POST is not retried on 503", "method": "POST", "body": {"q": 1},
-     "steps": [{"status": 503}],
-     "expect": {"status": 503, "attempts": 1, "sleeps": []}},
-    {"name": "POST is retried on 429", "method": "POST", "body": {"q": 1},
-     "steps": [{"status": 429}, {"status": 200}],
-     "expect": {"status": 200, "attempts": 2, "sleeps": [0.5]}},
-    {"name": "POST with an Idempotency-Key is retried on 503", "method": "POST", "headers": {"Idempotency-Key": "k1"},
-     "steps": [{"status": 503}, {"status": 201}],
-     "expect": {"status": 201, "attempts": 2, "sleeps": [0.5]}},
-    {"name": "a connection error then an answer", "method": "GET",
-     "steps": [{"error": "connection"}, {"status": 200}],
-     "expect": {"status": 200, "attempts": 2, "sleeps": [0.5]}},
-    {"name": "connection errors exhaust the retries", "method": "GET", "retries": 1,
-     "steps": [{"error": "connection"}, {"error": "connection"}],
-     "expect": {"error": "connection", "attempts": 2, "sleeps": [0.5]}},
-    {"name": "a timeout of a POST is not retried", "method": "POST", "body": "x",
-     "steps": [{"error": "timeout"}],
-     "expect": {"error": "timeout", "attempts": 1, "sleeps": []}},
-    {"name": "a body over the cap is an error", "method": "GET", "maxBytes": 4,
-     "steps": [{"status": 200, "body": "12345"}],
-     "expect": {"error": "too-large", "attempts": 1, "sleeps": []}},
-    {"name": "a body at the cap is an answer", "method": "GET", "maxBytes": 4,
-     "steps": [{"status": 200, "body": "1234"}],
-     "expect": {"status": 200, "attempts": 1, "sleeps": []}},
-    {"name": "a 4xx is answered as it came", "method": "GET",
-     "steps": [{"status": 404}],
-     "expect": {"status": 404, "attempts": 1, "sleeps": []}}
+  [
+   "http://[::1]:9000/a",
+   "http://[::1]:9000/a"
   ]
+ ],
+ "checkUrl": [
+  [
+   "https://api.example/v1",
+   false,
+   false
+  ],
+  [
+   "http://127.0.0.1:8080/x",
+   false,
+   false
+  ],
+  [
+   "http://localhost:8080/x",
+   false,
+   false
+  ],
+  [
+   "http://[::1]:8080/x",
+   false,
+   false
+  ],
+  [
+   "http://api.example/v1",
+   false,
+   true
+  ],
+  [
+   "http://api.example/v1",
+   true,
+   false
+  ],
+  [
+   "ftp://api.example/v1",
+   false,
+   true
+  ],
+  [
+   "file:///etc/passwd",
+   false,
+   true
+  ],
+  [
+   "https://user:pass@api.example/v1",
+   false,
+   true
+  ],
+  [
+   "https://:pass@api.example/v1",
+   false,
+   true
+  ],
+  [
+   "not a url",
+   false,
+   true
+  ],
+  [
+   "http://127.1/x",
+   false,
+   false
+  ],
+  [
+   "http://2130706433/x",
+   false,
+   false
+  ],
+  [
+   "http://10.1/x",
+   false,
+   true
+  ]
+ ],
+ "retryAfter": [
+  [
+   "120",
+   0,
+   120
+  ],
+  [
+   "0",
+   0,
+   0
+  ],
+  [
+   " 7 ",
+   0,
+   7
+  ],
+  [
+   "-1",
+   0,
+   null
+  ],
+  [
+   "1.5",
+   0,
+   null
+  ],
+  [
+   "Sun, 06 Nov 1994 08:49:37 GMT",
+   784111767,
+   10
+  ],
+  [
+   "Sun, 06 Nov 1994 08:49:37 GMT",
+   784111787,
+   0
+  ],
+  [
+   "Sun, 31 Feb 1994 08:49:37 GMT",
+   0,
+   null
+  ],
+  [
+   "Sunday, 06-Nov-94 08:49:37 GMT",
+   0,
+   null
+  ],
+  [
+   "Sun Nov  6 08:49:37 1994",
+   0,
+   null
+  ],
+  [
+   "soon",
+   0,
+   null
+  ],
+  [
+   null,
+   0,
+   null
+  ]
+ ],
+ "mayRetry": [
+  [
+   "GET",
+   {},
+   503,
+   true
+  ],
+  [
+   "GET",
+   {},
+   404,
+   false
+  ],
+  [
+   "GET",
+   {},
+   null,
+   true
+  ],
+  [
+   "POST",
+   {},
+   503,
+   false
+  ],
+  [
+   "POST",
+   {},
+   null,
+   false
+  ],
+  [
+   "POST",
+   {},
+   429,
+   true
+  ],
+  [
+   "POST",
+   {
+    "Idempotency-Key": "k1"
+   },
+   503,
+   true
+  ],
+  [
+   "POST",
+   {
+    "idempotency-key": "k1"
+   },
+   null,
+   true
+  ],
+  [
+   "PUT",
+   {},
+   500,
+   true
+  ],
+  [
+   "DELETE",
+   {},
+   502,
+   true
+  ],
+  [
+   "PATCH",
+   {},
+   504,
+   false
+  ]
+ ],
+ "backoff": [
+  [
+   0,
+   0.5,
+   8,
+   0.5,
+   0.5
+  ],
+  [
+   1,
+   0.5,
+   8,
+   0.5,
+   1
+  ],
+  [
+   5,
+   0.5,
+   8,
+   0.5,
+   8
+  ],
+  [
+   0,
+   0.5,
+   8,
+   0,
+   0.25
+  ],
+  [
+   0,
+   0.5,
+   8,
+   1,
+   0.75
+  ]
+ ],
+ "scenarios": [
+  {
+   "name": "an answer on the first try",
+   "method": "GET",
+   "steps": [
+    {
+     "status": 200,
+     "body": "{\"a\":1}"
+    }
+   ],
+   "expect": {
+    "status": 200,
+    "attempts": 1,
+    "sleeps": []
+   }
+  },
+  {
+   "name": "two 503 then 200 with backoff",
+   "method": "GET",
+   "retries": 2,
+   "steps": [
+    {
+     "status": 503
+    },
+    {
+     "status": 503
+    },
+    {
+     "status": 200
+    }
+   ],
+   "expect": {
+    "status": 200,
+    "attempts": 3,
+    "sleeps": [
+     0.5,
+     1
+    ]
+   }
+  },
+  {
+   "name": "retries spent: the last answer stands",
+   "method": "GET",
+   "retries": 1,
+   "steps": [
+    {
+     "status": 502
+    },
+    {
+     "status": 502
+    }
+   ],
+   "expect": {
+    "status": 502,
+    "attempts": 2,
+    "sleeps": [
+     0.5
+    ]
+   }
+  },
+  {
+   "name": "Retry-After replaces the backoff",
+   "method": "GET",
+   "steps": [
+    {
+     "status": 429,
+     "headers": {
+      "Retry-After": "3"
+     }
+    },
+    {
+     "status": 200
+    }
+   ],
+   "expect": {
+    "status": 200,
+    "attempts": 2,
+    "sleeps": [
+     3
+    ]
+   }
+  },
+  {
+   "name": "Retry-After over the cap is not waited",
+   "method": "GET",
+   "maxRetryAfterS": 30,
+   "steps": [
+    {
+     "status": 503,
+     "headers": {
+      "Retry-After": "120"
+     }
+    }
+   ],
+   "expect": {
+    "status": 503,
+    "attempts": 1,
+    "sleeps": []
+   }
+  },
+  {
+   "name": "a wait past the deadline is not taken",
+   "method": "GET",
+   "deadlineS": 5,
+   "steps": [
+    {
+     "status": 429,
+     "headers": {
+      "Retry-After": "6"
+     }
+    }
+   ],
+   "expect": {
+    "status": 429,
+    "attempts": 1,
+    "sleeps": []
+   }
+  },
+  {
+   "name": "POST is not retried on 503",
+   "method": "POST",
+   "body": {
+    "q": 1
+   },
+   "steps": [
+    {
+     "status": 503
+    }
+   ],
+   "expect": {
+    "status": 503,
+    "attempts": 1,
+    "sleeps": []
+   }
+  },
+  {
+   "name": "POST is retried on 429",
+   "method": "POST",
+   "body": {
+    "q": 1
+   },
+   "steps": [
+    {
+     "status": 429
+    },
+    {
+     "status": 200
+    }
+   ],
+   "expect": {
+    "status": 200,
+    "attempts": 2,
+    "sleeps": [
+     0.5
+    ]
+   }
+  },
+  {
+   "name": "POST with an Idempotency-Key is retried on 503",
+   "method": "POST",
+   "headers": {
+    "Idempotency-Key": "k1"
+   },
+   "steps": [
+    {
+     "status": 503
+    },
+    {
+     "status": 201
+    }
+   ],
+   "expect": {
+    "status": 201,
+    "attempts": 2,
+    "sleeps": [
+     0.5
+    ]
+   }
+  },
+  {
+   "name": "a connection error then an answer",
+   "method": "GET",
+   "steps": [
+    {
+     "error": "connection"
+    },
+    {
+     "status": 200
+    }
+   ],
+   "expect": {
+    "status": 200,
+    "attempts": 2,
+    "sleeps": [
+     0.5
+    ]
+   }
+  },
+  {
+   "name": "connection errors exhaust the retries",
+   "method": "GET",
+   "retries": 1,
+   "steps": [
+    {
+     "error": "connection"
+    },
+    {
+     "error": "connection"
+    }
+   ],
+   "expect": {
+    "error": "connection",
+    "attempts": 2,
+    "sleeps": [
+     0.5
+    ]
+   }
+  },
+  {
+   "name": "a timeout of a POST is not retried",
+   "method": "POST",
+   "body": "x",
+   "steps": [
+    {
+     "error": "timeout"
+    }
+   ],
+   "expect": {
+    "error": "timeout",
+    "attempts": 1,
+    "sleeps": []
+   }
+  },
+  {
+   "name": "a body over the cap is an error",
+   "method": "GET",
+   "maxBytes": 4,
+   "steps": [
+    {
+     "status": 200,
+     "body": "12345"
+    }
+   ],
+   "expect": {
+    "error": "too-large",
+    "attempts": 1,
+    "sleeps": []
+   }
+  },
+  {
+   "name": "a body at the cap is an answer",
+   "method": "GET",
+   "maxBytes": 4,
+   "steps": [
+    {
+     "status": 200,
+     "body": "1234"
+    }
+   ],
+   "expect": {
+    "status": 200,
+    "attempts": 1,
+    "sleeps": []
+   }
+  },
+  {
+   "name": "a 4xx is answered as it came",
+   "method": "GET",
+   "steps": [
+    {
+     "status": 404
+    }
+   ],
+   "expect": {
+    "status": 404,
+    "attempts": 1,
+    "sleeps": []
+   }
+  }
+ ],
+ "jsonBody": [
+  [
+   {
+    "a": "x\ud800y",
+    "b": "\u00e9"
+   },
+   "{\"a\":\"x\\ud800y\",\"b\":\"\u00e9\"}"
+  ],
+  [
+   [
+    1,
+    2.5,
+    "z"
+   ],
+   "[1,2.5,\"z\"]"
+  ]
+ ],
+ "textBody": [
+  [
+   "a\udcffb",
+   "a\ufffdb"
+  ]
+ ]
 }

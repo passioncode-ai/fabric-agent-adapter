@@ -490,6 +490,29 @@
         "the partner's token carries {partner: org:<id>} innermost under the partner's agent; the verifier counts it toward the depth limit, refuses it outermost or as personal (malformed-chain), and the checked chain names it by its org: id",
         "minting the partner's token and its grant (FAC-SEM-124) stay with the issuer; the service verifies and never mints"
       ]
+    },
+    {
+      "id": "kit-installed-as-a-set",
+      "trap": "since 0.40.0 the kit is layered modules: a service that copies fabric_service.py alone fails on import, and an updated fabric_estate.py alone no longer loads",
+      "request": "Update the Fabric service kit in our example-agent service to the latest release; we copied fabric_service.py and fabric_estate.py by hand last time.",
+      "expected": [
+        "runs fabric_kit.py status on the service folder first and reads which copies are older, modified or missing",
+        "installs with fabric_kit.py install --module for each module the service uses (fabric_service, fabric_estate, fabric_interop as needed), not by copying single files",
+        "does not overwrite a copy status calls modified without saying so and asking or using --force deliberately",
+        "re-runs status and shows every file current"
+      ]
+    },
+    {
+      "id": "model-calls-under-a-ceiling",
+      "trap": "a hand-rolled OpenRouter call checked spend once per job, counted only the messages, retried past the cap and recorded nothing for a timed-out call",
+      "request": "Our example-agent service should draft replies with an OpenRouter model and never spend more than two dollars a day.",
+      "expected": [
+        "uses fabric_openrouter.Client with the agent's own key read from an environment variable, not a key in a file or argv",
+        "sets ceiling_usd with window day and prices from the OpenRouter catalog, and a fallback model of another vendor",
+        "relies on the ceiling being checked before every attempt, retries and fallback included, with tools and params counted as input",
+        "records usage through the client's ledger and shows spend (usage_report or totals), counting unknown cost as unknown, never as 0",
+        "treats an empty or length-cut answer as a failure, not a reply"
+      ]
     }
   ]
 }

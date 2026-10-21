@@ -31,6 +31,7 @@ import http.client
 import ipaddress
 import json
 import re
+import socket
 import random as _random
 import time
 import urllib.error
@@ -82,6 +83,21 @@ class Response:
         return json.loads(self.body.decode("utf-8"))
 
 
+_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def utf8(text: str) -> bytes:
+    """Text as UTF-8 the way `TextEncoder` writes it: a lone surrogate becomes U+FFFD instead of an error."""
+    return _SURROGATE.sub("\ufffd", text).encode("utf-8")
+
+
+def json_bytes(value: Any) -> bytes:
+    """Compact JSON as `JSON.stringify` writes it, in UTF-8: a lone surrogate escaped as `\\uXXXX`, and NaN or
+    Infinity refused (`ValueError`) rather than written as a token no JSON reader accepts."""
+    text = json.dumps(value, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    return _SURROGATE.sub(lambda m: "\\u%04x" % ord(m.group()), text).encode("utf-8")
+
+
 def redact_url(url: str) -> str:
     """The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or
     fragment, which is where keys and tokens ride."""
@@ -109,6 +125,10 @@ def _is_loopback(host: str) -> bool:
     try:
         return ipaddress.ip_address(host).is_loopback
     except ValueError:
+        pass
+    try:  # the short IPv4 forms a WHATWG URL also reads (127.1, 2130706433, 0x7f.1)
+        return socket.inet_aton(host)[0] == 127
+    except (OSError, ValueError):
         return False
 
 
@@ -203,8 +223,22 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
         raise reason if isinstance(reason, OSError) else ConnectionError(str(reason))
     except (http.client.HTTPException, ValueError) as exc:
         raise ConnectionError(type(exc).__name__)
+    end = time.monotonic() + timeout_s
     try:
-        data = resp.read(max_bytes + 1)
+        chunks, size = [], 0
+        while size <= max_bytes:
+            left = end - time.monotonic()
+            if left <= 0:
+                raise TimeoutError("the body did not arrive within the deadline")
+            sock = getattr(getattr(getattr(resp, "fp", None), "raw", None), "_sock", None)
+            if sock is not None:
+                sock.settimeout(left)  # each read waits at most what is left of the deadline
+            chunk = resp.read1(min(65536, max_bytes + 1 - size))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+        data = b"".join(chunks)[:max_bytes + 1]
         return resp.status if hasattr(resp, "status") else resp.code, dict(resp.headers.items()), data
     except http.client.HTTPException as exc:
         raise ConnectionError(type(exc).__name__)
@@ -233,11 +267,14 @@ def request(method: str, url: str, *, headers: Optional[Mapping[str, str]] = Non
     if body is None:
         data = None
     elif isinstance(body, (dict, list)):
-        data = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        try:
+            data = json_bytes(body)
+        except ValueError:
+            raise HttpError("the body holds a number JSON cannot write (NaN or Infinity)", kind="refused")
         if not any(k.lower() == "content-type" for k in sent):
             sent["Content-Type"] = "application/json"
     elif isinstance(body, str):
-        data = body.encode("utf-8")
+        data = utf8(body)
     elif isinstance(body, (bytes, bytearray)):
         data = bytes(body)
     else:
@@ -260,7 +297,7 @@ def request(method: str, url: str, *, headers: Optional[Mapping[str, str]] = Non
             raise
         except TimeoutError:
             failure = HttpError("%s %s: timed out" % (method, where), url=where, attempts=attempt, kind="timeout")
-        except OSError as exc:
+        except Exception as exc:  # noqa: BLE001 - as the Node twin: whatever the transport throws is a connection error
             failure = HttpError("%s %s: connection error (%s)" % (method, where, type(exc).__name__), url=where,
                                 attempts=attempt, kind="connection")
         if failure is None:

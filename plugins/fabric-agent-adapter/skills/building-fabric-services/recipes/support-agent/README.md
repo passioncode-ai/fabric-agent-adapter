@@ -22,7 +22,7 @@ service that calls it owns its channel (mail, a chat, a store review) and its re
 
 ```bash
 python3 <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_kit.py \
-  install <service>/support --lang py --module fabric_openrouter
+  install <service>/support --lang py --module fabric_openrouter --module fabric_usage --module fabric_paths
 cp <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/recipes/support-agent/support_agent.py <service>/support/
 python3 <adapter>/.../fabric_kit.py status <service>/support      # current, older or modified, per file
 ```

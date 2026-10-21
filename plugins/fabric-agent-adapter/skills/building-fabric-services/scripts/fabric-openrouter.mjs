@@ -24,6 +24,8 @@ export const BASE_URL = 'https://openrouter.ai/api/v1';
 export const ANSWERED = Object.freeze(['stop', 'tool_calls']);
 const STOP_AT_ONCE = { 401: 'auth', 402: 'payment', 403: 'auth' };
 const RESERVED_PARAMS = ['model', 'messages', 'max_tokens', 'maxTokens', 'stream', 'usage'];
+// Params that change what a call is billed for (other models, plugins, web search): the ceiling could not bound them.
+const UNBOUNDED_PARAMS = ['models', 'route', 'plugins', 'web_search_options'];
 
 export class OpenRouterError extends Error {
   constructor(message, { kind, attempts = [] } = {}) {
@@ -60,7 +62,8 @@ export function pricesFromCatalog(catalog) {
   return out;
 }
 
-export const promptTokensBound = (messages) => Math.ceil(new TextEncoder().encode(JSON.stringify(messages)).length / 2);
+// One token per two UTF-8 bytes of what is sent as compact JSON: the messages and every param, all billed as input.
+export const promptTokensBound = (value) => Math.ceil(http.jsonBytes(value).length / 2);
 
 function checkAttribution(projectId, taskRunId) {
   try {
@@ -98,10 +101,19 @@ export class Client {
     this.inFlight = 0;
   }
 
-  worstCaseUsd(model, messages, maxTokens) {
+  priced(model) {
     const p = this.prices[model];
-    if (!p || price(p.prompt) === null || price(p.completion) === null) return null;
-    return promptTokensBound(messages) * Number(p.prompt) + maxTokens * Number(p.completion) + (price(p.request) ?? 0);
+    if (!isObject(p)) return null;
+    const prompt = price(p.prompt);
+    const completion = price(p.completion);
+    if (prompt === null || completion === null) return null;
+    return { prompt, completion, request: price(p.request) ?? 0 };
+  }
+
+  worstCaseUsd(model, messages, maxTokens, params = {}) {
+    const p = this.priced(model);
+    if (p === null) return null;
+    return promptTokensBound({ ...params, messages }) * p.prompt + maxTokens * p.completion + p.request;
   }
 
   inWindow(at, today) {
@@ -121,8 +133,8 @@ export class Client {
     return total;
   }
 
-  reserve(model, messages, maxTokens) {
-    const worst = this.worstCaseUsd(model, messages, maxTokens);
+  reserve(model, messages, maxTokens, params) {
+    const worst = this.worstCaseUsd(model, messages, maxTokens, params);
     if (worst === null) {
       throw new OpenRouterError(`${model} has no price: its spend cannot be bounded, so it is not called`, { kind: 'unpriced' });
     }
@@ -153,13 +165,19 @@ export class Client {
     let cost = typeof usage.cost === 'number' ? price(usage.cost) : null;
     let basis = 'provider';
     if (cost === null) {
-      const p = this.prices[served] ?? this.prices[asked];
-      if (p) { cost = prompt * Number(p.prompt) + completion * Number(p.completion); basis = 'price-list'; }
+      const p = this.priced(served) ?? this.priced(asked);
+      if (p) { cost = prompt * p.prompt + completion * p.completion; basis = 'price-list'; }
     }
     return makeUsageReceipt('openrouter', served.slice(0, 128), {
       inputTokens: Math.max(0, prompt - cached - written), outputTokens: completion, cacheReadTokens: cached,
       cacheWriteTokens: written, costUsd: cost, costBasis: cost === null ? undefined : basis, ...common,
     });
+  }
+
+  // A receipt for an attempt that may have been billed with no usage to read: no tokens, no cost.
+  unmeasured(asked, taskRunId) {
+    return makeUsageReceipt('openrouter', asked.slice(0, 128), { inputTokens: 0, outputTokens: 0, tokensMeasured: false,
+      at: time.formatRfc3339(Math.trunc(this.now() * 1000)), route: 'key', projectId: this.projectId, taskRunId });
   }
 
   key() {
@@ -187,6 +205,15 @@ export class Client {
     checkAttribution(this.projectId, taskRunId); // before anything is sent: a billed call keeps its receipt
     const clash = Object.keys(params).filter((k) => RESERVED_PARAMS.includes(k));
     if (clash.length) throw new OpenRouterError(`the client sets ${clash.sort().join(', ')} itself`, { kind: 'config' });
+    const unbounded = Object.keys(params).filter((k) => UNBOUNDED_PARAMS.includes(k));
+    if (unbounded.length) {
+      throw new OpenRouterError(`${unbounded.sort().join(', ')} change what a call is billed for; the ceiling cannot bound them`, { kind: 'config' });
+    }
+    try {
+      promptTokensBound({ ...params, messages });
+    } catch {
+      throw new OpenRouterError('the request holds a number JSON cannot write (NaN or Infinity)', { kind: 'config' });
+    }
     const headers = this.headers(this.key());
     const url = `${this.baseUrl}/chat/completions`;
     const end = this.clock() + this.deadlineS;
@@ -198,7 +225,7 @@ export class Client {
         if (left <= 0) throw new OpenRouterError(`the deadline passed after ${attempts.length} attempts`, { kind: 'failed', attempts });
         let held;
         try {
-          held = this.reserve(current, messages, maxTokens);
+          held = this.reserve(current, messages, maxTokens, params);
         } catch (err) {
           err.attempts = [...attempts];
           throw err;
@@ -229,7 +256,10 @@ export class Client {
       response = await http.request('POST', url, { headers, body, deadlineS: left, retries: 0, transport: this.transport, clock: this.clock });
     } catch (err) {
       if (!(err instanceof http.HttpError)) throw err;
-      return { outcome: ['connection', 'timeout'].includes(err.kind) ? 'retry' : 'refused', status: null };
+      if (err.kind === 'timeout' || (err.kind === 'too-large' && err.status === 200)) {
+        this.ledger.record(this.unmeasured(asked, taskRunId)); // may have been billed: counted, never as $0
+      }
+      return { outcome: ['connection', 'timeout'].includes(err.kind) ? 'retry' : 'refused', status: err.status };
     }
     const { status } = response;
     if (STOP_AT_ONCE[status]) return { outcome: STOP_AT_ONCE[status], status };
@@ -237,9 +267,12 @@ export class Client {
       if (http.RETRY_STATUSES.includes(status)) return { outcome: 'retry', status, wait: http.retryAfterS(response.headers['retry-after'] ?? null) };
       return { outcome: 'refused', status };
     }
-    let parsed;
-    try { parsed = response.json(); } catch { return { outcome: 'bad-answer', status }; }
-    if (!isObject(parsed)) return { outcome: 'bad-answer', status };
+    let parsed = null;
+    try { parsed = response.json(); } catch { /* read as no answer below */ }
+    if (!isObject(parsed)) {
+      this.ledger.record(this.unmeasured(asked, taskRunId));
+      return { outcome: 'bad-answer', status };
+    }
     const receipt = this.receipt(asked, parsed, taskRunId);
     this.ledger.record(receipt);
     const choice = Array.isArray(parsed.choices) && isObject(parsed.choices[0]) ? parsed.choices[0] : {};

@@ -19,6 +19,10 @@ import shutil
 import subprocess
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_estate as _estate
 import fabric_identifiers as _ids
 import fabric_secrets as _secrets

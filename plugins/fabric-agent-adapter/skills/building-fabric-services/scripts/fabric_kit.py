@@ -111,7 +111,7 @@ def state_of(path: Path, manifest: Dict) -> Dict:
     if any(e["file"] == path.name and e["sha256"] == digest for e in manifest["python"] + manifest["node"]) or \
             manifest.get("data", {}).get(path.name) == digest:
         return {"state": "current", "version": manifest["version"]}
-    for version, files in sorted(manifest.get("history", {}).items(), key=lambda kv: [int(x) for x in kv[0].split(".")], reverse=True):
+    for version, files in sorted(manifest.get("history", {}).items(), key=lambda kv: [int(x) for x in re.findall(r"[0-9]+", kv[0])], reverse=True):
         if files.get(path.name) == digest:
             return {"state": "older", "version": version}
     return {"state": "modified", "version": None}
@@ -126,16 +126,28 @@ def status(service_dir: Path) -> Dict:
         for e in present:
             report["files"].append({"file": e["file"], **state_of(service_dir / e["file"], manifest)})
         names = {e["module"] for e in present}
+        by_name = {e["module"]: e for e in entries}
+        reader = python_imports if lang == "python" else node_imports
+        # What each copy imports is read from the copy itself (an older release imports other modules than this one);
+        # a module it lacks would be installed at this release, so that module's own imports are followed too.
+        queue = [(e["file"], reader(service_dir / e["file"], list(by_name))) for e in present]
+        reported = set()
         for e in present:
             for d in e.get("data", []):
                 if (service_dir / d).is_file():
                     if d not in [f["file"] for f in report["files"]]:
                         report["files"].append({"file": d, **state_of(service_dir / d, manifest)})
-                else:
+                elif d not in reported:
+                    reported.add(d)
                     report["missing"].append({"file": e["file"], "needs": d})
-            for dep in e["imports"]:
-                if dep not in names:
-                    report["missing"].append({"file": e["file"], "needs": next(x["file"] for x in entries if x["module"] == dep)})
+        while queue:
+            importer, deps = queue.pop(0)
+            for dep in deps:
+                if dep in names or dep in reported:
+                    continue
+                reported.add(dep)
+                report["missing"].append({"file": importer, "needs": by_name[dep]["file"]})
+                queue.append((by_name[dep]["file"], by_name[dep]["imports"]))
     return report
 
 
@@ -203,7 +215,12 @@ def main(argv: List[str]) -> int:
         bad = report["missing"] or any(f["state"] != "current" for f in report["files"])
         return 1 if bad else 0
     lang = LANGS[args.lang]
-    modules = [e["module"] for e in load_manifest()[lang]] if args.all else args.module
+    known = [e["module"] for e in load_manifest()[lang]]
+    modules = known if args.all else args.module
+    unknown = [m for m in modules if m not in known]
+    if unknown:
+        print("no such %s kit module: %s (kit.json lists %s)" % (lang, ", ".join(unknown), ", ".join(known)), file=sys.stderr)
+        return 2
     result = install(args.dir, lang, modules, args.dry_run, args.force)
     for name in result["copied"]:
         print(("would copy " if args.dry_run else "copied     ") + name)

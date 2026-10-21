@@ -72,6 +72,16 @@ class Cases(unittest.TestCase):
         for attempt, base, cap, rand, expected in CASES["backoff"]:
             self.assertEqual(fh.backoff_s(attempt, base_s=base, max_s=cap, rand=rand), expected)
 
+    def test_bodies(self):
+        for value, text in CASES["jsonBody"]:
+            self.assertEqual(fh.json_bytes(value), text.encode("utf-8"))
+        for value, text in CASES["textBody"]:
+            self.assertEqual(fh.utf8(value), text.encode("utf-8"))
+        for bad in (float("nan"), float("inf")):
+            with self.assertRaises(fh.HttpError) as caught:
+                fh.request("POST", "https://api.example/", body={"n": bad}, transport=scripted([], []))
+            self.assertEqual(caught.exception.kind, "refused")
+
     def test_scenarios(self):
         for case in CASES["scenarios"]:
             with self.subTest(case["name"]):
@@ -173,6 +183,39 @@ class DefaultTransport(unittest.TestCase):
         with self.assertRaises(fh.HttpError) as caught:
             fh.request("GET", self.base + "/big", deadline_s=10, max_bytes=10)
         self.assertEqual(caught.exception.kind, "too-large")
+
+    def test_a_trickled_body_stops_at_the_deadline(self):
+        import socket
+        import time as _time
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+
+        def trickle():
+            conn, _ = server.accept()
+            conn.recv(65536)
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n")
+            try:
+                _time.sleep(1.5)
+                conn.sendall(b"x")  # then nothing: a read started at 1.5 s must not wait the whole 2 s again
+                _time.sleep(5)
+            except OSError:
+                pass
+            conn.close()
+        threading.Thread(target=trickle, daemon=True).start()
+        start = _time.monotonic()
+        with self.assertRaises(fh.HttpError) as caught:
+            fh.request("GET", "http://127.0.0.1:%d/" % server.getsockname()[1], deadline_s=2, retries=0)
+        server.close()
+        self.assertEqual(caught.exception.kind, "timeout")
+        self.assertLess(_time.monotonic() - start, 2.8, "the deadline covers the body, not each read")
+
+    def test_a_transport_bug_is_a_connection_error_as_in_node(self):
+        def broken(*args):
+            raise RuntimeError("bug")
+        with self.assertRaises(fh.HttpError) as caught:
+            fh.request("GET", "https://api.example/", transport=broken, retries=0)
+        self.assertEqual(caught.exception.kind, "connection")
 
     def test_a_closed_port_is_a_connection_error(self):
         with self.assertRaises(fh.HttpError) as caught:

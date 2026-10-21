@@ -22,14 +22,17 @@ function scripted(steps, seen) {
   return async ({ url, headers, body }) => {
     seen.push({ url, headers, body: JSON.parse(new TextDecoder().decode(body)) });
     const step = left.shift();
-    return { status: step.status, headers: step.headers ?? {}, body: new TextEncoder().encode(JSON.stringify(step.body ?? {})) };
+    if (step.error === 'timeout') throw Object.assign(new Error('slow'), { name: 'TimeoutError' });
+    if (step.error === 'connection') throw Object.assign(new Error('refused'), { name: 'TypeError' });
+    const raw = step.raw ?? JSON.stringify(step.body ?? {});
+    return { status: step.status, headers: step.headers ?? {}, body: new TextEncoder().encode(raw) };
   };
 }
 
 function client(c, seen, ledger, extra = {}) {
   const sleeps = [];
   let now = 0;
-  const cl = new fo.Client({ ceilingUsd: c.ceilingUsd ?? 1, ledger, prices: CASES.prices,
+  const cl = new fo.Client({ ceilingUsd: c.ceilingUsd ?? 1, ledger, prices: { ...CASES.prices, ...(c.prices ?? {}) },
     env: c.noKey ? {} : { OPENROUTER_API_KEY: KEY }, transport: scripted(c.steps ?? [], seen),
     sleep: async (s) => { sleeps.push(s); now += s; }, clock: () => now, now: () => NOW, rand: () => 0.5, ...extra });
   return { cl, sleeps };
@@ -41,7 +44,7 @@ async function run(c) {
   const { cl, sleeps } = client(c, seen, ledger);
   let got;
   try {
-    const a = await cl.chat(MESSAGES, { model: c.model ?? 'a/one', fallback: c.fallback ?? 'b/two', maxTokens: 100 });
+    const a = await cl.chat(MESSAGES, { model: c.model ?? 'a/one', fallback: c.fallback ?? 'b/two', maxTokens: 100, ...(c.params ?? {}) });
     got = { content: a.content, model: a.model, outcomes: a.attempts.map((x) => x.outcome), sleeps };
   } catch (err) {
     if (!(err instanceof fo.OpenRouterError)) throw err;
@@ -150,4 +153,21 @@ test('config refusals and totals', () => {
   }
   assert.deepEqual(fo.totals([{ costUsd: 0.5 }, { costUsd: null }, { costUsd: 0.25 }]), { calls: 3, spentUsd: 0.75, unpricedCalls: 1 });
   assert.deepEqual(fo.totals([{ costUsd: null }]), { calls: 1, spentUsd: null, unpricedCalls: 1 });
+});
+
+test('unencodable requests and answers over the cap', async () => {
+  const seen = [];
+  const { cl } = client({ steps: [] }, seen, new Ledger());
+  await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100, temperature: Number.NaN }),
+    (e) => e.kind === 'config' && seen.length === 0);
+  const ledger = new Ledger();
+  const huge = new Uint8Array(8 * 1024 * 1024 + 1);
+  const steps = [() => ({ status: 200, headers: {}, body: huge }),
+    () => ({ status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: 'b' } }] })) })];
+  const capped = new fo.Client({ ceilingUsd: 1, ledger, prices: CASES.prices, env: { OPENROUTER_API_KEY: KEY }, now: () => NOW,
+    transport: async () => steps.shift()() });
+  const got = await capped.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100 });
+  assert.deepEqual(got.attempts.map((a) => a.outcome), ['refused', 'answered']);
+  assert.equal(ledger.rows[0].tokensMeasured, false);
+  assert.equal(ledger.rows[0].costUsd, null);
 });

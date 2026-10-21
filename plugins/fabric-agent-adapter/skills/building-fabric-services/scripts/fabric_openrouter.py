@@ -34,7 +34,6 @@ The transport is fabric_http's, injected in tests. Standard library only. Part o
 """
 from __future__ import annotations
 
-import json
 import math
 import os
 import random as _random
@@ -42,6 +41,10 @@ import threading
 import time
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_http
 import fabric_time
 import fabric_usage
@@ -50,6 +53,8 @@ BASE_URL = "https://openrouter.ai/api/v1"
 ANSWERED = ("stop", "tool_calls")
 _STOP_AT_ONCE = {401: "auth", 402: "payment", 403: "auth"}
 _RESERVED_PARAMS = ("model", "messages", "max_tokens", "stream", "usage")
+#: Params that change what a call is billed for (other models, plugins, web search): the ceiling could not bound them.
+_UNBOUNDED_PARAMS = ("models", "route", "plugins", "web_search_options")
 
 
 class OpenRouterError(Exception):
@@ -94,10 +99,11 @@ def prices_from_catalog(catalog: Any) -> Dict[str, Dict[str, float]]:
     return out
 
 
-def prompt_tokens_bound(messages: Any) -> int:
-    """An upper bound on a prompt's tokens: one token per two UTF-8 bytes of the messages as compact JSON (as `JSON.stringify` writes it). Real tokenizers
-    average three to four bytes a token on prose; the bound is meant to be loose."""
-    return math.ceil(len(json.dumps(messages, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) / 2)
+def prompt_tokens_bound(value: Any) -> int:
+    """An upper bound on the input tokens of what is sent: one token per two UTF-8 bytes of it as compact JSON (as
+    `JSON.stringify` writes it). The client bounds the messages and every param together (tools, response_format):
+    all of it is billed as input. Real tokenizers average three to four bytes a token on prose; the bound is loose."""
+    return math.ceil(len(fabric_http.json_bytes(value)) / 2)
 
 
 def _count(value: Any) -> Optional[int]:
@@ -151,13 +157,24 @@ class Client:
         self._in_flight = 0.0
 
     # -- money ---------------------------------------------------------------------------------------------------
-    def worst_case_usd(self, model: str, messages: Any, max_tokens: int) -> Optional[float]:
-        """What one attempt may cost at most, or None when the model has no price."""
+    def _priced(self, model: str) -> Optional[Dict[str, float]]:
         price = self.prices.get(model)
-        if not price or _price(price.get("prompt")) is None or _price(price.get("completion")) is None:
+        if not isinstance(price, Mapping):
             return None
-        return (prompt_tokens_bound(messages) * float(price["prompt"]) + max_tokens * float(price["completion"])
-                + float(_price(price.get("request")) or 0.0))
+        prompt, completion = _price(price.get("prompt")), _price(price.get("completion"))
+        if prompt is None or completion is None:
+            return None
+        return {"prompt": prompt, "completion": completion, "request": _price(price.get("request")) or 0.0}
+
+    def worst_case_usd(self, model: str, messages: Any, max_tokens: int,
+                       params: Optional[Mapping[str, Any]] = None) -> Optional[float]:
+        """What one attempt may cost at most (the messages and params as input, `max_tokens` of output), or None when
+        the model has no price."""
+        price = self._priced(model)
+        if price is None:
+            return None
+        sent = dict(params or {}, messages=messages)
+        return prompt_tokens_bound(sent) * price["prompt"] + max_tokens * price["completion"] + price["request"]
 
     def _in_window(self, at: Any, today: str) -> bool:
         ms = fabric_time.parse_rfc3339_ms(at)
@@ -178,8 +195,8 @@ class Client:
             total += float(cost) if measured else unmeasured_usd
         return total
 
-    def _reserve(self, model: str, messages: Any, max_tokens: int) -> float:
-        worst = self.worst_case_usd(model, messages, max_tokens)
+    def _reserve(self, model: str, messages: Any, max_tokens: int, params: Mapping[str, Any]) -> float:
+        worst = self.worst_case_usd(model, messages, max_tokens, params)
         if worst is None:
             raise OpenRouterError("%s has no price: its spend cannot be bounded, so it is not called" % model,
                                   kind="unpriced")
@@ -214,14 +231,21 @@ class Client:
         cost = _price(usage.get("cost")) if isinstance(usage.get("cost"), (int, float)) else None
         basis = "provider"
         if cost is None:
-            price = self.prices.get(served) or self.prices.get(asked)
+            price = self._priced(served) or self._priced(asked)
             if price:
-                cost = prompt * float(price["prompt"]) + completion * float(price["completion"])
+                cost = prompt * price["prompt"] + completion * price["completion"]
                 basis = "price-list"
         return fabric_usage.make_usage_receipt(
             "openrouter", served[:128], input_tokens=max(0, prompt - cached - written), output_tokens=completion,
             cache_read_tokens=cached, cache_write_tokens=written, cost_usd=cost,
             cost_basis=basis if cost is not None else None, **common)
+
+    def _unmeasured(self, asked: str, task_run_id: Optional[str]) -> Dict[str, Any]:
+        """A receipt for an attempt that may have been billed with no usage to read: no tokens, no cost."""
+        return fabric_usage.make_usage_receipt(
+            "openrouter", asked[:128], input_tokens=0, output_tokens=0, tokens_measured=False,
+            at=fabric_time.format_rfc3339(fabric_time.now_ms(self._now)), route="key", project_id=self.project_id,
+            task_run_id=task_run_id)
 
     # -- the call ------------------------------------------------------------------------------------------------
     def _key(self) -> str:
@@ -252,6 +276,14 @@ class Client:
         clash = [k for k in params if k in _RESERVED_PARAMS]
         if clash:
             raise OpenRouterError("the client sets %s itself" % ", ".join(sorted(clash)), kind="config")
+        unbounded = [k for k in params if k in _UNBOUNDED_PARAMS]
+        if unbounded:
+            raise OpenRouterError("%s change what a call is billed for; the ceiling cannot bound them"
+                                  % ", ".join(sorted(unbounded)), kind="config")
+        try:
+            prompt_tokens_bound(dict(params, messages=messages))
+        except ValueError:
+            raise OpenRouterError("the request holds a number JSON cannot write (NaN or Infinity)", kind="config")
         headers = self._headers(self._key())
         url = self.base_url + "/chat/completions"
         end = self._clock() + self.deadline_s
@@ -265,7 +297,7 @@ class Client:
                     raise OpenRouterError("the deadline passed after %d attempts" % len(attempts), kind="failed",
                                           attempts=attempts)
                 try:
-                    held = self._reserve(current, messages, max_tokens)
+                    held = self._reserve(current, messages, max_tokens, params)
                 except OpenRouterError as refused:
                     refused.attempts = list(attempts)
                     raise
@@ -298,7 +330,10 @@ class Client:
             response = fabric_http.request("POST", url, headers=headers, body=body, deadline_s=left, retries=0,
                                            transport=self._transport, clock=self._clock)
         except fabric_http.HttpError as err:
-            return ("retry" if err.kind in ("connection", "timeout") else "refused"), None, None, None
+            if err.kind == "timeout" or (err.kind == "too-large" and err.status == 200):
+                # the provider may have billed a call whose answer never arrived whole: counted, never as $0
+                self.ledger.record(self._unmeasured(asked, task_run_id))
+            return ("retry" if err.kind in ("connection", "timeout") else "refused"), err.status, None, None
         status = response.status
         if status in _STOP_AT_ONCE:
             return _STOP_AT_ONCE[status], status, None, None
@@ -309,8 +344,9 @@ class Client:
         try:
             parsed = response.json()
         except ValueError:
-            return "bad-answer", status, None, None
+            parsed = None
         if not isinstance(parsed, dict):
+            self.ledger.record(self._unmeasured(asked, task_run_id))
             return "bad-answer", status, None, None
         receipt = self._receipt(asked, parsed, task_run_id)
         self.ledger.record(receipt)

@@ -12,6 +12,13 @@ import os  # noqa: F401 - callers reach these through the facade
 import sys  # noqa: F401 - callers reach these through the facade
 from pathlib import Path  # noqa: F401
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+# Private names 0.39.1 code reached through this module; they live in the core now (FAA-65).
+from fabric_jsvalue import is_number as _number  # noqa: E402,F401
+from fabric_time import DAY_MS as _DAY_MS, utc_date_ms as _utc_date_ms  # noqa: E402,F401
 from fabric_base import (  # noqa: F401
     PROTOCOL,
     EXTENSION_KEY,

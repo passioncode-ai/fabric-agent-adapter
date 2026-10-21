@@ -96,6 +96,8 @@ class Recipe(unittest.TestCase):
              ["unknown-citation:refund-window"]),
             ("an em dash", "How do I reset my password?", ["Open Settings \u2014 then Account [KB:password-reset]."],
              ["dash"]),
+            ("a horizontal bar", "How do I reset my password?", ["Open Settings \u2015 then Account [KB:password-reset]."],
+             ["dash"]),
             ("a spaced hyphen", "How do I reset my password?", ["Open Settings - then Account [KB:password-reset]."],
              ["dash"]),
             ("another script", "Как сбросить пароль?", ["Open Settings, then Account [KB:password-reset-ru]."],
@@ -125,6 +127,12 @@ class Recipe(unittest.TestCase):
         agent, _ = self.agent(model_says("Откройте Настройки, затем Аккаунт [KB:password-reset-ru]."))
         got = agent.answer("m-2", "Как сбросить пароль?")
         self.assertEqual((got["action"], got["reply"]), ("reply", "Откройте Настройки, затем Аккаунт."))
+
+    def test_a_lone_surrogate_is_not_fatal(self):
+        agent, handoffs = self.agent(model_says("Open Settings [KB:password-reset]."))
+        got = agent.answer("m-1", "\udcff reset my password")
+        self.assertEqual(got["action"], "reply")
+        self.assertTrue((self.dir / "decisions.json").read_text(encoding="utf-8"))
 
     def test_the_default_outbox(self):
         client = fo.Client(ceiling_usd=1.0, ledger=sa.fabric_usage.JsonlUsageLedger(self.dir / "usage.jsonl"),

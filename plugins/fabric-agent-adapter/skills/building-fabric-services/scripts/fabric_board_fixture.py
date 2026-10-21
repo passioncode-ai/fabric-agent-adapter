@@ -8,6 +8,10 @@ from typing import Any
 from typing import Dict
 from typing import List
 
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_hub as _hub
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
     COMMS_PROTOCOL,

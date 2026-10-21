@@ -33,7 +33,12 @@ def scripted(steps, seen):
     def transport(method, url, headers, body, timeout_s, max_bytes):
         seen.append({"url": url, "headers": headers, "body": json.loads(body)})
         step = steps.pop(0)
-        return step["status"], step.get("headers", {}), json.dumps(step.get("body", {})).encode("utf-8")
+        if step.get("error") == "timeout":
+            raise TimeoutError("slow")
+        if step.get("error") == "connection":
+            raise ConnectionRefusedError("refused")
+        raw = step["raw"].encode("utf-8") if "raw" in step else json.dumps(step.get("body", {})).encode("utf-8")
+        return step["status"], step.get("headers", {}), raw
     return transport
 
 
@@ -43,7 +48,7 @@ def client(case, seen, ledger, **extra):
     def sleep(s):
         sleeps.append(s)
         now[0] += s
-    c = fo.Client(ceiling_usd=case.get("ceilingUsd", 1.0), ledger=ledger, prices=CASES["prices"],
+    c = fo.Client(ceiling_usd=case.get("ceilingUsd", 1.0), ledger=ledger, prices=dict(CASES["prices"], **case.get("prices", {})),
                   environ={} if case.get("noKey") else {"OPENROUTER_API_KEY": KEY},
                   transport=scripted(case.get("steps", []), seen), sleep=sleep, clock=lambda: now[0],
                   now=lambda: NOW, rand=lambda: 0.5, **extra)
@@ -55,7 +60,7 @@ def run(case):
     c, sleeps = client(case, seen, ledger)
     try:
         answer = c.chat(MESSAGES, model=case.get("model", "a/one"), fallback=case.get("fallback", "b/two"),
-                        max_tokens=100)
+                        max_tokens=100, **case.get("params", {}))
         got = {"content": answer["content"], "model": answer["model"],
                "outcomes": [a["outcome"] for a in answer["attempts"]], "sleeps": sleeps}
     except fo.OpenRouterError as err:
@@ -214,6 +219,30 @@ class Rules(unittest.TestCase):
             args.update(kwargs)
             with self.assertRaises(Exception, msg=kwargs):
                 fo.Client(**args)
+
+    def test_unencodable_requests_are_refused_before_sending(self):
+        seen = []
+        c, _ = client({"steps": []}, seen, Ledger())
+        with self.assertRaises(fo.OpenRouterError) as caught:
+            c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=100, temperature=float("nan"))
+        self.assertEqual((caught.exception.kind, seen), ("config", []))
+        lone = [{"role": "user", "content": "x\ud800y"}]
+        c, _ = client({"steps": [{"status": 200, "body": {"choices": [{"finish_reason": "stop",
+                                                                      "message": {"content": "ok"}}]}}]}, seen, Ledger())
+        self.assertEqual(c.chat(lone, model="a/one", fallback="b/two", max_tokens=100)["content"], "ok")
+        self.assertEqual(seen[0]["body"]["messages"], lone, "a lone surrogate is sent escaped, as JSON.stringify does")
+
+    def test_an_answer_over_the_size_cap_may_be_billed(self):
+        ledger = Ledger()
+        huge = b"x" * (fo.fabric_http.DEFAULT_MAX_BYTES + 1)
+        steps = [lambda: (200, {}, huge),
+                 lambda: (200, {}, json.dumps({"choices": [{"finish_reason": "stop", "message": {"content": "b"}}]}).encode())]
+        c = fo.Client(ceiling_usd=1.0, ledger=ledger, prices=CASES["prices"], environ={"OPENROUTER_API_KEY": KEY},
+                      transport=lambda *a: steps.pop(0)(), now=lambda: NOW)
+        got = c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=100)
+        self.assertEqual([a["outcome"] for a in got["attempts"]], ["refused", "answered"])
+        self.assertEqual(ledger.rows[0]["tokensMeasured"], False)
+        self.assertIsNone(ledger.rows[0]["costUsd"])
 
     def test_totals(self):
         self.assertEqual(fo.totals([{"costUsd": 0.5}, {"costUsd": None}, {"costUsd": 0.25}]),

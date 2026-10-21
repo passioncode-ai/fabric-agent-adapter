@@ -19,6 +19,8 @@ module with exactly what it needs and reports a copy's state. Tests: `test/test_
 ```bash
 K=<adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/scripts
 python3 $K/fabric_kit.py install <service-dir>                      # fabric_service and its closure (Python)
+python3 $K/fabric_kit.py install <service-dir> --module fabric_service --module fabric_interop --module fabric_board
+                                                                    # what sample_service.py imports
 python3 $K/fabric_kit.py install <service-dir> --lang node          # fabric-service.mjs and its closure
 python3 $K/fabric_kit.py install <service-dir> --module fabric_openrouter --module fabric_board
 python3 $K/fabric_kit.py install <service-dir> --all --dry-run      # every module, nothing written
@@ -29,9 +31,14 @@ python3 $K/fabric_kit.py build [--check]                            # maintainer
 - `install` copies the closure of the named modules and nothing else. It refuses to overwrite a file it does not
   recognise (`modified`: someone edited the copy) unless `--force`, and says which.
 - `status` names each kit file in the folder as `current`, `older` with the release it came from, or `modified`, and
-  prints `missing <file>, which <file> imports` for a module the folder lacks: that copy would fail when that code
-  path runs. A folder holding only the 0.40.0 `fabric_service.py` gets one such line per module it needs.
-- Exit codes: 0 done or all current, 1 a problem (missing, modified, refused), 2 usage.
+  prints `missing <file>, which <file> imports` for every module the folder lacks, read from what each copy itself
+  imports and followed through the modules it would install: that copy would fail when that code path runs. A folder
+  holding only the 0.40.0 `fabric_service.py` gets one line for each of the 16 modules it needs; a 0.39.1 copy is
+  asked only for what it imports (`test_an_older_copy_is_judged_by_its_own_imports`).
+- Exit codes: 0 done or every copy current, 1 a problem (a copy missing, `older` or `modified`, an install refused),
+  2 usage (an unknown `--module` included).
+- Every kit module puts its own folder on `sys.path` before it imports a sibling, so a service that loads a kit file
+  by its path from another working directory gets its siblings too (`test_every_module_loads_by_path_from_any_folder`).
 - `build --check` is what CI runs: `kit.json` must be what the sources say.
 
 ## The layers
@@ -83,7 +90,8 @@ the kit live in `../recipes/` ([the support agent](../recipes/support-agent/READ
 
 `import fabric_service as fs` and `import ... from './fabric-service.mjs'` keep working: the facades re-export every
 public name 0.39.1 had, in both languages (the snapshot is `test/fixtures/kit-api/kit-api-0.39.1.json`; a missing
-name fails `test_kit_api`), and the Python facade the private names too. `fabric_board` and `fabric-board.mjs` are
+name fails `test_kit_api`), and the Python facade the private names other code reached through it (`_number`,
+`_DAY_MS`, `_utc_date_ms` from the core). `fabric_board` and `fabric-board.mjs` are
 facades the same way. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
 install with `fabric_kit.py install` and `status` names what is missing. A service that imported a module-private
 helper (`_x`) of the Node twin should import it from its module now.

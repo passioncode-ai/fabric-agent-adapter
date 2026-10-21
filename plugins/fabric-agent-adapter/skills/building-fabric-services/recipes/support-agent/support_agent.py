@@ -42,7 +42,7 @@ import fabric_paths
 import fabric_usage
 
 EM_DASH = "\u2014"
-_DASHES = re.compile(r"\u2014|--|(?<=\w) [-\u2013] (?=\w)")
+_DASHES = re.compile(r"[\u2012\u2014\u2015]|--|(?<=\w) [-\u2013] (?=\w)")
 _CITATION = re.compile(r"\[KB:([A-Za-z0-9][A-Za-z0-9._-]{0,63})\]")
 _WORD = re.compile(r"\w+", re.UNICODE)
 _URL = re.compile(r"https?://\S+")
@@ -187,6 +187,7 @@ class SupportAgent:
             raise RecipeError("message id: letters, digits, '.', '_', ':' or '-', up to 128")
         if not isinstance(text, str) or not text.strip():
             raise RecipeError("the message has no text")
+        text = re.sub("[\ud800-\udfff]", "\ufffd", text)  # a lone surrogate (bytes a terminal could not decode) is kept, not fatal
         with self._lock:  # one decision per message id, in this process; the service's instance lock covers others
             done = self._decisions().get(message_id)
             if done is not None:

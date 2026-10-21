@@ -40,11 +40,26 @@ copies the kit now installs it with `fabric_kit.py install` (one file is no long
   `fabric_session.py` is a facade over `fabric_session_{env,mcp,mail,hosts,cli}.py`; the hooks, the worker and
   `install-host-hooks` still run the facade.
 - No import cycle is left: `fabric_estate` no longer imports `fabric_delegation`, in both languages.
+- A Node service that imported a module-private helper of `fabric-service.mjs` or `fabric-board.mjs` (not exported at
+  0.39.1, so outside the snapshot) imports it from the module that holds it now.
 - The probe runs the board responder's self-check in a clean Python (`-E -s`, its own working directory), so it reads
   the kit it names and not a copy already imported.
 
 ### Fixed
 
+- **Found by the release review (three blind readings) and fixed before release:** the OpenRouter ceiling counted
+  only the messages, so a large `tools` list could pass it (the worst case now bounds the messages and every param;
+  `models`, `route`, `plugins` and `web_search_options` are refused); an attempt that may have been billed without an
+  answer to read (a timeout, a 200 over the size cap or not JSON) left no receipt (it now records one with no tokens
+  and no cost, counted at the worst case); the Python transport could overrun its deadline on a slowly trickled body
+  (it reads in chunks against one deadline); the twins differed on a lone surrogate, NaN in a body, a transport bug and
+  `http://127.1` (both now behave the same, on shared cases); `fabric_service.py` could not be loaded by its path from
+  another folder (every kit module now puts its own folder on `sys.path`, tested from `/`); `fabric_kit.py status`
+  judged an older copy by the current release's imports and named only direct ones (it now reads each copy's own
+  imports and follows the closure); an unknown `--module` is a usage error (exit 2); the facade keeps `_number`,
+  `_DAY_MS` and `_utc_date_ms`; `install-host-hooks` requires the session helper's new modules; the recipe hands off a
+  message holding bytes a terminal could not decode instead of exiting, and its dash check also catches U+2012 and
+  U+2015.
 - **A usage receipt's project id is checked the same way in both kits.** `fabric_service.py` defined its URI pattern
   twice and the second won: Python accepted `project_id="urn:"` where Node refused it. Now one pattern per module, and
   both kits refuse it (a test in each).

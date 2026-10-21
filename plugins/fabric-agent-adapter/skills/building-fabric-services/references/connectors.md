@@ -38,6 +38,8 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 | Redirects are answered, never followed | | a redirect must not carry the `Authorization` header to another host |
 | Plain `http://` is refused unless the host is loopback or `insecure=True`; credentials in a URL are refused | | a token never crosses a network in clear, nor sits in a URL |
 | Header names must be tokens; a value with a line break or NUL is refused | | header injection |
+| A JSON body is written as `JSON.stringify` writes it: a lone surrogate escaped, NaN and Infinity refused | | both twins send the same bytes |
+| Whatever the transport throws is a connection error, in both languages; a timeout is a timeout | | |
 
 Every answer comes back as a `Response`, whatever its status; `HttpError` means no usable answer came, with `kind`
 `connection`, `timeout`, `too-large` or `refused`, the status when there was one, and the URL redacted to scheme,
@@ -63,12 +65,12 @@ const answer = await client.chat(messages, { model, fallback, maxTokens: 800 });
 |---|---|
 | The key | read from the environment variable `key_env` names (`OPENROUTER_API_KEY`) at each call; sent only in `Authorization`; missing is `OpenRouterError` kind `config` before anything is sent |
 | The ceiling, before every attempt | the window's spend (ledger receipts in the UTC `day` or `month`) plus calls in flight plus this attempt's worst case must stay within `ceiling_usd`; otherwise kind `ceiling`, nothing sent. Retries and the fallback are checked the same way |
-| The worst case | the prompt at one token per two UTF-8 bytes of the messages as compact JSON (`prompt_tokens_bound`), `max_tokens` of output, at the model's price, plus a per-request price |
+| The worst case | the input at one token per two UTF-8 bytes of the messages and every param (tools, response_format) as compact JSON (`prompt_tokens_bound`), `max_tokens` of output, at the model's price, plus a per-request price. `models`, `route`, `plugins` and `web_search_options` are refused: they change what is billed |
 | A model without a price | never called (kind `unpriced`): its spend could not be bounded. Prices come from `GET https://openrouter.ai/api/v1/models` through `prices_from_catalog` |
 | A receipt without a cost in the window | counted at `unmeasured_call_usd`, by default this attempt's worst case |
-| Receipts | every status-200 answer records one: the served model, the provider's tokens (cache reads and writes kept apart), `costUsd` from `usage.cost`, else from the price list (`costBasis: price-list`), else `null` with `tokensMeasured: false`; `route: key`, the client's `project_id` and the call's `task_run_id`. A refused request records nothing |
+| Receipts | every status-200 answer records one, and so does an attempt that may have been billed without an answer to read (a timeout, a 200 over the size cap or not JSON: no tokens, `costUsd: null`, `tokensMeasured: false`, counted as `unmeasured_call_usd` afterwards): the served model, the provider's tokens (cache reads and writes kept apart), `costUsd` from `usage.cost`, else from the price list (`costBasis: price-list`), else `null` with `tokensMeasured: false`; `route: key`, the client's `project_id` and the call's `task_run_id`. A refused request records nothing |
 | What is an answer | `finish_reason` `stop` or `tool_calls` with content or tool calls; `error` is retried on the same model; `length` (the budget ran out, reasoning included), `content_filter` and empty content go to the fallback |
-| Retries | 408, 429, 5xx and connection errors on the same model, `retries` times (default 1), `Retry-After` honoured, within one deadline (`deadline_s` 120) for the whole call |
+| Retries | 408, 425, 429, 500, 502, 503, 504 and connection errors on the same model, `retries` times (default 1), `Retry-After` honoured, within one deadline (`deadline_s` 120) for the whole call |
 | Stop at once | 401, 402 and 403 (kinds `auth`, `payment`): a key, credit or permission problem is the same on every model |
 | The fallback | required, of another vendor (the part before `/` differs) |
 | Attribution | off unless an `attribution` setting is given (FAC-SEM-098, `fabric_usage.attribution_headers`) |

@@ -31,6 +31,10 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 import urllib.error
 import urllib.parse
 import urllib.request
+import sys as _sys  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
+    _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from fabric_crypto import (  # noqa: E402 - the core (FAA-65)
     SMALL_ORDER_ENCODINGS,
     _ED_P as _P,

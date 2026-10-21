@@ -9,6 +9,7 @@
 """
 import ast
 import json
+import os
 import re
 import subprocess
 import sys
@@ -147,12 +148,40 @@ class Install(unittest.TestCase):
             run = subprocess.run(["node", str(Path(tmp) / "smoke.mjs")], capture_output=True, text=True)
             self.assertEqual(run.returncode, 0, run.stderr)
 
+    def test_every_module_loads_by_path_from_any_folder(self):
+        """A service that loads a kit file by its path (spec_from_file_location) from another working directory gets
+        its siblings too, as with 0.39.1: the Windows lock holder and copied kits do exactly this."""
+        code = ("import importlib.util as u, sys\n"
+                "for name in sys.argv[2:]:\n"
+                "    s = u.spec_from_file_location('by_path_' + name, sys.argv[1] + '/' + name + '.py')\n"
+                "    s.loader.exec_module(u.module_from_spec(s))\n")
+        out = subprocess.run([sys.executable, "-E", "-s", "-c", code, str(SCRIPTS)] + [e["module"] for e in KIT["python"]],
+                             capture_output=True, text=True, cwd=os.path.abspath(os.sep), timeout=120)
+        self.assertEqual(out.returncode, 0, out.stderr[-500:])
+
     def test_a_one_file_copy_is_named_incomplete(self):
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / "fabric_service.py").write_bytes((SCRIPTS / "fabric_service.py").read_bytes())
             report = fabric_kit.status(Path(tmp))
             self.assertIn("fabric_usage.py", [m["needs"] for m in report["missing"]])
             self.assertEqual(self.run_kit("status", tmp).returncode, 1)
+            closure = {e["file"] for e in fabric_kit.closure(KIT["python"], ["fabric_service"])} - {"fabric_service.py"}
+            self.assertEqual(sorted(m["needs"] for m in report["missing"]), sorted(closure),
+                             "the whole closure is named at once, not only the direct imports")
+
+    def test_an_older_copy_is_judged_by_its_own_imports(self):
+        old = subprocess.run(["git", "-C", str(ROOT), "show",
+                              "969a4ca:plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_service.py"],
+                             capture_output=True)
+        if old.returncode:
+            self.skipTest("the 0.39.1 commit is not in this clone")
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "fabric_service.py").write_bytes(old.stdout)
+            report = fabric_kit.status(Path(tmp))
+            self.assertEqual(report["files"][0]["state"], "older")
+            needs = {m["needs"] for m in report["missing"]}
+            self.assertIn("fabric_estate.py", needs, "the 0.39.1 file imports fabric_estate itself")
+            self.assertNotIn("fabric_base.py", needs, "a module only the 0.40.0 file imports is not asked of it")
 
     def test_an_older_release_and_an_edited_copy_are_told_apart(self):
         old = subprocess.run(["git", "show", "v0.39.1:plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_share.py"],
