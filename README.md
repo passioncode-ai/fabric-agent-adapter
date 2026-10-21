@@ -54,9 +54,15 @@ that is always alive, runs as one copy, keeps its state through a reinstall and 
 in Fabric Dashboards by itself: the `fabric-service/0.1` extension. It also makes an **online** agent
 or dashboard (an `https` origin on a platform) a Fabric service (the remote placement, DEC-0019): the same
 four routes behind the token, a `__Host-` session cookie, and one descriptor on the operator's computer;
-`scripts/sample-remote-service.mjs` is the complete example. It ships Python and
-Node reference kits (`scripts/fabric_service.py`, `scripts/fabric-service.mjs`), a
-complete `scripts/sample_service.py`, and `scripts/check_service.py`, a live probe. A service that answers
+`scripts/sample-remote-service.mjs` is the complete example. It ships the service kit in Python and
+Node: layered modules listed in `scripts/kit.json` behind the `fabric_service` / `fabric-service.mjs` facades,
+installed into a service with `scripts/fabric_kit.py install` and checked with `fabric_kit.py status`
+([kit modules](plugins/fabric-agent-adapter/skills/building-fabric-services/references/kit-modules.md), including
+the dates API); connectors for outbound HTTP and OpenRouter (`fabric_http`, `fabric_openrouter`: one deadline, safe
+retries, the agent's own key, a spend ceiling before every attempt, usage receipts, a fallback model;
+[connectors](plugins/fabric-agent-adapter/skills/building-fabric-services/references/connectors.md)); a ready
+[support-agent recipe](plugins/fabric-agent-adapter/skills/building-fabric-services/recipes/support-agent/README.md);
+a complete `scripts/sample_service.py`; and `scripts/check_service.py`, a live probe. A service that answers
 requests other Projects post to its Project on Fabric's project board uses the board responder
 (`scripts/fabric_hub.py` and `scripts/fabric_board.py`, Node `fabric-hub.mjs` and `fabric-board.mjs`): the
 `board.respond` grant, enroll, claim, accept the exact digest, complete, a checkpoint before every step, and restarts

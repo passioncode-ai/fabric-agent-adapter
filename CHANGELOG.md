@@ -2,24 +2,52 @@
 
 ## 0.40.0 - 2026-10-21
 
-The kits as production modules (FAA-65). Every name a kit module made public at 0.39.1 is still there.
+The kits as production modules (FAA-65). Every name a kit module made public at 0.39.1 is still there; a service that
+copies the kit now installs it with `fabric_kit.py install` (one file is no longer enough, see below).
 
 ### Added
 
 - **A shared core, once per language** (layer L0 and L1): `fabric_jsvalue` / `fabric-jsvalue.mjs` (JavaScript's view
   of JSON values: `show`, `js_to_number`, `same`, `json_equal`, `jcs` and the rest), `fabric_time` / `fabric-time.mjs`
-  (strict RFC 3339, UTC days, day windows, an injectable clock) and `fabric_crypto` / `fabric-crypto.mjs` (Ed25519 and
-  P-256 checks, small-order keys, base64url, sha256). They used to live, twice, inside the estate and delegation
-  readers; every reader now imports them.
+  (strict RFC 3339, UTC days, formatting, day windows, an injectable clock: the public dates API, on shared cases) and
+  `fabric_crypto` / `fabric-crypto.mjs` (Ed25519 and P-256 checks, small-order keys, base64url, sha256). They used to
+  live, twice, inside the estate and delegation readers; every reader now imports them.
 - **The kit is a manifest-listed set, installable as one.** `kit.json` lists every module in dependency order, with the
   kit modules it imports, its sha256 and the sha256 of every release since 0.8.0. `fabric_kit.py install <dir>`
   copies a module's closure (data files included); `status <dir>` says `current`, `older` (with its release) or
   `modified`, and names a module a copy imports but lacks. SKILL.md said the kit was "one self-contained file"; it was
   not, and a one-file copy of `fabric_service.py` failed in `usage_findings`.
+- **Connectors** (layer L4, both languages, shared cases): `fabric_http` (one deadline across attempts, bounded
+  retries with jittered backoff only when repeating is safe, `Retry-After` up to a cap, a response size cap, redirects
+  answered and never followed, plain http refused off loopback, redacted URLs in errors) and `fabric_openrouter` (the
+  agent's own key from a named environment variable, a spend ceiling checked before every attempt at the worst case
+  with calls in flight reserved, one usage receipt per answered call, empty, `length`, `error` and filtered answers
+  never returned as success, a fallback of another vendor required, 401/402/403 stop at once, attribution off by
+  default). References: `kit-modules.md`, `connectors.md`.
+- **A support-agent recipe** (`building-fabric-services/recipes/support-agent/`): answers a question from a knowledge
+  file through `fabric_openrouter`, accepts a reply only when code proves it (citations exist and were given, no em
+  dash or substitute, the question's script, a length limit), otherwise hands it to a person with the failed checks
+  named; idempotent per message id. `test/validate.py` lets a recipe import the kit modules `kit.json` lists.
+- **Layering held by tests**: a module imports only modules listed before it (a planted cycle is caught), none is over
+  1000 lines across every skill's scripts, the core is defined once, every module is in the module map, and the
+  0.39.1 public API of both facades is a snapshot test.
 
 ### Changed
 
+- `fabric_service` / `fabric-service.mjs` and `fabric_board` / `fabric-board.mjs` are facades over modules split by
+  responsibility (base, platform, paths, protocols, lock, usage, backups, descriptor, auth, events, logs, supervisors;
+  board shapes, session, fixture). The probe's rules moved to `check_service_rules.py`. In working-with-fabric,
+  `fabric_session.py` is a facade over `fabric_session_{env,mcp,mail,hosts,cli}.py`; the hooks, the worker and
+  `install-host-hooks` still run the facade.
 - No import cycle is left: `fabric_estate` no longer imports `fabric_delegation`, in both languages.
+- The probe runs the board responder's self-check in a clean Python (`-E -s`, its own working directory), so it reads
+  the kit it names and not a copy already imported.
+
+### Fixed
+
+- **A usage receipt's project id is checked the same way in both kits.** `fabric_service.py` defined its URI pattern
+  twice and the second won: Python accepted `project_id="urn:"` where Node refused it. Now one pattern per module, and
+  both kits refuse it (a test in each).
 
 ## 0.39.1 - 2026-10-21
 

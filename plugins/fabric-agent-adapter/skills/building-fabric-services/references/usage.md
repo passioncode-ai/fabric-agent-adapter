@@ -29,6 +29,8 @@ ledger.record(receipt)                     # fs.JsonlUsageLedger(data / "usage.j
 ledger.record(k.makeUsageReceipt('openrouter', model, { inputTokens, outputTokens, costUsd: usage.cost ?? null }));
 ```
 
+- **OpenRouter through the kit.** `fabric_openrouter.Client` records these receipts itself, one per answered call,
+  and checks a spend ceiling before every attempt ([connectors](connectors.md)).
 - **The provider's own numbers.** Take tokens from the response's usage block, not from a local
   estimate. The cost is `provider` when the provider reported the charge (OpenRouter `usage.cost`,
   a billing API) and `price-list` when you computed it from a published price list.

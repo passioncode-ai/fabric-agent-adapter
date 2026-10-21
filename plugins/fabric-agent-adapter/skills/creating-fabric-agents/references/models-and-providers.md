@@ -87,6 +87,9 @@ change an embedding model without re-indexing every stored vector (search silent
 - **Show spend.** An agent's interface shows spend per day, per provider and per model for 30 days; spend nobody sees
   is spend nobody controls.
 - **Unknown cost is `null`, never 0** (DEC-0087, `fabric-interop/0.2`).
+- **The kit does this for a service.** `fabric_openrouter` (building-fabric-services, references/connectors.md): the
+  key from a named environment variable, the ceiling before every attempt at the full output budget, a receipt per
+  call, empty and `length` answers never returned as success, a fallback of another vendor required.
 - **Attribution is off by default.** A product may send OpenRouter's attribution headers only with its operator's
   setting and only for requests it originates (FAC-SEM-098); an agent a user built keeps the user's own.
 

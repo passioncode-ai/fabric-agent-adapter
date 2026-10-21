@@ -144,12 +144,21 @@ The request body is data behind the service's own input gate. Read [the board re
 
 ## Step 3: build it with the kit
 
-Copy the kit into the service (each is one self-contained file): Python
-[`scripts/fabric_service.py`](scripts/fabric_service.py), Node
-[`scripts/fabric-service.mjs`](scripts/fabric-service.mjs). Both share file formats, and
+Install the kit into the service with its manifest: `python3 scripts/fabric_kit.py install
+<service-dir>` (Python, `fabric_service` and the modules it needs) or `--lang node`;
+`fabric_kit.py status <service-dir>` says per file whether a copy is current, older or edited,
+and what is missing. The kit is layered modules behind the `fabric_service` /
+`fabric-service.mjs` facades, which keep every 0.39 import working; read
+[the kit modules reference](references/kit-modules.md) for the map, the dates API and
+installing more (`--module fabric_openrouter`). Both languages share file formats, and
 their locks exclude each other. The complete worked example is
 [`scripts/sample_service.py`](scripts/sample_service.py); read it before writing a
 handler.
+
+Calling out: [the connectors reference](references/connectors.md) (`fabric_http` with one
+deadline, safe retries and a size cap; `fabric_openrouter` with the agent's own key, a
+spend ceiling before every attempt, receipts and a fallback). A ready support agent on the
+kit: [`recipes/support-agent/`](recipes/support-agent/README.md).
 
 Startup order is the part that goes wrong; keep it exactly:
 
