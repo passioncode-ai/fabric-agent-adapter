@@ -17,6 +17,7 @@ R compared by its encoding).
 from __future__ import annotations
 
 import hashlib
+import http.client
 import ipaddress
 import json
 import math
@@ -64,6 +65,8 @@ JWKS_MAX_AGE_SECONDS = 600
 JWKS_REREAD_SECONDS = 60
 # After a failed read, wait this long before trying again, so a down issuer does not cost every call a fetch.
 JWKS_RETRY_SECONDS = 10
+# One read of the key set, headers and body together, ends within this many seconds (Node's AbortSignal.timeout(5000)).
+JWKS_FETCH_SECONDS = 5.0
 # JavaScript's String.prototype.trim set, so a header is trimmed as the contract's verifier trims it.
 _JS_WHITESPACE = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
@@ -626,18 +629,60 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect)
+def _opener(deadline: Dict[str, Any]) -> urllib.request.OpenerDirector:
+    """No redirect, and a timer that shuts the socket down at the deadline: a socket timeout bounds one read, so an
+    issuer trickling a byte a second would otherwise hold the caller for as long as it likes (finding 13)."""
+    def watched(base: type) -> type:
+        class Watched(base):  # type: ignore[misc, valid-type]
+            def connect(self) -> None:
+                super().connect()
+                sock = self.sock
+
+                def fire() -> None:
+                    deadline["fired"] = True
+                    try:
+                        sock.shutdown(2)  # socket.SHUT_RDWR
+                    except OSError:
+                        pass
+                timer = threading.Timer(max(0.0, deadline["end"] - time.monotonic()), fire)
+                timer.daemon = True
+                deadline["timer"] = timer
+                timer.start()
+        return Watched
+
+    class Http(urllib.request.HTTPHandler):
+        def http_open(self, req: Any) -> Any:
+            return self.do_open(watched(http.client.HTTPConnection), req)
+
+    class Https(urllib.request.HTTPSHandler):
+        def https_open(self, req: Any) -> Any:
+            return self.do_open(watched(http.client.HTTPSConnection), req, context=self._context)
+    return urllib.request.build_opener(_NoRedirect, Http, Https)
 
 
 def _fetch(source: str) -> Any:
     if source.startswith(("https://", "http://")):
         request = urllib.request.Request(source, headers={"Accept": "application/json"})
+        deadline: Dict[str, Any] = {"end": time.monotonic() + JWKS_FETCH_SECONDS, "fired": False, "timer": None}
         try:
-            with _OPENER.open(request, timeout=5) as response:  # https or loopback http only, no redirect
-                return json.loads(response.read(65537)[:65536])
+            with _opener(deadline).open(request, timeout=JWKS_FETCH_SECONDS) as response:  # https or loopback http only
+                body = b""
+                while len(body) <= 65536 and not deadline["fired"]:
+                    chunk = response.read1(65537 - len(body))
+                    if not chunk:
+                        break
+                    body += chunk
+            if deadline["fired"] or time.monotonic() > deadline["end"]:
+                raise TimeoutError("the key set did not arrive within %s s" % JWKS_FETCH_SECONDS)
+            return json.loads(body[:65536])
         except urllib.error.HTTPError as exc:
             exc.close()
             raise
+        except http.client.HTTPException as exc:  # a garbage status line or headers: the issuer cannot be read
+            raise ConnectionError(type(exc).__name__) from None
+        finally:
+            if deadline["timer"] is not None:
+                deadline["timer"].cancel()
     return json.loads(Path(source).expanduser().read_text())
 
 
@@ -665,28 +710,37 @@ class JwksCache:
         self._tried_at = -math.inf
         self._reread_at = -math.inf  # the last re-read for a kid the set did not hold
         self._lock = threading.Lock()
-
-    def _read(self, now: float) -> None:
-        self._tried_at = now
-        try:
-            value = self._fetch(self.source)
-        except (OSError, ValueError):
-            return
-        if _has_keys(value):
-            self._keys, self._read_at = value, now
+        self._pending: Optional[threading.Event] = None
 
     def get(self, kid: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """The key set, or None. The read runs outside the lock (finding 13): a caller whose kid the set holds never
+        waits on another caller's fetch, and one read at a time goes out, as Node's `pending` does."""
+        leader, waiting = False, None
         with self._lock:
             now = self._clock()
             fresh = now - self._read_at < JWKS_MAX_AGE_SECONDS
             known = self._keys is not None and (kid is None or any(isinstance(k, dict) and k.get("kid") == kid for k in self._keys["keys"]))
-            if not fresh:
-                if now - self._tried_at >= JWKS_RETRY_SECONDS:
-                    self._read(now)
-            elif not known and now - self._reread_at >= JWKS_REREAD_SECONDS:
+            due = (not fresh and now - self._tried_at >= JWKS_RETRY_SECONDS) or (fresh and not known and now - self._reread_at >= JWKS_REREAD_SECONDS)
+            if due and fresh:
                 self._reread_at = now
-                self._read(now)
-            return self._keys if now - self._read_at < JWKS_MAX_AGE_SECONDS else None
+            if due and self._pending is None:
+                self._pending, self._tried_at, leader = threading.Event(), now, True
+            elif due:
+                waiting = self._pending
+        if leader:
+            try:
+                value = self._fetch(self.source)
+            except Exception:  # noqa: BLE001 - whatever a source raises leaves the set unread; the age check decides
+                value = None
+            with self._lock:
+                if _has_keys(value):
+                    self._keys, self._read_at = value, now
+                done, self._pending = self._pending, None
+            done.set()
+        elif waiting is not None:
+            waiting.wait(JWKS_FETCH_SECONDS + 1)
+        with self._lock:
+            return self._keys if self._clock() - self._read_at < JWKS_MAX_AGE_SECONDS else None
 
 
 def _kid_of(token: str) -> Optional[str]:

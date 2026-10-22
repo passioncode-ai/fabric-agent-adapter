@@ -493,5 +493,84 @@ class TrailingNewline(unittest.TestCase):
         self.assertEqual((got["ok"], got.get("code"), got.get("detail")), (False, "unauthenticated", "malformed"))
 
 
+class JwksFetchIsBounded(unittest.TestCase):
+    """Finding 13: the key set fetch has one deadline for the whole answer, runs outside the cache lock, and a garbage
+    answer is issuer-unavailable (None), never an exception out of the gate."""
+
+    def serve(self, mode):
+        import socket
+        srv = socket.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(5)
+        self.addCleanup(srv.close)
+        stop = threading.Event()
+        self.addCleanup(stop.set)
+
+        def handle(conn):
+            try:
+                conn.recv(4096)
+                if mode == "garbage":
+                    conn.sendall(b"GARBAGE\r\n\r\n")
+                elif mode == "slow-headers":
+                    for ch in b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}":
+                        if stop.wait(0.3):
+                            break
+                        conn.sendall(bytes([ch]))
+                else:  # a body trickled one byte at a time, each well inside a per-read timeout
+                    conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n")
+                    while not stop.wait(0.3):
+                        conn.sendall(b" ")
+            except OSError:
+                pass
+            finally:
+                conn.close()
+
+        def accept():
+            while not stop.is_set():
+                try:
+                    conn, _ = srv.accept()
+                except OSError:
+                    return
+                threading.Thread(target=handle, args=(conn,), daemon=True).start()
+        threading.Thread(target=accept, daemon=True).start()
+        return "http://127.0.0.1:%d/jwks" % srv.getsockname()[1]
+
+    def test_a_slow_or_garbage_issuer_answers_none_within_the_deadline(self):
+        import time
+        saved = dl.JWKS_FETCH_SECONDS
+        dl.JWKS_FETCH_SECONDS = 1.0
+        self.addCleanup(setattr, dl, "JWKS_FETCH_SECONDS", saved)
+        for mode in ("garbage", "slow-headers", "trickle"):
+            with self.subTest(mode):
+                cache = dl.JwksCache(self.serve(mode))
+                start = time.monotonic()
+                self.assertIsNone(cache.get("k"))
+                self.assertLess(time.monotonic() - start, 4.0)
+
+    def test_the_fetch_runs_outside_the_lock(self):
+        now = [1000.0]
+        release, entered = threading.Event(), threading.Event()
+        def fetch(source):
+            if entered.is_set():
+                release.wait(5)
+            entered.set()
+            return VECTORS["jwks"]
+        cache = dl.JwksCache("https://hub.example/j", fetch=fetch, clock=lambda: now[0])
+        self.assertEqual(cache.get("estate-new"), VECTORS["jwks"])
+        self.assertTrue(entered.is_set())
+        slow = threading.Thread(target=cache.get, args=("a-kid-it-does-not-hold",))
+        slow.start()
+        try:
+            got = []
+            reader = threading.Thread(target=lambda: got.append(cache.get("estate-new")))
+            reader.start()
+            reader.join(1.0)
+            self.assertFalse(reader.is_alive(), "a get for a held kid waited on another caller's fetch")
+            self.assertEqual(got, [VECTORS["jwks"]])
+        finally:
+            release.set()
+            slow.join(5)
+
+
 if __name__ == "__main__":
     unittest.main()
