@@ -44,15 +44,16 @@ LOCAL_PATH_MAX = 1024
 ARGV_MAX_ITEMS = 32
 ARGV_MAX_ITEM = 1024
 ENV_MAX = 64
-_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
-_ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
-_SECRET_REF = re.compile(r"^secret-ref:([A-Za-z0-9][A-Za-z0-9._/:@-]{0,255})$")
+# Whole-value patterns end in \Z, never `$` (R1: `$` also matches before a trailing newline).
+_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z")
+_ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*\Z")
+_SECRET_REF = re.compile(r"^secret-ref:([A-Za-z0-9][A-Za-z0-9._/:@-]{0,255})\Z")
 _LOCAL_PATH = re.compile(LOCAL_PATH_PATTERN)
 _URL = re.compile(URL_PATTERN)
 # format: uri (RFC 3986 absolute URI): a scheme, a colon, then no whitespace or control character.
-_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+$")
+_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+\Z")
 # format: date-time (RFC 3339).
-_TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$")
+_TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})\Z")
 FIELDS = {"protocol", "id", "providerId", "name", "summary", "manifest", "run", "source", "installedAt", "installedBy", "extensions"}
 # FAC-SEM-015 reads a credential by its SHAPE: a reference named after a key is fine.
 CREDENTIAL_SHAPES = [re.compile(p) for p in (

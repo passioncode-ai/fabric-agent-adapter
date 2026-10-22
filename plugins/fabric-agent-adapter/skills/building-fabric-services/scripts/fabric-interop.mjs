@@ -380,13 +380,13 @@ export class JobStore {
   // With idempotencyKey the key is kept per caller (the authenticated caller, DEC-0087): a key that already names a job
   // starts nothing and throws, unless repeat() answers 'run'; then the key names the new job.
   // The key is kept beside the intent's digest (FAA-77): a key that names a job of another intent is idempotency-conflict.
+  // A key file a kit before 0.41.0 wrote carries no intent: it is answered with its job as 0.40.0 answered it (see repeat).
   create(capability, input, { traceparent, pollIntervalMs, caller = null, idempotencyKey, now, limitHolds, approvalGranted = false } = {}) {
     let intent = null;
     if (idempotencyKey !== undefined) {
       intent = intentDigest(capability, input);
-      const recorded = this.keyRecord(caller, idempotencyKey);
-      const decision = this.repeat(caller, idempotencyKey, now ?? nowIso(), { limitHolds, approvalGranted });
-      if (decision.job !== null && recorded?.intent !== intent) throw new InteropError(`idempotency-conflict: key ${idempotencyKey} names a job of another intent; send the same capability and input, or a new key.`);
+      const decision = this.repeat(caller, idempotencyKey, now ?? nowIso(), { limitHolds, approvalGranted, capability, input });
+      if (decision.decision === 'conflict') throw new InteropError(`idempotency-conflict: key ${idempotencyKey} names a job of another intent; send the same capability and input, or a new key.`);
       if (decision.decision === 'same') throw new InteropError(`Key ${idempotencyKey} already names job ${decision.job.id}; answer with that job (JobStore.repeat).`);
     }
     const id = `job_${crypto.randomBytes(12).toString('hex')}`;
@@ -415,7 +415,10 @@ export class JobStore {
     return record;
   }
 
-  // The answer to a key this caller sent before: {decision: 'new'|'same'|'run', job}.
+  // The answer to a key this caller sent before: {decision: 'new'|'same'|'run'|'conflict', job}. 'same': answer with
+  // that job; 'run': the intent runs again, once; 'conflict': given options.capability (and options.input), the key was
+  // kept beside another intent (idempotency-conflict, FAA-77). A key file a kit before 0.41.0 wrote holds only
+  // {"job": id}, no intent: it never answers 'conflict', and 'run' only for the intent its job stored; otherwise 'same'.
   repeat(caller, key, now, options = {}) {
     const record = this.keyRecord(caller, key);
     if (record === null) return { decision: 'new', job: null };
@@ -423,7 +426,16 @@ export class JobStore {
     if (typeof id !== 'string') throw new InteropError(`Key ${key} is unreadable on disk.`);
     let job;
     try { job = this.get(id); } catch (e) { if (e instanceof UnknownJob) return { decision: 'new', job: null }; throw e; }
-    return { decision: repeatedKeyDecision(job, now, options), job };
+    let decision = repeatedKeyDecision(job, now, options);
+    if (options.capability === undefined || options.capability === null) return { decision, job };
+    const intent = intentDigest(options.capability, options.input ?? null);
+    if (Object.hasOwn(record, 'intent')) return { decision: record.intent !== intent ? 'conflict' : decision, job };
+    // A 0.40.0 key runs only the intent its job stored (an input with no JSON form is refused, as the Python kit refuses it).
+    if (decision === 'run') {
+      const stored = this.load(id).private ?? {};
+      if (intentDigest(stored.capability ?? null, stored.input ?? null) !== intent) decision = 'same';
+    }
+    return { decision, job };
   }
 
   get(jobId) { return { ...this.load(jobId).job }; }

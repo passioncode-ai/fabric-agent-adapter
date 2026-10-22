@@ -10,6 +10,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -375,7 +376,8 @@ def _entry_cwd(entries: List[Path]) -> Path:
 def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: float = WORKER_DEADLINE_S) -> List[str]:
     """Drain one session's spool through fabric-mcp --rejoin-only. Returns the log lines it wrote. An entry that
     cannot be read, or a call answered with a JSON-RPC error, is logged and dropped; the rest still goes out (FAA-68).
-    Only an answer that never came leaves the spool for the next worker."""
+    Only an answer that never came leaves the spool for the next worker: the session's folder goes only once its end
+    entry's calls (the claim release and the end observation) were answered, refused or error-coded."""
     env = dict(os.environ if env is None else env)
     said: List[str] = []
 
@@ -432,7 +434,6 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                 key = "%s:%s" % (session_id, path.name.split("-", 1)[0])
                 reason = entry.get("reason") if isinstance(entry.get("reason"), str) else "other"
                 if event == "end":
-                    ended = True
                     if RELEASE_TOOL in names:
                         call(event, RELEASE_TOOL, {
                             "claims": "session", "outcome": "let-go",
@@ -450,6 +451,8 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                     note("session=%s event=%s outcome=degraded reason=%r" % (session_id[:8], event, "no %s" % OBSERVE_TOOL))
                     (directory / "observe.degraded").touch()
                 path.unlink()
+                if event == "end":
+                    ended = True  # only now: a call that timed out above left this entry for the next worker
             entries = sorted(directory.glob("*-*.json"))  # turns spooled while this worker ran
         if not ended and BOARD_STATUS_TOOL in names:
             # The board's unread count for the prompt hook (FAA-12a). A count, never a message.

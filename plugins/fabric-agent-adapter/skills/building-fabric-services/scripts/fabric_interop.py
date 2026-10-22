@@ -576,15 +576,14 @@ class JobStore:
         With `idempotency_key` the key is kept per `caller` (the authenticated caller, DEC-0087) beside the digest of the
         intent (the capability and its input): a key that names a job of another intent raises `idempotency-conflict`;
         one that names a job of this intent starts nothing and raises InteropError, unless `repeat` would answer "run"
-        (a limit no longer holds, an approval granted); then the key names the new job."""
+        (a limit no longer holds, an approval granted); then the key names the new job. A 0.40.0 key file: see `repeat`."""
         with self._lock:
             intent = None
             if idempotency_key is not None:
                 intent = intent_digest(capability, arguments)
-                recorded = self._key_record(caller, idempotency_key)
-                decision = self.repeat(caller, idempotency_key, now if now is not None else _fs.now_iso(),
-                                       limit_holds=limit_holds, approval_granted=approval_granted)
-                if decision["job"] is not None and (recorded or {}).get("intent") != intent:
+                decision = self.repeat(caller, idempotency_key, now if now is not None else _fs.now_iso(), limit_holds=limit_holds,
+                                       approval_granted=approval_granted, capability=capability, arguments=arguments)
+                if decision["decision"] == "conflict":
                     raise InteropError("idempotency-conflict: key %s names a job of another intent; send the same capability and input, or a new key." % idempotency_key)
                 if decision["decision"] == "same":
                     raise InteropError("Key %s already names job %s; answer with that job (JobStore.repeat)." % (idempotency_key, decision["job"]["id"]))
@@ -623,9 +622,10 @@ class JobStore:
         return record
 
     def repeat(self, caller: Optional[str], key: str, now: Any, limit_holds: Optional[bool] = None,
-               approval_granted: bool = False) -> Dict[str, Any]:
-        """The answer to a key this caller sent before (DEC-0087): {"decision": "new"|"same"|"run", "job": job or None}.
-        "same": answer with that job, never run it again (outcome-unknown above all); "run": the intent runs again, once."""
+               approval_granted: bool = False, *, capability: Optional[str] = None, arguments: Any = None) -> Dict[str, Any]:
+        """The answer to a key this caller sent before (DEC-0087): {"decision": "new"|"same"|"run"|"conflict", "job"}. "same": answer with
+        that job, never run it again (outcome-unknown above all); "run": the intent runs again, once; "conflict": given `capability` and
+        its input `arguments`, the key was kept beside another intent (FAA-77). A 0.40.0 key file ({"job": id}) never answers "conflict"."""
         record = self._key_record(caller, key)
         if record is None:
             return {"decision": "new", "job": None}
@@ -635,7 +635,14 @@ class JobStore:
             return {"decision": "new", "job": None}
         except (KeyError, TypeError):
             raise InteropError("Key %s is unreadable on disk." % key) from None
-        return {"decision": repeated_key_decision(job, now, limit_holds, approval_granted), "job": job}
+        decision = repeated_key_decision(job, now, limit_holds, approval_granted)
+        if capability is not None:
+            intent = intent_digest(capability, arguments)
+            if "intent" in record:
+                decision = "conflict" if record["intent"] != intent else decision
+            elif decision == "run":  # a 0.40.0 key runs only the intent its job stored (an input with no JSON form is refused)
+                decision = "run" if intent_digest(*map(self.private(record["job"]).get, ("capability", "input"))) == intent else "same"
+        return {"decision": decision, "job": job}
 
     def get(self, job_id: str) -> Dict[str, Any]:
         return dict(self._load(job_id)["job"])

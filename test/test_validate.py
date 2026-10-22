@@ -715,8 +715,12 @@ class DollarAnchorTests(unittest.TestCase):
     def test_an_escaped_backslash_before_the_dollar_still_anchors(self):
         self.assertEqual(len(validate.dollar_anchored_patterns('import re\nre.compile(r"a\\\\$")\n')), 1)
 
-    def test_the_repository_scan_fails_on_a_planted_pattern_in_either_skill(self):
-        for rel in (self.KIT, self.SESSION):
+    ADAPT = "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_example.py"
+    CREATE = "plugins/fabric-agent-adapter/skills/creating-fabric-agents/scripts/nested/create_example.py"
+
+    def test_the_repository_scan_fails_on_a_planted_pattern_in_every_skill(self):
+        """FAA-72: the guard covers every skill's scripts, not only the service kit and working-with-fabric."""
+        for rel in (self.KIT, self.SESSION, self.ADAPT, self.CREATE):
             with self.subTest(rel=rel):
                 tmp, root = _tree({rel: 'import re\nID = re.compile(r"^[a-z]+$")\n'})
                 with tmp:
