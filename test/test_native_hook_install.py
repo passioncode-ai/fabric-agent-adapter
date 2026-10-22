@@ -89,5 +89,20 @@ class NativeInstallTests(unittest.TestCase):
         doc = json.loads(p.read_text())
         self.assertEqual(doc['plugins']['load']['paths'], [foreign])
         self.assertNotIn(h.IDENTITY, doc['plugins'].get('entries', {}))
+    def test_openclaw_remove_reads_a_home_relative_load_path(self):
+        """A `~/` load path is read where it points: a live folder whose manifest names another plugin is kept, a gone
+        one in our layout is dropped (round-2 reading of 0.44.0)."""
+        import os
+        from unittest import mock
+        live = '~/live/plugins/x/skills/working-with-fabric/scripts/hosts/openclaw'
+        gone = '~/gone/plugins/x/skills/working-with-fabric/scripts/hosts/openclaw'
+        folder = self.home / 'live/plugins/x/skills/working-with-fabric/scripts/hosts/openclaw'
+        folder.mkdir(parents=True)
+        (folder / 'openclaw.plugin.json').write_text(json.dumps({'id': 'someone-else'}))
+        p = self.home/'.openclaw/openclaw.json'; p.parent.mkdir()
+        p.write_text(json.dumps({'plugins': {'entries': {h.IDENTITY: {'enabled': True, 'hooks': {'allowConversationAccess': True, 'allowPromptInjection': True}}}, 'load': {'paths': [live, gone]}}}))
+        with mock.patch.dict(os.environ, {'HOME': str(self.home)}):
+            self.assertEqual(self.run_cli('openclaw', '--remove'), 0)
+        self.assertEqual(json.loads(p.read_text())['plugins']['load']['paths'], [live])
 
 if __name__=='__main__':unittest.main()

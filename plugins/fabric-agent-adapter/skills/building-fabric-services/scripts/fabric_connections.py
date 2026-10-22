@@ -15,7 +15,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_secrets import JWT_SHAPE, _long_secret, credential_name, raw_values  # noqa: E402
+from fabric_secrets import CREDENTIAL_PAIRS, CREDENTIAL_WORDS, JWT_SHAPE, _long_secret, raw_values  # noqa: E402
 
 CONNECTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1"
 KINDS = ("service", "model", "connector", "store", "channel")
@@ -173,6 +173,17 @@ _PATH_LIKE = re.compile(r"(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*://)", re.IGN
 _ARGUMENT_SPLIT = re.compile("[%s=]" % _JS_SPACE)
 
 
+def _credential_name(name: str) -> bool:
+    """fabric_secrets.credential_name with ECMAScript's whitespace in the word split (U+FEFF splits a name there)."""
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
+    split = [w.lower() for w in re.split("[%s._-]+" % _JS_SPACE, spaced) if w]
+    words = split + [w[:-1] for w in split if len(w) > 2 and w.endswith("s")]
+    if any(w in CREDENTIAL_WORDS for w in words) or (len(split) == 1 and any(w in CREDENTIAL_PAIRS for w in words)):
+        return True
+    return any(word in words and any(p in words for p in partners) for word, partners in CREDENTIAL_PAIRS.items())
+
+
 def _secret_value(value: str) -> bool:
     return bool(JWT_SHAPE.search(value) or _SECRET_VALUE.search(value) or _long_secret(value))
 
@@ -197,6 +208,8 @@ _FORBIDDEN_DOMAIN = _FORBIDDEN_HOST | set(chr(c) for c in range(0x20)) | {"%", "
 
 
 def _ipv4_number(part: str) -> Optional[int]:
+    if part == "":
+        return None  # an empty part fails WHATWG's IPv4 parser (`1..2`); `0x` alone is 0
     base = 10
     if part[:2].lower() == "0x":
         part, base = part[2:], 16
@@ -219,11 +232,10 @@ def _domain_ok(host: str) -> bool:
             return False
     if any(c in _FORBIDDEN_DOMAIN for c in host):
         return False
+    # A non-ASCII host goes through UTS46 in WHATWG; this module does not port it. When unsure, the host is taken as
+    # valid, so its URL's credentials are read: the doubt then hides a list rather than publish one (round-2 reading).
     if any(ord(c) > 0x7f for c in host):
-        try:
-            host = host.encode("idna").decode("ascii")
-        except UnicodeError:
-            return False
+        return True
     labels = host.split(".")
     if labels and labels[-1] == "" and len(labels) > 1:
         labels = labels[:-1]
@@ -237,6 +249,8 @@ def _domain_ok(host: str) -> bool:
 
 
 def _ipv6_ok(text: str) -> bool:
+    if "%" in text:
+        return False  # a zone id: `ipaddress` takes one, WHATWG does not
     try:
         ipaddress.IPv6Address(text)
         return True
@@ -254,7 +268,8 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
     scheme, rest = match.group(1).lower(), value[match.end():]
     special = scheme in _SPECIAL
     if special:
-        rest = rest.replace("\\", "/")
+        cut = min([i for i in (rest.find("?"), rest.find("#")) if i >= 0] or [len(rest)])
+        rest = rest[:cut].replace("\\", "/") + rest[cut:]  # a backslash is a slash before the query only
     if not rest.startswith("//"):
         return {"password": "", "query": "", "fragment": ""} if not special else None
     rest = rest[2:].lstrip("/") if special and scheme != "file" else rest[2:]
@@ -268,7 +283,10 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
     before = tail.split("#", 1)[0]
     query = before.split("?", 1)[1] if "?" in before else ""
     if scheme == "file":
-        return {"password": "", "query": query, "fragment": fragment} if authority == "" or _domain_ok(authority) else None
+        # A drive letter (`C:`, `c|`) is an empty host and the start of the path.
+        if authority == "" or re.fullmatch(r"[A-Za-z][:|]", authority) or _domain_ok(authority):
+            return {"password": "", "query": query, "fragment": fragment}
+        return None
     userinfo, _, hostport = authority.rpartition("@")
     password = userinfo.split(":", 1)[1] if ":" in userinfo else ""
     if hostport.startswith("["):
@@ -291,7 +309,7 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
             return None
     elif any(c in _FORBIDDEN_HOST for c in host):
         return None
-    elif host == "" and (userinfo or port):
+    elif host == "" and ("@" in authority or port):
         return None
     return {"password": password, "query": query, "fragment": fragment}
 
@@ -306,7 +324,7 @@ def _secret_url(value: str) -> bool:
         return False
     if parts["password"]:
         return True
-    return any((raw != "" and credential_name(name)) or _secret_value(raw)
+    return any((raw != "" and _credential_name(name)) or _secret_value(raw)
                for part in (parts["query"], parts["fragment"]) for name, raws in raw_values(part).items() for raw in raws)
 
 

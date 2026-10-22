@@ -13,6 +13,7 @@ build_well_known = fs.build_well_known
 
 V = json.loads((Path(__file__).resolve().parent / "fixtures/contract/connections-vectors.json").read_text(encoding="utf-8"))
 KEY = fc.CONNECTIONS_EXTENSION_KEY
+INPUTS = json.loads((Path(__file__).resolve().parent / "fixtures/kit-connections-inputs.json").read_text(encoding="utf-8"))
 EXTRA = json.loads((Path(__file__).resolve().parent / "fixtures/contract/connections-extra-vectors.json").read_text(encoding="utf-8"))
 
 
@@ -28,7 +29,7 @@ class Vectors(unittest.TestCase):
     def test_every_kit_input_answers_as_the_contract_does(self):
         """The kit's own inputs (test/fixtures/kit-connections-inputs.json), answered by the contract's connectionsView:
         ECMAScript's whitespace, word boundary and case folding in the credential shapes, and URLs WHATWG refuses."""
-        self.assertEqual(len(EXTRA["cases"]), 462)
+        self.assertEqual(len(EXTRA["cases"]), len(INPUTS["inputs"]))
         for index, case in enumerate(EXTRA["cases"]):
             with self.subTest(index=index):
                 view = fc.connections_view(case["input"])

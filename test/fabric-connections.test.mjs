@@ -9,6 +9,7 @@ import { ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fa
 import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 
 const V = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/connections-vectors.json', import.meta.url), 'utf8'));
+const INPUTS = JSON.parse(fs.readFileSync(new URL('./fixtures/kit-connections-inputs.json', import.meta.url), 'utf8'));
 const EXTRA = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/connections-extra-vectors.json', import.meta.url), 'utf8'));
 
 test('every case answers as the contract does', () => {
@@ -63,7 +64,7 @@ test('the well-known document carries it, a host reads it, an invalid one is ref
 });
 
 test('every kit input answers as the contract does', () => {
-  assert.equal(EXTRA.cases.length, 462);
+  assert.equal(EXTRA.cases.length, INPUTS.inputs.length);
   EXTRA.cases.forEach((c, index) => {
     const view = connectionsView(c.input);
     assert.deepEqual(Object.fromEntries(Object.keys(c.expected).map((k) => [k, view[k]])), c.expected, String(index));

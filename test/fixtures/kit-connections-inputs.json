@@ -1,5 +1,5 @@
 {
- "about": "Inputs the contract vectors do not cover (JavaScript and Python regex semantics, lengths in code points, the if/then rules, odd keys and member types, dates, credential shapes and URLs WHATWG refuses), from the blind reading of 0.44.0. make_connections_vectors.mjs answers each with the contract's connectionsView into contract/connections-extra-vectors.json; never edited by hand except to add inputs.",
+ "about": "Inputs the contract vectors do not cover (JavaScript and Python regex semantics, lengths in code points, the if/then rules, odd keys and member types, dates, credential shapes and URLs WHATWG refuses), from the two blind readings of 0.44.0 (the second round's URLs as a `label`: IDN and bidi hosts, file drive letters, U+FEFF in a query name, IPv4 and IPv6 forms; only those the Python twin answers as the reference does, the rest being the documented closed side). make_connections_vectors.mjs answers each with the contract's connectionsView into contract/connections-extra-vectors.json; never edited by hand except to add inputs.",
  "inputs": [
   {
    "extensions": {
@@ -7055,6 +7055,7836 @@
        "kind": "model",
        "target": "http://u:p@xn--a/",
        "state": "ok"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\ud83d\ude00.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\ud83d\ude00.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\ud83d\ude00.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\ud83d\ude00.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\ud83d\ude00.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\ud83d\ude00.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u00e4..com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00e4..com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u00e4..com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u00e4..com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u00e4..com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u00e4..com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u00e4.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00e4.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u00e4.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u00e4.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u00e4.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u00e4.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d01.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u05d01.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u05d01.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u05d01.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u05d01.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u05d01.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://1\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://xn--a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://xn--a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://xn--a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://xn--a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://xn--a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://xn--a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://xn--.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://xn--.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://xn--.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://xn--.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://xn--.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://xn--.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://a\u200db.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://a\u200cb.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u00df.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00df.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u00df.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u00df.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u00df.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u00df.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://a\uff0fb/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://a\uff03b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://a\uff05b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\uff11\uff12\uff17\uff0e\uff10\uff0e\uff10\uff0e\uff11/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\uff11\uff12\uff17\uff0e\uff10\uff0e\uff10\uff0e\uff11/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\uff11\uff12\uff17\uff0e\uff10\uff0e\uff10\uff0e\uff11/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\uff11\uff12\uff17\uff0e\uff10\uff0e\uff10\uff0e\uff11/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\uff11\uff12\uff17\uff0e\uff10\uff0e\uff10\uff0e\uff11/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\uff11\uff12\uff17\uff0e\uff10\uff0e\uff10\uff0e\uff11/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://%EF%BB%BFexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://%EF%BB%BFexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://%EF%BB%BFexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://%EF%BB%BFexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://%EF%BB%BFexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://%EF%BB%BFexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://%C2%ADexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://%C2%ADexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://%C2%ADexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://%C2%ADexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://%C2%ADexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://%C2%ADexample.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1..2/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://1..2/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://1..2/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://1..2/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://1..2/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://1..2/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://..1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://..1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://..1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://..1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://..1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://..1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1.2.3.4.5/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://1.2.3.4.5/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://1.2.3.4.5/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://1.2.3.4.5/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://1.2.3.4.5/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://1.2.3.4.5/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://0x.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://0x.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://0x.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://0x.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://0x.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://0x.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://1.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://1.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://1.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://1.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://1.0x/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[fe80::1%25eth0]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[fe80::1%25eth0]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[fe80::1%25eth0]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[fe80::1%25eth0]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[fe80::1%25eth0]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[fe80::1%25eth0]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[::1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[::1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[::1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[::1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[::1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[::1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[1:2:3:4:5:6:7::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[1:2:3:4:5:6:7::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[1:2:3:4:5:6:7::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[1:2:3:4:5:6:7::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[1:2:3:4:5:6:7::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[1:2:3:4:5:6:7::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[::1:2:3:4:5:6:7]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[::1:2:3:4:5:6:7]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[::1:2:3:4:5:6:7]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[::1:2:3:4:5:6:7]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[::1:2:3:4:5:6:7]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[::1:2:3:4:5:6:7]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[1:2:3:4:5:6:7:8::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[1:2:3:4:5:6:7:8::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[1:2:3:4:5:6:7:8::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[1:2:3:4:5:6:7:8::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[1:2:3:4:5:6:7:8::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[1:2:3:4:5:6:7:8::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[::01.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[::01.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[::01.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[::01.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[::01.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[::01.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[:1::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[:1::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[:1::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[:1::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[:1::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[:1::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[1::2::3]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[1::2::3]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[1::2::3]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[1::2::3]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[1::2::3]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[1::2::3]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[::ffff:1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[::ffff:1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[::ffff:1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[::ffff:1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[::ffff:1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[::ffff:1.2.3.4]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://[0001::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://[0001::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://[0001::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://[0001::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://[0001::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://[0001::]/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u00e4./?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00e4./?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u00e4./?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u00e4./?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u00e4./?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u00e4./?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u00e4../?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00e4../?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u00e4../?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u00e4../?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u00e4../?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u00e4../?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0870a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u0870a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u0870a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u0870a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u0870a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u0870a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u1e9e.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u1e9e.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u1e9e.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u1e9e.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u1e9e.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u1e9e.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u2132.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u2132.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u2132.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u2132.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u2132.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u2132.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u00b7b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://a\u00b7b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://a\u00b7b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://a\u00b7b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://a\u00b7b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://a\u00b7b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u0661\u06f1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06271.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u06271.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u06271.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u06271.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u06271.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u06271.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627.1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u0627.1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u0627.1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u0627.1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u0627.1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u0627.1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\ud83e\udd14abc/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\ud83e\udd14abc/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\ud83e\udd14abc/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\ud83e\udd14abc/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\ud83e\udd14abc/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\ud83e\udd14abc/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://a\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://a\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://a\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://a\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://a\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u0300a.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://-\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://-\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://-\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://-\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://-\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://-\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u00e4-.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00e4-.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://\u00e4-.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u00e4-.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://\u00e4-.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://\u00e4-.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://ab--\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://ab--\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ws://ab--\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://ab--\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see ftp://ab--\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://ab--\u00e4.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://C:/x?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://c|/x?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://C:?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://C|?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://localhost/x?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://Z:/x#token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://C:x?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://CC:/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://1:/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://@?token=x"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://@/?token=x"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://:@?token=x"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see foo://@#token=x"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://@h/?token=x"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/?q=AAAAAAAAAAAAAAAAAAAAAAAa1\\AAAAAAAAAAAAAAAAAAAAAAAa1"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/#q=AAAAAAAAAAAAAAAAAAAAAAAa1\\AAAAAAAAAAAAAAAAAAAAAAAa1"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/?my%EF%BB%BFtoken=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/?api%EF%BB%BFkey=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/?api%1Ckey=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/?api%C2%85key=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/?api%E2%80%A8key=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://h/?api%C2%A0key=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d01/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d01/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d01.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d09.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d09.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0661.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0661.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u06f1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u06f1.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0610.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0610.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u064b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u064b.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u05b0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u05b0.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u05d0.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u0300.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d01\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d01\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d01\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d01\u05d0.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u094d\u200d.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u05d0\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u05d0\u094d\u200d.\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1\u05d0\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06271/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u06271/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06271.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06279.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06279/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u06279/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06279.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0661.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0661.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u06f1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u06f1.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0610.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0610.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u064b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u064b.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u05b0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u05b0.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u05d0.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u0300.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06271\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06271\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u06271\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06271\u05d0.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u094d\u200d.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0627\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0627\u094d\u200d.\u0627/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1\u0627\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06281.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06281/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u06281/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06281.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06289.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06289/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u06289/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06289.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0661.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0661.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u06f1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u06f1.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0610.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0610.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u064b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u064b.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u05b0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u05b0.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u05d0.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u0300.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06281\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06281\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u06281\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u06281\u05d0.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u094d\u200d.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0628\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0628\u094d\u200d.\u0628/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1\u0628\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c01.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c01/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c01/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c01.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c09.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c09/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c09.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0661.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0661.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u06f1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u06f1.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0610.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0610.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u064b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u064b.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u05b0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u05b0.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u05d0.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u0300.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c01\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c01\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c01\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c01\u05d0.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u094d\u200d.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07c0\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07c0\u094d\u200d.\u07c0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1\u07c0\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07101.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07101/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07101/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07101.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07109.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07109/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07109/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07109.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0661.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u0661/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0661.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u06f1.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u06f1/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u06f1.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0610.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u0610/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0610.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u064b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u064b/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u064b.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u05b0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u05b0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u05b0.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u05d0.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0300.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u0300/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u0300.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07101\u05d0.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07101\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u07101\u05d0/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u07101\u05d0.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u094d\u200d.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a.\u0710\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0710\u094d\u200d.\u0710/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://1\u0710\u094d\u200d/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0915\u094d\u200d\u0937.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0915\u094d\u200c\u0937.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://\u0644\u200c\u0627.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u206db.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u206ab.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u00adb.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u034fb.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u180bb.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\ufe00b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u2060b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\u200bb.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see http://a\udb40\udd00b.com/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://h/?%EF%BB%BFtoken=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://h/?%EF%BB%BFapi_key=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://h/#%EF%BB%BFpassword=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see see https://%D7%90%31.example/?api_key=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u0645\u0648\u0642\u06391.example/?api_key=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u05e9\u05dc\u05d5\u05dd2.example/?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u0645\u0648\u0642\u06391.example/x?q=1#token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see wss://\u05d0\u05ea\u05e83.example/?secret=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://C:/Users/x/app.json?token=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see file://c|/x#api_key=abc"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "extensions": {
+    "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+     "connections": [
+      {
+       "id": "c",
+       "kind": "connector",
+       "target": "api",
+       "state": "ok",
+       "label": "see https://\u00e4..example/?token=abc"
       }
      ]
     }
