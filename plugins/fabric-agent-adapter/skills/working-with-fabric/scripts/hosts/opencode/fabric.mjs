@@ -1,11 +1,12 @@
 // #region native-host-context — docs: plugins/fabric-agent-adapter/skills/working-with-fabric/references/native-host-hooks.md
-import { readContext } from '../context.mjs';
+import { onceEach } from '../context.mjs';
 
 const marker = '[fabric-agent-adapter]';
 
 // OpenCode's legacy loader treats every export as a plugin factory.
 export default async function fabricPlugin({directory} = {}) {
   let fabricRegistered = false;
+  const readContext = onceEach();  // Python once per workspace and registration, not per request (FAA-69)
   return {
     config: async config => {
       const entry = config?.mcp?.fabric;

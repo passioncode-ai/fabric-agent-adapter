@@ -48,8 +48,10 @@ session id Fabric keeps with the enrollment, which only Claude Code supplies tod
 would add (never a value already in the file) and the `--apply --expect-sha256 <digest>` command. With `--apply` it
 backs the file up (`<file>.<UTC stamp>.bak`, never overwriting an earlier backup), keeps the file's mode, refuses a
 file whose shape is not `{"hooks": {"<Event>": [{"hooks": [...]}]}}` (Codex) or an array of `[[hooks]]` tables
-(Kimi Code, read back with `tomllib`: Python 3.11+), and refuses one that changed since the dry run. `--remove` takes
-the entry out again. Codex may ask the person to trust a new hook (`/hooks`) before it runs. Codex keys that trust by event, group and index, so
+(Kimi Code, read back with `tomllib`: Python 3.11+), and refuses one that changed since the dry run. It refuses a
+`--script` that is not an existing file. Our own entry, found by what it runs (for Kimi Code each `[[hooks]]` table is
+read on its own, so a hand-touched one is still found), is rewritten in place to the new script (`updated`) rather
+than added a second time. `--remove` takes the entry out again, stale or not, and needs no script. Codex may ask the person to trust a new hook (`/hooks`) before it runs. Codex keys that trust by event, group and index, so
 `--remove` names the SessionStart groups after the removed one that it moves, which Codex asks the person to approve
 again. The hook runs the
 `fabric_session.py` of the skills install (`~/.agents/skills/working-with-fabric/`) when there is one, else this

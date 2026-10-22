@@ -62,6 +62,24 @@ test('OpenCode malformed host output and missing context are harmless', async t 
   await hooks['experimental.chat.system.transform']({},output);
   assert.deepEqual(output.system,['existing']);
 });
+test('OpenCode runs the helper once per workspace and registration, not per request (FAA-69)', async t => {
+  const f=await fixture(t,"import json,sys,os\nopen(os.path.join(os.path.dirname(sys.argv[0]),'runs.log'),'a').write('x\\n')\n"+
+    "p=json.load(sys.stdin)\nprint('[fabric-agent-adapter] registered='+str(p.get('fabric_registered') is True))");
+  const {readFile}=await import('node:fs/promises');
+  const runs=async()=>(await readFile(join(f.root,'runs.log'),'utf8')).length;
+  const hooks=await (await f.load('opencode')).default({directory:f.root});
+  for (let n=0;n<3;n++) {
+    const output={system:['existing']};
+    await hooks['experimental.chat.system.transform']({},output);
+    assert.deepEqual(output.system,['existing','[fabric-agent-adapter] registered=False']);
+  }
+  assert.equal(await runs(),2,'one helper run for three requests');
+  await hooks.config({mcp:{fabric:{type:'local',command:['fabric-mcp']}}});
+  const output={system:[]};
+  await hooks['experimental.chat.system.transform']({},output);
+  assert.deepEqual(output.system,['[fabric-agent-adapter] registered=True']);
+  assert.equal(await runs(),4,'a changed registration asks again');
+});
 async function piHandler(f, tools) {
   const handlers=new Map(); const mod=await f.load('pi');
   assert.deepEqual(Object.keys(mod),['default']);

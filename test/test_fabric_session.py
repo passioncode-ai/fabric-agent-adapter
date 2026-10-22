@@ -908,7 +908,13 @@ class OtherHosts(Base):
 
 
 class InstallHostHooks(Base):
-    SCRIPT_PATH = "/opt/skills/working-with-fabric/scripts/fabric_session.py"
+    def setUp(self):
+        super().setUp()
+        # FAA-69: --script must name an existing file.
+        script = self.base / "opt/skills/working-with-fabric/scripts/fabric_session.py"
+        script.parent.mkdir(parents=True)
+        script.write_text("# the entry point\n")
+        self.SCRIPT_PATH = str(script)
 
     def test_the_default_script_is_the_entry_point(self):
         # FAA-65: the code moved into modules beside fabric_session.py; a hook must still run fabric_session.py.
