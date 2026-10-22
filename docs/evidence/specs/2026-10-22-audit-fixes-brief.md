@@ -65,3 +65,7 @@ proved both ways (fails on a planted defect, passes on the fix); npm `latest` = 
 ## Run state
 
 - 2026-10-22: brief written; wave 1 launched.
+- 2026-10-22: wave 1 running (builders A to G). Stale remote branches checked for the clean-up: 8 are ancestors of
+  `main`, 8 were squash-merged (PRs #19, #20, #23, #30, #43, #44, #46, #128), `agent/working-with-fabric-20261011` was
+  superseded by #81 (PR #53 closed with that note), and every file on `codex/contract-adoption-review-20261004` is
+  byte-equal on `main`. All 18 are deleted after integration; the `leases/` remote belongs to agent-sync and stays.
