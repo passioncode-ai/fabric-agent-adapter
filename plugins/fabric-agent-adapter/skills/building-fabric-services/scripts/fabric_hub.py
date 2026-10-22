@@ -44,7 +44,7 @@ import fabric_service as _fs  # noqa: E402 - beside this file: token files, atom
 HUB_PROTOCOL = "fabric-hub/0.1"
 MCP_PROTOCOL_VERSION = "2025-06-18"
 READ_CAP = 64 * 1024
-LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{4,5})")
+LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:([0-9]{4,5})")
 TOKEN = re.compile(r"[A-Za-z0-9_-]{43}")
 UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 CAPABILITY = re.compile(r"[a-z][a-z0-9._-]{1,127}")

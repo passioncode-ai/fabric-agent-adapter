@@ -36,7 +36,7 @@ MAX_PROBE_MS = 5000
 #: excludes nothing by it — and what a lane reads when it reads what a member, a client or the public sends.
 OPEN_VENDOR = "open-vendor"
 USER_CONTENT = "user-content"
-_BARE_BINARY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_BARE_BINARY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
 class ProfileError(ValueError):

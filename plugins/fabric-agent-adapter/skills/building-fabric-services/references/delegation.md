@@ -30,7 +30,7 @@ the declaration (`auth.delegation-declared`) and that `/mcp` refuses the descrip
 
 ```python
 import fabric_delegation as fd, fabric_interop as fi
-keys = fd.JwksCache(well_known["auth"]["delegation"]["jwks"])          # https, loopback http, or a file
+keys = fd.JwksCache(well_known["auth"]["delegation"]["jwks"])          # https, loopback http, or a file; one 5 s deadline per fetch
 gate = fd.delegation_gate(audience="example-agent", jwks=keys, issuer=well_known["auth"]["delegation"]["issuer"],  # required
                           effects={"example.write": "draft", "example.publish": "publish"})   # each tool's manifest effect
 server = fi.McpToolServer("example-agent", VERSION, authorize=gate)    # pass the request headers to handle()
@@ -115,7 +115,8 @@ current verified revision as `estate=` / `{ estate }`, as a value or as a functi
 - A revision that cannot be read, is outside its window, is lower than the applied one or forks it is the trust
   source's fault: `issuer-unavailable`, detail `estate-unreadable`, `estate-outside-window`, `estate-rolled-back` or
   `estate-forked`.
-- Without `estate`, nothing changes.
+- Without `estate` (the option left out), nothing changes. An explicit `null` (Python `None`) for `estate`, its
+  applied mark or its revocations is an unreadable source, `estate-unreadable`, in both kits (FAA-78).
 - Every verifier refuses a clock that is not a number of seconds `unknown-state` `no-clock` before row 1: a NaN clock
   would make every time row false and pass an expired token.
 

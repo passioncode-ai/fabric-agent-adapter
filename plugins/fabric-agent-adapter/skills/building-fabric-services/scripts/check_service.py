@@ -318,7 +318,7 @@ class Probe:
         self.events = events
         bad = []
         for e in events:
-            if e.get("level") not in fs.LEVELS or not re.match(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$", str(e.get("kind", ""))):
+            if e.get("level") not in fs.LEVELS or not re.match(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*\Z", str(e.get("kind", ""))):
                 bad.append(str(e.get("id")))
             elif " " not in str(e.get("text", "")).strip():
                 bad.append("%s (text is not a sentence)" % e.get("id"))

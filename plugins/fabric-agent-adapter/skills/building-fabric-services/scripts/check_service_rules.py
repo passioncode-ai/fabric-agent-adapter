@@ -29,7 +29,7 @@ def plist_problems(plist: dict, label: object, token: object = None) -> list:
     if plist.get("KeepAlive") is not True:
         problems.append("KeepAlive is %r, not true" % plist.get("KeepAlive"))
     for key, value in (plist.get("EnvironmentVariables") or {}).items():
-        if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)$", key) and not key.endswith("_FILE"):
+        if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)\Z", key) and not key.endswith("_FILE"):
             problems.append("secret-like variable %s in the plist" % key)
         if token and token in str(value):
             problems.append("the service token itself is in the plist")

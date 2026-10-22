@@ -113,7 +113,7 @@ def _kimi_spans(text: str, host: str) -> List[Tuple[int, int]]:
     headers = [i for i, line in enumerate(lines) if line.startswith("[")]
     spans = []
     for n, start in enumerate(headers):
-        if not re.match(r"\[\[\s*hooks\s*\]\]\s*(#.*)?$", lines[start].rstrip("\r\n")):
+        if not re.match(r"\[\[\s*hooks\s*\]\]\s*(#.*)?\Z", lines[start].rstrip("\r\n")):
             continue
         end = headers[n + 1] if n + 1 < len(headers) else len(lines)
         while end > start + 1 and (not lines[end - 1].strip() or lines[end - 1].lstrip().startswith("#")):

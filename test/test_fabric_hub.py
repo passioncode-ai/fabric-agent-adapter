@@ -62,6 +62,7 @@ class LocateTests(HubTestCase):
             {"origin": "http://localhost:%d" % self.hub.port},
             {"origin": "http://127.0.0.2:%d" % self.hub.port},
             {"origin": "http://127.0.0.1:80"},
+            {"origin": "http://127.0.0.1:\u0664\u0660\u0660\u0660"},  # non-ASCII digits are not a port (FAA-78)
             {"mcp": "/other"},
             {"pid": 0},
             {"pid": True},
