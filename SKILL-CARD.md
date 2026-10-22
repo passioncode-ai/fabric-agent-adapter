@@ -8,13 +8,14 @@
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
 | Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base |
 | Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`) |
-| Mutations | only the seven documented target-project paths; collisions refused by default; `fabric_provider.py write` writes one entry in the providers directory |
-| Network | not required for structural mode; a contract checkout (public repository) required for exact schema validation |
+| Mutations | only the seven documented target-project paths; collisions refused by default, `scaffold --dry-run` shows each diff and writes nothing; `fabric_provider.py write` writes one entry in the providers directory |
+| Network | none of its own: structural mode reads local files; exact schema validation runs a local contract checkout's own `tsx` (the checkout is a public repository, fetched by the person) |
 | Secrets | never accepted or emitted |
 
 Triggers include explicit requests to connect, adapt, migrate, or check a project against
-the Fabric Agent Contract. It does not trigger for generic agent construction, Fabric host
-implementation, MCP client configuration, or whole-project audits.
+the Fabric Agent Contract. It does not trigger for generic agent construction (creating-fabric-agents), running an
+agent as a Fabric service (building-fabric-services), a coding session working through Fabric (working-with-fabric),
+Fabric host implementation, MCP client configuration, or whole-project audits.
 
 The skill may recommend A2A, MCP, local runner, or `undetermined`. It cannot admit or bind
 a provider because those actions require a real Fabric host/runtime.
@@ -35,8 +36,9 @@ a provider because those actions require a real Fabric host/runtime.
 | Secrets | never accepted or emitted |
 
 Triggers include explicit requests to create, design, or build a NEW Fabric-compatible
-agent or provider. It does not trigger for adapting an existing project (the sibling
-skill), Fabric host implementation, or generic agent construction.
+agent or provider. It does not trigger for adapting an existing project (adapting-projects-to-fabric), running an
+agent as a Fabric service (building-fabric-services), a session working through Fabric (working-with-fabric), Fabric
+host implementation, or generic agent construction.
 
 The grill refuses to proceed without a named consumer, and the report always carries the
 canary-binding expectation: checker plus budget cap until a recorded promotion.
@@ -52,15 +54,16 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
 | Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration, a signed `fabric-package/1` folder (`fabric_package`, `fabric-package.mjs`), probe and layout-probe reports |
-| Mutations | the target service's files; the plist in `~/Library/LaunchAgents`; one descriptor in the services directory |
-| Network | loopback only; the probe talks to `127.0.0.1:<port>`, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; a board responder talks only to Fabric's hub at the `http://127.0.0.1:<port>` its `hub.json` names, after checking that file's pid; the layout probe opens the dashboard in a local headless browser with a one-time login code |
+| Mutations | the target service's files; its supervisor file when its installer runs (a launchd plist in `~/Library/LaunchAgents`, a systemd user unit, or a per-user Scheduled Task); one descriptor in the services directory |
+| Network | the probe talks to `127.0.0.1:<port>` for a local service and to the service's own `https` origin for a remote placement, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; a board responder talks only to Fabric's hub at the `http://127.0.0.1:<port>` its `hub.json` names, after checking that file's pid; the layout probe opens the dashboard in a local headless browser with a one-time login code; the kit's connectors (`fabric_http`, `fabric_openrouter`) reach the external APIs the service's author configures |
 | Secrets | the service token is created 0600 and read, never printed; a board responder's binding credential lives in a 0600 file, read for each join and never logged |
 
 Triggers include making an agent a local service, an always-on dashboard, where an agent
 stores settings, connecting a service to Fabric Dashboards, answering a Project's requests on the
 project board, and migrating or checking a
 service against `fabric-service/0.1`. It does not trigger for cron jobs, hosted SaaS, the
-provider manifest (the adapting skill) or the Fabric Dashboards app.
+provider manifest (adapting-projects-to-fabric), a new agent's design (creating-fabric-agents), a coding session
+using Fabric (working-with-fabric) or the Fabric Dashboards app.
 
 # Skill card: working-with-fabric
 

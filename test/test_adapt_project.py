@@ -292,3 +292,192 @@ class LifecycleRuleTests(unittest.TestCase):
         base = Path(__file__).resolve().parents[1] / "plugins/fabric-agent-adapter/skills"
         self.assertEqual((base / "adapting-projects-to-fabric/scripts/fabric_secrets.py").read_bytes(),
                          (base / "building-fabric-services/scripts/fabric_secrets.py").read_bytes())
+
+
+def replace_every_sentinel(root: Path) -> None:
+    """What an author does before admission: real schemas, fixture, assertions, author, data classes; no template block."""
+    manifest_path = root / "fabric-agent.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["provider"]["createdBy"] = "https://agents.example/people/author"
+    manifest["provider"]["contentHash"] = "sha256:" + "1" * 64
+    capability = manifest["capabilities"][0]
+    capability["dataClasses"] = ["project-internal"]
+    capability["profile"]["probes"][0]["assertions"] = ["returns the keyword list for the fixture domain"]
+    manifest.pop("extensions", None)
+    manifest_path.write_text(json.dumps(manifest))
+    (root / "fabric/schemas/capability-input.schema.json").write_text(json.dumps(
+        {"$schema": "https://json-schema.org/draft/2020-12/schema", "title": "Keyword request", "type": "object",
+         "properties": {"domain": {"type": "string"}}, "required": ["domain"]}))
+    (root / "fabric/schemas/capability-output.schema.json").write_text(json.dumps(
+        {"$schema": "https://json-schema.org/draft/2020-12/schema", "title": "Keyword list", "type": "object",
+         "properties": {"keywords": {"type": "array"}}, "required": ["keywords"]}))
+    (root / "fabric/fixtures/admission-input.json").write_text(json.dumps({"domain": "example.com"}))
+    (root / "fabric/probes/assertions.md").write_text("# Probe\n\n- Returns at least one keyword for example.com.\n")
+
+
+class TemplateSentinelTests(unittest.TestCase):
+    """FAA-71 (audit finding 19): check warns on every template sentinel still present, and readyForAdmission stays
+    false while any remains."""
+
+    def warnings_after(self, profile="mcp", **overrides):
+        args = scaffold_args(profile)
+        for key, value in overrides.items():
+            setattr(args, key, value)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ADAPTER.scaffold_project(root, args)
+            return ADAPTER.check_project(root, None)
+
+    def test_a_fresh_scaffold_names_each_sentinel(self):
+        result = self.warnings_after()
+        joined = "\n".join(result["warnings"])
+        for expected in ("fabric/schemas/capability-input.schema.json", "fabric/schemas/capability-output.schema.json",
+                         "provider.createdBy", "assertions", "/capabilities/0/dataClasses", "/provider/identity/method",
+                         "fabric/fixtures/admission-input.json", "fabric/probes/assertions.md", "provider.contentHash"):
+            self.assertIn(expected, joined, result["warnings"])
+        self.assertFalse(result["readyForAdmission"])
+
+    def test_placeholders_in_any_generated_file_are_named(self):
+        result = self.warnings_after("a2a", agent_card_url="https://replace.invalid/.well-known/agent-card.json")
+        self.assertTrue(any("agentCardUrl" in w for w in result["warnings"]), result["warnings"])
+        self.assertTrue(any("skillIds" in w for w in result["warnings"]), result["warnings"])
+        result = self.warnings_after("local-runner", runner_kind="replace-me")
+        self.assertTrue(any("runnerKind" in w for w in result["warnings"]), result["warnings"])
+
+    def test_given_values_are_not_marked_as_defaulted(self):
+        result = self.warnings_after(data_class=["confidential"], created_by="https://agents.example/people/author",
+                                     probe_assertion=["returns three keywords"], identity_method="oauth2")
+        joined = "\n".join(result["warnings"])
+        for absent in ("dataClasses", "createdBy", "/provider/identity/method", "/profile/probes/0/assertions", "probes[0].assertions"):
+            self.assertNotIn(absent, joined, result["warnings"])
+
+    def test_local_install_identity_is_not_a_sentinel(self):
+        result = self.warnings_after("local-runner")
+        self.assertNotIn("/provider/identity/method", "\n".join(result["warnings"]))
+
+    def test_no_warning_once_every_sentinel_is_replaced(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ADAPTER.scaffold_project(root, scaffold_args("mcp"))
+            replace_every_sentinel(root)
+            result = ADAPTER.check_project(root, None)
+            self.assertEqual(result["warnings"], [])
+            self.assertEqual(result["gates"]["localStructure"]["status"], "PASS")
+
+    def test_a_template_block_left_behind_keeps_admission_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ADAPTER.scaffold_project(root, scaffold_args("mcp"))
+            original = json.loads((root / "fabric-agent.json").read_text())
+            replace_every_sentinel(root)
+            manifest = json.loads((root / "fabric-agent.json").read_text())
+            manifest["extensions"] = original["extensions"]
+            (root / "fabric-agent.json").write_text(json.dumps(manifest))
+            self.assertTrue(ADAPTER.check_project(root, None)["warnings"])
+
+
+class ContractRunnerTests(unittest.TestCase):
+    """FAA-71 (audit finding 20): check --contract runs the checkout's own tsx, never `pnpm exec`."""
+
+    def test_the_checkout_tsx_is_called_directly(self):
+        from unittest import mock
+        import subprocess as sp
+        with tempfile.TemporaryDirectory() as temp:
+            contract = Path(temp) / "contract"
+            (contract / "node_modules/.bin").mkdir(parents=True)
+            (contract / "node_modules/.bin/tsx").write_text("#!/bin/sh\n")
+            manifest = Path(temp) / "fabric-agent.json"
+            manifest.write_text("{}")
+            calls = []
+
+            def fake_run(argv, **kwargs):
+                calls.append(list(argv))
+                out = ADAPTER.CONTRACT_COMMIT + "\n" if argv[:2] == ["git", "rev-parse"] else ""
+                return sp.CompletedProcess(argv, 0, stdout=out, stderr="")
+
+            with mock.patch.object(ADAPTER.subprocess, "run", side_effect=fake_run):
+                status, _ = ADAPTER._contract_shape(manifest, contract, ADAPTER.CONTRACT_COMMIT)
+            self.assertEqual(status, "PASS")
+            runner = calls[-1]
+            self.assertEqual(runner[0], str(contract / "node_modules/.bin/tsx"))
+            self.assertNotIn("pnpm", runner)
+
+
+class InspectAndCheckRobustnessTests(unittest.TestCase):
+    """FAA-71 (audit finding 21)."""
+
+    def test_a_client_mcp_config_is_not_an_mcp_surface(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / ".mcp.json").write_text(json.dumps({"mcpServers": {"x": {"command": "x"}}}))
+            (root / "settings.json").write_text(json.dumps({"mcpServers": {"y": {"url": "http://127.0.0.1:1234/mcp"}}}))
+            result = ADAPTER.inspect_project(root)
+            self.assertNotIn("mcp", result["candidateProfiles"])
+            self.assertEqual(result["recommendedProfile"], "undetermined")
+            self.assertTrue(result["evidence"]["mcp-client-config"])
+            self.assertIn("MCP client", result["openQuestion"])
+
+    def test_a_client_config_beside_a_server_keeps_the_server(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / ".mcp.json").write_text(json.dumps({"mcpServers": {}}))
+            (root / "package.json").write_text(json.dumps({"dependencies": {"@modelcontextprotocol/sdk": "1"}}))
+            self.assertEqual(ADAPTER.inspect_project(root)["recommendedProfile"], "mcp")
+
+    def test_a_non_utf8_manifest_is_a_typed_receipt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            ADAPTER.scaffold_project(root, scaffold_args("mcp"))
+            (root / "fabric-agent.json").write_bytes(b"\xff\xfe{not utf-8")
+            result = ADAPTER.check_project(root, None)
+            self.assertEqual(result["gates"]["localStructure"]["status"], "FAIL")
+            self.assertTrue(any(r.startswith("invalid-json:fabric-agent.json") for r in result["gates"]["localStructure"]["receipts"]))
+
+    def test_dry_run_writes_nothing_and_shows_each_collision(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "fabric-agent.json").write_text("old manifest\n")
+            args = scaffold_args("mcp")
+            args.dry_run = True
+            result = ADAPTER.scaffold_project(root, args)
+            self.assertTrue(result["dryRun"])
+            self.assertEqual(result["wouldReplace"], ["fabric-agent.json"])
+            self.assertIn("fabric/FABRIC-CONFORMANCE.md", result["wouldCreate"])
+            self.assertIn("-old manifest", result["diffs"]["fabric-agent.json"])
+            self.assertEqual((root / "fabric-agent.json").read_text(), "old manifest\n")
+            self.assertFalse((root / "fabric").exists())
+
+    def test_force_without_dry_run_still_replaces(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "fabric-agent.json").write_text("old manifest\n")
+            args = scaffold_args("mcp", force=True)
+            args.dry_run = False
+            ADAPTER.scaffold_project(root, args)
+            self.assertIn("contractVersion", (root / "fabric-agent.json").read_text())
+
+    def test_the_cli_dry_run_prints_the_diff(self):
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as temp:
+            (Path(temp) / "fabric-agent.json").write_text("old manifest\n")
+            out = io.StringIO()
+            argv = ["scaffold", temp, "--profile", "mcp", "--provider-id", "https://agents.example/p", "--capability-id",
+                    "https://agents.example/c", "--capability-name", "demo.run", "--schema-base", "https://agents.example/fabric",
+                    "--effect", "none", "--dry-run"]
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(ADAPTER.main(argv), 0)
+            self.assertIn("--- fabric-agent.json", out.getvalue())
+            self.assertIn("-old manifest", out.getvalue())
+            self.assertEqual((Path(temp) / "fabric-agent.json").read_text(), "old manifest\n")
+
+
+class StatusSpellingTests(unittest.TestCase):
+    """FAA-74 (audit finding 32): one spelling of the unverified status, the one check prints."""
+
+    def test_the_conformance_report_says_NOT_VERIFIED(self):
+        with tempfile.TemporaryDirectory() as temp:
+            ADAPTER.scaffold_project(Path(temp), scaffold_args("mcp"))
+            text = (Path(temp) / "fabric/FABRIC-CONFORMANCE.md").read_text()
+            self.assertIn("NOT_VERIFIED", text)
+            self.assertNotIn("NOT VERIFIED", text)

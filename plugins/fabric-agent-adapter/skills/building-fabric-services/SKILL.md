@@ -1,19 +1,15 @@
 ---
 name: building-fabric-services
 description: >-
-  Use when handing out or opening a Fabric service dashboard, building a local agent service on a
-  macOS machine, making an ONLINE agent or dashboard (https origin, the remote placement) a
-  Fabric service, or letting a service answer a Project's board requests: «сделай агенту дашборд»,
-  «локальный сервис агента», «подключи агента к Fabric Dashboards», «отвечать на запросы с доски проекта»,
-  "make this agent a local service", "make an online dashboard a Fabric service", "add the
-  well-known endpoint", «расходы агента на модели». Covers fabric-service/0.1:
-  surfaces, token and one-time login, state, one copy, launchd, descriptor, well-known document,
-  events, the usage report; online: the https guard, token-gated well-known, the
-  __Host- cookie; the board responder (fenced claims); Python, Node and dashboard kits, probes;
-  packing and signing (fabric-package/1).
-  NOT for a one-off script or cron job, a hosted product
-  with no agent, the provider manifest (adapting-projects-to-fabric), or building Fabric
-  Dashboards.
+  Use when running an agent as a Fabric service (fabric-service/0.1, its kits and probe): a local
+  service (launchd, systemd, Windows), an ONLINE agent or dashboard on https, its dashboard link,
+  spend report, answering a Project's board requests, or packing and signing it. «сделай агенту
+  дашборд», «локальный сервис агента», «подключи агента к Fabric Dashboards», «отвечать на запросы с
+  доски проекта», «расходы агента на модели», "make this agent a local service", "make an online dashboard a Fabric service",
+  "add the well-known endpoint". NOT for a one-off script or cron job, a hosted product with no
+  agent, the provider manifest (adapting-projects-to-fabric), a new agent's design
+  (creating-fabric-agents), a session using Fabric or its board (working-with-fabric), or building
+  Fabric Dashboards.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits; the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
@@ -47,6 +43,10 @@ to review one. Do not use it for:
   Fabric IS in scope: it is the remote placement; read [Online services](#online-services-the-remote-placement);
 - the provider manifest and admission bundle: that is `adapting-projects-to-fabric`
   (a service that is also a provider does both);
+- designing a new agent (the intake grill, its knowledge pack): that is `creating-fabric-agents`,
+  which hands over to this skill when the agent keeps running;
+- a coding session working through Fabric (registering `fabric-mcp`, asking another Project on
+  the board, claims): that is `working-with-fabric`; this skill builds the service that answers;
 - the Fabric Dashboards app itself.
 
 ## Step 0: is it a service?
@@ -127,10 +127,12 @@ The request body is data behind the service's own input gate. Read [the board re
 5. **State outside code.** Data and config in `~/Library/Application Support/<id>/`,
    logs in `~/Library/Logs/<id>/`, cache in `~/Library/Caches/<id>/`; the service's own
    access token in a 0600 file it generates (principle 6). **Every provider credential the
-   service uses comes from Project Observatory, by name**: the plist starts the service
-   with `use_secret.py serve --consumer <label> <project> <NAME>[,<NAME>] -- <command>`, which
-   reads the vault only and records the consumer so a rotation names it; never a copy of a
-   key in a `.env`, a config file or the plist. Never inside the service's own code checkout or a release directory; a
+   service uses is read by name**: with Project Observatory installed, the plist starts the
+   service with `python3 "$(project-observatory full-path)/tools/use_secret.py" serve --consumer <label> <project> <NAME>[,<NAME>] -- <command>`
+   (resolve the path when the plist is written; launchd runs no shell), which reads the vault
+   only and records the consumer so a rotation names it. Without it, a small launcher reads the
+   key from the OS keychain or the person's secret manager into the service's environment at
+   start. Never a copy of a key in a `.env`, a config file, an argument or the plist. Never inside the service's own code checkout or a release directory; a
    repository that versions the data itself is a store and is fine; declare
    `source.repository` so the probe can tell them apart. *(Deleting a checkout left a
    plist launchd retried every 10 s, and the data went with it.)*
@@ -345,8 +347,10 @@ things change and the kits implement each:
 2. **Secrets live on the platform:** the service token and the session key (32 bytes) are
    platform secrets, never in the repository, a URL or an argument vector. A provider key the
    remote service needs is issued and kept in Project Observatory, pushed to the platform, and
-   the movement recorded with `vault.py moved --at <provider>`, so the platform's copy is
-   known rather than invisible.
+   the movement recorded with
+   `python3 "$(project-observatory full-path)/tools/vault.py" moved <project> <env> <NAME> --how "<what moved, where, evidence>" --at <provider>`,
+   so the platform's copy is known rather than invisible. Without Project Observatory, record
+   where the key lives in the person's own secret manager.
 3. **Register it on the operator's computer**, the installer side, run there:
    `registerRemote({ id, name, origin, token })` / `register_remote(...)` writes the token file
    (0600) and the descriptor; pass the token from a file or stdin, never in argv. Public names
@@ -410,12 +414,6 @@ reports a `FAIL`.
 
 ## Dashboard handoff: also for consumers
 
-When handing a registered service dashboard to a person, or writing the generated
-agent's completion/notification instructions, read and apply
-[dashboard links](references/dashboard-links.md): use the host's `open_link`,
-check the target device and host, and run the bundled output gate before delivery.
-An installed host failure never means browser fallback. This applies in Claude
-Code, Codex and other providers; it needs no host-specific hook. MCP unavailable:
-report the unresolved capability or use an approved project resolver; no automatic
-client configuration. Python unavailable: perform the reference's manual checks
-and report the executable gate NOT_RUN. Headless agents need no dashboard.
+When handing a registered service dashboard to a person, or writing the generated agent's
+completion or notification instructions, read and apply [dashboard links](references/dashboard-links.md)
+and run its output gate before delivery, in any host. Headless agents need no dashboard.

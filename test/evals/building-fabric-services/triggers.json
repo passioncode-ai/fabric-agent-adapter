@@ -168,6 +168,21 @@
     {
       "query": "Zip this folder and upload it to S3.",
       "shouldTrigger": false
+    },
+    {
+      "query": "Подключи этот проект к Fabric: сгенерируй provider bundle для его MCP-сервера.",
+      "shouldTrigger": false,
+      "note": "sibling: adapting-projects-to-fabric"
+    },
+    {
+      "query": "Create a brand-new Fabric-compatible agent from scratch and run its intake grill.",
+      "shouldTrigger": false,
+      "note": "sibling: creating-fabric-agents"
+    },
+    {
+      "query": "Подключись к Fabric и возьми задачу через fabric_work_claim.",
+      "shouldTrigger": false,
+      "note": "sibling: working-with-fabric"
     }
   ]
 }

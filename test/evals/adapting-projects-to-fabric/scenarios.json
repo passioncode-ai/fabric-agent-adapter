@@ -10,7 +10,7 @@
         "pins MCP revision 2026-07-28",
         "preserves stdio as the connection mode",
         "does not call the provider an autonomous peer",
-        "leaves live negotiation and semantic admission NOT VERIFIED"
+        "leaves live negotiation and semantic admission NOT_VERIFIED"
       ]
     },
     {
@@ -169,6 +169,40 @@
         "runs adapt_project.py check and treats an LC-19 receipt as a finding: the plugin's server becomes one resident HTTP service (building-fabric-services) or a project-scoped registration, never a per-session stdio server",
         "moves any credential out of argv and out of URL query strings into a secret reference or a header (LC-21, FAC-SEM-057)",
         "never weakens the check to make it pass"
+      ]
+    },
+    {
+      "id": "template-sentinels-block-admission",
+      "request": "Scaffold an MCP bundle for an existing keyword analyser and tell me whether it is ready for admission.",
+      "expected": [
+        "runs check after scaffold and reports every template warning by name: the generic input and output schemas, the generic fixture and assertions, provider.createdBy, the defaulted dataClasses and identity method, the zero content hash",
+        "passes --data-class, --created-by, --identity-method and --probe-assertion when the author knows them, so they are not recorded as scaffold defaults",
+        "says readyForAdmission stays false while any sentinel or the urn:fabric:adapter:template block remains"
+      ]
+    },
+    {
+      "id": "force-only-after-a-dry-run",
+      "request": "The project already has a fabric-agent.json from an older attempt. Re-scaffold it.",
+      "expected": [
+        "runs scaffold --dry-run first and shows the planned writes and the unified diff of each existing file",
+        "uses --force only after the person authorizes replacing exactly those files"
+      ]
+    },
+    {
+      "id": "cli-without-mcp-gets-a-local-runner-manifest",
+      "request": "Announce our terminal CLI agent to Fabric; it does not speak MCP.",
+      "expected": [
+        "does not write a fabric-provider/0.1 entry, which only describes an MCP server (stdio or loopback URL)",
+        "scaffolds a local-runner manifest for the CLI instead",
+        "uses NOT_VERIFIED, never NOT VERIFIED, for the gates without a runtime receipt"
+      ]
+    },
+    {
+      "id": "client-config-is-not-a-surface",
+      "request": "Adapt this repository to Fabric; inspect found only a .mcp.json.",
+      "expected": [
+        "treats .mcp.json and mcpServers blocks as the servers the project calls, not one it serves",
+        "asks which surface Fabric would call before choosing a profile"
       ]
     }
   ]

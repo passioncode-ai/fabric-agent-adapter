@@ -18,6 +18,21 @@ Use only `PASS`, `FAIL`, `NOT_RUN`, and `NOT_VERIFIED`:
 - `NOT_VERIFIED`: no implemented verifier/runtime currently exists for the claim.
 - Never relabel either as a warning-level pass.
 
+## Template sentinels
+
+`check` lists every value the scaffold invented as a warning, and `readyForAdmission` stays false
+while one remains: `placeholder:` for a fixed sentinel (the zero content hash, `replace-me`,
+`.invalid`, `urn:fabric:adapter:author`, the generic probe assertion, a generated file still marked
+`fabric-adapter-template` or still in the generic request/summary shape, the generic fixture) and
+`template-default:` for each JSON pointer listed under the manifest's `urn:fabric:adapter:template`
+extension (a legal value the author did not choose, such as `dataClasses: ["public"]`). A warning
+is cleared by replacing the value with an implementation-backed fact and removing the pointer from
+that list; deleting the block without confirming its values is a false receipt.
+
+`check --contract` runs the checkout's own `node_modules/.bin/tsx`, never `pnpm exec`, so it cannot
+reinstall or purge the contract checkout. A manifest that is not UTF-8 or not JSON is an
+`invalid-json:` receipt, not a crash.
+
 ## Receipts
 
 A receipt names what ran and what identity was tested:

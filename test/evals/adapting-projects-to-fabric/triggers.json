@@ -88,6 +88,21 @@
     {
       "query": "Pick a Postgres connection pool size for our API.",
       "shouldTrigger": false
+    },
+    {
+      "query": "Подключись к Fabric и возьми задачу FAA-12 через fabric_work_claim.",
+      "shouldTrigger": false,
+      "note": "sibling: working-with-fabric (a session working through Fabric, not a project being adapted)"
+    },
+    {
+      "query": "Create a brand-new Fabric-compatible agent from scratch and run its intake grill.",
+      "shouldTrigger": false,
+      "note": "sibling: creating-fabric-agents"
+    },
+    {
+      "query": "Turn example-agent into an always-on local Fabric service with a dashboard and launchd.",
+      "shouldTrigger": false,
+      "note": "sibling: building-fabric-services"
     }
   ]
 }

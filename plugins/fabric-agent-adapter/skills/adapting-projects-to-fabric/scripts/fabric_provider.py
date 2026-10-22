@@ -7,8 +7,11 @@ entry and only its uninstaller removes it; the entry grants no Project access.
 Standard library only; it does not import the service kit, so this skill stands alone.
 
   fabric_provider.py write --id ID --provider-id URI --name NAME --manifest PATH --installed-by TEXT
-                           (--url http://127.0.0.1:PORT/mcp | --stdio EXECUTABLE [ARG ...])
-                           [--env NAME=secret-ref:REF ...] [--summary TEXT] [--repository URL]
+                           [--summary TEXT] [--repository URI]
+                           (--url http://127.0.0.1:PORT/mcp | [--env NAME=secret-ref:REF ...] --stdio [--] EXECUTABLE [ARG ...])
+
+--stdio is last: it takes the rest of the line. A writer option after it is refused; write `--stdio --` when the server
+itself takes an option of the same name. --env is for a stdio server only and is refused with --url.
   fabric_provider.py remove ID
   fabric_provider.py validate PATH
 
@@ -33,12 +36,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044, LC-21), beside this file
 
 PROTOCOL = "fabric-provider/0.1"
+# Copied from the pinned schemas (provider.schema.json, service-common.schema.json, common.schema.json) and applied
+# with fullmatch, so a trailing newline never passes. test_provider.SchemaParityTests compares them with the pin.
+URL_PATTERN = r"^http://127\.0\.0\.1:([1-9][0-9]{2,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])/mcp$"
+LOCAL_PATH_PATTERN = "^(~[\\\\/]|/(?![\\\\/])|[A-Za-z]:[\\\\/])[^\\u0000]*$"
+LOCAL_PATH_MAX = 1024
+ARGV_MAX_ITEMS = 32
+ARGV_MAX_ITEM = 1024
+ENV_MAX = 64
 _ID = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
 _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 _SECRET_REF = re.compile(r"^secret-ref:([A-Za-z0-9][A-Za-z0-9._/:@-]{0,255})$")
-_LOCAL_PATH = re.compile(r"^(~/|/)[^\x00]*$")
-_URL = re.compile(r"^http://127\.0\.0\.1:([0-9]{1,5})/mcp$")
-_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s]+$")
+_LOCAL_PATH = re.compile(LOCAL_PATH_PATTERN)
+_URL = re.compile(URL_PATTERN)
+# format: uri (RFC 3986 absolute URI): a scheme, a colon, then no whitespace or control character.
+_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+$")
+# format: date-time (RFC 3339).
+_TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$")
 FIELDS = {"protocol", "id", "providerId", "name", "summary", "manifest", "run", "source", "installedAt", "installedBy", "extensions"}
 # FAC-SEM-015 reads a credential by its SHAPE: a reference named after a key is fine.
 CREDENTIAL_SHAPES = [re.compile(p) for p in (
@@ -53,6 +67,9 @@ CREDENTIAL_SHAPES = [re.compile(p) for p in (
     r"^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$",
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])[A-Za-z0-9+=_-]{32,}$",
 )]
+
+
+WRITER_OPTIONS = {"--id", "--provider-id", "--name", "--summary", "--manifest", "--installed-by", "--repository", "--env", "--url", "--stdio"}
 
 
 class ProviderError(Exception):
@@ -95,19 +112,36 @@ def validate_provider_entry(entry: Any) -> List[str]:
         return problems
     if entry["protocol"] != PROTOCOL:
         problems.append("protocol must be %s" % PROTOCOL)
-    if not _ID.match(str(entry["id"])):
+    if not isinstance(entry["id"], str) or not _ID.fullmatch(entry["id"]):
         problems.append("id must match %s" % _ID.pattern)
-    if not _URI.match(str(entry["providerId"])):
+    if not _is_uri(entry["providerId"]):
         problems.append("providerId is the absolute URI of the manifest's provider.id")
     if not isinstance(entry["name"], str) or not 1 <= len(entry["name"]) <= 80:
         problems.append("name is 1 to 80 characters")
     if "summary" in entry and (not isinstance(entry["summary"], str) or len(entry["summary"]) > 200):
         problems.append("summary is at most 200 characters")
-    manifest = str(entry["manifest"])
-    if not _LOCAL_PATH.match(manifest) or not re.search(r"(^|/)fabric-agent\.json$", manifest):
-        problems.append("manifest is an absolute or ~/ path to fabric-agent.json")
+    manifest = entry["manifest"]
+    if (not isinstance(manifest, str) or len(manifest) > LOCAL_PATH_MAX or not _LOCAL_PATH.fullmatch(manifest)
+            or not re.search(r"(^|/)fabric-agent\.json\Z", manifest)):
+        problems.append("manifest is an absolute or ~/ path to fabric-agent.json, at most %d characters, never a network share" % LOCAL_PATH_MAX)
+    if "source" in entry:
+        source = entry["source"]
+        if not isinstance(source, dict) or not set(source) <= {"repository"}:
+            problems.append("source is {repository?}")
+        elif "repository" in source and not _is_uri(source["repository"]):
+            problems.append("source.repository is an absolute URI")
+    if not isinstance(entry["installedAt"], str) or not _TIMESTAMP.fullmatch(entry["installedAt"]):
+        problems.append("installedAt is an RFC 3339 date-time")
+    if not isinstance(entry["installedBy"], str) or not 1 <= len(entry["installedBy"]) <= 200:
+        problems.append("installedBy is 1 to 200 characters")
+    if "extensions" in entry and (not isinstance(entry["extensions"], dict) or not all(_is_uri(k) for k in entry["extensions"])):
+        problems.append("extensions is an object whose keys are URIs")
     problems.extend(_run_problems(entry["run"]))
     return problems
+
+
+def _is_uri(value: Any) -> bool:
+    return isinstance(value, str) and bool(_URI.fullmatch(value))
 
 
 def _run_problems(run: Any) -> List[str]:
@@ -115,8 +149,8 @@ def _run_problems(run: Any) -> List[str]:
     if not isinstance(mcp, dict) or len(mcp) != 1 or not set(mcp) <= {"stdio", "url"}:
         return ["run is {mcp: {stdio: ...}} or {mcp: {url: ...}}, exactly one"]
     if "url" in mcp:
-        match = _URL.match(str(mcp["url"]))
-        return [] if match and 1 <= int(match.group(1)) <= 65535 else ["run.mcp.url is http://127.0.0.1:<port>/mcp"]
+        url = mcp["url"]
+        return [] if isinstance(url, str) and _URL.fullmatch(url) else ["run.mcp.url is http://127.0.0.1:<port>/mcp with a port from 100 to 65535"]
     stdio = mcp["stdio"]
     problems: List[str] = []
     if not isinstance(stdio, dict) or not set(stdio) <= {"command", "env", "scope"} or "command" not in stdio:
@@ -125,17 +159,21 @@ def _run_problems(run: Any) -> List[str]:
     if "scope" in stdio and stdio["scope"] not in ("project", "on-demand"):
         problems.append("run.mcp.stdio.scope is project or on-demand; a stdio server started in every session is refused (FAC-SEM-056, LC-19)")
     command = stdio["command"]
-    if not isinstance(command, list) or not 1 <= len(command) <= 32 or not all(isinstance(a, str) and a for a in command):
-        problems.append("run.mcp.stdio.command is an argument array, never a shell string")
+    if not isinstance(command, list) or not 1 <= len(command) <= ARGV_MAX_ITEMS or not all(isinstance(a, str) and a for a in command):
+        problems.append("run.mcp.stdio.command is an argument array of 1 to %d non-empty strings, never a shell string" % ARGV_MAX_ITEMS)
+    elif any(len(a) > ARGV_MAX_ITEM for a in command):
+        problems.append("run.mcp.stdio.command has an argument over %d characters" % ARGV_MAX_ITEM)
     elif any(_secrets.secret_argument(a) for a in command):
         problems.append("run.mcp.stdio.command carries a credential in an argument; argv is visible to every process (LC-21, FAC-SEM-057): pass it as a secret reference in env")
     env = stdio.get("env", {})
     if not isinstance(env, dict):
         return problems + ["run.mcp.stdio.env is an object"]
+    if len(env) > ENV_MAX:
+        problems.append("run.mcp.stdio.env has at most %d names" % ENV_MAX)
     for name, value in env.items():
-        if not _ENV_NAME.match(name):
+        if not _ENV_NAME.fullmatch(name):
             problems.append("env name %s is not an environment variable name" % name)
-        reference = _SECRET_REF.match(value) if isinstance(value, str) else None
+        reference = _SECRET_REF.fullmatch(value) if isinstance(value, str) else None
         if not reference or looks_like_credential(reference.group(1)):
             problems.append("env %s must be a secret reference (secret-ref:<name>), never a secret value (FAC-SEM-015)" % name)
     return problems
@@ -207,7 +245,7 @@ def write_provider_entry(entry: Dict[str, Any], directory: Optional[Path] = None
 
 def remove_provider_entry(provider_id: str, directory: Optional[Path] = None) -> bool:
     """Uninstaller-only. Returns whether there was an entry to remove."""
-    if not _ID.match(provider_id):
+    if not _ID.fullmatch(provider_id):
         raise ProviderError("Provider id %s does not match %s." % (provider_id, _ID.pattern))
     try:
         ((directory or providers_dir()) / ("%s.json" % provider_id)).unlink()
@@ -234,11 +272,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     write.add_argument("--env", action="append", default=[], help="NAME=secret-ref:REF (a reference, never a value)")
     transport = write.add_mutually_exclusive_group(required=True)
     transport.add_argument("--url")
-    transport.add_argument("--stdio", nargs=argparse.REMAINDER, help="the executable and its arguments, last on the line")
+    transport.add_argument("--stdio", action="store_true", help="the executable and its arguments follow, last on the line")
     remove = sub.add_parser("remove")
     remove.add_argument("id")
     check = sub.add_parser("validate")
     check.add_argument("path", type=Path)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # --stdio takes the rest of the line. It is split off here rather than by argparse, whose REMAINDER handling of
+    # a leading `--` differs between Python versions.
+    stdio_tail: Optional[List[str]] = None
+    if argv[:1] == ["write"] and "--stdio" in argv:
+        at = argv.index("--stdio")
+        argv, stdio_tail = argv[:at + 1], argv[at + 1:]
     args = parser.parse_args(argv)
     try:
         if args.command == "remove":
@@ -253,14 +298,26 @@ def main(argv: Optional[List[str]] = None) -> int:
                 problems = manifest_problems(entry)
             print("; ".join(problems) if problems else "valid")
             return 1 if problems else 0
+        if args.env and args.url:
+            raise ProviderError("--env applies only to a stdio server; a --url server reads its own environment. Drop --env or use --stdio.")
+        command = list(stdio_tail or [])
+        if command and command[0] == "--":
+            command = command[1:]  # everything after -- belongs to the server, its own --name included
+        else:
+            misplaced = [a for a in command if a.split("=", 1)[0] in WRITER_OPTIONS]
+            if misplaced:
+                raise ProviderError("%s came after --stdio, which takes the rest of the line as the server's command. Put writer options before --stdio, "
+                                    "or write --stdio -- EXECUTABLE ... when the server itself takes that option." % misplaced[0].split("=", 1)[0])
+        if args.stdio and not command:
+            raise ProviderError("--stdio needs the executable and its arguments.")
         env: Dict[str, str] = {}
         for pair in args.env:
             name, sep, value = pair.partition("=")
             if not sep:
                 raise ProviderError("--env takes NAME=secret-ref:REF.")
             env[name] = value
-        run: Dict[str, Any] = {"mcp": {"url": args.url}} if args.url else {"mcp": {"stdio": {"command": args.stdio}}}
-        if env and args.stdio:
+        run: Dict[str, Any] = {"mcp": {"url": args.url}} if args.url else {"mcp": {"stdio": {"command": command}}}
+        if env:
             run["mcp"]["stdio"]["env"] = env
         entry: Dict[str, Any] = {"protocol": PROTOCOL, "id": args.id, "providerId": args.provider_id, "name": args.name, "manifest": args.manifest,
                                  "run": run, "installedAt": _now(), "installedBy": args.installed_by}

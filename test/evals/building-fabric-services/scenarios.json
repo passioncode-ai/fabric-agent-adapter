@@ -513,6 +513,14 @@
         "records usage through the client's ledger and shows spend (usage_report or totals), counting unknown cost as unknown, never as 0",
         "treats an empty or length-cut answer as a failure, not a reply"
       ]
+    },
+    {
+      "id": "remote-key-movement-recorded",
+      "request": "Our online example-agent on a platform needs an OpenRouter key; record where it went.",
+      "expected": [
+        "records the movement with vault.py moved <project> <env> <NAME> --how \"<what moved, where, evidence>\" --at <provider>",
+        "uses the path form \"$(project-observatory full-path)/tools/vault.py\", and without Project Observatory records the movement in the person's own secret manager"
+      ]
     }
   ]
 }
