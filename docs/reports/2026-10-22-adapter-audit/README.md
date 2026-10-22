@@ -14,8 +14,10 @@ report:
     a session spool one JSON-RPC error blocks for good, Python twins of the kit that let secrets
     into launchd plists and race under threads, a validate workflow with no nightly trigger and
     contract checks that never run and have already rotted, a provider writer looser than the
-    pinned schema, and documents that state false things about the network and the CI. Proposed
-    as backlog rows FAA-68 to FAA-76.
+    pinned schema, and documents that state false things about the network and the CI. A second
+    round adds a board responder that leaves requests stuck after one lost answer, twin divergences
+    in package and estate checks, a layout probe that prints a login code, an installer that deletes
+    copies without --force and a recipe whose checks pass an injected reply. Rows FAA-68 to FAA-81.
 ---
 
 # Whole-adapter audit at 0.40.0
@@ -126,7 +128,58 @@ Unused imports in `fabric_delegation.py`, `fabric_crypto.py`, `fabric_estate.py`
 file naming them; `test/test_fabric_service.py:584` uses a personal GitHub owner where the neutral-names rule asks
 for `example-agent`.
 
+## Second round (same day): the areas the first round did not reach
+
+Three more reviewers took the crypto-bearing modules (package, delegation, crypto), the estate, share, ceremony,
+board responder and job-limit modules, and the dashboard kit front end, the installers and the recipes. They ran the
+contract vectors through both twins (about 9,200 mutated estate and share vectors per seed, 347 Ed25519 and 320 ES256
+differential cases) and the repository's own fake hub. The auditor re-ran the board reproduction and re-read the
+package walk, the installer and the layout probe.
+
+### Board responder (FAA-77)
+
+| # | Sev | Where | What | Proof |
+|---|---|---|---|---|
+| 35 | high | `fabric_board_session.py:856`, `:547`; `fabric-board-session.mjs:784` | A lost `com.reply` answer: after reconnect the checkpointed reply key is reused under the new attempt's fence and refused as `idempotency_conflict`, reported under the already-fired `board.down`; the request stays `accepted` | R: `R3 board: accepted cp: replying`, both twins |
+| 36 | high | `fabric_board_session.py:306`, `:768`, `:821` | `com.renew` built from the shared revision races `effect_begin`; the `revision_conflict` is treated as a lost attempt and the finished result is never sent | R: `R2 after 20 min: board in_progress cp in-progress reconciles 0` |
+| 37 | medium | `:475`, `:610`, `:749`, `:833-841` | An effect lost while this session still holds the slot is never observed or settled until a restart | R (reviewer): `board in_progress cp unknown reconcile calls 0` after 40 min |
+| 38 | medium | `:524-563` | One `unreachable` call in a tick drops the session and stops the running handler with about 40 s of lease left | R: `after fault: state down current None` |
+| 39 | low | `:470-471`; `fabric_interop.py:559-606` | Only the first transferred request resumes; a `quota-exhausted` key admits a different intent (`{'to': 'mallory', 'usd': 500}` ran under it) | R / C (reviewer) |
+
+### Package, delegation and estate twins (FAA-78)
+
+| # | Sev | Where | What | Proof |
+|---|---|---|---|---|
+| 40 | medium | `fabric-package.schema.json:560`, `fabric-package.mjs:157` | In JavaScript `.` does not match U+2028/U+2029, so `a\u2028/../../etc/passwd` passes the path pattern in Node and in the contract's own ajv; Python refuses it. The kit's `verify` still fails it on disk; an installer extracting by listed path would traverse | R (reviewer): Node and ajv `traversal-2028 []`, Python a pattern error |
+| 41 | medium | `fabric_package.py:611` vs `fabric-package.mjs:404` | `os.walk` ignores errors, so Python `verify` passes a folder holding unsigned content in an unreadable directory; Node crashes with `EACCES` | C by the auditor; R (reviewer): Python `ok True []` |
+| 42 | low | `fabric_package.py:623-627`, `fabric-package.mjs:406-409` | Check-then-read on symlinks: a swapped link puts an outside file's bytes into the package | R (reviewer): accepted once in 156,999 tries |
+| 43 | low | `fabric-package.mjs:486-504`, `:456`; `fabric_package.py:189`, `:529` | Node decodes invalid UTF-8 leniently (bytes change, signature verifies) and drops a top-level `__proto__`; Python's `\d` takes non-ASCII digits; deep nesting raises `RecursionError` instead of `malformed` | R (reviewer) |
+| 44 | low | `fabric_estate.py:424` vs `fabric-estate.mjs:278`; `fabric_delegation.py:390` vs `fabric-delegation.mjs:261`, `:221` vs `:140`; `fabric-estate.mjs:377` | Twins disagree: `applied: null` and `estate: null` (Python skips DL-14, Node refuses), JWKS `x` strictness, the device-key finding path | R (reviewer): 251 fuzz cases on `applied: null` |
+| 45 | low | `fabric_crypto.py:60` | Python Ed25519 signing time depends on the secret scalar (0.86 ms vs 1.69 ms); only a local attacker timing the one-shot CLI | R (reviewer) |
+
+### Dashboard probes and the handoff-link gate (FAA-79)
+
+| # | Sev | Where | What | Proof |
+|---|---|---|---|---|
+| 46 | medium | `check_dashboard_layout.mjs:246-258` | Without Playwright, `--service` mints a login code and prints the login URL with it as `target` | C by the auditor; R (reviewer): `"target": ".../fabric/v1/login?code=..."` |
+| 47 | medium | `check_dashboard_link.py:45-48` | The login check compares the raw path (`/fabric/v1/./login?code=` passes) and the credential list misses `code` and `api_key` | C by the auditor; R (reviewer) |
+| 48 | low | `check_dashboard_layout.mjs:124-133`, `:158-160` | ED-3 ignores vertical clipping; ED-4 passes silently past 6000 elements | R (reviewer) |
+| 49 | low | `assets/dashboard-kit/fabric-button.js:214-248` | The "Get Fabric" link in the menu cannot be reached by keyboard | R (reviewer) |
+
+### Installers (FAA-80) and the support-agent recipe (FAA-81)
+
+| # | Sev | Where | What | Proof |
+|---|---|---|---|---|
+| 50 | medium | `install.sh:34-36` | `rm -rf` any existing copy that is not a link, without `--force`; the Node CLI skips it. Run from a checkout it also copies `__pycache__` | C by the auditor; R (reviewer): a user's `MY-NOTES.md` deleted |
+| 51 | medium | `bin/fabric-agent-adapter.js:49-57`, `:162-163` | Replace is remove-then-copy with no catch; a failure leaves a mixed install that a rerun reports as installed | R (reviewer): 71 of 76 entries left |
+| 52 | high | `recipes/support-agent/support_agent.py:120-153`, `:218-223` | The checks prove only that the reply cites an id it was given; a reply carrying an injected refund promise and an outside URL passes every check | R with a fake model (reviewer); whether a real model obeys is plausible |
+| 53 | low | `support_agent.py:177-204` | `decisions.json` is rewritten whole with fsync per message (44 s for 5,000) and the outbox keeps customer text with no retention note | R (reviewer) |
+
+The second round found nothing unsafe in the DOM code (no `innerHTML`, no `javascript:` sinks), the storage of the
+dashboard (appearance only), the seven themes' contrast, JWS header handling, the jti stores, the Ed25519 and ES256
+differentials, or the 18 package vectors.
+
 ## What this audit did not look at
 
-Live behaviour against a running Fabric (the hooks were exercised against stubs only); the model-side quality of the
+Live behaviour against a running Fabric (the hooks and the responder were exercised against stubs and the fake hub only); `redeem`, pairing and rendezvous were not fuzzed; the model-side quality of the
 skills (finding 33 is exactly that gap); Windows and Linux beyond what the reviewers could reason about from code.

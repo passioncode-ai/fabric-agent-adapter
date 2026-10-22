@@ -20,9 +20,17 @@ and nine proposed rows, FAA-68 to FAA-76, in [the backlog](../backlog.md). No pr
 deliverable with one test surface. Severity is the auditor's; the rows stay `open ... proposed by the audit` until the
 operator orders them.
 
-**Open.** All nine rows. FAA-66, FAA-67 and the earlier open rows are untouched.
+**Second round (same day).** The operator repeated the request; `main` was unchanged, so the second round took
+what the first did not reach: the crypto-bearing modules, the estate, share, ceremony and board responder modules,
+the dashboard front end, the installers and the recipes. Five more rows, FAA-77 to FAA-81, and a second section in
+the report. The auditor re-ran the board reproduction on the repository's fake hub (`R2 after 20 min: board
+in_progress cp in-progress reconciles 0`, `R3 board: accepted cp: replying`) and re-read the package walk, the
+installer and the layout probe. Board read: the one request addressed here (DEC-0087) is closed by FAA-56, the two
+findings by FAA-48 and FAA-53.
 
-**Exact next task.** FAA-68 item 1 then 2: make `deliver` drop a refused or unreadable spool entry with its error
+**Open.** All fourteen rows. FAA-66, FAA-67 and the earlier open rows are untouched.
+
+**Exact next task.** By severity: FAA-77 items 35-36 (the responder leaves board requests stuck), then FAA-68 item 1 then 2: make `deliver` drop a refused or unreadable spool entry with its error
 code (a test with a stub answering `-32602` that proves the `end` entry and `fabric_work_release` still go out), and
 kill the whole process group in `McpStdio.close` (a test with a wrapper script around a stub that ignores stdin's
 end). Then FAA-70 item 10 (Python `launchd_plist` parity with Node) and FAA-72 (nightly trigger and the pinned
