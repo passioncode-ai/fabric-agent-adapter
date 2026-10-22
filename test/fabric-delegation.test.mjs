@@ -145,3 +145,51 @@ test('small-order keys are refused by the kit itself, whatever the Node version 
   for (const b of [pPlus(0), pPlus(1), Buffer.from('0000000000000000000000000000000000000000000000000000000000000080', 'hex')]) assert.equal(d.isSmallOrderKey(b), true, b.toString('hex'));
   for (const c of V.ed25519.filter((x) => x.kind === 'valid')) assert.equal(d.isSmallOrderKey(Buffer.from(c.pub, 'hex')), false);
 });
+
+// D3 (FAA-78, finding 44): an omitted estate option skips DL-14; an explicit null fails closed, as in the Python twin.
+const certifyingRecord = (c) => {
+  const estate = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/estate-vectors.json'), 'utf8'));
+  const jwks = c.options.jwks ?? V.jwks;
+  const kid = c.expected.kid;
+  const iso = (s) => new Date(s * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const record = structuredClone(estate.digests[0].record);
+  record.issuedAt = iso(c.options.now - 3600);
+  record.validUntil = iso(c.options.now + 3600);
+  record.machines[0].hubKey = { ...record.machines[0].hubKey, kid, x: jwks.keys.find((k) => k.kid === kid).x };
+  return record;
+};
+
+test('an omitted estate skips the rule; an explicit null estate, source, applied mark or delta is unreadable', () => {
+  const c = V.delegation.find((x) => x.expected.ok);
+  const record = certifyingRecord(c);
+  const verify = (extra) => d.verifyDelegation(c.token, { ...c.options, jwks: c.options.jwks ?? V.jwks, ...extra });
+  assert.equal(verify({}).ok, true);
+  assert.equal(verify({ estate: record }).ok, true);
+  assert.equal(verify({ estate: record, estateApplied: { revision: record.revision } }).ok, true);
+  assert.equal(verify({ estate: record, estateRevocations: [] }).ok, true);
+  for (const [name, extra] of [['estate', { estate: null }], ['source', { estate: () => null }],
+    ['applied', { estate: record, estateApplied: null }], ['revocations', { estate: record, estateRevocations: null }]]) {
+    const got = verify(extra);
+    assert.deepEqual([got.ok, got.code, got.detail], [false, 'issuer-unavailable', 'estate-unreadable'], name);
+  }
+});
+
+test('D4: a published x is exactly 43 base64url characters that re-encode to themselves', () => {
+  const c = V.delegation.find((x) => x.expected.ok);
+  const jwks = c.options.jwks ?? V.jwks;
+  const kid = c.expected.kid;
+  const x = jwks.keys.find((k) => k.kid === kid).x;
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const noncanonical = x.slice(0, -1) + alphabet[alphabet.indexOf(x.at(-1)) ^ 1];
+  for (const loose of [`${x}=`, `${x}\n`, `+${x.slice(1)}`, noncanonical, ` ${x}`]) {
+    const keys = { keys: jwks.keys.map((k) => (k.kid === kid ? { ...k, x: loose } : k)) };
+    const got = d.verifyDelegation(c.token, { ...c.options, jwks: keys });
+    assert.deepEqual([got.ok, got.code, got.detail], [false, 'issuer-unavailable', 'unusable-key'], JSON.stringify(loose));
+  }
+});
+
+test('R1: a token with a trailing newline is malformed', () => {
+  const c = V.delegation[0];
+  const got = d.verifyDelegation(`${c.token}\n`, c.options);
+  assert.deepEqual([got.ok, got.code, got.detail], [false, 'unauthenticated', 'malformed']);
+});

@@ -16,7 +16,6 @@ R compared by its encoding).
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import ipaddress
 import json
@@ -36,14 +35,14 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from fabric_crypto import (  # noqa: E402 - the core (FAA-65)
-    SMALL_ORDER_ENCODINGS,
-    _ED_P as _P,
-    _ed_decode_point as _decode_point,
+    SMALL_ORDER_ENCODINGS,  # noqa: F401 - public here since v0.39.1 (test/fixtures/kit-api)
+    b64url as _b64encode,
     b64url_decode as _b64decode,
     ed25519_verify,
     is_small_order_key,
 )
 from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
+    MISSING as _MISSING,
     jcs,
 )
 
@@ -91,16 +90,15 @@ REFUSAL_MESSAGES = {
     "unknown-state": "The state cannot be established, so the call is refused.",
 }
 
-_B64URL = re.compile(r"^[A-Za-z0-9_-]+$")
+_B64URL = re.compile(r"^[A-Za-z0-9_-]+\Z")
 # DL-2's grammar, as the contract's verifier types the claims (DEC-0045): an agent id, an opaque session or task id,
 # a URI, a jti and a scope.
-AGENT_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}(\.[a-z][a-z0-9-]{0,31})?$")
-OPAQUE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
-_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:\S+$")
-_JTI = re.compile(r"^[A-Za-z0-9._~-]{16,128}$")
-_SCOPE = re.compile(r"^[a-z][a-z0-9._-]{1,127}( [a-z][a-z0-9._-]{1,127})*$")
+AGENT_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}(\.[a-z][a-z0-9-]{0,31})?\Z")
+OPAQUE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}\Z")
+_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:\S+\Z")
+_JTI = re.compile(r"^[A-Za-z0-9._~-]{16,128}\Z")
+_SCOPE = re.compile(r"^[a-z][a-z0-9._-]{1,127}( [a-z][a-z0-9._-]{1,127})*\Z")
 _SPEND_WINDOWS = ("total", "task", "project", "day", "week", "month")
-_MISSING = object()
 
 
 def _full(pattern: "re.Pattern[str]", value: Any) -> bool:
@@ -224,7 +222,8 @@ def _key_for(jwks: Dict[str, Any], kid: str) -> Dict[str, Any]:
         raw = _b64decode(jwk["x"])
     except ValueError:
         return {"problem": "unusable-key"}
-    if len(raw) != 32:
+    # D4: exactly the 43 characters that write 32 bytes, so the key compared with the estate record is one string.
+    if len(raw) != 32 or _b64encode(raw) != jwk["x"]:
         return {"problem": "unusable-key"}
     if is_small_order_key(raw):
         return {"problem": "small-order-key"}  # refused before any verification (DEC-0045, CT-29)
@@ -379,24 +378,27 @@ def _readable_clock(now: Any) -> bool:
         return False
 
 
-def _estate_problem(estate: Any, kid: str, x: str, now: float, applied: Any = None,
-                    revocations: Any = None) -> Optional[Tuple[str, str]]:
+def _estate_problem(estate: Any, kid: str, x: str, now: float, applied: Any = _MISSING,
+                    revocations: Any = _MISSING) -> Optional[Tuple[str, str]]:
     """DL-14 row 4a (DEC-0055, DEC-0060), right after the signature: when the callee reads the estate record, the
     token's kid and the published key must be certified by that revision. `estate` is a revision the caller verified
-    (fabric_estate.verify_estate_record) and its machine applied, or a callable returning it; None skips the rule (a
-    callable returning None is an unreadable source). `applied` is the highest revision the machine applied
-    (`{"revision", "digest"?}`); `revocations` the revocation delta's entries applied since (a list or a callable). A
-    source that raises is unreadable, never a pass. Returns ("token" | "issuer", detail) or None."""
-    if estate is None:
+    (fabric_estate.verify_estate_record) and its machine applied, or a callable returning it; only an omitted `estate`
+    skips the rule, and None (given, or returned by the callable) is an unreadable source, as Node's null is (D3).
+    `applied` is the highest revision the machine applied (`{"revision", "digest"?}`); `revocations` the revocation
+    delta's entries applied since (a list or a callable). An omitted one is absent; None is unreadable. A source that
+    raises is unreadable, never a pass. Returns ("token" | "issuer", detail) or None."""
+    if estate is _MISSING:
         return None
     try:
         record = estate() if callable(estate) else estate
         extra = revocations() if callable(revocations) else revocations
     except Exception:
         return ("issuer", "estate-unreadable")
+    if applied is None:  # the contract's hubKeyCertified refuses a null applied mark after its record checks: unreadable
+        return ("issuer", "estate-unreadable")
     import fabric_estate  # beside this file; imported here, since fabric_estate imports this module
-    verdict = fabric_estate.hub_key_certified(record, kid, x, now, applied,
-                                              fabric_estate._MISSING if extra is None else extra)
+    given = {} if applied is _MISSING else {"applied": applied}
+    verdict = fabric_estate.hub_key_certified(record, kid, x, now, extra_revocations=extra, **given)
     if verdict["certified"]:
         return None
     # The clock was refused before row 1, so a verdict here is the token's or the trust source's.
@@ -404,8 +406,8 @@ def _estate_problem(estate: Any, kid: str, x: str, now: float, applied: Any = No
 
 
 def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capability: str, effect: str,
-                      issuer: Optional[str], read_only: bool = False, estate: Any = None,
-                      estate_applied: Any = None, estate_revocations: Any = None) -> Dict[str, Any]:
+                      issuer: Optional[str], read_only: bool = False, estate: Any = _MISSING,
+                      estate_applied: Any = _MISSING, estate_revocations: Any = _MISSING) -> Dict[str, Any]:
     """DL-13, in its fixed order: nothing about a token is believed before its signature is.
     `now` is seconds since the epoch. Returns {ok: True, claims, principal, caller, chain, kid} or a refusal
     {ok: False, code, detail[, data]} whose detail is a short machine word, never the token. `issuer` is required.
@@ -525,8 +527,8 @@ UNSAFE_NO_JTI_STORE = _NoReplayProtection()
 
 
 def verify_approval(approval: Optional[str], *, audience: str, jwks: Any, now: float, action_digest: str,
-                    jti_store: Any, issuer: Optional[str], estate: Any = None, estate_applied: Any = None,
-                    estate_revocations: Any = None) -> Dict[str, Any]:
+                    jti_store: Any, issuer: Optional[str], estate: Any = _MISSING, estate_applied: Any = _MISSING,
+                    estate_revocations: Any = _MISSING) -> Dict[str, Any]:
     """DL-18: a missing approval is approval-required carrying the action digest; any fault of the document is
     approval-invalid; a second use is approval-reused. The jti is consumed last."""
     if approval is None or approval == "":
@@ -699,8 +701,8 @@ TIERS = ("T0", "T1", "T2")
 
 
 def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], issuer: str,
-                    read_only: bool = False, clock: Callable[[], float] = time.time, estate: Any = None,
-                    estate_applied: Any = None, estate_revocations: Any = None) -> Callable[..., Dict[str, Any]]:
+                    read_only: bool = False, clock: Callable[[], float] = time.time, estate: Any = _MISSING,
+                    estate_applied: Any = _MISSING, estate_revocations: Any = _MISSING) -> Callable[..., Dict[str, Any]]:
     """A check for one tools/call: `gate(tool, headers, tier="T2")` answers the accepted delegation or a DL-19
     refusal. `effects` maps each tool to its declared effect class (its manifest entry); a tool with none is
     refused rather than guessed. `jwks` is a JwksCache or a key set; `issuer` (auth.delegation.issuer) is required.

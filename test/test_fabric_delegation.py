@@ -10,6 +10,7 @@ from pathlib import Path
 from test_fabric_service import SCRIPTS, load
 
 dl = load("fabric_delegation")
+fc = load("fabric_crypto")
 fi = load("fabric_interop")
 VECTORS = json.loads((Path(__file__).resolve().parent / "fixtures/delegation/vectors.json").read_text())
 
@@ -49,8 +50,8 @@ class Ed25519Tests(unittest.TestCase):
         self.assertFalse(dl.ed25519_verify(pub, msg, sig[:63]))
         self.assertFalse(dl.ed25519_verify(b"\xff" * 32, msg, sig))  # y >= p is not a canonical point
         # The identity point (0, 1) decodes; the same point written as y = p + 1 is not canonical and is refused.
-        self.assertIsNotNone(dl._decode_point((1).to_bytes(32, "little")))
-        self.assertIsNone(dl._decode_point((2 ** 255 - 19 + 1).to_bytes(32, "little")))
+        self.assertIsNotNone(fc._ed_decode_point((1).to_bytes(32, "little")))
+        self.assertIsNone(fc._ed_decode_point((2 ** 255 - 19 + 1).to_bytes(32, "little")))
 
 
 class VerifierVectorTests(unittest.TestCase):
@@ -416,6 +417,80 @@ class GatedJobTests(unittest.TestCase):
         self.assertEqual(self.call("fabric.job.cancel", {"id": job}, self.other["token"])["structuredContent"]["error"]["code"], "scope-not-granted")
         self.assertEqual(self.call("fabric.job.get", {"id": job}, self.case["token"])["structuredContent"]["job"]["id"], job)
         self.assertTrue(self.call("fabric.job.get", {"id": "job_" + "0" * 24}, self.case["token"])["isError"])
+
+
+def _certifying_record(case):
+    """An estate revision that certifies the vector token's kid and key at its clock (DL-14)."""
+    import copy
+    import datetime as dt
+    estate = json.loads((Path(__file__).resolve().parent / "fixtures/contract/estate-vectors.json").read_text())
+    jwks = case["options"].get("jwks") or VECTORS["jwks"]
+    kid = case["expected"]["kid"]
+    now = case["options"]["now"]
+    iso = lambda seconds: dt.datetime.fromtimestamp(seconds, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    record = copy.deepcopy(estate["digests"][0]["record"])
+    record["issuedAt"], record["validUntil"] = iso(now - 3600), iso(now + 3600)
+    record["machines"][0]["hubKey"] = {**record["machines"][0]["hubKey"], "kid": kid,
+                                       "x": next(k["x"] for k in jwks["keys"] if k.get("kid") == kid)}
+    return record
+
+
+class EstateNullFailsClosed(unittest.TestCase):
+    """D3 (FAA-78, finding 44): an omitted estate option skips DL-14; an explicit null fails closed, as in Node."""
+
+    def setUp(self):
+        self.case = next(c for c in VECTORS["delegation"] if c["expected"].get("ok"))
+        self.record = _certifying_record(self.case)
+
+    def verify(self, **estate):
+        o = self.case["options"]
+        return dl.verify_delegation(self.case["token"], audience=o["audience"], jwks=o.get("jwks") or VECTORS["jwks"],
+                                    now=o["now"], capability=o["capability"], effect=o["effect"], issuer=o["issuer"], **estate)
+
+    def test_omitted_options_skip_the_rule_and_a_record_certifies(self):
+        self.assertTrue(self.verify()["ok"])
+        self.assertTrue(self.verify(estate=self.record)["ok"])
+        self.assertTrue(self.verify(estate=self.record, estate_applied={"revision": self.record["revision"]})["ok"])
+        self.assertTrue(self.verify(estate=self.record, estate_revocations=[])["ok"])
+
+    def test_an_explicit_null_is_unreadable(self):
+        for name, estate in (("estate", {"estate": None}),
+                             ("estate source", {"estate": lambda: None}),
+                             ("applied", {"estate": self.record, "estate_applied": None}),
+                             ("revocations", {"estate": self.record, "estate_revocations": None})):
+            with self.subTest(name):
+                got = self.verify(**estate)
+                self.assertEqual((got["ok"], got.get("code"), got.get("detail")), (False, "issuer-unavailable", "estate-unreadable"))
+
+
+class JwksKeyIsStrictBase64url(unittest.TestCase):
+    """D4 (FAA-78, finding 44): a published `x` is exactly 43 base64url characters that re-encode to themselves."""
+
+    def test_a_loose_x_is_unusable(self):
+        case = next(c for c in VECTORS["delegation"] if c["expected"].get("ok"))
+        o = case["options"]
+        jwks = o.get("jwks") or VECTORS["jwks"]
+        kid = case["expected"]["kid"]
+        x = next(k["x"] for k in jwks["keys"] if k.get("kid") == kid)
+        last = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        noncanonical = x[:-1] + last[last.index(x[-1]) ^ 1]  # the same 32 bytes with a non-zero trailing bit
+        for loose in (x + "=", x + "\n", x.replace(x[0], "+", 1) if x[0] in "-_" else "+" + x[1:], noncanonical, " " + x):
+            with self.subTest(x=loose):
+                keys = {"keys": [dict(k, x=loose) if k.get("kid") == kid else k for k in jwks["keys"]]}
+                got = dl.verify_delegation(case["token"], audience=o["audience"], jwks=keys, now=o["now"],
+                                           capability=o["capability"], effect=o["effect"], issuer=o["issuer"])
+                self.assertEqual((got["ok"], got.get("code"), got.get("detail")), (False, "issuer-unavailable", "unusable-key"))
+
+
+class TrailingNewline(unittest.TestCase):
+    """R1 (finding 14): a token or header with a trailing newline is refused as Node refuses it."""
+
+    def test_a_token_with_a_trailing_newline_is_malformed(self):
+        case = VECTORS["delegation"][0]
+        o = case["options"]
+        got = dl.verify_delegation(case["token"] + "\n", audience=o["audience"], jwks=o.get("jwks") or VECTORS["jwks"],
+                                   now=o["now"], capability=o["capability"], effect=o["effect"], issuer=o["issuer"])
+        self.assertEqual((got["ok"], got.get("code"), got.get("detail")), (False, "unauthenticated", "malformed"))
 
 
 if __name__ == "__main__":
