@@ -34,8 +34,7 @@ class HubKeyAppliedTests(unittest.TestCase):
 
     def test_the_absent_value_is_the_core_sentinel(self):
         """Callers that mean "not given" pass fabric_jsvalue.MISSING, the one object fabric_estate._MISSING names."""
-        import fabric_jsvalue
-        self.assertIs(fe._MISSING, fabric_jsvalue.MISSING)
+        self.assertIs(fe._MISSING, importlib.import_module("fabric_jsvalue").MISSING)
         self.assertEqual(fe.hub_key_certified(HUB["record"], HUB["kid"], HUB["x"], HUB["at"], fe._MISSING), HUB["expected"])
 
 
