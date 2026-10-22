@@ -1,6 +1,6 @@
 ---
 name: adapting-projects-to-fabric
-description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract (choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility); also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, or a brand-new agent (that is creating-fabric-agents).
+description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract (choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility); also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, a brand-new agent (creating-fabric-agents), running an agent as a local or online Fabric service with a dashboard (building-fabric-services), or a coding session working through Fabric, its board or claims, «подключись к Fabric» (working-with-fabric).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
@@ -25,7 +25,11 @@ Use this skill to adapt or assess a provider project. Do not use it to:
 - answer wire-level MCP or A2A questions (transports, sessions, auth handshakes, task
   states on the wire): that is `agent-interop` (agent-stack); the pinned contract stays
   normative for what Fabric requires;
-- design a new agent from scratch: that is the sibling skill creating-fabric-agents;
+- design a new agent from scratch: that is the sibling skill `creating-fabric-agents`;
+- run the agent as a resident service with a dashboard, a descriptor and launchd: that is
+  `building-fabric-services`;
+- work in a project through Fabric from a coding session (registering `fabric-mcp`, the board,
+  claims): that is `working-with-fabric`;
 - claim admission merely because generated files or a valid manifest exist.
 
 If the project has only a browser interface and no stable API, MCP/A2A surface, or CLI,
@@ -57,7 +61,9 @@ python3 <skill-dir>/scripts/adapt_project.py inspect <project-root> --json
 ```
 
 The inspector samples repository files but does not execute the project. Verify its
-evidence manually. Existing runtime documentation and code outrank filename heuristics.
+evidence manually. Existing runtime documentation and code outrank filename heuristics. A
+client configuration (`.mcp.json`, an `mcpServers` block) lists servers the project calls, not one
+it serves: inspect reports it as `mcp-client-config` and asks instead of choosing `mcp`.
 
 If the inspector returns `undetermined`, answer its lifecycle question before creating
 files. A repository can expose multiple surfaces; choose a profile per capability, not
@@ -110,12 +116,18 @@ target paths. It refuses any collision.
 `charge`, `delete`, `merge`, `deploy`, `change-policy`), read from what the code does or asked of the author. Choose
 `--idempotency required|supported|none` for an external effect on purpose. When a run's cost varies, give the
 launcher fixed options (DEC-0037): `--cost-preset ID MAX_USD LABEL` per option and `--default-cost-preset ID`; the
-amounts come from the author or measured runs, never invented. Do not use `--force` unless the user explicitly
-authorizes replacement after the exact conflicting files and diff are shown.
+amounts come from the author or measured runs, never invented. Pass what the author knows so it is not written as a
+scaffold default: `--data-class` (repeat), `--created-by URI`, `--identity-method`, `--probe-assertion` (repeat).
 
-The generated zero hash, `.invalid` endpoints, `replace-me` values, generic schemas, and
-assertions are deliberate blockers. Replace them with implementation-backed facts. A
-template that still contains one is not ready for admission.
+On a collision run `scaffold --dry-run` first: it writes nothing and prints the planned writes and a unified diff of
+each existing file. Use `--force` only when the user authorizes replacing exactly those files.
+
+Every value the scaffold invents is a sentinel that `check` names: the zero hash, `.invalid` endpoints,
+`replace-me` values, `urn:fabric:adapter:author`, the generic schemas (marked `fabric-adapter-template`), the
+generic fixture and assertions, and each value listed under the manifest's `urn:fabric:adapter:template`
+extension (the defaulted `dataClasses`, a defaulted `tls` identity method). Replace each with an
+implementation-backed fact, then remove it from that list and the block when it is empty. While one remains,
+`readyForAdmission` is false.
 
 ### 4. Implement the adapter seam
 
@@ -138,11 +150,14 @@ Treat all provider output as untrusted until schemas and semantic assertions pas
 
 ### 4b. Announce an agent that is not a service
 
-An agent Fabric reaches as a CLI or a stdio MCP server gets a provider entry, written by
-its installer with [`scripts/fabric_provider.py`](scripts/fabric_provider.py) and removed
-by its uninstaller: argv arrays only, env values as `secret-ref:` references, never the
-id of an existing service, and a `providerId` equal to the manifest's `provider.id`. Load [provider entries](references/provider-entry.md). An
-agent that runs as a service uses a descriptor instead (`building-fabric-services`).
+An agent Fabric reaches as a stdio MCP server, or as an MCP server on a loopback URL that is not
+a service, gets a provider entry, written by its installer with
+[`scripts/fabric_provider.py`](scripts/fabric_provider.py) and removed by its uninstaller: argv
+arrays only, env values as `secret-ref:` references, never the id of an existing service, and a
+`providerId` equal to the manifest's `provider.id`. Load [provider entries](references/provider-entry.md).
+A provider entry only describes an MCP server: a CLI that does not speak MCP gets no entry; it is
+announced by its `local-runner` manifest (step 3). An agent that runs as a service uses a
+descriptor instead (`building-fabric-services`).
 
 ### 5. Make probes safe and meaningful
 
@@ -195,58 +210,25 @@ Update `fabric/FABRIC-CONFORMANCE.md` with dated receipts for:
 
 Include commands and exit codes, immutable endpoint or artifact identities, and explicit
 unverified surfaces. If live Fabric admission/runtime does not yet exist, the last gates
-remain `NOT VERIFIED`; the completed deliverable is an adaptation-ready provider bundle,
+remain `NOT_VERIFIED`; the completed deliverable is an adaptation-ready provider bundle,
 not a connected provider.
 
 ### 8. Propose the operator channel
 
 If the agent has a human stop (a choice, an approval, a confirmation) or emits `notify: true`
-events, propose its **operator channel** to the operator once, now. The channel is the agent's
-own messenger channel, first Telegram, that sends those events and answers its stops with
-buttons: `fabric-operator-channel/0.1` (contract DEC-0034,
-`docs/specification/operator-channel.md`), whose rule OC-11 this step follows. Give the
-operator's four steps:
-
-1. create a bot with @BotFather;
-2. put its token into the operator's secret store under the name the agent reads (for example
-   `EXAMPLE_AGENT_TELEGRAM_BOT_TOKEN`), never into a chat, a file or the bundle;
-3. run the agent's link command;
-4. type the code it shows in the chat with the bot.
-
-In a group shared with other bots the channel follows OC-14…OC-17 (DEC-0035): it stays silent
-unless addressed (`/command@ThisBot`, a reply to its own message or a press of its own button; a
-bare `/command` in a group is not addressed), and a channel nobody receives on is `degraded`
-(`receiver-missing`). Say so in the proposal when the operator means to bind a shared group.
-
-Record the answer (`accepted`, `declined` or `later`) in the agent's state and the
-conformance report, and do not ask again; an agent that serves `surfaces.operatorChannel` also
-shows it as `proposal` in its status document. Creating the bot, storing the token and enabling the
-channel are the operator's action: never create the bot, ask for or store the token's value, or
-enable the channel yourself. The default pin carries DEC-0034 and DEC-0035: a served status document is checked
-against the pinned `schemas/operator-channel-status.schema.json`; the channel's runtime rules have
-no probe rule here yet, so report them `NOT_RUN`. An agent with neither stops nor notify
-events skips this step.
+events, propose its operator channel (`fabric-operator-channel/0.1`, OC-11) to the operator once,
+now, as [the operator channel and the repository standard](references/operator-channel-and-repository.md)
+describes: the operator's four steps, the answer recorded and never asked again, and the bot, the
+token and enabling the channel left to the operator. An agent with neither stops nor notify events
+skips this step.
 
 ## The repository around the provider
 
 **For a PassionCode.ai repository**, the adapted project's repository follows the organization's
-[repository standard](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/repository-standard.md) (`knowledge/repository-standard.md`
-in the organization's knowledge base; a clone has it at `fabric-workspace/knowledge/`) from its
-first commit:
-
-- `LICENSE`, `COMMERCIAL-LICENSE.md` and `CLA.md` copied byte for byte from the knowledge base's
-  `templates/`, and `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial` in every manifest and
-  every SKILL.md `license:`; `SECURITY.md` when the repository is public;
-- a README whose first heading is the full name, with `## Quick start for a new teammate`
-  (Install; Configure, key names only; MCP, the registration command and one proving tool call,
-  verified with a real client in a temporary config; Develop) and `## License`;
-- an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
-  and a `CLAUDE.md` whose first line is `@AGENTS.md`.
-
-org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
-someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
-choice, nothing about it is published or listed by the organization, and none of these files is
-required of it, though the verified MCP quick start is still how anyone learns to drive it.
+repository standard (`knowledge/repository-standard.md`) from its first commit: the licence files,
+the README quick start verified with a real client, `AGENTS.md` and `CLAUDE.md`, listed in the
+shared reference above. An agent someone builds for themselves is not a PassionCode.ai repository:
+its licence is its owner's choice and none of those files is required of it.
 
 ## Completion format
 
@@ -265,12 +247,6 @@ passed against a real provider and the project binding is valid.
 
 ## Dashboard handoff: also for consumers
 
-When handing a registered service dashboard to a person, or writing the generated
-agent's completion/notification instructions, read and apply
-[dashboard links](references/dashboard-links.md): use the host's `open_link`,
-check the target device and host, and run the bundled output gate before delivery.
-An installed host failure never means browser fallback. This applies in Claude
-Code, Codex and other providers; it needs no host-specific hook. MCP unavailable:
-report the unresolved capability or use an approved project resolver; no automatic
-client configuration. Python unavailable: perform the reference's manual checks
-and report the executable gate NOT_RUN. Headless agents need no dashboard.
+When handing a registered service dashboard to a person, or writing the generated agent's
+completion or notification instructions, read and apply [dashboard links](references/dashboard-links.md)
+and run its output gate before delivery, in any host. Headless agents need no dashboard.

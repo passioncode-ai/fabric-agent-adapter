@@ -38,7 +38,7 @@
       "expected": [
         "reuses the sibling skill's check and report machinery rather than inventing a second path",
         "records the canary-binding expectation: checker plus budget cap until a recorded promotion",
-        "leaves live admission gates NOT VERIFIED without a real host",
+        "leaves live admission gates NOT_VERIFIED without a real host",
         "never summarises the outcome as Fabric-compatible without passed admission gates"
       ]
     },
@@ -157,6 +157,15 @@
         "asks 'How does it learn?': decisions with reasons, one trace per turn, failures turned into planted fixtures before fixes, learnings proposed and not self-approved",
         "names which capabilities need the person's machine and what they answer when it is off",
         "reads references/where-agents-run.md, models-and-providers.md, orchestration-and-learning.md and practices.md before scaffolding"
+      ]
+    },
+    {
+      "id": "credentials-without-project-observatory",
+      "request": "Create a new Fabric agent that calls OpenRouter; I do not use Project Observatory.",
+      "expected": [
+        "names the key the agent reads, never its value",
+        "with Project Observatory installed, runs it through \"$(project-observatory full-path)/tools/use_secret.py\"",
+        "without it, injects the key at runtime from the OS keychain or the person's secret manager, never in argv or a committed file"
       ]
     }
   ]

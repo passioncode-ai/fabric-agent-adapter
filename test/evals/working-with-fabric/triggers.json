@@ -35,6 +35,7 @@
     {"query": "Build a responder service that answers com.submit requests for my project.", "shouldTrigger": false},
     {"query": "Implement com.reply in Fabric's boardService.ts.", "shouldTrigger": false},
     {"query": "Send the operator a Telegram message that the release is out.", "shouldTrigger": false},
-    {"query": "Напиши коллеге в Slack, что ревью готово.", "shouldTrigger": false}
+    {"query": "Напиши коллеге в Slack, что ревью готово.", "shouldTrigger": false},
+    {"query": "Подключить проект к Fabric: сгенерируй provider bundle и проверь совместимость.", "shouldTrigger": false, "note": "sibling: adapting-projects-to-fabric"}
   ]
 }
