@@ -58,7 +58,7 @@ STDLIB_IMPORTS = {
     "os", "pathlib", "re", "subprocess", "sys", "tempfile", "typing", "unittest",
     "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets", "socketserver",
     "shutil", "signal", "socket", "ssl", "stat", "threading", "time",
-    "random", "io", "contextlib", "textwrap", "traceback",
+    "random", "io", "contextlib", "textwrap", "traceback", "difflib",
     "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
     "email",  # email.utils: the probe reads a cookie's Expires date (DEC-0039)
     "xml",  # the supervisor tests read the Task Scheduler XML back (FAA-21)
