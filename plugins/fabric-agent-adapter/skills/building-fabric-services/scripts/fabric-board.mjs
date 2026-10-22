@@ -1,6 +1,6 @@
 // The project board connector, Node: the facade (fabric-project-comms/0.1; the twin of fabric_board.py).
-// Since 0.40.0 (FAA-65) it is three modules: fabric-board-shapes, fabric-board-session and fabric-board-fixture. This file
-// re-exports everything it exported at 0.39.1. Node 20+, no dependency.
+// Since 0.40.0 (FAA-65) it is layered modules: fabric-board-shapes, fabric-board-link (since 0.41.0), fabric-board-session and
+// fabric-board-fixture. This file re-exports everything it exported at 0.39.1. Node 20+, no dependency.
 export {
   COMMS_PROTOCOL,
   LEASE_SECONDS,
