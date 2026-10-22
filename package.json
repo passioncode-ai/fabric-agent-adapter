@@ -31,7 +31,7 @@
     "url": "https://passioncode.ai/"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   },
   "keywords": [
     "fabric",

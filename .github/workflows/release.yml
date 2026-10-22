@@ -5,11 +5,16 @@ name: release
 # OFF by default: `release` runs only when the repo variable RELEASE_ENABLED is
 # "true", `publish` only when PUBLISH_NPMJS is "true" (Settings -> Secrets and
 # variables -> Actions -> Variables). A fork decides for itself whether to arm
-# either half — no code change needed.
+# either half; no code change needed.
 #
 # Trigger: a v* tag, or a manual run naming an existing tag. Steps: validate ->
-# version check -> GitHub release carrying the CHANGELOG section -> pack smoke
-# test from a clean cwd -> npm publish with provenance.
+# version check -> pack smoke test from a clean cwd -> GitHub release carrying
+# the CHANGELOG section -> npm publish with provenance. The smoke test runs
+# BEFORE the release is created (FAA-73): a tarball that does not install
+# leaves no public release behind.
+#
+# Every action is pinned to a full commit SHA with its release in a comment;
+# raise one on purpose, with the SHA the release tag points at.
 
 on:
   push:
@@ -30,6 +35,7 @@ jobs:
     needs: validate
     if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     steps:
@@ -41,7 +47,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "ver=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ steps.t.outputs.tag }}
           fetch-depth: 0
@@ -90,30 +96,16 @@ jobs:
           ' CHANGELOG.md > /tmp/notes.md
           test -s /tmp/notes.md || { echo "no CHANGELOG section for ${{ steps.t.outputs.ver }}"; exit 1; }
 
-      - name: Create or refresh the GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Smoke test before anything is public (pack + npx from a clean cwd)
         run: |
           set -eu
-          if gh release view "${{ steps.t.outputs.tag }}" >/dev/null 2>&1; then
-            gh release edit "${{ steps.t.outputs.tag }}" --notes-file /tmp/notes.md
-            echo "release ${{ steps.t.outputs.tag }} already existed — notes refreshed"
-          else
-            gh release create "${{ steps.t.outputs.tag }}" \
-              --title "${{ steps.t.outputs.tag }} — fabric-agent-adapter" \
-              --notes-file /tmp/notes.md --latest
-          fi
-
-      - name: Post-release smoke test (pack + npx from a clean cwd — the verify gate)
-        run: |
-          set -eu
-          # This repository is PRIVATE, so the family's `npx github:owner/repo`
-          # smoke cannot clone here. Pack the checked-out tag and install the
-          # tarball instead — which also tests the exact artifact npm will
-          # serve, files whitelist included.
+          # Pack the checked-out tag and install the tarball: this tests the
+          # exact artifact npm will serve, files whitelist included. It runs
+          # before the GitHub release exists, so a failure publishes nothing.
           REPO="$PWD"
           TARBALL="$PWD/$(npm pack --silent)"
-          export HOME="$(mktemp -d)"
+          FRESH_HOME="$(mktemp -d)"
+          export HOME="$FRESH_HOME"
           cd "$(mktemp -d)"
           # A bare `npx <path.tgz>` executes the PATH as a command (126); the
           # package spec and the command must be named apart.
@@ -131,18 +123,36 @@ jobs:
           test ! -e "$HOME/.claude/skills"
           # The installed copies must survive a strict YAML reader, not only Claude Code.
           python3 "$REPO/test/validate.py" --frontmatter "$HOME"/.agents/skills/*/SKILL.md
-          echo "OK: released ${{ steps.t.outputs.tag }} installs cleanly from the packed tarball"
+          echo "OK: ${{ steps.t.outputs.tag }} installs cleanly from the packed tarball"
+
+      - name: Create or refresh the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if gh release view "${{ steps.t.outputs.tag }}" >/dev/null 2>&1; then
+            gh release edit "${{ steps.t.outputs.tag }}" --notes-file /tmp/notes.md
+            echo "release ${{ steps.t.outputs.tag }} already existed: notes refreshed"
+          else
+            gh release create "${{ steps.t.outputs.tag }}" \
+              --title "${{ steps.t.outputs.tag }}: fabric-agent-adapter" \
+              --notes-file /tmp/notes.md --latest
+          fi
 
   publish:
     # Auth works two ways on purpose. NODE_AUTH_TOKEN comes from the NPM_TOKEN
-    # secret (a GRANULAR AUTOMATION token — a classic token is refused by 2FA).
+    # secret (a GRANULAR AUTOMATION token; a classic token is refused by 2FA).
     # `id-token: write` is granted regardless, which is what npm trusted
-    # publishing (OIDC) needs: name this workflow file as the package's trusted
-    # publisher on npmjs.com, delete the secret, and this file keeps working
-    # with no long-lived credential at all. It also signs provenance.
+    # publishing (OIDC) needs, and it signs provenance.
+    # OPEN HUMAN STEP (FAA-73, decision D8): register this workflow file as the
+    # package's trusted publisher on npmjs.com (needs the operator's npmjs.com
+    # sign-in), then delete the NPM_TOKEN secret and the NODE_AUTH_TOKEN line
+    # below. Until then the standing token stays, because without it nothing
+    # publishes.
     needs: release
     if: vars.PUBLISH_NPMJS == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       id-token: write
@@ -155,19 +165,20 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "ver=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ steps.t.outputs.tag }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: npm must be new enough for trusted publishing
+      - name: npm must be new enough for trusted publishing (11.5.1 or later)
         run: |
           set -eu
-          npm install -g npm@latest
+          # An exact release, never the moving latest tag: this job holds id-token: write.
+          npm install -g npm@11.21.1
           npm --version
 
       - name: The tag must match what would be published
@@ -188,7 +199,7 @@ jobs:
           # tag pushed after a manual publish must not fail the release.
           if npm view "$NAME@${{ steps.t.outputs.ver }}" version >/dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "$NAME@${{ steps.t.outputs.ver }} already published — nothing to do"
+            echo "$NAME@${{ steps.t.outputs.ver }} already published: nothing to do"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -197,24 +208,17 @@ jobs:
         if: steps.pub.outputs.skip == 'false'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          # Sigstore provenance attests a PUBLIC source repository; npm rejects
-          # it from a private one with E422. Detect instead of hardcoding, so
-          # making this repo public restores provenance with no CI edit.
-          if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = "false" ]; then
-            npm publish --provenance
-          else
-            echo "repository is private — publishing without provenance"
-            npm publish
-          fi
+          # The repository is public (since 2026-09-29), so every publish
+          # carries Sigstore provenance.
+          npm publish --provenance
 
       - name: The registry must actually serve it
         if: steps.pub.outputs.skip == 'false'
         run: |
           set -eu
-          # The read replica lags the write master — "published" is a claim
+          # The read replica lags the write master: "published" is a claim
           # until it is served; poll instead of trusting the exit code alone.
           # 18x10s missed the FIRST scoped publish of this package by seconds
           # (+4 min for 0.3.1; 0.4.3 on 2026-09-29 was still unserved at +5 min); 10 minutes.

@@ -1,58 +1,196 @@
 name: validate
 
+# The organization's CI rule (fabric-workspace knowledge/rules.md section 3, org-index docs/CI-BATCHING.md): the
+# hosted suite runs in a nightly batch on the default branch, plus a manual dispatch for an urgent candidate. No
+# per-push or per-pull-request trigger. release.yml calls this file before it publishes anything.
 on:
+  schedule:
+    # 23:00 Europe/Warsaw in winter time (CET, UTC+1). GitHub cron is UTC and knows no time zone, so in summer
+    # time (CEST, UTC+2) this runs at 00:00 Warsaw. GitHub may start scheduled work late. Scheduled runs use the
+    # default branch.
+    - cron: "0 22 * * *"
   workflow_dispatch:
   workflow_call:
 
 permissions:
   contents: read
 
+# A newer run on the same ref supersedes an older one: the older one is cancelled (CI-BATCHING.md).
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# In a test job every check after the first runs even when an earlier one failed (`!cancelled()`), so one red step
+# does not hide the others.
 jobs:
   python:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - run: python3 -m unittest discover -s test -v
-      - run: python3 test/validate.py
-      - run: node --test 'test/*.test.mjs'
+      - if: ${{ !cancelled() }}
+        run: python3 test/validate.py
+      - if: ${{ !cancelled() }}
+        run: node --test 'test/*.test.mjs'
+
+  # FAA-72: the floors the package promises, Python 3.9 (README, macOS's own python3) and Node 18
+  # (package.json engines). Node 18 does not expand a --test glob itself, so the shell does.
+  floors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.9"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "18"
+      - name: The Python suite on Python 3.9
+        run: python3 -m unittest discover -s test -v
+      - name: The structural validator on Python 3.9
+        if: ${{ !cancelled() }}
+        run: python3 test/validate.py
+      - name: The Node suite on Node 18
+        if: ${{ !cancelled() }}
+        run: node --test test/*.test.mjs
+
+  # FAA-72: the checks against the pinned contract skip unless FABRIC_CONTRACT_NEW and FABRIC_CONTRACT_OLD name
+  # installed checkouts. This job makes them run: the pin comes from fabric-contract.lock.json, the legacy revision
+  # from test/test_contract_revisions.py (OLD), so neither is written twice.
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Read the pinned and the legacy contract revisions
+        id: rev
+        run: |
+          set -eu
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, re
+          pin = json.load(open("fabric-contract.lock.json"))["commit"]
+          old = re.search(r"^OLD = '([0-9a-f]{40})'", open("test/test_contract_revisions.py").read(), re.M).group(1)
+          print("pin=%s" % pin)
+          print("old=%s" % old)
+          PY
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: passioncode-ai/fabric-agent-contract
+          ref: ${{ steps.rev.outputs.pin }}
+          path: contract-new
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: passioncode-ai/fabric-agent-contract
+          ref: ${{ steps.rev.outputs.old }}
+          path: contract-old
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      # The contract needs Node 22.13 or later (its package.json engines).
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Install the pnpm release the contract names (packageManager)
+        id: pnpm
+        run: |
+          set -eu
+          PM="$(node -p "require('./contract-new/package.json').packageManager.split('+')[0]")"
+          case "$PM" in pnpm@[0-9]*) ;; *) echo "::error::unexpected packageManager $PM"; exit 1 ;; esac
+          npm install --global "$PM"
+          pnpm --version
+          echo "store=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('contract-new/pnpm-lock.yaml', 'contract-old/pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+      - name: Install both checkouts (frozen lockfiles)
+        run: |
+          set -eu
+          (cd contract-new && pnpm install --frozen-lockfile)
+          (cd contract-old && pnpm install --frozen-lockfile)
+      - name: The checks against the pinned and the legacy contract
+        env:
+          FABRIC_CONTRACT_NEW: ${{ github.workspace }}/contract-new
+          FABRIC_CONTRACT_OLD: ${{ github.workspace }}/contract-old
+        run: |
+          set -euo pipefail
+          cd test
+          # A skip here is a gate that did not run: the job fails on one.
+          python3 -m unittest -v test_contract_revisions test_dashboard_kit 2>&1 | tee ../contract-tests.log
+          if grep -q "skipped 'NOT_RUN" ../contract-tests.log; then
+            echo "::error::a contract-gated test skipped although both checkouts are installed"
+            exit 1
+          fi
 
   claude-plugin:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
-      - run: npm install --global @anthropic-ai/claude-code
+      # An exact release, so a new Claude Code cannot change what --strict means overnight. Raise it on purpose.
+      - run: npm install --global @anthropic-ai/claude-code@2.1.307
       - run: claude plugin validate ./plugins/fabric-agent-adapter --strict
       - run: claude plugin validate . --strict
 
-  # DEC-0032: both service kits on Windows — the instance lock between two processes (and between the
-  # kits), a token file's ACL written and read back, the refusals the rule names. They skip elsewhere.
+  # DEC-0032: both service kits on Windows (the instance lock between two processes and between the kits, a token
+  # file's ACL written and read back, the refusals the rule names), the session hooks, and the whole Node suite.
   windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.13"
       # Before the Python cases: one of them probes a Node service's lock.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
       - name: DEC-0032 platform cases (Windows ones run here)
         run: python -m unittest discover -s test -p "test_fabric_service_platforms.py" -v
       - name: The rest of the service kit's cases on Windows
+        if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_service.py" -v
       - name: The supervisor writers on Windows (FAA-21)
+        if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_service_supervisors.py" -v
       - name: Settings backups and every limit on Windows (FAA-13)
+        if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_service_backups.py" -v
-      - name: The Node kit on Windows — its lock, token ACL and writers (FAA-21)
-        run: node --test test/fabric-service-platforms.test.mjs test/fabric-service-supervisors.test.mjs test/fabric-service.test.mjs test/fabric-service-backups.test.mjs
+      - name: The session hooks on Windows (FAA-72)
+        if: ${{ !cancelled() }}
+        run: python -m unittest discover -s test -p "test_fabric_session.py" -v
+      - name: The whole Node suite on Windows (FAA-72)
+        if: ${{ !cancelled() }}
+        run: node --test "test/*.test.mjs"
+
+  # FAA-72: launchd is the first supervisor the kit writes, so macOS runs both suites. The lifecycle tests put a
+  # fake launchctl first on PATH and never touch the runner's own jobs (LC-14).
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - run: python3 -m unittest discover -s test -v
+      - if: ${{ !cancelled() }}
+        run: node --test 'test/*.test.mjs'

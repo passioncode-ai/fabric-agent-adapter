@@ -197,7 +197,8 @@ class LicenseTests(unittest.TestCase):
     def test_an_em_dash_in_text_people_read_fails(self):  # FAA-64: the operator's rule, held here
         for rel in ("README.md", "plugins/fabric-agent-adapter/skills/building-fabric-services/references/usage.md",
                     "test/evals/building-fabric-services/scenarios.json", "install.sh", "bin/fabric-agent-adapter.js",
-                    "plugins/fabric-agent-adapter/skills/building-fabric-services/assets/dashboard-kit/demo.html"):
+                    "plugins/fabric-agent-adapter/skills/building-fabric-services/assets/dashboard-kit/demo.html",
+                    ".github/workflows/release.yml", ".github/pull_request_template.md"):  # R6: .github too (FAA-73)
             def mutate(copy, rel=rel):
                 path = copy / rel
                 path.write_text(path.read_text(encoding="utf-8").replace("the", "the \u2014", 1), encoding="utf-8")
@@ -671,3 +672,153 @@ class PrivateSourceDeferralTests(unittest.TestCase):
     def test_every_shipped_skill_page_is_free_of_private_deferrals(self):
         for page in sorted((ROOT / "plugins").rglob("*.md")):
             self.assertEqual(validate.private_source_deferrals(page.read_text(encoding="utf-8")), [], str(page))
+
+
+def _tree(files):
+    """A throwaway tree holding only the given {relative path: text} files."""
+    tmp = tempfile.TemporaryDirectory()
+    root = Path(tmp.name)
+    for rel, text in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    return tmp, root
+
+
+class DollarAnchorTests(unittest.TestCase):
+    """R1 (audit 2026-10-22): `$` also matches before a trailing newline in Python, never in JavaScript, so a
+    `$`-anchored whole-value pattern lets the Python twin accept what the Node twin refuses."""
+
+    KIT = "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_example.py"
+    SESSION = "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/example/__init__.py"
+
+    def test_the_hazard_is_real(self):
+        import re
+        self.assertIsNotNone(re.match(r"^[a-z]+$", "abc\n"))
+        self.assertIsNone(re.match(r"^[a-z]+\Z", "abc\n"))
+
+    def test_a_planted_dollar_is_found_in_every_checked_call(self):
+        for call in ("compile", "match", "search"):
+            with self.subTest(call=call):
+                found = validate.dollar_anchored_patterns('import re\nNAME = re.%s(r"^[a-z]+$", "x")\n' % call)
+                self.assertEqual(found, [(2, call, "^[a-z]+$")])
+
+    def test_backslash_z_an_escaped_dollar_and_fullmatch_pass(self):
+        for source in ('import re\nre.compile(r"^[a-z]+\\Z")\n',
+                       'import re\nre.compile(r"price\\$")\n',
+                       'import re\nre.fullmatch(r"^[a-z]+$", "x")\n',
+                       'import re\nre.sub(r"\\.git$", "", "x")\n',
+                       'import re\nre.compile(r"a$b")\n'):
+            with self.subTest(source=source):
+                self.assertEqual(validate.dollar_anchored_patterns(source), [])
+
+    def test_an_escaped_backslash_before_the_dollar_still_anchors(self):
+        self.assertEqual(len(validate.dollar_anchored_patterns('import re\nre.compile(r"a\\\\$")\n')), 1)
+
+    def test_the_repository_scan_fails_on_a_planted_pattern_in_either_skill(self):
+        for rel in (self.KIT, self.SESSION):
+            with self.subTest(rel=rel):
+                tmp, root = _tree({rel: 'import re\nID = re.compile(r"^[a-z]+$")\n'})
+                with tmp:
+                    problems = validate.dollar_anchor_problems(root, allow={})
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn("%s:2 re.compile" % rel, problems[0])
+                self.assertIn("R1", problems[0])
+
+    def test_the_fixed_pattern_passes(self):
+        tmp, root = _tree({self.KIT: 'import re\nID = re.compile(r"^[a-z]+\\Z")\n'})
+        with tmp:
+            self.assertEqual(validate.dollar_anchor_problems(root, allow={}), [])
+
+    def test_an_allowlisted_multiline_use_passes_and_needs_its_reason(self):
+        tmp, root = _tree({self.KIT: 'import re\nre.search(r"^x$", "x", re.MULTILINE)\n'})
+        with tmp:
+            self.assertEqual(validate.dollar_anchor_problems(root, allow={(self.KIT, "^x$"): "multiline"}), [])
+            problems = validate.dollar_anchor_problems(root, allow={(self.KIT, "^x$"): " "})
+        self.assertTrue(any("has no reason" in p for p in problems), problems)
+
+    def test_a_stale_allowlist_entry_fails(self):
+        tmp, root = _tree({self.KIT: 'import re\nre.compile(r"^x\\Z")\n'})
+        with tmp:
+            problems = validate.dollar_anchor_problems(root, allow={(self.KIT, "^x$"): "converted elsewhere"})
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("matches nothing any more", problems[0])
+
+    def test_the_real_tree_passes_with_the_current_allowlist(self):
+        self.assertEqual(validate.dollar_anchor_problems(), [])
+
+
+class WorkflowGuardTests(unittest.TestCase):
+    """R5 and FAA-72/FAA-73: the hosted gates must be able to fail, and the release path must be safe."""
+
+    def _problems(self, rel, edit):
+        files = {p.relative_to(ROOT).as_posix(): p.read_text(encoding="utf-8")
+                 for p in sorted((ROOT / ".github/workflows").glob("*.yml"))}
+        files[rel] = edit(files[rel])
+        self.assertNotEqual(files[rel], (ROOT / rel).read_text(encoding="utf-8"), "the edit planted nothing")
+        tmp, root = _tree(files)
+        with tmp:
+            return validate.workflow_problems(root)
+
+    def test_the_real_workflows_pass(self):
+        self.assertEqual(validate.workflow_problems(), [])
+
+    def test_a_floating_action_tag_fails(self):
+        import re
+        problems = self._problems(".github/workflows/release.yml",
+                                  lambda t: re.sub(r"actions/checkout@[0-9a-f]{40} # v[0-9.]+", "actions/checkout@v4", t, count=1))
+        self.assertTrue(any("moving ref" in p for p in problems), problems)
+
+    def test_a_sha_without_its_version_comment_fails(self):
+        import re
+        problems = self._problems(".github/workflows/validate.yml",
+                                  lambda t: re.sub(r"(actions/setup-node@[0-9a-f]{40}) # v[0-9.]+", r"\1", t, count=1))
+        self.assertTrue(any("moving ref" in p for p in problems), problems)
+
+    def test_npm_at_latest_fails(self):
+        problems = self._problems(".github/workflows/release.yml",
+                                  lambda t: t.replace("npm install -g npm@11.21.1", "npm install -g npm@latest"))
+        self.assertTrue(any("@latest" in p for p in problems), problems)
+
+    def test_a_job_without_a_timeout_fails(self):
+        problems = self._problems(".github/workflows/validate.yml",
+                                  lambda t: t.replace("    timeout-minutes: 10\n", "", 1))
+        self.assertTrue(any("timeout-minutes" in p for p in problems), problems)
+
+    def test_the_nightly_and_the_gated_jobs_cannot_be_dropped(self):
+        for needle in ("schedule:", "FABRIC_CONTRACT_OLD:", 'python-version: "3.9"', 'node-version: "18"',
+                       "runs-on: macos-", "cancel-in-progress: true", '-p "test_fabric_session.py"'):
+            with self.subTest(needle=needle):
+                problems = self._problems(".github/workflows/validate.yml", lambda t: t.replace(needle, "removed:"))
+                self.assertTrue(any(repr(needle) in p for p in problems), problems)
+
+    def test_a_per_push_trigger_fails(self):
+        problems = self._problems(".github/workflows/validate.yml",
+                                  lambda t: t.replace("  workflow_dispatch:\n", "  workflow_dispatch:\n  push:\n", 1))
+        self.assertTrue(any("must not run on push" in p for p in problems), problems)
+
+    def test_a_release_created_before_the_smoke_test_fails(self):
+        def swap(text):
+            smoke = text.index("      - name: Smoke test before anything is public")
+            create = text.index("      - name: Create or refresh the GitHub release")
+            tail = text.index("\n  publish:")
+            return text[:smoke] + text[create:tail] + "\n" + text[smoke:create] + text[tail:]
+        problems = self._problems(".github/workflows/release.yml", swap)
+        self.assertTrue(any("before `gh release create`" in p for p in problems), problems)
+
+    def test_an_action_sha_is_not_a_contract_pin_but_any_other_commit_is(self):
+        pin = validate.PIN_DEFAULT_COMMIT
+        action = "11d5960a326750d5838078e36cf38b85af677262"
+        good = "steps:\n  - uses: actions/checkout@%s # v4.4.0\n" % action
+        tmp, root = _tree({".github/workflows/x.yml": good})
+        with tmp:
+            self.assertEqual(validate.contract_pin_drift(root, pin), [])
+        bad = good + "  - run: echo %s\n" % action
+        tmp, root = _tree({".github/workflows/x.yml": bad})
+        with tmp:
+            drift = validate.contract_pin_drift(root, pin)
+        self.assertEqual(len(drift), 1, drift)
+        self.assertIn(".github/workflows/x.yml:3", drift[0])
+        tmp, root = _tree({"docs.md": "uses: actions/checkout@%s # v4.4.0\n" % action})
+        with tmp:
+            self.assertEqual(len(validate.contract_pin_drift(root, pin)), 1, "the exemption is for workflows only")
