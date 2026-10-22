@@ -67,7 +67,8 @@ function sameTree(src, dest) {
   let b;
   try {
     a = fs.readdirSync(src, { withFileTypes: true }).filter((e) => !bytecode(e.name));
-    b = fs.readdirSync(dest, { withFileTypes: true });
+    // The same filter on both sides: an installed skill whose Python ran has its own __pycache__.
+    b = fs.readdirSync(dest, { withFileTypes: true }).filter((e) => !bytecode(e.name));
   } catch {
     return false;
   }
