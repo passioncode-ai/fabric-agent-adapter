@@ -313,15 +313,22 @@ test('Fabric down: bounded backoff, one event, then recovery', async (t) => {
 });
 
 test('restart: a request answered while the responder was down leaves the checkpoint (DEC-0098, DEC-0102, FAA-100)', async (t) => {
+  // The process dies between com.claim and com.accept (in its input gate), the claim returns to the queue and the
+  // target's participant reply answers it (queued -> answered, the only way in): it is no longer this responder's.
   const hub = await fakeHub(t);
   const h = harness(hub);
-  h.outcome = () => new Promise(() => {}); // the process "dies" inside the work
+  h.gate = () => new Promise(() => {});
   const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
-  await h.responder().step();
+  h.responder().step(); // never settles: the "dead" process
+  for (let i = 0; i < 200 && h.checkpoint()[rid]?.step !== 'claimed'; i += 1) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(h.checkpoint()[rid].step, 'claimed');
   await hub.control({ op: 'end-sessions' });
-  await hub.control({ op: 'answer', request: rid });
+  assert.ok(!('error' in await hub.control({ op: 'requeue', request: rid })));
+  assert.ok(!('error' in await hub.control({ op: 'answer', request: rid })));
+  h.gate = () => null;
   await h.responder().step();
   const s = await h.state();
+  assert.equal(s.requests[rid].state, 'answered');
   assert.deepEqual(h.checkpoint(), {});
   assert.ok(!s.calls.includes('com.reconcile'));
 });

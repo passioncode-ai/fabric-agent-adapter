@@ -681,9 +681,17 @@ class FakeHub:
             for st in list(self.sessions.values()):
                 b.release(st["id"])
             self.sessions.clear()
+        elif op == "requeue":  # a claim that lapsed returns to the queue (the board's own claimed -> queued)
+            req = b.requests[cmd["request"]]
+            if req["state"] != "claimed":
+                return {"error": "only a claimed request returns to the queue"}
+            b._move(req, "queued")
+            req["attempt"] = None
         elif op == "answer":  # the board's pass: the target Project's participant reply answered it (DEC-0098, DEC-0102)
             req = b.requests[cmd["request"]]
-            req["state"], req["revision"] = "answered", req.get("revision", 0) + 1
+            if req["state"] != "queued":
+                return {"error": "only a queued request is answered (project-comms: queued -> answered)"}
+            b._move(req, "answered")
         elif op == "forget-sessions":  # the sessions end but no DELETE arrives: their slots lapse on their own (FAA-77)
             self.sessions.clear()
         elif op != "state":

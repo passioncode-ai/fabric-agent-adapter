@@ -287,7 +287,7 @@ class Responder:
                     continue
                 raise
             if state is None or state in TERMINAL or state in NOT_OURS:
-                self.checkpoint.drop(entry["request"])  # settled, or back in the queue for whoever claims next
+                self.checkpoint.drop(entry["request"])  # settled, or no longer this responder's (NOT_OURS)
             elif state == "accepted":
                 transfer.setdefault(entry["capability"], []).append(entry)
             else:  # in_progress (lost result once a new generation holds the slot) or outcome_unknown

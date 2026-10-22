@@ -117,7 +117,9 @@ spend sees it) is the service's own responsibility. A message never carries an a
 | `idempotency_conflict` | a key sent with other content is a defect, not an outage: `board.blocked` (notify) naming it, and the session is left |
 | in progress at a reconnect whose slot another session still holds | marked `unknown`; reconciled every five minutes once the slot is this session's |
 
-On restart the checkpoint is read back: settled or queued requests are dropped; `in_progress` and `outcome_unknown` are
+On restart the checkpoint is read back: settled, queued, claimed or `answered` requests are dropped (`answered`:
+the target Project's participant reply answered it, DEC-0098 and DEC-0102; not settled, the requester may still cancel
+it, but no longer this responder's); `in_progress` and `outcome_unknown` are
 reconciled from what `observe(entry)` answers (observed only; with no observation they stay unknown and notify);
 accepted ones go back to this responder with `com.responder_replace {expectedGeneration, transfer}`, whose receipt's
 `transferred` (DEC-0078: `{request, revision, attempt}`) carries the new fence. **A Fabric that does not answer

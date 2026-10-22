@@ -527,14 +527,34 @@ class RestartTests(Conversation):
         self.assertIn("board.reconcile.needed", self.kinds())
 
     def test_a_request_answered_while_the_responder_was_down_leaves_the_checkpoint(self):
-        """DEC-0098, DEC-0102: a held request back in the queue may be answered by the target's participant reply; it
-        is no longer this responder's, so the restarted responder drops it and reconciles nothing (FAA-100)."""
-        rid, _ = self._crash_after(effect=False)
-        self.board.requests[rid]["state"] = "answered"
+        """DEC-0098, DEC-0102: the process dies between com.claim and com.accept (in its input gate), the claim returns
+        to the queue and the target's participant reply answers it (queued -> answered, the only way in). It is no
+        longer this responder's: the restarted responder drops it and reconciles nothing (FAA-100)."""
+        inside, never = threading.Event(), threading.Event()
+        self.addCleanup(never.set)
+
+        def gate(request):
+            inside.set()
+            never.wait(10)
+            raise Stopped()
+        self.gate = gate
+        rid = self.board.queue("video.render")
+        threading.Thread(target=self.responder().step, daemon=True).start()
+        self.assertTrue(inside.wait(5))
+        self.assertEqual(self.checkpoint()[rid]["step"], "claimed")
+        self.hub.control({"op": "end-sessions"})
+        self.assertNotIn("error", self.hub.control({"op": "requeue", "request": rid}))
+        self.assertNotIn("error", self.hub.control({"op": "answer", "request": rid}))
+        self.gate = lambda request: None
         second = self.responder()
         second.step()
+        self.assertEqual(self.board.requests[rid]["state"], "answered")
         self.assertEqual(self.checkpoint(), {})
         self.assertNotIn("com.reconcile", self.tools())
+
+    def test_the_fake_board_answers_only_a_queued_request(self):
+        rid, _ = self._crash_after(effect=False)
+        self.assertIn("error", self.hub.control({"op": "answer", "request": rid}))  # accepted stays held, never answered
 
     def test_accepted_work_is_transferred_and_finished(self):
         rid, _ = self._crash_after(effect=False)
