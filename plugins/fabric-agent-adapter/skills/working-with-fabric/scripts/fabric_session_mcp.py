@@ -13,6 +13,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     BOARD_STATUS_TOOL,
@@ -251,6 +252,10 @@ def _take_lock(directory: Path, wait_s: float = 0.0) -> bool:
         time.sleep(0.2)
 
 
+def _identity(st: os.stat_result) -> Tuple[int, int, int, int]:
+    return (st.st_dev, st.st_ino, st.st_mtime_ns, st.st_size)  # not ctime: the rename itself moves it
+
+
 def _try_lock(lock: Path, directory: Path, _between: Optional[Callable[[], None]] = None) -> bool:
     """Create the lock; take a stale one (older than LOCK_STALE_S) by renaming it to a name of this worker's own and
     checking that the file renamed is the very one judged stale. A lock another worker made in between is put back
@@ -286,7 +291,9 @@ def _try_lock(lock: Path, directory: Path, _between: Optional[Callable[[], None]
             got = os.lstat(str(taken))
         except OSError:
             return False
-        if (got.st_dev, got.st_ino) != (seen.st_dev, seen.st_ino):
+        # An inode number alone is not identity: Linux hands a freed one straight to the next file, so the lock another
+        # worker just made can carry the stale lock's number. Its write time and size are its own.
+        if _identity(got) != _identity(seen):
             try:
                 os.link(str(taken), str(lock))  # put the live lock back, unless a newer one is there already
             except OSError:
