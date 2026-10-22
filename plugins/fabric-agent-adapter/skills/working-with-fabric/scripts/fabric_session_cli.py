@@ -173,7 +173,9 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
     if event == "end" and payload.get("reason") == "clear":
         # /clear keeps the agent process and its fabric-mcp; Fabric 0.3.9 renames the session to the new id (board
         # thread 02bf19c5, ask 2). No claim is released and no end observed; turns already spooled still go out.
-        if any(directory.glob("*-turn.json")) and not lock_held(directory):
+        # Spawned even while a worker runs: that one may have read the spool before the last turn landed, and no
+        # later hook comes for this id. The new worker waits for the lock and finds an empty spool at worst.
+        if any(directory.glob("*-turn.json")):
             spawn(directory)
         return "skipped: /clear keeps the Fabric session"
     if no_session_held(directory):

@@ -13,7 +13,7 @@
 // scroll box) and ED-5 (sticky chrome within min(120 px, a quarter of the height), anchors landing
 // below it, no nested full-height scroller). What it cannot measure is NOT_RUN with the reason,
 // never a pass. WebKit is the default engine (Safari's). Exit 0 when nothing FAILs, 1 when
-// something does, 2 on a usage error. It reads; it never clicks a control of the page.
+// something does, 2 on a usage error or a report with no rule in it. It reads; it never clicks a control of the page.
 import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, platform } from 'node:os';

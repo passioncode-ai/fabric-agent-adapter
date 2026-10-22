@@ -497,11 +497,15 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
         # Recorded once (02bf19c5, ask 4): nothing in the spool can reach a session Fabric does not hold.
         note("session=%s outcome=no-session reason=%r" % (session_id[:8], "Fabric holds no session for this id"))
         for path in directory.glob("*-*.json"):
+            ended = ended or path.name.endswith("-end.json")  # the session's last hook: its folder goes now
             try:
                 path.unlink()
             except OSError:
                 pass
-        _write_private(directory / NO_SESSION_MARK, "")
+        try:
+            _write_private(directory / NO_SESSION_MARK, "")
+        except OSError as exc:  # the worker never raises: without the mark, the next turn tries once more
+            note("session=%s outcome=no-session reason=%r" % (session_id[:8], "the mark was not written (%s)" % type(exc).__name__))
     except TimeoutError as exc:
         note("session=%s outcome=unknown reason=%r" % (session_id[:8], str(exc)))
     except Exception as exc:  # noqa: BLE001 — the worker never raises

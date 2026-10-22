@@ -522,6 +522,30 @@ class StopAndEndActive(Base):
         said, _ = self.spool("end", reason="prompt_input_exit")
         self.assertEqual(said, "spooled: worker started")
 
+    def test_clear_starts_a_worker_even_while_one_runs(self):
+        """A running worker may have read the spool before the last turn landed, and no later hook comes for the old
+        id after /clear: a new worker is started anyway; it waits for the lock (blind reading of 0.42.0, finding 1)."""
+        directory = fs.session_dir(SID, self.env)
+        fs.spool(directory, {"event": "turn", "runtimeSessionId": SID, "cwd": str(self.repo),
+                             "observedAt": "2026-10-22T00:00:00Z", "facts": {}})
+        (directory / "worker.lock").write_text("")
+        said, spawned = self.spool("end", reason="clear")
+        self.assertEqual(said, "skipped: /clear keeps the Fabric session")
+        self.assertEqual(spawned, [directory])
+
+    def test_no_session_with_an_end_in_the_spool_removes_the_folder(self):
+        """The end was the session's last hook, so nothing would remove its folder before the 7-day prune."""
+        self.env["FAKE_MCP_MODE"] = "no-session"
+        _, spawned = self.spool("end", reason="prompt_input_exit")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertEqual(self.records("call"), [])
+        self.assertFalse(spawned[0].exists())
+
+    def test_watch_mail_names_a_session_fabric_does_not_hold(self):
+        self.env["FAKE_MCP_MODE"] = "no-session"
+        self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8),
+                         ("down", "Fabric holds no session for this id"))
+
     def test_an_end_while_no_session_is_held_removes_the_folder(self):
         directory = fs.session_dir(SID, self.env)
         directory.mkdir(parents=True)
