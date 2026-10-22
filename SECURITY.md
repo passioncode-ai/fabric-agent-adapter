@@ -11,7 +11,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
 ## What the installers and scripts touch
 
 - `npx @passioncode-ai/fabric-agent-adapter` and `install.sh` write only
-  `~/.agents/skills/<skill>`; `--target claude` writes `~/.claude/skills/<skill>` and is
+  `~/.agents/skills/<skill>` (and, while replacing a copy with `--force`, the sibling folders
+  `.<skill>.installing-*` and `.<skill>.replaced-*`, removed when the run ends; a killed run can
+  leave one behind); `--target claude` writes `~/.claude/skills/<skill>` and is
   refused while the plugin is installed; `--prune-shadow` moves shadowing copies into
   `~/.claude/skills-shadow-backup/`.
 - `building-fabric-services/scripts/check_service.py` reads a descriptor and the token
@@ -30,6 +32,11 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   external APIs the service's author configures, such as OpenRouter, with keys the service
   reads by name at run time; the kit itself calls no outside host on its own. A board
   responder talks only to Fabric's hub on loopback.
+- The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
+  in the session's folder (counts only, at most 1.5 s), read the process table to tell a
+  session Fabric launched, write their spool and log under the user's cache folder (0600),
+  and the delivery worker starts `fabric-mcp` in its own process group and ends that group
+  (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no token.
 - `adapting-projects-to-fabric/scripts/adapt_project.py` reads the target project without
   executing it and writes only the seven documented bundle paths (`scaffold --dry-run`
   writes nothing); `check --contract` runs the contract checkout's own

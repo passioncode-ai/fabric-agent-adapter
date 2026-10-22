@@ -83,8 +83,10 @@ or instructions alone do not prove all final answers from every agent are filter
   path is required. Skills must be activated/loaded; install does not intercept every answer.
 - MCP absent: report unresolved host capability once, use the project's approved
   resolver/CLI if available. Do not write machine or agent MCP config automatically.
-- Python absent: perform the comparisons above manually; mark the executable gate
-  NOT_RUN. Do not label the output mechanically validated.
+- Python absent: perform the comparisons above manually, including the gate's own rules (a
+  path with a `.` or `..` segment, an encoded or backslash separator, or a query or fragment
+  name or value that reads as a credential, such as `code`, `key`, `auth` or `api_key`, is
+  refused); mark the executable gate NOT_RUN. Do not label the output mechanically validated.
 
 Syntax is owned by Fabric Dashboards and `@passioncode-ai/fabric-service-host`:
 [ADR-0005](https://github.com/passioncode-ai/fabric-dashboards/blob/51a7a80acf42781d7bec304cc87c655d48cc309b/docs/adr/0005-service-links.md).
