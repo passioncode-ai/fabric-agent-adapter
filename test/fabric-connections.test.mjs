@@ -9,6 +9,7 @@ import { ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fa
 import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 
 const V = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/connections-vectors.json', import.meta.url), 'utf8'));
+const EXTRA = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/connections-extra-vectors.json', import.meta.url), 'utf8'));
 
 test('every case answers as the contract does', () => {
   assert.equal(V.cases.length, 127);
@@ -59,4 +60,29 @@ test('the well-known document carries it, a host reads it, an invalid one is ref
   assert.equal(view.declared, true);
   assert.deepEqual(view.connections.map((c) => c.failing), [false, false, true]);
   assert.throws(() => buildWellKnown({ ...base, status: 'ready', extensions: { [KEY]: { connections: [{ id: 'a', kind: 'nope', target: 't', state: 'ok' }] } } }), ServiceError);
+});
+
+test('every kit input answers as the contract does', () => {
+  assert.equal(EXTRA.cases.length, 462);
+  EXTRA.cases.forEach((c, index) => {
+    const view = connectionsView(c.input);
+    assert.deepEqual(Object.fromEntries(Object.keys(c.expected).map((k) => [k, view[k]])), c.expected, String(index));
+  });
+});
+
+test('odd input is refused with ServiceError only; null options read as empty', () => {
+  for (const [declared, options] of [[['x'], {}], [[null], {}], [[['id', 'a']], {}], [null, {}], ['ab', {}],
+    [[DECLARED[2]], { degraded: 'x' }], [[DECLARED[2]], { states: ['router'] }], [[DECLARED[0]], { states: { router: '' } }]]) {
+    assert.throws(() => connectionsExtension(declared, options), ServiceError);
+  }
+  assert.equal(connectionsExtension([DECLARED[2]], { degraded: null, states: null })[KEY].connections[0].state, 'unknown');
+  assert.equal(connectionsExtension([DECLARED[2]], null)[KEY].connections[0].state, 'unknown');
+});
+
+test('a secret-shaped member name never reaches the message', () => {
+  const secret = 'sk-AbCdEf0123456789xyzQ';
+  const findings = connectionsRules({ extensions: { [KEY]: { connections: [{ ...DECLARED[2], state: 'ok', [secret]: 1 }], [secret]: 2 } } });
+  assert.ok(findings.length);
+  assert.ok(!JSON.stringify(findings).includes(secret));
+  assert.throws(() => connectionsExtension([{ ...DECLARED[2], [secret]: 1 }]), (err) => err instanceof ServiceError && !err.message.includes(secret));
 });

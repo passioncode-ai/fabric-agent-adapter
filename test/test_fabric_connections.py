@@ -13,6 +13,7 @@ build_well_known = fs.build_well_known
 
 V = json.loads((Path(__file__).resolve().parent / "fixtures/contract/connections-vectors.json").read_text(encoding="utf-8"))
 KEY = fc.CONNECTIONS_EXTENSION_KEY
+EXTRA = json.loads((Path(__file__).resolve().parent / "fixtures/contract/connections-extra-vectors.json").read_text(encoding="utf-8"))
 
 
 class Vectors(unittest.TestCase):
@@ -23,6 +24,15 @@ class Vectors(unittest.TestCase):
                 view = fc.connections_view(case["input"])
                 self.assertEqual({k: view[k] for k in case["expected"]}, case["expected"])
                 self.assertEqual(bool(view["errors"]), view["reported"])
+
+    def test_every_kit_input_answers_as_the_contract_does(self):
+        """The kit's own inputs (test/fixtures/kit-connections-inputs.json), answered by the contract's connectionsView:
+        ECMAScript's whitespace, word boundary and case folding in the credential shapes, and URLs WHATWG refuses."""
+        self.assertEqual(len(EXTRA["cases"]), 462)
+        for index, case in enumerate(EXTRA["cases"]):
+            with self.subTest(index=index):
+                view = fc.connections_view(case["input"])
+                self.assertEqual({k: view[k] for k in case["expected"]}, case["expected"])
 
     def test_rules_name_fac_sem_127_only_for_a_reported_value(self):
         for case in V["cases"]:
@@ -74,6 +84,25 @@ class Producer(unittest.TestCase):
                     [{"id": "X", "kind": "store", "target": "db"}]):  # the id's pattern
             with self.subTest(bad=bad), self.assertRaises(ServiceError):
                 fc.connections_extension(bad)
+
+    def test_odd_input_is_refused_with_service_error_only(self):
+        for declared, kwargs in ((["x"], {}), ([None], {}), ([[("id", "a")]], {}), (None, {}), ("ab", {}),
+                                 ([self.DECLARED[2]], {"degraded": "x"}), ([self.DECLARED[2]], {"states": ["router"]}),
+                                 ([self.DECLARED[0]], {"states": {"router": ""}})):
+            with self.subTest(declared=declared, kwargs=kwargs), self.assertRaises(ServiceError):
+                fc.connections_extension(declared, **kwargs)
+        ext = fc.connections_extension([self.DECLARED[2]], degraded=None, states=None)
+        self.assertEqual(ext[KEY]["connections"][0]["state"], "unknown")
+
+    def test_a_secret_shaped_member_name_never_reaches_the_message(self):
+        secret = "sk-AbCdEf0123456789xyzQ"
+        value = {"connections": [dict(self.DECLARED[2], state="ok", **{secret: 1})], secret: 2}
+        findings = fc.connections_rules({"extensions": {KEY: value}})
+        self.assertTrue(findings)
+        self.assertNotIn(secret, json.dumps(findings))
+        with self.assertRaises(ServiceError) as raised:
+            fc.connections_extension([dict(self.DECLARED[2], **{secret: 1})])
+        self.assertNotIn(secret, str(raised.exception))
 
     def test_the_well_known_document_carries_it_and_a_host_reads_it(self):
         ext = fc.connections_extension(self.DECLARED, degraded=[{"source": "crm", "reason": "token expired"}])

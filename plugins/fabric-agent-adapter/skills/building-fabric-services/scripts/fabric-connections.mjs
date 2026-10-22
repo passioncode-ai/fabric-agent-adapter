@@ -53,7 +53,8 @@ const length = (value) => [...value].length; // code points, as ajv counts them
 /** service-connections-extension.schema.json, read as the contract's validator reads it. */
 function shapeProblems(value) {
   if (!isObject(value)) return ['/ type: must be object'];
-  const problems = Object.keys(value).filter((key) => key !== 'connections').map((key) => `/ additionalProperties: ${key} is not allowed`);
+  // A member's name is never echoed: a secret-shaped name would reach the error text and a probe's evidence.
+  const problems = Object.keys(value).filter((key) => key !== 'connections').map(() => '/ additionalProperties: a member other than connections');
   if (!Object.hasOwn(value, 'connections')) return [...problems, '/ required: connections'];
   const connections = value.connections;
   if (!Array.isArray(connections)) return [...problems, '/connections type: must be array'];
@@ -62,7 +63,7 @@ function shapeProblems(value) {
     const at = `/connections/${index}`;
     if (!isObject(item)) { problems.push(`${at} type: must be object`); return; }
     for (const key of ['id', 'kind', 'target', 'state']) if (!Object.hasOwn(item, key)) problems.push(`${at} required: ${key}`);
-    for (const key of Object.keys(item)) if (!MEMBERS.includes(key)) problems.push(`${at} additionalProperties: ${key} is not allowed`);
+    for (const key of Object.keys(item)) if (!MEMBERS.includes(key)) problems.push(`${at} additionalProperties: a member the schema does not name`);
     for (const key of [...STRING_MEMBERS, 'lastAt']) if (Object.hasOwn(item, key) && typeof item[key] !== 'string') problems.push(`${at}/${key} type: must be string`);
     const text = (key) => (Object.hasOwn(item, key) && typeof item[key] === 'string' ? item[key] : undefined);
     if (text('id') !== undefined && !ID.test(text('id'))) problems.push(`${at}/id pattern`);
@@ -160,13 +161,21 @@ export function connectionsRules(wellKnown) {
  * is kept. Throws ServiceError on a declaration a host would hide: a service never publishes one that reads as
  * "declared nothing".
  */
-export function connectionsExtension(declared, { degraded = [], states = {} } = {}) {
-  const failing = new Set(degraded.filter(isObject).map((entry) => entry.source));
-  const connections = [...declared].map((item) => {
+export function connectionsExtension(declared, options = {}) {
+  const { degraded: givenDegraded, states: givenStates } = options ?? {};
+  const degraded = givenDegraded ?? [];
+  const states = givenStates ?? {};
+  if (!Array.isArray(declared) || !Array.isArray(degraded) || !isObject(states)) {
+    throw new ServiceError('Connections declaration: declared and degraded are lists, states an object by id.');
+  }
+  const failing = new Set(degraded.filter(isObject).map((entry) => entry.source).filter((source) => typeof source === 'string'));
+  const connections = declared.map((item) => {
+    if (!isObject(item)) return item; // the shape check names it and the declaration is refused
     const connection = { ...item };
     if (!Object.hasOwn(connection, 'state')) {
-      const checked = Object.hasOwn(states, connection.id) ? states[connection.id] : undefined;
-      connection.state = checked || (failing.has(connection.id) ? 'degraded' : 'unknown');
+      const id = typeof connection.id === 'string' ? connection.id : undefined;
+      // An invalid check value is refused by the shape check, never read as a missing one.
+      connection.state = id !== undefined && Object.hasOwn(states, id) ? states[id] : (failing.has(id) ? 'degraded' : 'unknown');
     }
     return connection;
   });

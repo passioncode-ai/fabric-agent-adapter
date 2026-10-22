@@ -4,7 +4,9 @@
 `degraded[]`. Part of the service kit (FAA-62, layer L3). Standard library only."""
 from __future__ import annotations
 
+import ipaddress
 import re
+import urllib.parse
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import sys as _sys  # noqa: E402
@@ -13,7 +15,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_secrets import JWT_SHAPE, _BEARER_INSIDE, _long_secret, secret_url  # noqa: E402
+from fabric_secrets import JWT_SHAPE, _long_secret, credential_name, raw_values  # noqa: E402
 
 CONNECTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1"
 KINDS = ("service", "model", "connector", "store", "channel")
@@ -88,7 +90,8 @@ def _shape_problems(value: Any) -> List[str]:
     """service-connections-extension.schema.json, read as the contract's validator reads it."""
     if not isinstance(value, dict):
         return ["/ type: must be object"]
-    problems = ["/ additionalProperties: %s is not allowed" % key for key in value if key != "connections"]
+    # A member's name is never echoed: a secret-shaped name would reach the error text and a probe's evidence.
+    problems = ["/ additionalProperties: a member other than connections" for key in value if key != "connections"]
     if "connections" not in value:
         return problems + ["/ required: connections"]
     connections = value["connections"]
@@ -102,7 +105,7 @@ def _shape_problems(value: Any) -> List[str]:
             problems.append("%s type: must be object" % at)
             continue
         problems += ["%s required: %s" % (at, key) for key in ("id", "kind", "target", "state") if key not in item]
-        problems += ["%s additionalProperties: %s is not allowed" % (at, key) for key in item if key not in _MEMBERS]
+        problems += ["%s additionalProperties: a member the schema does not name" % at for key in item if key not in _MEMBERS]
         for key in _STRING_MEMBERS + ("lastAt",):
             if key in item and not isinstance(item[key], str):
                 problems.append("%s/%s type: must be string" % (at, key))
@@ -158,9 +161,158 @@ def _long_run(value: str) -> bool:
     return False
 
 
+# The shared detector (DEC-0044) as the contract's ECMAScript reads it: ASCII case folding, ECMAScript's \s and `.`,
+# an ASCII word boundary. The kit's fabric_secrets keeps Python's semantics for its other callers (LC-21); FAC-SEM-127
+# is held to the reference, so this module reads with the reference's (blind reading of 0.44.0, finding 1).
+_NOT_LINE_END = "[^\n\r\u2028\u2029]"
+_SECRET_VALUE = re.compile(r"(^bearer[%s]%s+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}"
+                           r"|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})" % (_JS_SPACE, _NOT_LINE_END), re.IGNORECASE | re.ASCII)
+_BEARER = re.compile(r"(?<![A-Za-z0-9_])bearer[%s]+(?=[A-Za-z0-9._~+/-]*[0-9])[A-Za-z0-9._~+/-]{12,}=*" % _JS_SPACE,
+                     re.IGNORECASE | re.ASCII)
+_PATH_LIKE = re.compile(r"(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*://)", re.IGNORECASE | re.ASCII)
+_ARGUMENT_SPLIT = re.compile("[%s=]" % _JS_SPACE)
+
+
+def _secret_value(value: str) -> bool:
+    return bool(JWT_SHAPE.search(value) or _SECRET_VALUE.search(value) or _long_secret(value))
+
+
+def _path_like(piece: str) -> bool:
+    return bool(_PATH_LIKE.match(piece)) or (
+        bool(re.search(r"[\\/]", piece))
+        and (bool(re.search(r"\.[A-Za-z0-9]{1,8}\Z", piece))
+             or any(re.fullmatch(r"[a-z][a-z0-9_-]{2,}", segment) for segment in re.split(r"[\\/]", piece))))
+
+
+def _secret_argument(value: str) -> bool:
+    if JWT_SHAPE.search(value) or _SECRET_VALUE.search(value) or _BEARER.search(value):
+        return True
+    return any(any(_long_secret(part) for part in re.split(r"[\\/]", piece)) if _path_like(piece) else _long_secret(piece)
+               for piece in _ARGUMENT_SPLIT.split(value))
+
+
+_SPECIAL = ("http", "https", "ws", "wss", "ftp", "file")
+_FORBIDDEN_HOST = set("\x00\t\n\r #/:<>?@[\\]^|")
+_FORBIDDEN_DOMAIN = _FORBIDDEN_HOST | set(chr(c) for c in range(0x20)) | {"%", "\x7f"}
+
+
+def _ipv4_number(part: str) -> Optional[int]:
+    base = 10
+    if part[:2].lower() == "0x":
+        part, base = part[2:], 16
+    elif len(part) > 1 and part[0] == "0":
+        part, base = part[1:], 8
+    if part == "":
+        return 0
+    digits = {10: "0123456789", 16: "0123456789abcdefABCDEF", 8: "01234567"}[base]
+    return int(part, base) if all(c in digits for c in part) else None
+
+
+def _domain_ok(host: str) -> bool:
+    """The WHATWG host parser on a special scheme's host, enough to know when `new URL` refuses it."""
+    if host.startswith("["):
+        return host.endswith("]") and _ipv6_ok(host[1:-1])
+    if re.search(r"%(?![0-9A-Fa-f]{2})", host) is None:
+        try:
+            host = urllib.parse.unquote_to_bytes(host).decode("utf-8")
+        except UnicodeDecodeError:
+            return False
+    if any(c in _FORBIDDEN_DOMAIN for c in host):
+        return False
+    if any(ord(c) > 0x7f for c in host):
+        try:
+            host = host.encode("idna").decode("ascii")
+        except UnicodeError:
+            return False
+    labels = host.split(".")
+    if labels and labels[-1] == "" and len(labels) > 1:
+        labels = labels[:-1]
+    last = labels[-1] if labels else ""
+    if not (last and (last.isdigit() and last.isascii() or re.fullmatch(r"0[xX][0-9A-Fa-f]*", last))):
+        return host != ""
+    numbers = [_ipv4_number(label) for label in labels]
+    if len(numbers) > 4 or any(n is None for n in numbers):
+        return False
+    return all(n <= 255 for n in numbers[:-1]) and numbers[-1] < 256 ** (5 - len(numbers))
+
+
+def _ipv6_ok(text: str) -> bool:
+    try:
+        ipaddress.IPv6Address(text)
+        return True
+    except ValueError:
+        return False
+
+
+def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
+    """The password, query and fragment `new URL(value)` gives, or None where it throws. A subset of the WHATWG URL
+    parser: an absolute URL with `//` authority, as the members that reach it are (_urls_in starts each at a scheme)."""
+    value = re.sub(r"[\t\n\r]", "", value.strip("".join(chr(c) for c in range(0x21))))
+    match = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):", value)
+    if not match:
+        return None
+    scheme, rest = match.group(1).lower(), value[match.end():]
+    special = scheme in _SPECIAL
+    if special:
+        rest = rest.replace("\\", "/")
+    if not rest.startswith("//"):
+        return {"password": "", "query": "", "fragment": ""} if not special else None
+    rest = rest[2:].lstrip("/") if special and scheme != "file" else rest[2:]
+    end = len(rest)
+    for stop in "/?#":
+        at = rest.find(stop)
+        if at >= 0:
+            end = min(end, at)
+    authority, tail = rest[:end], rest[end:]
+    fragment = tail.split("#", 1)[1] if "#" in tail else ""
+    before = tail.split("#", 1)[0]
+    query = before.split("?", 1)[1] if "?" in before else ""
+    if scheme == "file":
+        return {"password": "", "query": query, "fragment": fragment} if authority == "" or _domain_ok(authority) else None
+    userinfo, _, hostport = authority.rpartition("@")
+    password = userinfo.split(":", 1)[1] if ":" in userinfo else ""
+    if hostport.startswith("["):
+        close = hostport.find("]")
+        if close < 0:
+            return None
+        host, after = hostport[:close + 1], hostport[close + 1:]
+        if after and not after.startswith(":"):
+            return None
+        port = after[1:]
+    else:
+        host, _, port = hostport.partition(":")
+    if port and not (port.isascii() and port.isdigit() and int(port) <= 65535):
+        return None
+    if special:
+        if host == "" or not _domain_ok(host):
+            return None
+    elif host.startswith("["):
+        if not _ipv6_ok(host[1:-1]):
+            return None
+    elif any(c in _FORBIDDEN_HOST for c in host):
+        return None
+    elif host == "" and (userinfo or port):
+        return None
+    return {"password": password, "query": query, "fragment": fragment}
+
+
+def _secret_url(value: str) -> bool:
+    """The contract's secretUrl (DEC-0044): what _secret_argument finds, a password, or a query or fragment value
+    named or shaped like a credential, in a URL WHATWG parses; one it refuses is read as an argument only."""
+    if _secret_argument(value):
+        return True
+    parts = _whatwg_parts(value)
+    if parts is None:
+        return False
+    if parts["password"]:
+        return True
+    return any((raw != "" and credential_name(name)) or _secret_value(raw)
+               for part in (parts["query"], parts["fragment"]) for name, raws in raw_values(part).items() for raw in raws)
+
+
 def _credential(value: str, runs: bool) -> bool:
-    return bool(JWT_SHAPE.search(value) or _KEY_SHAPE.search(value) or _BEARER_INSIDE.search(value)
-                or (runs and _long_run(value)) or any(secret_url(url) for url in _urls_in(value)))
+    return bool(JWT_SHAPE.search(value) or _KEY_SHAPE.search(value) or _BEARER.search(value)
+                or (runs and _long_run(value)) or any(_secret_url(url) for url in _urls_in(value)))
 
 
 def _beyond_shape(connections: Sequence[Dict[str, Any]]) -> List[str]:
@@ -215,14 +367,27 @@ def connections_extension(declared: Iterable[Mapping[str, Any]], degraded: Seque
     own checks (`states`, by id), else `degraded` when a `degraded[].source` names it, else `unknown`. A declared
     `state` is kept. Raises ServiceError on a declaration a host would hide (the schema, a repeated id, a credential):
     a service never publishes one that reads as "declared nothing"."""
-    checks = dict(states or {})
+    if declared is None or isinstance(declared, (str, bytes, Mapping)) or not isinstance(declared, Iterable):
+        raise ServiceError("Connections declaration: declared is a list of connections.")
+    if degraded is None:
+        degraded = ()
+    if states is None:
+        states = {}
+    if isinstance(degraded, (str, bytes, Mapping)) or not isinstance(degraded, Iterable) or not isinstance(states, Mapping):
+        raise ServiceError("Connections declaration: degraded is a list of entries and states a mapping by id.")
     failing = {entry.get("source") for entry in degraded if isinstance(entry, Mapping) and isinstance(entry.get("source"), str)}
-    connections: List[Dict[str, Any]] = []
+    connections: List[Any] = []
     for item in declared:
-        connection = {k: v for k, v in item.items()}
+        if not isinstance(item, Mapping):
+            connections.append(item)  # the shape check names it and the declaration is refused
+            continue
+        connection = dict(item)
         if "state" not in connection:
             ident = connection.get("id") if isinstance(connection.get("id"), str) else None
-            connection["state"] = (checks.get(ident) if ident else None) or ("degraded" if ident in failing else "unknown")
+            if ident is not None and ident in states:
+                connection["state"] = states[ident]  # an invalid check value is refused by the shape check
+            else:
+                connection["state"] = "degraded" if ident in failing else "unknown"
         connections.append(connection)
     value = {"connections": connections}
     view = connections_view({"extensions": {CONNECTIONS_EXTENSION_KEY: value}})

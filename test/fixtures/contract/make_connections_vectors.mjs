@@ -4,7 +4,10 @@
 //
 //   node test/fixtures/contract/make_connections_vectors.mjs --contract <a clean checkout of the contract at the pin>
 //     --contract-src <dir with its src/*.ts staged, .js imports rewritten to .ts, beside a node_modules that holds ajv>
-//     [--out test/fixtures/contract/connections-vectors.json]
+//     [--out test/fixtures/contract/connections-vectors.json] [--extra test/fixtures/kit-connections-inputs.json]
+//
+// With --extra, the kit's own inputs are answered by the same connectionsView into connections-extra-vectors.json beside
+// --out, so both twins are held to the reference beyond the contract's cases.
 //
 // Needs Node 24 or later (type stripping). The reference's `errors` wording is not part of a vector.
 
@@ -25,3 +28,13 @@ for (const c of vectors.cases) {
   if (!same(answer, c.expected)) throw new Error(`the contract's connections case "${c.name}" no longer answers as written`);
 }
 fs.writeFileSync(out, `${JSON.stringify({ ...vectors, source: 'fixtures/vectors/connections.json' }, null, 2)}\n`);
+
+if (args.extra) {
+  const extra = JSON.parse(fs.readFileSync(args.extra, 'utf8'));
+  const cases = extra.inputs.map((input) => {
+    const { declared, reported, connections } = connectionsView(input);
+    return { input, expected: { declared, reported, connections } };
+  });
+  fs.writeFileSync(path.join(path.dirname(out), 'connections-extra-vectors.json'),
+    `${JSON.stringify({ about: 'The kit\'s inputs (test/fixtures/kit-connections-inputs.json), each answered by the contract\'s connectionsView at the pin. Never written by hand.', cases }, null, 1)}\n`);
+}

@@ -12,7 +12,10 @@
   `connections_view` / `connectionsView` read a peer's list as the contract's reference does; both answer all 127
   cases of the contract's `fixtures/vectors/connections.json`, vendored by `make_connections_vectors.mjs`.
   `build_well_known` / `buildWellKnown` refuse an invalid declaration passed in by hand, `check_service.py` reports
-  `well-known.connections`, and the `fabric_service` facades re-export the four names.
+  `well-known.connections`, and the `fabric_service` facades re-export the four names. The Python twin reads
+  credentials with the reference's ECMAScript semantics (ASCII case folding and word boundary, ECMAScript's whitespace,
+  a URL WHATWG refuses read as text only); 462 more inputs, answered by the contract's reader into
+  `connections-extra-vectors.json`, hold both twins to it.
 
 ### Changed
 
