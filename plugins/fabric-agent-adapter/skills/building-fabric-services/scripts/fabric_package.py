@@ -900,8 +900,7 @@ def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
 
 
 def fd_write(path: Path, text: str) -> None:
-    """Write through a temporary file in the same folder and rename it over, so a reader never sees half a file. The
-    bytes as given: text mode would write \r\n on Windows, and the Node kit writes the same file with \n (FAA-72)."""
+    """Write through a temporary file and rename it over; bytes, as the Node kit writes them (text mode: \r\n on Windows)."""
     temp = path.with_name(".%s.tmp-%d" % (path.name, os.getpid()))
     temp.write_bytes(text.encode("utf-8"))
     os.replace(temp, path)
@@ -950,15 +949,14 @@ def verify(folder: Any, trust: Dict[str, Any], countersigned: bool = False) -> D
 
 
 def _emit(text: str) -> None:
-    """One answer line in UTF-8 ending in \\n, as the Node kit writes it, whatever the locale: a Windows pipe takes the
-    code page (cp1252), which cannot encode most of what a manifest may name (FAA-72)."""
-    out = sys.stdout
-    if not hasattr(out, "buffer"):  # a stream a caller put in place: text is what it takes
-        out.write(text + "\n")
+    """One answer line, UTF-8 and \\n as the Node kit writes it, whatever the locale (a Windows pipe is cp1252; FAA-72)."""
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is None:  # a stream a caller put in place takes text
+        sys.stdout.write(text + "\n")
         return
-    out.flush()
-    out.buffer.write((text + "\n").encode("utf-8"))
-    out.buffer.flush()
+    sys.stdout.flush()
+    buffer.write((text + "\n").encode("utf-8"))
+    buffer.flush()
 
 
 def main(argv: Optional[List[str]] = None) -> int:
