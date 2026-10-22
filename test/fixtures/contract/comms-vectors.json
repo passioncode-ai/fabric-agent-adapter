@@ -143,6 +143,29 @@
       }
     },
     {
+      "name": "comms-complete-outcome-unknown",
+      "schema": "comms-complete.schema.json",
+      "valid": false,
+      "document": {
+        "fence": {
+          "request": "req_A1b2C3d4E5",
+          "generation": 2,
+          "attempt": "att_Zx9Cv8Bn7M",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedRevision": 3,
+          "idempotency": {
+            "epoch": 3,
+            "key": "accept-req_A1b2C3d4E5-1"
+          }
+        },
+        "outcome": {
+          "state": "outcome_unknown",
+          "observed": true,
+          "summary": "Retention computed from the warehouse; query attached."
+        }
+      }
+    },
+    {
       "name": "comms-status",
       "schema": "comms-status.schema.json",
       "valid": true,

@@ -201,7 +201,10 @@ class SchemaParityTests(unittest.TestCase):
     @unittest.skipUnless(os.environ.get("FABRIC_CONTRACT_NEW"), "NOT_RUN: set FABRIC_CONTRACT_NEW to a contract checkout at the pin")
     def test_the_url_pattern_is_the_pinned_schema_pattern(self):
         schema = json.loads((Path(os.environ["FABRIC_CONTRACT_NEW"]) / "schemas/provider.schema.json").read_text())
-        url = schema["properties"]["run"]["properties"]["mcp"]["oneOf"][1]["properties"]["url"]["pattern"]
+        mcp = schema["properties"]["run"]["properties"]["mcp"]
+        # Since contract 40eb352 the stdio and URL branches are if/then/else keyed on `stdio` (FAA-95); before, a oneOf.
+        branch = mcp["else"] if "else" in mcp else mcp["oneOf"][1]
+        url = branch["properties"]["url"]["pattern"]
         self.assertEqual(fp.URL_PATTERN, url)
         common = json.loads((Path(os.environ["FABRIC_CONTRACT_NEW"]) / "schemas/service-common.schema.json").read_text())["$defs"]
         self.assertEqual(fp.LOCAL_PATH_PATTERN, common["localPath"]["pattern"])

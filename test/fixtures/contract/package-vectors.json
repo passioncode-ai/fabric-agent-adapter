@@ -6067,6 +6067,242 @@
           }
         ]
       }
+    },
+    {
+      "name": "fabric-package-path-line-separator-dot-dot",
+      "valid": false,
+      "document": {
+        "schema": "fabric-package/1",
+        "kind": "skill-set",
+        "id": "writing-rules",
+        "version": "1.4.0",
+        "publisher": "example",
+        "licence": "MIT",
+        "layer": "org",
+        "runners": [
+          "claude-code",
+          "codex"
+        ],
+        "skills": [
+          "plain-words",
+          "release-notes"
+        ],
+        "allowedToolsCeiling": [
+          "Read",
+          "Grep"
+        ],
+        "listingChars": 410,
+        "requires": {
+          "packages": []
+        },
+        "evals": {
+          "suite": "evals/suite.json"
+        },
+        "files": [
+          {
+            "path": ".claude-plugin/plugin.json",
+            "sha256": "sha256:59879d9c2f7c4bf4a962f827da4f3c346f44ba3867e421600bfe0f52e82a2966"
+          },
+          {
+            "path": "skills /../../etc/passwd",
+            "sha256": "sha256:f350390c79736fa5136f5876efe489b34a70f72aaf14d5b0a52451184e62e4d7"
+          },
+          {
+            "path": "skills/plain-words/SKILL.md",
+            "sha256": "sha256:bf6e018d3da34113efaedc9d22c635be632fd5c96b963cf87e9240ce21db0690"
+          },
+          {
+            "path": "skills/release-notes/SKILL.md",
+            "sha256": "sha256:eb7594c8c6af400e05ecfc388b21d8c69c996bf10928ab48056bb9c31486c152"
+          }
+        ],
+        "digest": "sha256:0c0afca9fa465b4655d496e23813c34c6eaa97a1f36739cce9b6b454f2b23bd5",
+        "signatures": [
+          {
+            "role": "publisher",
+            "alg": "EdDSA",
+            "kid": "example-publisher-2026",
+            "sig": "JcmTymO1AVzP4kHr8NItLiw8rYjNm4FnG_Xll4rK2vl_o0T1uqvXeiLk6HolhJ0KQeMCj193twbzvALYWyeVBQ"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fabric-package-path-paragraph-separator-dot-dot",
+      "valid": false,
+      "document": {
+        "schema": "fabric-package/1",
+        "kind": "skill-set",
+        "id": "writing-rules",
+        "version": "1.4.0",
+        "publisher": "example",
+        "licence": "MIT",
+        "layer": "org",
+        "runners": [
+          "claude-code",
+          "codex"
+        ],
+        "skills": [
+          "plain-words",
+          "release-notes"
+        ],
+        "allowedToolsCeiling": [
+          "Read",
+          "Grep"
+        ],
+        "listingChars": 410,
+        "requires": {
+          "packages": []
+        },
+        "evals": {
+          "suite": "evals/suite.json"
+        },
+        "files": [
+          {
+            "path": ".claude-plugin/plugin.json",
+            "sha256": "sha256:59879d9c2f7c4bf4a962f827da4f3c346f44ba3867e421600bfe0f52e82a2966"
+          },
+          {
+            "path": "skills /../../etc/passwd",
+            "sha256": "sha256:f350390c79736fa5136f5876efe489b34a70f72aaf14d5b0a52451184e62e4d7"
+          },
+          {
+            "path": "skills/plain-words/SKILL.md",
+            "sha256": "sha256:bf6e018d3da34113efaedc9d22c635be632fd5c96b963cf87e9240ce21db0690"
+          },
+          {
+            "path": "skills/release-notes/SKILL.md",
+            "sha256": "sha256:eb7594c8c6af400e05ecfc388b21d8c69c996bf10928ab48056bb9c31486c152"
+          }
+        ],
+        "digest": "sha256:0c0afca9fa465b4655d496e23813c34c6eaa97a1f36739cce9b6b454f2b23bd5",
+        "signatures": [
+          {
+            "role": "publisher",
+            "alg": "EdDSA",
+            "kid": "example-publisher-2026",
+            "sig": "JcmTymO1AVzP4kHr8NItLiw8rYjNm4FnG_Xll4rK2vl_o0T1uqvXeiLk6HolhJ0KQeMCj193twbzvALYWyeVBQ"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fabric-package-path-line-separator-backslash",
+      "valid": false,
+      "document": {
+        "schema": "fabric-package/1",
+        "kind": "skill-set",
+        "id": "writing-rules",
+        "version": "1.4.0",
+        "publisher": "example",
+        "licence": "MIT",
+        "layer": "org",
+        "runners": [
+          "claude-code",
+          "codex"
+        ],
+        "skills": [
+          "plain-words",
+          "release-notes"
+        ],
+        "allowedToolsCeiling": [
+          "Read",
+          "Grep"
+        ],
+        "listingChars": 410,
+        "requires": {
+          "packages": []
+        },
+        "evals": {
+          "suite": "evals/suite.json"
+        },
+        "files": [
+          {
+            "path": ".claude-plugin/plugin.json",
+            "sha256": "sha256:59879d9c2f7c4bf4a962f827da4f3c346f44ba3867e421600bfe0f52e82a2966"
+          },
+          {
+            "path": "skills \\..\\etc",
+            "sha256": "sha256:f350390c79736fa5136f5876efe489b34a70f72aaf14d5b0a52451184e62e4d7"
+          },
+          {
+            "path": "skills/plain-words/SKILL.md",
+            "sha256": "sha256:bf6e018d3da34113efaedc9d22c635be632fd5c96b963cf87e9240ce21db0690"
+          },
+          {
+            "path": "skills/release-notes/SKILL.md",
+            "sha256": "sha256:eb7594c8c6af400e05ecfc388b21d8c69c996bf10928ab48056bb9c31486c152"
+          }
+        ],
+        "digest": "sha256:0c0afca9fa465b4655d496e23813c34c6eaa97a1f36739cce9b6b454f2b23bd5",
+        "signatures": [
+          {
+            "role": "publisher",
+            "alg": "EdDSA",
+            "kid": "example-publisher-2026",
+            "sig": "JcmTymO1AVzP4kHr8NItLiw8rYjNm4FnG_Xll4rK2vl_o0T1uqvXeiLk6HolhJ0KQeMCj193twbzvALYWyeVBQ"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fabric-package-path-line-separator-double-slash",
+      "valid": false,
+      "document": {
+        "schema": "fabric-package/1",
+        "kind": "skill-set",
+        "id": "writing-rules",
+        "version": "1.4.0",
+        "publisher": "example",
+        "licence": "MIT",
+        "layer": "org",
+        "runners": [
+          "claude-code",
+          "codex"
+        ],
+        "skills": [
+          "plain-words",
+          "release-notes"
+        ],
+        "allowedToolsCeiling": [
+          "Read",
+          "Grep"
+        ],
+        "listingChars": 410,
+        "requires": {
+          "packages": []
+        },
+        "evals": {
+          "suite": "evals/suite.json"
+        },
+        "files": [
+          {
+            "path": ".claude-plugin/plugin.json",
+            "sha256": "sha256:59879d9c2f7c4bf4a962f827da4f3c346f44ba3867e421600bfe0f52e82a2966"
+          },
+          {
+            "path": "skills //etc/passwd",
+            "sha256": "sha256:f350390c79736fa5136f5876efe489b34a70f72aaf14d5b0a52451184e62e4d7"
+          },
+          {
+            "path": "skills/plain-words/SKILL.md",
+            "sha256": "sha256:bf6e018d3da34113efaedc9d22c635be632fd5c96b963cf87e9240ce21db0690"
+          },
+          {
+            "path": "skills/release-notes/SKILL.md",
+            "sha256": "sha256:eb7594c8c6af400e05ecfc388b21d8c69c996bf10928ab48056bb9c31486c152"
+          }
+        ],
+        "digest": "sha256:0c0afca9fa465b4655d496e23813c34c6eaa97a1f36739cce9b6b454f2b23bd5",
+        "signatures": [
+          {
+            "role": "publisher",
+            "alg": "EdDSA",
+            "kid": "example-publisher-2026",
+            "sig": "JcmTymO1AVzP4kHr8NItLiw8rYjNm4FnG_Xll4rK2vl_o0T1uqvXeiLk6HolhJ0KQeMCj193twbzvALYWyeVBQ"
+          }
+        ]
+      }
     }
   ],
   "semantic": [

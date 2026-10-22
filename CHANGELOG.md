@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.43.0 (2026-10-22)
+
+### Changed
+
+- **Pinned to contract `bfa9a67`** (FAA-95; the contract review, PR #137 and #138, DEC-0096 and DEC-0097). `c55f2d5`
+  (0.39.0 to 0.42.1) joins the supported revisions. Every vendored vector was regenerated from the contract's own
+  functions at the pin: new negative package fixtures, a `comms-complete` case and `fabric-connections` in the register.
+- **A delegation chain names a partner only for a partner actor** (contract `src/delegation.ts` at `bfa9a67`): an actor
+  that carries `partner` beside `sub` is named by its `sub` in the verified `chain`, in both kits.
+- **`fabric-connections/0.1` is in both protocol registers** (DEC-0096), so a `protocols` list naming it is read as
+  the contract reads it. The kits do not emit the extension yet (FAA-62).
+- **The provider schema's MCP branches are read as `if`/`then`/`else`** (the contract review): the schema parity test
+  takes the URL pattern from `else` (a `oneOf` before); the pattern itself is unchanged. No kit code walked that `oneOf`.
+
+### Fixed
+
+- **The kit's copy of `fabric-package.schema.json` carries DEC-0097's path pattern.** ECMAScript's `.` stops at U+2028
+  and U+2029, so the old pattern accepted `skills<U+2028>/../../etc/passwd`; any character is now `[\s\S]`. Both kits'
+  own package checks already refused these paths (0.41.0). `share-registration.schema.json` is regenerated at the pin.
+- **A guard holds the kit's vendored schemas to the pin:** `test_the_kit_schemas_carry_the_patterns_of_the_pinned_contract`
+  fails when a pattern in either copy is not a pattern of that schema's `$ref` closure at the pinned contract.
+
 ## 0.42.1 (2026-10-22)
 
 The first published release of the 0.42 line: everything in 0.42.0 below, plus one test fix.

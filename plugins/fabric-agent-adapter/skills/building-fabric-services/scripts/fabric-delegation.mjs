@@ -188,7 +188,8 @@ export function chainDepth(act) {
 
 function chainOf(act) {
   const chain = [];
-  for (let node = act; node; node = 'act' in node ? node.act : undefined) chain.push('partner' in node ? node.partner : node.sub);
+  // The contract's chainOf at bfa9a67: a node names its partner only when it is a partner actor (the partner member alone).
+  for (let node = act; node; node = 'act' in node ? node.act : undefined) chain.push(isPartnerActor(node) ? node.partner : node.sub);
   return chain;
 }
 

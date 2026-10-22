@@ -2,6 +2,7 @@
 import json
 import argparse
 import os
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -11,7 +12,8 @@ from unittest.mock import patch
 from test_adapt_project import ADAPTER, ROOT, scaffold_args
 
 OLD = '2ce392291c6668598d12cd38327e24696b5ca15c'
-NEW = 'c55f2d5a11c9a0197e958e87212fca7ae1154769'
+NEW = 'bfa9a67aa3c6cb808c093e7d83cd59799f1ee7d0'
+DEC95 = 'c55f2d5a11c9a0197e958e87212fca7ae1154769'  # DEC-0089…0095 (0.39.0…0.42.1); bundles issued under it stay valid
 DEC88 = '07042181bfae2a481aa0da1a5651f24c76669c48'  # DEC-0084…0088 (0.36.0…0.37.1); bundles issued under it stay valid
 DEC83 = 'd8146cfb0a1c74fc6432284c4356bb0c864b37b5'  # DEC-0083 (0.34.0…0.35.4); bundles issued under it stay valid
 DEC82 = '82e163665e156a08aa3b92e4711015582c06162c'  # DEC-0082 (0.33.0); bundles issued under it stay valid
@@ -36,7 +38,7 @@ FIXTURES = ROOT / 'test/fixtures/contract-revisions/legacy'
 class RevisionTests(unittest.TestCase):
     def test_default_is_new_and_supported_revisions_are_immutable(self):
         self.assertEqual(ADAPTER.CONTRACT_COMMIT, NEW)
-        self.assertEqual(ADAPTER.SUPPORTED_CONTRACT_COMMITS, (NEW, DEC88, DEC83, DEC82, DEC79, DEC78, DEC77, DEC57, DEC55, DEC46, DEC45, DEC39, DEC36, DEC35, DEC33, DEC31, PREVIOUS, PRIOR, EARLIER, OLD))
+        self.assertEqual(ADAPTER.SUPPORTED_CONTRACT_COMMITS, (NEW, DEC95, DEC88, DEC83, DEC82, DEC79, DEC78, DEC77, DEC57, DEC55, DEC46, DEC45, DEC39, DEC36, DEC35, DEC33, DEC31, PREVIOUS, PRIOR, EARLIER, OLD))
 
     def test_complete_issued_legacy_bundles_remain_locally_valid(self):
         for profile in ('mcp', 'a2a', 'local-runner'):
@@ -143,3 +145,38 @@ class CompiledRevisionTests(unittest.TestCase):
                     value['capabilities'][0]['name'] = name
                     path.write_text(json.dumps(value))
                     self.assertShape(root, contract, 'FAIL')
+
+    def test_the_kit_schemas_carry_the_patterns_of_the_pinned_contract(self):
+        """FAA-95: the kit ships closed copies of two contract schemas (their $ref targets inlined). Every pattern in a
+        copy must be a pattern of that schema or of a schema its $ref closure reaches at the pin, so a contract fix to
+        a pattern (DEC-0097 replaced `.` with `[\\s\\S]`) cannot stay behind in the kit."""
+        kit = ROOT / 'plugins/fabric-agent-adapter/skills/building-fabric-services/scripts'
+        schemas = self.new / 'schemas'
+
+        def patterns(value, found):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if key == 'pattern' and isinstance(item, str):
+                        found.add(item)
+                    patterns(item, found)
+            elif isinstance(value, list):
+                for item in value:
+                    patterns(item, found)
+            return found
+
+        def closure(name, seen):
+            if name in seen:
+                return seen
+            seen.add(name)
+            text = (schemas / name).read_text()
+            for ref in set(re.findall(r'"\$ref":\s*"([^"#]+)#', text)):
+                closure(ref, seen)
+            return seen
+
+        for name in ('fabric-package.schema.json', 'share-registration.schema.json'):
+            with self.subTest(schema=name):
+                allowed = set()
+                for reached in closure(name, set()):
+                    patterns(json.loads((schemas / reached).read_text()), allowed)
+                shipped = patterns(json.loads((kit / name).read_text()), set())
+                self.assertEqual(sorted(shipped - allowed), [], 'patterns the pinned contract does not carry')
