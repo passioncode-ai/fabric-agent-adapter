@@ -59,6 +59,8 @@ def openclaw_edit(data, script, remove):
             return True
         if not value.replace('\\', '/').endswith('/working-with-fabric/scripts/hosts/openclaw'):
             return False
+        if remove and not Path(value).exists():
+            return True  # our layout, its folder gone (FAA-90): no manifest left to read, and a dead load path
         try:
             manifest = fs.read_small(Path(value) / 'openclaw.plugin.json')
             return isinstance(manifest, str) and json.loads(manifest).get('id') == IDENTITY

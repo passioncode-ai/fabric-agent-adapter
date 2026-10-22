@@ -137,7 +137,8 @@ the floor minus 40 and at 360, 480, 768 and 1280 px, and reports ED-1…ED-5 per
 Playwright where it runs (`npm i -D playwright && npx playwright install webkit`, or `--playwright
 <dir>`); without it every rule is `NOT_RUN`, and the probe asks for no login code. ED-3 also fails a link clipped
 vertically by the viewport or a clipping ancestor; ED-4 is `NOT_RUN` on a page past its 6000-element cap. It does not measure edge shades or that a refresh keeps
-the scroll position: say so in the report. A `NOT_RUN` is not a pass.
+the scroll position: say so in the report. A `NOT_RUN` is not a pass. Exit codes: 0 when no rule fails and at least
+one passed, 1 on a `FAIL`, 2 on a usage error, 3 when no rule was measured (every rule `NOT_RUN`, since 0.44.0).
 
 ## Upgrading an existing dashboard
 

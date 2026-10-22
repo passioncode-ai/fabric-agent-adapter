@@ -42,10 +42,12 @@ test('fabric-package.mjs runs through a symlinked folder', (t) => {
   assert.equal(r.status, 1, 'the refusal, not a silent exit 0: ' + r.stdout + r.stderr);
 });
 
-test('a layout report with no rule in it is not a pass', () => {
+test('a layout report that measured nothing is not a pass (exit 3, FAA-96)', () => {
   // A file URL, never a path: Windows reads `D:\...` in an import as a URL with the scheme `d:`.
   const source = `import { report } from ${JSON.stringify(pathToFileURL(path.join(scripts, 'check_dashboard_layout.mjs')).href)};
-process.exitCode = report([], { json: true }, 'x') === 0 ? 9 : 0;`;
+const all = report([{ rule: 'ED-1', width: 0, verdict: 'NOT_RUN', evidence: 'x' }], { json: true }, 'x');
+const some = report([{ rule: 'ED-1', width: 0, verdict: 'NOT_RUN', evidence: 'x' }, { rule: 'ED-2', width: 360, verdict: 'PASS', evidence: 'y' }], { json: true }, 'x');
+process.exitCode = report([], { json: true }, 'x') === 3 && all === 3 && some === 0 ? 0 : 9;`;
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', source], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });

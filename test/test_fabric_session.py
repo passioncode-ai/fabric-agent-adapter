@@ -546,6 +546,19 @@ class StopAndEndActive(Base):
         self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8),
                          ("down", "Fabric holds no session for this id"))
 
+    def test_a_server_that_closes_stdin_and_exits_3_later_is_no_session(self):
+        """FAA-97: a broken pipe waited only 1 s for the exit status, so a server still alive then was logged as
+        `outcome=unknown` and its spool kept. The wait now runs to the deadline."""
+        script = self.base / "late-exit.py"
+        script.write_text("import os, sys, time\nos.close(0)\ntime.sleep(2.0)\nsys.exit(3)\n")
+        client = fs.McpStdio([sys.executable, str(script)], str(self.base), self.env, time.monotonic() + 8)
+        time.sleep(0.5)
+        try:
+            with self.assertRaises(fs.NoSessionError):
+                client.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}})
+        finally:
+            client.close()
+
     def test_an_end_while_no_session_is_held_removes_the_folder(self):
         directory = fs.session_dir(SID, self.env)
         directory.mkdir(parents=True)

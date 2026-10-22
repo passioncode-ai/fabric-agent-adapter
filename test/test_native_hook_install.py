@@ -78,5 +78,16 @@ class NativeInstallTests(unittest.TestCase):
         before=p.read_bytes()
         self.assertEqual(self.run_cli('openclaw','--remove'),0)
         self.assertEqual(p.read_bytes(),before)
+    def test_openclaw_remove_drops_our_load_path_when_its_folder_is_gone(self):
+        """FAA-90: the ownership check read the folder's manifest, so a load path whose plugin folder was deleted (an
+        older install, a moved checkout) was never removed. A path in our layout whose folder is gone is dropped."""
+        gone = str(self.home / 'old/plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/openclaw')
+        foreign = str(self.home / 'other-plugin')
+        p = self.home/'.openclaw/openclaw.json'; p.parent.mkdir()
+        p.write_text(json.dumps({'plugins': {'entries': {h.IDENTITY: {'enabled': True, 'hooks': {'allowConversationAccess': True, 'allowPromptInjection': True}}}, 'load': {'paths': [gone, foreign]}}}))
+        self.assertEqual(self.run_cli('openclaw', '--remove'), 0)
+        doc = json.loads(p.read_text())
+        self.assertEqual(doc['plugins']['load']['paths'], [foreign])
+        self.assertNotIn(h.IDENTITY, doc['plugins'].get('entries', {}))
 
 if __name__=='__main__':unittest.main()

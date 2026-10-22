@@ -289,7 +289,7 @@ propagation, event trace pairs, and `board.responder` for a service that declare
 any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
-and 1280 px; needs Playwright, else `NOT_RUN`).
+and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured).
 
 Then prove the lock: start a second copy by hand against the same data directory; it
 must exit 75 while the first keeps serving. Prove recovery: `kill -9` the launchd pid;
