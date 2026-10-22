@@ -209,6 +209,7 @@ class EffectAndCostTests(unittest.TestCase):
     def test_bad_cost_presets_are_refused(self):
         cases = {
             "bad id": [["Quick", "1", "x"]],
+            "id with a trailing newline (R1, FAA-72)": [["quick\n", "1", "x"]],
             "negative": [["quick", "-1", "x"]],
             "not a number": [["quick", "lots", "x"]],
             "not finite": [["quick", "inf", "x"]],

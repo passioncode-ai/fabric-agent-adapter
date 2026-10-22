@@ -630,14 +630,12 @@ def malformed_board_rows(text: str) -> List[str]:
 # validates a whole value ends in `\Z`, or is applied with `re.fullmatch` (which is why a direct `re.fullmatch`
 # call is not checked: fullmatch already demands the end of the string).
 DOLLAR_SCOPES = (
-    ("plugins/fabric-agent-adapter/skills/building-fabric-services/scripts", "*.py"),
-    ("plugins/fabric-agent-adapter/skills/working-with-fabric/scripts", "**/*.py"),
+    ("plugins/fabric-agent-adapter/skills", "*/scripts/**/*.py"),  # every skill's scripts (FAA-72)
 )
 DOLLAR_CALLS = ("compile", "match", "search")
 # (repository-relative path, the pattern exactly as written) -> why `$` is right there. A legitimate entry is a
 # multiline use (re.MULTILINE, where `$` means "end of a line"). Entries that no longer match anything fail, so the
 # list only shrinks by hand and never hides a new pattern.
-_R1_IN_FLIGHT = "converted by FAA-70/FAA-78 in this release"
 DOLLAR_ALLOW = {
     ('plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session_env.py',
      '^\\s*\\[\\s*"?mcp_servers"?\\s*\\.\\s*"?fabric"?\\s*\\]\\s*$'): "re.MULTILINE over a whole config.toml: `$` is the end of each line on purpose",

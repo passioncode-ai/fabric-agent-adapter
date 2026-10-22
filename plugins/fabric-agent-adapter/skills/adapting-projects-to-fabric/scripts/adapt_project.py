@@ -408,7 +408,7 @@ placeholders. Scaffolding is not admission and must not be presented as compatib
 
 EFFECT_CLASSES = ("none", "draft", "publish", "send", "reply", "charge", "delete", "merge", "deploy", "change-policy")
 IDEMPOTENCY = ("required", "supported", "none")
-_PRESET_ID = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
+_PRESET_ID = re.compile(r"^[a-z][a-z0-9-]{0,39}\Z")  # \Z, not `$`: `$` also matches before a trailing newline (R1)
 
 
 def _cost_presets(args: argparse.Namespace) -> List[Dict[str, Any]]:
