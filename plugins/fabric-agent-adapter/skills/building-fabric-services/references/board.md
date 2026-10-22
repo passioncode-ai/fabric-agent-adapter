@@ -126,7 +126,11 @@ contract has no `com.claim` read-back and `com.claim` never moves an accepted re
 transfer without running the handler again. Every transferred request resumes, one at a time as the responder goes
 idle. A transfer makes every fenced idempotency key again, because the old key's digest named the old attempt; a reply
 whose answer was lost is first sent again under its old key and fence, so the board's stored receipt says whether it
-was posted, and it is never posted twice. `shutdown()` drains, then leaves the session (its DELETE releases the slot).
+was posted, and it is never posted twice. That question is asked only after the new attempt is in the checkpoint and the
+request is in the resume queue (the old fence is kept beside it as `probe`): when its answer is lost too, or the board
+answers `not_available` or `capacity_exceeded`, which do not say whether the reply was stored, the request stays first
+in line and the next tick asks again, and a restart asks with the same old fence. `shutdown()` drains, then leaves the
+session (its DELETE releases the slot).
 
 ## When the operator holds work (DEC-0079)
 

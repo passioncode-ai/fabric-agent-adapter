@@ -584,6 +584,58 @@ test('FAA-77 35: a reply lost before a transfer is not sent twice, keys are made
   assert.ok(!h3.kinds().includes('board.down'));
 });
 
+test('FAA-77 35: a second lost answer, on the replied-before probe after the transfer, still completes with one reply', async (t) => {
+  // The replace just renewed the slot, so the session is kept and recovery does not run again: the transferred entry
+  // must already carry the new attempt and wait in the resume queue, and the probe is asked again from there.
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = { state: 'completed', summary: 'ok', reply: { text: 'here' } };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await hub.control({ op: 'drop', tool: 'com.reply' }); // the reply is stored; its answer is lost
+  await r.step();
+  await hub.control({ op: 'end-sessions' });
+  let dropped = false;
+  for (let i = 0; i < 12; i += 1) {
+    if (!dropped && !r.session) {
+      await hub.control({ op: 'drop', tool: 'com.reply' }); // the probe after the replace: stored, answer lost again
+      dropped = true;
+    }
+    await h.advance(Math.max(31, r.waitUntil - h.clock.t));
+    await r.step();
+  }
+  assert.ok(dropped);
+  const s = await h.state();
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(s.replies.length, 1);
+  assert.deepEqual(h.checkpoint(), {});
+  assert.equal(r.state, 'ready');
+
+  // not_available says nothing about whether the old reply was stored: reading it as "not stored" sent a second reply.
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  h2.outcome = h.outcome;
+  const { request: rid2 } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const r2 = h2.responder();
+  await hub2.control({ op: 'drop', tool: 'com.reply' });
+  await r2.step();
+  await hub2.control({ op: 'end-sessions' });
+  let refused = false;
+  for (let i = 0; i < 12; i += 1) {
+    if (!refused && !r2.session) {
+      await hub2.control({ op: 'fail', tool: 'com.reply', code: 'not_available' }); // the probe after the replace
+      refused = true;
+    }
+    await h2.advance(Math.max(31, r2.waitUntil - h2.clock.t));
+    await r2.step();
+  }
+  assert.ok(refused);
+  const s2 = await h2.state();
+  assert.equal(s2.requests[rid2].state, 'completed');
+  assert.equal(s2.replies.length, 1);
+  assert.deepEqual(h2.checkpoint(), {});
+});
+
 test('FAA-77 36: renew never races effect_begin; a revision_conflict on renew or progress reads again and keeps the attempt', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

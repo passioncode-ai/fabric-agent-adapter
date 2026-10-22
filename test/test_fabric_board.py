@@ -619,6 +619,49 @@ class AuditFaultTests(Conversation):
         complete = [a for t, a in self.board.calls if t == "com.complete"][-1]["fence"]
         self.assertEqual(complete["generation"], self.board.slots["video.render"]["generation"])
 
+    def test_a_second_lost_answer_on_the_replied_before_probe_still_completes_once(self):
+        # The transfer is committed, then the probe that asks whether the old reply was stored loses its answer too. The
+        # session is kept (the replace just renewed the slot), so recovery does not run again: the transferred entry must
+        # already carry the new attempt and wait in the resume queue, and the probe is asked again from there.
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        self.board.drop_next["com.reply"] = 1  # the reply is stored; its answer is lost
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        dropped = False
+        for _ in range(12):
+            if not dropped and r.session is None:
+                self.board.drop_next["com.reply"] = 1  # the probe after the replace: stored answer lost again
+                dropped = True
+            self.board.advance(max(31, r.wait_until - self.board.now))
+            r.step()
+        self.assertTrue(dropped)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(len(self.board.replies), 1)
+        self.assertEqual(self.checkpoint(), {})
+        self.assertEqual(r.state, "ready")
+
+    def test_a_probe_the_board_cannot_read_now_is_asked_again_never_read_as_not_stored(self):
+        # not_available says nothing about whether the old reply was stored: reading it as "not stored" sent a second reply.
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        self.board.drop_next["com.reply"] = 1  # the reply is stored; its answer is lost
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        refused = False
+        for _ in range(12):
+            if not refused and r.session is None:
+                self.board.fail_next["com.reply"] = "not_available"  # the probe after the replace
+                refused = True
+            self.board.advance(max(31, r.wait_until - self.board.now))
+            r.step()
+        self.assertTrue(refused)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(len(self.board.replies), 1)
+        self.assertEqual(self.checkpoint(), {})
+
     def test_keys_of_the_old_attempt_are_made_again_after_a_transfer(self):
         self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
         rid = self.board.queue("video.render")

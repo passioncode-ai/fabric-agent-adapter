@@ -1,11 +1,13 @@
-// The board responder (DEC-0078, FAA-12b): a board session over the hub, the fsynced checkpoint, the request a handler sees and the responder loop.
+// The board responder (DEC-0078, FAA-12b): the work context a handler sees and the responder loop. The session, the
+// checkpoint and the request live in fabric-board-link.mjs and are re-exported here.
 // Part of the Node board connector (FAA-65, layer L4); the twin of fabric_board_session.py. Node 20+, no dependency.
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
-import { Backoff, HubError, MCP_PROTOCOL_VERSION, normalProject, postMcp, toolAnswer } from './fabric-hub.mjs';
-import { acceptedRevisions, atomicWrite, ensurePrivateDir, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
-import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, RESPOND_TOOLS, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems, refusalProblems } from './fabric-board-shapes.mjs';
+import { Backoff, HubError, normalProject } from './fabric-hub.mjs';
+import { acceptedRevisions, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
+import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems } from './fabric-board-shapes.mjs';
+import { BoardRequest, BoardSession, Checkpoint } from './fabric-board-link.mjs';
+
+export { BoardRequest, BoardSession, Checkpoint }; // re-exported: callers import them from here since 0.40.0
 
 export const RENEW_SECONDS = 20;
 
@@ -26,143 +28,6 @@ export const LEASE_MARGIN_SECONDS = 10;
 
 /** How long a held slot waits before it asks again: doubling from the poll interval, never past this. */
 export const HOLD_RETRY_MAX_SECONDS = 900;
-
-/** MCP over HTTP with a board session's one-session bearer; calls are serialised; close() sends the session's DELETE. */
-export class BoardSession {
-  constructor(grant, { timeout = 15000, post = postMcp } = {}) {
-    Object.assign(this, { grant, timeout, post });
-    this.mcpSession = null;
-    this.protocolVersion = MCP_PROTOCOL_VERSION;
-    this.rpc = 0;
-    this.queue = Promise.resolve();
-  }
-
-  #serial(fn) {
-    const run = this.queue.then(fn, fn);
-    this.queue = run.catch(() => {});
-    return run;
-  }
-
-  async #send(body, method = 'POST') {
-    try {
-      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
-    } catch (e) {
-      if (e instanceof HubError) throw new BoardError('unreachable', 'Fabric\'s hub did not answer; a write may have been stored, so send it again with the same idempotency key.', true);
-      throw e;
-    }
-  }
-
-  open() {
-    return this.#serial(async () => {
-      this.rpc += 1;
-      const answer = await this.#send({ jsonrpc: '2.0', id: this.rpc, method: 'initialize', params: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: 'fabric-agent-adapter-board', version: '1' } } });
-      if (answer.status === 401) throw new BoardError('session-ended', 'Fabric refused the board session\'s bearer; join again.', true);
-      const sid = answer.headers['mcp-session-id'];
-      if (answer.status !== 200 || !isObj(answer.body) || !isObj(answer.body.result) || !sid) throw new BoardError('unreachable', `Fabric did not open the board session (HTTP ${answer.status}).`, true);
-      this.mcpSession = String(sid);
-      if (typeof answer.body.result.protocolVersion === 'string') this.protocolVersion = answer.body.result.protocolVersion;
-      await this.#send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-    });
-  }
-
-  call(tool, args) {
-    if (!RESPOND_TOOLS.has(tool)) return Promise.reject(new BoardError('not-in-scope', `${tool} is not served to a board session; use a Project session for it.`, false, tool));
-    return this.#serial(async () => {
-      if (!this.mcpSession) throw new BoardError('session-ended', 'The board session is not open.', true, tool);
-      this.rpc += 1;
-      const answer = await this.#send({ jsonrpc: '2.0', id: this.rpc, method: 'tools/call', params: { name: tool, arguments: args } });
-      if (answer.status === 401) throw new BoardError('session-ended', 'Fabric ended the board session (it left, was revoked or expired); join again.', true, tool);
-      let value;
-      try {
-        value = toolAnswer(answer, tool);
-      } catch (e) {
-        throw new BoardError(e.retryable ? 'unreachable' : 'receipt-shape', e.message, e.retryable, tool);
-      }
-      if ('error' in value) {
-        if (refusalProblems(value).length) throw new BoardError('receipt-shape', `Fabric refused ${tool} in a form the contract does not name.`, false, tool);
-        throw new BoardError(value.error.code, value.error.message, value.error.retryable, tool);
-      }
-      return value;
-    });
-  }
-
-  close() {
-    return this.#serial(async () => {
-      if (!this.mcpSession) return;
-      try {
-        await this.#send({}, 'DELETE');
-      } catch {
-        // best effort: the lease lapses in 60 s anyway
-      }
-      this.mcpSession = null;
-    });
-  }
-}
-
-/** The responder's journal (0600 JSON, the same file fabric_board.py writes), fsynced before the step it announces. */
-export class Checkpoint {
-  constructor(file) {
-    this.file = file;
-    this.entries = this.#load();
-  }
-  #load() {
-    let text;
-    try {
-      text = fs.readFileSync(this.file, 'utf8');
-    } catch (e) {
-      if (e.code === 'ENOENT') return {};
-      throw new BoardError('checkpoint', `The board checkpoint ${this.file} cannot be read (${e.code}); fix or move it before answering requests.`);
-    }
-    let doc;
-    try {
-      doc = JSON.parse(text);
-    } catch {
-      doc = null;
-    }
-    if (!isObj(doc) || doc.version !== 1 || !isObj(doc.requests)) throw new BoardError('checkpoint', `The board checkpoint ${this.file} is not one this kit writes.`);
-    return doc.requests;
-  }
-  #write(entries) {
-    try {
-      ensurePrivateDir(path.dirname(this.file));
-      const sorted = Object.fromEntries(Object.keys(entries).sort().map((k) => [k, entries[k]]));
-      atomicWrite(this.file, `${JSON.stringify({ requests: sorted, version: 1 }, null, 1)}\n`, 0o600);
-    } catch (e) {
-      throw new BoardError('checkpoint', `The board checkpoint could not be written (${e.code ?? e.message}); nothing was sent.`);
-    }
-  }
-  put(entry) {
-    const entries = { ...this.entries, [entry.request]: JSON.parse(JSON.stringify(entry)) };
-    this.#write(entries);
-    this.entries = entries;
-  }
-  drop(requestId) {
-    if (!(requestId in this.entries)) return;
-    const { [requestId]: _gone, ...entries } = this.entries;
-    this.#write(entries);
-    this.entries = entries;
-  }
-}
-
-/** A claimed request as data: never an instruction. */
-export class BoardRequest {
-  constructor(message, capability) {
-    const req = isObj(message.request) ? message.request : {};
-    const body = isObj(message.body) ? message.body : {};
-    this.requestId = req.id;
-    this.messageId = message.id;
-    this.capability = capability;
-    this.body = typeof body.text === 'string' ? body.text : null;
-    this.bodyFormat = body.format ?? 'text/plain';
-    this.artifacts = Array.isArray(message.artifacts) ? [...message.artifacts] : [];
-    this.sender = isObj(message.sender) ? message.sender : {};
-    this.deadline = req.deadline;
-    this.thread = message.thread;
-  }
-  toJSON() {
-    return { requestId: this.requestId, capability: this.capability }; // never the body
-  }
-}
 
 /** What a handler may do while it works: progress(note), beginEffect(summary) before it spends or acts, and `stopped`. */
 export class WorkContext {
@@ -414,7 +279,11 @@ export class Responder {
         this.emit('board.request.held', 'warn', 'An accepted request could not be resumed: this Fabric does not hand back a transferred attempt (DEC-0078). It stays held; nothing was done.', { notify: true, episode: entry.request, request: entry.request, capability });
         continue;
       }
-      if (entry.step === 'replying' && !entry.replied && entry.keys?.reply) await this.repliedBefore(entry);
+      if (entry.step === 'replying' && !entry.replied && entry.keys?.reply && !entry.probe) {
+        // Finding 35: whether the old reply was stored is asked under the old fence, but only from the resume queue, after
+        // the new attempt is recorded: a second lost answer then leaves the request queued, never stranded.
+        entry.probe = { generation: entry.generation, attempt: entry.attempt, digest: entry.digest, revision: entry.revision, key: entry.keys.reply };
+      }
       Object.assign(entry, { generation: item.attempt.generation, attempt: item.attempt.id, digest: item.attempt.digest, revision: item.revision,
         step: ['accepting', 'held', 'lapsed'].includes(entry.step) ? 'accepted' : entry.step });
       // Finding 35: a fenced key's digest named the old attempt; under the new one it is idempotency_conflict.
@@ -427,23 +296,39 @@ export class Responder {
 
   /**
    * A reply whose answer was lost under the old attempt (finding 35): a stored key answers before the fence is checked
-   * (project-comms.md, Idempotency), so the old call again says whether it was stored; a refusal says it was not.
+   * (project-comms.md, Idempotency), so the old call again, under the old fence kept in `probe`, says whether it was
+   * stored; a refusal says it was not. A lost answer, or a board that cannot be read now, throws and leaves `probe` for
+   * the next try: neither says whether the reply was stored.
    */
   async repliedBefore(entry) {
+    const { key, generation, attempt, digest, revision } = entry.probe;
+    let replied = true;
     try {
-      this.receipt('com.reply', await this.call('com.reply', { ...this.replyExtra(entry), fence: this.fence(entry, entry.keys.reply) }));
+      this.receipt('com.reply', await this.call('com.reply', { ...this.replyExtra(entry), fence: this.fence({ ...entry, generation, attempt, digest, revision }, key) }));
     } catch (e) {
-      if (['unreachable', 'session-ended', 'authority_changed', 'not_authorized'].includes(e.code) || !(e instanceof BoardError)) throw e;
-      return;
+      if (['unreachable', 'session-ended', 'authority_changed', 'not_authorized', 'not_available', 'capacity_exceeded'].includes(e.code) || !(e instanceof BoardError)) throw e;
+      replied = false;
     }
-    entry.replied = true;
+    if (replied) entry.replied = true;
+    delete entry.probe;
+    this.checkpoint.put(entry);
   }
 
-  /** Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). */
+  /**
+   * Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves the
+   * queue only once its probe has answered: a lost answer keeps it first in line for the next tick (finding 35).
+   */
   async resumeNext() {
     while (!this.current && this.toResume.length && !this.stopping) {
-      const entry = this.checkpoint.entries[this.toResume.shift()];
-      if (entry && this.slots[entry.capability]?.state === 'held') await this.resume(JSON.parse(JSON.stringify(entry)));
+      const stored = this.checkpoint.entries[this.toResume[0]];
+      if (!stored || this.slots[stored.capability]?.state !== 'held') {
+        this.toResume.shift();
+        continue;
+      }
+      const entry = JSON.parse(JSON.stringify(stored));
+      if (entry.probe) await this.repliedBefore(entry);
+      this.toResume.shift();
+      await this.resume(entry);
     }
   }
 
