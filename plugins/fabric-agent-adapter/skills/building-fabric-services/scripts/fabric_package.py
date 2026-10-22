@@ -949,6 +949,18 @@ def verify(folder: Any, trust: Dict[str, Any], countersigned: bool = False) -> D
     return {"ok": bool(verdict.get("ok")) and not problems, "verdict": verdict, "problems": problems}
 
 
+def _emit(text: str) -> None:
+    """One answer line in UTF-8 ending in \\n, as the Node kit writes it, whatever the locale: a Windows pipe takes the
+    code page (cp1252), which cannot encode most of what a manifest may name (FAA-72)."""
+    out = sys.stdout
+    if not hasattr(out, "buffer"):  # a stream a caller put in place: text is what it takes
+        out.write(text + "\n")
+        return
+    out.flush()
+    out.buffer.write((text + "\n").encode("utf-8"))
+    out.buffer.flush()
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="fabric_package.py", description="Pack, sign and verify a fabric-package/1 folder.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -980,9 +992,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             trust = _load_json(Path(args.trust).read_bytes(), args.trust)
             answer = verify(args.folder, trust, countersigned=args.countersigned)
     except (PackageError, OSError) as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, separators=(",", ":")))
+        _emit(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, separators=(",", ":")))
         return 1
-    print(dumps(answer))
+    _emit(dumps(answer))
     return 0 if answer.get("ok") else 1
 
 
