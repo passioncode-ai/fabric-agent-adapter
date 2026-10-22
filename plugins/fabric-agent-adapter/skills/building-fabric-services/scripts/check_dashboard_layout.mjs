@@ -22,6 +22,13 @@ import { pathToFileURL } from 'node:url';
 
 const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 const RULES = ['ED-1', 'ED-2', 'ED-3', 'ED-4', 'ED-5'];
+// The most elements ED-4 and ED-5 walk on one page; past it they say how much they did not see.
+const ELEMENT_CAP = 6000;
+
+// A one-time login code is a credential: no report, error or evidence line carries one.
+export function scrub(text) {
+  return String(text).replace(/([?&#;]code=)[^&#\s"']*/gi, '$1<redacted>');
+}
 
 function usage(message) {
   if (message) process.stderr.write(message + '\n');
@@ -103,7 +110,7 @@ async function serviceTarget(spec, dir) {
 }
 
 // Runs inside the page. Everything it reports is measured from the rendered layout.
-function measure(floor) {
+function measure([floor, cap]) {
   const de = document.documentElement;
   const vw = de.clientWidth;
   const vh = window.innerHeight;
@@ -111,6 +118,9 @@ function measure(floor) {
   const cs = (el) => getComputedStyle(el);
   const scrollsX = (el) => /(auto|scroll)/.test(cs(el).overflowX);
   const clipsX = (el) => cs(el).overflowX !== 'visible';
+  // Vertically a scroll box (auto, scroll) still lets the reader reach what it holds; hidden and clip do not.
+  const clipsY = (el) => /(hidden|clip)/.test(cs(el).overflowY);
+  const pinned = (el) => { for (let a = el; a && a !== de; a = a.parentElement) if (cs(a).position === 'fixed') return true; return false; };
   const label = (el) => {
     const id = el.id ? '#' + el.id : '';
     const cls = typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).join('.') : '';
@@ -118,16 +128,22 @@ function measure(floor) {
   };
   const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && cs(el).visibility !== 'hidden'; };
 
-  // ED-3: a link is reachable when it is fully inside the viewport and not clipped by an ancestor,
-  // or when it sits in a closed <details> whose summary is reachable, or in a menu a visible
+  // ED-3: a link is reachable when it is fully inside the viewport's width, inside the page's height
+  // (the viewport's, for something fixed to it) and not clipped by an ancestor on either axis, or
+  // when it sits in a closed <details> whose summary is reachable, or in a menu a visible
   // aria-controls button opens.
   const inViewport = (el) => {
     const r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0 || r.left < -1 || r.right > vw + 1) return false;
+    const [top, bottom] = pinned(el) ? [0, vh] : [-window.scrollY, de.scrollHeight - window.scrollY];
+    if (r.top < top - 1 || r.bottom > bottom + 1) return false;
     for (let a = el.parentElement; a && a !== de; a = a.parentElement) {
-      if (!clipsX(a)) continue;
+      const x = clipsX(a);
+      const y = clipsY(a);
+      if (!x && !y) continue;
       const ar = a.getBoundingClientRect();
-      if (r.left < ar.left - 1 || r.right > ar.right + 1) return false;
+      if (x && (r.left < ar.left - 1 || r.right > ar.right + 1)) return false;
+      if (y && (r.top < ar.top - 1 || r.bottom > ar.bottom + 1)) return false;
     }
     return true;
   };
@@ -155,9 +171,11 @@ function measure(floor) {
   // unless it is inside a scroll box or clipped by an ancestor that is itself inside the viewport.
   const all = document.body ? document.body.querySelectorAll('*') : [];
   const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]';
+  out.elements = all.length;
+  out.measured = Math.min(all.length, cap);
   let n = 0;
   for (const el of all) {
-    if (++n > 6000) break;
+    if (++n > cap) break;
     if (!visible(el)) continue;
     if (scrollsX(el) && el.scrollWidth > el.clientWidth + 1) {
       const keyboard = el.tabIndex >= 0 || !!el.querySelector(FOCUSABLE);
@@ -214,21 +232,28 @@ export function verdicts(width, floor, m) {
   else add('ED-3', m.nav.unreachable.length ? 'FAIL' : 'PASS',
     m.nav.unreachable.length ? `${m.nav.unreachable.length} of ${m.nav.total} links unreachable: ${m.nav.unreachable.slice(0, 6).join(', ')}` : `${m.nav.total} links reachable`);
   const badBoxes = m.boxes.filter((b) => !b.keyboard || !b.named);
+  // A page larger than the walk: what the walk saw can fail, but it cannot pass for the whole page.
+  const capped = m.elements > m.measured ? `only the first ${m.measured} of ${m.elements} elements measured` : '';
   const problems = [];
   if (m.past.length) problems.push(`past the viewport, not in a scroll box: ${m.past.slice(0, 4).join(', ')}`);
   if (badBoxes.length) problems.push(`scroll box without keyboard access or a name: ${badBoxes.slice(0, 4).map((b) => b.el).join(', ')}`);
-  add('ED-4', problems.length ? 'FAIL' : 'PASS', problems.join('; ') || `${m.boxes.length} overflowing box(es), each keyboard-reachable; edge shades not measured`);
+  if (problems.length) add('ED-4', 'FAIL', problems.join('; ') + (capped ? `; ${capped}` : ''));
+  else if (capped) add('ED-4', 'NOT_RUN', `${capped}: ${m.boxes.length} overflowing box(es) keyboard-reachable among them, the rest not seen`);
+  else add('ED-4', 'PASS', `${m.boxes.length} overflowing box(es), each keyboard-reachable; edge shades not measured`);
   const limit = Math.min(120, m.vh / 4);
   const ed5 = [];
   if (m.chrome > limit) ed5.push(`sticky chrome ${m.chrome} px > ${Math.round(limit)} px`);
   if (m.nested.length) ed5.push(`nested full-height scroller: ${m.nested.slice(0, 3).join(', ')}`);
   if (m.anchor && m.anchor.top < m.chrome - 1) ed5.push(`anchor ${m.anchor.el} lands at ${m.anchor.top} px, under the ${m.chrome} px chrome`);
   add('ED-5', ed5.length ? 'FAIL' : 'PASS', ed5.join('; ') ||
-    `sticky chrome ${m.chrome} px ≤ ${Math.round(limit)} px` + (m.anchor ? `; anchor lands at ${m.anchor.top} px` : '; no in-page anchor to jump to') + '; refresh keeps scroll: not measured');
+    `sticky chrome ${m.chrome} px ≤ ${Math.round(limit)} px` + (m.anchor ? `; anchor lands at ${m.anchor.top} px` : '; no in-page anchor to jump to') + '; refresh keeps scroll: not measured' +
+    (capped ? `; nested scrollers: ${capped}` : ''));
   return rows;
 }
 
 function report(rows, opts, target) {
+  rows = rows.map((r) => ({ ...r, evidence: scrub(r.evidence) }));
+  target = scrub(target);
   const failed = rows.filter((r) => r.verdict === 'FAIL').length;
   if (opts.json) {
     process.stdout.write(JSON.stringify({ target, browser: opts.browser, results: rows, failed }, null, 2) + '\n');
@@ -241,19 +266,12 @@ function report(rows, opts, target) {
 
 async function main(argv) {
   const opts = parseArgs(argv);
+  // What the report names: the service, never the login URL its one-time code is in.
+  const shown = opts.service || opts.url;
   let target = opts.url;
   let floor = opts.floor;
-  const notRun = (why) => report(RULES.map((rule) => ({ rule, width: 0, verdict: 'NOT_RUN', evidence: why })), opts, target || opts.service);
-  if (opts.service) {
-    try {
-      const t = await serviceTarget(opts.service, opts.servicesDir);
-      target = t.url;
-      if (floor === undefined && Number.isInteger(t.declared?.minWidth)) floor = t.declared.minWidth;
-    } catch (err) {
-      return notRun(`could not open the service's dashboard: ${err.message}`);
-    }
-  }
-  floor = floor ?? 360;
+  const notRun = (why) => report(RULES.map((rule) => ({ rule, width: 0, verdict: 'NOT_RUN', evidence: why })), opts, shown);
+  // The browser first: a run that cannot measure must not spend a one-time code.
   const pw = await loadPlaywright(opts.playwright);
   if (!pw) return notRun('Playwright is not installed here: npm i -D playwright && npx playwright install webkit (or pass --playwright DIR)');
   let browser;
@@ -262,6 +280,17 @@ async function main(argv) {
   } catch (err) {
     return notRun(`the ${opts.browser} browser does not start: ${String(err.message).split('\n')[0]} (npx playwright install ${opts.browser})`);
   }
+  if (opts.service) {
+    try {
+      const t = await serviceTarget(opts.service, opts.servicesDir);
+      target = t.url;
+      if (floor === undefined && Number.isInteger(t.declared?.minWidth)) floor = t.declared.minWidth;
+    } catch (err) {
+      await browser.close();
+      return notRun(`could not open the service's dashboard: ${err.message}`);
+    }
+  }
+  floor = floor ?? 360;
   const rows = [];
   try {
     const context = await browser.newContext({ viewport: { width: Math.max(...opts.widths), height: opts.height } });
@@ -279,7 +308,7 @@ async function main(argv) {
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
       await page.waitForTimeout(250);
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-      const m = await page.evaluate(measure, floor);
+      const m = await page.evaluate(measure, [floor, ELEMENT_CAP]);
       rows.push(...verdicts(width, floor, m));
     }
   } catch (err) {
@@ -287,7 +316,7 @@ async function main(argv) {
   } finally {
     await browser.close();
   }
-  return report(rows, opts, opts.service || target);
+  return report(rows, opts, shown);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
