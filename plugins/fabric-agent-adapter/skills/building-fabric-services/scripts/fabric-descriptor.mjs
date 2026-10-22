@@ -6,6 +6,7 @@ import { credentialName, secretArgument, secretUrl, secretValue } from './fabric
 import { ID, INSTANCE, LOCAL_PATH, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { protocolsFindings } from './fabric-protocols.mjs';
+import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
 import { ROUTES } from './fabric-usage.mjs';
 
 // The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
@@ -368,6 +369,11 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
     if (DASHBOARD_EXTENSION_KEY in extensions) {
       const problems = dashboardExtensionProblems(extensions[DASHBOARD_EXTENSION_KEY]);
       if (problems.length) throw new ServiceError(`Dashboard declaration: ${problems.join('; ')}.`);
+    }
+    if (Object.hasOwn(extensions, CONNECTIONS_EXTENSION_KEY)) {
+      // DEC-0096: a host hides an invalid declaration (FAC-SEM-127); a service never publishes one.
+      const view = connectionsView({ extensions: { [CONNECTIONS_EXTENSION_KEY]: extensions[CONNECTIONS_EXTENSION_KEY] } });
+      if (view.reported) throw new ServiceError(`Connections declaration: ${view.errors.join('; ')}.`);
     }
     doc.extensions = { ...extensions };
   }

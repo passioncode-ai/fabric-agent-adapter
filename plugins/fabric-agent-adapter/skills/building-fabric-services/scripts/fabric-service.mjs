@@ -40,6 +40,7 @@ export {
   feedDataFindings,
   feedDataProblems,
 } from './fabric-protocols.mjs';
+export { CONNECTIONS_EXTENSION_KEY, connectionsExtension, connectionsRules, connectionsView } from './fabric-connections.mjs';
 export {
   EXIT_ALREADY_RUNNING,
   LOCK_WAIT_SUPERVISED_SECONDS,

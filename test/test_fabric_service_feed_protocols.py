@@ -128,6 +128,24 @@ class ProbeRules(unittest.TestCase):
         results = self.probe(dict(wk), {"events": [], "cursor": None})
         self.assertNotIn("events.data", results, "a feed without data has no data rule")
 
+    def test_connections_fac_sem_127(self):
+        """DEC-0096: the probe reads a declared connections list as a host does; a list a host would hide fails, and
+        the credential that hid it never reaches the evidence."""
+        import fabric_connections as fcn
+        key = fcn.CONNECTIONS_EXTENSION_KEY
+        good = [{"id": "router", "kind": "model", "target": "openai/gpt-5.1", "state": "ok"}]
+        wk = fs.build_well_known(service_id="example-agent", instance="default", name="Example Agent", version="1.0.0",
+                                 build={"commit": "0" * 40}, started_at="2026-10-13T08:00:00Z", status="ready", degraded=[],
+                                 surfaces={"events": {"path": "/fabric/v1/events"}}, extensions={key: {"connections": good}})
+        page = {"events": [], "cursor": None}
+        self.assertEqual(self.probe(wk, page)["well-known.connections"]["verdict"], "PASS")
+        secret = "sk-AbCdEf0123456789xyzQ"
+        bad = dict(wk, extensions={key: {"connections": [dict(good[0], purpose="uses " + secret)]}})
+        result = self.probe(bad, page)["well-known.connections"]
+        self.assertEqual(result["verdict"], "FAIL")
+        self.assertNotIn(secret, result["evidence"])
+        self.assertNotIn("well-known.connections", self.probe(dict(wk, extensions={}), page), "an optional extension")
+
 
 if __name__ == "__main__":
     unittest.main()

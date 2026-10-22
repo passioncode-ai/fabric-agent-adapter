@@ -93,6 +93,26 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   ED-9): `minWidth` 360…1280 (required), `appearance` ⊆ `scheme`, `theme`, `themes`, `kit`
   (`name@semver`), nothing else. The kits build it with `dashboard_extension()` /
   `dashboardExtension()`; see [the dashboard kit reference](dashboard-kit.md).
+- `extensions` MAY say what the service uses under
+  `https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1` (`fabric-connections/0.1`, DEC-0096):
+  `{connections: [...]}`, at most 64, each `{id, kind, target, state}` with `kind` one of `service`, `model`,
+  `connector`, `store`, `channel`, `state` one of `ok`, `degraded`, `down`, `unknown`, and optionally `capability`
+  (a `service` only), `label`, `purpose`, `reason`, `lastAt`. No member carries a credential, and each `id` is named
+  once: a host hides a list that breaks either rule (FAC-SEM-127). A `degraded[].source` equal to an `id` is that
+  connection failing. The kits build it with `connections_extension(declared, degraded, states)` /
+  `connectionsExtension(declared, {degraded, states})`: `state` comes from the service's own checks (`states`, by
+  `id`), else `degraded` when `degraded[]` names it, else `unknown`; a declaration a host would hide is refused with
+  `ServiceError`, and `build_well_known` refuses one passed in by hand. `connections_view` / `connectionsView` read
+  a peer's list as Fabric Dashboards does, and `check_service.py` reports `well-known.connections`. Build it each
+  time the well-known document is built, from the same `degraded` list:
+
+  ```python
+  ext = fs.dashboard_extension()
+  ext.update(connections_extension(
+      [{"id": "router", "kind": "model", "target": "openai/gpt-5.1", "purpose": "drafts replies"},
+       {"id": "notify", "kind": "service", "target": "communicator.default", "capability": "communicator.notify"}],
+      degraded=degraded, states={"router": "ok" if model_answered else "down"}))
+  ```
 - `surfaces.mcp.auth`: `descriptor` (default), `own` (DEC-0024) or `delegation` (DEC-0039, DL-16):
   the MCP surface takes only the estate's delegation tokens, and the top-level
   `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's

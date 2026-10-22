@@ -248,6 +248,11 @@ and declare it with `extensions=fs.dashboard_extension()`. Read
 declaration and how to upgrade a dashboard built before the kit: an upgrade you may make yourself,
 which the plugin's session-start notice offers in a repository that owns the service.
 
+**Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
+agents, models, connectors, stores and channels, each with its state, from
+`connections_extension()` / `connectionsExtension()` in `fabric_connections`. Never a credential in it, never a call
+count (that is the usage report); the details are in [the wire reference](references/protocol.md).
+
 The events feed is a **view over the log you already keep** (a jobs table, a JSONL
 journal), not a second store. Each event is one sentence a person reads; set
 `notify: true` only when the operator must decide, or something failed or degrades their

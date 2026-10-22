@@ -179,6 +179,12 @@ from fabric_backups import (  # noqa: F401
     newest_intact_backup,
     restore_plan,
 )
+from fabric_connections import (  # noqa: F401
+    CONNECTIONS_EXTENSION_KEY,
+    connections_extension,
+    connections_rules,
+    connections_view,
+)
 from fabric_descriptor import (  # noqa: F401
     DASHBOARD_EXTENSION_KEY,
     DASHBOARD_KIT,

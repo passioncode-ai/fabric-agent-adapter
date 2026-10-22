@@ -35,6 +35,7 @@ from fabric_paths import (
 from fabric_protocols import (
     protocols_findings,
 )
+from fabric_connections import CONNECTIONS_EXTENSION_KEY, connections_view  # noqa: E402 - the kit (FAA-62)
 from fabric_usage import (
     ROUTES,
 )
@@ -570,6 +571,11 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
             problems = dashboard_extension_problems(extensions[DASHBOARD_EXTENSION_KEY])
             if problems:
                 raise ServiceError("Dashboard declaration: %s." % "; ".join(problems))
+        if CONNECTIONS_EXTENSION_KEY in extensions:
+            # DEC-0096: a host hides an invalid declaration (FAC-SEM-127); a service never publishes one.
+            view = connections_view({"extensions": {CONNECTIONS_EXTENSION_KEY: extensions[CONNECTIONS_EXTENSION_KEY]}})
+            if view["reported"]:
+                raise ServiceError("Connections declaration: %s." % "; ".join(view["errors"]))
         doc["extensions"] = dict(extensions)
     if configuration is not None:
         problems = configuration_problems(configuration)
