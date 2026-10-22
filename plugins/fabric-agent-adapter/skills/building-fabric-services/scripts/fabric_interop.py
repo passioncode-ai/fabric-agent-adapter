@@ -31,6 +31,7 @@ import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
+    _days_from_civil,
     PROTOCOL,
     EXTENSION_KEY,
     MCP_REVISION,
