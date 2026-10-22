@@ -54,14 +54,14 @@ REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "
 STATUSES = ("starting", "ready", "degraded", "stopping")
 
 
-_ORIGIN = re.compile(r"^http://127\.0\.0\.1:([0-9]{3,5})$")
+_ORIGIN = re.compile(r"^http://127\.0\.0\.1:([0-9]{3,5})\Z")
 
 
 # DEC-0019: a remote placement — an online agent or dashboard — lives at an https DNS name.
-_REMOTE_ORIGIN = re.compile(r"^https://((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?::([0-9]{1,5}))?$")
+_REMOTE_ORIGIN = re.compile(r"^https://((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?::([0-9]{1,5}))?\Z")
 
 
-_RESERVED_HOST = re.compile(r"(^|\.)(localhost|local|internal|home\.arpa|lan|localdomain)$")
+_RESERVED_HOST = re.compile(r"(^|\.)(localhost|local|internal|home\.arpa|lan|localdomain)\Z")
 
 
 PLACEMENTS = ("local", "remote")
@@ -213,13 +213,13 @@ CREDENTIAL_KINDS = ("subscription", "key", "platform-metered", "none")
 SUBSCRIPTION_RUNNERS = {"claude-code": "claude", "kimi-code": "kimi", "codex": "chatgpt"}
 
 
-_PEER_ENDPOINT = re.compile(r"^https://(?P<host>([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?$", re.ASCII)
+_PEER_ENDPOINT = re.compile(r"^https://(?P<host>([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?\Z", re.ASCII)
 
 
-_RESIDENCY = re.compile(r"^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$", re.ASCII)
+_RESIDENCY = re.compile(r"^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])\Z", re.ASCII)
 
 
-_RUNNER_KIND_NAME = re.compile(r"^[a-z][a-z0-9-]{1,62}$", re.ASCII)
+_RUNNER_KIND_NAME = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z", re.ASCII)
 
 
 def _pointer(name: str) -> str:
@@ -451,10 +451,10 @@ def build_info(repo_root: Optional[Path] = None, package_file: Optional[Path] = 
     return info
 
 
-_THEME_ID = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+_THEME_ID = re.compile(r"^[a-z][a-z0-9-]{0,31}\Z")
 
 
-_KIT_REF = re.compile(r"^[a-z][a-z0-9-]{0,63}@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$")
+_KIT_REF = re.compile(r"^[a-z][a-z0-9-]{0,63}@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?\Z", re.ASCII)
 
 
 def dashboard_extension_problems(value: Any) -> List[str]:
@@ -502,13 +502,13 @@ def dashboard_extension(min_width: int = 360, appearance: Sequence[str] = ("sche
     return {DASHBOARD_EXTENSION_KEY: value}
 
 
-_PROFILE_ID = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+_PROFILE_ID = re.compile(r"^[a-z][a-z0-9-]{0,62}\Z")
 
 
-_RUNNER_KIND = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
+_RUNNER_KIND = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z")
 
 
-_MODEL_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}/[a-z0-9][a-z0-9._:-]{0,127}$")
+_MODEL_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}/[a-z0-9][a-z0-9._:-]{0,127}\Z")
 
 
 def configuration_problems(doc: Any) -> List[str]:

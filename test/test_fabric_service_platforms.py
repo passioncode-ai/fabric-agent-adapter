@@ -194,12 +194,18 @@ class LockName(unittest.TestCase):
             data = Path(temp)
             holder = subprocess.Popen(["node", "--input-type=module", "-e", textwrap.dedent(f"""
                 const k = await import({json.dumps((SCRIPTS / "fabric-service.mjs").as_uri())});
-                await new k.InstanceLock({json.dumps(str(data))}).acquire();
+                try {{ await new k.InstanceLock({json.dumps(str(data))}).acquire(); }}
+                catch (e) {{ console.log("refused: " + e.message); process.exit(0); }}
                 console.log("held");
                 setInterval(() => {{}}, 1000);
                 """)], stdout=subprocess.PIPE, text=True)
             try:
-                self.assertEqual(holder.stdout.readline().strip(), "held")
+                first = holder.stdout.readline().strip()
+                if first.startswith("refused: "):
+                    # FAA-72: Node 18 and 20 cannot bind the name exactly and refuse the lock (lock-old-node-refuses.test.mjs).
+                    self.assertIn("Node 22 or later", first)
+                    self.skipTest("this Node cannot hold the Linux lock: " + first)
+                self.assertEqual(first, "held")
                 probe = check.Probe.__new__(check.Probe)
                 probe.results = []
                 probe.lock_rule(data)
@@ -232,8 +238,8 @@ class Windows(unittest.TestCase):
             fs = importlib.util.module_from_spec(spec); spec.loader.exec_module(fs)
             fs.InstanceLock(Path({str(self.dir)!r})).acquire()
             print("held", flush=True)
-            time.sleep(60)
-            """)], stdout=subprocess.PIPE, text=True)
+            sys.stdin.read()  # FAA-72: held until the test closes stdin or kills it, never past a lost test process
+            """)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         try:
             self.assertEqual(holder.stdout.readline().strip(), "held")
             with self.assertRaises(fs.AlreadyRunning) as caught:
@@ -242,6 +248,8 @@ class Windows(unittest.TestCase):
         finally:
             holder.kill()
             holder.wait()
+            holder.stdin.close()
+            holder.stdout.close()
         fs.InstanceLock(self.dir).acquire().release()   # the OS released it with the process
 
     def test_a_token_written_by_the_kit_reads_back(self):

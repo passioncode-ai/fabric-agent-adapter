@@ -9,6 +9,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { abstractNames } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+// FAA-72: on Linux the lock needs a Node that binds an abstract socket name exactly (22 and later); Node 18 and 20
+// refuse to hold it (fabric-lock.mjs), and lock-old-node-refuses.test.mjs holds that refusal.
+const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 'exact' && `Node ${process.version} cannot hold the Linux lock`;
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const temp = () => tempDir('fabric-supervisor-');
@@ -42,6 +46,13 @@ test('the systemd unit carries the contract settings', () => {
 test('systemd specifiers and variables are escaped', () => {
   const text = k.systemdUnit('x.service', ['/bin/echo', '100%', '$HOME', 'say "hi"\\'], { workingDirectory: '/tmp' });
   assert.ok(text.includes('ExecStart="/bin/echo" "100%%" "$$HOME" "say \\"hi\\"\\\\"'), text);
+});
+
+test('finding 17: Environment= keeps its $ (systemd expands no variable there) and escapes its specifiers', () => {
+  const text = k.systemdUnit('x.service', ['/bin/x'], { workingDirectory: '/tmp', environment: { EXAMPLE_PRICE: '$5 at 100%', EXAMPLE_QUOTE: 'a "b" \\c' } });
+  assert.ok(text.includes('Environment="EXAMPLE_PRICE=$5 at 100%%"\n'), text);
+  assert.ok(text.includes('Environment="EXAMPLE_QUOTE=a \\"b\\" \\\\c"\n'), text);
+  assert.ok(k.systemdUnit('x.service', ['/opt/$x/bin', '$y'], { workingDirectory: '/tmp' }).includes('ExecStart="/opt/$$x/bin" "$$y"\n'), 'every ExecStart word, the first too');
 });
 
 test('the systemd unit refuses what it cannot carry', () => {
@@ -200,7 +211,7 @@ print(json.dumps([fs.systemd_unit("example-agent.default.service", argv, working
   assert.equal(k.taskXml('\\PassionCode\\example-agent.default', ['C:\\x.exe', ...argv.slice(1)], { workingDirectory: 'C:\\w x', description: 'Ex & <y>', user: 'H\\u' }), pyTask);
 });
 
-test('a copy systemd restarts backs off on a held lock; a hand start does not', async (t) => {
+test('a copy systemd restarts backs off on a held lock; a hand start does not', { skip: noLinuxLock }, async (t) => {
   const saved = process.env[k.SUPERVISOR_ENV];
   t.after(() => { if (saved === undefined) delete process.env[k.SUPERVISOR_ENV]; else process.env[k.SUPERVISOR_ENV] = saved; });
   const dir = temp();
@@ -304,7 +315,7 @@ async function startAgainstHeldLock(env, argv, { holderPidKnown = true } = {}) {
     sideEffects: after.filter((name) => !before.includes(name)), outcome };
 }
 
-test('the kit\'s starts against a held lock conform (FAC-SEM-078)', async () => {
+test('the kit\'s starts against a held lock conform (FAC-SEM-078)', { skip: noLinuxLock }, async () => {
   const exe = '/opt/example-agent/bin/example-agent';
   const starts = [
     ['by hand', {}, [exe, 'serve'], true],

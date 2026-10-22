@@ -372,7 +372,7 @@ def request(method: str, url: str, *, headers: Optional[Mapping[str, str]] = Non
             status, got_headers, got = send(method, url, dict(sent), data, left, max_bytes)
         except HttpError:
             raise
-        except TimeoutError:
+        except (TimeoutError, socket.timeout):  # socket.timeout is no TimeoutError before Python 3.10
             failure = HttpError("%s %s: timed out" % (method, where), url=where, attempts=attempt, kind="timeout")
         except Exception as exc:  # noqa: BLE001 - as the Node twin: whatever the transport throws is a connection error
             failure = HttpError("%s %s: connection error (%s)" % (method, where, type(exc).__name__), url=where,

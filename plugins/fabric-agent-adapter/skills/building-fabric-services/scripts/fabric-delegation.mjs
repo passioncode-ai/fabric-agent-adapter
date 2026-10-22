@@ -138,7 +138,8 @@ function keyFor(jwks, kid) {
   if ((jwk.use !== undefined && jwk.use !== 'sig') || (jwk.alg !== undefined && jwk.alg !== 'EdDSA')) return { problem: 'key-not-for-signing' };
   if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || !isNonEmptyString(jwk.x) || jwk.d !== undefined) return { problem: 'unusable-key' };
   const raw = Buffer.from(jwk.x, 'base64url');
-  if (raw.length !== 32) return { problem: 'unusable-key' };
+  // D4: exactly the 43 characters that write 32 bytes (Buffer reads padding, `+` and stray characters leniently).
+  if (raw.length !== 32 || raw.toString('base64url') !== jwk.x) return { problem: 'unusable-key' };
   if (isSmallOrderKey(raw)) return { problem: 'small-order-key' }; // before any verification (DEC-0045, CT-29)
   try {
     return { key: crypto.createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: jwk.x }, format: 'jwk' }), raw, x: jwk.x };

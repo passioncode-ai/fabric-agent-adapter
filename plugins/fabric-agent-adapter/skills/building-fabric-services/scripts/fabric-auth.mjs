@@ -228,9 +228,11 @@ export const expiredSessionCookieHeader = (remote = false) => (remote ? remoteSe
  */
 export function checkRemoteRequest(origin, host, requestOrigin, secFetchSite, forwardedProto) {
   const own = new URL(origin);
-  if (String(host ?? '').toLowerCase() !== own.host) return `Host ${host} is not this service.`;
+  // A default port, written or not, names the same host (finding 15): the URL drops it from `own`; drop it from the request too.
+  const dropped = (value) => { const port = { 'https:': ':443', 'http:': ':80' }[own.protocol]; return port && value.endsWith(port) ? value.slice(0, -port.length) : value; };
+  if (dropped(String(host ?? '').toLowerCase()) !== own.host) return `Host ${host} is not this service.`;
   if (forwardedProto !== undefined && forwardedProto !== null && String(forwardedProto).split(',')[0].trim() !== 'https') return 'This service answers over https only.';
-  if (requestOrigin !== undefined && requestOrigin !== null && requestOrigin !== own.origin) return `Origin ${requestOrigin} is not this service.`;
+  if (requestOrigin !== undefined && requestOrigin !== null && dropped(String(requestOrigin)) !== own.origin) return `Origin ${requestOrigin} is not this service.`;
   if (secFetchSite === 'cross-site') return 'Cross-site requests are refused.';
   return null;
 }

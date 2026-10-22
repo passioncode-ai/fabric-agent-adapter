@@ -53,6 +53,14 @@ class SystemdUnitTests(unittest.TestCase):
         text = fs.systemd_unit("x.service", ["/bin/echo", "100%", "$HOME", 'say "hi"\\'], working_directory=Path("/tmp"))
         self.assertIn('ExecStart="/bin/echo" "100%%" "$$HOME" "say \\"hi\\"\\\\"', text)
 
+    def test_environment_keeps_its_dollar_and_escapes_its_specifiers(self):
+        """Finding 17: systemd expands no variable in Environment=, so a $ doubled there reached the service as $$."""
+        text = fs.systemd_unit("x.service", ["/bin/x"], working_directory=Path("/tmp"),
+                               environment={"EXAMPLE_PRICE": "$5 at 100%", "EXAMPLE_QUOTE": 'a "b" \\c'})
+        self.assertIn('Environment="EXAMPLE_PRICE=$5 at 100%%"\n', text)
+        self.assertIn('Environment="EXAMPLE_QUOTE=a \\"b\\" \\\\c"\n', text)
+        self.assertIn('ExecStart="/opt/$$x/bin" "$$y"\n', fs.systemd_unit("x.service", ["/opt/$x/bin", "$y"], working_directory=Path("/tmp")))
+
     def test_refusals(self):
         with self.assertRaises(fs.ServiceError):
             fs.systemd_unit("bad name", ["/bin/x"], working_directory=Path("/tmp"))

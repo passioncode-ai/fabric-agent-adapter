@@ -8,6 +8,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { abstractNames } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+// FAA-72: on Linux the lock needs a Node that binds an abstract socket name exactly (22 and later); Node 18 and 20
+// refuse to hold it (fabric-lock.mjs), and lock-old-node-refuses.test.mjs holds that refusal.
+const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 'exact' && `Node ${process.version} cannot hold the Linux lock`;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const kit = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs');
@@ -20,7 +24,7 @@ function withTemp(t) {
 
 // --- LC-03 / F8: a held lock under KeepAlive backs off in-process -----------------------
 
-test('by hand, a held lock still exits 75 at once', async (t) => {
+test('by hand, a held lock still exits 75 at once', { skip: noLinuxLock }, async (t) => {
   const dir = withTemp(t);
   const lock = await new k.InstanceLock(dir).acquire();
   t.after(() => lock.release());
@@ -32,7 +36,7 @@ test('by hand, a held lock still exits 75 at once', async (t) => {
   assert.ok(Date.now() - started < 5000);
 });
 
-test('a supervised copy takes over when the holder leaves', async (t) => {
+test('a supervised copy takes over when the holder leaves', { skip: noLinuxLock }, async (t) => {
   const dir = withTemp(t);
   const holder = await new k.InstanceLock(dir).acquire();
   const slept = [];
@@ -48,7 +52,7 @@ test('a supervised copy takes over when the holder leaves', async (t) => {
   lock.release();
 });
 
-test('a supervised copy backs off, capped, then exits 75', async (t) => {
+test('a supervised copy backs off, capped, then exits 75', { skip: noLinuxLock }, async (t) => {
   const dir = withTemp(t);
   const holder = await new k.InstanceLock(dir).acquire();
   t.after(() => holder.release());
@@ -68,7 +72,7 @@ test('a supervised copy backs off, capped, then exits 75', async (t) => {
   assert.ok(3600 / (k.LOCK_WAIT_SUPERVISED_SECONDS + 10) < 15, 'a few starts an hour, not 360');
 });
 
-test('a real supervised process waits before its exit 75', async (t) => {
+test('a real supervised process waits before its exit 75', { skip: noLinuxLock }, async (t) => {
   const dir = withTemp(t);
   const holder = await new k.InstanceLock(dir).acquire();
   t.after(() => holder.release());

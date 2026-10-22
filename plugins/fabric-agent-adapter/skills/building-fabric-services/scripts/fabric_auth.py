@@ -13,7 +13,7 @@ import secrets
 import stat
 import threading
 import time
-import urllib.request
+import urllib.parse
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -51,7 +51,7 @@ OPERATOR_SESSION_IDLE_SECONDS = 12 * 60 * 60
 OPERATOR_SESSION_MAX_SECONDS = 7 * 24 * 60 * 60
 
 
-_CODE = re.compile(r"^[A-Za-z0-9_-]{16,256}$")
+_CODE = re.compile(r"^[A-Za-z0-9_-]{16,256}\Z")
 
 
 def ensure_token(path: Path) -> str:
@@ -330,18 +330,24 @@ def expired_session_cookie_header(remote: bool = False) -> str:
     return (remote_session_cookie_header if remote else session_cookie_header)("", 0)
 
 
+def _default_port_dropped(scheme: str, value: str) -> str:
+    """A host or an origin as a WHATWG URL writes it (finding 15): the scheme's default port (https 443, http 80) left out."""
+    default = {"https": ":443", "http": ":80"}.get(scheme.lower())
+    return value[:-len(default)] if default and value.endswith(default) else value
+
+
 def check_remote_request(origin: str, host: Optional[str], request_origin: Optional[str] = None,
                          sec_fetch_site: Optional[str] = None, forwarded_proto: Optional[str] = None) -> Optional[str]:
     """DEC-0019: the request guard of an online service; returns the refusal sentence or None.
     ``forwarded_proto`` is the platform-set scheme where TLS ends before the process; pass None
-    when the process terminates TLS itself."""
+    when the process terminates TLS itself. A default port, written or not, names the same host."""
     own = urllib.parse.urlsplit(origin)
-    own_host = own.netloc.lower()
-    if str(host or "").lower() != own_host:
+    own_host = _default_port_dropped(own.scheme, own.netloc.lower())
+    if _default_port_dropped(own.scheme, str(host or "").lower()) != own_host:
         return "Host %s is not this service." % host
     if forwarded_proto is not None and str(forwarded_proto).split(",")[0].strip() != "https":
         return "This service answers over https only."
-    if request_origin is not None and request_origin != "%s://%s" % (own.scheme, own_host):
+    if request_origin is not None and _default_port_dropped(own.scheme, str(request_origin)) != "%s://%s" % (own.scheme, own_host):
         return "Origin %s is not this service." % request_origin
     if sec_fetch_site == "cross-site":
         return "Cross-site requests are refused."
