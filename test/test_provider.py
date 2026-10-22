@@ -162,5 +162,100 @@ class DirectoryTests(unittest.TestCase):
         self.assertEqual(remove.returncode, 0)
 
 
+class SchemaParityTests(unittest.TestCase):
+    """FAA-71 (audit finding 18): the writer refuses what the pinned provider.schema.json refuses."""
+
+    def test_ports_below_100_and_above_65535_are_refused(self):
+        for port in ("0", "1", "80", "99", "65536", "99999", "080"):
+            self.assertNotEqual(fp.validate_provider_entry(entry(run={"mcp": {"url": "http://127.0.0.1:%s/mcp" % port}})), [], port)
+        for port in ("100", "8080", "47201", "65535"):
+            self.assertEqual(fp.validate_provider_entry(entry(run={"mcp": {"url": "http://127.0.0.1:%s/mcp" % port}})), [], port)
+
+    def test_source_repository_is_a_uri(self):
+        self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": "not a uri"})), [])
+        self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": "https://example.com/r", "branch": "main"})), [])
+        self.assertNotEqual(fp.validate_provider_entry(entry(source="https://example.com/r")), [])
+        self.assertEqual(fp.validate_provider_entry(entry(source={"repository": "https://example.com/r"})), [])
+
+    def test_each_argument_is_at_most_1024_characters(self):
+        self.assertNotEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x", "a" * 1025]}}})), [])
+        self.assertEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x", "a" * 1024]}}})), [])
+
+    def test_env_names_and_count_follow_the_schema(self):
+        self.assertNotEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "env": {"lower": "secret-ref:a"}}}})), [])
+        many = {"K%d" % i: "secret-ref:a" for i in range(65)}
+        self.assertNotEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "env": many}}})), [])
+
+    def test_installed_fields_and_extensions_follow_the_schema(self):
+        self.assertNotEqual(fp.validate_provider_entry(entry(installedAt="yesterday")), [])
+        self.assertNotEqual(fp.validate_provider_entry(entry(installedBy="x" * 201)), [])
+        self.assertNotEqual(fp.validate_provider_entry(entry(installedBy="")), [])
+        self.assertNotEqual(fp.validate_provider_entry(entry(extensions={"not a uri": 1})), [])
+        self.assertEqual(fp.validate_provider_entry(entry(extensions={"https://example.com/x": 1})), [])
+
+    def test_manifest_path_follows_the_schema_local_path(self):
+        self.assertNotEqual(fp.validate_provider_entry(entry(manifest="//server/share/fabric-agent.json")), [])
+        self.assertNotEqual(fp.validate_provider_entry(entry(manifest="/" + "a" * 1024 + "/fabric-agent.json")), [])
+        self.assertEqual(fp.validate_provider_entry(entry(manifest="C:/Agents/example/fabric-agent.json")), [])
+
+    @unittest.skipUnless(os.environ.get("FABRIC_CONTRACT_NEW"), "NOT_RUN: set FABRIC_CONTRACT_NEW to a contract checkout at the pin")
+    def test_the_url_pattern_is_the_pinned_schema_pattern(self):
+        schema = json.loads((Path(os.environ["FABRIC_CONTRACT_NEW"]) / "schemas/provider.schema.json").read_text())
+        url = schema["properties"]["run"]["properties"]["mcp"]["oneOf"][1]["properties"]["url"]["pattern"]
+        self.assertEqual(fp.URL_PATTERN, url)
+        common = json.loads((Path(os.environ["FABRIC_CONTRACT_NEW"]) / "schemas/service-common.schema.json").read_text())["$defs"]
+        self.assertEqual(fp.LOCAL_PATH_PATTERN, common["localPath"]["pattern"])
+        self.assertEqual(fp.ARGV_MAX_ITEM, common["argv"]["items"]["maxLength"])
+
+
+class CliRefusalTests(unittest.TestCase):
+    """FAA-71: an option the writer would drop or misplace is refused, never silently."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.providers, self.services = root / "providers", root / "services"
+        self.manifest = root / "fabric-agent.json"
+        self.manifest.write_text(json.dumps({"provider": {"id": "https://agents.example/providers/example-agent"}, "capabilities": []}))
+        self.env = dict(os.environ, FABRIC_PROVIDERS_DIR=str(self.providers), FABRIC_SERVICES_DIR=str(self.services))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_writer(self, *tail):
+        return subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "write", "--id", "example-agent", "--name", "Example Agent",
+                               "--manifest", str(self.manifest), "--provider-id", "https://agents.example/providers/example-agent",
+                               "--installed-by", "test"] + list(tail), capture_output=True, text=True, env=self.env)
+
+    def test_env_with_url_is_refused(self):
+        result = self.run_writer("--env", "K=secret-ref:a", "--url", "http://127.0.0.1:47201/mcp")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("--env", result.stderr)
+        self.assertFalse((self.providers / "example-agent.json").exists())
+
+    def test_port_80_is_refused_on_the_command_line(self):
+        result = self.run_writer("--url", "http://127.0.0.1:80/mcp")
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse((self.providers / "example-agent.json").exists())
+
+    def test_a_writer_option_after_stdio_is_refused(self):
+        for tail in (["--stdio", "/bin/x", "--env", "K=secret-ref:a"], ["--stdio", "/bin/x", "--name=Other"],
+                     ["--stdio", "/bin/x", "--repository", "https://example.com/r"]):
+            result = self.run_writer(*tail)
+            self.assertEqual(result.returncode, 1, tail)
+            self.assertIn("before --stdio", result.stderr)
+            self.assertFalse((self.providers / "example-agent.json").exists())
+
+    def test_a_double_dash_passes_a_server_option_through(self):
+        result = self.run_writer("--stdio", "--", "/bin/x", "--name", "server-name")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        written = json.loads((self.providers / "example-agent.json").read_text())
+        self.assertEqual(written["run"]["mcp"]["stdio"]["command"], ["/bin/x", "--name", "server-name"])
+
+    def test_a_non_uri_repository_is_refused(self):
+        result = self.run_writer("--repository", "not a uri", "--stdio", "/bin/x")
+        self.assertEqual(result.returncode, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

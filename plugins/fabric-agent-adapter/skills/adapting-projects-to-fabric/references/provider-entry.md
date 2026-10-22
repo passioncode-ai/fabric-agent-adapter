@@ -32,7 +32,9 @@ python3 scripts/fabric_provider.py validate ~/Library/Application\ Support/ai.pa
 python3 scripts/fabric_provider.py remove example-agent      # the uninstaller
 ```
 
-`--stdio` takes the rest of the line as the argument array; there is no shell string. An entry may carry
+`--stdio` comes last and takes the rest of the line as the argument array; there is no shell string. A writer
+option after it (`--env`, `--name`, ...) is refused rather than swallowed into argv; write `--stdio -- EXECUTABLE ...`
+when the server itself takes an option of that name. `--env` belongs to a stdio server and is refused with `--url`. An entry may carry
 `run.mcp.stdio.scope` (DEC-0044): `project` (started for the sessions of a project that binds it) or `on-demand`;
 `session` (a server in every coding session) is refused (FAC-SEM-056, LC-19). The validator accepts the field; the
 writer does not set it until Fabric reads it. An argument that carries a credential is refused
@@ -46,8 +48,12 @@ It refuses, with one sentence that never quotes a value:
 - an env value that is not `secret-ref:<name>`, or a reference that has the shape of a
   credential itself: a token prefix, a private key, a JWT (FAC-SEM-015: a value is
   checked by its form; name patterns apply to names);
-- a URL other than `http://127.0.0.1:<port>/mcp`, a manifest path that is not an
-  absolute or `~/` path to `fabric-agent.json`, a shell-string command, unknown fields.
+- what the pinned `provider.schema.json` refuses: a URL other than `http://127.0.0.1:<port>/mcp` with a port from 100
+  to 65535, a manifest path that is not an absolute or `~/` path to `fabric-agent.json` (or is a network share, or over
+  1024 characters), a shell-string command, more than 32 arguments or one over 1024 characters, more than 64 env
+  names, a `source.repository` that is not an absolute URI, an `installedAt` that is not an RFC 3339 date-time,
+  unknown fields. The patterns are the schema's, copied (`test_provider.SchemaParityTests` compares them with a
+  contract checkout at the pin when `FABRIC_CONTRACT_NEW` names one).
 
 `validate` also checks that the file is named `<id>.json` (FAC-SEM-014, slug half).
 From Python: `write_provider_entry(entry)`, `remove_provider_entry(id)`,
