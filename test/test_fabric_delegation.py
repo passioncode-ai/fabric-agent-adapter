@@ -141,6 +141,37 @@ class JtiStoreTests(unittest.TestCase):
             self.assertEqual(oct(path.stat().st_mode & 0o777), "0o600")
             self.assertTrue(dl.FileJtiStore(path).consume("a", 2000, 1000 + dl.LEEWAY_SECONDS + 1))
 
+    def test_file_store_writes_with_the_kits_private_writer(self):
+        """FAA-85: the consumed ids go through fabric_paths.atomic_write, so on Windows the file gets the owner-only
+        ACL before its bytes (DEC-0032), and a failed write leaves no temporary file behind."""
+        writer = dl._atomic_write.__globals__  # the fabric_paths the store calls, whichever copy that is
+        self.assertTrue(writer["__file__"].endswith("fabric_paths.py"))
+        protected = []
+        saved = (writer["WINDOWS"], writer["_win_protect"])
+        try:
+            writer["WINDOWS"] = True
+            writer["_win_protect"] = lambda path, folder: protected.append((Path(path).name, folder))
+            with tempfile.TemporaryDirectory() as temp:
+                self.assertTrue(dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10))
+        finally:
+            writer["WINDOWS"], writer["_win_protect"] = saved
+        self.assertEqual(len(protected), 1, protected)
+        self.assertTrue(protected[0][0].startswith(".jti.json.") and protected[0][1] is False, protected)
+
+    def test_a_failed_file_store_write_leaves_no_temporary_file(self):
+        import os
+        with tempfile.TemporaryDirectory() as temp:
+            replace = os.replace
+            def refuse(src, dst):
+                raise PermissionError("refused")
+            os.replace = refuse
+            try:
+                with self.assertRaises(PermissionError):
+                    dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10)
+            finally:
+                os.replace = replace
+            self.assertEqual(sorted(p.name for p in Path(temp).iterdir()), [])
+
     def test_file_store_consumes_once_under_threads(self):
         with tempfile.TemporaryDirectory() as temp:
             store = dl.FileJtiStore(Path(temp) / "jti.json")
