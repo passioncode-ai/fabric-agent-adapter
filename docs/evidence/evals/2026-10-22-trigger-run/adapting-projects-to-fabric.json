@@ -1,0 +1,222 @@
+{
+  "model": "haiku",
+  "threshold": 0.85,
+  "skills": [
+    {
+      "skill": "adapting-projects-to-fabric",
+      "cases": 25,
+      "passed": 25,
+      "passRate": 1.0,
+      "positivesPassed": "11/11",
+      "negativesPassed": "14/14",
+      "errors": 0,
+      "aboveThreshold": true
+    }
+  ],
+  "cases": {
+    "adapting-projects-to-fabric": [
+      {
+        "query": "Adapt this autonomous research agent so Fabric can connect it over A2A.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Make this MCP server compatible with the Fabric Agent Contract.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Wrap our terminal coding agent as a Fabric local runner.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Choose MCP or A2A for this provider and generate fabric-agent.json.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Проверь проект и подготовь его для подключения к Fabric.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Сделай этого агента совместимым со стандартом Fabric.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Как подключить Pruvl к Fabric и пройти проверку совместимости?",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Создай provider bundle, fixtures и probes по Fabric Agent Contract.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Audit this agent repository against Fabric contract 0.1.0.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Migrate this HTTP job API into a Fabric-compatible A2A peer.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Build a multi-agent orchestrator for our product.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Add this MCP server to my Claude Code config.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Write a better system prompt for the research agent.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Create a generic A2A server from scratch.",
+        "shouldTrigger": false,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Review the architecture of this repository.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Connect an OAuth MCP server through agentgateway.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Make an agent that posts to LinkedIn every day.",
+        "shouldTrigger": false,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Install the Fabric repository locally.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Design the Fabric host registry and admission runtime.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Проведи общий аудит проекта и найди баги.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Register our stdio MCP agent with Fabric; it is not a service and has no port.",
+        "shouldTrigger": true,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Pick a Postgres connection pool size for our API.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключись к Fabric и возьми задачу FAA-12 через fabric_work_claim.",
+        "shouldTrigger": false,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Create a brand-new Fabric-compatible agent from scratch and run its intake grill.",
+        "shouldTrigger": false,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Turn example-agent into an always-on local Fabric service with a dashboard and launchd.",
+        "shouldTrigger": false,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      }
+    ]
+  },
+  "scenarios": "NOT_RUN: scenario evals need a judge of free-form behaviour",
+  "costUsd": 0.009791
+}
