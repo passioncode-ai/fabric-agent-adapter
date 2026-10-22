@@ -165,7 +165,7 @@ class Annotations(unittest.TestCase):
     def test_the_worker_lock_hints_resolve(self):
         """FAA-68: _try_lock's annotation names Callable; without its import get_type_hints raised NameError."""
         import typing
-        import fabric_session_mcp
+        fabric_session_mcp = importlib.import_module("fabric_session_mcp")
         hints = typing.get_type_hints(fabric_session_mcp._try_lock)
         self.assertEqual(hints["return"], bool)
 
