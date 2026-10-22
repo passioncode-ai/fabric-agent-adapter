@@ -1,6 +1,17 @@
 # Changelog
 
-## 0.42.0 (2026-10-22)
+## 0.42.1 (2026-10-22)
+
+The first published release of the 0.42 line: everything in 0.42.0 below, plus one test fix.
+
+### Fixed
+
+- **`test/entry-points.test.mjs` on Windows.** The test that a layout report with no rule exits 2 imported the script
+  by its path; Windows reads `D:\...` in an import as a URL with the scheme `d:`. It imports a file URL now. The tag
+  `v0.42.0` stays as it was: its release run ([39771949538](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/39771949538))
+  stopped at this test on the Windows job, so 0.42.0 was never published to npm or as a GitHub release.
+
+## 0.42.0 (2026-10-22, tagged, not published)
 
 The open asks of the Fabric project board, closed ([brief](docs/evidence/specs/2026-10-22-board-asks-0.42.0-brief.md)).
 
