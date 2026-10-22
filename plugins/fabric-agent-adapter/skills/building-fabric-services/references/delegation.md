@@ -80,7 +80,7 @@ then the grant check where there is one, then `verify_approval` / `verifyApprova
 `jti` last, then the action. Without an approval, answer `approval-required` with
 `action_digest(action)` / `actionDigest(action)` (the SHA-256 of the action's RFC 8785 form, `jcs`) so the caller
 can ask the hub. When the meter denies a grant check, answer `refusal_from_denial(denial)` /
-`refusalFromDenial(denial)`: the meter's code unchanged, its window and level in `error.data` (DL-21 step 6). Keep consumed ids in `FileJtiStore` (0600, survives a restart); `MemoryJtiStore` is for tests
+`refusalFromDenial(denial)`: the meter's code unchanged, its window and level in `error.data` (DL-21 step 6). Keep consumed ids in `FileJtiStore` (owner-only through the kit's private writer: 0600, on Windows a protected ACL; survives a restart); `MemoryJtiStore` is for tests
 and `UNSAFE_NO_JTI_STORE` exists only by name. No store at all, or a store file that cannot be read, is
 `unknown-state`, never a pass.
 

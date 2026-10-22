@@ -180,13 +180,30 @@ class JtiStoreTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as temp:
                 with self.assertRaisesRegex(RuntimeError, "acl refused"):
                     dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10)
+                self.assertEqual(len(opened), 1)
+                with self.assertRaises(OSError):  # checked at once, before anything else can reuse the number
+                    os.fstat(opened[0])
                 self.assertEqual(sorted(p.name for p in Path(temp).iterdir()), [])
         finally:
             writer["tempfile"].mkstemp = real_mkstemp
             writer["WINDOWS"], writer["_win_protect"] = saved
-        self.assertEqual(len(opened), 1)
-        with self.assertRaises(OSError):
-            os.fstat(opened[0])
+
+    def test_a_failed_cleanup_does_not_replace_the_error_that_caused_it(self):
+        import os
+        writer = dl._atomic_write.__globals__
+
+        def refuse(path, folder):
+            raise RuntimeError("acl refused")
+        saved = (writer["WINDOWS"], writer["_win_protect"], os.unlink)
+        writer["WINDOWS"], writer["_win_protect"] = True, refuse
+        os.unlink = lambda path: (_ for _ in ()).throw(PermissionError("refused remove"))
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                with self.assertRaisesRegex(RuntimeError, "acl refused"):
+                    dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10)
+                os.unlink = saved[2]
+        finally:
+            writer["WINDOWS"], writer["_win_protect"], os.unlink = saved
 
     def test_a_failed_file_store_write_leaves_no_temporary_file(self):
         import os
