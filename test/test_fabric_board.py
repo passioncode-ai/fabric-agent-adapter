@@ -743,6 +743,10 @@ class AuditFaultTests(Conversation):
         rid = self.board.queue("video.render")
         r = self.threaded()
         r.step()
+        import time
+        deadline = time.monotonic() + 5  # the handler runs on its own thread: its effect starts when it gets there
+        while "com.effect_begin" not in self.tools() and time.monotonic() < deadline:
+            time.sleep(0.01)
         self.board.fail_next["com.renew"] = "revision_conflict"
         self.board.advance(20)
         r.step()

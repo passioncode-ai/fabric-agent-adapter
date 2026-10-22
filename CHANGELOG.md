@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.44.1 (2026-10-22)
+
+### Changed
+
+- **Two kit modules split by responsibility** (FAA-92). `fabric_interop` and `fabric_package` stood at the 1000-line
+  ceiling `test_fabric_kit` enforces. The rules of `fabric-interop/0.1` that need no running service (constants,
+  `InteropError`, `UnknownJob`, trace context, the job limits of DEC-0087) moved to `fabric_interop_rules` /
+  `fabric-interop-rules.mjs` (L3), and the reading of `fabric-package.schema.json` to `fabric_package_schema` /
+  `fabric-package-schema.mjs` (L2), which now carries that schema as its data. `fabric_interop` and `fabric_package`
+  re-export every name they had, in both languages, so no caller changes; a service that copies the kit by hand
+  copies the two new files too (`fabric_kit.py install` and `status` name them). No behaviour changed.
+
+### Fixed
+
+- A board test (`test_a_revision_conflict_on_renew_reads_again_and_keeps_the_attempt`) read the call order before its
+  handler's thread had started its effect, and failed under load. It now waits for the effect to start.
+
 ## 0.44.0 (2026-10-22)
 
 ### Added

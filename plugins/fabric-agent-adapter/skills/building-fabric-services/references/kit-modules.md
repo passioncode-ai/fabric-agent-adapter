@@ -58,7 +58,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L2 | `fabric_delegation` | the callee's side of `fabric-delegation/0.1` (DEC-0039) |
 | L2 | `fabric_share` | share grants and registrations (DEC-0086) |
 | L2 | `fabric_ceremonies` | the headless join token (DEC-0084) |
-| L2 | `fabric_package` | `fabric-package/1`: pack, sign, verify (DEC-0050, DEC-0051) |
+| L2 | `fabric_package_schema` | the reading of `fabric-package.schema.json` with JavaScript's pattern and format semantics (FAA-92) |
+| L2 | `fabric_package` | `fabric-package/1`: pack, sign, verify; re-exports `schema_problems` (DEC-0050, DEC-0051) |
 | L3 | `fabric_base` | the protocol name, `ServiceError`, small shared helpers |
 | L3 | `fabric_platform` | Windows: named pipes, owner-only files (DEC-0032) |
 | L3 | `fabric_paths` | the services directory, a service's folders, atomic and private writes |
@@ -74,7 +75,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_supervisors` | launchd, systemd user units, Task Scheduler (DEC-0032, LC-14) |
 | L3 | `fabric_service` | the facade: every name 0.39.1 exported, re-exported from the modules above |
 | L3 | `fabric_profiles` | runner and model profiles ([profiles](profiles.md)) |
-| L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools ([interop](interop.md)) |
+| L3 | `fabric_interop_rules` | `fabric-interop/0.1` rules without a service: constants, `InteropError`, trace context, job limits (DEC-0087; FAA-92) |
+| L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools; re-exports the rule layer ([interop](interop.md)) |
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
 | L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data |
@@ -94,7 +96,8 @@ the kit live in `../recipes/` ([the support agent](../recipes/support-agent/READ
 public name 0.39.1 had, in both languages (the snapshot is `test/fixtures/kit-api/kit-api-0.39.1.json`; a missing
 name fails `test_kit_api`), and the Python facade the private names other code reached through it (`_number`,
 `_DAY_MS`, `_utc_date_ms` from the core). `fabric_board` and `fabric-board.mjs` are
-facades the same way. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
+facades the same way, and since 0.44.1 so are `fabric_interop` (over `fabric_interop_rules`) and `fabric_package` (over
+`fabric_package_schema`), with their Node twins: patch the rule or schema module, not the facade. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
 install with `fabric_kit.py install` and `status` names what is missing. A test or service that replaced a function
 by assigning it on the facade (`fabric_service.X = ...`) no longer changes what the kit does: the code reads its own
 module's name, so patch the module that defines it (`fabric_lock.X`, `fabric_session_env.X`). A service that imported a module-private
