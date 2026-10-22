@@ -58,7 +58,25 @@ _URL = re.compile(r"https?://\S+")
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 # What a reply may carry only when the entries it cites carry it (D6): a link, an address, a phone number, an amount,
 # a number. The customer's message never counts: an instruction hidden in it is exactly what this refuses.
-_LINK = re.compile(r"(?i)(?:\bhttps?://|\bwww\.)[^\s<>()\"'\[\]]+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s<>()\"'\[\]]*")
+# A bare host is a link only when its last label is a top-level domain people write in prose: every two-letter
+# country code, the common generic ones and the Cyrillic ones. That keeps "e.g.", "Node.js", "config.json", "2.5" and
+# "a.m." out, and catches "evil-refunds.com" with no scheme, `www.` or path.
+_CCTLD = ("ac ad ae af ag ai al am ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bm bn bo br bs bt bw by bz ca "
+          "cc cd cf cg ch ci ck cl cm cn co cr cu cv cw cx cy cz de dj dk dm do dz ec ee eg er es et eu fi fj fk fm fo "
+          "fr ga gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu id ie il im in io iq ir is it je "
+          "jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mg mh mk ml mm mn mo "
+          "mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt "
+          "pw py qa re ro rs ru rw sa sb sc sd se sg sh si sk sl sm sn so sr ss st su sv sx sy sz tc td tf tg th tj tk "
+          "tl tm tn to tr tt tv tw tz ua ug uk us uy uz va vc ve vg vi vn vu wf ws ye yt za zm zw")
+_GTLD = ("com net org info biz edu gov mil int app dev xyz online site shop store tech cloud email link live news blog "
+         "page help support pro club top vip one world today space website mobi name travel agency company services "
+         "solutions digital network media studio design money finance bank pay refund claim click download win "
+         "рф рус укр бел срб")
+_TLDS = "|".join(sorted(set((_CCTLD + " " + _GTLD).split()), key=lambda t: (-len(t), t)))
+_STOP = r"[^\s<>()\"'\[\]]"  # a link runs up to a space, a bracket or a quote
+_LINK = re.compile(r"(?i)(?:\bhttps?://|(?<![\w@.-])www\.)%s+"
+                   r"|(?<![\w@.\-/])(?:[^\W_](?:[\w-]{0,61}[^\W_])?\.)+(?:%s)(?![\w-])(?::\d{1,5})?(?:[/?#]%s*)?"
+                   % (_STOP, _TLDS, _STOP))
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _PHONE = re.compile(r"(?<![\w+])\+?\d(?:[ ().-]{0,2}\d){6,}")
 _CURRENCY = {"$": "usd", "\u20ac": "eur", "\u00a3": "gbp", "\u00a5": "jpy", "\u20bd": "rub", "\u20b9": "inr",
@@ -141,13 +159,23 @@ def _currency(unit: str) -> str:
     return "rub" if unit.startswith("руб") else _CURRENCY.get(unit, unit)
 
 
+def _link_key(link: str) -> str:
+    """A link as it is compared: no scheme, the host lower-cased, trailing punctuation and slashes gone; the path keeps
+    its case. Two links are the same claim only when their keys are equal, never when one is a prefix of the other."""
+    link = re.sub(r"(?i)^https?://", "", link)
+    while link and link[-1] in _TRAILING + "/":
+        link = link[:-1]
+    cut = re.search(r"[/?#]", link)
+    return link.lower() if cut is None else link[:cut.start()].lower() + link[cut.start():]
+
+
 def _claims(text: str) -> Dict[str, set]:
     """The links, addresses, phone numbers, amounts and numbers a text carries, each normalised for comparison."""
     amounts = set()
     for before, number, after_number, after in _AMOUNT.findall(text):
         amounts.add((_currency(before or after), number or after_number))
     return {
-        "url": {m.rstrip(_TRAILING).lower() for m in _LINK.findall(text)},
+        "url": {_link_key(m) for m in _LINK.findall(text)},
         "email": {m.rstrip(_TRAILING).lower() for m in _EMAIL.findall(text)},
         "phone": {re.sub(r"\D", "", m) for m in _PHONE.findall(text)},
         "amount": amounts,
@@ -158,14 +186,11 @@ def _claims(text: str) -> Dict[str, set]:
 def unsupported(reply: str, source: str) -> List[str]:
     """`unsupported:<kind>` for each kind of claim in the reply that the source text does not carry."""
     said, known = _claims(reply), _claims(source)
-    lowered = source.lower()
     problems = []
     for kind in ("url", "email", "phone", "amount", "number"):
-        if kind in ("url", "email"):
-            missing = [c for c in said[kind] if c not in lowered]
-        elif kind == "phone":
-            missing = [c for c in said[kind] if not any(c in k for k in known[kind])]
-        else:
+        if kind == "phone":  # the same number, or its tail: a country or trunk prefix may be left out, digits may not
+            missing = [c for c in said[kind] if not any(k.endswith(c) for k in known[kind])]
+        else:  # equality: a link or an address that is a prefix of a known one is another link or address
             missing = [c for c in said[kind] if c not in known[kind]]
         if missing:
             problems.append("unsupported:" + kind)
