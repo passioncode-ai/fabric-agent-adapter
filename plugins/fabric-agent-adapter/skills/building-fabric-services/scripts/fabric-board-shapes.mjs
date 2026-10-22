@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { sameIdentifier } from './fabric-identifiers.mjs';
 
 // A service agent answers a Project's requests on Fabric's project board (fabric-project-comms/0.1; contract DEC-0022,
-// DEC-0073, DEC-0077, DEC-0078; Fabric ADR-0149; FAA-12b, FAA-40). The twin of fabric_board.py — the same steps, the
+// DEC-0073, DEC-0077, DEC-0078; Fabric ADR-0149; FAA-12b, FAA-40). The twin of fabric_board.py: the same steps, the
 // same checkpoint file, the same answers; Node built-ins only. fabric-hub.mjs finds the hub.
 //
 //   enroll (capability) → claim → read the message → accept (the exact digest) → [effectBegin] → [progress] →
@@ -14,12 +14,12 @@ import { sameIdentifier } from './fabric-identifiers.mjs';
 // Responder runs that loop inside the service process: one tick every 15 s ± 5 s, claiming when idle and renewing the
 // 60 s lease (at about 20 s) while work runs. Before it advances a step it writes and fsyncs a checkpoint; a restart
 // reconciles work whose outcome is unknown (com.reconcile) and takes accepted work back by com.responder_replace with a
-// transfer (DEC-0078's receipt member transferred; a Fabric that does not answer it leaves the work held — never claimed
+// transfer (DEC-0078's receipt member transferred; a Fabric that does not answer it leaves the work held, never claimed
 // back). It stops acting on fenced, lease_expired and authority_changed.
 //
 // THE REQUEST BODY IS DATA. admit(request) is the service's own input gate, required: null admits, a sentence refuses
-// (the request is accepted and completed failed_known with it). Whatever the handler does with an admitted body — and
-// the checks it needs before a model, a tool or a spend sees it — is the service's own responsibility.
+// (the request is accepted and completed failed_known with it). Whatever the handler does with an admitted body (and
+// the checks it needs before a model, a tool or a spend sees it) is the service's own responsibility.
 //
 // A board session is served the respond scope only (RESPOND_TOOLS). com.submit, com.cancel, com.read_ack and
 // com.directory are never sent through one; findProject checks a directory page a Project session read (FAC-SEM-107).
@@ -63,7 +63,7 @@ const TIMESTAMP = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2
 
 const URI = /^[A-Za-z][A-Za-z0-9+.-]*:\S+$/;
 
-/** A board refusal (a contract refusal code) or a kit fault — see fabric_board.py's BoardError for the kit's codes. */
+/** A board refusal (a contract refusal code) or a kit fault; see fabric_board.py's BoardError for the kit's codes. */
 export class BoardError extends Error {
   constructor(code, message, retryable = false, op = undefined, data = {}) {
     super(message);

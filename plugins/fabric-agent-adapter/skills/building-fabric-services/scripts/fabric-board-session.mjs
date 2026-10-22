@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Backoff, HubError, MCP_PROTOCOL_VERSION, normalProject, postMcp, toolAnswer } from './fabric-hub.mjs';
 import { acceptedRevisions, atomicWrite, ensurePrivateDir, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
-import { BoardError, CAPABILITY, REQUEST_STATES, RESPOND_TOOLS, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems, refusalProblems } from './fabric-board-shapes.mjs';
+import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, RESPOND_TOOLS, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems, refusalProblems } from './fabric-board-shapes.mjs';
 
 export const RENEW_SECONDS = 20;
 
@@ -20,6 +20,9 @@ export const EVENT_SCHEMA = 'urn:fabric:schema:board-responder-event:1';
 export const STOP_CODES = Object.freeze(new Set(['fenced', 'lease_expired', 'authority_changed']));
 
 const TERMINAL = new Set(['completed', 'failed_known', 'cancelled', 'expired']);
+
+/** A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38). */
+export const LEASE_MARGIN_SECONDS = 10;
 
 /** How long a held slot waits before it asks again: doubling from the poll interval, never past this. */
 export const HOLD_RETRY_MAX_SECONDS = 900;
@@ -213,6 +216,16 @@ export class Responder {
     /** The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS. */
     this.holdDelay = POLL_SECONDS;
     this.onHold = new Set();
+    /** One fenced call at a time, and the entry edits beside them (FAA-77, finding 36). */
+    this.fenceQueue = Promise.resolve();
+    this.toResume = []; // transferred requests waiting until nothing runs (finding 39)
+  }
+
+  /** Runs fn after every fenced call queued before it (finding 36): an await inside a call never lets another in. */
+  locked(fn) {
+    const run = this.fenceQueue.then(fn, fn);
+    this.fenceQueue = run.catch(() => {});
+    return run;
   }
 
   // -- events --
@@ -365,12 +378,18 @@ export class Responder {
       } else if (transfer[capability]?.length) await this.replace(capability, transfer[capability], generations[capability] ?? 0);
       else await this.enroll(capability);
     }
-    for (const entry of reconcile) if (this.slots[entry.capability]?.state === 'held') await this.reconcile(entry);
+    for (const entry of reconcile) {
+      if (this.slots[entry.capability]?.state === 'held') await this.reconcile(entry);
+      else if (entry.step !== 'unknown') {
+        entry.step = 'unknown'; // the slot is not this session's yet: a later tick reconciles it (finding 38)
+        this.checkpoint.put(entry);
+      }
+    }
   }
 
   async replace(capability, entries, generation) {
-    const args = { idempotency: this.idem(this.key('replace')), capability, expectedGeneration: isInt(generation, 0) ? generation : 0,
-      transfer: { requests: entries.map((e) => e.request).slice(0, 64), checkpoint: { summary: 'Resumed by the same service after a restart; no effect had begun.' } } };
+    const args = { idempotency: this.idem(this.key('replace')), capability, expectedGeneration: isInt(generation, 0) ? generation : 0 };
+    if (entries.length) args.transfer = { requests: entries.map((e) => e.request).slice(0, 64), checkpoint: { summary: 'Resumed by the same service after a restart; no effect had begun.' } };
     let receipt;
     try {
       receipt = this.receipt('com.responder_replace', await this.call('com.responder_replace', args));
@@ -395,28 +414,64 @@ export class Responder {
         this.emit('board.request.held', 'warn', 'An accepted request could not be resumed: this Fabric does not hand back a transferred attempt (DEC-0078). It stays held; nothing was done.', { notify: true, episode: entry.request, request: entry.request, capability });
         continue;
       }
+      if (entry.step === 'replying' && !entry.replied && entry.keys?.reply) await this.repliedBefore(entry);
       Object.assign(entry, { generation: item.attempt.generation, attempt: item.attempt.id, digest: item.attempt.digest, revision: item.revision,
         step: ['accepting', 'held', 'lapsed'].includes(entry.step) ? 'accepted' : entry.step });
+      // Finding 35: a fenced key's digest named the old attempt; under the new one it is idempotency_conflict.
+      entry.keys = entry.keys?.reconcile ? { reconcile: entry.keys.reconcile } : {};
       this.checkpoint.put(entry);
-      if (!this.current) await this.resume(entry);
+      if (!this.toResume.includes(entry.request)) this.toResume.push(entry.request);
     }
+    await this.resumeNext();
+  }
+
+  /**
+   * A reply whose answer was lost under the old attempt (finding 35): a stored key answers before the fence is checked
+   * (project-comms.md, Idempotency), so the old call again says whether it was stored; a refusal says it was not.
+   */
+  async repliedBefore(entry) {
+    try {
+      this.receipt('com.reply', await this.call('com.reply', { ...this.replyExtra(entry), fence: this.fence(entry, entry.keys.reply) }));
+    } catch (e) {
+      if (['unreachable', 'session-ended', 'authority_changed', 'not_authorized'].includes(e.code) || !(e instanceof BoardError)) throw e;
+      return;
+    }
+    entry.replied = true;
+  }
+
+  /** Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). */
+  async resumeNext() {
+    while (!this.current && this.toResume.length && !this.stopping) {
+      const entry = this.checkpoint.entries[this.toResume.shift()];
+      if (entry && this.slots[entry.capability]?.state === 'held') await this.resume(JSON.parse(JSON.stringify(entry)));
+    }
+  }
+
+  /** An observed outcome: the one already known, else what observe(entry) reads; null when nothing was observed. */
+  async observed(entry) {
+    let outcome = isObj(entry.outcome) && entry.outcome.observed === true ? entry.outcome : null;
+    if (!outcome && this.observe) {
+      try {
+        outcome = await this.observe({ ...entry });
+      } catch {
+        outcome = null; // an observation that failed is no observation
+      }
+    }
+    return isObj(outcome) && outcome.observed === true && !outcomeProblems({ ...outcome, observed: true }, true).length ? outcome : null;
   }
 
   async reconcile(entry) {
     const state = await this.readState(entry);
     if (state !== 'outcome_unknown') {
       if (state !== null && (TERMINAL.has(state) || state === 'queued' || state === 'claimed')) this.checkpoint.drop(entry.request);
+      else if (state === 'in_progress' && entry.step !== 'unknown') {
+        entry.step = 'unknown'; // no next holder took the slot yet: a later tick tries again (finding 38)
+        this.checkpoint.put(entry);
+      }
       return;
     }
-    let outcome = isObj(entry.outcome) && entry.outcome.observed === true ? entry.outcome : null;
-    if (!outcome && this.observe) {
-      try {
-        outcome = await this.observe({ ...entry });
-      } catch {
-        outcome = null;
-      }
-    }
-    if (!isObj(outcome) || outcome.observed !== true || outcomeProblems({ ...outcome, observed: true }, true).length) {
+    const outcome = await this.observed(entry);
+    if (!outcome) {
       entry.step = 'unknown';
       this.checkpoint.put(entry);
       this.emit('board.reconcile.needed', 'warn', 'A request\'s outcome is unknown: the work may have happened. It stays unknown until this service observes what happened.', { notify: true, episode: entry.request, request: entry.request, capability: entry.capability });
@@ -447,6 +502,10 @@ export class Responder {
       if (!this.session) await this.connect();
       await this.tick();
       this.backoff.reset();
+      if (this.state === 'down') { // a lost call was sent again and answered: the session held throughout
+        this.state = 'ready';
+        delete this.said['board.down'];
+      }
       return this.interval();
     } catch (e) {
       if (!(e instanceof BoardError) && !(e instanceof HubError)) throw e;
@@ -454,9 +513,18 @@ export class Responder {
     }
   }
 
+  /** Seconds this session's leases still run, by its own clock: the running attempt's, else the oldest held slot's. */
+  leaseLeft() {
+    const renewed = this.current ? [this.current.renewedAt ?? 0] : Object.values(this.slots).filter((s) => s.state === 'held').map((s) => s.renewedAt ?? 0);
+    return renewed.length && this.session ? Math.min(...renewed) + LEASE_SECONDS - this.now() : 0;
+  }
+
   async fault(e) {
     const code = e.code ?? 'unreachable';
-    const wait = this.backoff.next();
+    let wait = this.backoff.next();
+    const left = this.leaseLeft() - LEASE_MARGIN_SECONDS;
+    const keep = code === 'unreachable' && left > 0; // finding 38: the lease holds, so the session and the work stay
+    if (keep) wait = Math.max(1, Math.min(wait, left)); // and the call goes again before the lease lapses
     this.waitUntil = this.now() + wait;
     if (['not_authorized', 'authority_changed', 'credential'].includes(code)) {
       this.state = 'not-authorized';
@@ -465,13 +533,14 @@ export class Responder {
     } else if (code === 'held') {
       this.state = 'paused';
       this.emit('board.held', 'info', 'The operator holds new work on this Project; the responder waits and asks again with a growing pause.', { episode: 'held', reason: code });
-    } else if (['no-epoch', 'schema-unsupported', 'checkpoint', 'receipt-shape'].includes(code)) {
+    } else if (['no-epoch', 'schema-unsupported', 'checkpoint', 'receipt-shape', 'idempotency_conflict'].includes(code)) {
+      // idempotency_conflict is a key sent with other content, a defect and not an outage (finding 35)
       this.state = 'down';
       await this.dropSession();
       this.emit('board.blocked', 'error', `The responder stopped answering requests: ${e.message}`, { notify: true, episode: code, reason: code });
     } else {
       this.state = 'down';
-      if (['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code)) await this.dropSession();
+      if (['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code) && !keep) await this.dropSession();
       this.emit('board.down', 'warn', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
     }
     return wait;
@@ -480,6 +549,7 @@ export class Responder {
   async dropSession() {
     const work = this.current;
     this.current = null;
+    this.toResume = []; // the next session transfers them again
     if (work) {
       const { entry } = work;
       if (work.done && !work.failure && !outcomeProblems(work.outcome, !!entry.effect).length) {
@@ -511,7 +581,10 @@ export class Responder {
       }
       if (capability !== heldByWork && this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.enroll(capability);
     }
-    if (!this.current && !this.stopping) await this.continueLapsed();
+    if (!this.current && !this.stopping) {
+      await this.continueLapsed();
+      await this.resumeNext();
+    }
     if (!this.current && !this.stopping) {
       await this.reconcilePending();
       await this.claimNext();
@@ -622,7 +695,7 @@ export class Responder {
     this.checkpoint.put(entry);
     let receipt;
     try {
-      receipt = await this.fenced('com.accept', entry, { fence: this.fence(entry, entry.keys.accept) });
+      receipt = await this.fenced('com.accept', entry, entry.keys.accept);
     } catch (e) {
       if (e.code !== 'held') throw e;
       // A hold came between the claim and the accept (DEC-0079): nothing was done, the claim lapses and the request waits.
@@ -657,16 +730,33 @@ export class Responder {
     await this.runWork(entry, new BoardRequest(message, entry.capability));
   }
 
-  async fenced(op, entry, args) {
-    try {
-      return this.receipt(op, await this.call(op, args));
-    } catch (e) {
-      if (STOP_CODES.has(e.code) || ['revision_conflict', 'invalid_transition', 'digest_conflict'].includes(e.code)) {
-        this.lose(entry, e.code);
-        if (e.code === 'authority_changed') throw e;
-        return null;
+  /**
+   * A fenced call, one at a time (finding 36): fence built, sent and receipt applied under the lock. A revision_conflict
+   * on com.renew or com.progress (they store nothing) reads the revision and sends once more. On a stop code the attempt
+   * is lost: the work stops, and it answers null (authority_changed throws after, so the responder stops claiming).
+   */
+  async fenced(op, entry, key, extra = {}, apply = null) {
+    let again = op === 'com.renew' || op === 'com.progress';
+    for (;;) {
+      try {
+        return await this.locked(async () => {
+          const receipt = this.receipt(op, await this.call(op, { ...extra, fence: this.fence(entry, key) }));
+          apply?.(receipt);
+          return receipt;
+        });
+      } catch (e) {
+        if (e.code === 'revision_conflict' && again) {
+          again = false;
+          await this.locked(() => this.readState(entry));
+          continue;
+        }
+        if (STOP_CODES.has(e.code) || ['revision_conflict', 'invalid_transition', 'digest_conflict'].includes(e.code)) {
+          this.lose(entry, e.code);
+          if (e.code === 'authority_changed') throw e;
+          return null;
+        }
+        throw e;
       }
-      throw e;
     }
   }
 
@@ -688,8 +778,7 @@ export class Responder {
 
   async renew(work) {
     if (this.now() - (work.renewedAt ?? 0) < RENEW_SECONDS - 0.5) return;
-    const receipt = await this.fenced('com.renew', work.entry, { fence: this.fence(work.entry, this.key('renew')) });
-    if (!receipt) {
+    if (!(await this.fenced('com.renew', work.entry, this.key('renew')))) {
       this.current = null;
       return;
     }
@@ -698,9 +787,8 @@ export class Responder {
   }
 
   async progress(entry, note) {
-    const args = { fence: this.fence(entry, this.key('progress')) };
-    if (note !== undefined && note !== null) args.note = { text: clean(note) || 'Working.' };
-    if (!(await this.fenced('com.progress', entry, args))) throw new Stopped();
+    const extra = note !== undefined && note !== null ? { note: { text: clean(note) || 'Working.' } } : {};
+    if (!(await this.fenced('com.progress', entry, this.key('progress'), extra))) throw new Stopped();
   }
 
   async effectBegin(entry, summary, ctx) {
@@ -708,13 +796,18 @@ export class Responder {
     entry.step = 'effect-beginning';
     entry.effect = true; // from here a lost attempt is an unknown outcome, never "nothing happened"
     this.checkpoint.put(entry);
-    const args = { fence: this.fence(entry, entry.keys.effect_begin), ...(summary ? { summary: clean(summary) } : {}) };
+    const extra = summary ? { summary: clean(summary) } : {};
+    const begun = (receipt) => {
+      entry.revision = receipt.request.revision;
+      entry.step = 'in-progress';
+      this.checkpoint.put(entry);
+    };
     let receipt = null;
     let lost = 0;
     let delay = this.holdDelay;
     for (;;) { // a lost answer: the same key again tells whether it was stored
       try {
-        receipt = await this.fenced('com.effect_begin', entry, args);
+        receipt = await this.fenced('com.effect_begin', entry, entry.keys.effect_begin, extra, begun);
         break;
       } catch (e) {
         if (e.code === 'held') {
@@ -742,9 +835,6 @@ export class Responder {
       }
     }
     if (!receipt) throw new Stopped();
-    entry.revision = receipt.request.revision;
-    entry.step = 'in-progress';
-    this.checkpoint.put(entry);
   }
 
   async finish(work) {
@@ -755,37 +845,70 @@ export class Responder {
     }
     let { outcome } = work;
     if (work.failure) {
-      if (entry.effect || work.failure instanceof Stopped) {
+      if (entry.effect) {
+        await this.settleLive(entry, 'handler-failed');
+        return;
+      }
+      if (work.failure instanceof Stopped) {
         this.current = null;
-        if (entry.effect) this.lose(entry, 'handler-failed');
         return;
       }
       outcome = { state: 'failed_known', observed: true, summary: `The service could not do this (${work.failure?.name ?? 'Error'}).` };
     }
     const problems = outcomeProblems(outcome, !!entry.effect);
     if (problems.length) {
-      this.current = null;
-      if (entry.effect) this.lose(entry, problems.some((p) => p.includes('observation_required')) ? 'observation_required' : 'outcome');
+      this.emit('board.outcome.invalid', 'warn', `The handler's outcome was not sent: ${problems[0]}.`, { request: entry.request, capability: entry.capability });
+      if (entry.effect) await this.settleLive(entry, problems.some((p) => p.includes('observation_required')) ? 'observation_required' : 'outcome');
       else {
         entry.outcome = { state: 'failed_known', observed: true, summary: 'The service answered in a form it cannot send.' };
         await this.complete(entry);
       }
-      this.emit('board.outcome.invalid', 'warn', `The handler's outcome was not sent: ${problems[0]}.`, { request: entry.request, capability: entry.capability });
       return;
     }
     entry.outcome = { ...outcome, observed: outcome.observed ?? !entry.effect };
     await this.complete(entry);
   }
 
+  /**
+   * Finding 37: the handler threw after beginEffect, or answered unobserved, while the attempt is live. Only an observed
+   * result settles a started effect (project-comms.md, Request lifecycle), so observe(entry) is completed under the live
+   * fence. With nothing observed, com.responder_replace on this responder's own slot is the contract's lost-result
+   * operation ("an in_progress one becomes outcome_unknown ... when the next holder takes the slot", Slots end with the
+   * session); com.reconcile settles it once something is observed.
+   */
+  async settleLive(entry, code) {
+    const lost = !!this.current?.ctx.stopped; // the attempt is not live: nothing to settle
+    const state = lost ? null : await this.readState(entry);
+    if (state === 'accepted') { // effect_begin was never stored, so nothing began: a known failure
+      entry.effect = false;
+      entry.outcome = { state: 'failed_known', observed: true, summary: `The service could not do this (${code}).` };
+      await this.complete(entry);
+      return;
+    }
+    const outcome = state === 'in_progress' ? await this.observed(entry) : null;
+    if (outcome) {
+      entry.outcome = { ...Object.fromEntries(['state', 'summary', 'evidence'].filter((k) => k in outcome).map((k) => [k, outcome[k]])), observed: true };
+      await this.complete(entry);
+      return;
+    }
+    this.current = null;
+    this.lose(entry, code);
+    const slot = this.slots[entry.capability] ?? {};
+    if (state === 'in_progress' && slot.state === 'held') await this.replace(entry.capability, [], slot.generation ?? 0);
+  }
+
+  replyExtra(entry) {
+    const { reply } = entry.outcome;
+    return { body: { text: reply.text, ...(reply.format ? { format: reply.format } : {}) }, ...(reply.artifacts?.length ? { artifacts: reply.artifacts } : {}) };
+  }
+
   async complete(entry) {
     const { outcome } = entry;
-    const { reply } = outcome;
-    if (reply && !entry.replied) {
+    if (outcome.reply && !entry.replied) {
       entry.keys.reply ??= this.key('reply');
       entry.step = 'replying';
       this.checkpoint.put(entry);
-      const args = { fence: this.fence(entry, entry.keys.reply), body: { text: reply.text, ...(reply.format ? { format: reply.format } : {}) }, ...(reply.artifacts?.length ? { artifacts: reply.artifacts } : {}) };
-      if (!(await this.fenced('com.reply', entry, args))) {
+      if (!(await this.fenced('com.reply', entry, entry.keys.reply, this.replyExtra(entry)))) {
         this.current = null;
         return;
       }
@@ -796,7 +919,7 @@ export class Responder {
     entry.step = 'completing';
     this.checkpoint.put(entry);
     const sent = Object.fromEntries(['state', 'observed', 'summary', 'evidence'].filter((k) => k in outcome).map((k) => [k, outcome[k]]));
-    const receipt = await this.fenced('com.complete', entry, { fence: this.fence(entry, entry.keys.complete), outcome: sent });
+    const receipt = await this.fenced('com.complete', entry, entry.keys.complete, { outcome: sent });
     this.current = null;
     if (!receipt) return;
     this.checkpoint.drop(entry.request);

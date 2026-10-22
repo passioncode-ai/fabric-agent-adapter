@@ -74,8 +74,11 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 
 The checkpoint is fsynced before each call it announces. A write that fails stops the step (`board.blocked`): nothing
 is sent that the checkpoint does not know about. A lost answer is sent again with the same idempotency key, so the
-board returns the first receipt. One request is in flight at a time. Lease times are the board's; the kit renews on its
-own monotonic clock and never reasons from `leaseExpiresAt`.
+board returns the first receipt; while the lease still holds, the session and the running work stay and the call goes
+again before the lease would lapse (FAA-77). One request is in flight at a time, and one fenced call: the fence is
+built, sent and its receipt applied under one lock, so the tick's `com.renew` never carries a revision the handler's
+`com.effect_begin` is moving. Lease times are the board's; the kit renews on its own monotonic clock and never reasons
+from `leaseExpiresAt`.
 
 ## The request is data: the input gate
 
@@ -89,8 +92,10 @@ spend sees it) is the service's own responsibility. A message never carries an a
 
 - Call `ctx.begin_effect(summary)`, and let it return, before the handler spends, writes outside the service or calls
   anything that acts. If it raises `Stopped`, act no further.
-- After an effect began, the outcome must be observed (`observed: true`): the kit never sends an unobserved result; the
-  request stays unknown and is reconciled later.
+- After an effect began, the outcome must be observed (`observed: true`): the kit never sends an unobserved result. A
+  handler that raises after `begin_effect`, or answers unobserved, is settled at once from `observe(entry)` under the
+  live fence; with nothing observed, the kit replaces its own slot (`com.responder_replace`), the contract's lost-result
+  operation, so the board moves the request to `outcome_unknown`, and `com.reconcile` settles it once `observe` answers.
 - `evidence` is at most 8 references `{id: uri, contentHash: sha256:<hex>, label?}`; `artifact_ref(uri, content=…|path=…)`
   hashes the bytes itself. Two ids with one normal form (DEC-0076) name one artifact and are refused.
 - `reply: {text, format?, artifacts?}` is posted with `com.reply` before the completion. A reply is not a completion.
@@ -107,6 +112,10 @@ spend sees it) is the service's own responsibility. A message never carries an a
 | `fenced` on enroll | another live holder: wait for it to lapse; never replace it on its own initiative |
 | lost after an effect began | keep the entry as `unknown`; `observe(entry)` is asked to settle it with `com.reconcile` |
 | Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning |
+| one call without an answer while the lease holds | `board.down`, but the session and the running work stay; the call goes again, with the same key, before the lease lapses |
+| `revision_conflict` on `com.renew` or `com.progress` | they store nothing: the revision is read again (`com.get`) and the call sent once more; a second one loses the attempt |
+| `idempotency_conflict` | a key sent with other content is a defect, not an outage: `board.blocked` (notify) naming it, and the session is left |
+| in progress at a reconnect whose slot another session still holds | marked `unknown`; reconciled every five minutes once the slot is this session's |
 
 On restart the checkpoint is read back: settled or queued requests are dropped; `in_progress` and `outcome_unknown` are
 reconciled from what `observe(entry)` answers (observed only; with no observation they stay unknown and notify);
@@ -114,7 +123,10 @@ accepted ones go back to this responder with `com.responder_replace {expectedGen
 `transferred` (DEC-0078: `{request, revision, attempt}`) carries the new fence. **A Fabric that does not answer
 `transferred` yet leaves the request held** (`board.request.held`, notify): the kit never claims it back, because the
 contract has no `com.claim` read-back and `com.claim` never moves an accepted request. A known outcome is sent after the
-transfer without running the handler again. `shutdown()` drains, then leaves the session (its DELETE releases the slot).
+transfer without running the handler again. Every transferred request resumes, one at a time as the responder goes
+idle. A transfer makes every fenced idempotency key again, because the old key's digest named the old attempt; a reply
+whose answer was lost is first sent again under its old key and fence, so the board's stored receipt says whether it
+was posted, and it is never posted twice. `shutdown()` drains, then leaves the session (its DELETE releases the slot).
 
 ## When the operator holds work (DEC-0079)
 
