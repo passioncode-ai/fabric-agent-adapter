@@ -158,6 +158,36 @@ class JtiStoreTests(unittest.TestCase):
         self.assertEqual(len(protected), 1, protected)
         self.assertTrue(protected[0][0].startswith(".jti.json.") and protected[0][1] is False, protected)
 
+    def test_a_failed_acl_step_closes_the_temporary_file_and_raises_its_own_error(self):
+        """FAA-85 round 2: on Windows the ACL step runs before the bytes; when it fails the temporary file's handle is
+        closed (else Windows cannot delete it), nothing is left, and the ACL error is what the caller sees."""
+        import os
+        writer = dl._atomic_write.__globals__
+        opened = []
+        real_mkstemp = writer["tempfile"].mkstemp
+
+        def mkstemp(*args, **kwargs):
+            fd, name = real_mkstemp(*args, **kwargs)
+            opened.append(fd)
+            return fd, name
+
+        def refuse(path, folder):
+            raise RuntimeError("acl refused")
+        saved = (writer["WINDOWS"], writer["_win_protect"])
+        writer["WINDOWS"], writer["_win_protect"] = True, refuse
+        writer["tempfile"].mkstemp = mkstemp
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                with self.assertRaisesRegex(RuntimeError, "acl refused"):
+                    dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10)
+                self.assertEqual(sorted(p.name for p in Path(temp).iterdir()), [])
+        finally:
+            writer["tempfile"].mkstemp = real_mkstemp
+            writer["WINDOWS"], writer["_win_protect"] = saved
+        self.assertEqual(len(opened), 1)
+        with self.assertRaises(OSError):
+            os.fstat(opened[0])
+
     def test_a_failed_file_store_write_leaves_no_temporary_file(self):
         import os
         with tempfile.TemporaryDirectory() as temp:

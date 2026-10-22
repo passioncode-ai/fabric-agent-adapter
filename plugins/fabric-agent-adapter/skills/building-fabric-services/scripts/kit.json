@@ -64,7 +64,7 @@
     "fabric_base",
     "fabric_platform"
    ],
-   "sha256": "41b04e294b8dcc0aa559b78b70c80508551e3ce51a6c3daed6e1cd1166c15c9b"
+   "sha256": "6c92af34292baddf7e10d3134d0a5b0bb23387741812a9f79c409cf1628bad23"
   },
   {
    "module": "fabric_estate",
@@ -460,7 +460,7 @@
     "fabric-base",
     "fabric-platform"
    ],
-   "sha256": "6f699085d5c8a7cdce7bd355c21bfab1f4cdab0536bcc222a29d85716d62bc95"
+   "sha256": "2201b4ed7126f260931b63e8386377b4317d8dcad419d109bf22c683e44b7f29"
   },
   {
    "module": "fabric-estate",
@@ -2048,7 +2048,7 @@
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
    "fabric_base.py": "f62bcc2ed9912660fa875d27a09f60867260cc4925f79873501fd9620be59611",
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",
-   "fabric_paths.py": "41b04e294b8dcc0aa559b78b70c80508551e3ce51a6c3daed6e1cd1166c15c9b",
+   "fabric_paths.py": "6c92af34292baddf7e10d3134d0a5b0bb23387741812a9f79c409cf1628bad23",
    "fabric_estate.py": "50cc12166a00b680ba5b2e458200912d7bcfbef70bd73ec4edf57c7fcfa9b687",
    "fabric_delegation.py": "4eb5004188fdc6f5c0fd21fb0f9f1f538899a0383bcde0365dea080ef8347182",
    "fabric_share.py": "78506fe1a60829c525dbf6266a0aa0749a2164290ed94da8249a20b4e9be5605",
@@ -2084,7 +2084,7 @@
    "fabric-crypto.mjs": "038e03689701e3c9721a1e7f8e0a4d02a52d6a5d1661b0dc84035edc3ebbfcf6",
    "fabric-base.mjs": "7804b2df7715dbbf9702a9b61b6b8cef2110f9a52b04cabd8fb0a66458d87512",
    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",
-   "fabric-paths.mjs": "6f699085d5c8a7cdce7bd355c21bfab1f4cdab0536bcc222a29d85716d62bc95",
+   "fabric-paths.mjs": "2201b4ed7126f260931b63e8386377b4317d8dcad419d109bf22c683e44b7f29",
    "fabric-estate.mjs": "912b1ceab57ed20f946986bf14ae2faf41fb8ea539e818164496874f3749ef65",
    "fabric-delegation.mjs": "85a7e00e606244e7e02f9cbecc3e421bfcb9c1e12cd2a91daadf8a9c2403104d",
    "fabric-share.mjs": "d40a7405d7bd4c3213ed691330b7549afe8e023db0753b582e249714e672010d",

@@ -9,9 +9,12 @@
   and a write that failed left its temporary file behind. It now writes through `fabric_paths.atomic_write` /
   `atomicWrite`: a protected owner-only ACL before the bytes on Windows (DEC-0032), 0600 elsewhere, fsynced and renamed
   into place, nothing left on failure. The file holds consumed approval ids, not a secret.
-- **`atomicWrite` in the Node kit removes its temporary file whatever fails** (FAA-85, found by the blind reading).
-  It cleaned up only when chmod or the rename failed; a failure while setting the Windows ACL, writing or syncing left
-  `.<name>.<pid>.<hex>` beside the real file. The Python `atomic_write` already cleaned up on every failure.
+- **The kit's private writer removes its temporary file whatever fails, and reports the error that caused it**
+  (FAA-85, found by the blind readings). Node `atomicWrite` cleaned up only when chmod or the rename failed; a failure
+  while setting the Windows ACL, writing or syncing left `.<name>.<pid>.<hex>` beside the real file. Python
+  `atomic_write` set the Windows ACL before it wrapped the file's handle, so when that step failed the handle stayed
+  open, Windows could not delete the file, and the delete's error replaced the ACL's. Both now close the file on every
+  path, remove it, and raise the original error even when the removal fails.
 
 ### Changed
 

@@ -63,7 +63,9 @@ export function atomicWrite(file, data, mode = 0o600) {
     if (process.platform !== 'win32') fs.chmodSync(tmp, mode);
     fs.renameSync(tmp, file);
   } catch (error) {
-    fs.rmSync(tmp, { force: true }); // whatever failed, no half-written file is left beside the real one (FAA-85)
+    // Whatever failed, no half-written file is left beside the real one, and a failed cleanup never replaces the
+    // error that caused it (FAA-85).
+    try { fs.rmSync(tmp, { force: true }); } catch { /* the original error is the one to report */ }
     throw error;
   }
 }
