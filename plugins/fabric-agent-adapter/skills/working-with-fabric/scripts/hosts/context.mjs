@@ -30,4 +30,21 @@ export async function readContext(host, cwd, options = {}) {
     } catch { resolve(''); }
   });
 }
+
+// One helper run per host, workspace and registration in this process (FAA-69): OpenCode and OpenClaw ask on every
+// request, and the answer does not change within a process. A failed run is not kept, so the next request asks again.
+const cacheCap = 64;
+export function onceEach(reader = readContext) {
+  const answers = new Map();
+  return (host, cwd, options = {}) => {
+    const key = JSON.stringify([host, cwd, options.fabricRegistered === true]);
+    if (!answers.has(key)) {
+      if (answers.size >= cacheCap) answers.delete(answers.keys().next().value);
+      const pending = Promise.resolve().then(() => reader(host, cwd, options));
+      answers.set(key, pending);
+      pending.catch(() => answers.delete(key));
+    }
+    return answers.get(key);
+  };
+}
 // #endregion native-host-context

@@ -20,7 +20,7 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 | Event | When it acts | What it does |
 |---|---|---|
 | SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running: adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric down, in a project that uses Fabric (below): one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
-| Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | spools one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}`, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
+| Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | measures the turn's facts (HEAD, files changed, lines added and removed: counts and ids only, git sharing 1.5 s), spools them in one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}` as stored, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
 | UserPromptSubmit | the session's spool holds a count | adds ONE line, `N unread on the project board: com.list`, only when the count rose since the last line; a fall or the same count says nothing. It reads two small files and never calls Fabric. |
 | SessionEnd | as for Stop | spools the end; the worker sends `fabric_work_release {claims: "session", outcome: "let-go", …}`, then `fabric_session_observe {event: "end", reason}`, and removes the session's spool |
 
@@ -31,8 +31,8 @@ outside a checkout; never above it); or a service descriptor whose `source.repos
 `remote.origin.url`. The machine's service descriptors are no longer counted into the session: the host's own
 instructions say how to read Fabric services (since 0.38.0).
 
-Without `session-hooks/1`, Stop and SessionEnd read `hub.json`, return, and write nothing, so UserPromptSubmit has
-nothing to show; `fabric_session.py status` says "Session hooks: inert". That is every Fabric before the release
+Without `session-hooks/1`, Stop and SessionEnd read `hub.json`, return, and spool nothing (they only remove stale
+session folders, below), so UserPromptSubmit has nothing to show; `fabric_session.py status` says "Session hooks: inert". That is every Fabric before the release
 that ships the dependencies below. A board that cannot be read (`unavailable`, a refusal) leaves no count, never a
 zero; a `degraded` board that still gives the count is read.
 
@@ -48,8 +48,10 @@ session id Fabric keeps with the enrollment, which only Claude Code supplies tod
 would add (never a value already in the file) and the `--apply --expect-sha256 <digest>` command. With `--apply` it
 backs the file up (`<file>.<UTC stamp>.bak`, never overwriting an earlier backup), keeps the file's mode, refuses a
 file whose shape is not `{"hooks": {"<Event>": [{"hooks": [...]}]}}` (Codex) or an array of `[[hooks]]` tables
-(Kimi Code, read back with `tomllib`: Python 3.11+), and refuses one that changed since the dry run. `--remove` takes
-the entry out again. Codex may ask the person to trust a new hook (`/hooks`) before it runs. Codex keys that trust by event, group and index, so
+(Kimi Code, read back with `tomllib`: Python 3.11+), and refuses one that changed since the dry run. It refuses a
+`--script` that is not an existing file. Our own entry, found by what it runs (for Kimi Code each `[[hooks]]` table is
+read on its own, so a hand-touched one is still found), is rewritten in place to the new script (`updated`) rather
+than added a second time. `--remove` takes the entry out again, stale or not, and needs no script. Codex may ask the person to trust a new hook (`/hooks`) before it runs. Codex keys that trust by event, group and index, so
 `--remove` names the SessionStart groups after the removed one that it moves, which Codex asks the person to approve
 again. The hook runs the
 `fabric_session.py` of the skills install (`~/.agents/skills/working-with-fabric/`) when there is one, else this
@@ -63,8 +65,10 @@ They consume the same context through their own APIs. They never use the Claude-
 `fabric_session.py watch-mail [--interval 60]` is for an idle Claude Code session waiting on the board; the agent
 starts it under a background watcher. It rejoins the session (`CLAUDE_CODE_SESSION_ID`, or `--session-id`) through
 `fabric-mcp --rejoin-only` for each look, prints one line each time the unread count rises, and waits `interval`
-± 20 % between looks (never under 10 s). While Fabric is down or the board unreadable it says so once and backs off,
-doubling to at most 15 minutes. It exits on its stdin's end (when started with a pipe), SIGTERM, SIGINT or SIGHUP,
+± 20 % between looks (after the jitter never under 10 s and never over 15 minutes). It shares the session's
+once-a-minute rejoin with the Stop worker: a look within a minute of the last rejoin (the worker's `rejoined` mark or
+its own) waits instead, and its own rejoin renews that mark when the session's folder exists. While Fabric is down or
+the board unreadable it says so once and backs off, doubling to at most 15 minutes. It exits on its stdin's end (when started with a pipe), SIGTERM, SIGINT or SIGHUP,
 or when its parent is gone. It refuses to start in a session Fabric launched, and without a `fabric` registration.
 
 ## A session Fabric launched
@@ -78,13 +82,18 @@ only variable names are looked at, never a value (two of them carry the session'
    `<Fabric's folder>/sessions/` (Codex).
 3. Claude Code launched by Fabric has no variable yet: its command line holds `--mcp-config
    <Fabric's folder>/sessions/<id>/mcp.json`. SessionStart, and Stop once per session, look for that in a few
-   ancestor processes (`ps`, bounded to 0.5 s each); only the match is used, nothing is kept or logged.
+   ancestor processes (`ps`, bounded to 0.5 s each); only the match is used, nothing is logged. A match is kept as
+   an empty `launched` file in the session's folder, so the walk runs once and nothing is spooled after it. A `ps`
+   that fails or runs out of time is "unknown", never "not launched": that hook spools nothing (so no worker can
+   release a launched session's claims) and the next one looks again.
 
 ## What they never do
 
 - **Block or slow the session.** Each hook has a 5 s ceiling in `hooks.json`; the script reads a few small files and
-  returns in tens of milliseconds. Every call to Fabric happens in a detached worker with a 10 s deadline. Every
-  hook exits 0, on every path.
+  returns in tens of milliseconds, plus the turn's git facts in Stop and SessionEnd (at most 1.5 s, shared by every
+  git call). Every call to Fabric happens in a detached worker with a 10 s deadline; at its end the worker closes
+  `fabric-mcp`'s stdin and then ends its whole process group, so a wrapper (`npx`, a shell script,
+  `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path.
 - **Read a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
   those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log.
 - **Send or read content.** A turn is the HEAD commit, the number of files that differ from it (untracked included)
@@ -96,8 +105,10 @@ only variable names are looked at, never a value (two of them carry the session'
 - **Rejoin more than once a minute.** Every rejoin spends the agent's Fabric request budget, which every session of
   the machine shares. A turn within 60 s of the session's last successful rejoin (the worker marks it as `rejoined`
   in the session's folder) is spooled and waits for the next worker; the end of a session always starts one (FAA-53).
-- **Retry in a loop.** A refused call is logged by its error code and dropped; an answer that never came is logged
-  as `outcome=unknown`. The calls carry an `idempotencyKey`, so a repeat is the same event.
+- **Retry in a loop.** A refused call, or one answered with a JSON-RPC error, is logged by its error code and its
+  entry dropped; an entry that cannot be read is logged as `outcome=dropped` and dropped. The entries after it, the
+  end's release and the end observation still go out. An answer that never came is logged as `outcome=unknown` and
+  leaves the spool to the next worker. The calls carry an `idempotencyKey`, so a repeat is the same event.
 
 ## Where they log, and how to turn them off
 
@@ -106,7 +117,8 @@ One line per event that did something, never content: `~/Library/Caches/ai.passi
 `%LOCALAPPDATA%\fabric-agent-adapter\hooks.log` (Windows). Mode 0600, rotated at 1 MB to `hooks.log.1`. The
 per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, `board.json`, `board.shown`; a
 folder untouched for 7 days, whose worker failed or whose session ended without SessionEnd, is removed by the next
-spooling hook),
+Stop or SessionEnd hook, even while the hooks are inert; a stale worker lock is taken by renaming it, never by a
+check and a delete),
 removed at the session's end.
 
 Turn them off with Claude Code's own switch (`/hooks`, or `"disableAllHooks": true` in settings), or remove the

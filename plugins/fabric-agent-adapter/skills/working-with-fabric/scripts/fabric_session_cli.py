@@ -11,9 +11,12 @@ from pathlib import Path
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     HOOK_FEATURE,
     HOSTS,
+    LAUNCHED_MARK,
     NATIVE_PLUGIN_HOSTS,
+    REJOIN_MIN_INTERVAL_S,
     SESSION_ID,
     UNREAD_LINE,
+    _remove_tree,
     _write_private,
     claude_registration,
     codex_registered,
@@ -29,12 +32,15 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     project_uses_fabric,
     prune_stale_sessions,
     read_small,
+    rejoined_recently,
     session_dir,
     spawn_worker,
     spool,
 )
 from fabric_session_mcp import (  # noqa: E402 - the kit (FAA-65)
+    FACTS_BUDGET_S,
     deliver,
+    git_facts,
 )
 from fabric_session_mail import (  # noqa: E402 - the kit (FAA-65)
     watch_mail_cli,
@@ -42,11 +48,6 @@ from fabric_session_mail import (  # noqa: E402 - the kit (FAA-65)
 from fabric_session_hosts import (  # noqa: E402 - the kit (FAA-65)
     install_host_hooks_cli,
 )
-
-
-#: A session rejoins at most once in this span (FAA-53): every rejoin spends Fabric's per-agent request budget, which
-#: every session of the machine shares; a turn inside it waits in the spool for the next worker, an end never waits.
-REJOIN_MIN_INTERVAL_S = 60.0
 
 
 PREAMBLE = (
@@ -144,15 +145,17 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
 
 
 def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]] = None, spawn=spawn_worker) -> str:
-    """Stop (`turn`) and SessionEnd (`end`): spool one entry and start the worker. Returns what happened, for the
-    tests. Nothing runs, and nothing is written, unless the running Fabric advertises `session-hooks/1` and
-    `fabric` is registered — hub.json is read first because it is the cheap check that fails for every Fabric
-    before the one that ships the hooks' dependency (`status` says so: "Session hooks: inert")."""
+    """Stop (`turn`) and SessionEnd (`end`): spool one entry, with the turn's facts measured now, and start the worker.
+    Returns what happened, for the tests. Nothing is spooled and no worker runs unless the running Fabric advertises
+    `session-hooks/1` and `fabric` is registered: hub.json is read first because it is the cheap check that fails for
+    every Fabric before the one that ships the hooks' dependency (`status` says so: "Session hooks: inert"). Stale
+    session folders are pruned before that check, so an inert Fabric does not keep them (FAA-68)."""
     session_id = payload.get("session_id")
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return "skipped: no session id"
     if fabric_launched(env):
         return "skipped: launched by Fabric"
+    prune_stale_sessions(env, keep=session_id)
     hub = locate_hub(fabric_root(env=env))
     if hub["state"] != "running":
         return "inert: Fabric is not running"
@@ -162,12 +165,26 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
     if not claude_registration(cwd, env):
         return "skipped: fabric is not registered"
     directory = session_dir(session_id, env)
-    # The ancestor check costs a process-table read or two: only once per session, when its folder is first made.
-    if not directory.is_dir() and launched_by_ancestor(env):
+    if (directory / LAUNCHED_MARK).exists():
+        if event == "end":
+            _remove_tree(directory)
         return "skipped: launched by Fabric"
+    # The ancestor check costs a process-table read or two: only once per session, when its folder is first made. A
+    # positive answer is kept in the folder; an unknown one (a `ps` that failed) spools nothing, so no worker can
+    # release a launched session's claims, and is asked again at the next hook.
+    if not directory.is_dir():
+        launched = launched_by_ancestor(env)
+        if launched is None:
+            return "skipped: whether Fabric launched this session is unknown"
+        if launched:
+            if event != "end":
+                directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+                _write_private(directory / LAUNCHED_MARK, "")
+            return "skipped: launched by Fabric"
+    # The turn's own facts, measured when it ended (counts and ids only, never a path), not when a worker runs.
     entry = {"event": event, "runtimeSessionId": session_id, "cwd": str(cwd),
-             "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-    prune_stale_sessions(env, keep=session_id)
+             "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             "facts": git_facts(cwd, budget_s=FACTS_BUDGET_S)}
     if event == "end" and isinstance(payload.get("reason"), str):
         entry["reason"] = payload["reason"][:64]
     spool(directory, entry)
@@ -177,15 +194,6 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
         return "spooled: rejoined recently"
     spawn(directory)
     return "spooled: worker started"
-
-
-def rejoined_recently(directory: Path, now: Optional[float] = None) -> bool:
-    """Whether this session's last rejoin succeeded within REJOIN_MIN_INTERVAL_S (the worker marks it)."""
-    try:
-        mark = (directory / "rejoined").stat().st_mtime
-    except OSError:
-        return False
-    return 0 <= (time.time() if now is None else now) - mark < REJOIN_MIN_INTERVAL_S
 
 
 def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.platform) -> Dict[str, Any]:

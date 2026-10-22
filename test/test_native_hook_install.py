@@ -63,6 +63,16 @@ class NativeInstallTests(unittest.TestCase):
             self.assertEqual(self.run_cli(host,'--apply','--script',str(old)),1)
             self.assertFalse(h.destination(host,self.env).exists())
 
+    def test_hermes_remove_needs_no_source_hosts_folder(self):
+        """FAA-69: the skill the loader was installed from moved or lost its hosts/ folder; removal reads nothing there."""
+        root=self.home/'.hermes/plugins/fabric-agent-adapter'
+        old=self.home/'old/fabric_session.py';old.parent.mkdir();old.write_text('pass')
+        for script in (old, self.home/'gone/fabric_session.py'):
+            with self.subTest(script=script):
+                self.assertEqual(self.run_cli('hermes','--apply'),0);self.assertTrue((root/'plugin.yaml').exists())
+                self.assertEqual(self.run_cli('hermes','--remove','--script',str(script)),0,self.lines)
+                self.assertFalse(root.exists())
+
     def test_openclaw_remove_absent_adapter_is_byte_exact_noop(self):
         p=self.home/'.openclaw/openclaw.json';p.parent.mkdir();p.write_text('{"unrelated": true}\n')
         before=p.read_bytes()
