@@ -53,7 +53,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L0 | `fabric_time` | strict RFC 3339, UTC days, formatting, day windows, the clock ([dates](#dates-and-times)) |
 | L0 | `fabric_identifiers` | identifier equality by normal form (DEC-0076) |
 | L0 | `fabric_secrets` | the contract's one credential detector (DEC-0044) |
-| L1 | `fabric_crypto` | Ed25519 and P-256 verification, base64url, sha256: what the verifiers need and nothing more |
+| L1 | `fabric_crypto` | Ed25519 signing (a Montgomery ladder that does not branch on the key) and verification, P-256 verification, base64url, sha256 |
 | L2 | `fabric_estate` | `estate-record/1` revisions and their rules (DEC-0055) |
 | L2 | `fabric_delegation` | the callee's side of `fabric-delegation/0.1` (DEC-0039) |
 | L2 | `fabric_share` | share grants and registrations (DEC-0086) |
