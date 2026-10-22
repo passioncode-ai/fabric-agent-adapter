@@ -18,11 +18,11 @@ export const SETTINGS_BACKUP_MAX_AGE_SECONDS = 24 * 60 * 60;
 
 const TABLE = /^[a-z][a-z0-9_]{0,62}$/;
 
-const SECRET_TABLE = /^((.+_)?(account_connections?|account_connection_drafts?|tokens?|secrets?|credentials?|passwords?|login_codes?)|(operator_)?sessions?)$/;
+const SECRET_TABLE = /^(([\s\S]+_)?(account_connections?|account_connection_drafts?|tokens?|secrets?|credentials?|passwords?|login_codes?)|(operator_)?sessions?)$/;
 
 const COLUMN = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 
-const SECRET_COLUMN = /^(?:.+_)?(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]assphrase|[Aa]pi_?[Kk]ey|[Pp]rivate_[Kk]ey|[Cc]ookie|[Ll]ogin_[Cc]ode|[Oo]tp|[Cc]redential)s?$/;
+const SECRET_COLUMN = /^(?:[\s\S]+_)?(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]assphrase|[Aa]pi_?[Kk]ey|[Pp]rivate_[Kk]ey|[Cc]ookie|[Ll]ogin_[Cc]ode|[Oo]tp|[Cc]redential)s?$/;
 
 const REASON = /^[a-z][a-z0-9_.-]{0,63}$/;
 

@@ -19,6 +19,9 @@
 - **The kit's copy of `fabric-package.schema.json` carries DEC-0097's path pattern.** ECMAScript's `.` stops at U+2028
   and U+2029, so the old pattern accepted `skills<U+2028>/../../etc/passwd`; any character is now `[\s\S]`. Both kits'
   own package checks already refused these paths (0.41.0). `share-registration.schema.json` is regenerated at the pin.
+- **The settings backup's secret-name patterns follow DEC-0097** in both kits (`[\s\S]+_` for `.+_`); no input reached
+  the difference, since table and column names refuse a line break first. A contract-gated test holds each twin's
+  regex to the pinned schema's pattern.
 - **A guard holds the kit's vendored schemas to the pin:** `test_the_kit_schemas_carry_the_patterns_of_the_pinned_contract`
   fails when a pattern in either copy is not a pattern of that schema's `$ref` closure at the pinned contract.
 

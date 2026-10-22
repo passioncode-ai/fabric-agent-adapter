@@ -169,7 +169,7 @@ class CompiledRevisionTests(unittest.TestCase):
                 return seen
             seen.add(name)
             text = (schemas / name).read_text()
-            for ref in set(re.findall(r'"\$ref":\s*"([^"#]+)#', text)):
+            for ref in set(re.findall(r'"\$ref":\s*"([^"#]+)(?:#|")', text)):
                 closure(ref, seen)
             return seen
 
@@ -180,3 +180,27 @@ class CompiledRevisionTests(unittest.TestCase):
                     patterns(json.loads((schemas / reached).read_text()), allowed)
                 shipped = patterns(json.loads((kit / name).read_text()), set())
                 self.assertEqual(sorted(shipped - allowed), [], 'patterns the pinned contract does not carry')
+
+    def test_the_backup_secret_names_are_the_pinned_schema_patterns(self):
+        """FAA-95: the settings backup kit writes the schema's two secret-name patterns by hand (DEC-0097 replaced
+        `.` with `[\\s\\S]` in both); each twin's regex text equals the pinned schema's (Python spells `$` as `\\Z`)."""
+        schema = json.loads((self.new / 'schemas/settings-backup.schema.json').read_text())
+        patterns = set()
+        def walk(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if key == 'pattern' and '[Tt]oken' in item or key == 'pattern' and 'login_codes' in item:
+                        patterns.add(item)
+                    walk(item)
+            elif isinstance(value, list):
+                for item in value:
+                    walk(item)
+        walk(schema)
+        self.assertEqual(len(patterns), 2)
+        kit = ROOT / 'plugins/fabric-agent-adapter/skills/building-fabric-services/scripts'
+        python = (kit / 'fabric_backups.py').read_text()
+        node = (kit / 'fabric-backups.mjs').read_text()
+        for pattern in sorted(patterns):
+            with self.subTest(pattern=pattern):
+                self.assertIn('r"%s\\Z")' % pattern[:-1], python)
+                self.assertIn('/%s/;' % pattern, node)
