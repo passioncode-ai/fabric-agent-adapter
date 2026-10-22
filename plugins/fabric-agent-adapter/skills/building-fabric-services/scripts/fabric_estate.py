@@ -20,7 +20,6 @@ in ``fabric_delegation``.
 from __future__ import annotations
 
 import base64
-import datetime as _dt
 import hashlib
 import json
 import math
