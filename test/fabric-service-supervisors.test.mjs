@@ -44,6 +44,13 @@ test('systemd specifiers and variables are escaped', () => {
   assert.ok(text.includes('ExecStart="/bin/echo" "100%%" "$$HOME" "say \\"hi\\"\\\\"'), text);
 });
 
+test('finding 17: Environment= keeps its $ (systemd expands no variable there) and escapes its specifiers', () => {
+  const text = k.systemdUnit('x.service', ['/bin/x'], { workingDirectory: '/tmp', environment: { EXAMPLE_PRICE: '$5 at 100%', EXAMPLE_QUOTE: 'a "b" \\c' } });
+  assert.ok(text.includes('Environment="EXAMPLE_PRICE=$5 at 100%%"\n'), text);
+  assert.ok(text.includes('Environment="EXAMPLE_QUOTE=a \\"b\\" \\\\c"\n'), text);
+  assert.ok(k.systemdUnit('x.service', ['/opt/$x/bin', '$y'], { workingDirectory: '/tmp' }).includes('ExecStart="/opt/$$x/bin" "$$y"\n'), 'every ExecStart word, the first too');
+});
+
 test('the systemd unit refuses what it cannot carry', () => {
   const refuse = (fn) => assert.throws(fn, k.ServiceError);
   refuse(() => k.systemdUnit('bad name', ['/bin/x'], { workingDirectory: '/tmp' }));

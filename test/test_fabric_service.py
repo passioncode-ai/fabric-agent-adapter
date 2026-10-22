@@ -527,6 +527,31 @@ class LiveServiceTests(unittest.TestCase):
         self.assertEqual(post({"MCP-Protocol-Version": fi_mod.MCP_REVISION}), 400)
         self.assertEqual(post(fi_mod.mcp_request_headers("tools/list", {})), 200)
 
+    def test_a_bad_content_length_or_body_is_a_400(self):
+        """Finding 17: the sample trusted Content-Length (a negative one read to the end of the stream, a word or a JSON
+        that is no object crashed the handler, a bad event kind escaped as ServiceError)."""
+        import socket
+        token = (self.data / "service.token").read_text().strip()
+
+        def raw(path, length, body, extra=""):
+            with socket.create_connection(("127.0.0.1", self.port), timeout=5) as sock:
+                sock.sendall(("POST %s HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nAuthorization: Bearer %s\r\nX-Fabric-Request: 1\r\n"
+                              "Content-Type: application/json\r\nContent-Length: %s\r\n%s\r\n" % (path, self.port, token, length, extra)).encode()
+                             + body)
+                return sock.recv(65536).split(b" ", 2)[1]
+        mcp = "".join("%s: %s\r\n" % kv for kv in load("fabric_interop").mcp_request_headers("tools/list", {}).items())
+        listed = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}).encode()
+        self.assertEqual(raw("/mcp", len(listed), listed, mcp), b"200")
+        for length in ("-1", "abc", "1e3", str(2 * 1048576)):
+            with self.subTest(length=length):
+                self.assertEqual(raw("/mcp", length, b"{}", mcp), b"400")
+                self.assertEqual(raw("/api/emit", length, b"{}"), b"400")
+        for body in (b"[1]", b"{bad", b'{"kind": "Not A Kind"}', b'"text"'):
+            with self.subTest(body=body):
+                self.assertEqual(raw("/api/emit", len(body), body), b"400")
+        note = b'{"text": "still serving"}'
+        self.assertEqual(raw("/api/emit", len(note), note), b"200")
+
     def test_second_copy_exits_75_and_leaves_the_first_serving(self):
         second = subprocess.run([sys.executable, str(SCRIPTS / "sample_service.py"), "serve", "--port",
                                  str(free_port()), "--data-dir", str(self.data)], capture_output=True, text=True, timeout=10)

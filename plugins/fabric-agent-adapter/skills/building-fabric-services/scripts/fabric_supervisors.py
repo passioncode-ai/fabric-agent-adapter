@@ -68,10 +68,12 @@ def _plain(value: str, what: str) -> str:
     return value
 
 
-def _systemd_quote(value: str) -> str:
+def _systemd_quote(value: str, dollar: bool = True) -> str:
+    """A quoted systemd value. ExecStart= expands $VAR, so its $ is doubled; Environment= expands none, so `dollar`
+    False leaves it alone (finding 17). Both expand % specifiers."""
     _plain(value, "an argument")
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
-    return '"%s"' % escaped
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+    return '"%s"' % (escaped.replace("$", "$$") if dollar else escaped)
 
 
 def systemd_unit(unit: str, program_arguments: Sequence[str], *, working_directory: Path,
@@ -102,7 +104,7 @@ def systemd_unit(unit: str, program_arguments: Sequence[str], *, working_directo
     for name in env:
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*\Z", name):
             raise ServiceError("environment name %r is not a variable name" % name)
-    lines += ["Environment=%s" % _systemd_quote("%s=%s" % (k, v)) for k, v in sorted(env.items())]
+    lines += ["Environment=%s" % _systemd_quote("%s=%s" % (k, v), dollar=False) for k, v in sorted(env.items())]
     lines += ["Restart=always", "RestartSec=10", "TimeoutStopSec=%d" % stop_timeout, "KillMode=mixed", "",
               "[Install]", "WantedBy=default.target", ""]
     return "\n".join(lines)

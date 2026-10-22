@@ -817,7 +817,8 @@ def mcp_header_problem(message: Any, headers: Any) -> Optional[str]:
         return "Mcp-Method %s disagrees with the body's method %s" % (sent, method)
     field = NAMED_METHODS.get(str(method))
     if field:
-        value = (message.get("params") or {}).get(field)
+        params = message.get("params")
+        value = params.get(field) if isinstance(params, dict) else None
         named = header("Mcp-Name")
         if named is None and declared:
             return "the body carries params.%s but the required Mcp-Name header is absent" % field
@@ -904,8 +905,11 @@ class McpToolServer:
         if "id" not in message:
             return None  # a notification gets no response
         rid = message["id"]
-        params = message.get("params") or {}
-        meta = params.get("_meta") or {}
+        params = {} if message.get("params") is None else message["params"]
+        meta = params.get("_meta") if isinstance(params, dict) else None
+        meta = {} if meta is None else meta
+        if not isinstance(params, dict) or not isinstance(meta, dict):  # finding 17: answered, never a crash
+            return self._error(rid, -32602, "params and params._meta are JSON objects.")
         span = child_traceparent(meta.get("traceparent"))
         method = message["method"]
         if method == "initialize":
@@ -924,7 +928,9 @@ class McpToolServer:
         if method != "tools/call":
             return self._error(rid, -32601, "Method %s is not served here." % method)
         name = params.get("name")
-        arguments = params.get("arguments") or {}
+        arguments = {} if params.get("arguments") is None else params["arguments"]
+        if not isinstance(name, str) or not isinstance(arguments, dict):
+            return self._error(rid, -32602, "A tool call names its tool as a string and passes its arguments as a JSON object.")
         if name in ("fabric.job.get", "fabric.job.cancel") and self.jobs is not None:
             verdict = None
             if self._authorize is not None:
