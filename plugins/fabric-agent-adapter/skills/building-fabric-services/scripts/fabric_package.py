@@ -16,12 +16,13 @@ library only; the answer is JSON on stdout, exit 0 when it holds, 1 when it does
 
 import argparse
 import base64
+import errno
 import hashlib
 import json
 import os
 import re
+import stat as _stat
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -35,12 +36,20 @@ SIGNATURE_STATEMENT = "fabric-package-signature/1"
 # DEC-0051: ES256 joins when Fabric records its decision D2; until then a verifier refuses it as unknown-algorithm.
 PACKAGE_ALGORITHMS = ("EdDSA",)
 SCHEMA_PATH = Path(__file__).resolve().parent / "fabric-package.schema.json"
-# What pack refuses to list: version-control and cache litter, and files that are credentials by their name.
-JUNK = re.compile(r"^(\.git|__pycache__|\.DS_Store|.*\.pyc)$")
-SECRET_FILE = re.compile(r"^(\.env(\..+)?|.*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc))$")
-SECRET_FILE_OK = re.compile(r"^\.env\.(example|sample|template)$")
-_B64URL = re.compile(r"^[A-Za-z0-9_-]+$")
+# What pack refuses to list: version-control and cache litter, and files that are credentials by their name. Matched
+# whole (fullmatch) and with JavaScript's `.`, so a name ending in a newline is judged as fabric-package.mjs judges it.
+_JS_DOT = "[^\n\r\u2028\u2029]"
+JUNK = re.compile(r"\.git|__pycache__|\.DS_Store|%s*\.pyc" % _JS_DOT)
+SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)" % (_JS_DOT, _JS_DOT))
+SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
+_B64URL = re.compile(r"[A-Za-z0-9_-]+")
 _PKCS8_ED25519 = bytes.fromhex("302e020100300506032b657004220420")
+#: How deep a document read from disk may nest. Python's recursion limit and Node's stack give out at different depths,
+#: so both readers refuse past this one, well below either (FAA-78, finding 43); no package document comes near it.
+MAX_NESTING = 256
+#: JavaScript's whitespace, what String.prototype.trim and the regular expression class \s take (ECMA-262 WhiteSpace
+#: and LineTerminator), so a key file and a URI are read as fabric-package.mjs reads them.
+JS_WHITESPACE = "\t\n\x0b\x0c\r \xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
 
 class PackageError(Exception):
@@ -63,9 +72,12 @@ def sha256_of(data: Any) -> str:
 
 def package_digest(pkg: Dict[str, Any]) -> str:
     """SHA-256 over the UTF-8 RFC 8785 form of the package without ``digest`` and ``signatures`` (DEC-0050).
-    Raises TypeError for a value with no RFC 8785 form."""
+    Raises TypeError for a value with no RFC 8785 form, a value nested past the stack included."""
     covered = {k: v for k, v in pkg.items() if k not in ("digest", "signatures")}
-    return sha256_of(_jsv.jcs(covered))
+    try:
+        return sha256_of(_jsv.jcs(covered))
+    except RecursionError:  # nested past Python's stack: no form this kit can write, as Node's RangeError is none
+        raise TypeError("the package nests too deeply to have an RFC 8785 form") from None
 
 
 def package_signing_input(digest: str, role: str) -> bytes:
@@ -73,34 +85,16 @@ def package_signing_input(digest: str, role: str) -> bytes:
     return _jsv.jcs({"type": SIGNATURE_STATEMENT, "role": role, "digest": digest}).encode("utf-8")
 
 
-# --- Ed25519 signing (RFC 8032 §5.1.6) ------------------------------------------------------------------
-
-def _secret_scalar(seed: bytes) -> Tuple[int, bytes]:
-    h = hashlib.sha512(seed).digest()
-    a = int.from_bytes(h[:32], "little")
-    a &= (1 << 254) - 8
-    a |= 1 << 254
-    return a, h[32:]
-
+# --- Ed25519 signing: the core's (fabric_crypto, RFC 8032 §5.1.6), which never branches on the secret (finding 45) ---
 
 def ed25519_public_key(seed: bytes) -> bytes:
     """The 32-byte public key of a 32-byte Ed25519 seed."""
     if len(seed) != 32:
         raise PackageError("An Ed25519 private key is 32 bytes.")
-    a, _ = _secret_scalar(seed)
-    return _crypto._ed_encode_point(_crypto._ed_mul(a, _crypto._ED_G))
+    return _crypto.ed25519_seed_public_key(seed)
 
 
-def ed25519_sign(seed: bytes, message: bytes) -> bytes:
-    """A deterministic Ed25519 signature; the same seed and message give the bytes Node's crypto.sign gives."""
-    a, prefix = _secret_scalar(seed)
-    public = _crypto._ed_encode_point(_crypto._ed_mul(a, _crypto._ED_G))
-    r = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little") % _crypto._ED_L
-    big_r = _crypto._ed_encode_point(_crypto._ed_mul(r, _crypto._ED_G))
-    k = int.from_bytes(hashlib.sha512(big_r + public + message).digest(), "little") % _crypto._ED_L
-    return big_r + ((r + k * a) % _crypto._ED_L).to_bytes(32, "little")
-
-
+from fabric_crypto import ed25519_sign  # noqa: E402,F401 - the core's: the bytes Node's crypto.sign gives
 from fabric_crypto import b64url as _b64url  # noqa: E402 - the core's (FAA-65)
 
 
@@ -121,7 +115,7 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
         raise PackageError("Cannot read the key file %s: %s." % (path, exc.strerror)) from None
     if os.name == "posix" and stat.st_mode & 0o077:
         raise PackageError("The key file %s is readable by others (mode %o); chmod 600 it first." % (path, stat.st_mode & 0o777))
-    text = raw.decode("utf-8", "replace").strip()
+    text = raw.decode("utf-8", "replace").strip(JS_WHITESPACE)  # as JavaScript's trim: a leading BOM goes too
     if text.startswith("{"):
         try:
             jwk = json.loads(text)
@@ -131,7 +125,7 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
             raise PackageError("The key file must be an Ed25519 private JWK (kty OKP, crv Ed25519, with d).")
         if jwk.get("alg", "EdDSA") != "EdDSA":
             raise PackageError("The key names alg %r; a package signature is EdDSA (DEC-0051)." % jwk.get("alg"))
-        seed = _crypto.b64url_decode(jwk["d"]) if _B64URL.match(jwk["d"]) else b""
+        seed = _crypto.b64url_decode(jwk["d"]) if _B64URL.fullmatch(jwk["d"]) else b""
         if len(seed) != 32:
             raise PackageError("The key's d is not a 32-byte Ed25519 private key.")
         if isinstance(jwk.get("x"), str) and jwk["x"] != _b64url(ed25519_public_key(seed)):
@@ -151,7 +145,7 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
         seed = der[16:]
     else:
         raise PackageError("The key file is neither a JWK nor a PEM private key.")
-    if not isinstance(kid, str) or not re.match(r"^[A-Za-z0-9._:-]{1,128}$", kid):
+    if not isinstance(kid, str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", kid):
         raise PackageError("Name the key with --kid (1-128 of A-Z a-z 0-9 . _ : -): the installing machine pins it by that name.")
     return seed, kid
 
@@ -186,25 +180,65 @@ def _type_of(value: Any) -> str:
     return "object"
 
 
-_DATE_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$")
-_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s]*$")
+# ASCII digits only and the whole string (fullmatch): Python's \d takes any Unicode digit and its $ a trailing newline,
+# which JavaScript's do not (FAA-78, finding 43).
+_DATE_TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?([Zz]|[+-]([0-9]{2}):([0-9]{2}))")
+_URI = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:[^%s]*" % JS_WHITESPACE)
+_MONTH_DAYS = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+def _leap(year: int) -> bool:
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)
 
 
 def _format_ok(fmt: str, value: Any) -> bool:
     if not isinstance(value, str):
         return True
     if fmt == "date-time":
-        if not _DATE_TIME.match(value):
+        m = _DATE_TIME.fullmatch(value)
+        if not m:
             return False
-        try:
-            datetime.strptime(value[:19].replace("t", "T"), "%Y-%m-%dT%H:%M:%S")
-        except ValueError:
+        year, month, day, hour, minute, second = (int(g) for g in m.groups()[:6])
+        # The proleptic calendar the contract's ajv-formats checks: year 0000 exists and is a leap year (0000-02-29
+        # holds). datetime starts at year 1, so the days are counted here, as fabric-package.mjs counts them.
+        if not 1 <= month <= 12 or not 1 <= day <= (29 if month == 2 and _leap(year) else _MONTH_DAYS[month]):
             return False
-        offset = value[19:].lstrip(".0123456789")
-        return offset in ("Z", "z") or (int(offset[1:3]) < 24 and int(offset[4:6]) < 60)
+        if hour > 23 or minute > 59 or second > 59:
+            return False
+        return m.group(8) in ("Z", "z") or (int(m.group(9)) < 24 and int(m.group(10)) < 60)
     if fmt == "uri":
-        return bool(_URI.match(value))
+        return bool(_URI.fullmatch(value))
     return True
+
+
+_PATTERNS: Dict[str, Any] = {}
+
+
+def _js_pattern(source: str) -> Any:
+    """A schema's ECMAScript pattern (``u`` flag) as Python reads it the same way: ``$`` is the end of the string, not
+    the end before a final newline; ``.`` stops at JavaScript's line terminators (\\n, \\r, U+2028, U+2029); ``\\d`` and
+    ``\\w`` are ASCII. Escapes and character classes are copied as written."""
+    if source not in _PATTERNS:
+        out: List[str] = []
+        i, in_class = 0, False
+        while i < len(source):
+            ch = source[i]
+            if ch == "\\":
+                out.append(source[i:i + 2])
+                i += 2
+                continue
+            if in_class:
+                in_class = ch != "]"
+            elif ch == "[":
+                in_class = True
+            elif ch == "$":
+                ch = r"\Z"
+            elif ch == ".":
+                ch = _JS_DOT
+            out.append(ch)
+            i += 1
+        _PATTERNS[source] = re.compile("".join(out), re.ASCII)
+    return _PATTERNS[source]
 
 
 def _pointer(token: Any) -> str:
@@ -239,7 +273,7 @@ def _validate(schema: Any, value: Any, at: str, out: List[Dict[str, str]]) -> No
             out.append({"instancePath": at, "message": "is shorter than %d" % schema["minLength"]})
         if "maxLength" in schema and length > schema["maxLength"]:
             out.append({"instancePath": at, "message": "is longer than %d" % schema["maxLength"]})
-        if "pattern" in schema and not re.search(schema["pattern"], value):
+        if "pattern" in schema and not _js_pattern(schema["pattern"]).search(value):
             out.append({"instancePath": at, "message": "does not match %s" % schema["pattern"]})
         if "format" in schema and not _format_ok(schema["format"], value):
             out.append({"instancePath": at, "message": "is not a %s" % schema["format"]})
@@ -459,6 +493,63 @@ def _mcp_roles(value: Dict[str, Any]) -> List[Dict[str, str]]:
     return out
 
 
+# --- the path rule (FAA-78, finding 40; decision D5) ----------------------------------------------------------------
+
+def _control(ch: str) -> bool:
+    """C0 and C1 controls, DEL, and the two Unicode line terminators JavaScript's ``.`` stops at."""
+    code = ord(ch)
+    return code < 0x20 or 0x7F <= code <= 0x9F or code in (0x2028, 0x2029)
+
+
+def path_problem(path: Any) -> Optional[str]:
+    """Why ``path`` is no packaged path, or None. The schema's pattern says the same in one expression, but JavaScript's
+    ``.`` stops at U+2028 and U+2029, so in Node and in the contract's own ajv its look-aheads never see a ``..``, a
+    backslash or a ``//`` after one (``a\u2028/../../etc/passwd`` passes there). This rule reads the path character by
+    character in both kits, and refuses C1 controls, DEL and the line terminators besides. A non-string is the
+    schema's to refuse."""
+    if not isinstance(path, str):
+        return None
+    if not 1 <= len(path) <= 256:
+        return "a path is 1 to 256 characters"
+    if any(_control(ch) for ch in path):
+        return "a path carries no control character and no line or paragraph separator"
+    if path[0] in "/~":
+        return "a path is relative to the package folder: it never starts with / or ~"
+    if "\\" in path or ":" in path:
+        return "a path is written with forward slashes and no colon"
+    if "//" in path or path.endswith("/"):
+        return "a path names a file: no empty segment and no trailing slash"
+    if any(segment in (".", "..") for segment in path.split("/")):
+        return "a path never steps through . or .."
+    return None
+
+
+def _path_fields(pkg: Dict[str, Any]) -> List[Tuple[str, Any]]:
+    """Every member the schema types as a path, by its JSON pointer."""
+    fields: List[Tuple[str, Any]] = [("/provider", pkg.get("provider", _UNDEFINED))]
+    evals = pkg.get("evals")
+    if isinstance(evals, dict):
+        fields.append(("/evals/suite", evals.get("suite", _UNDEFINED)))
+    for name in ("state", "dependencies", "files"):
+        items = pkg.get(name)
+        for index, entry in enumerate(items if isinstance(items, list) else []):
+            if isinstance(entry, dict):
+                fields.append(("/%s/%d/path" % (name, index), entry.get("path", _UNDEFINED)))
+    return [(at, value) for at, value in fields if value is not _UNDEFINED]
+
+
+def path_problems(pkg: Any) -> List[Dict[str, str]]:
+    """The path rule over every path the package names: ``{instancePath, message}`` per path refused."""
+    if not isinstance(pkg, dict):
+        return []
+    out = []
+    for at, value in _path_fields(pkg):
+        why = path_problem(value)
+        if why is not None:
+            out.append({"instancePath": at, "message": why})
+    return out
+
+
 def package_findings(pkg: Dict[str, Any]) -> List[Dict[str, str]]:
     """FAC-SEM-064 (whole), 065 (no secret), 066 (agentRef derived) and 102 (one role, one server), in that order."""
     return _whole(pkg) + _no_secret(pkg) + _agent_ref(pkg) + _mcp_roles(pkg)
@@ -470,8 +561,8 @@ def _parsed(data: Optional[bytes]) -> Optional[Dict[str, Any]]:
     if data is None:
         return None
     try:
-        value = json.loads(data.decode("utf-8", "replace"))
-    except ValueError:
+        value = json.loads(data.decode("utf-8"))
+    except (ValueError, RecursionError):  # invalid UTF-8 is no manifest, in both kits
         return None
     return value if isinstance(value, dict) else None
 
@@ -515,7 +606,7 @@ def _key_for(keys: Any, kid: str, alg: str) -> Dict[str, Any]:
     if jwk.get("alg", _UNDEFINED) != alg:
         return {"problem": "key-algorithm-mismatch"}
     x = jwk.get("x")
-    if (jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or not isinstance(x, str) or not _B64URL.match(x)
+    if (jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or not isinstance(x, str) or not _B64URL.fullmatch(x)
             or "d" in jwk or ("use" in jwk and jwk["use"] != "sig")):
         return {"problem": "unusable-key"}
     raw = _crypto.b64url_decode(x)
@@ -548,7 +639,7 @@ def verify_package(pkg: Any, trust: Dict[str, Any], countersigned: bool = False)
     trust = trust if isinstance(trust, dict) else {}
     for index, entry in enumerate(signatures):
         if (not isinstance(entry, dict) or entry.get("role") not in ("publisher", "organization") or not isinstance(entry.get("alg"), str)
-                or not isinstance(entry.get("kid"), str) or not isinstance(entry.get("sig"), str) or not _B64URL.match(entry["sig"])):
+                or not isinstance(entry.get("kid"), str) or not isinstance(entry.get("sig"), str) or not _B64URL.fullmatch(entry["sig"])):
             return {"ok": False, "problem": "malformed", "signature": index}
         if entry["alg"] not in PACKAGE_ALGORITHMS:
             return {"ok": False, "problem": "unknown-algorithm", "signature": index}
@@ -592,50 +683,142 @@ def consumer_placement(pkg: Any, configured: Any) -> List[Dict[str, str]]:
 # --- the folder on disk -----------------------------------------------------------------------------------
 
 def _litter(name: str) -> Optional[str]:
-    if JUNK.match(name):
+    if JUNK.fullmatch(name):
         return "litter"
-    if SECRET_FILE.match(name) and not SECRET_FILE_OK.match(name):
+    if SECRET_FILE.fullmatch(name) and not SECRET_FILE_OK.fullmatch(name):
         return "a credential file"
     return None
 
 
+#: Opening a packaged file: never through a link, never waiting on a pipe (FAA-78, finding 42). Folders are opened
+#: without following a link too, and what is in one is opened relative to it, so a folder swapped for a link mid-walk is
+#: never followed either; where the platform has no such calls (Windows), the walk goes by path.
+_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_FILE_FLAGS = os.O_RDONLY | _NOFOLLOW | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+_DIR_FLAGS = os.O_RDONLY | _NOFOLLOW | getattr(os, "O_DIRECTORY", 0)
+_LINK_ERRNOS = (errno.ELOOP, errno.EMLINK)  # open() on a link it may not follow: ELOOP (Linux, macOS), EMLINK (FreeBSD)
+_BY_FOLDER = bool(_NOFOLLOW) and hasattr(os, "O_DIRECTORY") and os.open in os.supports_dir_fd and os.scandir in getattr(os, "supports_fd", set())
+
+
+def _unreadable(rel: str, exc: OSError) -> PackageError:
+    """``Cannot read <path>: EACCES.``: the error's symbolic name, as Node's error.code names it."""
+    return PackageError("Cannot read %s: %s." % (rel or ".", errno.errorcode.get(exc.errno or -1) or exc.strerror or exc))
+
+
+def _read_file(name: str, dir_fd: Optional[int]) -> Tuple[Optional[bytes], Optional[str]]:
+    """``(bytes, None)`` for a regular file, ``(None, why)`` for a link or anything else. Raises OSError."""
+    try:
+        handle = os.open(name, _FILE_FLAGS, dir_fd=dir_fd)
+    except OSError as exc:
+        if _NOFOLLOW and exc.errno in _LINK_ERRNOS:
+            return None, "a symlink"
+        raise
+    try:
+        if not _stat.S_ISREG(os.fstat(handle).st_mode):
+            return None, "not a regular file"
+        chunks = []
+        while True:
+            chunk = os.read(handle, 1 << 20)
+            if not chunk:
+                return b"".join(chunks), None
+            chunks.append(chunk)
+    finally:
+        os.close(handle)
+
+
+def _walk(here: Any, rel: str, files: Dict[str, bytes], refused: List[str]) -> None:
+    """One folder: ``here`` is its descriptor when the walk goes by folder, else its path."""
+    by_fd = isinstance(here, int)
+    try:
+        with os.scandir(here) as listing:
+            entries = sorted(listing, key=lambda e: e.name)
+    except OSError as exc:
+        raise _unreadable(rel, exc) from None
+    for entry in entries:
+        where = "%s/%s" % (rel, entry.name) if rel else entry.name
+        try:
+            why = "a symlink" if entry.is_symlink() else _litter(entry.name)
+            folder = entry.is_dir(follow_symlinks=False)
+            if why is None and not folder and not entry.is_file(follow_symlinks=False):
+                why = "not a regular file"
+            if why is None and folder:
+                inner = os.open(entry.name, _DIR_FLAGS, dir_fd=here) if by_fd else entry.path
+                try:
+                    _walk(inner, where, files, refused)
+                finally:
+                    if by_fd:
+                        os.close(inner)
+                continue
+            if why is None:
+                data, why = _read_file(entry.name if by_fd else entry.path, here if by_fd else None)
+                if why is None:
+                    files[where] = data  # type: ignore[assignment]
+                    continue
+        except OSError as exc:
+            if not (_NOFOLLOW and exc.errno in _LINK_ERRNOS):
+                raise _unreadable(where, exc) from None
+            why = "a symlink"
+        refused.append("%s (%s)" % (where, why))
+
+
 def read_folder(folder: Any) -> Dict[str, bytes]:
     """Every regular file under ``folder`` by its forward-slash path. Refuses a symlink, a special file, version-control
-    or cache litter, and a file that is a credential by its name — each named, so the person can remove it or pack a
-    clean copy."""
+    or cache litter, and a file that is a credential by its name, each named, so the person can remove it or pack a
+    clean copy. A file or folder it cannot read is a refusal naming it (``Cannot read <path>: EACCES.``), never
+    skipped (FAA-78, finding 41); a file is opened without following a link and read only when it is a regular file
+    (finding 42)."""
     root = Path(folder)
     if not root.is_dir():
         raise PackageError("%s is not a folder." % root)
     files: Dict[str, bytes] = {}
     refused: List[str] = []
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        here = Path(dirpath)
-        rel_dir = here.relative_to(root).as_posix()
-        for name in sorted(dirnames):
-            rel = name if rel_dir == "." else "%s/%s" % (rel_dir, name)
-            why = "a symlink" if (here / name).is_symlink() else _litter(name)
-            if why:
-                refused.append("%s (%s)" % (rel, why))
-                dirnames.remove(name)
-        for name in filenames:
-            rel = name if rel_dir == "." else "%s/%s" % (rel_dir, name)
-            full = here / name
-            why = "a symlink" if full.is_symlink() else (None if full.is_file() else "not a regular file") or _litter(name)
-            if why:
-                refused.append("%s (%s)" % (rel, why))
-                continue
-            files[rel] = full.read_bytes()
+    try:
+        top = os.open(str(root), os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)) if _BY_FOLDER else str(root)
+    except OSError as exc:
+        raise _unreadable(str(root), exc) from None
+    try:
+        _walk(top, "", files, refused)
+    finally:
+        if _BY_FOLDER:
+            os.close(top)  # type: ignore[arg-type]
     if refused:
         raise PackageError("Not packed: remove these or pack a clean copy: " + "; ".join(sorted(refused)))
     return files
 
 
+def _nesting(text: str) -> int:
+    """How deep the arrays and objects of a JSON text nest, read without recursion (strings skipped)."""
+    depth = deepest = 0
+    i, end = 0, len(text)
+    while i < end:
+        ch = text[i]
+        if ch == '"':
+            i += 1
+            while i < end and text[i] != '"':
+                i += 2 if text[i] == "\\" else 1
+        elif ch in "[{":
+            depth += 1
+            deepest = max(deepest, depth)
+        elif ch in "]}":
+            depth -= 1
+        i += 1
+    return deepest
+
+
 def _load_json(data: bytes, what: str) -> Dict[str, Any]:
+    """A JSON object from strict UTF-8 bytes: no member named twice, nesting at most MAX_NESTING deep. Every refusal
+    is a PackageError, never a traceback (a RecursionError included)."""
     try:
-        value = json.loads(data.decode("utf-8"), object_pairs_hook=fd._no_duplicates)
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise PackageError("%s is not JSON: %s" % (what, exc)) from None
+    if _nesting(text) > MAX_NESTING:
+        raise PackageError("%s nests deeper than %d levels." % (what, MAX_NESTING))
+    try:
+        value = json.loads(text, object_pairs_hook=fd._no_duplicates)
     except fd._Duplicate as exc:
         raise PackageError("%s names %s twice in one object." % (what, json.dumps(exc.args[0], ensure_ascii=False))) from None
-    except (ValueError, UnicodeDecodeError) as exc:
+    except (ValueError, RecursionError) as exc:
         raise PackageError("%s is not JSON: %s" % (what, exc)) from None
     if not isinstance(value, dict):
         raise PackageError("%s is not a JSON object." % what)
@@ -677,12 +860,16 @@ def compose(draft: Dict[str, Any], files: Dict[str, bytes]) -> Tuple[Dict[str, A
         notes.append("dropped %d signature(s): a repacked package is signed again" % len(draft["signatures"]))
     pkg["files"] = [{"path": p, "sha256": sha256_of(files[p])} for p in sorted((p for p in files if p != PACKAGE_FILE),
                                                                                   key=lambda p: p.encode("utf-16-be", "surrogatepass"))]
-    pkg["digest"] = package_digest(pkg)
+    try:
+        pkg["digest"] = package_digest(pkg)
+    except TypeError as exc:
+        raise PackageError("%s has no RFC 8785 form, so it has no digest: %s" % (PACKAGE_FILE, exc)) from None
     return pkg, notes
 
 
 def _all_problems(pkg: Dict[str, Any], files: Dict[str, bytes]) -> List[Dict[str, str]]:
     problems = [dict(p, rule="schema") for p in schema_problems(pkg)]
+    problems += [dict(p, rule="path") for p in path_problems(pkg)]
     problems += [dict(p, rule=p["code"]) for p in package_findings(pkg)]
     problems += [{"rule": "folder", "problem": p["problem"], "instancePath": p["path"], "message": p["problem"]} for p in check_package_folder(pkg, files)]
     return problems

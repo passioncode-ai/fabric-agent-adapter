@@ -225,6 +225,18 @@ class HubKeyTests(HubTestCase):
         self.assertEqual(cm.exception.code, "hub-key-refused")
         self.assertEqual(cm.exception.data["detail"], bad["expected"]["detail"])
 
+    def test_a_null_or_missing_applied_means_none_known_and_a_present_one_is_checked(self):
+        """As fabric-hub.mjs reads `estate.applied ?? undefined`: null and absent are "no applied revision known"
+        (fabric_hub maps None to fabric_estate._MISSING, since hub_key_certified refuses an explicit None, D3)."""
+        good = self._case(True)
+        self.hub.publish(os.getpid(), hubKey={"kid": good["kid"], "x": good["x"]})
+        fh.locate_hub(self.root, estate={"record": good["record"]}, now=good["at"])
+        fh.locate_hub(self.root, estate={"record": good["record"], "applied": None}, now=good["at"])
+        with self.assertRaises(fh.HubError) as cm:
+            fh.locate_hub(self.root, estate={"record": good["record"], "applied": {"revision": good["record"]["revision"] + 1}},
+                          now=good["at"])
+        self.assertEqual(cm.exception.data["detail"], "estate-rolled-back")
+
 
 class BackoffTests(unittest.TestCase):
     def test_bounded_growing_never_spinning(self):

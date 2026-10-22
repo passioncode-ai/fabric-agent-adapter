@@ -238,6 +238,7 @@ export function verifyEstateRecord(record, trust) {
  * undefined when the record places no such agent there in that context.
  */
 export function placementTrust(record, machineId, agentRef, context = PERSONAL_CONTEXT) {
+  if (!isObject(record)) return undefined; // a record that is no object places nothing, as in the Python twin
   const machine = list(record.machines).find((entry) => entry.id === machineId);
   const placement = list(machine?.packages).find((entry) => entry.agentRef === agentRef && contextOf(entry) === context);
   if (!placement) return undefined;
@@ -378,7 +379,8 @@ function keys(value, flag) {
     if (deviceKeys.filter((key) => key.use === 'sig').length !== 1) flag(`${at}/deviceKeys`, 'a machine has exactly one signing device key, <id>#sig');
     if (deviceKeys.filter((key) => key.use === 'kem').length > 1) flag(`${at}/deviceKeys`, 'a machine has at most one key-agreement device key, <id>#kem');
     const seen = new Set();
-    deviceKeys.forEach((key, k) => {
+    // The index is the key's position in the list as written, non-objects counted, as the contract and the Python twin name it.
+    indexed(machine.deviceKeys).forEach(([key, k]) => {
       if (key.kid !== `${show(machine.id)}#${show(key.use)}`) flag(`${at}/deviceKeys/${k}/kid`, 'a device key is listed as <machine id>#sig or <machine id>#kem, by its role');
       // A key with no canonical fingerprint could be read as two keys by two readers, and no key reference names it (DEC-0084).
       if (deviceKeyFingerprint(key) === undefined) flag(`${at}/deviceKeys/${k}/publicKey`, "a device key's octets are written in canonical padded base64, the one form a key reference can name (DEC-0084)");

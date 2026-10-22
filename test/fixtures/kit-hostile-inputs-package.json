@@ -1,0 +1,367 @@
+{
+  "comment": "Hostile inputs both package twins answer the same way (FAA-78, findings 40 and 43): fabric_package.py and fabric-package.mjs each run every case (test_kit_hostile_package.py, kit-hostile-package.test.mjs). paths: a files[].path and whether the kit refuses it, beyond the schema's pattern (D5). schema: JSON pointers set on the contract's vector package and whether the schema and the path rule refuse the result. documents: the bytes of fabric.package.json in the vector folder and how pack answers. keyFiles: a prefix before the publisher JWK and whether the key is read.",
+  "paths": [
+    {
+      "name": "plain",
+      "path": "bin/serve.mjs",
+      "refused": false
+    },
+    {
+      "name": "dotfile-folder",
+      "path": ".claude-plugin/plugin.json",
+      "refused": false
+    },
+    {
+      "name": "non-ascii-name",
+      "path": "docs/caf\u00e9.md",
+      "refused": false
+    },
+    {
+      "name": "traversal-after-u2028",
+      "path": "a\u2028/../../etc/passwd",
+      "refused": true
+    },
+    {
+      "name": "traversal-after-u2029",
+      "path": "a\u2029/../../etc/passwd",
+      "refused": true
+    },
+    {
+      "name": "backslash-after-u2028",
+      "path": "a\u2028\\..\\b",
+      "refused": true
+    },
+    {
+      "name": "backslash-after-u2029",
+      "path": "a\u2029\\b",
+      "refused": true
+    },
+    {
+      "name": "double-slash-after-u2028",
+      "path": "a\u2028//b",
+      "refused": true
+    },
+    {
+      "name": "double-slash-after-u2029",
+      "path": "a\u2029//b",
+      "refused": true
+    },
+    {
+      "name": "dot-segment-after-u2028",
+      "path": "a\u2028/./b",
+      "refused": true
+    },
+    {
+      "name": "trailing-slash-after-u2028",
+      "path": "a\u2028/",
+      "refused": true
+    },
+    {
+      "name": "lone-u2028",
+      "path": "a\u2028b",
+      "refused": true
+    },
+    {
+      "name": "lone-u2029",
+      "path": "a\u2029b",
+      "refused": true
+    },
+    {
+      "name": "next-line-c1",
+      "path": "a\u0085b",
+      "refused": true
+    },
+    {
+      "name": "delete",
+      "path": "a\u007fb",
+      "refused": true
+    },
+    {
+      "name": "c1-csi",
+      "path": "a\u009bb",
+      "refused": true
+    },
+    {
+      "name": "carriage-return-traversal",
+      "path": "a\r/../b",
+      "refused": true
+    },
+    {
+      "name": "trailing-newline",
+      "path": "bin/serve.mjs\n",
+      "refused": true
+    },
+    {
+      "name": "nul",
+      "path": "a\u0000b",
+      "refused": true
+    },
+    {
+      "name": "parent-segment",
+      "path": "a/../b",
+      "refused": true
+    },
+    {
+      "name": "leading-slash",
+      "path": "/etc/passwd",
+      "refused": true
+    },
+    {
+      "name": "leading-tilde",
+      "path": "~/x",
+      "refused": true
+    },
+    {
+      "name": "colon",
+      "path": "c:/x",
+      "refused": true
+    },
+    {
+      "name": "empty",
+      "path": "",
+      "refused": true
+    }
+  ],
+  "schema": [
+    {
+      "name": "id-trailing-newline",
+      "set": {
+        "/id": "inbox-digest\n"
+      },
+      "refused": true
+    },
+    {
+      "name": "version-trailing-newline",
+      "set": {
+        "/version": "1.2.0\n"
+      },
+      "refused": true
+    },
+    {
+      "name": "receipt-suite-trailing-newline",
+      "set": {
+        "/evals/receipt/suite": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-plain",
+      "set": {
+        "/evals/receipt/ranAt": "2026-10-12T08:30:00Z"
+      },
+      "refused": false
+    },
+    {
+      "name": "date-time-trailing-newline",
+      "set": {
+        "/evals/receipt/ranAt": "2026-10-12T08:30:00Z\n"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-arabic-indic-year",
+      "set": {
+        "/evals/receipt/ranAt": "\u0662\u0660\u0662\u0666-10-12T08:30:00Z"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-arabic-indic-fraction",
+      "set": {
+        "/evals/receipt/ranAt": "2026-10-12T08:30:00.\u0661Z"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-fullwidth-offset",
+      "set": {
+        "/evals/receipt/ranAt": "2026-10-12T08:30:00+\uff10\uff10:00"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-year-0000",
+      "set": {
+        "/evals/receipt/ranAt": "0000-01-01T00:00:00Z"
+      },
+      "refused": false
+    },
+    {
+      "name": "date-time-year-0000-leap-day",
+      "set": {
+        "/evals/receipt/ranAt": "0000-02-29T00:00:00Z"
+      },
+      "refused": false
+    },
+    {
+      "name": "date-time-year-0100-no-leap-day",
+      "set": {
+        "/evals/receipt/ranAt": "0100-02-29T00:00:00Z"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-year-1900-no-leap-day",
+      "set": {
+        "/evals/receipt/ranAt": "1900-02-29T00:00:00Z"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-year-2000-leap-day",
+      "set": {
+        "/evals/receipt/ranAt": "2000-02-29T00:00:00Z"
+      },
+      "refused": false
+    },
+    {
+      "name": "date-time-offset-23-59",
+      "set": {
+        "/evals/receipt/ranAt": "2026-10-12T08:30:00.5+23:59"
+      },
+      "refused": false
+    },
+    {
+      "name": "date-time-second-60",
+      "set": {
+        "/evals/receipt/ranAt": "2026-10-12T23:59:60Z"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-offset-24",
+      "set": {
+        "/evals/receipt/ranAt": "2026-10-12T08:30:00+24:00"
+      },
+      "refused": true
+    },
+    {
+      "name": "date-time-month-13",
+      "set": {
+        "/evals/receipt/ranAt": "2026-13-01T00:00:00Z"
+      },
+      "refused": true
+    },
+    {
+      "name": "extension-uri",
+      "set": {
+        "/extensions": {
+          "https://example.com/x": {
+            "a": 1
+          }
+        }
+      },
+      "refused": false
+    },
+    {
+      "name": "extension-uri-trailing-newline",
+      "set": {
+        "/extensions": {
+          "x:a\n": {}
+        }
+      },
+      "refused": true
+    },
+    {
+      "name": "extension-uri-with-space",
+      "set": {
+        "/extensions": {
+          "x:a b": {}
+        }
+      },
+      "refused": true
+    },
+    {
+      "name": "extension-uri-with-bom",
+      "set": {
+        "/extensions": {
+          "x:a\ufeff": {}
+        }
+      },
+      "refused": true
+    }
+  ],
+  "documents": [
+    {
+      "name": "invalid-utf8-in-a-string",
+      "member": "summary",
+      "rawHex": "ff",
+      "answer": "error"
+    },
+    {
+      "name": "overlong-utf8-in-a-string",
+      "member": "summary",
+      "rawHex": "c0af",
+      "answer": "error"
+    },
+    {
+      "name": "lone-surrogate-bytes",
+      "member": "summary",
+      "rawHex": "eda080",
+      "answer": "error"
+    },
+    {
+      "name": "lone-surrogate-escape",
+      "member": "summary",
+      "rawHex": "5c7564383030",
+      "answer": "error"
+    },
+    {
+      "name": "top-level-proto-member",
+      "addTopLevel": {
+        "__proto__": {
+          "polluted": true
+        }
+      },
+      "answer": "problem",
+      "instancePath": "/__proto__"
+    },
+    {
+      "name": "nested-proto-member",
+      "addTopLevel": {
+        "extensions": {
+          "https://example.com/x": {
+            "__proto__": {
+              "a": 1
+            }
+          }
+        }
+      },
+      "answer": "ok",
+      "digest": "sha256:44b626e7104486800318c2bacaadab4fe52bebcf3a6e7b64100d681a5b3e1a35"
+    },
+    {
+      "name": "nesting-past-the-limit",
+      "nest": 257,
+      "answer": "error"
+    },
+    {
+      "name": "nesting-at-the-limit",
+      "nest": 200,
+      "answer": "problem",
+      "instancePath": "/x"
+    },
+    {
+      "name": "nesting-far-past-any-stack",
+      "nest": 200000,
+      "answer": "error"
+    }
+  ],
+  "keyFiles": [
+    {
+      "name": "plain",
+      "prefix": "",
+      "ok": true
+    },
+    {
+      "name": "byte-order-mark",
+      "prefix": "\ufeff",
+      "ok": true
+    },
+    {
+      "name": "byte-order-mark-and-space",
+      "prefix": "\ufeff \n",
+      "ok": true
+    }
+  ]
+}
