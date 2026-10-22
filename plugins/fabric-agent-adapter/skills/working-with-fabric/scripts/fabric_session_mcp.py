@@ -191,11 +191,12 @@ class McpStdio:
         try:
             self.proc.stdin.write((json.dumps(message) + "\n").encode("utf-8"))
             self.proc.stdin.flush()
-        except OSError:  # a server that exited closed its stdin: say why it exited, never a broken pipe
+        except OSError:  # a server that closed its stdin: say why it exits, never a broken pipe
+            # Its exit status may come later than the pipe's end (FAA-97): wait for it up to the deadline.
             try:
-                self.proc.wait(timeout=max(0.0, min(1.0, self.deadline - time.monotonic())))
+                self.proc.wait(timeout=max(0.0, self.deadline - time.monotonic()))
             except subprocess.TimeoutExpired:
-                pass
+                raise TimeoutError("fabric-mcp closed its stdin and did not exit") from None
             self._ended()
 
     def notify(self, method: str, params: Optional[Dict[str, Any]] = None) -> None:

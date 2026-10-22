@@ -60,7 +60,7 @@ class WithoutPlaywright(unittest.TestCase):
             script = Path(empty).resolve() / PROBE.name
             shutil.copy(PROBE, script)
             code, report, _ = probe("http://127.0.0.1:9/", "--playwright", empty, cwd=empty, env=env, script=script)
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 3, "nothing was measured: never a pass (FAA-96)")
         self.assertEqual(report["failed"], 0)
         self.assertEqual({r["rule"] for r in report["results"]}, {"ED-1", "ED-2", "ED-3", "ED-4", "ED-5"})
         for r in report["results"]:
@@ -109,7 +109,7 @@ class WithoutPlaywright(unittest.TestCase):
                                            str(base / "services"), "--playwright", str(base)] + extra,
                                           capture_output=True, text=True, timeout=60, cwd=str(base),
                                           env=dict(os.environ, FABRIC_PLAYWRIGHT="", NODE_PATH=""))
-                    self.assertEqual(done.returncode, 0, done.stderr)
+                    self.assertEqual(done.returncode, 3, done.stderr)  # nothing measured (FAA-96)
                     self.assertNotIn("code=", done.stdout + done.stderr)
                     self.assertIn("Playwright is not installed", done.stdout)
                     if extra:

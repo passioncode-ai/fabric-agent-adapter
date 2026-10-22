@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.43.0"
+  version: "0.44.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "bfa9a67aa3c6cb808c093e7d83cd59799f1ee7d0"
@@ -248,6 +248,11 @@ and declare it with `extensions=fs.dashboard_extension()`. Read
 declaration and how to upgrade a dashboard built before the kit: an upgrade you may make yourself,
 which the plugin's session-start notice offers in a repository that owns the service.
 
+**Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
+agents, models, connectors, stores and channels, each with its state, from
+`connections_extension()` / `connectionsExtension()` in `fabric_connections`. Never a credential in it, never a call
+count (that is the usage report); the details are in [the wire reference](references/protocol.md).
+
 The events feed is a **view over the log you already keep** (a jobs table, a JSONL
 journal), not a second store. Each event is one sentence a person reads; set
 `notify: true` only when the operator must decide, or something failed or degrades their
@@ -284,7 +289,7 @@ propagation, event trace pairs, and `board.responder` for a service that declare
 any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
-and 1280 px; needs Playwright, else `NOT_RUN`).
+and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured).
 
 Then prove the lock: start a second copy by hand against the same data directory; it
 must exit 75 while the first keeps serving. Prove recovery: `kill -9` the launchd pid;

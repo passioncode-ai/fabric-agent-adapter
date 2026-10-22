@@ -52,6 +52,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402
+import fabric_connections as fcn  # noqa: E402
 import fabric_interop as fi  # noqa: E402
 
 Result = Dict[str, str]
@@ -238,6 +239,14 @@ class Probe:
             findings = fs.protocols_findings(wk["protocols"])
             self.add("well-known.protocols", "FAIL" if findings else "PASS",
                      "; ".join("%s %s" % (f["instancePath"], f["message"]) for f in findings) or ", ".join(wk["protocols"]))
+        extensions = wk.get("extensions") if isinstance(wk.get("extensions"), dict) else {}
+        if fcn.CONNECTIONS_EXTENSION_KEY in extensions:
+            # DEC-0096, FAC-SEM-127: what it uses, valid, each id once, no credential; a host hides an invalid list.
+            view = fcn.connections_view(wk)
+            failing = sum(1 for c in view["connections"] if c["failing"])
+            self.add("well-known.connections", "FAIL" if view["reported"] else "PASS",
+                     "; ".join(f["message"] for f in fcn.connections_rules(wk)[:5]) or
+                     "%d connection(s), %d named in degraded[]" % (len(view["connections"]), failing))
         self.configuration_rule()
         svc = wk.get("service") or {}
         answered = "%s.%s" % (svc.get("id"), svc.get("instance"))

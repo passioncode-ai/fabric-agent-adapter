@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.44.0 (2026-10-22)
+
+### Added
+
+- **What an agent uses, `fabric-connections/0.1`** (FAA-62, contract DEC-0096, FAC-SEM-127; asked by Fabric Dashboards
+  on board thread `131648c0`). A new kit module in both twins, `fabric_connections` / `fabric-connections.mjs`:
+  `connections_extension(declared, degraded, states)` / `connectionsExtension(declared, {degraded, states})` builds
+  the `extensions` entry, each connection's `state` from the service's own checks, else `degraded` when `degraded[]`
+  names it, else `unknown`, and refuses a declaration a host would hide (the schema, an id twice, a credential).
+  `connections_view` / `connectionsView` read a peer's list as the contract's reference does; both answer all 127
+  cases of the contract's `fixtures/vectors/connections.json`, vendored by `make_connections_vectors.mjs`.
+  `build_well_known` / `buildWellKnown` refuse an invalid declaration passed in by hand, `check_service.py` reports
+  `well-known.connections`, and the `fabric_service` facades re-export the four names. The Python twin reads
+  credentials with the reference's ECMAScript semantics (ASCII case folding and word boundary, ECMAScript's whitespace,
+  a URL WHATWG refuses read as text only, its query and fragment read as WHATWG serializes them, a name's leading
+  `?` dropped as `URLSearchParams` drops it, an unpaired surrogate read as U+FFFD); 1,073 more inputs, answered by the
+  contract's reader into `connections-extra-vectors.json`, hold both twins to it. Inputs whose answer changes with the
+  Node release (the reference parses URLs with the runtime's own `new URL`) are left out of that set. Where Python cannot tell whether WHATWG refuses a URL (a
+  non-ASCII host), it reads the URL's credentials anyway, so a doubt hides a declaration rather than publish one
+  (FAA-98 ports UTS46 to close that gap).
+
+### Changed
+
+- **`check_dashboard_layout.mjs` exits 3 when no rule was measured** (FAA-96): every rule `NOT_RUN` (no Playwright, a
+  browser that does not start, a service it cannot open) or no rule at all. It exited 0, and 2 for an empty report
+  since 0.42.1. 0 still needs at least one rule measured and none failing.
+
+### Fixed
+
+- **The session worker waits for an exit status to its deadline after a closed pipe** (FAA-97): a `fabric-mcp` that
+  closed its stdin and exited 3 more than a second later was logged as `outcome=unknown` and its spool kept.
+- **OpenClaw `--remove` drops our load path when its folder is gone** (FAA-90): the ownership check read a manifest
+  that no longer existed, so the dead path stayed.
+
 ## 0.43.0 (2026-10-22)
 
 ### Changed

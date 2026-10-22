@@ -63,6 +63,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_platform` | Windows: named pipes, owner-only files (DEC-0032) |
 | L3 | `fabric_paths` | the services directory, a service's folders, atomic and private writes |
 | L3 | `fabric_protocols` | protocol revisions (DEC-0067) and feed data (DEC-0070) |
+| L3 | `fabric_connections` | what an agent uses, `fabric-connections/0.1`: the reference reading and the declaration (DEC-0096, FAC-SEM-127) |
 | L3 | `fabric_lock` | the instance lock and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |

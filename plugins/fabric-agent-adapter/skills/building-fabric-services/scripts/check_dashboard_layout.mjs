@@ -13,7 +13,8 @@
 // scroll box) and ED-5 (sticky chrome within min(120 px, a quarter of the height), anchors landing
 // below it, no nested full-height scroller). What it cannot measure is NOT_RUN with the reason,
 // never a pass. WebKit is the default engine (Safari's). Exit 0 when nothing FAILs, 1 when
-// something does, 2 on a usage error or a report with no rule in it. It reads; it never clicks a control of the page.
+// something does, 2 on a usage error, 3 when no rule was measured (every rule NOT_RUN). It reads; it never clicks a
+// control of the page.
 import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, platform } from 'node:os';
@@ -261,11 +262,13 @@ export function report(rows, opts, target) {
     for (const r of rows) process.stdout.write(`${r.verdict.padEnd(8)} ${(r.rule + (r.width ? '@' + r.width : '')).padEnd(10)} ${r.evidence}\n`);
     process.stdout.write(`\n${rows.length} rule(s), ${failed} FAIL, ${rows.filter((r) => r.verdict === 'NOT_RUN').length} NOT_RUN\n`);
   }
-  if (!rows.length) {
-    process.stderr.write('no rule ran: nothing was measured, so nothing passed\n');
-    return 2;
+  if (failed) return 1;
+  // Nothing measured is never a pass (FAA-96): no rule, or every rule NOT_RUN, exits 3.
+  if (!rows.some((r) => r.verdict === 'PASS')) {
+    process.stderr.write('no rule was measured, so nothing passed\n');
+    return 3;
   }
-  return failed ? 1 : 0;
+  return 0;
 }
 
 async function main(argv) {
