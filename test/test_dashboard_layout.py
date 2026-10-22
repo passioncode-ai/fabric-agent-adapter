@@ -67,9 +67,105 @@ class WithoutPlaywright(unittest.TestCase):
             self.assertEqual(r["verdict"], "NOT_RUN")
             self.assertIn("Playwright is not installed", r["evidence"])
 
+    def test_a_service_without_playwright_mints_no_login_code(self):
+        # Finding 46: the probe loads Playwright and the browser before it asks for a one-time code, so a
+        # run that cannot measure never spends a code and never prints a login URL.
+        minted = []
+
+        class Service(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                return
+
+            def _json(self, obj):
+                body = json.dumps(obj).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self):
+                self._json({"surfaces": {"dashboard": {"path": "/", "login": True}}})
+
+            def do_POST(self):
+                minted.append(self.path)
+                self._json({"url": "/fabric/v1/login?code=ONE-TIME-CODE-1234"})
+
+        port = free_port()
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Service)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            with tempfile.TemporaryDirectory() as empty:
+                base = Path(empty).resolve()
+                (base / "token").write_text("example-token\n")
+                (base / "services").mkdir()
+                (base / "services" / "example-agent.default.json").write_text(json.dumps(
+                    {"id": "example-agent", "instance": "default", "origin": "http://127.0.0.1:%d" % port,
+                     "auth": {"tokenFile": str(base / "token")}}))
+                script = base / PROBE.name
+                shutil.copy(PROBE, script)
+                for extra in ([], ["--json"]):
+                    done = subprocess.run([NODE, str(script), "--service", "example-agent", "--services-dir",
+                                           str(base / "services"), "--playwright", str(base)] + extra,
+                                          capture_output=True, text=True, timeout=60, cwd=str(base),
+                                          env=dict(os.environ, FABRIC_PLAYWRIGHT="", NODE_PATH=""))
+                    self.assertEqual(done.returncode, 0, done.stderr)
+                    self.assertNotIn("code=", done.stdout + done.stderr)
+                    self.assertIn("Playwright is not installed", done.stdout)
+                    if extra:
+                        self.assertEqual(json.loads(done.stdout)["target"], "example-agent")
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(minted, [])
+
     def test_usage_errors_exit_2(self):
         self.assertEqual(subprocess.run([NODE, str(PROBE)], capture_output=True).returncode, 2)
         self.assertEqual(subprocess.run([NODE, str(PROBE), "x", "--widths", "10"], capture_output=True).returncode, 2)
+
+
+def node_eval(source):
+    done = subprocess.run([NODE, "--input-type=module", "-e", source], capture_output=True, text=True, timeout=60)
+    if done.returncode:
+        raise AssertionError(done.stderr)
+    return json.loads(done.stdout)
+
+
+@unittest.skipUnless(NODE, "NOT_RUN: node is not on PATH")
+class Verdicts(unittest.TestCase):
+    """The rules' verdicts from a measurement, without a browser."""
+
+    MEASURED = {"vw": 360, "vh": 800, "scrollWidth": 360, "nav": {"total": 2, "unreachable": []}, "boxes": [],
+                "past": [], "nested": [], "chrome": 40, "anchor": None, "rootMinWidth": 0, "floor": 360,
+                "elements": 9000, "measured": 6000}
+
+    def verdicts(self, m):
+        return {r["rule"]: r for r in node_eval(
+            "import { verdicts } from %s; process.stdout.write(JSON.stringify(verdicts(360, 360, %s)));"
+            % (json.dumps(PROBE.as_uri()), json.dumps(m)))}
+
+    def test_a_page_past_the_element_cap_is_not_a_silent_pass(self):
+        rows = self.verdicts(self.MEASURED)
+        self.assertEqual(rows["ED-4"]["verdict"], "NOT_RUN", rows["ED-4"])
+        self.assertIn("6000 of 9000", rows["ED-4"]["evidence"])
+        self.assertIn("6000 of 9000", rows["ED-5"]["evidence"])
+
+    def test_a_defect_found_before_the_cap_still_fails(self):
+        rows = self.verdicts(dict(self.MEASURED, past=["div.wide"]))
+        self.assertEqual(rows["ED-4"]["verdict"], "FAIL")
+        self.assertIn("6000 of 9000", rows["ED-4"]["evidence"])
+
+    def test_a_page_under_the_cap_passes(self):
+        rows = self.verdicts(dict(self.MEASURED, elements=40, measured=40))
+        self.assertEqual(rows["ED-4"]["verdict"], "PASS")
+        self.assertNotIn("of 40", rows["ED-4"]["evidence"])
+
+    def test_a_login_code_never_reaches_the_evidence(self):
+        out = node_eval("import { scrub } from %s; process.stdout.write(JSON.stringify(scrub("
+                        "'page.goto: net::ERR at http://127.0.0.1:1/fabric/v1/login?code=abc-123&x=1')));"
+                        % json.dumps(PROBE.as_uri()))
+        self.assertNotIn("abc-123", out)
+        self.assertIn("code=<redacted>", out)
 
 
 @unittest.skipUnless(NODE and PLAYWRIGHT, "NOT_RUN: set FABRIC_PLAYWRIGHT to a directory with playwright and its webkit")
@@ -117,6 +213,25 @@ class InWebKit(unittest.TestCase):
         self.assertIn("div.fixed", verdicts["ED-4"]["evidence"])
         self.assertIn("sticky chrome 200 px", verdicts["ED-5"]["evidence"])
         self.assertIn("nested full-height scroller", verdicts["ED-5"]["evidence"])
+
+    def test_a_nav_cut_off_below_its_first_row_fails_ed3(self):
+        code, report, _ = probe((BROKEN.parent / "clipped-nav.html").as_uri(), "--playwright", PLAYWRIGHT,
+                                "--widths", "360")
+        rows = {r["rule"]: r for r in report["results"] if r["width"] == 360}
+        self.assertEqual(rows["ED-3"]["verdict"], "FAIL", rows["ED-3"])
+        self.assertIn("unreachable", rows["ED-3"]["evidence"])
+        self.assertEqual(code, 1)
+
+    def test_content_past_the_element_cap_is_not_run(self):
+        code, report, _ = probe((BROKEN.parent / "past-the-cap.html").as_uri(), "--playwright", PLAYWRIGHT,
+                                "--widths", "360")
+        rows = {r["rule"]: r for r in report["results"] if r["width"] == 360}
+        self.assertEqual(rows["ED-4"]["verdict"], "NOT_RUN", rows["ED-4"])
+        self.assertIn("6000 of", rows["ED-4"]["evidence"])
+        # The same wide block under the cap is an ED-4 FAIL (the reviewer's nocap page); ED-1 sees the
+        # document's width either way, so the run fails on ED-1 alone.
+        self.assertEqual(rows["ED-1"]["verdict"], "FAIL")
+        self.assertEqual(code, 1)
 
     def test_the_live_sample_service_signs_in_and_holds(self):
         with tempfile.TemporaryDirectory() as temp:

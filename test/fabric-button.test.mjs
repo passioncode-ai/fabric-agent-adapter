@@ -163,6 +163,23 @@ test('in WebKit: placement, name, menu and keyboard, the host cookie, Fabric abs
     assert.equal(await get.isVisible(), true);
     assert.equal(await p.locator('.fd-fabric-button-note').textContent(), 'Fabric is not installed. Get it at passioncode.ai/fabric');
     assert.deepEqual([await get.getAttribute('href'), await get.getAttribute('rel'), await get.getAttribute('target')], ['https://passioncode.ai/fabric', 'noopener', '_blank']);
+    // FB-4, FB-5: the way to get Fabric is a menu item the arrows reach, not a link only a pointer can.
+    await p.keyboard.press('Escape');
+    await p.getByRole('button', { name: 'Open Fabric' }).focus();
+    await p.keyboard.press('Enter');
+    assert.deepEqual(await p.getByRole('menuitem').allTextContents(),
+      ['Chat with Fabric about Example Agent', 'Open a coding session in Project A', 'passioncode.ai/fabric']);
+    const focused = () => p.evaluate(() => document.activeElement.textContent);
+    await p.keyboard.press('ArrowUp');
+    assert.equal(await focused(), 'passioncode.ai/fabric', 'up from the first item wraps to the get link');
+    await p.keyboard.press('ArrowDown');
+    assert.equal(await focused(), 'Chat with Fabric about Example Agent');
+    await p.keyboard.press('End');
+    assert.equal(await focused(), 'passioncode.ai/fabric');
+    await p.keyboard.press('Escape');
+    await p.keyboard.press('ArrowUp');
+    assert.equal(await focused(), 'passioncode.ai/fabric', 'ArrowUp on the button opens at the last item');
+    await p.keyboard.press('Escape');
     // FB-5: with no signal, following a link that nothing takes leaves the page focused: the note shows after 1.5 s.
     await context.clearCookies();
     await p.goto(`${origin}/chat-only`);

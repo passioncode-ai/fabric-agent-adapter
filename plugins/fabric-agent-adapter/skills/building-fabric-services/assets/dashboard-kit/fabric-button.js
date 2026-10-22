@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.1 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+/* fabric-dashboard-kit@1.1.2 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
    Load it same-origin, after fabric-dashboard.css, with the service it opens Fabric on:
      <script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
              data-project="project-a" data-project-name="Project A"></script>
@@ -10,7 +10,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '1.1.1';
+  var VERSION = '1.1.2';
   var COOKIE = 'fabric_button';
   var GET_FABRIC = 'https://passioncode.ai/fabric';
   var ABSENT_AFTER_MS = 1500;
@@ -213,7 +213,9 @@
     });
     var note = el(doc, 'p', { 'class': 'fd-fabric-button-note', role: 'note' });
     note.appendChild(doc.createTextNode('Fabric is not installed. Get it at '));
-    note.appendChild(el(doc, 'a', { href: GET_FABRIC, target: '_blank', rel: 'noopener', 'class': 'fd-fabric-button-get' }, 'passioncode.ai/fabric'));
+    // The way to get Fabric is a menu item too, so the arrows reach it whenever the note shows.
+    var get = el(doc, 'a', { role: 'menuitem', href: GET_FABRIC, target: '_blank', rel: 'noopener', tabindex: '-1', 'class': 'fd-fabric-button-get' }, 'passioncode.ai/fabric');
+    note.appendChild(get);
     note.hidden = !absent;
     menu.appendChild(note);
     wrap.appendChild(menu);
@@ -221,10 +223,11 @@
     doc.body.appendChild(wrap);
     doc.documentElement.classList.add('fd-has-fabric-button');
 
+    function reachable() { return note.hidden ? links : links.concat([get]); }
     function open(focusFirst) {
       menu.hidden = false;
       button.setAttribute('aria-expanded', 'true');
-      if (focusFirst && links.length) links[0].focus();
+      if (focusFirst && reachable().length) reachable()[0].focus();
     }
     function close(refocus) {
       menu.hidden = true;
@@ -232,19 +235,28 @@
       if (refocus) button.focus();
     }
     function move(by) {
-      var at = links.indexOf(doc.activeElement);
-      links[(at + by + links.length) % links.length].focus();
+      var all = reachable();
+      if (!all.length) return;
+      var at = all.indexOf(doc.activeElement);
+      all[(at + by + all.length) % all.length].focus();
     }
     button.addEventListener('click', function () { if (menu.hidden) open(true); else close(true); });
     button.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); open(false); (e.key === 'ArrowDown' ? links[0] : links[links.length - 1]).focus(); }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); open(false);
+        var all = reachable();
+        if (all.length) (e.key === 'ArrowDown' ? all[0] : all[all.length - 1]).focus();
+      }
     });
     menu.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { e.preventDefault(); close(true); }
       else if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
-      else if (e.key === 'Home') { e.preventDefault(); links[0].focus(); }
-      else if (e.key === 'End') { e.preventDefault(); links[links.length - 1].focus(); }
+      else if (e.key === 'Home' || e.key === 'End') {
+        e.preventDefault();
+        var all = reachable();
+        if (all.length) all[e.key === 'Home' ? 0 : all.length - 1].focus();
+      }
       else if (e.key === 'Tab') { close(false); }
     });
     doc.addEventListener('click', function (e) { if (!menu.hidden && !wrap.contains(e.target)) close(false); });

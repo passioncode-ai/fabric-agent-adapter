@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ED-3: a nav that wraps into a box cut off below its first row</title>
+  <style>
+    body { margin: 0; }
+    nav ul { display: flex; flex-wrap: wrap; height: 32px; overflow: hidden; margin: 0; padding: 0; list-style: none; }
+    nav li { padding: 6px 10px; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Sections"><ul>
+    <li><a href="#a">Overview</a></li><li><a href="#b">Events</a></li><li><a href="#c">Usage</a></li>
+    <li><a href="#d">Settings</a></li><li><a href="#e">Logs</a></li><li><a href="#f">Backups</a></li>
+    <li><a href="#g">Profiles</a></li><li><a href="#h">Schedules</a></li>
+  </ul></nav>
+  <main><p id="a">Overview</p></main>
+</body>
+</html>
