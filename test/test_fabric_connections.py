@@ -2,16 +2,14 @@
 contract's fixtures/vectors/connections.json (vendored as test/fixtures/contract/connections-vectors.json, each case
 re-answered by the contract's connectionsView); the Node twin runs the same file in fabric-connections.test.mjs."""
 import json
-import sys
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"))
+from test_fabric_service import fs, load
 
-import fabric_connections as fc  # noqa: E402
-from fabric_base import ServiceError  # noqa: E402
-from fabric_descriptor import build_well_known  # noqa: E402
+fc = load("fabric_connections")
+ServiceError = fc.ServiceError  # the class the kit raises (a second load would make another one)
+build_well_known = fs.build_well_known
 
 V = json.loads((Path(__file__).resolve().parent / "fixtures/contract/connections-vectors.json").read_text(encoding="utf-8"))
 KEY = fc.CONNECTIONS_EXTENSION_KEY

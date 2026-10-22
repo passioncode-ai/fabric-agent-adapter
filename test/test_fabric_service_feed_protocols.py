@@ -131,7 +131,7 @@ class ProbeRules(unittest.TestCase):
     def test_connections_fac_sem_127(self):
         """DEC-0096: the probe reads a declared connections list as a host does; a list a host would hide fails, and
         the credential that hid it never reaches the evidence."""
-        import fabric_connections as fcn
+        fcn = load("fabric_connections")
         key = fcn.CONNECTIONS_EXTENSION_KEY
         good = [{"id": "router", "kind": "model", "target": "openai/gpt-5.1", "state": "ok"}]
         wk = fs.build_well_known(service_id="example-agent", instance="default", name="Example Agent", version="1.0.0",
