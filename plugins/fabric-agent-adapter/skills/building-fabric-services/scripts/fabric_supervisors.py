@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path, PurePath
 from typing import Any, Callable, Dict, List, Optional, Sequence
@@ -38,6 +39,9 @@ from fabric_lock import (
 
 
 DEFAULT_EXIT_TIMEOUT = 15
+
+
+_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,250}\Z")  # what launchd and the Node twin take as a label
 
 
 def _no_marker_argument(argv: Sequence[str]) -> None:
@@ -96,7 +100,7 @@ def systemd_unit(unit: str, program_arguments: Sequence[str], *, working_directo
              # Not quoted: systemd reads WorkingDirectory= as the rest of the line, quotes included.
              "WorkingDirectory=%s" % cwd.replace("%", "%%")]
     for name in env:
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*\Z", name):
             raise ServiceError("environment name %r is not a variable name" % name)
     lines += ["Environment=%s" % _systemd_quote("%s=%s" % (k, v)) for k, v in sorted(env.items())]
     lines += ["Restart=always", "RestartSec=10", "TimeoutStopSec=%d" % stop_timeout, "KillMode=mixed", "",
@@ -237,17 +241,36 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
 
     ``ExitTimeOut`` (15 s) sits above the drain and its hard exit (``Drain``: 8 + 2 s), so launchd's
     SIGKILL never arrives first. ``FABRIC_SERVICE_SUPERVISOR=launchd`` tells the lock to back off
-    instead of exiting into a respawn loop."""
+    instead of exiting into a respawn loop.
+
+    The same refusals as the Node twin (finding 10): a label launchd cannot name, no program, an ExitTimeOut that does
+    not outlast the drain, an environment name ending TOKEN/SECRET/PASSWORD/KEY (a `*_FILE` path is fine), a value or
+    an argument shaped like a credential, and a control character in any string the plist carries."""
+    import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
+    if not _LABEL.match(str(label)):
+        raise ServiceError("label must match %s" % _LABEL.pattern)
+    argv = [str(a) for a in program_arguments]
+    if not argv:
+        raise ServiceError("A launchd job starts a program; ProgramArguments is empty.")
+    if not exit_timeout > DRAIN_SECONDS:
+        raise ServiceError("ExitTimeOut must outlast the %d s drain." % DRAIN_SECONDS)
     env = dict(environment or {})
-    for key in env:
-        if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)$", key) and not key.endswith("_FILE"):
+    for key, value in env.items():
+        if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)\Z", key) and not key.endswith("_FILE"):
             raise ServiceError("Environment variable %s looks like a secret; pass a *_FILE path instead." % key)
+        if fabric_secrets.secret_value(str(value)):
+            raise ServiceError("Environment %s holds a value shaped like a credential; a plist never carries one." % key)
+    for arg in argv:
+        if fabric_secrets.secret_argument(arg):
+            raise ServiceError("An argument carries a credential; a plist never does (read it from the token file or a secret reference).")
+    for value in [str(label), str(working_directory), str(stdout_path)] + argv + [str(x) for pair in env.items() for x in pair]:
+        _plain(value, "a plist string")
     env.setdefault("PATH", "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin")
-    _no_marker_argument([str(a) for a in program_arguments])
+    _no_marker_argument(argv)
     env[SUPERVISOR_ENV] = "launchd"
     plist = {
         "Label": label,
-        "ProgramArguments": list(program_arguments),
+        "ProgramArguments": argv,
         "WorkingDirectory": str(working_directory),
         "RunAtLoad": True,
         "KeepAlive": True,
@@ -287,7 +310,7 @@ def fetch_well_known(origin: str, timeout: float = 2.0) -> Optional[Dict[str, An
         return None
 
 
-_OVERRIDE_ROW = re.compile(r'^\s*"([^"]+)"\s*=>\s*(\S+)\s*$')
+_OVERRIDE_ROW = re.compile(r'^\s*"([^"]+)"\s*=>\s*(\S+)\s*\Z')
 
 
 def launchd_override(label: str) -> Optional[str]:

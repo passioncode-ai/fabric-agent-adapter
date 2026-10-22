@@ -28,10 +28,10 @@ SUPERVISOR_ENV = "FABRIC_SERVICE_SUPERVISOR"
 DRAIN_SECONDS = 8.0
 
 
-_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
+_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z")
 
 
-_INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+_INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}\Z")
 
 
 # DEC-0032: a local path is POSIX (`/…`, `~/…`) or Windows (`C:\…`, `C:/…`, `~\…`); a network
@@ -40,10 +40,10 @@ _INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 _LOCAL_PATH = re.compile(r"^(~[\\/]|/(?![\\/])|[A-Za-z]:[\\/])")
 
 
-_UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$")
+_UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service\Z")
 
 
-_TASK = re.compile(r"^\\[A-Za-z0-9 ._\\-]{1,254}$")
+_TASK = re.compile(r"^\\[A-Za-z0-9 ._\\-]{1,254}\Z")
 
 
 WINDOWS = os.name == "nt"

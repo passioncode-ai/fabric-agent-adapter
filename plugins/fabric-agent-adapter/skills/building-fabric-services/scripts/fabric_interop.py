@@ -51,11 +51,11 @@ JOB_HANDLE_SCHEMA: Dict[str, Any] = {
 }
 TERMINAL = ("completed", "failed", "cancelled")
 
-_TRACEPARENT = re.compile(r"^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$")
-_JOB_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
-_KEY = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+_TRACEPARENT = re.compile(r"^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})\Z")
+_JOB_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}\Z")
+_KEY = re.compile(r"^[A-Za-z0-9_.-]{1,64}\Z")
 _SECRET_WORDS = re.compile(r"pass(word|phrase)|secret|api[\s_-]?key|access[\s_-]?key|private[\s_-]?key|"
-                           r"(access|auth|bearer|refresh|session)[\s_-]?token|^token$|credential", re.IGNORECASE)
+                           r"(access|auth|bearer|refresh|session)[\s_-]?token|^token\Z|credential", re.IGNORECASE)
 
 
 class InteropError(_fs.ServiceError):

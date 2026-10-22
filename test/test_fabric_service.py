@@ -581,8 +581,8 @@ class StateRuleTests(unittest.TestCase):
 
     def test_verdicts(self):
         checker = load("check_service")
-        self.assertTrue(checker.same_repository("git@github.com:ssheleg/x.git", "https://github.com/ssheleg/x"))
-        self.assertFalse(checker.same_repository("git@github.com:ssheleg/x.git", "https://github.com/ssheleg/y"))
+        self.assertTrue(checker.same_repository("git@github.com:example-org/x.git", "https://github.com/example-org/x"))
+        self.assertFalse(checker.same_repository("git@github.com:example-org/x.git", "https://github.com/example-org/y"))
         with tempfile.TemporaryDirectory() as temp:
             code = Path(temp) / "code"
             self.repo(code, "git@github.com:passioncode-ai/svc.git")

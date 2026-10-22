@@ -33,13 +33,13 @@ EVENTS_MAX_LIMIT = 200
 LEVELS = ("info", "notice", "warning", "error")
 
 
-_KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}$")
+_KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}\Z")
 
 
-_TRACE_ID = re.compile(r"^(?!0{32}$)[0-9a-f]{32}$")
+_TRACE_ID = re.compile(r"^(?!0{32}\Z)[0-9a-f]{32}\Z")
 
 
-_SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
+_SPAN_ID = re.compile(r"^(?!0{16}\Z)[0-9a-f]{16}\Z")
 
 
 def make_event(event_id: Any, at: str, kind: str, level: str, text: str, *, subject: Optional[Dict[str, str]] = None,
