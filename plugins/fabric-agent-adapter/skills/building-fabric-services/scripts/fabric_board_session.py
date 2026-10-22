@@ -341,8 +341,12 @@ class Responder:
                            "back a transferred attempt (DEC-0078). It stays held; nothing was done.", notify=True,
                            episode=entry["request"], request=entry["request"], capability=capability)
                 continue
-            if entry.get("step") == "replying" and not entry.get("replied") and (entry.get("keys") or {}).get("reply"):
-                self._replied_before(entry)
+            if entry.get("step") == "replying" and not entry.get("replied") and (entry.get("keys") or {}).get("reply") \
+                    and not entry.get("probe"):
+                # Finding 35: whether the old reply was stored is asked under the old fence, but only from the resume queue,
+                # after the new attempt is recorded: a second lost answer then leaves the request queued, never stranded.
+                entry["probe"] = {"generation": entry["generation"], "attempt": entry["attempt"], "digest": entry["digest"],
+                                  "revision": entry["revision"], "key": entry["keys"]["reply"]}
             entry.update(generation=item["attempt"]["generation"], attempt=item["attempt"]["id"], digest=item["attempt"]["digest"],
                          revision=item["revision"], step="accepted" if entry.get("step") in ("accepting", "held", "lapsed") else entry.get("step"))
             # Finding 35: a fenced key's digest named the old attempt; under the new one it is idempotency_conflict.
@@ -354,21 +358,34 @@ class Responder:
 
     def _replied_before(self, entry: Dict[str, Any]) -> None:
         """A reply whose answer was lost under the old attempt (finding 35): a stored key answers before the fence is checked
-        (project-comms.md, Idempotency), so the old call again says whether it was stored; a refusal says it was not."""
+        (project-comms.md, Idempotency), so the old call again, under the old fence kept in `probe`, says whether it was
+        stored; a refusal says it was not. A lost answer, or a board that cannot be read now, raises and leaves `probe` for
+        the next try: neither says whether the reply was stored."""
+        probe = entry["probe"]
+        old = dict(entry, **{k: probe[k] for k in ("generation", "attempt", "digest", "revision")})
         try:
-            self._receipt("com.reply", self._call("com.reply", dict(self._reply_extra(entry), fence=self._fence(entry, entry["keys"]["reply"]))))
+            self._receipt("com.reply", self._call("com.reply", dict(self._reply_extra(entry), fence=self._fence(old, probe["key"]))))
         except BoardError as exc:
-            if exc.code in ("unreachable", "session-ended", "authority_changed", "not_authorized"):
+            if exc.code in ("unreachable", "session-ended", "authority_changed", "not_authorized", "not_available", "capacity_exceeded"):
                 raise
-            return
-        entry["replied"] = True
+        else:
+            entry["replied"] = True
+        del entry["probe"]
+        self.checkpoint.put(entry)
 
     def _resume_next(self) -> None:
-        """Resume a transferred request while nothing runs; each idle tick takes the next (finding 39)."""
+        """Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves
+        the queue only once its probe has answered: a lost answer keeps it first in line for the next tick (finding 35)."""
         while self.current is None and self._to_resume and not self.stopping:
-            entry = self.checkpoint.entries.get(self._to_resume.pop(0))
+            entry = self.checkpoint.entries.get(self._to_resume[0])
             if entry is not None and self.slots.get(entry["capability"], {}).get("state") == "held":
-                self._resume(json.loads(json.dumps(entry)))
+                entry = json.loads(json.dumps(entry))
+                if entry.get("probe"):
+                    self._replied_before(entry)
+                self._to_resume.pop(0)
+                self._resume(entry)
+            else:
+                self._to_resume.pop(0)
 
     def _observed(self, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """An observed outcome: the one already known, else what `observe(entry)` reads; None when nothing was observed."""

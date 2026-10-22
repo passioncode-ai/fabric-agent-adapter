@@ -279,7 +279,11 @@ export class Responder {
         this.emit('board.request.held', 'warn', 'An accepted request could not be resumed: this Fabric does not hand back a transferred attempt (DEC-0078). It stays held; nothing was done.', { notify: true, episode: entry.request, request: entry.request, capability });
         continue;
       }
-      if (entry.step === 'replying' && !entry.replied && entry.keys?.reply) await this.repliedBefore(entry);
+      if (entry.step === 'replying' && !entry.replied && entry.keys?.reply && !entry.probe) {
+        // Finding 35: whether the old reply was stored is asked under the old fence, but only from the resume queue, after
+        // the new attempt is recorded: a second lost answer then leaves the request queued, never stranded.
+        entry.probe = { generation: entry.generation, attempt: entry.attempt, digest: entry.digest, revision: entry.revision, key: entry.keys.reply };
+      }
       Object.assign(entry, { generation: item.attempt.generation, attempt: item.attempt.id, digest: item.attempt.digest, revision: item.revision,
         step: ['accepting', 'held', 'lapsed'].includes(entry.step) ? 'accepted' : entry.step });
       // Finding 35: a fenced key's digest named the old attempt; under the new one it is idempotency_conflict.
@@ -292,23 +296,39 @@ export class Responder {
 
   /**
    * A reply whose answer was lost under the old attempt (finding 35): a stored key answers before the fence is checked
-   * (project-comms.md, Idempotency), so the old call again says whether it was stored; a refusal says it was not.
+   * (project-comms.md, Idempotency), so the old call again, under the old fence kept in `probe`, says whether it was
+   * stored; a refusal says it was not. A lost answer, or a board that cannot be read now, throws and leaves `probe` for
+   * the next try: neither says whether the reply was stored.
    */
   async repliedBefore(entry) {
+    const { key, generation, attempt, digest, revision } = entry.probe;
+    let replied = true;
     try {
-      this.receipt('com.reply', await this.call('com.reply', { ...this.replyExtra(entry), fence: this.fence(entry, entry.keys.reply) }));
+      this.receipt('com.reply', await this.call('com.reply', { ...this.replyExtra(entry), fence: this.fence({ ...entry, generation, attempt, digest, revision }, key) }));
     } catch (e) {
-      if (['unreachable', 'session-ended', 'authority_changed', 'not_authorized'].includes(e.code) || !(e instanceof BoardError)) throw e;
-      return;
+      if (['unreachable', 'session-ended', 'authority_changed', 'not_authorized', 'not_available', 'capacity_exceeded'].includes(e.code) || !(e instanceof BoardError)) throw e;
+      replied = false;
     }
-    entry.replied = true;
+    if (replied) entry.replied = true;
+    delete entry.probe;
+    this.checkpoint.put(entry);
   }
 
-  /** Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). */
+  /**
+   * Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves the
+   * queue only once its probe has answered: a lost answer keeps it first in line for the next tick (finding 35).
+   */
   async resumeNext() {
     while (!this.current && this.toResume.length && !this.stopping) {
-      const entry = this.checkpoint.entries[this.toResume.shift()];
-      if (entry && this.slots[entry.capability]?.state === 'held') await this.resume(JSON.parse(JSON.stringify(entry)));
+      const stored = this.checkpoint.entries[this.toResume[0]];
+      if (!stored || this.slots[stored.capability]?.state !== 'held') {
+        this.toResume.shift();
+        continue;
+      }
+      const entry = JSON.parse(JSON.stringify(stored));
+      if (entry.probe) await this.repliedBefore(entry);
+      this.toResume.shift();
+      await this.resume(entry);
     }
   }
 
