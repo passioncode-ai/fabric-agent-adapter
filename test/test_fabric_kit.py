@@ -53,6 +53,25 @@ class Manifest(unittest.TestCase):
     def test_kit_json_is_what_the_sources_say(self):
         self.assertEqual(fabric_kit.build(check=True), [], "run: python3 %s build" % (SCRIPTS / "fabric_kit.py"))
 
+    def test_a_released_version_keeps_its_digests(self):
+        """A release's history entry is what that release shipped. `build` writes the entry of kit.json's own version, so
+        a build run before the version moves on would rewrite the last release's digests and make its genuine copies read
+        `modified` (seen in the 0.41.0 integration). Every release tag present in this clone is compared."""
+        tags = subprocess.run(["git", "-C", str(ROOT), "tag", "--list", "v*"], capture_output=True, text=True).stdout.split()
+        rel = (SCRIPTS / "kit.json").relative_to(ROOT).as_posix()
+        compared = 0
+        for tag in tags:
+            shown = subprocess.run(["git", "-C", str(ROOT), "show", "%s:%s" % (tag, rel)], capture_output=True, text=True)
+            if shown.returncode != 0:
+                continue  # a release older than kit.json
+            released = json.loads(shown.stdout)
+            version = released.get("version")
+            if version in released.get("history", {}):
+                self.assertEqual(KIT["history"].get(version), released["history"][version], "history %s" % version)
+                compared += 1
+        if not compared:
+            self.skipTest("no release tag in this clone (a shallow checkout)")
+
     def test_it_lists_every_library_module(self):
         listed = {e["file"] for e in KIT["python"] + KIT["node"]}
         on_disk = {p.name for p in SCRIPTS.glob("*.py")} | {p.name for p in SCRIPTS.glob("*.mjs")}
