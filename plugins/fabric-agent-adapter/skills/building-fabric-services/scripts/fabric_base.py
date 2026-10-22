@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime as _dt
 import os
 import re
+import threading
 from pathlib import Path
+from typing import Dict
 
 
 PROTOCOL = "fabric-service/0.1"
@@ -68,6 +70,17 @@ def expand(path: str) -> Path:
     if not p.is_absolute():
         raise ServiceError("Path %r must be absolute or start with ~/." % path)
     return p
+
+
+_STORE_LOCKS: Dict[str, threading.RLock] = {}
+_STORE_LOCKS_GUARD = threading.Lock()
+
+
+def store_lock(path: Path) -> threading.RLock:
+    """One lock per store path in this process (R3): a ThreadingHTTPServer runs a store's load-modify-save callers side
+    by side (the job store, the event log), and two store instances on one path share it."""
+    with _STORE_LOCKS_GUARD:
+        return _STORE_LOCKS.setdefault(str(Path(path).resolve()), threading.RLock())
 
 
 def _require_id(service_id: str) -> None:

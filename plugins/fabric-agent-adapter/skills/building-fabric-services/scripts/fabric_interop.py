@@ -18,6 +18,7 @@ Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016,
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -27,6 +28,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as _fs  # noqa: E402
+from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 
 PROTOCOL = "fabric-interop/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
@@ -365,7 +367,6 @@ def intent_idempotency_key(intent: Any) -> Optional[str]:
     """The idempotency key of an intent {agentId, capability, input, request?}: a UUID of version 8 from the first 16
     bytes of the SHA-256 of its RFC 8785 form. The same intent gives the same key on every resend and machine; None
     for another shape or an input with no RFC 8785 form."""
-    import hashlib
     import fabric_delegation as _fd  # noqa: E402 - beside this file: RFC 8785
     names = ("agentId", "capability", "input", "request")
     if not isinstance(intent, dict) or any(name not in names for name in intent):
@@ -469,6 +470,16 @@ def pause_message(resets_at: Optional[str] = None, text: Optional[str] = None) -
     return message
 
 
+def intent_digest(capability: str, arguments: Any) -> str:
+    """What a key is kept beside (FAA-77): the SHA-256 of the RFC 8785 form of [capability, input], so a key admits
+    only the intent it was first sent with. An input with no RFC 8785 form is refused."""
+    import fabric_delegation as _fd  # noqa: E402 - beside this file: RFC 8785
+    try:
+        return "sha256:" + hashlib.sha256(_fd.jcs([capability, arguments]).encode("utf-8")).hexdigest()
+    except (TypeError, ValueError, RecursionError):
+        raise InteropError("A job's input with an idempotency key needs a JSON form (RFC 8785).") from None
+
+
 def repeated_key_decision(job: Any, now: Any, limit_holds: Optional[bool] = None, approval_granted: bool = False) -> str:
     """The provider's answer to a repeated key: "run" (the same intent runs again, once) or "same" (answer with that job).
     A quota-exhausted job runs again once the limit no longer holds: `limit_holds` False when the provider knows it, else
@@ -525,17 +536,17 @@ def url_request(message: str, url: str) -> Dict[str, Any]:
 
 # --- C3.2 jobs ---------------------------------------------------------------------
 
-class JobStore:
-    """Durable jobs, one private JSON file each under `directory`, written atomically.
+_SURROGATE = re.compile("[\ud800-\udfff]")
 
-    A job id survives a restart of the agent, so fabric.job.get after a restart finds
-    the same job. The file holds the public `job` object exactly as fabric.job.get
-    returns it, and a `private` part (the capability, its input, the trace) that is
-    never returned. The Node kit reads and writes the same format.
-    """
+
+class JobStore:
+    """Durable jobs, one private JSON file each under `directory`, written atomically and under the directory's lock.
+    A job id survives a restart. The file holds the public `job` object exactly as fabric.job.get returns it, and a
+    `private` part (the capability, its input, the trace) that is never returned; the Node kit uses the same format."""
 
     def __init__(self, directory: Path):
         self.dir = Path(directory)
+        self._lock = store_lock(self.dir)
 
     def _path(self, job_id: str) -> Path:
         if not _JOB_ID.match(job_id or ""):
@@ -562,46 +573,67 @@ class JobStore:
                limit_holds: Optional[bool] = None, approval_granted: bool = False) -> Dict[str, Any]:
         """Start a job; returns the handle a job-capable tool puts in structuredContent.
 
-        With `idempotency_key` the key is kept per `caller` (the authenticated caller, DEC-0087): a key that already names
-        a job starts nothing and raises InteropError, unless `repeat` would answer "run" (a limit no longer holds, an
-        approval granted); then the key names the new job."""
-        if idempotency_key is not None:
-            decision = self.repeat(caller, idempotency_key, now if now is not None else _fs.now_iso(),
-                                   limit_holds=limit_holds, approval_granted=approval_granted)
-            if decision["decision"] == "same":
-                raise InteropError("Key %s already names job %s; answer with that job (JobStore.repeat)." % (idempotency_key, decision["job"]["id"]))
-        job_id = "job_" + secrets.token_hex(12)
-        job: Dict[str, Any] = {"id": job_id, "status": "working"}
-        if poll_interval_ms:
-            job["pollIntervalMs"] = int(poll_interval_ms)
-        private: Dict[str, Any] = {"capability": capability, "input": arguments,
-                                   "traceparent": traceparent if parse_traceparent(traceparent) else None}
-        if delegation:  # DEC-0039: who started it; only they read, cancel or answer it
-            private["delegation"] = {"principal": delegation.get("principal"), "caller": delegation.get("caller")}
-        self._save({"job": job, "private": private})
-        if idempotency_key is not None:
-            _fs.atomic_write(self._key_path(caller, idempotency_key), (json.dumps({"job": job_id}) + "\n").encode(), 0o600)
-        return {"job": {"id": job_id, "status": "working"}}
+        With `idempotency_key` the key is kept per `caller` (the authenticated caller, DEC-0087) beside the digest of the
+        intent (the capability and its input): a key that names a job of another intent raises `idempotency-conflict`;
+        one that names a job of this intent starts nothing and raises InteropError, unless `repeat` would answer "run"
+        (a limit no longer holds, an approval granted); then the key names the new job."""
+        with self._lock:
+            intent = None
+            if idempotency_key is not None:
+                intent = intent_digest(capability, arguments)
+                recorded = self._key_record(caller, idempotency_key)
+                decision = self.repeat(caller, idempotency_key, now if now is not None else _fs.now_iso(),
+                                       limit_holds=limit_holds, approval_granted=approval_granted)
+                if decision["job"] is not None and (recorded or {}).get("intent") != intent:
+                    raise InteropError("idempotency-conflict: key %s names a job of another intent; send the same capability and input, or a new key." % idempotency_key)
+                if decision["decision"] == "same":
+                    raise InteropError("Key %s already names job %s; answer with that job (JobStore.repeat)." % (idempotency_key, decision["job"]["id"]))
+            job_id = "job_" + secrets.token_hex(12)
+            job: Dict[str, Any] = {"id": job_id, "status": "working"}
+            if poll_interval_ms:
+                job["pollIntervalMs"] = int(poll_interval_ms)
+            private: Dict[str, Any] = {"capability": capability, "input": arguments,
+                                       "traceparent": traceparent if parse_traceparent(traceparent) else None}
+            if delegation:  # DEC-0039: who started it; only they read, cancel or answer it
+                private["delegation"] = {"principal": delegation.get("principal"), "caller": delegation.get("caller")}
+            self._save({"job": job, "private": private})
+            if idempotency_key is not None:
+                _fs.atomic_write(self._key_path(caller, idempotency_key), (json.dumps({"job": job_id, "intent": intent}) + "\n").encode(), 0o600)
+            return {"job": {"id": job_id, "status": "working"}}
 
     def _key_path(self, caller: Optional[str], key: str) -> Path:
-        import hashlib
         if not isinstance(key, str) or not key:
             raise InteropError("An idempotency key is a non-empty string.")
+        if _SURROGATE.search(key) or (isinstance(caller, str) and _SURROGATE.search(caller)):
+            raise InteropError("An idempotency key and its caller are Unicode text; a lone surrogate is refused.")
         name = hashlib.sha256(json.dumps([caller, key], separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()  # as JSON.stringify writes it
         directory = self.dir / "keys"
         _fs.ensure_private_dir(directory)
         return directory / ("%s.json" % name)
 
+    def _key_record(self, caller: Optional[str], key: str) -> Optional[Dict[str, Any]]:
+        try:
+            record = json.loads(self._key_path(caller, key).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        except ValueError:
+            record = None
+        if not isinstance(record, dict):
+            raise InteropError("Key %s is unreadable on disk." % key)
+        return record
+
     def repeat(self, caller: Optional[str], key: str, now: Any, limit_holds: Optional[bool] = None,
                approval_granted: bool = False) -> Dict[str, Any]:
         """The answer to a key this caller sent before (DEC-0087): {"decision": "new"|"same"|"run", "job": job or None}.
         "same": answer with that job, never run it again (outcome-unknown above all); "run": the intent runs again, once."""
-        try:
-            job_id = json.loads(self._key_path(caller, key).read_text(encoding="utf-8"))["job"]
-            job = self.get(job_id)
-        except (FileNotFoundError, UnknownJob):
+        record = self._key_record(caller, key)
+        if record is None:
             return {"decision": "new", "job": None}
-        except (ValueError, KeyError, TypeError):
+        try:
+            job = self.get(record["job"])
+        except UnknownJob:
+            return {"decision": "new", "job": None}
+        except (KeyError, TypeError):
             raise InteropError("Key %s is unreadable on disk." % key) from None
         return {"decision": repeated_key_decision(job, now, limit_holds, approval_granted), "job": job}
 
@@ -615,15 +647,16 @@ class JobStore:
         return self._load(job_id)["private"].get("traceparent")
 
     def _transition(self, job_id: str, status: str, **fields: Any) -> Dict[str, Any]:
-        record = self._load(job_id)
-        job = record["job"]
-        if job["status"] in TERMINAL:
-            raise InteropError("Job %s is already %s; a terminal job does not change." % (job_id, job["status"]))
-        for key in ("inputRequests", "result", "error", "statusMessage"):
-            job.pop(key, None)
-        job["status"] = status
-        job.update({key: value for key, value in fields.items() if value is not None})
-        return self._save(record)
+        with self._lock:
+            record = self._load(job_id)
+            job = record["job"]
+            if job["status"] in TERMINAL:
+                raise InteropError("Job %s is already %s; a terminal job does not change." % (job_id, job["status"]))
+            for key in ("inputRequests", "result", "error", "statusMessage"):
+                job.pop(key, None)
+            job["status"] = status
+            job.update({key: value for key, value in fields.items() if value is not None})
+            return self._save(record)
 
     def working(self, job_id: str, message: Optional[str] = None) -> Dict[str, Any]:
         return self._transition(job_id, "working", statusMessage=message)
@@ -641,15 +674,16 @@ class JobStore:
         """Apply inputResponses to an input_required job; unknown keys are ignored (MCP Tasks rule).
 
         Returns the responses that matched; when any did, the job is working again."""
-        job = self.get(job_id)
-        if job["status"] != "input_required":
-            return {}
-        matched = {key: value for key, value in (input_responses or {}).items()
-                   if key in job.get("inputRequests", {}) and isinstance(value, dict)
-                   and value.get("action") in ("accept", "decline", "cancel")}
-        if matched:
-            self.working(job_id)
-        return matched
+        with self._lock:
+            job = self.get(job_id)
+            if job["status"] != "input_required":
+                return {}
+            matched = {key: value for key, value in (input_responses or {}).items()
+                       if key in job.get("inputRequests", {}) and isinstance(value, dict)
+                       and value.get("action") in ("accept", "decline", "cancel")}
+            if matched:
+                self.working(job_id)
+            return matched
 
     def complete(self, job_id: str, envelope: Dict[str, Any]) -> Dict[str, Any]:
         """The envelope carries the job's trace, authoritative for the stored result (DEC-0017); one that names
@@ -675,13 +709,10 @@ class JobStore:
         """A job a limit paused and its provider will resume (DEC-0087): working, its statusMessage in the pause grammar,
         and pollIntervalMs reaching the reset within its cap of one hour."""
         message = pause_message(resets_at, text)
-        record = self._load(job_id)
-        if resets_at is not None:
-            wait = utc_time(resets_at) - utc_time(_fs.now_iso())
-            if wait > 0:
-                record["job"]["pollIntervalMs"] = int(min(wait, 3600000))
-                self._save(record)
-        return self._transition(job_id, "working", statusMessage=message)
+        wait = utc_time(resets_at) - utc_time(_fs.now_iso()) if resets_at is not None else 0
+        # One write, after the terminal check: a terminal job does not change, pollIntervalMs included (finding 11).
+        return self._transition(job_id, "working", statusMessage=message,
+                                pollIntervalMs=int(min(wait, 3600000)) if wait > 0 else None)
 
     def quota_exhausted(self, job_id: str, message: str, retryable: bool, resets_at: Optional[str] = None) -> Dict[str, Any]:
         """A job a limit stopped and its provider will not resume: failed, quota-exhausted, data {retryable, resetsAt?}."""
@@ -936,7 +967,10 @@ class McpToolServer:
             if name == "fabric.job.cancel":
                 state = self.jobs.get(job_id)
                 if state["status"] not in TERMINAL:
-                    state = self.jobs.cancel(job_id)
+                    try:
+                        state = self.jobs.cancel(job_id)
+                    except InteropError:  # it ended meanwhile: answer as it ended
+                        state = self.jobs.get(job_id)
                 return tool_result({"job": state}, traceparent=job_span)
             responses = arguments.get("inputResponses")
             if responses:
