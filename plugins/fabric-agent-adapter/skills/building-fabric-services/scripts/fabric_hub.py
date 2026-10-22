@@ -163,8 +163,12 @@ def locate_hub(root: Optional[Path] = None, alive: Callable[[int], bool] = pid_a
     if estate is not None and isinstance(doc.get("hubKey"), dict):
         import fabric_estate  # beside this file
         key = doc["hubKey"]
+        # A missing or null applied is "none known", as fabric-hub.mjs reads it (`estate.applied ?? undefined`); only a
+        # present one is checked, and hub_key_certified refuses an explicit null of its own (decision D3).
+        applied = estate.get("applied")
         verdict = fabric_estate.hub_key_certified(estate.get("record"), key.get("kid"), key.get("x"),
-                                                  time.time() if now is None else now, estate.get("applied"))
+                                                  time.time() if now is None else now,
+                                                  fabric_estate._MISSING if applied is None else applied)
         if not verdict.get("certified"):
             raise HubError("hub-key-refused", "The estate record does not certify the hub's key (%s)." % verdict.get("detail"),
                            data={"fault": verdict.get("fault"), "detail": verdict.get("detail")})

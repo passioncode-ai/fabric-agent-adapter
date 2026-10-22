@@ -1,0 +1,99 @@
+{
+  "comment": "Hostile inputs the estate and ceremony twins answer alike (FAA-78, finding 44; decision D3): fabric_estate.py, fabric_ceremonies.py and their Node twins each run every case (test_kit_hostile_estate.py, kit-hostile-estate.test.mjs). hubKey: the contract's first hub-key vector with applied set as written (absent when the member is missing); an explicit null fails closed. deviceKeys: a deviceKeys list replacing machine 0's in the contract's estate-contexts-ok.json, and the finding paths expected (the index is the position in the list as written, non-objects included). placementTrust: a record that is no object places nothing. enrollTokenClock: every ceremony verify vector answered the same with the clock as epoch seconds.",
+  "hubKey": [
+    {
+      "name": "applied-absent",
+      "expected": {
+        "certified": true,
+        "machine": "m-4c1e",
+        "revision": 2
+      }
+    },
+    {
+      "name": "applied-null",
+      "applied": null,
+      "expected": {
+        "certified": false,
+        "fault": "estate",
+        "detail": "estate-unreadable"
+      }
+    },
+    {
+      "name": "applied-false",
+      "applied": false,
+      "expected": {
+        "certified": false,
+        "fault": "estate",
+        "detail": "estate-unreadable"
+      }
+    },
+    {
+      "name": "applied-empty",
+      "applied": {},
+      "expected": {
+        "certified": false,
+        "fault": "estate",
+        "detail": "estate-unreadable"
+      }
+    },
+    {
+      "name": "applied-same-revision",
+      "applied": {
+        "revision": 2
+      },
+      "expected": {
+        "certified": true,
+        "machine": "m-4c1e",
+        "revision": 2
+      }
+    },
+    {
+      "name": "applied-later-revision",
+      "applied": {
+        "revision": 3
+      },
+      "expected": {
+        "certified": false,
+        "fault": "estate",
+        "detail": "estate-rolled-back"
+      }
+    }
+  ],
+  "deviceKeys": [
+    {
+      "name": "a non-object before a misnamed key",
+      "prefix": [
+        1.5
+      ],
+      "kidFromSecond": "m-4c1e#wrong",
+      "paths": [
+        "/machines/0/deviceKeys/2/kid"
+      ]
+    },
+    {
+      "name": "two non-objects before a misnamed key",
+      "prefix": [
+        null,
+        "x"
+      ],
+      "kidFromSecond": "m-4c1e#wrong",
+      "paths": [
+        "/machines/0/deviceKeys/3/kid"
+      ]
+    }
+  ],
+  "placementTrust": [
+    {
+      "name": "null record",
+      "record": null
+    },
+    {
+      "name": "array record",
+      "record": []
+    },
+    {
+      "name": "string record",
+      "record": "estate"
+    }
+  ]
+}

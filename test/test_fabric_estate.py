@@ -194,15 +194,21 @@ class HubKeyCertified(unittest.TestCase):
         self.record["machines"][0]["hubKey"] = {**self.record["machines"][0]["hubKey"], "kid": self.kid, "x": self.x}
         self.now = now
 
-    def verify(self, estate):
+    def verify(self, *estate):
+        """The token verified with ``estate=`` the one argument given, or without the option when none is."""
         o = self.options
+        given = {"estate": estate[0]} if estate else {}
         return dl.verify_delegation(self.token, audience=o["audience"], jwks=self.jwks, now=o["now"], capability=o["capability"],
-                                    effect=o["effect"], issuer=o["issuer"], read_only=o.get("readOnly", False), estate=estate)
+                                    effect=o["effect"], issuer=o["issuer"], read_only=o.get("readOnly", False), **given)
 
     def test_a_certified_kid_is_trusted_and_no_record_changes_nothing(self):
         self.assertEqual(fe.hub_key_certified(self.record, self.kid, self.x, self.now),
                          {"certified": True, "machine": self.record["machines"][0]["id"], "revision": self.record["revision"]})
-        self.assertTrue(self.verify(None)["ok"])
+        self.assertTrue(self.verify()["ok"], "an omitted estate skips DL-14")
+        # Decision D3: an explicit None is an unreadable source and fails closed, as Node's null does (fabric_delegation,
+        # builder B's half of finding 44; on this branch alone it still skips).
+        self.assertEqual({k: v for k, v in self.verify(None).items() if k != "ok"},
+                         {"code": "issuer-unavailable", "detail": "estate-unreadable"})
         self.assertTrue(self.verify(self.record)["ok"])
         self.assertTrue(self.verify(lambda: self.record)["ok"], "a callable gives the current revision")
 
@@ -268,7 +274,7 @@ class HubKeyVectors(unittest.TestCase):
         for case in HUB["cases"]:
             extra = case["extraRevocations"] if "extraRevocations" in case else fe._MISSING
             with self.subTest(case["name"]):
-                got = fe.hub_key_certified(case["record"], case["kid"], case.get("x", fe._MISSING), case["at"], case.get("applied"), extra)
+                got = fe.hub_key_certified(case["record"], case["kid"], case.get("x", fe._MISSING), case["at"], case.get("applied", fe._MISSING), extra)
                 self.assertEqual(got, case["expected"])
                 details.add(got.get("detail", "certified"))
         self.assertEqual(details, {"certified", "kid-not-certified", "estate-unreadable", "estate-outside-window",
