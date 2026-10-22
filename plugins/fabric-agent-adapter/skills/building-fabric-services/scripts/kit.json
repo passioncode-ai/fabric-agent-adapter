@@ -149,7 +149,7 @@
     "fabric_base",
     "fabric_secrets"
    ],
-   "sha256": "e424e11df14a11d58f57e0998e980cd93c538db55216c16743fb80e162d0446e"
+   "sha256": "77d3ccf863c70e9209d21ef45c46a6db9c06237019bc20d54f8d3946873f3f11"
   },
   {
    "module": "fabric_lock",
@@ -1863,7 +1863,7 @@
    "fabric_platform.py": "8b0cd89193bc55da204a4a1850665c96929c6778523a8715b8156c5643745288",
    "fabric_paths.py": "0d87e572bde2b930391b27aa370d808e093ce45cfba6148706f5318219906d30",
    "fabric_protocols.py": "71482284e57334b2d364a44596fc4183baddfe61a80083d3099b7ef423dc6f38",
-   "fabric_connections.py": "e424e11df14a11d58f57e0998e980cd93c538db55216c16743fb80e162d0446e",
+   "fabric_connections.py": "77d3ccf863c70e9209d21ef45c46a6db9c06237019bc20d54f8d3946873f3f11",
    "fabric_lock.py": "ba2399d2137c7a7791b7133b9db9cca36693f4eb7e30955b25a75ade814e95ba",
    "fabric_usage.py": "ce685cb9fdfd62ea75fff8b1b2be12a2ba758da783e4bfb4dcebe47bcbeb832b",
    "fabric_backups.py": "02dc5eb66ec956723d3ddba07b6dd15f6a9726d901f4d60edfd02eee57880ceb",

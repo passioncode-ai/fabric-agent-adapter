@@ -258,9 +258,28 @@ def _ipv6_ok(text: str) -> bool:
         return False
 
 
+_SURROGATE = re.compile("[\ud800-\udfff]")
+_QUERY_ENCODE = set(chr(c) for c in range(0x21)) | set('"#<>')
+_FRAGMENT_ENCODE = set(chr(c) for c in range(0x21)) | set('"<>`')
+
+
+def _serialize(text: str, encode: set) -> str:
+    """A query or fragment as WHATWG serializes it (`url.search`, `url.hash`): the set's ASCII and every code point
+    above U+007E as UTF-8 percent-escapes in upper-case hex; `%` stays as written (round-3 reading of 0.44.0)."""
+    out = []
+    for c in text:
+        if c in encode or ord(c) > 0x7e:
+            out.append("".join("%%%02X" % b for b in c.encode("utf-8")))
+        else:
+            out.append(c)
+    return "".join(out)
+
+
 def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
     """The password, query and fragment `new URL(value)` gives, or None where it throws. A subset of the WHATWG URL
     parser: an absolute URL with `//` authority, as the members that reach it are (_urls_in starts each at a scheme)."""
+    # A JavaScript string becomes a USV string first: an unpaired surrogate is U+FFFD (json.loads keeps one).
+    value = _SURROGATE.sub("\ufffd", value)
     value = re.sub(r"[\t\n\r]", "", value.strip("".join(chr(c) for c in range(0x21))))
     match = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):", value)
     if not match:
@@ -279,9 +298,9 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
         if at >= 0:
             end = min(end, at)
     authority, tail = rest[:end], rest[end:]
-    fragment = tail.split("#", 1)[1] if "#" in tail else ""
+    fragment = _serialize(tail.split("#", 1)[1], _FRAGMENT_ENCODE) if "#" in tail else ""
     before = tail.split("#", 1)[0]
-    query = before.split("?", 1)[1] if "?" in before else ""
+    query = _serialize(before.split("?", 1)[1], _QUERY_ENCODE | ({"'"} if special else set())) if "?" in before else ""
     if scheme == "file":
         # A drive letter (`C:`, `c|`) is an empty host and the start of the path.
         if authority == "" or re.fullmatch(r"[A-Za-z][:|]", authority) or _domain_ok(authority):
@@ -314,6 +333,21 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
     return {"password": password, "query": query, "fragment": fragment}
 
 
+def _raw_values(query: str) -> Dict[str, List[str]]:
+    """fabric_secrets.raw_values with the name read as URLSearchParams reads it: one leading `?` of the raw piece is
+    dropped before decoding (`??token` names `?token`, `%3Ftoken` names `?token`; round-3 reading)."""
+    values: Dict[str, List[str]] = {}
+    for piece in query.split("&"):
+        if piece == "":
+            continue
+        at = piece.find("=")
+        raw_name = piece if at < 0 else piece[:at]
+        merged = raw_values(raw_name[1:] if raw_name.startswith("?") else raw_name)
+        name = next(iter(merged), "")
+        values.setdefault(name, []).extend(raw_values("x" + piece[at:])["x"] if at >= 0 else [""])
+    return values
+
+
 def _secret_url(value: str) -> bool:
     """The contract's secretUrl (DEC-0044): what _secret_argument finds, a password, or a query or fragment value
     named or shaped like a credential, in a URL WHATWG parses; one it refuses is read as an argument only."""
@@ -325,7 +359,7 @@ def _secret_url(value: str) -> bool:
     if parts["password"]:
         return True
     return any((raw != "" and _credential_name(name)) or _secret_value(raw)
-               for part in (parts["query"], parts["fragment"]) for name, raws in raw_values(part).items() for raw in raws)
+               for part in (parts["query"], parts["fragment"]) for name, raws in _raw_values(part).items() for raw in raws)
 
 
 def _credential(value: str, runs: bool) -> bool:

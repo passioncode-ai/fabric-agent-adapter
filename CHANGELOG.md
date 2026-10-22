@@ -14,8 +14,10 @@
   `build_well_known` / `buildWellKnown` refuse an invalid declaration passed in by hand, `check_service.py` reports
   `well-known.connections`, and the `fabric_service` facades re-export the four names. The Python twin reads
   credentials with the reference's ECMAScript semantics (ASCII case folding and word boundary, ECMAScript's whitespace,
-  a URL WHATWG refuses read as text only); 984 more inputs, answered by the contract's reader into
-  `connections-extra-vectors.json`, hold both twins to it. Where Python cannot tell whether WHATWG refuses a URL (a
+  a URL WHATWG refuses read as text only, its query and fragment read as WHATWG serializes them, a name's leading
+  `?` dropped as `URLSearchParams` drops it, an unpaired surrogate read as U+FFFD); 1,073 more inputs, answered by the
+  contract's reader into `connections-extra-vectors.json`, hold both twins to it. Inputs whose answer changes with the
+  Node release (the reference parses URLs with the runtime's own `new URL`) are left out of that set. Where Python cannot tell whether WHATWG refuses a URL (a
   non-ASCII host), it reads the URL's credentials anyway, so a doubt hides a declaration rather than publish one
   (FAA-98 ports UTS46 to close that gap).
 
