@@ -29,7 +29,7 @@ test('every resolution and every rule case answers as the contract does', () => 
 test('runnerCheck runs only the catalogued binary and argv, bounded, and reads the version and sign-in', { skip: process.platform === 'win32' }, () => {
   const dir = tempDir('runner-');
   const tool = (body) => { const f = path.join(dir, 'example-code'); fs.writeFileSync(f, `#!/bin/sh\n${body}\n`); fs.chmodSync(f, 0o755); };
-  const entry = (extra = {}) => ({ kind: 'example-code', binaries: ['example-code'], version: { argv: ['--version'], pattern: '^example (\\d+\\.\\d+\\.\\d+)', timeoutMs: 2000 }, ...extra });
+  const entry = (extra = {}) => ({ kind: 'example-code', binaries: ['example-code'], version: { argv: ['--version'], pattern: '^example (\\d+\\.\\d+\\.\\d+)', timeoutMs: p.MAX_PROBE_MS }, ...extra });
   assert.equal(p.runnerCheck(entry(), { searchPath: dir }).installed, false);
   assert.equal(p.runnerCheck(entry(), { searchPath: dir }).probe, 'not-installed');
   tool('if [ "$1" = "--version" ]; then echo "example 2.0.1"; exit 0; fi; if [ "$1" = "auth" ]; then exit 4; fi');
