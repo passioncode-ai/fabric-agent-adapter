@@ -184,6 +184,17 @@
         "Distinguishes installed loader, native context fixture and live Fabric admission; other hosts get sourced capability evidence, never invented event parity",
         "Does not add unsupported Fabric runners or call rejoin lifecycle hooks from non-Claude hosts"
       ]
+    },
+    {
+      "id": "hooks-under-faults-stay-honest",
+      "request": "A teammate's Claude Code session ended but Fabric still shows its claim held, and its hooks log says the worker failed once. What do the session hooks do when a call fails or the machine is slow?",
+      "expected": [
+        "Explains that a refused or unreadable spool entry is logged by its code and dropped, and the end entry still releases the session's claims",
+        "Explains that an end whose release got no answer stays in the spool for the next worker, so the release is retried rather than lost",
+        "Explains that when the process table cannot be read the hook treats the session as unknown and spools nothing, and that a session Fabric launched is remembered by a marker",
+        "Explains that the worker ends fabric-mcp's whole process group at its 10 s deadline and that stale spool folders are pruned even while the hooks are inert",
+        "Points at the hooks log and references/session-hooks.md for evidence instead of guessing, and never edits the spool by hand"
+      ]
     }
   ]
 }

@@ -43,8 +43,8 @@ claude plugin validate . --strict
 `npm test` runs the first two plus `node --test 'test/*.test.mjs'`. `python3 test/validate.py --frontmatter
 <SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs them
 nightly on `main`, on a manual dispatch, and from `release.yml` before a publish; never on each push or pull request.
-Its jobs are `python`, `claude-plugin` and `windows`, plus the ones the CI batching change adds (the contract installed
-at the pin, and the Python 3.9 and Node floors); the file's own job list is the authority, not this line. A missing
+Its jobs (since 0.41.0, FAA-72) cover the Python and Node suites on Linux, macOS and Windows, the Python 3.9 and Node 18
+floors, the contract installed at the pin, and both plugin validations; the file's own job list is the authority. A missing
 or billing-blocked run is not a green one. `.github/workflows/release.yml` validates, creates a GitHub release
 and publishes to npm on a `v*` tag, but only when the repository variables `RELEASE_ENABLED` and
 `PUBLISH_NPMJS` are `"true"`; off by default in a fork, both `true` here
@@ -158,7 +158,7 @@ long-lived process, `watch-mail`, runs only while an agent waits on the board, u
 | `fabric_session.py hook user-prompt-submit` (plugin hook) | Claude Code | per prompt | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook session-start --host codex\|kimi` | Codex / Kimi Code, only after `install-host-hooks --apply` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py watch-mail` | a Claude Code agent, under its own background watcher, while it waits on the board | one look per interval (default 60 s ± 20 %, kept between 10 s and 15 min after the jitter; backoff to 15 min while Fabric is down; a look within a minute of the session's last rejoin waits) | nothing | its stdin's end, SIGTERM/SIGINT/SIGHUP, or its parent gone | 0 between looks (a sleeping process; each look one `fabric-mcp --rejoin-only` with a 10 s deadline) |
-| `fabric_session.py deliver` (detached worker) | the Stop / SessionEnd hook, only when Fabric advertises `session-hooks/1` | per turn, at most one start per session a minute (an end always starts one), one per session at a time | finishes its spool | its own 10 s deadline; closes `fabric-mcp`'s stdin, then kills it | 0 |
+| `fabric_session.py deliver` (detached worker) | the Stop / SessionEnd hook, only when Fabric advertises `session-hooks/1` | per turn, at most one start per session a minute (an end always starts one), one per session at a time | finishes its spool | its own 10 s deadline; closes `fabric-mcp`'s stdin, then ends its whole process group | 0 |
 | Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`), a systemd user unit (`Restart=always`) or a per-user Scheduled Task (logon trigger) | resident | the service | `launchctl bootout` + `disable` or `launchd_uninstall`; `systemctl --user disable --now` or `systemd_uninstall`; `schtasks /End` + `/Change /DISABLE` or `task_uninstall` | declared by each service in its own `AGENTS.md` |
 | Test suites (`npm test`) | a person or CI | on demand | nothing | exit; the lifecycle tests kill their own children in `finally` | 0 |
 
