@@ -29,6 +29,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     locate_hub,
     lock_held,
     log,
+    no_session_held,
     project_uses_fabric,
     prune_stale_sessions,
     read_small,
@@ -169,6 +170,17 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
         if event == "end":
             _remove_tree(directory)
         return "skipped: launched by Fabric"
+    if event == "end" and payload.get("reason") == "clear":
+        # /clear keeps the agent process and its fabric-mcp; Fabric 0.3.9 renames the session to the new id (board
+        # thread 02bf19c5, ask 2). No claim is released and no end observed; turns already spooled still go out.
+        if any(directory.glob("*-turn.json")) and not lock_held(directory):
+            spawn(directory)
+        return "skipped: /clear keeps the Fabric session"
+    if no_session_held(directory):
+        # A rejoin found no Fabric session for this id (02bf19c5, ask 4): recorded once, never retried every turn.
+        if event == "end":
+            _remove_tree(directory)
+        return "skipped: Fabric holds no session for it"
     # The ancestor check costs a process-table read or two: only once per session, when its folder is first made. A
     # positive answer is kept in the folder; an unknown one (a `ps` that failed) spools nothing, so no worker can
     # release a launched session's claims, and is asked again at the next hook.

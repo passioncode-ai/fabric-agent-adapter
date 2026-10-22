@@ -70,6 +70,9 @@ class Manifest(unittest.TestCase):
                 self.assertEqual(KIT["history"].get(version), released["history"][version], "history %s" % version)
                 compared += 1
         if not compared:
+            # The hosted `python` job checks out with tags and sets this, so the guard cannot skip there (FAA-82).
+            if os.environ.get("FABRIC_REQUIRE_RELEASE_TAGS") == "1":
+                self.fail("FABRIC_REQUIRE_RELEASE_TAGS=1 and no release tag in this clone: check out with tags")
             self.skipTest("no release tag in this clone (a shallow checkout)")
 
     def test_it_lists_every_library_module(self):

@@ -57,7 +57,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.41.0"
+VERSION = "0.42.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -433,6 +433,23 @@ REJOIN_MIN_INTERVAL_S = 60.0
 
 #: The file in a session's folder that says Fabric launched it: the ancestor walk ran once and found the launcher.
 LAUNCHED_MARK = "launched"
+
+
+#: The file in a session's folder that says Fabric held no session for its id: fabric-mcp --rejoin-only exited 3
+#: (Fabric 0.3.9, TR-11). For NO_SESSION_HOLD_S the hooks spool nothing for that id; after it, one rejoin tries again,
+#: so a Fabric that restarted and enrolled the id again is found (board thread 02bf19c5, ask 4).
+NO_SESSION_MARK = "no-session"
+NO_SESSION_HOLD_S = 15 * 60.0
+
+
+def no_session_held(directory: Path, now: Optional[float] = None) -> bool:
+    """Whether a rejoin found no Fabric session for this id within NO_SESSION_HOLD_S."""
+    try:
+        mark = (directory / NO_SESSION_MARK).stat().st_mtime
+    except OSError:
+        return False
+    age = (time.time() if now is None else now) - mark
+    return 0 <= age < NO_SESSION_HOLD_S
 
 
 def rejoined_recently(directory: Path, now: Optional[float] = None) -> bool:
