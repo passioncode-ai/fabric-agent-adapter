@@ -900,9 +900,9 @@ def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
 
 
 def fd_write(path: Path, text: str) -> None:
-    """Write through a temporary file in the same folder and rename it over, so a reader never sees half a file."""
+    """Write through a temporary file and rename it over; bytes, as the Node kit writes them (text mode: \r\n on Windows)."""
     temp = path.with_name(".%s.tmp-%d" % (path.name, os.getpid()))
-    temp.write_text(text, encoding="utf-8")
+    temp.write_bytes(text.encode("utf-8"))
     os.replace(temp, path)
 
 
@@ -948,6 +948,17 @@ def verify(folder: Any, trust: Dict[str, Any], countersigned: bool = False) -> D
     return {"ok": bool(verdict.get("ok")) and not problems, "verdict": verdict, "problems": problems}
 
 
+def _emit(text: str) -> None:
+    """One answer line, UTF-8 and \\n as the Node kit writes it, whatever the locale (a Windows pipe is cp1252; FAA-72)."""
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is None:  # a stream a caller put in place takes text
+        sys.stdout.write(text + "\n")
+        return
+    sys.stdout.flush()
+    buffer.write((text + "\n").encode("utf-8"))
+    buffer.flush()
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="fabric_package.py", description="Pack, sign and verify a fabric-package/1 folder.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -979,9 +990,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             trust = _load_json(Path(args.trust).read_bytes(), args.trust)
             answer = verify(args.folder, trust, countersigned=args.countersigned)
     except (PackageError, OSError) as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, separators=(",", ":")))
+        _emit(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False, separators=(",", ":")))
         return 1
-    print(dumps(answer))
+    _emit(dumps(answer))
     return 0 if answer.get("ok") else 1
 
 

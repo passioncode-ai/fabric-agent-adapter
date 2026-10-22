@@ -68,7 +68,8 @@ test('jti stores: memory prunes, the file store survives a restart, the store is
   const file = path.join(tempDir('jti-'), 'jti.json');
   assert.equal(new d.FileJtiStore(file).consume('a', 1000, 10), true);
   assert.equal(new d.FileJtiStore(file).consume('a', 1000, 20), false);
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  // A mode is this file's whole claim (consumed ids, no secret); on Windows Node reports 0o666 whatever the ACL says.
+  if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
   const step = V.approvals[0].steps[0];
   assert.equal(d.verifyApproval(step.approval, { ...step.options, jtiStore: undefined }).code, 'unknown-state');
   assert.equal(d.verifyApproval(step.approval, { ...step.options, jtiStore: d.UNSAFE_NO_JTI_STORE }).ok, true);

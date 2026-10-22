@@ -352,6 +352,21 @@ class PackTests(unittest.TestCase):
         for result in (out, signed, refused):
             self.assertNotIn(private, result.stdout + result.stderr, "the private key never reaches the output")
 
+    def test_the_command_line_answers_in_utf8_whatever_the_locale(self):
+        """FAA-72: a Windows pipe takes the locale's code page (cp1252), which has no Cyrillic; the answer is UTF-8 as
+        the Node kit writes it, and a package naming any character still prints."""
+        write_agent(self.root, allowedToolsCeiling=["Read", "\u00fcn\u00ef <&>", "\u00abbystro \u0431\u044b\u0441\u0442\u0440\u043e\u00bb"])
+        env = dict(os.environ, PYTHONIOENCODING="cp1252", PYTHONUTF8="0")
+        for args in (("pack", str(self.root)), ("pack", str(Path(self.tmp.name) / "\u043d\u0435\u0442"))):
+            out = subprocess.run([sys.executable, str(SCRIPTS / "fabric_package.py"), *args], capture_output=True, env=env)
+            self.assertEqual(out.stderr, b"", out.stderr.decode("utf-8", "replace"))
+            answer = json.loads(out.stdout.decode("utf-8"))
+            self.assertNotIn(b"\r\n", out.stdout, "one line ending, as the Node kit writes it")
+            if args[1] == str(self.root):
+                self.assertIn("\u0431\u044b\u0441\u0442\u0440\u043e", json.dumps(answer["package"], ensure_ascii=False))
+            else:
+                self.assertIn("not a folder", answer["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

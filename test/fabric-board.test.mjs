@@ -2,7 +2,7 @@
 // held to the same contract fixtures (contract f00a768, fixtures/contract/comms-vectors.json and canonical.json) and driven
 // against the same fake Fabric hub (test/fake_fabric_hub.py, run as a process).
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import * as fb from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board.mjs';
 import * as fh from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { assertPrivateFile } from './private-file.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const COMMS = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/comms-vectors.json'), 'utf8'));
@@ -148,7 +149,7 @@ test('hub: locate, the door ask, the credential saved once, join, refusals', asy
   assert.equal(allowed.credentialSaved, true);
   assert.ok(!JSON.stringify(allowed).includes(hub.credential));
   assert.equal(fs.readFileSync(target, 'utf8'), hub.credential);
-  assert.equal(fs.statSync(target).mode & 0o777, 0o600);
+  assertPrivateFile(target);
   const grant = await client.joinBoard(hub.project, hub.cred);
   assert.deepEqual(grant.capabilities, ['video.render']);
   assert.ok(!JSON.stringify(grant).includes(grant.bearer()));
@@ -158,7 +159,9 @@ test('hub: locate, the door ask, the credential saved once, join, refusals', asy
   const before = (await hub.control({ op: 'state' })).bindingsSeen.length;
   await assert.rejects(dead.joinBoard(hub.project, hub.cred), (e) => e.code === 'not-running');
   assert.equal((await hub.control({ op: 'state' })).bindingsSeen.length, before); // never sent
-  fs.chmodSync(hub.cred, 0o644);
+  // Readable by others: a mode on macOS and Linux, an Everyone grant on Windows, where a mode is not the privacy (DEC-0032).
+  if (process.platform === 'win32') assert.equal(spawnSync('icacls.exe', [hub.cred, '/grant', '*S-1-1-0:(R)']).status, 0);
+  else fs.chmodSync(hub.cred, 0o644);
   await assert.rejects(client.joinBoard(hub.project, hub.cred), (e) => e.code === 'credential' && !e.message.includes(hub.credential));
 });
 

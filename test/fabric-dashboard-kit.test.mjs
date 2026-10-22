@@ -3,15 +3,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const skill = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services');
 const require = createRequire(import.meta.url);
 const kit = require(path.join(skill, 'assets/dashboard-kit/fabric-dashboard.js'));
-const svc = await import(path.join(skill, 'scripts/fabric-service.mjs'));
-const layout = await import(path.join(skill, 'scripts/check_dashboard_layout.mjs'));
+const svc = await import(pathToFileURL(path.join(skill, 'scripts/fabric-service.mjs')).href);
+const layout = await import(pathToFileURL(path.join(skill, 'scripts/check_dashboard_layout.mjs')).href);
 const KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 
 test('the carrier cookie is read as v=1 scheme and theme', () => {
