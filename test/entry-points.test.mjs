@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'plugins', 'fabric-agent-adapter', 'skills',
   'building-fabric-services', 'scripts');
@@ -43,7 +43,8 @@ test('fabric-package.mjs runs through a symlinked folder', (t) => {
 });
 
 test('a layout report with no rule in it is not a pass', () => {
-  const source = `import { report } from ${JSON.stringify(path.join(scripts, 'check_dashboard_layout.mjs'))};
+  // A file URL, never a path: Windows reads `D:\...` in an import as a URL with the scheme `d:`.
+  const source = `import { report } from ${JSON.stringify(pathToFileURL(path.join(scripts, 'check_dashboard_layout.mjs')).href)};
 process.exitCode = report([], { json: true }, 'x') === 0 ? 9 : 0;`;
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', source], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
