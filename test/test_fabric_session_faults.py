@@ -369,5 +369,14 @@ class Housekeeping(Faults):
         self.assertEqual(sorted(p.name for p in self.directory.iterdir()), ["worker.lock"])
 
 
+    def test_a_reused_inode_number_is_not_the_same_lock(self):
+        """Linux hands a freed inode number straight to the next file: the lock another worker made can carry the stale
+        lock's number, so identity also needs the file's write time and size (seen on the hosted Linux runners, FAA-68)."""
+        stale = os.stat_result((0o100600, 7, 1, 1, 0, 0, 1, 0, 100, 100, 0, 0, 100 * 10**9, 100 * 10**9, 100 * 10**9))
+        fresh = os.stat_result((0o100600, 7, 1, 1, 0, 0, 4, 0, 900, 900, 0, 0, 900 * 10**9, 900 * 10**9, 900 * 10**9))
+        self.assertEqual((stale.st_dev, stale.st_ino), (fresh.st_dev, fresh.st_ino))
+        self.assertNotEqual(MCP._identity(stale), MCP._identity(fresh))
+        self.assertEqual(MCP._identity(stale), MCP._identity(stale))
+
 if __name__ == "__main__":
     unittest.main()
