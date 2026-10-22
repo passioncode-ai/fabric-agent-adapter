@@ -402,11 +402,15 @@ def _process(pid: int) -> Tuple[Optional[str], int]:
 
 
 def launched_by_ancestor(env: Optional[Dict[str, str]] = None, depth: int = 4,
-                         process: Optional[Callable[[int], Tuple[Optional[str], int]]] = None) -> Optional[bool]:
+                         process: Optional[Callable[[int], Tuple[Optional[str], int]]] = None,
+                         platform: str = sys.platform) -> Optional[bool]:
     """A Claude Code Fabric launched runs with `--mcp-config <Fabric>/sessions/<id>/mcp.json` (sessionBundle.ts,
     adapter mcp-config-flag) and no environment marker yet: look for that in this hook's few ancestors. True or False
     once the walk is done; None when a process could not be read (a `ps` that failed or ran out of time), which is
-    "unknown", never "not launched" (FAA-68). Only the path is matched; nothing read here is kept or logged."""
+    "unknown", never "not launched" (FAA-68). Windows has no walk (`_process` reads no process there): False, so
+    only the environment signals count. Only the path is matched; nothing read here is kept or logged."""
+    if process is None and platform == "win32":
+        return False
     marker = os.path.normpath(str(fabric_root(env=env) / "sessions")) + os.sep
     process = process or _process
     pid = os.getppid()

@@ -131,6 +131,16 @@ class Base(unittest.TestCase):
             "projects": {str(self.repo.resolve()): {"mcpServers": {"fabric": entry}}}}
         (self.home / ".claude.json").write_text(json.dumps(config))
 
+    def fabric_mcp(self, script):
+        """How a host runs `script` as fabric-mcp: the file itself (its shebang) on POSIX; on Windows, which runs no
+        shebang, a .cmd beside it, the way Fabric ships fabric-mcp.cmd there."""
+        if sys.platform != "win32":
+            script.chmod(script.stat().st_mode | stat.S_IXUSR)
+            return script
+        wrapper = script.with_name(script.name + ".cmd")
+        wrapper.write_text('@"%s" "%s" %%*\r\n' % (sys.executable, script))
+        return wrapper
+
     def dead_pid(self):
         proc = subprocess.Popen([sys.executable, "-c", "pass"])
         proc.wait()
@@ -183,6 +193,7 @@ class Hub(Base):
         (self.root / "hub.json").write_text("{not json")
         self.assertEqual(fs.locate_hub(self.root)["state"], "not-a-hub")
 
+    @unittest.skipIf(sys.platform == "win32", "Windows has no FIFO in the file system (os.mkfifo)")
     def test_a_fifo_is_not_read(self):
         self.root.mkdir(parents=True)
         os.mkfifo(str(self.root / "hub.json"))
@@ -346,8 +357,7 @@ class StopAndEndActive(Base):
         fake = self.base / "bin" / "fabric-mcp"
         fake.parent.mkdir()
         fake.write_text(FAKE_MCP.format(python=sys.executable))
-        fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-        self.register(command=str(fake))
+        self.register(command=str(self.fabric_mcp(fake)))
         self.env["FAKE_MCP_RECORD"] = str(self.record)
         subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
         for key, value in (("user.email", "t@example.invalid"), ("user.name", "t"), ("commit.gpgsign", "false")):
@@ -531,9 +541,8 @@ class Active(Base):
         fake = self.base / "bin" / "fabric-mcp"
         fake.parent.mkdir()
         fake.write_text(FAKE_MCP.format(python=sys.executable))
-        fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
         self.fake = fake
-        self.register(command=str(fake))
+        self.register(command=str(self.fabric_mcp(fake)))
         self.env["FAKE_MCP_RECORD"] = str(self.record)
         self.env["FAKE_MCP_BOARD"] = str(self.board)
         subprocess.run(["git", "init", "-q", str(self.repo)], check=True)
@@ -568,7 +577,8 @@ class BoardUnread(Active):
         self.assertEqual([c["name"] for c in self.records("call")], ["fabric_session_observe", "com.status"])
         board = json.loads((directory / "board.json").read_text())
         self.assertEqual(board["unread"], 3)
-        self.assertEqual(stat.S_IMODE((directory / "board.json").stat().st_mode), 0o600)
+        if sys.platform != "win32":  # POSIX permission bits; Windows keeps only read-only
+            self.assertEqual(stat.S_IMODE((directory / "board.json").stat().st_mode), 0o600)
         self.assertIn("tool=com.status answer=ok unread=3", self.log_text())
 
     def test_an_unreadable_board_or_a_refusal_is_no_count(self):
@@ -698,6 +708,7 @@ class WatchMail(Active):
         self.assertLess(time.perf_counter() - started, 8.0)
         proc.stdout.close()
 
+    @unittest.skipIf(sys.platform == "win32", "Windows ends a process without a catchable SIGTERM (TerminateProcess)")
     def test_the_cli_exits_on_a_signal(self):
         import signal
         proc = subprocess.Popen([sys.executable, str(SCRIPT), "watch-mail", "--interval", "10", "--cwd", str(self.repo)],
@@ -988,9 +999,10 @@ class InstallHostHooks(Base):
         self.assertEqual(doc["hooks"]["Stop"], original["hooks"]["Stop"])
         self.assertEqual(doc["hooks"]["SessionStart"][0], original["hooks"]["SessionStart"][0])
         (ours,) = [h for e in doc["hooks"]["SessionStart"] for h in e["hooks"] if "fabric_session.py" in h["command"]]
-        self.assertEqual(ours["command"], "python3 -S %s hook session-start --host codex" % self.SCRIPT_PATH)
+        self.assertEqual(ours["command"], fs.hook_command(self.SCRIPT_PATH, "codex"))  # quoted the platform's way
         self.assertLessEqual(ours["timeout"], 5)
-        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o640)
+        if sys.platform != "win32":  # POSIX permission bits; Windows keeps only read-only
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o640)
         code, out, _ = self.install("codex", "--apply")
         self.assertEqual(code, 0)
         self.assertIn("already", out)
@@ -1062,7 +1074,7 @@ class InstallHostHooks(Base):
         self.assertTrue(text.startswith(original))
         hooks = fs.tomllib.loads(text)["hooks"]
         self.assertEqual(len(hooks), 3)
-        self.assertEqual(hooks[-1]["command"], "python3 -S %s hook session-start --host kimi" % self.SCRIPT_PATH)
+        self.assertEqual(hooks[-1]["command"], fs.hook_command(self.SCRIPT_PATH, "kimi"))
         (backup,) = path.parent.glob("config.toml.*.bak")
         self.assertEqual(backup.read_text(), original)
         code, out, _ = self.install("kimi", "--apply")

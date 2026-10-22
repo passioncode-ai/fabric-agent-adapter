@@ -136,6 +136,10 @@ class McpStdio:
         options: Dict[str, Any] = {}
         if sys.platform == "win32":
             options["creationflags"] = 0x00000200  # CREATE_NEW_PROCESS_GROUP
+            # CreateProcess applies no PATHEXT: a registration naming `fabric-mcp` means `fabric-mcp.cmd` on PATH.
+            import shutil
+            found = shutil.which(argv[0], path=env.get("PATH"))
+            argv = [found or argv[0]] + list(argv[1:])
         else:
             options["start_new_session"] = True
         self.proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,

@@ -180,6 +180,8 @@ class LaunchedUnknown(Faults):
         marker = str(fs.fabric_root(env=self.env) / "sessions" / "s1" / "mcp.json")
         self.assertTrue(fs.launched_by_ancestor(self.env, process=lambda pid: ("claude --mcp-config " + marker, 1)))
         self.assertFalse(fs.launched_by_ancestor(self.env, process=lambda pid: ("claude", 1)))
+        # Windows reads no process table: only the environment signals count, and a session there still spools.
+        self.assertIs(fs.launched_by_ancestor(self.env, platform="win32"), False)
 
     def walk(self, answer):
         calls = []
