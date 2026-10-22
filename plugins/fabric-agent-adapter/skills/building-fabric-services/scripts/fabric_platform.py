@@ -1,6 +1,6 @@
 """Windows, where the kit needs it (DEC-0032): named pipes that hold one copy, protecting a file to its owner, and
 reading a file's ACL to refuse a token file others can read. On other systems the same names exist and do nothing
-or answer "absent". Part of the service kit (FAA-65, layer L3)."""
+or answer "absent". Part of the service kit (FAA-65, layer L1)."""
 from __future__ import annotations
 
 import os

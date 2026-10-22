@@ -61,15 +61,17 @@ test("the contract's canonical vectors (DEC-0043)", () => {
 });
 
 test('the file jti store writes with the kit\'s private writer: a failed write leaves no temporary file (FAA-85)', () => {
-  const dir = tempDir('jti-');
-  const rename = fs.renameSync;
-  fs.renameSync = () => { const e = new Error('refused'); e.code = 'EPERM'; throw e; };
-  try {
-    assert.throws(() => new d.FileJtiStore(path.join(dir, 'jti.json')).consume('a', 1000, 10), /refused/);
-  } finally {
-    fs.renameSync = rename;
+  for (const step of ['writeSync', 'fsyncSync', 'renameSync']) {
+    const dir = tempDir('jti-');
+    const real = fs[step];
+    fs[step] = () => { const e = new Error(`refused ${step}`); e.code = 'EPERM'; throw e; };
+    try {
+      assert.throws(() => new d.FileJtiStore(path.join(dir, 'jti.json')).consume('a', 1000, 10), /refused/, step);
+    } finally {
+      fs[step] = real;
+    }
+    assert.deepEqual(fs.readdirSync(dir), [], step);
   }
-  assert.deepEqual(fs.readdirSync(dir), []);
 });
 
 test('jti stores: memory prunes, the file store survives a restart, the store is required', () => {

@@ -1,5 +1,5 @@
 """Where a service's things live (fabric-service/0.1): the services directory, a service's data, config, logs and run
-directories per OS, private directories and atomic writes. Part of the service kit (FAA-65, layer L3)."""
+directories per OS, private directories and atomic writes. Part of the service kit (FAA-65, layer L1)."""
 from __future__ import annotations
 
 import os

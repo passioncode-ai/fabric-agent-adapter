@@ -347,7 +347,7 @@ export function createMemoryJtiStore() {
 export class JtiStoreError extends Error {}
 
 /**
- * Consumed approval ids in a 0600 JSON file, so a second use is refused across a restart (DL-18). A file that
+ * Consumed approval ids in an owner-only JSON file, so a second use is refused across a restart (DL-18). A file that
  * cannot be read throws JtiStoreError: forgetting every consumed id would let each approval be replayed.
  */
 export class FileJtiStore {

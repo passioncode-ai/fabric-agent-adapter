@@ -1,5 +1,5 @@
 // Windows, where the kit needs it (DEC-0032): reading a file's ACL to refuse a token file others can read.
-// Part of the Node service kit (FAA-65, layer L3); the twin of fabric_platform.py. Node 20+, no dependency.
+// Part of the Node service kit (FAA-65, layer L1); the twin of fabric_platform.py. Node 20+, no dependency.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';

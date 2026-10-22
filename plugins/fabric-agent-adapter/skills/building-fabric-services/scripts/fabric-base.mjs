@@ -1,5 +1,5 @@
 // What every module of the Node service kit shares: the protocol name, ServiceError, ids, nowIso and expand.
-// Part of the Node service kit (FAA-65, layer L3); the twin of fabric_base.py. Node 20+, no dependency.
+// Part of the Node service kit (FAA-65, layer L1); the twin of fabric_base.py. Node 20+, no dependency.
 import os from 'node:os';
 import path from 'node:path';
 
