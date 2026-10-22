@@ -13,12 +13,12 @@
 // scroll box) and ED-5 (sticky chrome within min(120 px, a quarter of the height), anchors landing
 // below it, no nested full-height scroller). What it cannot measure is NOT_RUN with the reason,
 // never a pass. WebKit is the default engine (Safari's). Exit 0 when nothing FAILs, 1 when
-// something does, 2 on a usage error. It reads; it never clicks a control of the page.
-import { readFileSync, existsSync } from 'node:fs';
+// something does, 2 on a usage error or a report with no rule in it. It reads; it never clicks a control of the page.
+import { readFileSync, existsSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, platform } from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 const RULES = ['ED-1', 'ED-2', 'ED-3', 'ED-4', 'ED-5'];
@@ -251,7 +251,7 @@ export function verdicts(width, floor, m) {
   return rows;
 }
 
-function report(rows, opts, target) {
+export function report(rows, opts, target) {
   rows = rows.map((r) => ({ ...r, evidence: scrub(r.evidence) }));
   target = scrub(target);
   const failed = rows.filter((r) => r.verdict === 'FAIL').length;
@@ -260,6 +260,10 @@ function report(rows, opts, target) {
   } else {
     for (const r of rows) process.stdout.write(`${r.verdict.padEnd(8)} ${(r.rule + (r.width ? '@' + r.width : '')).padEnd(10)} ${r.evidence}\n`);
     process.stdout.write(`\n${rows.length} rule(s), ${failed} FAIL, ${rows.filter((r) => r.verdict === 'NOT_RUN').length} NOT_RUN\n`);
+  }
+  if (!rows.length) {
+    process.stderr.write('no rule ran: nothing was measured, so nothing passed\n');
+    return 2;
   }
   return failed ? 1 : 0;
 }
@@ -319,6 +323,17 @@ async function main(argv) {
   return report(rows, opts, shown);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+// Whether node was started on this file. Real paths, not URLs: the launcher installs the plugin under a symlinked
+// folder (~/.passioncode/current), and comparing import.meta.url (resolved) with argv[1] (the link) never ran main
+// (board thread b42e16b7).
+function startedDirectly() {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (startedDirectly()) {
   main(process.argv.slice(2)).then((code) => process.exit(code), (err) => { process.stderr.write(String(err?.stack || err) + '\n'); process.exit(2); });
 }

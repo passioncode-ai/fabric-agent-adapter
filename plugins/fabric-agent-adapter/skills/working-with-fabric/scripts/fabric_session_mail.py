@@ -25,6 +25,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
 )
 from fabric_session_mcp import (  # noqa: E402 - the kit (FAA-65)
     McpStdio,
+    NoSessionError,
     _wait_for_session_tools,
     board_unread,
 )
@@ -74,6 +75,8 @@ def poll_unread(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None
             return "unavailable", "this Fabric serves no %s" % BOARD_STATUS_TOOL
         unread, said = board_unread(client.request("tools/call", {"name": BOARD_STATUS_TOOL, "arguments": {}}))
         return ("ok", unread) if unread is not None else ("unavailable", "the project board cannot be read (%s)" % said)
+    except NoSessionError:
+        return "down", "Fabric holds no session for this id"
     except TimeoutError:
         return "down", "fabric-mcp did not join this session in time"
     except Exception as exc:  # noqa: BLE001 — a poll never raises

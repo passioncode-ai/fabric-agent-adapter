@@ -15,7 +15,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { isSmallOrderKey, jcs } from './fabric-delegation.mjs';
 import { secretArgument, secretValue } from './fabric-secrets.mjs';
 
@@ -701,4 +701,15 @@ export function main(argv, print = (line) => process.stdout.write(`${line}\n`)) 
   return answer.ok ? 0 : 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) process.exitCode = main(process.argv.slice(2));
+// Whether node was started on this file. Real paths, not URLs: the launcher installs the plugin under a symlinked
+// folder (~/.passioncode/current), and comparing import.meta.url (resolved) with argv[1] (the link) never ran main
+// (board thread b42e16b7).
+function startedDirectly() {
+  try {
+    return Boolean(process.argv[1]) && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (startedDirectly()) process.exitCode = main(process.argv.slice(2));

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.42.0 (2026-10-22)
+
+The open asks of the Fabric project board, closed ([brief](docs/evidence/specs/2026-10-22-board-asks-0.42.0-brief.md)).
+
+### Changed
+
+- **Session hooks follow Fabric 0.3.9** (board thread `02bf19c5`, FAA-93; Fabric's tracking audit TR-1, TR-2, TR-11).
+  The session-wide release carries `observedAt`, the time the end hook fired, where the release tool's input schema
+  names it, so Fabric refuses an end from before the session enrolled (`stale-end`). A `SessionEnd` with reason
+  `clear` releases nothing and observes no end: `/clear` keeps the agent process and its fabric-mcp; turns already
+  spooled still go out. An end followed by a later turn of the same session id is dropped with a log line instead of
+  being delivered to a resumed process (`claude --resume` keeps the id), which closes FAA-83. When
+  `fabric-mcp --rejoin-only` exits 3 (no session holds the id), the worker drops the spool, marks the folder and logs
+  it once; for 15 minutes the hooks spool nothing for that id, then one rejoin tries again.
+
+### Fixed
+
+- **Kit scripts started through a symlinked folder ran nothing** (board thread `b42e16b7`, FAA-94).
+  `check_dashboard_layout.mjs` and `fabric-package.mjs` compared `import.meta.url` (resolved) with `process.argv[1]`
+  (the link), so under the launcher's `~/.passioncode/current` a layout check printed nothing and exited 0. Both
+  compare real paths now, and a layout report with no rule in it exits 2.
+- **The kit history guard runs in hosted CI** (FAA-82). The `python` job checks out the full history with tags and sets
+  `FABRIC_REQUIRE_RELEASE_TAGS=1`, under which `test_a_released_version_keeps_its_digests` fails instead of skipping
+  when no release tag is present.
+
 ## 0.41.0 (2026-10-22)
 
 The 2026-10-22 audit, closed (FAA-68 to FAA-81; [report](docs/reports/2026-10-22-adapter-audit/README.md),

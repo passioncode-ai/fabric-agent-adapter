@@ -48,7 +48,7 @@ FAKE_MCP = textwrap.dedent('''\
     tools = {{"connect": ["fabric_whoami", "fabric_session_observe", "fabric_work_release", "fabric_tasks_list", "com.status"],
              "old-fabric": ["fabric_whoami", "fabric_tasks_list", "fabric_task_claim"],
              "refuse": ["fabric_whoami", "fabric_session_observe", "fabric_work_release"],
-             "never": ["fabric_whoami"]}}[mode]
+             "never": ["fabric_whoami"], "no-session": ["fabric_whoami"]}}[mode]
     def send(message):
         sys.stdout.write(json.dumps(message) + "\\n"); sys.stdout.flush()
     for line in sys.stdin:
@@ -58,12 +58,19 @@ FAKE_MCP = textwrap.dedent('''\
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"protocolVersion": m["params"]["protocolVersion"],
                   "capabilities": {{"tools": {{"listChanged": True}}}}, "serverInfo": {{"name": "fabric", "version": "0.4.0"}}}}}})
         elif method == "notifications/initialized":
+            if mode == "no-session":  # Fabric 0.3.9 (TR-11): a rejoin that finds no session exits 3 at once
+                write("exit", 3)
+                sys.exit(3)
             if mode != "never":
                 connected = True
                 send({{"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}})
         elif method == "tools/list":
             names = tools if connected else ["fabric_whoami"]
-            send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": {{"type": "object"}}}} for n in names]}}}})
+            def schema(n):
+                if n == "fabric_work_release" and os.environ.get("FAKE_MCP_RELEASE_OBSERVED"):
+                    return {{"type": "object", "properties": {{"claims": {{"type": "string"}}, "observedAt": {{"type": "string"}}}}}}
+                return {{"type": "object"}}
+            send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": schema(n)}} for n in names]}}}})
         elif method == "tools/call":
             write("call", m["params"])
             if m["params"]["name"] == os.environ.get("FAKE_MCP_HANG_ON"):
@@ -438,6 +445,114 @@ class StopAndEndActive(Base):
         self.assertEqual(calls[0]["arguments"]["idempotencyKey"], calls[1]["arguments"]["idempotencyKey"],
                          "the retried release carries the same key")
         self.assertFalse(spawned[0].exists(), "the folder goes once the end is delivered")
+
+    def test_the_release_carries_observed_at_where_its_schema_names_it(self):
+        """Fabric 0.3.9 (board thread 02bf19c5, ask 1): the session-wide release says when the end was observed, so the
+        hub refuses an end from before the session enrolled (`stale-end`)."""
+        self.env["FAKE_MCP_RELEASE_OBSERVED"] = "1"
+        _, spawned = self.spool("end", reason="prompt_input_exit")
+        (entry,) = spawned[0].glob("*-end.json")
+        observed = json.loads(entry.read_text())["observedAt"]
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        (release,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_work_release"]
+        self.assertEqual(release["observedAt"], observed)
+
+    def test_the_release_leaves_observed_at_out_where_its_schema_does_not_name_it(self):
+        """A host whose release schema is strict and older than 0.3.9 would refuse the field: it is sent only where
+        the tool's advertised input schema names it."""
+        _, spawned = self.spool("end", reason="prompt_input_exit")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        (release,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_work_release"]
+        self.assertNotIn("observedAt", release)
+
+    def test_clear_ends_nothing(self):
+        """Fabric 0.3.9 (02bf19c5, ask 2): /clear keeps the agent process and its fabric-mcp, so its SessionEnd releases
+        no claim and observes no end. A turn spooled before it still goes out."""
+        said, spawned = self.spool("end", reason="clear")
+        self.assertEqual(said, "skipped: /clear keeps the Fabric session")
+        self.assertEqual(spawned, [])
+        self.assertFalse(fs.session_dir(SID, self.env).exists(), "no folder is made for a /clear")
+        directory = fs.session_dir(SID, self.env)
+        fs.spool(directory, {"event": "turn", "runtimeSessionId": SID, "cwd": str(self.repo),
+                             "observedAt": "2026-10-22T00:00:00Z", "facts": {}})
+        said, spawned = self.spool("end", reason="clear")
+        self.assertEqual(said, "skipped: /clear keeps the Fabric session")
+        self.assertEqual(spawned, [directory], "the pending turn still goes out")
+        self.assertEqual(list(directory.glob("*-end.json")), [])
+        fs.deliver(directory, self.env, deadline_s=8)
+        self.assertEqual([c["name"] for c in self.records("call") if c["name"] != "com.status"], ["fabric_session_observe"])
+        self.assertTrue(directory.is_dir(), "the folder stays: the session did not end")
+
+    def test_an_end_followed_by_a_turn_of_the_same_session_is_dropped(self):
+        """Fabric 0.3.9 (02bf19c5, ask 3) and FAA-83: `claude --resume` keeps the session id, so an end kept after a
+        release timeout must not be delivered once the resumed session spools a turn: it would release live claims."""
+        directory = fs.session_dir(SID, self.env)
+        fs.spool(directory, {"event": "end", "runtimeSessionId": SID, "cwd": str(self.repo), "reason": "other",
+                             "observedAt": "2026-10-18T00:00:00Z", "facts": {}})
+        said, spawned = self.spool("turn")
+        self.assertEqual(said, "spooled: worker started")
+        fs.deliver(directory, self.env, deadline_s=8)
+        self.assertEqual([c["name"] for c in self.records("call") if c["name"] != "com.status"], ["fabric_session_observe"])
+        self.assertEqual(self.records("call")[0]["arguments"]["event"], "turn")
+        self.assertIn("event=end outcome=dropped", self.log_text())
+        self.assertTrue(directory.is_dir(), "the resumed session goes on")
+        self.assertEqual(list(directory.glob("*-end.json")), [])
+
+    def test_a_rejoin_that_finds_no_session_is_recorded_once(self):
+        """Fabric 0.3.9 (02bf19c5, ask 4): fabric-mcp --rejoin-only exits 3 when no session holds the id. The spool is
+        dropped, the folder is marked, and for NO_SESSION_HOLD_S the hooks spool nothing for that id."""
+        self.env["FAKE_MCP_MODE"] = "no-session"
+        _, spawned = self.spool("turn")
+        started = time.perf_counter()
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertLess(time.perf_counter() - started, 4.0, "exit 3 is not held to the deadline")
+        self.assertEqual(self.records("call"), [])
+        self.assertEqual(self.records("exit"), [3])
+        self.assertEqual(list(spawned[0].glob("*-*.json")), [])
+        self.assertTrue((spawned[0] / fs.NO_SESSION_MARK).exists())
+        self.assertEqual(self.log_text().count("outcome=no-session"), 1)
+        said, again = self.spool("turn")
+        self.assertEqual(said, "skipped: Fabric holds no session for it")
+        self.assertEqual(again, [])
+        self.assertEqual(list(spawned[0].glob("*-*.json")), [])
+        old = time.time() - fs.NO_SESSION_HOLD_S - 5
+        os.utime(str(spawned[0] / fs.NO_SESSION_MARK), (old, old))
+        said, again = self.spool("turn")
+        self.assertEqual(said, "spooled: worker started", "the mark expires: a Fabric that re-enrolled is found again")
+        said, _ = self.spool("end", reason="prompt_input_exit")
+        self.assertEqual(said, "spooled: worker started")
+
+    def test_clear_starts_a_worker_even_while_one_runs(self):
+        """A running worker may have read the spool before the last turn landed, and no later hook comes for the old
+        id after /clear: a new worker is started anyway; it waits for the lock (blind reading of 0.42.0, finding 1)."""
+        directory = fs.session_dir(SID, self.env)
+        fs.spool(directory, {"event": "turn", "runtimeSessionId": SID, "cwd": str(self.repo),
+                             "observedAt": "2026-10-22T00:00:00Z", "facts": {}})
+        (directory / "worker.lock").write_text("")
+        said, spawned = self.spool("end", reason="clear")
+        self.assertEqual(said, "skipped: /clear keeps the Fabric session")
+        self.assertEqual(spawned, [directory])
+
+    def test_no_session_with_an_end_in_the_spool_removes_the_folder(self):
+        """The end was the session's last hook, so nothing would remove its folder before the 7-day prune."""
+        self.env["FAKE_MCP_MODE"] = "no-session"
+        _, spawned = self.spool("end", reason="prompt_input_exit")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertEqual(self.records("call"), [])
+        self.assertFalse(spawned[0].exists())
+
+    def test_watch_mail_names_a_session_fabric_does_not_hold(self):
+        self.env["FAKE_MCP_MODE"] = "no-session"
+        self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8),
+                         ("down", "Fabric holds no session for this id"))
+
+    def test_an_end_while_no_session_is_held_removes_the_folder(self):
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True)
+        (directory / fs.NO_SESSION_MARK).write_text("")
+        said, spawned = self.spool("end", reason="prompt_input_exit")
+        self.assertEqual(said, "skipped: Fabric holds no session for it")
+        self.assertFalse(directory.exists())
 
     def test_an_older_fabric_without_the_tools_degrades_to_a_log_line(self):
         self.env["FAKE_MCP_MODE"] = "old-fabric"

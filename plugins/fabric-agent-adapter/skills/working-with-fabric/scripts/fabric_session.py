@@ -67,6 +67,9 @@ from fabric_session_env import (  # noqa: F401
     lock_held,
     spawn_worker,
     _remove_tree,
+    NO_SESSION_MARK,
+    NO_SESSION_HOLD_S,
+    no_session_held,
 )
 from fabric_session_mcp import (  # noqa: F401
     RUNNER,
@@ -87,6 +90,8 @@ from fabric_session_mcp import (  # noqa: F401
     board_unread,
     deliver,
     _wait_for_session_tools,
+    NO_SESSION_EXIT,
+    NoSessionError,
 )
 from fabric_session_mail import (  # noqa: F401
     WATCH_MIN_INTERVAL_S,

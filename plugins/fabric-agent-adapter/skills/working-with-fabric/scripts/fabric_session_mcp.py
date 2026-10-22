@@ -21,6 +21,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     GIT_TIMEOUT_S,
     HOOK_FEATURE,
     LOCK_STALE_S,
+    NO_SESSION_MARK,
     SESSION_ID,
     VERSION,
     WORKER_DEADLINE_S,
@@ -127,6 +128,15 @@ class JsonRpcError(RuntimeError):
         return "error:%s" % ("unnamed" if self.code is None else self.code)
 
 
+#: fabric-mcp --rejoin-only's exit status when no Fabric session holds the runtime id (Fabric 0.3.9, TR-11).
+NO_SESSION_EXIT = 3
+
+
+class NoSessionError(TimeoutError):
+    """fabric-mcp --rejoin-only ended with NO_SESSION_EXIT: Fabric holds no session for this id. A TimeoutError, so a
+    caller that knows only "no answer" (watch-mail) keeps treating it as one."""
+
+
 class McpStdio:
     """A minimal MCP client over stdio (newline-delimited JSON-RPC) with a hard deadline."""
 
@@ -150,6 +160,7 @@ class McpStdio:
         self.cond = threading.Condition()
         self.next_id = 0
         self.tools_changed = False
+        self.tools: List[Dict[str, Any]] = []  # the last tools/list answer, for the tools' input schemas
         self.reader = threading.Thread(target=self._read, daemon=True)
         self.reader.start()
 
@@ -169,10 +180,23 @@ class McpStdio:
         with self.cond:
             self.cond.notify_all()
 
+    def _ended(self) -> None:
+        """The server is gone: raise what its exit status says."""
+        if self.proc.returncode == NO_SESSION_EXIT:
+            raise NoSessionError("fabric-mcp found no session for this id")
+        raise TimeoutError("fabric-mcp ended")
+
     def _send(self, message: Dict[str, Any]) -> None:
         assert self.proc.stdin is not None
-        self.proc.stdin.write((json.dumps(message) + "\n").encode("utf-8"))
-        self.proc.stdin.flush()
+        try:
+            self.proc.stdin.write((json.dumps(message) + "\n").encode("utf-8"))
+            self.proc.stdin.flush()
+        except OSError:  # a server that exited closed its stdin: say why it exited, never a broken pipe
+            try:
+                self.proc.wait(timeout=max(0.0, min(1.0, self.deadline - time.monotonic())))
+            except subprocess.TimeoutExpired:
+                pass
+            self._ended()
 
     def notify(self, method: str, params: Optional[Dict[str, Any]] = None) -> None:
         self._send({"jsonrpc": "2.0", "method": method, **({"params": params} if params else {})})
@@ -191,7 +215,9 @@ class McpStdio:
                             raise JsonRpcError(error.get("code") if isinstance(error, dict) else None)
                         return message.get("result") or {}
                 left = self.deadline - time.monotonic()
-                if left <= 0 or self.proc.poll() is not None:
+                if self.proc.poll() is not None:
+                    self._ended()
+                if left <= 0:
                     raise TimeoutError("no answer to %s" % method)
                 self.cond.wait(min(left, 0.25))
 
@@ -402,7 +428,7 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
         note("session=%s event=%s tool=%s answer=%s" % (session_id[:8], event, tool, answer))
 
     try:
-        entries = sorted(directory.glob("*-*.json"))
+        entries = _drop_stale_ends(sorted(directory.glob("*-*.json")), note, session_id)
         if not entries:
             return said
         cwd = _entry_cwd(entries)
@@ -435,10 +461,14 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                 reason = entry.get("reason") if isinstance(entry.get("reason"), str) else "other"
                 if event == "end":
                     if RELEASE_TOOL in names:
-                        call(event, RELEASE_TOOL, {
-                            "claims": "session", "outcome": "let-go",
-                            "reason": "the Claude Code session ended (%s)" % reason,
-                            "idempotencyKey": key + ":release"})
+                        release = {"claims": "session", "outcome": "let-go",
+                                   "reason": "the Claude Code session ended (%s)" % reason,
+                                   "idempotencyKey": key + ":release"}
+                        # Fabric 0.3.9 refuses an end observed before the session enrolled (`stale-end`, board thread
+                        # 02bf19c5): say when it was observed, where the tool takes the field.
+                        if isinstance(entry.get("observedAt"), str) and "observedAt" in _input_fields(client, RELEASE_TOOL):
+                            release["observedAt"] = entry["observedAt"]
+                        call(event, RELEASE_TOOL, release)
                     else:
                         note("session=%s event=end outcome=degraded reason=%r" % (session_id[:8], "no %s" % RELEASE_TOOL))
                 if OBSERVE_TOOL in names:
@@ -453,7 +483,7 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                 path.unlink()
                 if event == "end":
                     ended = True  # only now: a call that timed out above left this entry for the next worker
-            entries = sorted(directory.glob("*-*.json"))  # turns spooled while this worker ran
+            entries = _drop_stale_ends(sorted(directory.glob("*-*.json")), note, session_id)  # spooled meanwhile
         if not ended and BOARD_STATUS_TOOL in names:
             # The board's unread count for the prompt hook (FAA-12a). A count, never a message.
             try:
@@ -463,6 +493,19 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
             _write_private(directory / "board.json", json.dumps({
                 "unread": unread, "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}))
             note("session=%s event=board tool=%s %s" % (session_id[:8], BOARD_STATUS_TOOL, said_board))
+    except NoSessionError:
+        # Recorded once (02bf19c5, ask 4): nothing in the spool can reach a session Fabric does not hold.
+        note("session=%s outcome=no-session reason=%r" % (session_id[:8], "Fabric holds no session for this id"))
+        for path in directory.glob("*-*.json"):
+            ended = ended or path.name.endswith("-end.json")  # the session's last hook: its folder goes now
+            try:
+                path.unlink()
+            except OSError:
+                pass
+        try:
+            _write_private(directory / NO_SESSION_MARK, "")
+        except OSError as exc:  # the worker never raises: without the mark, the next turn tries once more
+            note("session=%s outcome=no-session reason=%r" % (session_id[:8], "the mark was not written (%s)" % type(exc).__name__))
     except TimeoutError as exc:
         note("session=%s outcome=unknown reason=%r" % (session_id[:8], str(exc)))
     except Exception as exc:  # noqa: BLE001 — the worker never raises
@@ -479,10 +522,39 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
     return said
 
 
+def _drop_stale_ends(entries: List[Path], note: Callable[[str], None], session_id: str) -> List[Path]:
+    """The entries left once every end followed by a later turn of the same id is dropped (FAA-83; board thread
+    02bf19c5, ask 3): `claude --resume` keeps the id, so such an end belongs to an earlier process of the session, and
+    delivering it would release the live session's claims. An end that is the newest entry keeps its retry. Entries
+    are named by `time_ns`, so the sorted order is the spooling order."""
+    kept: List[Path] = []
+    for index, path in enumerate(entries):
+        if path.name.endswith("-end.json") and any(p.name.endswith("-turn.json") for p in entries[index + 1:]):
+            note("session=%s event=end outcome=dropped reason=%r" % (session_id[:8], "a later turn of the same session"))
+            try:
+                path.unlink()
+            except OSError:
+                pass
+            continue
+        kept.append(path)
+    return kept
+
+
+def _input_fields(client: McpStdio, tool: str) -> List[str]:
+    """The property names a listed tool's input schema declares; [] when it declares none."""
+    for listed in client.tools:
+        if listed.get("name") == tool:
+            schema = listed.get("inputSchema")
+            props = schema.get("properties") if isinstance(schema, dict) else None
+            return [k for k in props if isinstance(k, str)] if isinstance(props, dict) else []
+    return []
+
+
 def _wait_for_session_tools(client: McpStdio, deadline: float) -> List[str]:
     """fabric-mcp lists only fabric_whoami until it holds a session; then it says its tools changed."""
     while True:
         tools = client.request("tools/list", {}).get("tools") or []
+        client.tools = [t for t in tools if isinstance(t, dict)]
         names = [t.get("name") for t in tools if isinstance(t, dict) and isinstance(t.get("name"), str)]
         if [n for n in names if n != WAITING_TOOL]:
             return names
