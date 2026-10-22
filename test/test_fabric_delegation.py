@@ -141,6 +141,84 @@ class JtiStoreTests(unittest.TestCase):
             self.assertEqual(oct(path.stat().st_mode & 0o777), "0o600")
             self.assertTrue(dl.FileJtiStore(path).consume("a", 2000, 1000 + dl.LEEWAY_SECONDS + 1))
 
+    def test_file_store_writes_with_the_kits_private_writer(self):
+        """FAA-85: the consumed ids go through fabric_paths.atomic_write, so on Windows the file gets the owner-only
+        ACL before its bytes (DEC-0032), and a failed write leaves no temporary file behind."""
+        writer = dl._atomic_write.__globals__  # the fabric_paths the store calls, whichever copy that is
+        self.assertTrue(writer["__file__"].endswith("fabric_paths.py"))
+        protected = []
+        saved = (writer["WINDOWS"], writer["_win_protect"])
+        try:
+            writer["WINDOWS"] = True
+            writer["_win_protect"] = lambda path, folder: protected.append((Path(path).name, folder))
+            with tempfile.TemporaryDirectory() as temp:
+                self.assertTrue(dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10))
+        finally:
+            writer["WINDOWS"], writer["_win_protect"] = saved
+        self.assertEqual(len(protected), 1, protected)
+        self.assertTrue(protected[0][0].startswith(".jti.json.") and protected[0][1] is False, protected)
+
+    def test_a_failed_acl_step_closes_the_temporary_file_and_raises_its_own_error(self):
+        """FAA-85 round 2: on Windows the ACL step runs before the bytes; when it fails the temporary file's handle is
+        closed (else Windows cannot delete it), nothing is left, and the ACL error is what the caller sees."""
+        import os
+        writer = dl._atomic_write.__globals__
+        opened = []
+        real_mkstemp = writer["tempfile"].mkstemp
+
+        def mkstemp(*args, **kwargs):
+            fd, name = real_mkstemp(*args, **kwargs)
+            opened.append(fd)
+            return fd, name
+
+        def refuse(path, folder):
+            raise RuntimeError("acl refused")
+        saved = (writer["WINDOWS"], writer["_win_protect"])
+        writer["WINDOWS"], writer["_win_protect"] = True, refuse
+        writer["tempfile"].mkstemp = mkstemp
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                with self.assertRaisesRegex(RuntimeError, "acl refused"):
+                    dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10)
+                self.assertEqual(len(opened), 1)
+                with self.assertRaises(OSError):  # checked at once, before anything else can reuse the number
+                    os.fstat(opened[0])
+                self.assertEqual(sorted(p.name for p in Path(temp).iterdir()), [])
+        finally:
+            writer["tempfile"].mkstemp = real_mkstemp
+            writer["WINDOWS"], writer["_win_protect"] = saved
+
+    def test_a_failed_cleanup_does_not_replace_the_error_that_caused_it(self):
+        import os
+        writer = dl._atomic_write.__globals__
+
+        def refuse(path, folder):
+            raise RuntimeError("acl refused")
+        saved = (writer["WINDOWS"], writer["_win_protect"], os.unlink)
+        writer["WINDOWS"], writer["_win_protect"] = True, refuse
+        os.unlink = lambda path: (_ for _ in ()).throw(PermissionError("refused remove"))
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                with self.assertRaisesRegex(RuntimeError, "acl refused"):
+                    dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10)
+                os.unlink = saved[2]
+        finally:
+            writer["WINDOWS"], writer["_win_protect"], os.unlink = saved
+
+    def test_a_failed_file_store_write_leaves_no_temporary_file(self):
+        import os
+        with tempfile.TemporaryDirectory() as temp:
+            replace = os.replace
+            def refuse(src, dst):
+                raise PermissionError("refused")
+            os.replace = refuse
+            try:
+                with self.assertRaises(PermissionError):
+                    dl.FileJtiStore(Path(temp) / "jti.json").consume("a", 1000, 10)
+            finally:
+                os.replace = replace
+            self.assertEqual(sorted(p.name for p in Path(temp).iterdir()), [])
+
     def test_file_store_consumes_once_under_threads(self):
         with tempfile.TemporaryDirectory() as temp:
             store = dl.FileJtiStore(Path(temp) / "jti.json")

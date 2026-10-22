@@ -1,4 +1,4 @@
-"""What every module of the service kit shares (FAA-65, layer L3): the protocol name, ServiceError, the
+"""What every module of the service kit shares (FAA-65, layer L1): the protocol name, ServiceError, the
 platform, ids and now_iso. Standard library only."""
 from __future__ import annotations
 

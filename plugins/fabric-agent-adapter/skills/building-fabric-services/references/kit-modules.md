@@ -54,15 +54,15 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L0 | `fabric_identifiers` | identifier equality by normal form (DEC-0076) |
 | L0 | `fabric_secrets` | the contract's one credential detector (DEC-0044) |
 | L1 | `fabric_crypto` | Ed25519 signing (a Montgomery ladder that does not branch on the key) and verification, P-256 verification, base64url, sha256 |
+| L1 | `fabric_base` | the protocol name, `ServiceError`, small shared helpers |
+| L1 | `fabric_platform` | Windows: named pipes, owner-only files (DEC-0032) |
+| L1 | `fabric_paths` | the services directory, a service's folders, atomic and private writes (L1 since 0.44.2, so `fabric_delegation` writes its consumed approval ids with them, FAA-85) |
 | L2 | `fabric_estate` | `estate-record/1` revisions and their rules (DEC-0055) |
 | L2 | `fabric_delegation` | the callee's side of `fabric-delegation/0.1` (DEC-0039) |
 | L2 | `fabric_share` | share grants and registrations (DEC-0086) |
 | L2 | `fabric_ceremonies` | the headless join token (DEC-0084) |
 | L2 | `fabric_package_schema` | the reading of `fabric-package.schema.json` with JavaScript's pattern and format semantics (FAA-92) |
 | L2 | `fabric_package` | `fabric-package/1`: pack, sign, verify; re-exports `schema_problems` (DEC-0050, DEC-0051) |
-| L3 | `fabric_base` | the protocol name, `ServiceError`, small shared helpers |
-| L3 | `fabric_platform` | Windows: named pipes, owner-only files (DEC-0032) |
-| L3 | `fabric_paths` | the services directory, a service's folders, atomic and private writes |
 | L3 | `fabric_protocols` | protocol revisions (DEC-0067) and feed data (DEC-0070) |
 | L3 | `fabric_connections` | what an agent uses, `fabric-connections/0.1`: the reference reading and the declaration (DEC-0096, FAC-SEM-127) |
 | L3 | `fabric_lock` | the instance lock and the supervisor marker (LC-01, DEC-0057) |

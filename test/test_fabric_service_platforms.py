@@ -282,6 +282,21 @@ class Windows(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             fs.read_token(link)
 
+    def test_the_consumed_approval_file_is_owner_only(self):
+        """FAA-85: FileJtiStore writes with the kit's private writer, so its ACL is protected and grants only this
+        user, SYSTEM and Administrators, whatever the folder hands down."""
+        dl = load("fabric_delegation")
+        path = self.dir / "open" / "jti.json"
+        path.parent.mkdir()
+        subprocess.run(["icacls", str(path.parent), "/grant", "*S-1-1-0:(OI)(CI)(R)"], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.assertTrue(dl.FileJtiStore(path).consume("a", 1000, 10))
+        owner, aces = fs.windows_acl(path)
+        self.assertIn(owner, {fs.windows_user_sid(), "S-1-5-18", "S-1-5-32-544"})
+        granting = {a["sid"] for a in aces if a["type"] == "allow" and a["mask"]}
+        self.assertTrue(granting <= {fs.windows_user_sid(), "S-1-5-18", "S-1-5-32-544"}, granting)
+        self.assertEqual([p.name for p in path.parent.iterdir()], ["jti.json"])
+
     def test_the_log_is_written_in_binary(self):
         (self.dir / "logs").mkdir()
         fs.RotatingLog(self.dir / "logs" / "service.log").write("info", "one")

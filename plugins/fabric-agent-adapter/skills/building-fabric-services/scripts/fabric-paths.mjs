@@ -1,5 +1,5 @@
 // Where a service's things live (fabric-service/0.1): the services directory, its data, config, logs and run dirs per OS, private dirs, atomic writes.
-// Part of the Node service kit (FAA-65, layer L3); the twin of fabric_paths.py. Node 20+, no dependency.
+// Part of the Node service kit (FAA-65, layer L1); the twin of fabric_paths.py. Node 20+, no dependency.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -51,19 +51,21 @@ export function atomicWrite(file, data, mode = 0o600) {
   const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(4).toString('hex')}`);
   const fd = fs.openSync(tmp, 'wx', mode);
   try {
-    // On Windows the file's ACL is its privacy (DEC-0032): set explicitly and protected — before the bytes go in —
-    // so it does not depend on what the folder hands down. A rename keeps it.
-    if (process.platform === 'win32') windowsProtect(tmp, { folder: false });
-    fs.writeSync(fd, data);
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-  try {
+    try {
+      // On Windows the file's ACL is its privacy (DEC-0032): set explicitly and protected — before the bytes go in —
+      // so it does not depend on what the folder hands down. A rename keeps it.
+      if (process.platform === 'win32') windowsProtect(tmp, { folder: false });
+      fs.writeSync(fd, data);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
     if (process.platform !== 'win32') fs.chmodSync(tmp, mode);
     fs.renameSync(tmp, file);
   } catch (error) {
-    fs.rmSync(tmp, { force: true });
+    // Whatever failed, no half-written file is left beside the real one, and a failed cleanup never replaces the
+    // error that caused it (FAA-85).
+    try { fs.rmSync(tmp, { force: true }); } catch { /* the original error is the one to report */ }
     throw error;
   }
 }

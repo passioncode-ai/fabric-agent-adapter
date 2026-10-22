@@ -21,10 +21,8 @@ import http.client
 import ipaddress
 import json
 import math
-import os
 from pathlib import Path
 import re
-import secrets
 import threading
 import time
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
@@ -46,6 +44,7 @@ from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
     MISSING as _MISSING,
     jcs,
 )
+from fabric_paths import atomic_write as _atomic_write  # noqa: E402 - the kit's private writer (FAA-85)
 
 REFUSAL_CODES = (
     "unauthenticated", "token-expired", "wrong-audience", "scope-not-granted", "effect-above-ceiling", "no-grant",
@@ -484,7 +483,7 @@ class JtiStoreError(RuntimeError):
 
 
 class FileJtiStore:
-    """Consumed approval ids in a 0600 JSON file, so a second use is refused across a restart (DL-18). One
+    """Consumed approval ids in an owner-only JSON file, so a second use is refused across a restart (DL-18). One
     service instance writes it (the kit's instance lock keeps other processes out); threads are serialised."""
 
     _locks: Dict[str, threading.Lock] = {}
@@ -511,14 +510,9 @@ class FileJtiStore:
             if jti in seen:
                 return False
             seen[jti] = expires_at
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temp = self.path.with_name(".%s.%s.tmp" % (self.path.name, secrets.token_hex(4)))
-            fd = os.open(str(temp), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(fd, "w") as handle:
-                json.dump(seen, handle)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(str(temp), str(self.path))
+            # The kit's private writer: owner-only (0600; on Windows a protected ACL before the bytes, DEC-0032),
+            # fsynced, renamed into place, and no temporary file left when it fails (FAA-85).
+            _atomic_write(self.path, json.dumps(seen).encode("utf-8"))
             return True
 
 

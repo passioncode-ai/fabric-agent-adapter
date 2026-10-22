@@ -60,6 +60,32 @@ test("the contract's canonical vectors (DEC-0043)", () => {
   for (const v of doc.refuses) assert.throws(() => d.jcs('inputJson' in v ? JSON.parse(v.inputJson) : double(v.ieee754)), TypeError, v.name);
 });
 
+test('the file jti store writes with the kit\'s private writer: a failed write leaves no temporary file (FAA-85)', () => {
+  for (const step of ['writeSync', 'fsyncSync', 'renameSync']) {
+    const dir = tempDir('jti-');
+    const real = fs[step];
+    fs[step] = () => { const e = new Error(`refused ${step}`); e.code = 'EPERM'; throw e; };
+    try {
+      assert.throws(() => new d.FileJtiStore(path.join(dir, 'jti.json')).consume('a', 1000, 10), /refused/, step);
+    } finally {
+      fs[step] = real;
+    }
+    assert.deepEqual(fs.readdirSync(dir), [], step);
+  }
+});
+
+test('a failed cleanup does not replace the error that caused it (FAA-85)', () => {
+  const dir = tempDir('jti-');
+  const [write, rm] = [fs.writeSync, fs.rmSync];
+  fs.writeSync = () => { throw new Error('refused write'); };
+  fs.rmSync = () => { throw new Error('refused remove'); };
+  try {
+    assert.throws(() => new d.FileJtiStore(path.join(dir, 'jti.json')).consume('a', 1000, 10), /refused write/);
+  } finally {
+    [fs.writeSync, fs.rmSync] = [write, rm];
+  }
+});
+
 test('jti stores: memory prunes, the file store survives a restart, the store is required', () => {
   const mem = d.createMemoryJtiStore();
   assert.equal(mem.consume('a', 100, 50), true);

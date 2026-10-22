@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.44.2 (2026-10-22)
+
+### Fixed
+
+- **The consumed-approval file is written with the kit's private writer** (FAA-85). `FileJtiStore` in both twins
+  opened its file with a plain 0600 mode and set no Windows ACL, so on Windows its privacy rested on its folder alone,
+  and a write that failed left its temporary file behind. It now writes through `fabric_paths.atomic_write` /
+  `atomicWrite`: a protected owner-only ACL before the bytes on Windows (DEC-0032), 0600 elsewhere, fsynced and renamed
+  into place, nothing left on failure. The file holds consumed approval ids, not a secret.
+- **The kit's private writer removes its temporary file whatever fails, and reports the error that caused it**
+  (FAA-85, found by the blind readings). Node `atomicWrite` cleaned up only when chmod or the rename failed; a failure
+  while setting the Windows ACL, writing or syncing left `.<name>.<pid>.<hex>` beside the real file. Python
+  `atomic_write` set the Windows ACL before it wrapped the file's handle, so when that step failed the handle stayed
+  open, Windows could not delete the file, and the delete's error replaced the ACL's. Both now close the file on every
+  path, remove it, and raise the original error even when the removal fails.
+
+### Changed
+
+- `fabric_base`, `fabric_platform` and `fabric_paths` (and their Node twins) move from layer L3 to L1 in `kit.json`, so
+  the L2 modules may use them: their code and names are unchanged. `fabric_delegation` now imports `fabric_paths`, so
+  a service that copies `fabric_delegation` by hand copies `fabric_base`, `fabric_platform` and `fabric_paths` too
+  (`fabric_kit.py install` and `status` name them).
+
 ## 0.44.1 (2026-10-22)
 
 ### Changed

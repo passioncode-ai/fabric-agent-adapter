@@ -1,5 +1,5 @@
 """Where a service's things live (fabric-service/0.1): the services directory, a service's data, config, logs and run
-directories per OS, private directories and atomic writes. Part of the service kit (FAA-65, layer L3)."""
+directories per OS, private directories and atomic writes. Part of the service kit (FAA-65, layer L1)."""
 from __future__ import annotations
 
 import os
@@ -83,11 +83,11 @@ def atomic_write(path: Path, data: bytes, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix="." + path.name + ".", dir=str(path.parent))
     try:
-        if WINDOWS:
-            # The file's ACL is its privacy (DEC-0032): set explicitly and protected — before the bytes go in — so
-            # it does not depend on what the folder hands down. A rename keeps it.
-            _win_protect(Path(tmp), folder=False)
-        with os.fdopen(fd, "wb") as handle:
+        with os.fdopen(fd, "wb") as handle:  # closed on every path: Windows cannot delete a file still open
+            if WINDOWS:
+                # The file's ACL is its privacy (DEC-0032): set explicitly and protected — before the bytes go in —
+                # so it does not depend on what the folder hands down. A rename keeps it.
+                _win_protect(Path(tmp), folder=False)
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
@@ -97,6 +97,6 @@ def atomic_write(path: Path, data: bytes, mode: int = 0o600) -> None:
     except BaseException:
         try:
             os.unlink(tmp)
-        except FileNotFoundError:
-            pass
+        except OSError:
+            pass  # the error that got us here is the one to report, not a failed cleanup (FAA-85)
         raise

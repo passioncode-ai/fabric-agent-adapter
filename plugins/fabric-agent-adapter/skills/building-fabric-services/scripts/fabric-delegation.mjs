@@ -13,8 +13,8 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
-import path from 'node:path';
 import { hubKeyCertified } from './fabric-estate.mjs';
+import { atomicWrite } from './fabric-paths.mjs'; // the kit's private writer (FAA-85)
 
 export const REFUSAL_CODES = Object.freeze([
   'unauthenticated', 'token-expired', 'wrong-audience', 'scope-not-granted', 'effect-above-ceiling', 'no-grant',
@@ -347,7 +347,7 @@ export function createMemoryJtiStore() {
 export class JtiStoreError extends Error {}
 
 /**
- * Consumed approval ids in a 0600 JSON file, so a second use is refused across a restart (DL-18). A file that
+ * Consumed approval ids in an owner-only JSON file, so a second use is refused across a restart (DL-18). A file that
  * cannot be read throws JtiStoreError: forgetting every consumed id would let each approval be replayed.
  */
 export class FileJtiStore {
@@ -364,11 +364,9 @@ export class FileJtiStore {
     const seen = new Map(Object.entries(read).filter(([, until]) => typeof until === 'number' && until + LEEWAY_SECONDS >= now));
     if (seen.has(jti)) return false;
     seen.set(jti, expiresAt);
-    fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    const temp = path.join(path.dirname(this.file), `.${path.basename(this.file)}.${crypto.randomBytes(4).toString('hex')}.tmp`);
-    const fd = fs.openSync(temp, 'wx', 0o600);
-    try { fs.writeSync(fd, JSON.stringify(Object.fromEntries(seen))); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
-    fs.renameSync(temp, this.file);
+    // Owner-only (0600; on Windows a protected ACL before the bytes, DEC-0032), fsynced, renamed into place, and no
+    // temporary file left when it fails (FAA-85).
+    atomicWrite(this.file, JSON.stringify(Object.fromEntries(seen)));
     return true;
   }
 }
