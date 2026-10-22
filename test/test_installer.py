@@ -266,6 +266,23 @@ class ReplaceSafely(unittest.TestCase):
         again = run_pkg(self.pkg, self.home)
         self.assertIn("up to date", [l for l in again.stdout.splitlines() if str(self.hub / SKILLS[1]) in l][0])
 
+    def test_node_bytecode_an_installed_skill_left_is_still_up_to_date(self):
+        # FAA-80: an installed skill whose Python ran leaves scripts/__pycache__; the destination listing is read
+        # with the same filter as the source, so the next run does not call it "differs from this version".
+        first = run_pkg(self.pkg, self.home)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        for name in SKILLS:
+            where = self.hub / name / ("scripts" if (self.hub / name / "scripts").is_dir() else "")
+            (where / "__pycache__").mkdir(exist_ok=True)
+            (where / "__pycache__" / "x.cpython-39.pyc").write_bytes(b"\0")
+            (self.hub / name / "stray.pyc").write_bytes(b"\0")
+        again = run_pkg(self.pkg, self.home)
+        self.assertEqual(again.returncode, 0, again.stderr)
+        for name in SKILLS:
+            with self.subTest(name):
+                line = [l for l in again.stdout.splitlines() if str(self.hub / name) in l][0]
+                self.assertIn("up to date", line)
+
 
 if __name__ == "__main__":
     unittest.main()
