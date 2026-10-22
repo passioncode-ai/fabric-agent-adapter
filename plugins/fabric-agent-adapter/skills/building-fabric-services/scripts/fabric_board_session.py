@@ -896,8 +896,7 @@ class Responder:
 
     def _finish(self, work: _Work) -> None:
         entry = work.entry
-        if work.ctx.stopped.is_set():
-            # The attempt is no longer this session's: what happened to it is already recorded (_lose, _drop_session).
+        if work.ctx.stopped.is_set() and entry["request"] not in self.checkpoint.entries:
             self.current = None
             return
         outcome = work.outcome
@@ -929,7 +928,8 @@ class Responder:
         under the live fence. With nothing observed, `com.responder_replace` on this responder's own slot is the
         contract's lost-result operation ("an in_progress one becomes outcome_unknown ... when the next holder takes the
         slot", Slots end with the session); `com.reconcile` settles it once something is observed."""
-        state = self._read_state(entry)
+        lost = self.current is not None and self.current.ctx.stopped.is_set()  # the attempt is not live: nothing to settle
+        state = None if lost else self._read_state(entry)
         if state == "accepted":  # effect_begin was never stored, so nothing began: a known failure
             entry["effect"], entry["outcome"] = False, {"state": "failed_known", "observed": True, "summary": "The service could not do this (%s)." % code}
             self._complete(entry)

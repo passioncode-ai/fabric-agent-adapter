@@ -16,7 +16,8 @@ in `com.status`), `lift_holds_after` (a tool name: the board lifts every hold ri
 `held` once, so a test waits on the call itself, never on the wall clock).
 
 Python tests use it in-process (`FakeHub(root)`); the Node tests run it as a process (`python3 fake_fabric_hub.py
-serve --root DIR`), which prints one JSON line `{port, control}` and takes test commands as JSON on POST /_control.
+serve --root DIR`), which prints one JSON line `{port, control}` and takes test commands as JSON on POST /_control (`forget-sessions` ends every board session without its DELETE, so
+the slots it held lapse on their own).
 Standard library only."""
 from __future__ import annotations
 
@@ -679,6 +680,8 @@ class FakeHub:
         elif op == "end-sessions":
             for st in list(self.sessions.values()):
                 b.release(st["id"])
+            self.sessions.clear()
+        elif op == "forget-sessions":  # the sessions end but no DELETE arrives: their slots lapse on their own (FAA-77)
             self.sessions.clear()
         elif op != "state":
             return {"error": "unknown op %r" % op}
