@@ -5196,6 +5196,502 @@
         ],
         "cursor": null
       }
+    },
+    {
+      "name": "comms-list-unread-since",
+      "schema": "comms-list.schema.json",
+      "valid": true,
+      "document": {
+        "unread": true,
+        "since": "2026-10-21T00:00:00Z",
+        "limit": 100
+      }
+    },
+    {
+      "name": "comms-list-unread-string",
+      "schema": "comms-list.schema.json",
+      "valid": false,
+      "document": {
+        "unread": "yes"
+      }
+    },
+    {
+      "name": "comms-read-ack-one",
+      "schema": "comms-read-ack.schema.json",
+      "valid": true,
+      "document": {
+        "message": "msg_K9j8H7g6F5"
+      }
+    },
+    {
+      "name": "comms-read-ack-messages",
+      "schema": "comms-read-ack.schema.json",
+      "valid": true,
+      "document": {
+        "messages": [
+          "msg_K9j8H7g6F5",
+          "msg_Q2w3e4r5t6"
+        ]
+      }
+    },
+    {
+      "name": "comms-read-ack-thread",
+      "schema": "comms-read-ack.schema.json",
+      "valid": true,
+      "document": {
+        "thread": "thr_Q1w2E3r4T5",
+        "upTo": "msg_K9j8H7g6F5"
+      }
+    },
+    {
+      "name": "comms-read-ack-too-many",
+      "schema": "comms-read-ack.schema.json",
+      "valid": false,
+      "document": {
+        "messages": [
+          "msg_0000000000",
+          "msg_0000000001",
+          "msg_0000000002",
+          "msg_0000000003",
+          "msg_0000000004",
+          "msg_0000000005",
+          "msg_0000000006",
+          "msg_0000000007",
+          "msg_0000000008",
+          "msg_0000000009",
+          "msg_0000000010",
+          "msg_0000000011",
+          "msg_0000000012",
+          "msg_0000000013",
+          "msg_0000000014",
+          "msg_0000000015",
+          "msg_0000000016",
+          "msg_0000000017",
+          "msg_0000000018",
+          "msg_0000000019",
+          "msg_0000000020",
+          "msg_0000000021",
+          "msg_0000000022",
+          "msg_0000000023",
+          "msg_0000000024",
+          "msg_0000000025",
+          "msg_0000000026",
+          "msg_0000000027",
+          "msg_0000000028",
+          "msg_0000000029",
+          "msg_0000000030",
+          "msg_0000000031",
+          "msg_0000000032",
+          "msg_0000000033",
+          "msg_0000000034",
+          "msg_0000000035",
+          "msg_0000000036",
+          "msg_0000000037",
+          "msg_0000000038",
+          "msg_0000000039",
+          "msg_0000000040",
+          "msg_0000000041",
+          "msg_0000000042",
+          "msg_0000000043",
+          "msg_0000000044",
+          "msg_0000000045",
+          "msg_0000000046",
+          "msg_0000000047",
+          "msg_0000000048",
+          "msg_0000000049",
+          "msg_0000000050",
+          "msg_0000000051",
+          "msg_0000000052",
+          "msg_0000000053",
+          "msg_0000000054",
+          "msg_0000000055",
+          "msg_0000000056",
+          "msg_0000000057",
+          "msg_0000000058",
+          "msg_0000000059",
+          "msg_0000000060",
+          "msg_0000000061",
+          "msg_0000000062",
+          "msg_0000000063",
+          "msg_0000000064",
+          "msg_0000000065",
+          "msg_0000000066",
+          "msg_0000000067",
+          "msg_0000000068",
+          "msg_0000000069",
+          "msg_0000000070",
+          "msg_0000000071",
+          "msg_0000000072",
+          "msg_0000000073",
+          "msg_0000000074",
+          "msg_0000000075",
+          "msg_0000000076",
+          "msg_0000000077",
+          "msg_0000000078",
+          "msg_0000000079",
+          "msg_0000000080",
+          "msg_0000000081",
+          "msg_0000000082",
+          "msg_0000000083",
+          "msg_0000000084",
+          "msg_0000000085",
+          "msg_0000000086",
+          "msg_0000000087",
+          "msg_0000000088",
+          "msg_0000000089",
+          "msg_0000000090",
+          "msg_0000000091",
+          "msg_0000000092",
+          "msg_0000000093",
+          "msg_0000000094",
+          "msg_0000000095",
+          "msg_0000000096",
+          "msg_0000000097",
+          "msg_0000000098",
+          "msg_0000000099",
+          "msg_0000000100"
+        ]
+      }
+    },
+    {
+      "name": "comms-read-ack-two-forms",
+      "schema": "comms-read-ack.schema.json",
+      "valid": false,
+      "document": {
+        "messages": [
+          "msg_K9j8H7g6F5"
+        ],
+        "thread": "thr_Q1w2E3r4T5",
+        "upTo": "msg_K9j8H7g6F5"
+      }
+    },
+    {
+      "name": "comms-read-ack-repeated-message",
+      "schema": "comms-read-ack.schema.json",
+      "valid": false,
+      "document": {
+        "messages": [
+          "msg_K9j8H7g6F5",
+          "msg_K9j8H7g6F5"
+        ]
+      }
+    },
+    {
+      "name": "comms-receipt-read-ack-thread",
+      "schema": "comms-receipt.schema.json",
+      "valid": true,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "marked": 1000,
+        "alreadyRead": 0,
+        "at": "2026-10-22T12:00:00Z",
+        "more": true
+      }
+    },
+    {
+      "name": "comms-receipt-more-false",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "marked": 3,
+        "alreadyRead": 0,
+        "more": false
+      }
+    },
+    {
+      "name": "comms-receipt-submit-no-responder",
+      "schema": "comms-receipt.schema.json",
+      "valid": true,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "message": "msg_K9j8H7g6F5",
+        "thread": "thr_Q1w2E3r4T5",
+        "at": "2026-10-12T10:00:00Z",
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "queued",
+          "effect": "not_started",
+          "revision": 1
+        },
+        "noResponder": {
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "message": "No agent answers this capability for that Project now; a reply from it answers the request."
+        }
+      }
+    },
+    {
+      "name": "comms-receipt-no-responder-without-message",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "message": "msg_K9j8H7g6F5",
+        "thread": "thr_Q1w2E3r4T5",
+        "at": "2026-10-12T10:00:00Z",
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "queued",
+          "effect": "not_started",
+          "revision": 1
+        },
+        "noResponder": {
+          "target": "proj-analytics",
+          "capability": "analytics.retention"
+        }
+      }
+    },
+    {
+      "name": "comms-message-request-answered",
+      "schema": "comms-message.schema.json",
+      "valid": true,
+      "document": {
+        "id": "msg_Q2w3e4r5t6",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "request",
+        "sender": {
+          "project": "proj-growth",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_growth_01",
+            "label": "Growth agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-04T15:00:00Z",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "body": {
+          "text": "Please publish release 1.4.2 of the iOS app."
+        },
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "state": "answered",
+          "effect": "not_started",
+          "revision": 2
+        },
+        "read": true
+      }
+    },
+    {
+      "name": "comms-reply-reaction-row",
+      "schema": "comms-reply.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-12-0001"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "row CT-81, merged by 2026-10-24."
+        },
+        "reaction": {
+          "type": "row",
+          "ref": "CT-81",
+          "due": "2026-10-24"
+        }
+      }
+    },
+    {
+      "name": "comms-reply-reaction-row-without-due",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-12-0001"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "row CT-81, merged by 2026-10-24."
+        },
+        "reaction": {
+          "type": "row",
+          "ref": "CT-81"
+        }
+      }
+    },
+    {
+      "name": "comms-reply-reaction-due-on-adapted",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-12-0001"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "row CT-81, merged by 2026-10-24."
+        },
+        "reaction": {
+          "type": "adapted",
+          "ref": "bfa9a67",
+          "due": "2026-10-24"
+        }
+      }
+    },
+    {
+      "name": "comms-reply-reaction-adapted-without-ref",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-12-0001"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "row CT-81, merged by 2026-10-24."
+        },
+        "reaction": {
+          "type": "adapted"
+        }
+      }
+    },
+    {
+      "name": "comms-reply-reaction-unknown-type",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-12-0001"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "row CT-81, merged by 2026-10-24."
+        },
+        "reaction": {
+          "type": "approved",
+          "ref": "x"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-reply-reaction",
+      "schema": "comms-submit.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-04-0002"
+        },
+        "thread": {
+          "id": "thr_8Hc2kQ9xA1"
+        },
+        "kind": "reply",
+        "replyTo": "msg_Q2w3e4r5t6",
+        "body": {
+          "text": "Done: 41.2 % on 2026-09-27 cohort, query attached."
+        },
+        "artifacts": [
+          {
+            "id": "https://example.com/artifacts/retention.sql",
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "label": "retention.sql"
+          }
+        ],
+        "reaction": {
+          "type": "not-affected"
+        }
+      }
+    },
+    {
+      "name": "comms-submit-reaction-on-message",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-04-0002"
+        },
+        "thread": {
+          "id": "thr_8Hc2kQ9xA1"
+        },
+        "kind": "message",
+        "body": {
+          "text": "Done: 41.2 % on 2026-09-27 cohort, query attached."
+        },
+        "artifacts": [
+          {
+            "id": "https://example.com/artifacts/retention.sql",
+            "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "label": "retention.sql"
+          }
+        ],
+        "reaction": {
+          "type": "not-affected"
+        }
+      }
+    },
+    {
+      "name": "comms-host-wait",
+      "schema": "comms-host-wait.schema.json",
+      "valid": true,
+      "document": {
+        "error": "Fabric is starting its database; call again in 12 seconds.",
+        "code": "stack-starting",
+        "retryable": true
+      }
+    },
+    {
+      "name": "comms-host-wait-unknown-code",
+      "schema": "comms-host-wait.schema.json",
+      "valid": false,
+      "document": {
+        "error": "down",
+        "code": "maintenance",
+        "retryable": true
+      }
+    },
+    {
+      "name": "comms-read-ack-empty",
+      "schema": "comms-read-ack.schema.json",
+      "valid": false,
+      "document": {
+        "messages": []
+      }
+    },
+    {
+      "name": "comms-host-wait-not-retryable",
+      "schema": "comms-host-wait.schema.json",
+      "valid": false,
+      "document": {
+        "error": "Fabric lost its database.",
+        "code": "stack-unavailable",
+        "retryable": false
+      }
+    },
+    {
+      "name": "comms-receipt-no-responder-long-message",
+      "schema": "comms-receipt.schema.json",
+      "valid": false,
+      "document": {
+        "ok": true,
+        "repeated": false,
+        "message": "msg_K9j8H7g6F5",
+        "thread": "thr_Q1w2E3r4T5",
+        "at": "2026-10-12T10:00:00Z",
+        "request": {
+          "id": "req_A1b2C3d4E5",
+          "state": "queued",
+          "effect": "not_started",
+          "revision": 1
+        },
+        "noResponder": {
+          "target": "proj-analytics",
+          "capability": "analytics.retention",
+          "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      }
     }
   ],
   "digests": [

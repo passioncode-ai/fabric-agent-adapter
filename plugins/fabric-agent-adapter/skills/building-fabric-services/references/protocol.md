@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `bfa9a67aa3c6cb808c093e7d83cd59799f1ee7d0`
+Pinned to `fabric-agent-contract` commit `e742016dc396aa31e5a13a893489e43f15786c69`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -41,7 +41,7 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `source.repository`, `fabricManifest` | optional |
 | `installedAt`, `installedBy` | when, and who installed it: the installer and its version as a string, or `{by, role?, tool}` (DEC-0061): `by` `person` (with `role` `operator` or `administrator`), `node` or `organization`; `role` for a person only; `tool` the installer and its version. It names a role, never a person. An app's descriptor uses the object form with `by: "person"`. `register_remote` / `registerRemote` and the sample write the object form |
 | `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none`: a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
-| `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed` or `personal`; `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
+| `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed`, `personal` or `processor-hosted` (an organization's cloud a processor runs under a processing agreement, DEC-0099); `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
 
 ## Identifier equality (DEC-0076)
 

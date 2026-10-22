@@ -31,7 +31,7 @@ def fixture(name):
 class ContractFixtures(unittest.TestCase):
     def test_every_valid_descriptor_is_accepted(self):
         valid = [d for d in FIX["descriptors"] if d["valid"]]
-        self.assertEqual(len(valid), 10)
+        self.assertEqual(len(valid), 11)
         for d in valid:
             with self.subTest(d["name"]):
                 self.assertEqual(fs.validate_descriptor(d["descriptor"]), [])

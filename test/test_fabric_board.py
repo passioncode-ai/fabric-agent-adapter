@@ -73,6 +73,16 @@ class ShapeTests(unittest.TestCase):
         twice = dict(doc, transferred=[doc["transferred"][0], doc["transferred"][0]])
         self.assertTrue(any("each request once" in p for p in fb.receipt_problems(twice, "com.responder_replace")))
 
+    def test_read_ack_counts_and_no_responder_answer_their_own_call_only(self):
+        """DEC-0098: marked, alreadyRead and more answer com.read_ack; noResponder answers a request's com.submit."""
+        ack = FIXTURES["comms-receipt-read-ack-thread"]["document"]
+        self.assertEqual(fb.receipt_problems(ack, "com.read_ack"), [])
+        self.assertTrue(any("com.read_ack only" in p for p in fb.receipt_problems(ack, "com.submit")))
+        submit = FIXTURES["comms-receipt-submit-no-responder"]["document"]
+        self.assertEqual(fb.receipt_problems(submit, "com.submit"), [])
+        self.assertTrue(any("com.submit only" in p for p in fb.receipt_problems(submit, "com.reply")))
+        self.assertEqual(fb.receipt_problems(dict(ack, marked=-1), "com.read_ack"), ["/marked is an integer ≥ 0"])
+
     def test_refusals_as_the_catalogue_says(self):
         for f in COMMS["fixtures"]:
             if f["schema"] == "comms-refusal.schema.json":
@@ -515,6 +525,36 @@ class RestartTests(Conversation):
         self.assertNotIn("com.reconcile", self.tools())
         self.assertEqual(self.checkpoint()[rid]["step"], "unknown")
         self.assertIn("board.reconcile.needed", self.kinds())
+
+    def test_a_request_answered_while_the_responder_was_down_leaves_the_checkpoint(self):
+        """DEC-0098, DEC-0102: the process dies between com.claim and com.accept (in its input gate), the claim returns
+        to the queue and the target's participant reply answers it (queued -> answered, the only way in). It is no
+        longer this responder's: the restarted responder drops it and reconciles nothing (FAA-100)."""
+        inside, never = threading.Event(), threading.Event()
+        self.addCleanup(never.set)
+
+        def gate(request):
+            inside.set()
+            never.wait(10)
+            raise Stopped()
+        self.gate = gate
+        rid = self.board.queue("video.render")
+        threading.Thread(target=self.responder().step, daemon=True).start()
+        self.assertTrue(inside.wait(5))
+        self.assertEqual(self.checkpoint()[rid]["step"], "claimed")
+        self.hub.control({"op": "end-sessions"})
+        self.assertNotIn("error", self.hub.control({"op": "requeue", "request": rid}))
+        self.assertNotIn("error", self.hub.control({"op": "answer", "request": rid}))
+        self.gate = lambda request: None
+        second = self.responder()
+        second.step()
+        self.assertEqual(self.board.requests[rid]["state"], "answered")
+        self.assertEqual(self.checkpoint(), {})
+        self.assertNotIn("com.reconcile", self.tools())
+
+    def test_the_fake_board_answers_only_a_queued_request(self):
+        rid, _ = self._crash_after(effect=False)
+        self.assertIn("error", self.hub.control({"op": "answer", "request": rid}))  # accepted stays held, never answered
 
     def test_accepted_work_is_transferred_and_finished(self):
         rid, _ = self._crash_after(effect=False)

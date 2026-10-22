@@ -99,6 +99,14 @@ test('receipts, refusals and directory pages as the catalogue says', () => {
   assert.deepEqual(fb.receiptProblems(replace, 'com.responder_replace'), []);
   assert.ok(fb.receiptProblems(replace, 'com.claim').length);
   assert.ok(fb.receiptProblems({ ...replace, transferred: [replace.transferred[0], replace.transferred[0]] }, 'com.responder_replace').some((p) => p.includes('each request once')));
+  // DEC-0098: marked, alreadyRead and more answer com.read_ack; noResponder answers a request's com.submit.
+  const ack = FIXTURES['comms-receipt-read-ack-thread'].document;
+  assert.deepEqual(fb.receiptProblems(ack, 'com.read_ack'), []);
+  assert.ok(fb.receiptProblems(ack, 'com.submit').some((p) => p.includes('com.read_ack only')));
+  const submit = FIXTURES['comms-receipt-submit-no-responder'].document;
+  assert.deepEqual(fb.receiptProblems(submit, 'com.submit'), []);
+  assert.ok(fb.receiptProblems(submit, 'com.reply').some((p) => p.includes('com.submit only')));
+  assert.deepEqual(fb.receiptProblems({ ...ack, marked: -1 }, 'com.read_ack'), ['/marked is an integer ≥ 0']);
 });
 
 test('FAC-SEM-107: findings equal the contract, find_project refuses a page that lists one twice and compares as written (FAA-40)', () => {
@@ -302,6 +310,27 @@ test('Fabric down: bounded backoff, one event, then recovery', async (t) => {
   const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
   await r.step();
   assert.equal((await h.state()).requests[rid].state, 'completed');
+});
+
+test('restart: a request answered while the responder was down leaves the checkpoint (DEC-0098, DEC-0102, FAA-100)', async (t) => {
+  // The process dies between com.claim and com.accept (in its input gate), the claim returns to the queue and the
+  // target's participant reply answers it (queued -> answered, the only way in): it is no longer this responder's.
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.gate = () => new Promise(() => {});
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  h.responder().step(); // never settles: the "dead" process
+  for (let i = 0; i < 200 && h.checkpoint()[rid]?.step !== 'claimed'; i += 1) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(h.checkpoint()[rid].step, 'claimed');
+  await hub.control({ op: 'end-sessions' });
+  assert.ok(!('error' in await hub.control({ op: 'requeue', request: rid })));
+  assert.ok(!('error' in await hub.control({ op: 'answer', request: rid })));
+  h.gate = () => null;
+  await h.responder().step();
+  const s = await h.state();
+  assert.equal(s.requests[rid].state, 'answered');
+  assert.deepEqual(h.checkpoint(), {});
+  assert.ok(!s.calls.includes('com.reconcile'));
 });
 
 test('restart: accepted work transferred and finished; without transferred it stays held; in-progress reconciled', async (t) => {

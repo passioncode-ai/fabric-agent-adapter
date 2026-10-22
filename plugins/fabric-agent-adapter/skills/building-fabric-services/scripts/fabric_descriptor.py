@@ -285,8 +285,8 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("peer.endpoint is https://<dns-name>[:<port>][/<path>], no query, fragment, userinfo or IP literal")
         elif _RESERVED_HOST.search(match.group("host")):
             problems.append("FAC-SEM-085: a service offered to others cannot be reached at the reserved name %s" % match.group("host"))
-        if peer.get("custody") not in ("organization-managed", "personal"):
-            problems.append("peer.custody is organization-managed or personal")
+        if peer.get("custody") not in ("organization-managed", "personal", "processor-hosted"):  # processor-hosted: DEC-0099
+            problems.append("peer.custody is organization-managed, personal or processor-hosted")
         residency = peer.get("residency")
         if (not isinstance(residency, list) or not 1 <= len(residency) <= 32 or len(set(map(json.dumps, residency))) != len(residency)
                 or not all(isinstance(r, str) and _RESIDENCY.match(r) for r in residency)):

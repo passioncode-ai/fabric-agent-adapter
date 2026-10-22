@@ -46,8 +46,9 @@ REFUSAL_CODES = frozenset(["invalid_arguments", "body_too_large", "not_authorize
                            "cursor_reset_required", "immutable_participants", "held"])
 
 
+#: answered (DEC-0098, DEC-0102): the target Project's participant message answered it; never a responder's fenced reply.
 REQUEST_STATES = ("queued", "claimed", "accepted", "in_progress", "completed", "failed_known", "cancelled", "expired",
-                  "outcome_unknown")
+                  "outcome_unknown", "answered")
 
 
 EFFECT_STATES = ("not_started", "started", "succeeded_observed", "failed_observed", "unknown")
@@ -176,7 +177,8 @@ def receipt_problems(value: Any, op: Optional[str] = None) -> List[str]:
     """`comms-receipt.schema.json` at the pin, closed at every level (a seq or a holder is refused, C3), plus what a
     schema cannot say: `transferred` answers only `com.responder_replace` (DEC-0078) and names each request once."""
     problems: List[str] = []
-    allowed = ("ok", "repeated", "message", "thread", "at", "request", "slot", "attempt", "transferred")
+    allowed = ("ok", "repeated", "message", "thread", "at", "request", "slot", "attempt", "transferred", "marked",
+               "alreadyRead", "more", "noResponder")
     if not _closed(value, "", ("ok", "repeated"), allowed, problems):
         return problems
     if value.get("ok") is not True:
@@ -241,6 +243,27 @@ def receipt_problems(value: Any, op: Optional[str] = None) -> List[str]:
                     if not _is_int(item.get("revision"), 1):
                         problems.append("%s/revision is an integer ≥ 1" % at)
                     _attempt_problems(item.get("attempt"), at + "/attempt", problems)
+    # DEC-0098: a bulk com.read_ack counts what it marked; `more` is present only as true (more than 1000 qualified).
+    for key in ("marked", "alreadyRead"):
+        if key in value and not _is_int(value[key], 0):
+            problems.append("/%s is an integer ≥ 0" % key)
+    if "more" in value and value["more"] is not True:
+        problems.append("/more is true when present")
+    if op is not None and any(k in value for k in ("marked", "alreadyRead", "more")) and op != "com.read_ack":
+        problems.append("/marked, /alreadyRead and /more answer com.read_ack only (DEC-0098)")
+    if "noResponder" in value:
+        # DEC-0098: only in the requester's own com.submit receipt for a request; the request is stored all the same.
+        n = value["noResponder"]
+        if op is not None and op != "com.submit":
+            problems.append("/noResponder answers com.submit only (DEC-0098)")
+        keys = ("target", "capability", "message")
+        if _closed(n, "/noResponder", keys, keys, problems):
+            if not (isinstance(n.get("target"), str) and _PROJECT.fullmatch(n["target"])):
+                problems.append("/noResponder/target is a Project id")
+            if not (isinstance(n.get("capability"), str) and _CAPABILITY.fullmatch(n["capability"])):
+                problems.append("/noResponder/capability is a capability name")
+            if not (isinstance(n.get("message"), str) and 1 <= len(n["message"]) <= 300):
+                problems.append("/noResponder/message is 1 to 300 characters")
     return problems
 
 

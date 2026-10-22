@@ -20,7 +20,7 @@ const temp = () => tempDir('fabric-descriptors-');
 
 test('every valid descriptor is accepted; every invalid one is refused but the local channel', () => {
   const valid = FIX.descriptors.filter((d) => d.valid);
-  assert.equal(valid.length, 10);
+  assert.equal(valid.length, 11);
   for (const d of valid) assert.deepEqual(k.validateDescriptor(d.descriptor), [], d.name);
   const accepted = FIX.descriptors.filter((d) => !d.valid && k.validateDescriptor(d.descriptor).length === 0).map((d) => d.name).sort();
   assert.deepEqual(accepted, LOCAL_CHANNEL);

@@ -39,7 +39,8 @@ export const REFUSAL_CODES = Object.freeze(new Set(['invalid_arguments', 'body_t
   'capacity_exceeded', 'digest_conflict', 'revision_conflict', 'fenced', 'lease_expired', 'invalid_transition', 'reconcile_required',
   'observation_required', 'cursor_reset_required', 'immutable_participants', 'held']));
 
-export const REQUEST_STATES = ['queued', 'claimed', 'accepted', 'in_progress', 'completed', 'failed_known', 'cancelled', 'expired', 'outcome_unknown'];
+// answered (DEC-0098, DEC-0102): the target Project's participant message answered it; never a responder's fenced reply.
+export const REQUEST_STATES = ['queued', 'claimed', 'accepted', 'in_progress', 'completed', 'failed_known', 'cancelled', 'expired', 'outcome_unknown', 'answered'];
 
 const EFFECT_STATES = ['not_started', 'started', 'succeeded_observed', 'failed_observed', 'unknown'];
 
@@ -139,7 +140,7 @@ function attemptProblems(a, at, problems) {
 /** comms-receipt at the pin, closed at every level; transferred answers com.responder_replace only, each request once. */
 export function receiptProblems(value, op) {
   const problems = [];
-  const allowed = ['ok', 'repeated', 'message', 'thread', 'at', 'request', 'slot', 'attempt', 'transferred'];
+  const allowed = ['ok', 'repeated', 'message', 'thread', 'at', 'request', 'slot', 'attempt', 'transferred', 'marked', 'alreadyRead', 'more', 'noResponder'];
   if (!closed(value, '', ['ok', 'repeated'], allowed, problems)) return problems;
   if (value.ok !== true) problems.push('/ok is true');
   if (typeof value.repeated !== 'boolean') problems.push('/repeated is a boolean');
@@ -187,6 +188,21 @@ export function receiptProblems(value, op) {
         if (!isInt(item.revision, 1)) problems.push(`${at}/revision is an integer ≥ 1`);
         attemptProblems(item.attempt, `${at}/attempt`, problems);
       });
+    }
+  }
+  // DEC-0098: a bulk com.read_ack counts what it marked; `more` is present only as true (more than 1000 qualified).
+  for (const k of ['marked', 'alreadyRead']) if (k in value && !isInt(value[k], 0)) problems.push(`/${k} is an integer ≥ 0`);
+  if ('more' in value && value.more !== true) problems.push('/more is true when present');
+  if (op !== undefined && ['marked', 'alreadyRead', 'more'].some((k) => k in value) && op !== 'com.read_ack') problems.push('/marked, /alreadyRead and /more answer com.read_ack only (DEC-0098)');
+  if ('noResponder' in value) {
+    // DEC-0098: only in the requester's own com.submit receipt for a request; the request is stored all the same.
+    const n = value.noResponder;
+    if (op !== undefined && op !== 'com.submit') problems.push('/noResponder answers com.submit only (DEC-0098)');
+    const keys = ['target', 'capability', 'message'];
+    if (closed(n, '/noResponder', keys, keys, problems)) {
+      if (!str(n.target, PROJECT)) problems.push('/noResponder/target is a Project id');
+      if (!str(n.capability, CAPABILITY)) problems.push('/noResponder/capability is a capability name');
+      if (!(typeof n.message === 'string' && [...n.message].length >= 1 && [...n.message].length <= 300)) problems.push('/noResponder/message is 1 to 300 characters');
     }
   }
   return problems;
