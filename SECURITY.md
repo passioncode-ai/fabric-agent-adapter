@@ -15,9 +15,23 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   refused while the plugin is installed; `--prune-shadow` moves shadowing copies into
   `~/.claude/skills-shadow-backup/`.
 - `building-fabric-services/scripts/check_service.py` reads a descriptor and the token
-  file it names, talks only to `127.0.0.1:<port>`, and redeems one login code it asked
-  for itself (creating one dashboard session). It never prints the token.
+  file it names, and redeems one login code it asked for itself (creating one dashboard
+  session). It never prints the token. For a local service it talks only to
+  `127.0.0.1:<port>`; for a remote placement it talks to the service's own `https` origin
+  named in the descriptor (`--ca-file` and `--connect` only change which CA it trusts and
+  which address it dials, for tests).
 - The service kits create the service token (0600) and the instance lock in the
-  service's own data directory, and write a launchd plist and a descriptor only when an
-  installer calls them. The token is readable by any process of the same user; the
-  protocol defends against web pages and mistakes, not against hostile local code.
+  service's own data directory, and write supervisor files only when an installer calls
+  them: a launchd plist in `~/Library/LaunchAgents` (macOS), a systemd user unit (Linux) or
+  a per-user Scheduled Task (Windows), plus one descriptor in the services directory. The
+  token is readable by any process of the same user; the protocol defends against web pages
+  and mistakes, not against hostile local code.
+- The kits' connectors (`fabric_http`, `fabric_openrouter` and their Node twins) reach the
+  external APIs the service's author configures, such as OpenRouter, with keys the service
+  reads by name at run time; the kit itself calls no outside host on its own. A board
+  responder talks only to Fabric's hub on loopback.
+- `adapting-projects-to-fabric/scripts/adapt_project.py` reads the target project without
+  executing it and writes only the seven documented bundle paths (`scaffold --dry-run`
+  writes nothing); `check --contract` runs the contract checkout's own
+  `node_modules/.bin/tsx` and installs nothing. `fabric_provider.py write` writes one
+  entry (0600) in the providers directory.

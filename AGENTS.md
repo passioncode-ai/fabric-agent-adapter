@@ -41,8 +41,11 @@ claude plugin validate . --strict
 ```
 
 `npm test` runs the first two plus `node --test 'test/*.test.mjs'`. `python3 test/validate.py --frontmatter
-<SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs all four in two jobs
-(`python`, `claude-plugin`). `.github/workflows/release.yml` validates, creates a GitHub release
+<SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs them
+nightly on `main`, on a manual dispatch, and from `release.yml` before a publish; never on each push or pull request.
+Its jobs are `python`, `claude-plugin` and `windows`, plus the ones the CI batching change adds (the contract installed
+at the pin, and the Python 3.9 and Node floors); the file's own job list is the authority, not this line. A missing
+or billing-blocked run is not a green one. `.github/workflows/release.yml` validates, creates a GitHub release
 and publishes to npm on a `v*` tag, but only when the repository variables `RELEASE_ENABLED` and
 `PUBLISH_NPMJS` are `"true"`; off by default in a fork, both `true` here
 (`gh variable list -R passioncode-ai/fabric-agent-adapter`). MCP (register + proving call): the
@@ -60,7 +63,9 @@ with `--strict-mcp-config` and a temporary config.
   kit: `building-fabric-services/recipes/`. `fabric_session.py` in working-with-fabric is a facade over
   `fabric_session_{env,mcp,mail,hosts,cli}.py`; hooks and workers always run the facade.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
-  `test/evals/<skill>/`.
+  `test/evals/<skill>/`. `test/evals/run_evals.py` runs the trigger evals against a real client, only when asked
+  (`FABRIC_REAL_CLIENT=1` and `claude` on PATH); hosted CI holds no model credential and does not run it. Measured
+  runs are recorded under `docs/evidence/evals/`.
 - `docs/evidence/`: specs, plans, evals, reports and retrospectives. The scaffold's write set is
   declared in the [delivery brief](docs/evidence/specs/2026-08-27-brief.md).
 - `CHANGELOG.md`, `SECURITY.md` and `SKILL-CARD.md` sit at the root. This repository has no ADR
