@@ -20,6 +20,8 @@ concurrency:
   group: validate-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# In a test job every check after the first runs even when an earlier one failed (`!cancelled()`), so one red step
+# does not hide the others.
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -33,8 +35,10 @@ jobs:
         with:
           node-version: "22"
       - run: python3 -m unittest discover -s test -v
-      - run: python3 test/validate.py
-      - run: node --test 'test/*.test.mjs'
+      - if: ${{ !cancelled() }}
+        run: python3 test/validate.py
+      - if: ${{ !cancelled() }}
+        run: node --test 'test/*.test.mjs'
 
   # FAA-72: the floors the package promises, Python 3.9 (README, macOS's own python3) and Node 18
   # (package.json engines). Node 18 does not expand a --test glob itself, so the shell does.
@@ -52,8 +56,10 @@ jobs:
       - name: The Python suite on Python 3.9
         run: python3 -m unittest discover -s test -v
       - name: The structural validator on Python 3.9
+        if: ${{ !cancelled() }}
         run: python3 test/validate.py
       - name: The Node suite on Node 18
+        if: ${{ !cancelled() }}
         run: node --test test/*.test.mjs
 
   # FAA-72: the checks against the pinned contract skip unless FABRIC_CONTRACT_NEW and FABRIC_CONTRACT_OLD name
@@ -157,14 +163,19 @@ jobs:
       - name: DEC-0032 platform cases (Windows ones run here)
         run: python -m unittest discover -s test -p "test_fabric_service_platforms.py" -v
       - name: The rest of the service kit's cases on Windows
+        if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_service.py" -v
       - name: The supervisor writers on Windows (FAA-21)
+        if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_service_supervisors.py" -v
       - name: Settings backups and every limit on Windows (FAA-13)
+        if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_service_backups.py" -v
       - name: The session hooks on Windows (FAA-72)
+        if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_session.py" -v
       - name: The whole Node suite on Windows (FAA-72)
+        if: ${{ !cancelled() }}
         run: node --test "test/*.test.mjs"
 
   # FAA-72: launchd is the first supervisor the kit writes, so macOS runs both suites. The lifecycle tests put a
@@ -181,4 +192,5 @@ jobs:
         with:
           node-version: "22"
       - run: python3 -m unittest discover -s test -v
-      - run: node --test 'test/*.test.mjs'
+      - if: ${{ !cancelled() }}
+        run: node --test 'test/*.test.mjs'
