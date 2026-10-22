@@ -135,7 +135,8 @@ this repository both obeys it and ships its service layer
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s) and
   write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**
   (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` in its own process group with a 10 s deadline
-  (the whole group is ended at the deadline; a refused or unreadable entry is logged by its code and dropped), reads the board's unread
+  (the whole group is ended at the deadline; a refused or unreadable entry is logged by its code and dropped; an end
+  whose release got no answer stays for the next worker), reads the board's unread
   count (`com.status`) after a turn, and exits. A session rejoins at most once a minute: a turn within 60 s of its
   last successful rejoin stays in the spool for the next worker; the end of a session always starts one (FAA-53). UserPromptSubmit reads two small files in that spool and calls
   nothing. Every one is silent in a session Fabric launched; a launched session is remembered by a marker so the process walk

@@ -117,7 +117,8 @@ One line per event that did something, never content: `~/Library/Caches/ai.passi
 `%LOCALAPPDATA%\fabric-agent-adapter\hooks.log` (Windows). Mode 0600, rotated at 1 MB to `hooks.log.1`. The
 per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, `board.json`, `board.shown`; a
 folder untouched for 7 days, whose worker failed or whose session ended without SessionEnd, is removed by the next
-Stop or SessionEnd hook, even while the hooks are inert; a stale worker lock is taken by renaming it, never by a
+Stop or SessionEnd hook, even while the hooks are inert; an end entry whose release or observation got no answer stays
+for the next worker, and the folder goes only once the end is delivered; a stale worker lock is taken by renaming it, never by a
 check and a delete),
 removed at the session's end.
 
