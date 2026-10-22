@@ -430,14 +430,12 @@ export class JobStore {
     if (options.capability === undefined || options.capability === null) return { decision, job };
     const intent = intentDigest(options.capability, options.input ?? null);
     if (Object.hasOwn(record, 'intent')) return { decision: record.intent !== intent ? 'conflict' : decision, job };
-    if (decision === 'run' && this.storedIntent(id) !== intent) decision = 'same'; // a legacy key admits no run it cannot vouch for
+    // A 0.40.0 key runs only the intent its job stored (an input with no JSON form is refused, as the Python kit refuses it).
+    if (decision === 'run') {
+      const stored = this.load(id).private ?? {};
+      if (intentDigest(stored.capability ?? null, stored.input ?? null) !== intent) decision = 'same';
+    }
     return { decision, job };
-  }
-
-  // The intent a job was started with, from its private part; null when it has no RFC 8785 form.
-  storedIntent(jobId) {
-    const stored = this.load(jobId).private ?? {};
-    try { return intentDigest(stored.capability ?? null, stored.input ?? null); } catch (e) { if (e instanceof InteropError) return null; throw e; }
   }
 
   get(jobId) { return { ...this.load(jobId).job }; }
