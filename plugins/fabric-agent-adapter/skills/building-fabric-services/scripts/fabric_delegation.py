@@ -284,7 +284,9 @@ def _chain_of(act: Dict[str, Any]) -> List[str]:
     chain = []
     node: Any = act
     while isinstance(node, dict):
-        chain.append(node["partner"] if "partner" in node else node["sub"])  # the contract's chainOf, partner first
+        # The contract's chainOf at bfa9a67: a node names its partner only when it is a partner actor (the partner member
+        # alone); one that carries `partner` beside `sub` names its `sub`.
+        chain.append(node["partner"] if is_partner_actor(node) else node["sub"])
         node = node.get("act")
     return chain
 

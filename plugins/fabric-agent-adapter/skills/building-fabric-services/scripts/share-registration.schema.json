@@ -200,7 +200,8 @@
     },
     "sha256": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$"
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "A content hash: sha256: and 64 lower-case hex digits. The bare 64-digit form, without the prefix, is sha256Hex."
     },
     "shareGrantId": {
       "type": "string",

@@ -49,13 +49,13 @@ _SAFE_INTEGER = 2 ** 53 - 1
 _TABLE = re.compile(r"^[a-z][a-z0-9_]{0,62}\Z")
 
 
-_SECRET_TABLE = re.compile(r"^((.+_)?(account_connections?|account_connection_drafts?|tokens?|secrets?|credentials?|passwords?|login_codes?)|(operator_)?sessions?)\Z")
+_SECRET_TABLE = re.compile(r"^(([\s\S]+_)?(account_connections?|account_connection_drafts?|tokens?|secrets?|credentials?|passwords?|login_codes?)|(operator_)?sessions?)\Z")
 
 
 _COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}\Z")
 
 
-_SECRET_COLUMN = re.compile(r"^(?:.+_)?(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]assphrase|[Aa]pi_?[Kk]ey|[Pp]rivate_[Kk]ey|[Cc]ookie|[Ll]ogin_[Cc]ode|[Oo]tp|[Cc]redential)s?\Z")
+_SECRET_COLUMN = re.compile(r"^(?:[\s\S]+_)?(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]assphrase|[Aa]pi_?[Kk]ey|[Pp]rivate_[Kk]ey|[Cc]ookie|[Ll]ogin_[Cc]ode|[Oo]tp|[Cc]redential)s?\Z")
 
 
 _REASON = re.compile(r"^[a-z][a-z0-9_.-]{0,63}\Z")

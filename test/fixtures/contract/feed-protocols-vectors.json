@@ -32,6 +32,9 @@
     "fabric-activity": [
       "0.1"
     ],
+    "fabric-connections": [
+      "0.1"
+    ],
     "fabric-dashboard": [
       "0.1"
     ],
