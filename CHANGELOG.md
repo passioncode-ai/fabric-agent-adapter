@@ -99,6 +99,7 @@ and their findings are fixed here too.
   store a threaded server reaches (R3).
 - `test_a_released_version_keeps_its_digests`: a release's `kit.json` history entry stays what the release shipped (a
   build before the version moved on had rewritten 0.40.0's, which would have read genuine 0.40.0 copies as modified).
+  It runs in a clone that has the release tags (a full local clone); the shallow hosted checkout skips it (FAA-82).
 - Two timing tests no longer fail on a loaded host: the runner probe's positive cases take the most a probe may take,
   and the interop probe test lets the machine-timing verdict be the one that fails.
 
