@@ -166,7 +166,8 @@ test('a Node copy is refused while a Python copy holds the lock', { skip: onLinu
 import sys, time; from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(kit)})
 import fabric_service as fs
-fs.InstanceLock(Path(${JSON.stringify(dir)})).acquire(); print("held", flush=True); time.sleep(60)`], { stdio: ['ignore', 'pipe', 'inherit'] });
+fs.InstanceLock(Path(${JSON.stringify(dir)})).acquire(); print("held", flush=True); sys.stdin.read()`], { stdio: ['pipe', 'pipe', 'inherit'] });
+  // FAA-72: the holder waits on its stdin, so it ends with this process even if the finally below never runs.
   try {
     await new Promise((resolve) => holder.stdout.once('data', resolve));
     await assert.rejects(new k.InstanceLock(dir).acquire(), (e) => e instanceof k.AlreadyRunning && e.holderPid === holder.pid);

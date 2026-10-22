@@ -184,83 +184,71 @@ class DefaultTransport(unittest.TestCase):
             fh.request("GET", self.base + "/big", deadline_s=10, max_bytes=10)
         self.assertEqual(caught.exception.kind, "too-large")
 
-    def test_a_trickled_body_stops_at_the_deadline(self):
+    # FAA-72 item 25: these three ran against margins of 0.5 to 0.8 s and flaked under load. Each now pits the deadline
+    # against a server that would hold the caller far longer (a byte every 0.2 s for a minute), so the upper bound can
+    # be generous (DEADLINE_SLACK) and still tell a whole-answer deadline from one a read or the headers restart.
+    DEADLINE_SLACK = 6.0
+
+    def serve(self, script):
+        """A one-connection server running `script(conn, stop)`; returns its URL. The server ends with the test."""
         import socket
-        import time as _time
         server = socket.socket()
         server.bind(("127.0.0.1", 0))
         server.listen(1)
+        stop = threading.Event()
+        self.addCleanup(server.close)
+        self.addCleanup(stop.set)
 
-        def trickle():
-            conn, _ = server.accept()
-            conn.recv(65536)
-            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\n")
+        def run():
             try:
-                _time.sleep(1.5)
-                conn.sendall(b"x")  # then nothing: a read started at 1.5 s must not wait the whole 2 s again
-                _time.sleep(5)
+                conn, _ = server.accept()
+            except OSError:
+                return
+            try:
+                conn.recv(65536)
+                script(conn, stop)
             except OSError:
                 pass
-            conn.close()
-        threading.Thread(target=trickle, daemon=True).start()
+            finally:
+                conn.close()
+        threading.Thread(target=run, daemon=True).start()
+        return "http://127.0.0.1:%d/" % server.getsockname()[1]
+
+    @staticmethod
+    def trickle(conn, stop, data, every=0.2):
+        for byte in data:
+            if stop.wait(every):
+                return
+            conn.sendall(bytes([byte]))
+
+    def timed_out_within(self, url, deadline_s, bound_s):
+        import time as _time
         start = _time.monotonic()
         with self.assertRaises(fh.HttpError) as caught:
-            fh.request("GET", "http://127.0.0.1:%d/" % server.getsockname()[1], deadline_s=2, retries=0)
-        server.close()
+            fh.request("GET", url, deadline_s=deadline_s, retries=0)
+        elapsed = _time.monotonic() - start
         self.assertEqual(caught.exception.kind, "timeout")
-        self.assertLess(_time.monotonic() - start, 2.8, "the deadline covers the body, not each read")
+        self.assertLess(elapsed, bound_s)
+        return elapsed
+
+    def test_a_trickled_body_stops_at_the_deadline(self):
+        url = self.serve(lambda conn, stop: (conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n"),
+                                             self.trickle(conn, stop, b"x" * 300)))
+        # A per-read timeout would let this run for the minute the server trickles.
+        self.timed_out_within(url, 2, 2 + self.DEADLINE_SLACK)
 
     def test_slow_headers_count_toward_the_deadline(self):
-        import socket
-        import time as _time
-        server = socket.socket()
-        server.bind(("127.0.0.1", 0))
-        server.listen(1)
-
-        def slow():
-            conn, _ = server.accept()
-            conn.recv(65536)
-            try:
-                _time.sleep(0.8)
-                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\n")
-                for _ in range(4):
-                    _time.sleep(0.3)
-                    conn.sendall(b"x")
-            except OSError:
-                pass
-            conn.close()
-        threading.Thread(target=slow, daemon=True).start()
-        start = _time.monotonic()
-        with self.assertRaises(fh.HttpError) as caught:
-            fh.request("GET", "http://127.0.0.1:%d/" % server.getsockname()[1], deadline_s=1, retries=0)
-        server.close()
-        self.assertEqual(caught.exception.kind, "timeout")
-        self.assertLess(_time.monotonic() - start, 1.5, "the headers' wait counts toward the deadline")
+        def slow(conn, stop):
+            if stop.wait(3.9):
+                return
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n")
+            self.trickle(conn, stop, b"x" * 300)
+        # Headers at 3.9 s of a 4 s deadline: a deadline that restarted with the body would end near 7.9 s.
+        self.timed_out_within(self.serve(slow), 4, 4 + 2.5)
 
     def test_trickled_headers_stop_at_the_deadline(self):
-        import socket
-        import time as _time
-        server = socket.socket()
-        server.bind(("127.0.0.1", 0))
-        server.listen(1)
-
-        def trickle():
-            conn, _ = server.accept()
-            conn.recv(65536)
-            try:
-                for byte in b"HTTP/1.1 200 OK\r\nX-Slow: " + b"a" * 40:
-                    _time.sleep(0.1)  # each read is quick: only a deadline across reads stops this
-                    conn.sendall(bytes([byte]))
-            except OSError:
-                pass
-            conn.close()
-        threading.Thread(target=trickle, daemon=True).start()
-        start = _time.monotonic()
-        with self.assertRaises(fh.HttpError) as caught:
-            fh.request("GET", "http://127.0.0.1:%d/" % server.getsockname()[1], deadline_s=1, retries=0)
-        server.close()
-        self.assertEqual(caught.exception.kind, "timeout")
-        self.assertLess(_time.monotonic() - start, 1.6)
+        url = self.serve(lambda conn, stop: self.trickle(conn, stop, b"HTTP/1.1 200 OK\r\nX-Slow: " + b"a" * 300))
+        self.timed_out_within(url, 2, 2 + self.DEADLINE_SLACK)
 
     def test_json_is_read_as_json_parse_reads_it(self):
         self.assertEqual(fh.Response(200, {}, b"\xef\xbb\xbf{\"a\":1}").json(), {"a": 1})

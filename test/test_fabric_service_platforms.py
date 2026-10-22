@@ -238,8 +238,8 @@ class Windows(unittest.TestCase):
             fs = importlib.util.module_from_spec(spec); spec.loader.exec_module(fs)
             fs.InstanceLock(Path({str(self.dir)!r})).acquire()
             print("held", flush=True)
-            time.sleep(60)
-            """)], stdout=subprocess.PIPE, text=True)
+            sys.stdin.read()  # FAA-72: held until the test closes stdin or kills it, never past a lost test process
+            """)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         try:
             self.assertEqual(holder.stdout.readline().strip(), "held")
             with self.assertRaises(fs.AlreadyRunning) as caught:
@@ -248,6 +248,8 @@ class Windows(unittest.TestCase):
         finally:
             holder.kill()
             holder.wait()
+            holder.stdin.close()
+            holder.stdout.close()
         fs.InstanceLock(self.dir).acquire().release()   # the OS released it with the process
 
     def test_a_token_written_by_the_kit_reads_back(self):
