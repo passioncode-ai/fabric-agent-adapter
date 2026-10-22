@@ -66,6 +66,8 @@ FAKE_MCP = textwrap.dedent('''\
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": {{"type": "object"}}}} for n in names]}}}})
         elif method == "tools/call":
             write("call", m["params"])
+            if m["params"]["name"] == os.environ.get("FAKE_MCP_HANG_ON"):
+                continue  # this call is never answered: the worker's deadline ends it
             if m["params"]["name"] == "com.status":
                 board = os.environ.get("FAKE_MCP_BOARD")
                 said = open(board).read().strip() if board and os.path.exists(board) else "0"
@@ -157,6 +159,15 @@ class Base(unittest.TestCase):
     def log_text(self):
         path = fs.state_root(env=self.env) / "hooks.log"
         return path.read_text() if path.exists() else ""
+
+
+class Annotations(unittest.TestCase):
+    def test_the_worker_lock_hints_resolve(self):
+        """FAA-68: _try_lock's annotation names Callable; without its import get_type_hints raised NameError."""
+        import typing
+        import fabric_session_mcp
+        hints = typing.get_type_hints(fabric_session_mcp._try_lock)
+        self.assertEqual(hints["return"], bool)
 
 
 class Paths(unittest.TestCase):
@@ -408,6 +419,25 @@ class StopAndEndActive(Base):
             self.assertNotIn(leaked, log)
         self.assertFalse(spawned[0].exists(), "the session's folder goes once its end is delivered")
         self.assertEqual(self.records("exit"), [0], "fabric-mcp is closed by the end of its stdin")
+
+    def test_an_end_whose_release_never_answered_stays_for_the_next_worker(self):
+        """FAA-68: `ended` was set before the release call, so a release that timed out removed the whole spool and
+        the claim release was never retried. The end entry stays; a later worker sends the release once."""
+        _, spawned = self.spool("end", reason="prompt_input_exit")
+        self.env["FAKE_MCP_HANG_ON"] = "fabric_work_release"
+        fs.deliver(spawned[0], self.env, deadline_s=1.5)
+        self.assertIn("outcome=unknown", self.log_text())
+        self.assertTrue(spawned[0].is_dir(), "the session's folder stays while its end is undelivered")
+        self.assertEqual(len(list(spawned[0].glob("*-end.json"))), 1, "the end entry stays for the next worker")
+        self.assertEqual([c["name"] for c in self.records("call")], ["fabric_work_release"])
+        del self.env["FAKE_MCP_HANG_ON"]
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        calls = self.records("call")
+        self.assertEqual([c["name"] for c in calls[1:]], ["fabric_work_release", "fabric_session_observe"],
+                         "the later worker sends the release once, then the end observation")
+        self.assertEqual(calls[0]["arguments"]["idempotencyKey"], calls[1]["arguments"]["idempotencyKey"],
+                         "the retried release carries the same key")
+        self.assertFalse(spawned[0].exists(), "the folder goes once the end is delivered")
 
     def test_an_older_fabric_without_the_tools_degrades_to_a_log_line(self):
         self.env["FAKE_MCP_MODE"] = "old-fabric"
