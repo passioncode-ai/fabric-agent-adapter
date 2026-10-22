@@ -54,7 +54,7 @@ EFFECT_STATES = ("not_started", "started", "succeeded_observed", "failed_observe
 
 
 #: DEC-0079: what an operator's hold may refuse, by the scopes that refuse it. A tool not named here is never refused
-#: `held` — it settles, reports on or keeps alive started work (com.renew, com.progress, com.complete, com.reconcile),
+#: `held`: it settles, reports on or keeps alive started work (com.renew, com.progress, com.complete, com.reconcile),
 #: cancels or reads. The contract's HOLD_SCOPES.
 HOLD_SCOPES = {"com.submit": ("thread",), "com.reply": ("thread",), "com.enroll": ("project", "slot"),
                "com.responder_replace": ("project", "slot"), "com.claim": ("thread", "project", "slot"),
@@ -87,7 +87,7 @@ _SAFE = 2 ** 53 - 1
 
 class BoardError(Exception):
     """A board refusal (`code` from the contract's refusal codes) or a kit fault: `unreachable` (the hub did not answer;
-    a write may have been stored — send it again with the same key), `session-ended`, `not-in-scope`, `receipt-shape`,
+    a write may have been stored, so send it again with the same key), `session-ended`, `not-in-scope`, `receipt-shape`,
     `schema-unsupported`, `no-epoch`, `checkpoint`, `digest-mismatch`, `not-addressed`, `directory-invalid`,
     `evidence`, `observation_required`. `str()` is one sentence and never carries a token or a body."""
 
@@ -264,7 +264,7 @@ def refusal_problems(value: Any) -> List[str]:
 
 def directory_findings(page: Any) -> List[Dict[str, str]]:
     """FAC-SEM-107 (DEC-0077), the contract's `commsDirectory`: a Project listed twice, or a capability listed twice
-    within a Project, compared exactly as written (Project ids are opaque and capability names are names, not URIs —
+    within a Project, compared exactly as written (Project ids are opaque and capability names are names, not URIs,
     so not by normal form). The finding names the second entry. Never raises."""
     findings: List[Dict[str, str]] = []
     projects = page.get("projects") if isinstance(page, dict) else None
@@ -366,7 +366,7 @@ def hold_refuses(tool: Any, target: Any, holds: Any) -> bool:
 
 
 def find_project(page: Any, project_id: str, capability: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """Look a Project up in one `com.directory` page (read by a Project session — a board session is not served the
+    """Look a Project up in one `com.directory` page (read by a Project session; a board session is not served the
     directory). The page is checked first: a page the contract would refuse, FAC-SEM-107 included, raises
     `BoardError("directory-invalid")` instead of answering from it. Ids and capability names compare exactly as
     written (DEC-0077). Answers the entry, or None when the page does not list it (or lists it without `capability`):
