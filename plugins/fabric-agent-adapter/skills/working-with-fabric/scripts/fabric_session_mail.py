@@ -15,10 +15,13 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     UNREAD_LINE,
     VERSION,
     WORKER_DEADLINE_S,
+    _write_private,
     claude_registration,
     fabric_launched,
     fabric_root,
     locate_hub,
+    rejoin_wait,
+    session_dir,
 )
 from fabric_session_mcp import (  # noqa: E402 - the kit (FAA-65)
     McpStdio,
@@ -36,9 +39,15 @@ WATCH_MAX_BACKOFF_S = 900
 def poll_unread(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None,
                 deadline_s: float = WORKER_DEADLINE_S) -> Tuple[str, Any]:
     """One look at the board through `fabric-mcp --rejoin-only`: ("ok", count), ("unavailable", why) when Fabric
-    answers but the board cannot be read, ("down", why) when Fabric cannot be reached. No fabric-mcp starts unless
-    the running Fabric advertises session-hooks/1 (the rejoin)."""
+    answers but the board cannot be read, ("down", why) when Fabric cannot be reached, ("wait", seconds) when the
+    session rejoined within the last minute (the Stop worker's mark, or this one's): the rejoin budget is shared, so
+    no fabric-mcp starts then (FAA-68). No fabric-mcp starts unless the running Fabric advertises session-hooks/1
+    (the rejoin). A successful rejoin renews the mark in the session's folder when the hooks made one."""
     env = dict(os.environ if env is None else env)
+    directory = session_dir(session_id, env)
+    left = rejoin_wait(directory)
+    if left > 0:
+        return "wait", left
     hub = locate_hub(fabric_root(env=env))
     if hub["state"] != "running":
         return "down", "Fabric is not running (%s)" % hub["reason"]
@@ -56,6 +65,11 @@ def poll_unread(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None
                                       "clientInfo": {"name": "fabric-agent-adapter-watch-mail", "version": VERSION}})
         client.notify("notifications/initialized")
         names = _wait_for_session_tools(client, deadline)
+        if directory.is_dir():  # the hooks made it, after their launch check; never made here
+            try:
+                _write_private(directory / "rejoined", "")
+            except OSError:
+                pass
         if BOARD_STATUS_TOOL not in names:
             return "unavailable", "this Fabric serves no %s" % BOARD_STATUS_TOOL
         unread, said = board_unread(client.request("tools/call", {"name": BOARD_STATUS_TOOL, "arguments": {}}))
@@ -72,15 +86,18 @@ def poll_unread(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None
 def watch_mail(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None, interval: float = 60, *,
                poll: Optional[Callable[[], Tuple[str, Any]]] = None, out: Callable[[str], None] = print,
                wait: Callable[[float], bool], stop: Callable[[], bool], rng: Callable[[], float]) -> int:
-    """Poll the board every `interval` seconds (±20 % jitter, never under WATCH_MIN_INTERVAL_S) and print ONE line each
-    time the unread count rises. While Fabric is down or the board unreadable, say so once and back off, doubling up
-    to WATCH_MAX_BACKOFF_S. `wait(seconds)` returns True when it was told to stop."""
+    """Poll the board every `interval` seconds (±20 % jitter; the delay after jitter stays within WATCH_MIN_INTERVAL_S
+    and WATCH_MAX_BACKOFF_S) and print ONE line each time the unread count rises. While Fabric is down or the board
+    unreadable, say so once and back off, doubling up to WATCH_MAX_BACKOFF_S. A look the shared rejoin mark holds back
+    ("wait") changes nothing and waits it out. `wait(seconds)` returns True when it was told to stop."""
     interval = max(float(WATCH_MIN_INTERVAL_S), float(interval))
     poll = poll or (lambda: poll_unread(session_id, cwd, env))
     last, trouble, backoff = 0, None, interval
     while not stop():
         kind, value = poll()
-        if kind == "ok":
+        if kind == "wait":
+            delay = float(value)
+        elif kind == "ok":
             if value > last:
                 out(UNREAD_LINE % value)
             last, trouble, backoff = value, None, interval
@@ -91,7 +108,8 @@ def watch_mail(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None,
                 out("watch-mail: %s; trying again, backing off up to %d minutes" % (value, WATCH_MAX_BACKOFF_S // 60))
                 trouble = kind
             delay = backoff
-        if wait(delay * (0.8 + 0.4 * rng())):
+        jittered = delay if kind == "wait" else delay * (0.8 + 0.4 * rng())
+        if wait(min(max(jittered, float(WATCH_MIN_INTERVAL_S)), float(WATCH_MAX_BACKOFF_S))):
             break
     return 0
 

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     BOARD_STATUS_TOOL,
     GIT_TIMEOUT_S,
     HOOK_FEATURE,
+    LOCK_STALE_S,
     SESSION_ID,
     VERSION,
     WORKER_DEADLINE_S,
@@ -25,7 +27,6 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     claude_registration,
     fabric_root,
     locate_hub,
-    lock_held,
     log,
     read_small,
 )
@@ -43,21 +44,36 @@ RELEASE_TOOL = "fabric_work_release"
 WAITING_TOOL = "fabric_whoami"
 
 
-def git_facts(cwd: Path) -> Dict[str, Optional[int]]:
-    """HEAD, files that differ from it (untracked included) and lines added/removed. No path, no text."""
+#: The Stop and SessionEnd hooks measure the turn's facts inside this total, so the hook stays far under its 5 s.
+FACTS_BUDGET_S = 1.5
+
+
+FACT_KEYS = ("head", "filesChanged", "linesAdded", "linesRemoved")
+
+
+HEAD = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+
+
+def git_facts(cwd: Path, budget_s: Optional[float] = None) -> Dict[str, Optional[int]]:
+    """HEAD, files that differ from it (untracked included) and lines added/removed. No path, no text. With
+    `budget_s`, every git call shares that total; a fact git could not give in time is None."""
     facts: Dict[str, Any] = {"head": None, "filesChanged": None, "linesAdded": None, "linesRemoved": None}
+    until = None if budget_s is None else time.monotonic() + budget_s
 
     def git(*args: str) -> Optional[str]:
+        timeout = GIT_TIMEOUT_S if until is None else min(GIT_TIMEOUT_S, until - time.monotonic())
+        if timeout <= 0:
+            return None
         try:
             done = subprocess.run(["git", "--no-optional-locks", "-C", str(cwd)] + list(args),
                                   stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                  timeout=GIT_TIMEOUT_S, check=False)
+                                  timeout=timeout, check=False)
         except (OSError, subprocess.SubprocessError):
             return None
         return done.stdout.decode("utf-8", "replace") if done.returncode == 0 else None
 
     head = (git("rev-parse", "--verify", "-q", "HEAD") or "").strip()
-    facts["head"] = head if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head) else None
+    facts["head"] = head if HEAD.fullmatch(head) else None
     status = git("status", "--porcelain=v1", "-z", "--untracked-files=normal")
     if status is not None:
         facts["filesChanged"] = _count_status(status)
@@ -86,19 +102,50 @@ def _count_status(z: str) -> int:
     return count
 
 
+def stored_facts(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """The facts a spool entry carries, as the hook measured them when its turn ended (FAA-68): a head of 40 or 64
+    hex digits and non-negative counts, each else None. Nothing is measured at delivery."""
+    facts = entry.get("facts") if isinstance(entry.get("facts"), dict) else {}
+    head = facts.get("head")
+    out: Dict[str, Any] = {"head": head if isinstance(head, str) and HEAD.fullmatch(head) else None}
+    for key in FACT_KEYS[1:]:
+        value = facts.get(key)
+        out[key] = value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value < 2 ** 53 else None
+    return out
+
+
+class JsonRpcError(RuntimeError):
+    """An `error` answer to one request: that request failed, the connection did not."""
+
+    def __init__(self, code: Any):
+        self.code = code if isinstance(code, int) and not isinstance(code, bool) else None
+        super().__init__("json-rpc error %s" % self.code)
+
+    def said(self) -> str:
+        return "error:%s" % ("unnamed" if self.code is None else self.code)
+
+
 class McpStdio:
     """A minimal MCP client over stdio (newline-delimited JSON-RPC) with a hard deadline."""
 
     def __init__(self, argv: List[str], cwd: str, env: Dict[str, str], deadline: float):
         import threading  # only the worker needs it; the hooks' path stays light
         self.deadline = deadline
+        # Its own process group (FAA-68): a wrapper (npx, a shell script, fabric-mcp.cmd) keeps the server as a
+        # grandchild, and only a group kill reaches it.
+        options: Dict[str, Any] = {}
+        if sys.platform == "win32":
+            options["creationflags"] = 0x00000200  # CREATE_NEW_PROCESS_GROUP
+        else:
+            options["start_new_session"] = True
         self.proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     stderr=subprocess.DEVNULL)
+                                     stderr=subprocess.DEVNULL, **options)
         self.messages: List[Dict[str, Any]] = []
         self.cond = threading.Condition()
         self.next_id = 0
         self.tools_changed = False
-        threading.Thread(target=self._read, daemon=True).start()
+        self.reader = threading.Thread(target=self._read, daemon=True)
+        self.reader.start()
 
     def _read(self) -> None:
         assert self.proc.stdout is not None
@@ -134,7 +181,8 @@ class McpStdio:
                     if message.get("id") == ident:
                         self.messages.remove(message)
                         if "error" in message:
-                            raise RuntimeError("json-rpc error %s" % (message["error"] or {}).get("code"))
+                            error = message["error"]
+                            raise JsonRpcError(error.get("code") if isinstance(error, dict) else None)
                         return message.get("result") or {}
                 left = self.deadline - time.monotonic()
                 if left <= 0 or self.proc.poll() is not None:
@@ -148,18 +196,42 @@ class McpStdio:
             self.tools_changed = False
 
     def close(self) -> None:
+        """End the server: its stdin's end first (fabric-mcp exits on it), then its whole process group, so nothing a
+        wrapper started keeps the pipe open. Never blocks on stdout while the reader thread holds it (FAA-68)."""
+        grace = max(0.2, min(1.5, self.deadline - time.monotonic()))
         try:
             if self.proc.stdin:
-                self.proc.stdin.close()  # fabric-mcp ends on stdin's end
-            self.proc.wait(timeout=1.5)
+                self.proc.stdin.close()
         except Exception:  # noqa: BLE001
-            self.proc.kill()
+            pass
+        try:
+            self.proc.wait(timeout=grace)
+        except Exception:  # noqa: BLE001
+            pass
+        self._kill_group()  # the wrapper may have exited and left its child behind: always
+        try:
+            self.proc.wait(timeout=1.0)
+        except Exception:  # noqa: BLE001
+            pass
+        self.reader.join(timeout=1.0)
+        if self.proc.stdout and not self.reader.is_alive():
+            self.proc.stdout.close()  # a reader still blocked keeps it; the process's end closes it
+
+    def _kill_group(self) -> None:
+        if sys.platform == "win32":
             try:
-                self.proc.wait(timeout=1.0)
-            except Exception:  # noqa: BLE001
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(self.proc.pid)], stdin=subprocess.DEVNULL,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2.0, check=False)
+            except (OSError, subprocess.SubprocessError):
                 pass
-        if self.proc.stdout:
-            self.proc.stdout.close()
+            if self.proc.poll() is None:
+                self.proc.kill()
+            return
+        import signal
+        try:
+            os.killpg(self.proc.pid, signal.SIGKILL)  # the group the server leads (start_new_session)
+        except OSError:
+            pass
 
 
 def _take_lock(directory: Path, wait_s: float = 0.0) -> bool:
@@ -175,7 +247,10 @@ def _take_lock(directory: Path, wait_s: float = 0.0) -> bool:
         time.sleep(0.2)
 
 
-def _try_lock(lock: Path, directory: Path) -> bool:
+def _try_lock(lock: Path, directory: Path, _between: Optional[Callable[[], None]] = None) -> bool:
+    """Create the lock; take a stale one (older than LOCK_STALE_S) by renaming it to a name of this worker's own and
+    checking that the file renamed is the very one judged stale. A lock another worker made in between is put back
+    (FAA-68: no check-then-act). `_between` runs after the judgement and before the rename, for the tests."""
     for _ in range(2):
         try:
             fd = os.open(str(lock), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -183,14 +258,44 @@ def _try_lock(lock: Path, directory: Path) -> bool:
             os.close(fd)
             return True
         except FileExistsError:
-            if lock_held(directory):
-                return False
-            try:
-                lock.unlink()
-            except OSError:
-                return False
+            pass
         except OSError:
             return False
+        try:
+            seen = os.lstat(str(lock))
+        except FileNotFoundError:
+            continue
+        except OSError:
+            return False
+        if time.time() - seen.st_mtime < LOCK_STALE_S:
+            return False
+        if _between is not None:
+            _between()
+        taken = directory / (".worker.lock.%d.%s" % (os.getpid(), os.urandom(4).hex()))
+        try:
+            os.rename(str(lock), str(taken))
+        except FileNotFoundError:
+            continue  # another worker took it first; try to create ours
+        except OSError:
+            return False
+        try:
+            got = os.lstat(str(taken))
+        except OSError:
+            return False
+        if (got.st_dev, got.st_ino) != (seen.st_dev, seen.st_ino):
+            try:
+                os.link(str(taken), str(lock))  # put the live lock back, unless a newer one is there already
+            except OSError:
+                pass
+            try:
+                os.unlink(str(taken))
+            except OSError:
+                pass
+            return False
+        try:
+            os.unlink(str(taken))
+        except OSError:
+            pass
     return False
 
 
@@ -234,8 +339,32 @@ def board_unread(result: Dict[str, Any]) -> Tuple[Optional[int], str]:
     return unread, "answer=ok unread=%d%s" % (unread, " board=degraded" if state == "degraded" else "")
 
 
+def _read_entry(path: Path) -> Optional[Dict[str, Any]]:
+    """One spool entry, or None when it cannot be read as one: not a small regular file, not UTF-8 JSON, not an
+    object, or an event other than `turn` and `end`."""
+    try:
+        entry = json.loads(read_small(path) or "")
+    except ValueError:
+        return None
+    if not isinstance(entry, dict) or entry.get("event") not in ("turn", "end"):
+        return None
+    return entry
+
+
+def _entry_cwd(entries: List[Path]) -> Path:
+    """The folder the session worked in, from the first entry that names an existing one."""
+    for path in entries:
+        entry = _read_entry(path)
+        cwd = entry.get("cwd") if entry else None
+        if isinstance(cwd, str) and cwd and "\0" not in cwd and Path(cwd).is_dir():
+            return Path(cwd)
+    return Path(os.getcwd())
+
+
 def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: float = WORKER_DEADLINE_S) -> List[str]:
-    """Drain one session's spool through fabric-mcp --rejoin-only. Returns the log lines it wrote."""
+    """Drain one session's spool through fabric-mcp --rejoin-only. Returns the log lines it wrote. An entry that
+    cannot be read, or a call answered with a JSON-RPC error, is logged and dropped; the rest still goes out (FAA-68).
+    Only an answer that never came leaves the spool for the next worker."""
     env = dict(os.environ if env is None else env)
     said: List[str] = []
 
@@ -250,12 +379,20 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
         return said
     client: Optional[McpStdio] = None
     ended = False
+
+    def call(event: str, tool: str, arguments: Dict[str, Any]) -> None:
+        assert client is not None
+        try:
+            answer = _answer_said(client.request("tools/call", {"name": tool, "arguments": arguments}))
+        except JsonRpcError as exc:
+            answer = exc.said()
+        note("session=%s event=%s tool=%s answer=%s" % (session_id[:8], event, tool, answer))
+
     try:
         entries = sorted(directory.glob("*-*.json"))
         if not entries:
             return said
-        first = json.loads(read_small(entries[0]) or "{}")
-        cwd = Path(first.get("cwd") or os.getcwd())
+        cwd = _entry_cwd(entries)
         registration = claude_registration(cwd, env)
         hub = locate_hub(fabric_root(env=env))
         if not registration or hub["state"] != "running" or HOOK_FEATURE not in hub.get("features", []):
@@ -275,35 +412,40 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
         _write_private(directory / "rejoined", "")
         while entries:
             for path in entries:
-                entry = json.loads(read_small(path) or "{}")
-                event = entry.get("event")
+                entry = _read_entry(path)
+                if entry is None:
+                    note("session=%s outcome=dropped reason=%r" % (session_id[:8], "unreadable entry"))
+                    path.unlink()
+                    continue
+                event = entry["event"]
                 key = "%s:%s" % (session_id, path.name.split("-", 1)[0])
+                reason = entry.get("reason") if isinstance(entry.get("reason"), str) else "other"
                 if event == "end":
                     ended = True
                     if RELEASE_TOOL in names:
-                        result = client.request("tools/call", {"name": RELEASE_TOOL, "arguments": {
+                        call(event, RELEASE_TOOL, {
                             "claims": "session", "outcome": "let-go",
-                            "reason": "the Claude Code session ended (%s)" % entry.get("reason", "other"),
-                            "idempotencyKey": key + ":release"}})
-                        note("session=%s event=end tool=%s answer=%s" % (session_id[:8], RELEASE_TOOL, _answer_said(result)))
+                            "reason": "the Claude Code session ended (%s)" % reason,
+                            "idempotencyKey": key + ":release"})
                     else:
                         note("session=%s event=end outcome=degraded reason=%r" % (session_id[:8], "no %s" % RELEASE_TOOL))
-                if event in ("turn", "end"):
-                    if OBSERVE_TOOL in names:
-                        arguments = dict(git_facts(cwd), event=event, runtime=RUNNER, runtimeSessionId=session_id,
-                                         observedAt=entry.get("observedAt"), idempotencyKey=key)
-                        if event == "end":
-                            arguments["reason"] = entry.get("reason", "other")
-                        result = client.request("tools/call", {"name": OBSERVE_TOOL, "arguments": arguments})
-                        note("session=%s event=%s tool=%s answer=%s" % (session_id[:8], event, OBSERVE_TOOL, _answer_said(result)))
-                    elif not (directory / "observe.degraded").exists():
-                        note("session=%s event=%s outcome=degraded reason=%r" % (session_id[:8], event, "no %s" % OBSERVE_TOOL))
-                        (directory / "observe.degraded").touch()
+                if OBSERVE_TOOL in names:
+                    arguments = dict(stored_facts(entry), event=event, runtime=RUNNER, runtimeSessionId=session_id,
+                                     observedAt=entry.get("observedAt"), idempotencyKey=key)
+                    if event == "end":
+                        arguments["reason"] = reason
+                    call(event, OBSERVE_TOOL, arguments)
+                elif not (directory / "observe.degraded").exists():
+                    note("session=%s event=%s outcome=degraded reason=%r" % (session_id[:8], event, "no %s" % OBSERVE_TOOL))
+                    (directory / "observe.degraded").touch()
                 path.unlink()
             entries = sorted(directory.glob("*-*.json"))  # turns spooled while this worker ran
         if not ended and BOARD_STATUS_TOOL in names:
             # The board's unread count for the prompt hook (FAA-12a). A count, never a message.
-            unread, said_board = board_unread(client.request("tools/call", {"name": BOARD_STATUS_TOOL, "arguments": {}}))
+            try:
+                unread, said_board = board_unread(client.request("tools/call", {"name": BOARD_STATUS_TOOL, "arguments": {}}))
+            except JsonRpcError as exc:
+                unread, said_board = None, "answer=" + exc.said()
             _write_private(directory / "board.json", json.dumps({
                 "unread": unread, "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}))
             note("session=%s event=board tool=%s %s" % (session_id[:8], BOARD_STATUS_TOOL, said_board))

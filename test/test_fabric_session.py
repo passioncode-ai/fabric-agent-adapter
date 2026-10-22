@@ -372,7 +372,7 @@ class StopAndEndActive(Base):
         said, spawned = self.spool("turn")
         self.assertEqual(said, "spooled: worker started")
         (entry,) = sorted(spawned[0].glob("*-turn.json"))
-        self.assertEqual(sorted(json.loads(entry.read_text())), ["cwd", "event", "observedAt", "runtimeSessionId"])
+        self.assertEqual(sorted(json.loads(entry.read_text())), ["cwd", "event", "facts", "observedAt", "runtimeSessionId"])
         self.spool("end", reason="prompt_input_exit")
         lines = fs.deliver(spawned[0], self.env, deadline_s=8)
         (argv,) = self.records("argv")
