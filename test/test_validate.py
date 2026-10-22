@@ -781,7 +781,7 @@ class WorkflowGuardTests(unittest.TestCase):
 
     def test_npm_at_latest_fails(self):
         problems = self._problems(".github/workflows/release.yml",
-                                  lambda t: t.replace("npm install -g npm@11.21.1", "npm install -g npm@latest"))
+                                  lambda t: t.replace("npm install -g npm@12.2.0", "npm install -g npm@latest"))
         self.assertTrue(any("@latest" in p for p in problems), problems)
 
     def test_a_job_without_a_timeout_fails(self):

@@ -177,8 +177,9 @@ jobs:
       - name: npm must be new enough for trusted publishing (11.5.1 or later)
         run: |
           set -eu
-          # An exact release, never the moving latest tag: this job holds id-token: write.
-          npm install -g npm@11.21.1
+          # An exact release, never the moving latest tag: this job holds id-token: write. 12.2.0 is the npm that
+          # published 0.40.0 with this token; 11.21.1 was refused with E401 "token is invalid" (v0.41.0, FAA-73).
+          npm install -g npm@12.2.0
           npm --version
 
       - name: The tag must match what would be published
