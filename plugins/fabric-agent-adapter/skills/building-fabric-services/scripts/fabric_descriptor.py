@@ -45,7 +45,7 @@ from fabric_usage import (
 DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
 
 
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.1"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.2"
 
 
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
