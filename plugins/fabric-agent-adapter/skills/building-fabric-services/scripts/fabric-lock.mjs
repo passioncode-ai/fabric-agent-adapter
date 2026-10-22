@@ -1,5 +1,5 @@
 // One copy of a service, locked before any side effect (LC-01, DEC-0057): the instance lock and the supervisor marker.
-// Part of the Node service kit (FAA-65, layer L3); the twin of fabric_lock.py. Node 20+, no dependency.
+// Part of the Node service kit (FAA-65, layer L3); the twin of fabric_lock.py. Node 20+ (22+ for the Linux lock), no dependency.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -52,6 +52,12 @@ export class InstanceLock {
     // with the process. The Python kit holds the same name beside its file lock (fabric_service.lock_name).
     const name = lockName(this.path);
     if (!name) throw new ServiceError(`No instance lock on ${process.platform}: the kit supports macOS, Linux and Windows.`);
+    const names = process.platform === 'linux' ? await abstractNames() : 'exact';
+    if (names === 'none' || names === 'padded') {
+      // Node 18 and 20 cannot bind the name the Python kit binds: 18 and early 20 make every name 108 NUL bytes (one lock
+      // for every service on the machine), later 20 pads it with NUL bytes (a name no Python copy or probe sees).
+      throw new ServiceError(`Node ${process.version} cannot hold the instance lock's abstract socket name on Linux; run the service on Node 22 or later.`);
+    }
     this.server = net.createServer();
     await new Promise((resolve, reject) => {
       // Windows reports a held pipe as EADDRINUSE (access denied) or, when its holder capped the instances, EBUSY.
@@ -70,6 +76,33 @@ export class InstanceLock {
     this.fd = null;
     this.server = null;
   }
+}
+
+let abstractNamesSeen = null;
+
+/**
+ * How this Node binds an abstract unix socket name on Linux, learned once by binding a random one and reading
+ * /proc/net/unix: 'exact' (Node 21 and later: the name the Python kit binds and fabric_lock.lock_name_held reads),
+ * 'padded' (Node 20.x: the name followed by NUL bytes to the whole sun_path) or 'none' (Node 18 and early 20: every
+ * name becomes 108 NUL bytes). 'unknown' when the table cannot be read.
+ */
+export async function abstractNames() {
+  if (abstractNamesSeen !== null) return abstractNamesSeen;
+  const probe = `fabric-probe-${crypto.randomBytes(8).toString('hex')}`;
+  const server = net.createServer();
+  try {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(`\0${probe}`, resolve); });
+    const rows = fs.readFileSync('/proc/net/unix', 'utf8').split('\n').map((row) => row.trimEnd().split(' ').pop());
+    if (rows.includes(`@${probe}`)) abstractNamesSeen = 'exact';
+    else if (rows.includes(`@${probe}`.padEnd(108, '@'))) abstractNamesSeen = 'padded';
+    else abstractNamesSeen = 'none';
+  } catch (error) {
+    // A random name already in use means every name collapses to one: another such Node holds it.
+    abstractNamesSeen = error?.code === 'EADDRINUSE' ? 'none' : 'unknown';
+  } finally {
+    server.close();
+  }
+  return abstractNamesSeen;
 }
 
 /** The name the lock is held under on Linux (abstract socket) and Windows (named pipe); null on macOS. */

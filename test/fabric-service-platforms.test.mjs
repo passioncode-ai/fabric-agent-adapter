@@ -10,6 +10,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { abstractNames } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+// FAA-72: on Linux the lock needs a Node that binds an abstract socket name exactly (22 and later); Node 18 and 20
+// refuse to hold it (fabric-lock.mjs), and lock-old-node-refuses.test.mjs holds that refusal.
+const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 'exact' && `Node ${process.version} cannot hold the Linux lock`;
 
 const kit = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const python = process.platform === 'win32' ? 'python' : 'python3';
@@ -137,7 +141,7 @@ print(json.dumps([fs.lock_name(p, platform) for p, platform in json.loads(sys.ar
 const onLinuxOrWindows = !['linux', 'win32'].includes(process.platform) && 'needs Linux or Windows';
 const temp = () => tempDir('fabric-platform-');
 
-test('a Python copy is refused while a Node copy holds the lock, and the probe sees it', { skip: onLinuxOrWindows || (!hasPython && 'needs python') }, async () => {
+test('a Python copy is refused while a Node copy holds the lock, and the probe sees it', { skip: onLinuxOrWindows || noLinuxLock || (!hasPython && 'needs python') }, async () => {
   const dir = temp();
   const lock = await new k.InstanceLock(dir).acquire();
   try {
@@ -156,7 +160,7 @@ except fs.AlreadyRunning as e:
   }
 });
 
-test('a Node copy is refused while a Python copy holds the lock', { skip: onLinuxOrWindows || (!hasPython && 'needs python') }, async () => {
+test('a Node copy is refused while a Python copy holds the lock', { skip: onLinuxOrWindows || noLinuxLock || (!hasPython && 'needs python') }, async () => {
   const dir = temp();
   const holder = spawn(python, ['-c', `
 import sys, time; from pathlib import Path

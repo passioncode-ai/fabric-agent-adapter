@@ -9,6 +9,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { abstractNames } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+// FAA-72: on Linux the lock needs a Node that binds an abstract socket name exactly (22 and later); Node 18 and 20
+// refuse to hold it (fabric-lock.mjs), and lock-old-node-refuses.test.mjs holds that refusal.
+const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 'exact' && `Node ${process.version} cannot hold the Linux lock`;
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const temp = () => tempDir('fabric-supervisor-');
@@ -207,7 +211,7 @@ print(json.dumps([fs.systemd_unit("example-agent.default.service", argv, working
   assert.equal(k.taskXml('\\PassionCode\\example-agent.default', ['C:\\x.exe', ...argv.slice(1)], { workingDirectory: 'C:\\w x', description: 'Ex & <y>', user: 'H\\u' }), pyTask);
 });
 
-test('a copy systemd restarts backs off on a held lock; a hand start does not', async (t) => {
+test('a copy systemd restarts backs off on a held lock; a hand start does not', { skip: noLinuxLock }, async (t) => {
   const saved = process.env[k.SUPERVISOR_ENV];
   t.after(() => { if (saved === undefined) delete process.env[k.SUPERVISOR_ENV]; else process.env[k.SUPERVISOR_ENV] = saved; });
   const dir = temp();
@@ -311,7 +315,7 @@ async function startAgainstHeldLock(env, argv, { holderPidKnown = true } = {}) {
     sideEffects: after.filter((name) => !before.includes(name)), outcome };
 }
 
-test('the kit\'s starts against a held lock conform (FAC-SEM-078)', async () => {
+test('the kit\'s starts against a held lock conform (FAC-SEM-078)', { skip: noLinuxLock }, async () => {
   const exe = '/opt/example-agent/bin/example-agent';
   const starts = [
     ['by hand', {}, [exe, 'serve'], true],
