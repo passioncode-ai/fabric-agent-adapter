@@ -85,3 +85,19 @@ test('OpenClaw malformed, disabled and unrelated MCP entries do not imply Fabric
     assert.deepEqual(calls, [{}]);
   }
 });
+
+test('OpenClaw runs the helper once per workspace and registration, not per prompt (FAA-69)', async () => {
+  const calls = [];
+  let fail = true;
+  const handler = register(async (...args) => {
+    calls.push(args);
+    if (fail) { fail = false; throw new Error('first run fails'); }
+    return 'context for ' + args[1];
+  });
+  assert.equal(await handler({}, { workspaceDir: '/example/one' }), undefined, 'a failure is not kept');
+  for (let n = 0; n < 3; n++) {
+    assert.deepEqual(await handler({}, { workspaceDir: '/example/one' }), { prependContext: 'context for /example/one' });
+  }
+  assert.deepEqual(await handler({}, { workspaceDir: '/example/two' }), { prependContext: 'context for /example/two' });
+  assert.deepEqual(calls.map(c => c[1]), ['/example/one', '/example/one', '/example/two']);
+});

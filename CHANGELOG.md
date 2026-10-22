@@ -1,5 +1,129 @@
 # Changelog
 
+## 0.41.0 (2026-10-22)
+
+The 2026-10-22 audit, closed (FAA-68 to FAA-81; [report](docs/reports/2026-10-22-adapter-audit/README.md),
+[brief](docs/evidence/specs/2026-10-22-audit-fixes-brief.md)). Its 53 findings fell into six classes; each class got
+its fixes and a guard that fails the next instance. Each fix has a test; the builders' reports and the commit
+messages name the ones seen failing before the fix. Three blind readings (unit, seam, product) certified the result
+and their findings are fixed here too.
+
+### Fixed
+
+- **Session hooks and the delivery worker** (FAA-68). One JSON-RPC error or unreadable spool entry no longer blocks
+  a session's spool for good: the entry is logged by its code and dropped, and the end, the claim release and the end
+  observation still go out. `fabric-mcp` runs in its own process group and the whole group is ended at the deadline,
+  so a wrapper (`npx`, a shell script, `fabric-mcp.cmd`) cannot hold the worker for a minute. A process walk that
+  cannot read the processes spools nothing and releases nothing; a launched session is remembered. Turn facts are
+  measured when the turn ends (counts only). watch-mail keeps its delay between 10 s and 15 min after the jitter and
+  honours the once-a-minute rejoin mark. Stale spool folders are pruned even while the hooks are inert; a stale
+  worker lock is taken by an atomic rename, and its identity includes the write time and size (Linux reuses a freed
+  inode number at once). An end whose release got no answer stays for the next worker. On Windows a bare `fabric-mcp`
+  resolves to `fabric-mcp.cmd`.
+- **Host installers and the dashboard notice** (FAA-69). The SessionStart notice asks whether the repository owns a
+  service before it reads the tree, all within one 3.5 s budget. The Kimi installer repairs or removes a stale script
+  path; Kimi and Codex require the script to exist; Hermes `--remove` works without the source folder; the OpenCode
+  and OpenClaw bridges run the helper once per workspace, not per request, and never keep a failed run.
+- **The service kit's Python twin** (FAA-70). `launchd_plist` refuses what the Node twin refuses: a secret-shaped
+  argument or environment value, a bad label, an empty argv, an `ExitTimeOut` under the drain. `JobStore` and the
+  event log hold a lock per store path (one idempotency key made two jobs; a cancelled job became completed; 41 of
+  160 events were kept). `pause` checks for a terminal job first (both twins). The JWKS fetch has one 5 s deadline,
+  runs outside the cache lock and turns a garbage answer into `issuer-unavailable`. Whole-value patterns end in
+  `\Z`, so a trailing newline no longer validates. An origin written with its default port is accepted as Node
+  accepts it. A socket timeout is a timeout on Python 3.9. Non-object MCP params answer -32602. systemd
+  `Environment=` no longer doubles `$`. The sample service answers 400 to a bad `Content-Length` or body.
+- **The board responder** (FAA-77). A lost reply answer no longer leaves a request `accepted` for good: a transfer
+  re-derives the per-attempt keys after re-sending the old reply under its old key, and `idempotency_conflict` is its
+  own `board.blocked` event. One fenced call per entry at a time, and a `revision_conflict` on renew re-reads the
+  revision. An effect lost while the session holds the slot is observed and completed, or its slot is replaced so the
+  board records `outcome_unknown`. One lost answer keeps the session while the lease holds. Every transferred request
+  resumes, and a transfer survives a second lost answer (the request completes with one reply). The session's link
+  (MCP session, checkpoint, request) is its own module, `fabric_board_link` / `fabric-board-link.mjs`.
+- **Interop job keys** (FAA-70, FAA-77). A key admits only the intent it was first used for: another capability or
+  input is `idempotency-conflict` in `create` and `conflict` in `repeat`, which now takes the intent. A key file
+  written before 0.41.0 is answered with its job, and runs again only for the intent its job stored.
+- **Package, delegation and estate twins** (FAA-78). Both kits refuse a package path holding a control character,
+  U+2028 or U+2029, whatever the schema's pattern lets through (the contract owner was told). An unreadable folder
+  entry is refused instead of skipped (Python) or crashing (Node). Files are opened without following links. Node
+  reads JSON as strict UTF-8 and keeps a top-level `__proto__`; both cap nesting at 256 levels; dates take ASCII
+  digits. An explicit `null` estate, applied mark or revocation list fails closed in both kits. JWKS `x` must be
+  canonical base64url in both. Python Ed25519 signing is a Montgomery ladder that does not branch on the key. The
+  hub's loopback origin takes ASCII digits only. On Windows, `fabric.package.json` is written with `\n` like the Node
+  kit's, and the command line answers in UTF-8 whatever the console's code page.
+- **The adapting skill's scripts** (FAA-71). `fabric_provider.py write` refuses what the pinned provider schema
+  refuses (ports under 100, a non-URI repository, an argument over 1024 characters), refuses `--env` with `--url`
+  and a writer option after `--stdio`. `check` names every template value still present and keeps
+  `readyForAdmission` false; `check --contract` calls the checkout's own `tsx`, never `pnpm exec`; a client
+  `.mcp.json` is not an MCP surface; a non-UTF-8 manifest is a typed receipt. `scaffold --dry-run` prints the writes
+  and a diff of each collision.
+- **Dashboard probes and the link gate** (FAA-79). The layout probe never prints a login code (it starts the browser
+  before asking for one); ED-3 checks vertical clipping; ED-4 says NOT_RUN past its element cap. The handoff-link
+  gate normalises the path and refuses `code`, `api_key` and the other credential names. The "Get Fabric" menu link is
+  reachable by keyboard; the dashboard kit is 1.1.2.
+- **Installers** (FAA-80). `install.sh` leaves an existing copy alone without `--force` and never copies
+  `__pycache__`; both installers build a new copy beside the old and rename it, report each failure and exit 1.
+- **The support-agent recipe** (FAA-81). A reply carrying a link (bare host names included), address, phone number,
+  amount or number its cited entries do not contain goes to a person; links and addresses are compared by equality,
+  never as substrings; the customer's message reaches the model as fenced data. A promise written in words is not
+  caught, and the README says so. Decisions are an
+  append-only log; `prune --keep-days N` deletes old rows; the README says the outbox keeps customer text.
+
+### Changed
+
+- **CI follows the organization's rule** (FAA-72). `validate.yml` runs nightly on `main` and on dispatch, with job
+  timeouts and a concurrency group; a `contract` job installs the contract at the pin and at the legacy revision and
+  runs the tests that used to skip (one of them had rotted); a `floors` job runs Python 3.9 and Node 18; a `macos` job
+  runs both suites; Windows runs the session tests and the whole Node suite (16 tests that assumed POSIX now check
+  the Windows ACL or say why they skip). `engines.node` is `>=18` (the npm CLI); the Node service kit needs 20, and on
+  Linux its instance lock needs 22: Node 18 and early 20 collapse every abstract socket name into one, and later 20
+  pads it so no Python copy or probe sees it, so the kit refuses to start there with a sentence naming Node 22.
+- **The release path** (FAA-73). The tarball smoke test runs before the GitHub release is created; every action is
+  pinned to a commit SHA; npm and the Claude Code CLI are pinned; release titles carry no em dash; the dead
+  private-repository branch is gone. Moving npm publishing to trusted publishing (and removing `NPM_TOKEN`) waits on
+  the operator's npmjs.com sign-in.
+- **Skills and documents** (FAA-74, FAA-75). SECURITY.md and SKILL-CARD say what the probe and the kit really reach
+  and write; the `vault.py moved` command is correct; the secret tools have a path and a fallback; each skill's
+  NOT-for list names its siblings; shared blocks live in one reference; the building skill's description is 799
+  characters. `test/evals/run_evals.py` runs the trigger evals against a real client when asked; its first run scored
+  25/25 on `adapting-projects-to-fabric`.
+
+### Guards (each fails on a planted defect)
+
+- `validate.py` refuses a `$`-anchored whole-value pattern in every skill's scripts (R1; it found a real one in
+  `adapt_project`'s cost preset id), an em dash under
+  `.github/` (R6), and a workflow that floats an action, uses `@latest`, lacks a timeout, drops the nightly or gated
+  jobs, gains a push or PR trigger, or creates the release before the smoke test (R5).
+- Shared hostile-input fixtures run by both twins: `kit-hostile-inputs-core.json`, `kit-hostile-inputs-package.json`,
+  `kit-hostile-inputs-estate.json` (R1).
+- Fault-injection tests for the spool, the worker, the responder and the package walk (R2); concurrency tests for every
+  store a threaded server reaches (R3).
+- `test_a_released_version_keeps_its_digests`: a release's `kit.json` history entry stays what the release shipped (a
+  build before the version moved on had rewritten 0.40.0's, which would have read genuine 0.40.0 copies as modified).
+  It runs in a clone that has the release tags (a full local clone); the shallow hosted checkout skips it (FAA-82).
+- Two timing tests no longer fail on a loaded host: the runner probe's positive cases take the most a probe may take,
+  and the interop probe test lets the machine-timing verdict be the one that fails.
+
+### Upgrading
+
+- **A service built on the copied kit:** `fabric_kit.py status <dir>` names the modules to update; `fabric_kit.py install
+  <dir>` brings the closure, `fabric_board_link` included. Passing `estate=None` (or `estate_applied=None`,
+  `estate_revocations=None`) on purpose now refuses every token as `estate-unreadable`: leave the option out instead.
+- **A Linux service on the Node kit:** run it on Node 22 or later; on 18 or 20 it stops at start with a sentence saying so.
+- **A scaffolded bundle:** new scaffolds write a `urn:fabric:adapter:template` block into `fabric-agent.json` and take
+  `--data-class`, `--created-by`, `--identity-method` and `--probe-assertion`. Rerun `check`: an older bundle that still
+  holds the template's author, schemas or assertions now reads `readyForAdmission: false` until they are replaced.
+- **A dashboard on kit 1.1.1:** the SessionStart notice now points at 1.1.2; `dashboard_kit.py install` updates it.
+- **The support recipe:** its state moves to `decisions.jsonl` (an old `decisions.json` is still read); handoff rows gain
+  `question` and `at`, and new reasons `unsupported:url|email|phone|amount|number`. Run `prune --keep-days N` once, then
+  delete `decisions.json`.
+- **Links you hand out:** the gate now refuses a query or fragment name such as `code`, `key`, `auth` or `api_key`, and
+  a path with a dot segment or an encoded separator.
+- **Installing:** a copy already in the hub is kept unless `--force` (both installers); the npm installer reports each
+  skill `up to date`, `differs` or installed, and never copies Python bytecode.
+- **Open human step:** moving npm publishing to trusted publishing and deleting `NPM_TOKEN` needs the operator's
+  npmjs.com sign-in.
+
+
 ## 0.40.0 - 2026-10-21
 
 The kits as production modules (FAA-65). Every name a kit module made public at 0.39.1 is still there; a service that

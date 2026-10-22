@@ -24,6 +24,9 @@
     {"query": "Create a generic A2A server from scratch.", "shouldTrigger": false},
     {"query": "Build a new Fabric agent that runs in our organization's cloud and picks its models on OpenRouter.", "shouldTrigger": true},
     {"query": "создай агента под фабрику, который работает в облаке организации и сам учится на ошибках", "shouldTrigger": true},
-    {"query": "Which OpenRouter model is cheapest for classifying support tickets in my existing script?", "shouldTrigger": false}
+    {"query": "Which OpenRouter model is cheapest for classifying support tickets in my existing script?", "shouldTrigger": false},
+    {"query": "Turn example-agent into an always-on local Fabric service with a dashboard and launchd.", "shouldTrigger": false, "note": "sibling: building-fabric-services"},
+    {"query": "Подключись к Fabric и проверь доску проекта перед работой.", "shouldTrigger": false, "note": "sibling: working-with-fabric"},
+    {"query": "Подключи существующий проект к Fabric: подготовь fabric-agent.json для его CLI.", "shouldTrigger": false, "note": "sibling: adapting-projects-to-fabric"}
   ]
 }

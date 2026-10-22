@@ -31,6 +31,13 @@ const SECRET_FILE = /^(\.env(\..+)?|.*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|d
 const SECRET_FILE_OK = /^\.env\.(example|sample|template)$/;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const PKCS8_ED25519 = Buffer.from('302e020100300506032b657004220420', 'hex');
+/**
+ * How deep a document read from disk may nest. Python's recursion limit and Node's stack give out at different depths,
+ * so both readers refuse past this one, well below either (FAA-78, finding 43); no package document comes near it.
+ */
+export const MAX_NESTING = 256;
+/** Strict UTF-8: invalid bytes are a refusal, never replaced, so the bytes read are the bytes signed (finding 43). */
+const strictUtf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 import { isObject, objects, jsonEqual } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 
@@ -48,7 +55,15 @@ export const sha256Of = (data) => `sha256:${crypto.createHash('sha256').update(d
 /** SHA-256 over the UTF-8 RFC 8785 form of the package without digest and signatures (DEC-0050). */
 export function packageDigest(pkg) {
   const { digest: _d, signatures: _s, ...covered } = pkg;
-  return sha256Of(Buffer.from(jcs(covered), 'utf8'));
+  let text;
+  try {
+    text = jcs(covered);
+  } catch (error) {
+    // Nested past the stack: no form this kit can write, as Python's RecursionError is none.
+    if (error instanceof RangeError) throw new TypeError('the package nests too deeply to have an RFC 8785 form');
+    throw error;
+  }
+  return sha256Of(Buffer.from(text, 'utf8'));
 }
 
 /** The bytes a package signature covers (DEC-0051); the role is inside, so no signature stands for another role. */
@@ -117,7 +132,9 @@ const schema = () => (schemaCache ??= JSON.parse(fs.readFileSync(SCHEMA_FILE, 'u
 
 
 const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v === 'number' ? (Number.isInteger(v) ? 'integer' : 'number') : typeof v);
-const DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(\.\d+)?([Zz]|[+-](\d{2}):(\d{2}))$/;
+const DATE_TIME = /^([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?([Zz]|[+-]([0-9]{2}):([0-9]{2}))$/;
+const MONTH_DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const leap = (year) => year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 
 function formatOk(format, value) {
   if (!isString(value)) return true;
@@ -125,8 +142,9 @@ function formatOk(format, value) {
     const m = DATE_TIME.exec(value);
     if (!m) return false;
     const [y, mo, d, h, mi, s] = m.slice(1, 7).map(Number);
-    const days = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-    if (mo < 1 || mo > 12 || d < 1 || d > days || h > 23 || mi > 59 || s > 59) return false;
+    // The proleptic calendar the contract's ajv-formats checks: year 0000 exists and is a leap year (0000-02-29 holds).
+    // Counted here, not with Date.UTC, which reads years 0 to 99 as 1900 to 1999.
+    if (mo < 1 || mo > 12 || d < 1 || d > (mo === 2 && leap(y) ? 29 : MONTH_DAYS[mo]) || h > 23 || mi > 59 || s > 59) return false;
     return m[8] === 'Z' || m[8] === 'z' || (Number(m[9]) < 24 && Number(m[10]) < 60);
   }
   if (format === 'uri') return /^[A-Za-z][A-Za-z0-9+.-]*:\S*$/.test(value);
@@ -289,6 +307,50 @@ function mcpRoles(value) {
   return findings;
 }
 
+// --- the path rule (FAA-78, finding 40; decision D5) -------------------------------------------------------------------
+
+/** C0 and C1 controls, DEL, and the two Unicode line terminators JavaScript's `.` stops at. */
+const control = (code) => code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+
+/**
+ * Why `p` is no packaged path, or null. The schema's pattern says the same in one expression, but JavaScript's `.`
+ * stops at U+2028 and U+2029, so here and in the contract's own ajv its look-aheads never see a `..`, a backslash or a
+ * `//` after one (`a\u2028/../../etc/passwd` passes there). This rule reads the path character by character in both
+ * kits, and refuses C1 controls, DEL and the line terminators besides. A non-string is the schema's to refuse.
+ */
+export function pathProblem(p) {
+  if (!isString(p)) return null;
+  const chars = [...p];
+  if (chars.length < 1 || chars.length > 256) return 'a path is 1 to 256 characters';
+  if (chars.some((ch) => control(ch.codePointAt(0)))) return 'a path carries no control character and no line or paragraph separator';
+  if (p[0] === '/' || p[0] === '~') return 'a path is relative to the package folder: it never starts with / or ~';
+  if (p.includes('\\') || p.includes(':')) return 'a path is written with forward slashes and no colon';
+  if (p.includes('//') || p.endsWith('/')) return 'a path names a file: no empty segment and no trailing slash';
+  if (p.split('/').some((segment) => segment === '.' || segment === '..')) return 'a path never steps through . or ..';
+  return null;
+}
+
+/** Every member the schema types as a path, by its JSON pointer. */
+function pathFields(pkg) {
+  const fields = [['/provider', pkg.provider]];
+  if (isObject(pkg.evals)) fields.push(['/evals/suite', pkg.evals.suite]);
+  for (const name of ['state', 'dependencies', 'files']) {
+    (Array.isArray(pkg[name]) ? pkg[name] : []).forEach((entry, index) => { if (isObject(entry)) fields.push([`/${name}/${index}/path`, entry.path]); });
+  }
+  return fields.filter(([, value]) => value !== undefined);
+}
+
+/** The path rule over every path the package names: `{instancePath, message}` per path refused. */
+export function pathProblems(pkg) {
+  if (!isObject(pkg)) return [];
+  const out = [];
+  for (const [instancePath, value] of pathFields(pkg)) {
+    const message = pathProblem(value);
+    if (message !== null) out.push({ instancePath, message });
+  }
+  return out;
+}
+
 /** FAC-SEM-064 (whole), 065 (no secret), 066 (agentRef derived) and 102 (one role, one server), in that order. */
 export const packageFindings = (pkg) => [...whole(pkg), ...noSecret(pkg), ...agentRefRule(pkg), ...mcpRoles(pkg)];
 
@@ -297,7 +359,7 @@ export const packageFindings = (pkg) => [...whole(pkg), ...noSecret(pkg), ...age
 const parsed = (bytes) => {
   if (bytes === undefined) return undefined;
   try {
-    const value = JSON.parse(Buffer.from(bytes).toString('utf8'));
+    const value = JSON.parse(strictUtf8.decode(bytes)); // invalid UTF-8 is no manifest, in both kits
     return isObject(value) ? value : undefined;
   } catch {
     return undefined;
@@ -389,10 +451,37 @@ export function consumerPlacement(pkg, configured) {
 const litter = (name) => (JUNK.test(name) ? 'litter' : SECRET_FILE.test(name) && !SECRET_FILE_OK.test(name) ? 'a credential file' : null);
 const utf16Order = (a, b) => (a < b ? -1 : a > b ? 1 : 0); // JavaScript compares strings by UTF-16 code units
 
+/** Opening a packaged file: never through a link (where the platform can say so), never waiting on a pipe (finding 42). */
+const FILE_FLAGS = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0);
+/** What open() answers for a link it was told not to follow: ELOOP on Linux and macOS, EMLINK on FreeBSD. */
+const LINK_CODES = new Set(['ELOOP', 'EMLINK']);
+
+const unreadable = (where, error) => new PackageError(`Cannot read ${where || '.'}: ${error.code ?? error.message}.`);
+
+/** The file's bytes, or the reason it is not read: a link, or not a regular file. Throws the system's error. */
+function readRegular(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, FILE_FLAGS);
+  } catch (error) {
+    if (fs.constants.O_NOFOLLOW !== undefined && LINK_CODES.has(error.code)) return { why: 'a symlink' };
+    throw error;
+  }
+  try {
+    if (!fs.fstatSync(fd).isFile()) return { why: 'not a regular file' };
+    return { bytes: fs.readFileSync(fd) };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 /**
  * Every regular file under `folder` by its forward-slash path. Refuses a symlink, a special file, version-control or
- * cache litter, and a file that is a credential by its name — each named, so the person can remove it or pack a clean
- * copy.
+ * cache litter, and a file that is a credential by its name, each named, so the person can remove it or pack a clean
+ * copy. A file or folder it cannot read is a refusal naming it (`Cannot read <path>: EACCES.`), never a crash (FAA-78,
+ * finding 41); a file is opened without following a link and read only when it is a regular file (finding 42). Node
+ * has no openat, so a folder swapped for a link mid-walk is checked by lstat before and after it is listed; the Python
+ * twin holds each folder open instead.
  */
 export function readFolder(folder) {
   let stat;
@@ -401,12 +490,31 @@ export function readFolder(folder) {
   const files = new Map();
   const refused = [];
   const walk = (dir, rel) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => utf16Order(a.name, b.name))) {
+    let entries;
+    let before;
+    try {
+      before = rel ? fs.lstatSync(dir) : null;
+      entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => utf16Order(a.name, b.name));
+    } catch (error) {
+      throw unreadable(rel, error);
+    }
+    if (before && !before.isDirectory()) { refused.push(`${rel} (a symlink)`); return; }
+    for (const entry of entries) {
       const where = rel ? `${rel}/${entry.name}` : entry.name;
-      const why = entry.isSymbolicLink() ? 'a symlink' : litter(entry.name) ?? (entry.isDirectory() || entry.isFile() ? null : 'not a regular file');
-      if (why) { refused.push(`${where} (${why})`); continue; }
-      if (entry.isDirectory()) walk(path.join(dir, entry.name), where);
-      else files.set(where, fs.readFileSync(path.join(dir, entry.name)));
+      let why = entry.isSymbolicLink() ? 'a symlink' : litter(entry.name) ?? (entry.isDirectory() || entry.isFile() ? null : 'not a regular file');
+      if (!why && entry.isDirectory()) { walk(path.join(dir, entry.name), where); continue; }
+      if (!why) {
+        let read;
+        try { read = readRegular(path.join(dir, entry.name)); } catch (error) { throw unreadable(where, error); }
+        if (read.why === undefined) { files.set(where, read.bytes); continue; }
+        why = read.why;
+      }
+      refused.push(`${where} (${why})`);
+    }
+    if (before) {
+      let after;
+      try { after = fs.lstatSync(dir); } catch (error) { throw unreadable(rel, error); }
+      if (!after.isDirectory() || after.ino !== before.ino || after.dev !== before.dev) refused.push(`${rel} (a symlink)`);
     }
   };
   walk(folder, '');
@@ -414,8 +522,15 @@ export function readFolder(folder) {
   return files;
 }
 
-/** JSON.parse that refuses a member named twice in one object, as the Python kit's reader does. */
-function parseStrict(text, what) {
+/**
+ * A JSON object from strict UTF-8 bytes (a string is taken as decoded already): no member named twice, nesting at most
+ * MAX_NESTING deep, as the Python kit's reader. Every refusal is a PackageError.
+ */
+function parseStrict(input, what) {
+  let text = input;
+  if (typeof input !== 'string') {
+    try { text = strictUtf8.decode(input); } catch (error) { throw new PackageError(`${what} is not JSON: ${error.message}`); }
+  }
   let value;
   try { value = JSON.parse(text); } catch (error) { throw new PackageError(`${what} is not JSON: ${error.message}`); }
   const stack = [];
@@ -423,6 +538,7 @@ function parseStrict(text, what) {
   const skipString = () => { i += 1; let s = ''; while (text[i] !== '"') { if (text[i] === '\\') { s += text.slice(i, i + 2); i += 2; } else { s += text[i]; i += 1; } } i += 1; return JSON.parse(`"${s}"`); };
   while (i < text.length) {
     const c = text[i];
+    if ((c === '{' || c === '[') && stack.length >= MAX_NESTING) throw new PackageError(`${what} nests deeper than ${MAX_NESTING} levels.`);
     if (c === '{') { stack.push({ keys: new Set(), expectKey: true }); i += 1; } else if (c === '[') { stack.push(null); i += 1; } else if (c === '}' || c === ']') { stack.pop(); i += 1; } else if (c === ',') { const top = stack.at(-1); if (top) top.expectKey = true; i += 1; } else if (c === '"') {
       const top = stack.at(-1);
       const s = skipString();
@@ -451,20 +567,28 @@ export function compose(draft, files) {
     throw new PackageError(`agentRef is derived, never chosen: it is ${agentRefOf(draft.publisher, draft.id)} for this publisher and id (FAC-SEM-066). Remove agentRef or fix publisher/id.`);
   }
   const pkg = {};
+  // A member is defined, never assigned: `pkg.__proto__ = v` would set the prototype and drop the member, where the
+  // Python twin keeps it for the schema to refuse (finding 43).
+  const put = (key, value) => Object.defineProperty(pkg, key, { value, enumerable: true, writable: true, configurable: true });
   for (const [key, value] of Object.entries(draft)) {
     if (key === 'files' || key === 'digest' || key === 'signatures' || (agent && key === 'agentRef')) continue;
-    pkg[key] = value;
-    if (agent && key === 'publisher') pkg.agentRef = agentRefOf(draft.publisher, draft.id);
+    put(key, value);
+    if (agent && key === 'publisher') put('agentRef', agentRefOf(draft.publisher, draft.id));
   }
   if (Array.isArray(draft.signatures) && draft.signatures.length) notes.push(`dropped ${draft.signatures.length} signature(s): a repacked package is signed again`);
   pkg.files = [...files.keys()].filter((p) => p !== PACKAGE_FILE).sort(utf16Order).map((p) => ({ path: p, sha256: sha256Of(files.get(p)) }));
-  pkg.digest = packageDigest(pkg);
+  try {
+    pkg.digest = packageDigest(pkg);
+  } catch (error) {
+    throw new PackageError(`fabric.package.json has no RFC 8785 form, so it has no digest: ${error.message}`);
+  }
   return { pkg, notes };
 }
 
 function allProblems(pkg, files) {
   return [
     ...schemaProblems(pkg).map((p) => ({ ...p, rule: 'schema' })),
+    ...pathProblems(pkg).map((p) => ({ ...p, rule: 'path' })),
     ...packageFindings(pkg).map((p) => ({ ...p, rule: p.code })),
     ...checkPackageFolder(pkg, files).map((p) => ({ rule: 'folder', problem: p.problem, instancePath: p.path, message: p.problem })),
   ];
@@ -483,7 +607,7 @@ export function pack(folder, { apply = false } = {}) {
   if (!files.has(PACKAGE_FILE)) {
     throw new PackageError(`Write ${PACKAGE_FILE} in the folder first: schema, kind, id, version, publisher, licence and, for an agent, resultSignal and evals with its receipt. pack fills in agentRef, files[] and digest.`);
   }
-  const draft = parseStrict(files.get(PACKAGE_FILE).toString('utf8'), PACKAGE_FILE);
+  const draft = parseStrict(files.get(PACKAGE_FILE), PACKAGE_FILE);
   const { pkg, notes } = compose(draft, files);
   const problems = allProblems(pkg, files);
   const suite = isObject(pkg.evals) ? pkg.evals.suite : undefined;
@@ -501,7 +625,7 @@ export function pack(folder, { apply = false } = {}) {
 function packed(folder) {
   const files = readFolder(folder);
   if (!files.has(PACKAGE_FILE)) throw new PackageError(`${folder} has no ${PACKAGE_FILE}: pack it first.`);
-  return { pkg: parseStrict(files.get(PACKAGE_FILE).toString('utf8'), PACKAGE_FILE), files };
+  return { pkg: parseStrict(files.get(PACKAGE_FILE), PACKAGE_FILE), files };
 }
 
 /**
@@ -565,7 +689,7 @@ export function main(argv, print = (line) => process.stdout.write(`${line}\n`)) 
       answer = sign(folder, flags.key, { role: flags.role ?? 'publisher', kid: flags.kid, apply: Boolean(flags.apply) });
     } else {
       let trustText;
-      try { trustText = fs.readFileSync(flags.trust, 'utf8'); } catch (error) { throw new PackageError(`Cannot read ${flags.trust}: ${error.code ?? error.message}.`); }
+      try { trustText = fs.readFileSync(flags.trust); } catch (error) { throw new PackageError(`Cannot read ${flags.trust}: ${error.code ?? error.message}.`); }
       answer = verify(folder, parseStrict(trustText, flags.trust), { countersigned: Boolean(flags.countersigned) });
     }
   } catch (error) {

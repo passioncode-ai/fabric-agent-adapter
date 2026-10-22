@@ -1,11 +1,11 @@
 ---
 name: creating-fabric-agents
-description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit, «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch", «агент в облаке организации», "which models and OpenRouter key for a new Fabric agent". Runs the intake grill (capability, named consumer, workflow-or-agent, MCP/A2A/local-runner profile, effect declarations, where it runs, models, who pays, how it learns), distils source projects into a knowledge pack whose recorded failures become planted eval fixtures, scaffolds the pinned contract bundle, and sets the two-clock eval expectation with the conformance report. NOT for adapting an existing project (use adapting-projects-to-fabric), building the Fabric host or orchestrator, or generic agent design where Fabric compatibility is not part of the request.
+description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit, «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch", «агент в облаке организации», "which models and OpenRouter key for a new Fabric agent". Runs the intake grill (capability, named consumer, workflow or agent, profile, effects, where it runs, models, who pays, how it learns), turns source projects' recorded failures into planted eval fixtures, scaffolds the pinned contract bundle and sets the canary expectation. NOT for adapting an existing project (adapting-projects-to-fabric), making an agent a local or online Fabric service with a dashboard (building-fabric-services), a coding session working through Fabric or its board (working-with-fabric), the Fabric host or orchestrator, or agent design without Fabric.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.40.0"
+  version: "0.41.0"
   contract-version: "0.1.0"
   contract-commit: "c55f2d5a11c9a0197e958e87212fca7ae1154769"
 ---
@@ -24,6 +24,10 @@ Use this skill to design and build a new provider. Do not use it to:
 
 - adapt a project that already has a stable API, MCP/A2A surface, or CLI: that is
   `adapting-projects-to-fabric`, and entering there skips nothing;
+- run an agent as a local or online service with a dashboard on its own: that is
+  `building-fabric-services` (step 4 hands over to it for a new agent that needs one);
+- work in a project through Fabric from a coding session (the board, claims): that is
+  `working-with-fabric`;
 - design the Fabric host, registry, scheduler, admission service, or binding runtime;
 - build a generic agent with no Fabric requirement: nothing here helps a project that
   will never be a provider;
@@ -99,30 +103,21 @@ authored now: it grows from real traces once the provider runs, and the step-1 f
 are its seed because a source project's recorded failures count as production.
 
 **For a PassionCode.ai repository**, the new agent's repository follows the organization's
-[repository standard](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/repository-standard.md) (`knowledge/repository-standard.md`
-in the organization's knowledge base; a clone has it at `fabric-workspace/knowledge/`) from its
-first commit:
+repository standard (`knowledge/repository-standard.md`) from its first commit: the licence files,
+the README quick start verified with a real client, `AGENTS.md` and `CLAUDE.md`, as
+[the operator channel and the repository standard](references/operator-channel-and-repository.md)
+lists them. An agent someone builds for themselves is not a PassionCode.ai repository: its licence
+is its owner's choice and none of those files is required of it.
 
-- `LICENSE`, `COMMERCIAL-LICENSE.md` and `CLA.md` copied byte for byte from the knowledge base's
-  `templates/`, and `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial` in every manifest and
-  every SKILL.md `license:`; `SECURITY.md` when the repository is public;
-- a README whose first heading is the full name, with `## Quick start for a new teammate`
-  (Install; Configure, key names only; MCP, the registration command and one proving tool call,
-  verified with a real client in a temporary config; Develop) and `## License`;
-- an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
-  and a `CLAUDE.md` whose first line is `@AGENTS.md`.
-
-**Every credential the agent uses comes from Project Observatory, by name**, from its first
-commit: the README's Configure section lists key NAMES; the agent finds them with
-`observatory_credentials` and runs with `use_secret.py run --vault-only` (a long-running
-service: `use_secret.py serve`), with `OBSERVATORY_VAULT_ONLY=1` in its environment. No `.env`
-of its own, no key file beside its data, no value in code, configuration or a commit. A
-workflow names the keys it needs in its checkpoint (`credentials`), never their values.
-
-org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
-someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
-choice, nothing about it is published or listed by the organization, and none of these files is
-required of it, though the verified MCP quick start is still how anyone learns to drive it.
+**Every credential the agent uses is read by name, never held as a value**, from its first commit:
+the README's Configure section lists key NAMES. With Project Observatory installed, the agent finds
+them with `observatory_credentials` and runs under
+`python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only <project> <NAME> -- <command>`
+(a long-running service: `use_secret.py serve`), with `OBSERVATORY_VAULT_ONLY=1` in its environment.
+Without it, the person's OS keychain or secret manager injects the key into the agent's environment
+at start. Either way: no `.env` of its own, no key file beside its data, no value in argv, code,
+configuration or a commit. A workflow names the keys it needs in its checkpoint (`credentials`),
+never their values.
 
 ## Step 3: scaffold the provider bundle
 
@@ -193,31 +188,11 @@ purpose. Then record one expectation the report must carry:
 ## Step 6: propose the operator channel
 
 If the agent has a human stop (a choice, an approval, a confirmation) or emits `notify: true`
-events, propose its **operator channel** to the operator once, now. The channel is the agent's
-own messenger channel, first Telegram, that sends those events and answers its stops with
-buttons: `fabric-operator-channel/0.1` (contract DEC-0034,
-`docs/specification/operator-channel.md`), whose rule OC-11 this step follows. Give the
-operator's four steps:
-
-1. create a bot with @BotFather;
-2. put its token into the secret store (Project Observatory) under the name the agent reads
-   (for example `EXAMPLE_AGENT_TELEGRAM_BOT_TOKEN`), never into a chat, a file or the bundle;
-3. run the agent's link command;
-4. type the code it shows in the chat with the bot.
-
-In a group shared with other bots the channel follows OC-14…OC-17 (DEC-0035): it stays silent
-unless addressed (`/command@ThisBot`, a reply to its own message or a press of its own button; a
-bare `/command` in a group is not addressed), and a channel nobody receives on is `degraded`
-(`receiver-missing`). Say so in the proposal when the operator means to bind a shared group.
-
-Record the answer (`accepted`, `declined` or `later`) in the agent's state and in the
-report, and do not ask again; an agent that serves `surfaces.operatorChannel` also shows it as
-`proposal` in its status document. Creating the bot, storing the token and enabling the channel are the
-operator's action: never create the bot, ask for or store the token's value, or enable the
-channel yourself. The default pin carries DEC-0034 and DEC-0035: a served status document is checked against
-the pinned `schemas/operator-channel-status.schema.json`; the channel's runtime rules have no
-probe rule here yet, so report them `NOT_RUN`. An agent with neither stops nor notify
-events skips this step.
+events, propose its operator channel (`fabric-operator-channel/0.1`, OC-11) to the operator once,
+now, as the shared reference linked at step 2 describes: the
+operator's four steps, the answer recorded and never asked again, and the bot, the token and
+enabling the channel left to the operator. An agent with neither stops nor notify events skips
+this step.
 
 ## Resilience and autonomy
 
@@ -239,12 +214,6 @@ operator channel answer (step 6); and the exact next command. Never summarize th
 
 ## Dashboard handoff: also for consumers
 
-When handing a registered service dashboard to a person, or writing the generated
-agent's completion/notification instructions, read and apply
-[dashboard links](references/dashboard-links.md): use the host's `open_link`,
-check the target device and host, and run the bundled output gate before delivery.
-An installed host failure never means browser fallback. This applies in Claude
-Code, Codex and other providers; it needs no host-specific hook. MCP unavailable:
-report the unresolved capability or use an approved project resolver; no automatic
-client configuration. Python unavailable: perform the reference's manual checks
-and report the executable gate NOT_RUN. Headless agents need no dashboard.
+When handing a registered service dashboard to a person, or writing the generated agent's
+completion or notification instructions, read and apply [dashboard links](references/dashboard-links.md)
+and run its output gate before delivery, in any host. Headless agents need no dashboard.

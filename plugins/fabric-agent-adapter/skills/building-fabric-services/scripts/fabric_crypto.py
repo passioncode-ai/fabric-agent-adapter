@@ -2,19 +2,22 @@
 
 - ``ed25519_verify(public_key, message, signature)`` (RFC 8032) and ``is_small_order_key`` with
   ``SMALL_ORDER_ENCODINGS``: a key of small order verifies forged signatures and is refused (DEC-0045).
-- ``is_valid_p256_key`` and ``es256_verify`` (ECDSA P-256 over SHA-256, DER or raw signatures) for passkeys.
+- ``is_valid_p256_key`` and ``es256_verify`` (ECDSA P-256 over SHA-256, the signature in DER) for passkeys.
+- ``ed25519_sign`` and ``ed25519_seed_public_key`` (RFC 8032), which ``fabric_package`` signs with, over ``ed_mul_secret``.
 - base64url without padding (``b64url``, ``b64url_bytes``, ``node_base64``) and ``sha256``.
 
-Pure Python over integers: slow next to OpenSSL, constant inputs only, verification only. Nothing here signs.
-Standard library only; imports only ``fabric_jsvalue``.
+Pure Python over integers, slow next to OpenSSL. Verification multiplies public values only and takes the short path;
+a secret scalar goes through ``ed_mul_secret``, a ladder that runs the same 256 steps whatever its bits are (FAA-78,
+finding 45). Python's integers do not promise constant-time arithmetic, so that removes the branch on the secret, not
+every timing difference: the signer stays a local, one-shot command line, never a service that signs for others.
+Standard library only; imports no other kit module.
 """
 from __future__ import annotations
 
 import base64
 import hashlib
-import re
-from typing import Any, Optional, Tuple
 import secrets
+from typing import Optional, Tuple
 
 
 # The small-order points of edwards25519 and their non-canonical encodings, sign bit cleared (the contract's
@@ -65,6 +68,50 @@ def _ed_mul(scalar: int, point: Tuple[int, int, int, int]) -> Tuple[int, int, in
         point = _ed_add(point, point)
         scalar >>= 1
     return result
+
+
+def _ed_cswap(a: Tuple[int, int, int, int], b: Tuple[int, int, int, int], bit: int) -> Tuple[Tuple[int, int, int, int], Tuple[int, int, int, int]]:
+    """``(b, a)`` when ``bit`` is 1, ``(a, b)`` when it is 0, by arithmetic rather than a branch on ``bit``."""
+    deltas = [(x - y) * bit for x, y in zip(a, b)]
+    return (tuple(x - d for x, d in zip(a, deltas)), tuple(y + d for y, d in zip(b, deltas)))  # type: ignore[return-value]
+
+
+def ed_mul_secret(scalar: int, point: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    """``[scalar]point`` for a secret scalar below 2**256: a Montgomery ladder over all 256 bits with a conditional
+    swap, so every scalar takes one addition and one doubling per bit and no step depends on a bit (finding 45). The
+    addition law is complete on edwards25519, so the ladder needs no special case for the identity or a doubling."""
+    r0, r1 = (0, 1, 1, 0), point
+    for i in range(255, -1, -1):
+        bit = (scalar >> i) & 1
+        r0, r1 = _ed_cswap(r0, r1, bit)
+        r1 = _ed_add(r0, r1)
+        r0 = _ed_add(r0, r0)
+        r0, r1 = _ed_cswap(r0, r1, bit)
+    return r0
+
+
+def _secret_scalar(seed: bytes) -> Tuple[int, bytes]:
+    h = hashlib.sha512(seed).digest()
+    a = int.from_bytes(h[:32], "little")
+    a &= (1 << 254) - 8
+    a |= 1 << 254
+    return a, h[32:]
+
+
+def ed25519_seed_public_key(seed: bytes) -> bytes:
+    """The 32-byte public key of a 32-byte Ed25519 seed (RFC 8032 §5.1.5)."""
+    return _ed_encode_point(ed_mul_secret(_secret_scalar(seed)[0], _ED_G))
+
+
+def ed25519_sign(seed: bytes, message: bytes) -> bytes:
+    """A deterministic Ed25519 signature (RFC 8032 §5.1.6); the same seed and message give the bytes Node's crypto.sign
+    gives. Both secret multiplications (the key's scalar, the nonce) go through ``ed_mul_secret``."""
+    a, prefix = _secret_scalar(seed)
+    public = _ed_encode_point(ed_mul_secret(a, _ED_G))
+    r = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little") % _ED_L
+    big_r = _ed_encode_point(ed_mul_secret(r, _ED_G))
+    k = int.from_bytes(hashlib.sha512(big_r + public + message).digest(), "little") % _ED_L
+    return big_r + ((r + k * a) % _ED_L).to_bytes(32, "little")
 
 
 def _ed_decode_point(data: bytes) -> Optional[Tuple[int, int, int, int]]:

@@ -14,6 +14,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 from fabric_base import (
     ServiceError,
     now_iso,
+    store_lock,
 )
 from fabric_paths import (
     atomic_write,
@@ -32,13 +33,13 @@ EVENTS_MAX_LIMIT = 200
 LEVELS = ("info", "notice", "warning", "error")
 
 
-_KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}$")
+_KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}\Z")
 
 
-_TRACE_ID = re.compile(r"^(?!0{32}$)[0-9a-f]{32}$")
+_TRACE_ID = re.compile(r"^(?!0{32}\Z)[0-9a-f]{32}\Z")
 
 
-_SPAN_ID = re.compile(r"^(?!0{16}$)[0-9a-f]{16}$")
+_SPAN_ID = re.compile(r"^(?!0{16}\Z)[0-9a-f]{16}\Z")
 
 
 def make_event(event_id: Any, at: str, kind: str, level: str, text: str, *, subject: Optional[Dict[str, str]] = None,
@@ -105,6 +106,7 @@ class JsonlEventLog:
     def __init__(self, path: Path, keep: int = 5000):
         self.path = Path(path)
         self.keep = keep
+        self._lock = store_lock(self.path)  # R3: appends from a threaded server's handlers never lose one another
 
     def _all(self) -> List[Dict[str, Any]]:
         if not self.path.exists():
@@ -118,13 +120,14 @@ class JsonlEventLog:
         return out
 
     def append(self, kind: str, level: str, text: str, **extra: Any) -> Dict[str, Any]:
-        rows = self._all()
-        next_id = int(rows[-1]["id"]) + 1 if rows else 1
-        event = make_event(next_id, now_iso(), kind, level, text, **extra)
-        rows.append(event)
-        rows = rows[-self.keep:]
-        atomic_write(self.path, ("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n").encode(), 0o600)
-        return event
+        with self._lock:
+            rows = self._all()
+            next_id = int(rows[-1]["id"]) + 1 if rows else 1
+            event = make_event(next_id, now_iso(), kind, level, text, **extra)
+            rows.append(event)
+            rows = rows[-self.keep:]
+            atomic_write(self.path, ("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n").encode(), 0o600)
+            return event
 
     def fetch(self, after: Optional[str], limit: int) -> List[Dict[str, Any]]:
         rows = self._all()

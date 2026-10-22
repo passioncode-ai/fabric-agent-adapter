@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -101,6 +102,52 @@ def _kimi_block(command: str) -> str:
             "[[hooks]]\nevent = \"SessionStart\"\ncommand = %s\ntimeout = 5\n" % json.dumps(command))
 
 
+_KIMI_COMMENT = _kimi_block("").split("[[hooks]]", 1)[0].lstrip("\n").splitlines(True)  # our two comment lines
+
+
+def _kimi_spans(text: str, host: str) -> List[Tuple[int, int]]:
+    """Where each `[[hooks]]` table whose command is ours sits in `text`, as line ranges [header, end). A table ends at
+    the next header; trailing blank and comment lines belong to what follows. Each table is read on its own with
+    tomllib, so a hand-touched table (another order, a comment, another timeout) is still found by what it runs."""
+    lines = text.splitlines(True)
+    headers = [i for i, line in enumerate(lines) if line.startswith("[")]
+    spans = []
+    for n, start in enumerate(headers):
+        if not re.match(r"\[\[\s*hooks\s*\]\]\s*(#.*)?\Z", lines[start].rstrip("\r\n")):
+            continue
+        end = headers[n + 1] if n + 1 < len(headers) else len(lines)
+        while end > start + 1 and (not lines[end - 1].strip() or lines[end - 1].lstrip().startswith("#")):
+            end -= 1
+        try:
+            table = tomllib.loads("".join(lines[start:end]))["hooks"][0]
+        except (ValueError, KeyError, IndexError, TypeError):
+            continue
+        if isinstance(table, dict) and _is_ours(table.get("command"), host):
+            spans.append((start, end))
+    return spans
+
+
+def _kimi_edit(text: str, host: str, command: Optional[str]) -> str:
+    """`text` with our one `[[hooks]]` table pointed at `command`, or taken out (None) with the comment lines and the
+    blank line `_kimi_block` put before it. Refused when there is not exactly one."""
+    spans = _kimi_spans(text, host)
+    if len(spans) != 1:
+        raise Refused("found %d Fabric hook tables to edit; remove the extra ones by hand" % len(spans))
+    lines = text.splitlines(True)
+    start, end = spans[0]
+    if command is not None:
+        found = [i for i in range(start + 1, end) if re.match(r"\s*command\s*=", lines[i])]
+        if len(found) != 1:
+            raise Refused("the Fabric hook's command could not be found line by line; edit it by hand")
+        lines[found[0]] = "command = %s\n" % json.dumps(command)
+        return "".join(lines)
+    if lines[max(0, start - len(_KIMI_COMMENT)):start] == _KIMI_COMMENT:
+        start -= len(_KIMI_COMMENT)
+    if start > 0 and lines[start - 1] == "\n":
+        start -= 1
+    return "".join(lines[:start] + lines[end:])
+
+
 def _replace_file(path: Path, data: bytes, seen: Optional[bytes]) -> Optional[Path]:
     """Back the file up, then write `data` atomically with the file's own mode. Refused when the file changed
     since it was read. Returns the backup."""
@@ -163,9 +210,14 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
         path = Path(env.get("CODEX_HOME") or str(_home(env) / ".codex")) / "hooks.json"
     else:
         path = _home(env) / ".kimi-code" / "config.toml"
-    command = hook_command(str(args.script or default_hook_script(env)), args.host)
+    script = Path(args.script).expanduser().absolute() if args.script else default_hook_script(env)
+    command = hook_command(str(script), args.host)
     shifted = 0  # Codex hook groups after ours, whose position a removal moves
+    updated = False  # our own hook was there with another command, and is rewritten (FAA-69)
     try:
+        if not args.remove and not script.is_file():
+            # A hook pointing at nothing fails at every session start; removal needs no script.
+            raise Refused("--script %s is not a file; pass the fabric_session.py of a complete installed skill" % script)
         data = _read_bytes(path)
         digest = _digest(data)
         if args.expect_sha256 and args.expect_sha256 != digest:
@@ -201,37 +253,43 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
                     out("install-host-hooks: the Fabric preamble hook is already in %s; nothing to change" % path)
                     return 0
                 owned[0]["command"] = command
+                updated = True
                 new = (json.dumps(doc, indent=2) + "\n").encode("utf-8")
             else:
                 doc.setdefault("hooks", {}).setdefault("SessionStart", []).append(entry)
                 new = (json.dumps(doc, indent=2) + "\n").encode("utf-8")
-            change = "remove from hooks.SessionStart" if args.remove else "add to hooks.SessionStart"
+            change = ("remove from" if args.remove else "update in" if updated else "add to") + " hooks.SessionStart"
             shown = json.dumps(entry, indent=2)
         else:
             block = _kimi_block(command)
             text = (data or b"").decode("utf-8", "replace")
-            if not (args.apply or args.remove):
-                present = tomllib is not None and any(_is_ours(h.get("command"), args.host) for h in _kimi_hooks(data))
-            else:
-                present = any(_is_ours(h.get("command"), args.host) for h in _kimi_hooks(data))
+            # Our table is found by what it runs (_is_ours), not by its exact text, so a stale path is repaired and a
+            # hand-touched table is still removed (FAA-69). A dry run without a TOML reader shows the plain append.
+            readable = tomllib is not None or args.apply or args.remove
+            owned = [h for h in _kimi_hooks(data) if _is_ours(h.get("command"), args.host)] if readable else []
+            if len(owned) > 1:
+                raise Refused("multiple Fabric hooks are configured in %s; remove the extra ones by hand" % path)
             if args.remove:
-                if not present:
+                if not owned:
                     out("install-host-hooks: no Fabric preamble hook in %s; nothing to change" % path)
                     return 0
-                if block not in text:
-                    raise Refused("the Fabric hook in %s was edited by hand; remove its [[hooks]] table yourself" % path)
-                new_text = text.replace(block, "", 1)
-            elif present:
+                new_text = _kimi_edit(text, args.host, None)
+            elif owned and owned[0].get("command") == command:
                 out("install-host-hooks: the Fabric preamble hook is already in %s; nothing to change" % path)
                 return 0
+            elif owned:
+                new_text = _kimi_edit(text, args.host, command)
+                updated = True
             else:
                 new_text = text + ("" if not text or text.endswith("\n") else "\n") + block
             new = new_text.encode("utf-8")
             if args.apply or args.remove:
                 after = _kimi_hooks(new)
-                if len(after) != len(_kimi_hooks(data)) + (-1 if args.remove else 1):
+                mine = [h.get("command") for h in after if _is_ours(h.get("command"), args.host)]
+                growth = -1 if args.remove else 0 if updated else 1
+                if len(after) != len(_kimi_hooks(data)) + growth or mine != ([] if args.remove else [command]):
                     raise Refused("the edited file would not read back as expected; nothing was changed")
-            change = "remove from" if args.remove else "append to"
+            change = "remove from" if args.remove else "update in" if updated else "append to"
             shown = block.strip("\n")
         if not (args.apply or args.remove):
             out("install-host-hooks: dry run, nothing is written.")
@@ -248,6 +306,7 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
             return 0
         backup = _replace_file(path, new, data)
         out("install-host-hooks: %s %s %s." % ("removed the Fabric preamble hook from" if args.remove
+                                              else "updated the Fabric preamble hook in" if updated
                                               else "added the Fabric preamble hook to", path,
                                               "(backup: %s)" % backup if backup else "(new file)"))
         out("Undo: fabric_session.py install-host-hooks --host %s %s" % (args.host, "--apply" if args.remove else "--remove"))

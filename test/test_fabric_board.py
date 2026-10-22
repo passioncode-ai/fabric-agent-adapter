@@ -253,7 +253,8 @@ class ConversationTests(Conversation):
         rid = self.board.queue("video.render")
         self.responder().step()
         self.assertNotIn("com.complete", self.tools())
-        self.assertEqual(self.board.requests[rid]["state"], "in_progress")
+        # nothing observed: given up to the lost-result operation, and reconciled once observed (FAA-77, finding 37)
+        self.assertEqual(self.board.requests[rid]["state"], "outcome_unknown")
         self.assertEqual(self.checkpoint()[rid]["step"], "unknown")
         self.assertIn("board.reconcile.needed", self.kinds())
 
@@ -407,13 +408,16 @@ class FailureTests(Conversation):
         self.board.drop_next["com.complete"] = 1
         rid = self.board.queue("video.render")
         r = self.responder()
-        r.step()  # complete committed, its answer lost: the session drops, the checkpoint keeps the outcome
+        r.step()  # complete committed, its answer lost: the lease still holds, so the session stays (FAA-77, finding 38)
         self.assertEqual(self.board.requests[rid]["state"], "completed")
         self.assertEqual(self.checkpoint()[rid]["step"], "completing")
         self.board.advance(r.wait_until - self.board.now)
-        r.step()  # reconnect: the request reads completed, so the checkpoint drops it
+        r.step()  # the same key again: the board answers the first receipt
         self.assertEqual(self.checkpoint(), {})
-        self.assertEqual(self.tools().count("com.complete"), 1)
+        keys = [a["fence"]["idempotency"]["key"] for t, a in self.board.calls if t == "com.complete"]
+        self.assertEqual(len(keys), 2)
+        self.assertEqual(len(set(keys)), 1)
+        self.assertEqual(r.state, "ready")
 
     def test_a_checkpoint_that_cannot_be_written_advances_nothing(self):
         rid = self.board.queue("video.render")
@@ -585,6 +589,295 @@ class RestartTests(Conversation):
         self.assertIsNone(self.board.slots["video.render"]["holder"])
         self.assertEqual(self.hub.sessions, {})
 
+
+
+class AuditFaultTests(Conversation):
+    """FAA-77 (audit 2026-10-22, findings 35 to 39): faults the reviewer reproduced against this fake board."""
+
+    def threaded(self, **kw):
+        return self.responder(spawn=lambda fn: threading.Thread(target=fn, daemon=True).start(), **kw)
+
+    def settle(self, r, rounds=6, seconds=31):
+        import time
+        for _ in range(rounds):
+            time.sleep(0.05)
+            self.board.advance(max(seconds, r.wait_until - self.board.now))
+            r.step()
+
+    # 35 -----------------------------------------------------------------------------------------------------------
+    def test_a_reply_lost_before_a_transfer_is_not_sent_twice_and_the_request_completes(self):
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        self.board.drop_next["com.reply"] = 1  # the reply is stored; its answer is lost
+        r.step()
+        self.hub.control({"op": "end-sessions"})  # and the session ends before the same key is sent again
+        self.settle(r, rounds=3)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(len(self.board.replies), 1)  # the old key told the reply was stored: never a second one
+        self.assertNotIn("idempotency_conflict", json.dumps([e[3] for e in self.events]))
+        complete = [a for t, a in self.board.calls if t == "com.complete"][-1]["fence"]
+        self.assertEqual(complete["generation"], self.board.slots["video.render"]["generation"])
+
+    def test_a_second_lost_answer_on_the_replied_before_probe_still_completes_once(self):
+        # The transfer is committed, then the probe that asks whether the old reply was stored loses its answer too. The
+        # session is kept (the replace just renewed the slot), so recovery does not run again: the transferred entry must
+        # already carry the new attempt and wait in the resume queue, and the probe is asked again from there.
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        self.board.drop_next["com.reply"] = 1  # the reply is stored; its answer is lost
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        dropped = False
+        for _ in range(12):
+            if not dropped and r.session is None:
+                self.board.drop_next["com.reply"] = 1  # the probe after the replace: stored answer lost again
+                dropped = True
+            self.board.advance(max(31, r.wait_until - self.board.now))
+            r.step()
+        self.assertTrue(dropped)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(len(self.board.replies), 1)
+        self.assertEqual(self.checkpoint(), {})
+        self.assertEqual(r.state, "ready")
+
+    def test_a_probe_the_board_cannot_read_now_is_asked_again_never_read_as_not_stored(self):
+        # not_available says nothing about whether the old reply was stored: reading it as "not stored" sent a second reply.
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        self.board.drop_next["com.reply"] = 1  # the reply is stored; its answer is lost
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        refused = False
+        for _ in range(12):
+            if not refused and r.session is None:
+                self.board.fail_next["com.reply"] = "not_available"  # the probe after the replace
+                refused = True
+            self.board.advance(max(31, r.wait_until - self.board.now))
+            r.step()
+        self.assertTrue(refused)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(len(self.board.replies), 1)
+        self.assertEqual(self.checkpoint(), {})
+
+    def test_keys_of_the_old_attempt_are_made_again_after_a_transfer(self):
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        self.board.fail_next["com.reply"] = "not_available"  # refused before anything is stored
+        r.step()
+        old = self.checkpoint()[rid]["keys"]
+        self.hub.control({"op": "end-sessions"})
+        self.settle(r, rounds=3)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        replies = [a["fence"]["idempotency"]["key"] for t, a in self.board.calls if t == "com.reply"]
+        self.assertEqual(replies[0], old["reply"])
+        self.assertNotEqual(replies[-1], old["reply"])
+        self.assertEqual(len(self.board.replies), 1)
+
+    def test_idempotency_conflict_is_its_own_event(self):
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        self.board.queue("video.render")
+        r = self.responder()
+        self.board.fail_next["com.reply"] = "idempotency_conflict"
+        r.step()
+        blocked = [e for e in self.events if e[0] == "board.blocked"]
+        self.assertTrue(blocked)
+        self.assertEqual(blocked[0][3]["data"]["value"]["reason"], "idempotency_conflict")
+        self.assertNotIn("board.down", self.kinds())
+
+    # 36 -----------------------------------------------------------------------------------------------------------
+    def test_renew_never_races_effect_begin(self):
+        release = threading.Event()
+
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            release.wait(5)
+            return {"state": "completed", "observed": True, "summary": "done"}
+        self.outcome = acts
+        rid = self.board.queue("video.render")
+        r = self.threaded()
+        raced = []
+        make = r.session_factory
+
+        def factory(grant):
+            s = make(grant)
+            real = s.call
+
+            def call(tool, args):
+                out = real(tool, args)
+                if tool == "com.effect_begin" and not raced:
+                    # the tick thread renews while this receipt is not applied yet
+                    self.board.advance(20)
+                    t = threading.Thread(target=lambda: raced.append(r._renew(r.current) or "renewed"), daemon=True)
+                    t.start()
+                    t.join(0.3)
+                return out
+            s.call = call
+            return s
+        r.session_factory = factory
+        r.step()
+        import time
+        for _ in range(100):
+            if raced:
+                break
+            time.sleep(0.02)
+        self.assertEqual(raced, ["renewed"])
+        self.assertNotIn("board.reconcile.needed", self.kinds())
+        release.set()
+        self.settle(r, rounds=2, seconds=5)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.board.requests[rid]["effect"], "succeeded_observed")
+
+    def test_a_revision_conflict_on_renew_reads_again_and_keeps_the_attempt(self):
+        release = threading.Event()
+
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            release.wait(5)
+            ctx.progress("almost")
+            return {"state": "completed", "observed": True, "summary": "done"}
+        self.outcome = acts
+        rid = self.board.queue("video.render")
+        r = self.threaded()
+        r.step()
+        self.board.fail_next["com.renew"] = "revision_conflict"
+        self.board.advance(20)
+        r.step()
+        self.assertIsNotNone(r.current)
+        self.assertEqual(self.tools()[-3:], ["com.renew", "com.get", "com.renew"])
+        self.board.fail_next["com.progress"] = "revision_conflict"
+        release.set()
+        self.settle(r, rounds=2, seconds=5)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertNotIn("board.reconcile.needed", self.kinds())
+
+    # 37 -----------------------------------------------------------------------------------------------------------
+    def test_a_handler_that_fails_after_its_effect_is_settled_from_what_is_observed(self):
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            raise RuntimeError("crashed mid-effect")
+        self.outcome = acts
+        self.observed = {"state": "completed", "observed": True, "summary": "on disk"}
+        rid = self.board.queue("video.render")
+        self.responder().step()
+        req = self.board.requests[rid]
+        self.assertEqual((req["state"], req["effect"]), ("completed", "succeeded_observed"))
+        self.assertEqual(self.checkpoint(), {})
+
+    def test_an_unobserved_result_is_settled_once_observed(self):
+        def acts(request, ctx):
+            ctx.begin_effect()
+            return {"state": "completed", "observed": False}
+        self.outcome = acts
+        self.observed = {"state": "failed_known", "observed": True, "summary": "nothing was written"}
+        rid = self.board.queue("video.render")
+        self.responder().step()
+        self.assertEqual(self.board.requests[rid]["state"], "failed_known")
+        self.assertEqual(self.checkpoint(), {})
+
+    def test_with_nothing_observed_the_board_is_told_and_it_is_reconciled_later(self):
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            raise RuntimeError("crashed mid-effect")
+        self.outcome = acts
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        r.step()
+        # the contract's lost-result operation: in_progress becomes outcome_unknown when the slot's next holder takes it
+        self.assertEqual(self.board.requests[rid]["state"], "outcome_unknown")
+        self.assertEqual(self.checkpoint()[rid]["step"], "unknown")
+        self.assertIn("board.reconcile.needed", self.kinds())
+        self.observed = {"state": "completed", "observed": True, "summary": "on disk after all"}
+        self.settle(r, rounds=12)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertIn("com.reconcile", self.tools())
+        self.assertEqual(self.checkpoint(), {})
+
+    # 38 -----------------------------------------------------------------------------------------------------------
+    def test_one_lost_answer_keeps_the_session_and_the_running_work(self):
+        release = threading.Event()
+
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            release.wait(5)
+            return {"state": "completed", "observed": True, "summary": "done"}
+        self.outcome = acts
+        rid = self.board.queue("video.render")
+        r = self.threaded()
+        r.step()
+        work = r.current
+        self.board.drop_next["com.renew"] = 1  # the renewal is stored; its answer is lost
+        self.board.advance(20)
+        r.step()
+        self.assertIs(r.current, work)
+        self.assertFalse(work.ctx.stopped.is_set())
+        self.assertLess(r.wait_until - self.board.now, 40)  # tried again while the lease still holds
+        release.set()
+        self.settle(r, rounds=2, seconds=5)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(r.state, "ready")
+        self.assertNotIn("board.reconcile.needed", self.kinds())
+
+    def test_a_lost_session_with_work_in_progress_is_reconciled_without_a_restart(self):
+        inside, never = threading.Event(), threading.Event()
+        self.addCleanup(never.set)
+
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            inside.set()
+            never.wait(10)
+            raise Stopped()
+        self.outcome = acts
+        rid = self.board.queue("video.render")
+        r = self.threaded()
+        r.step()
+        self.assertTrue(inside.wait(5))
+        self.hub.sessions.clear()  # the session is gone but its DELETE never came: the slot's lease runs out on its own
+        self.observed = {"state": "completed", "observed": True, "summary": "on disk"}
+        self.settle(r, rounds=1, seconds=20)  # the renew learns the session ended
+        self.settle(r, rounds=2, seconds=5)  # a new session while the old slot is still live: contested
+        self.assertIn("board.slot.contested", self.kinds())
+        self.settle(r, rounds=24)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertIn("com.reconcile", self.tools())
+        self.assertEqual(self.checkpoint(), {})
+
+    # 39 -----------------------------------------------------------------------------------------------------------
+    def test_every_transferred_request_resumes(self):
+        inside, never = threading.Event(), threading.Event()
+        self.addCleanup(never.set)
+
+        def blocks(request, ctx):
+            inside.set()
+            never.wait(10)
+            raise Stopped()
+        self.outcome = blocks
+        rids = [self.board.queue("video.render"), self.board.queue("video.render")]
+        merged = {}
+        for i in range(2):  # two responders, each accepts one request and dies in its work
+            inside.clear()
+            first = self.threaded(checkpoint_file=self.data / ("cp-%d.json" % i))
+            first.step()
+            self.assertTrue(inside.wait(5))
+            merged.update(json.loads((self.data / ("cp-%d.json" % i)).read_text())["requests"])
+            self.hub.control({"op": "end-sessions"})
+        self.assertEqual([self.board.requests[x]["state"] for x in rids], ["accepted", "accepted"])
+        (self.data / "board-checkpoint.json").write_text(json.dumps({"version": 1, "requests": merged}))
+        os.chmod(self.data / "board-checkpoint.json", 0o600)
+
+        def slow(request, ctx):
+            import time
+            time.sleep(0.05)
+            return {"state": "completed", "summary": "resumed"}
+        self.outcome = slow
+        r = self.threaded()
+        r.step()
+        self.settle(r, rounds=4, seconds=5)
+        self.assertEqual([self.board.requests[x]["state"] for x in rids], ["completed", "completed"])
+        self.assertEqual(self.checkpoint(), {})
 
 HOLD = json.loads((Path(__file__).resolve().parent / "fixtures/contract/comms-hold-vectors.json").read_text())
 

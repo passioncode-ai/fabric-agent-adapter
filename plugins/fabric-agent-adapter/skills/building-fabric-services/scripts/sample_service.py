@@ -264,6 +264,15 @@ def make_handler(svc: Service):
                                   content_type="text/html; charset=utf-8")
             self._send(404, {"error": "Not found."})
 
+        def _length(self, cap: int) -> "int | None":
+            """The body's declared length, 0..cap; anything else answers 400 and reads nothing (finding 17)."""
+            raw = (self.headers.get("Content-Length") or "0").strip()
+            if raw.isdigit() and raw.isascii() and int(raw) <= cap:
+                return int(raw)
+            self.close_connection = True  # an unread body must not be taken for the next request
+            self._send(400, {"error": "Content-Length must be a whole number of bytes up to %d." % cap})
+            return None
+
         def do_POST(self) -> None:  # noqa: N802
             if not self._guard():
                 return
@@ -271,10 +280,12 @@ def make_handler(svc: Service):
             if url.path == "/mcp":
                 if not self._token_ok():
                     return
-                length = min(int(self.headers.get("Content-Length") or 0), 1048576)
+                length = self._length(1048576)
+                if length is None:
+                    return
                 try:
                     message = json.loads(self.rfile.read(length) or b"null")
-                except ValueError:
+                except (ValueError, RecursionError):
                     return self._send(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error."}})
                 try:
                     with svc.drain.work():
@@ -300,11 +311,18 @@ def make_handler(svc: Service):
                     return self._send(401, {"error": "Sign in first."})
                 if self.headers.get("X-Fabric-Request") != "1":
                     return self._send(403, {"error": "Missing request header."})
-                length = min(int(self.headers.get("Content-Length") or 0), 65536)
-                body = json.loads(self.rfile.read(length) or b"{}")
-                event = svc.log.append(body.get("kind", "demo.note"), body.get("level", "info"),
-                                       body.get("text", "A note from the sample service."),
-                                       notify=bool(body.get("notify")), link=body.get("link"))
+                length = self._length(65536)
+                if length is None:
+                    return
+                try:
+                    body = json.loads(self.rfile.read(length) or b"{}")
+                    if not isinstance(body, dict):
+                        raise ValueError("not an object")
+                    event = svc.log.append(body.get("kind", "demo.note"), body.get("level", "info"),
+                                           body.get("text", "A note from the sample service."),
+                                           notify=bool(body.get("notify")), link=body.get("link"))
+                except (ValueError, RecursionError, fs.ServiceError) as exc:  # finding 17: a 400, never a crash
+                    return self._send(400, {"error": "The note is a JSON object the event log takes: %s" % exc})
                 return self._send(200, event)
             self._send(404, {"error": "Not found."})
 

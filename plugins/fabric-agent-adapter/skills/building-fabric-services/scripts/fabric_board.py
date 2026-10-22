@@ -1,8 +1,8 @@
 """The project board connector, Python: the facade (fabric-project-comms/0.1).
 
-Since 0.40.0 (FAA-65) the connector is three modules, lowest first: fabric_board_shapes (the wire), fabric_board_session
-(session, checkpoint and responder) and fabric_board_fixture (a scripted board for the probe). This file re-exports every
-name it defined at 0.39.1, so import fabric_board keeps working. Standard library only, Python 3.9+."""
+Since 0.40.0 (FAA-65) the connector is layered modules, lowest first: fabric_board_shapes (the wire), fabric_board_link
+(session, checkpoint and request; since 0.41.0), fabric_board_session (the responder) and fabric_board_fixture (a scripted
+board for the probe). This file re-exports every name it defined at 0.39.1, so import fabric_board keeps working. Standard library only, Python 3.9+."""
 from __future__ import annotations
 
 import sys  # noqa: F401 - callers reach these through the facade

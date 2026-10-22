@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import re
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.40.0"
+VERSION = "0.41.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -58,7 +58,7 @@ STDLIB_IMPORTS = {
     "os", "pathlib", "re", "subprocess", "sys", "tempfile", "typing", "unittest",
     "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets", "socketserver",
     "shutil", "signal", "socket", "ssl", "stat", "threading", "time",
-    "random", "io", "contextlib", "textwrap", "traceback",
+    "random", "io", "contextlib", "textwrap", "traceback", "difflib",
     "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
     "email",  # email.utils: the probe reads a cookie's Expires date (DEC-0039)
     "xml",  # the supervisor tests read the Task Scheduler XML back (FAA-21)
@@ -114,7 +114,7 @@ def check_plain_scalar(value: str, lineno: int, column: int) -> str:
     for index, ch in enumerate(value):
         if ch == ":" and value[index + 1:index + 2] in ("", " ", "\t"):
             raise ValueError(
-                "%s: mapping values are not allowed here — an unquoted value holds ': ' "
+                "%s: mapping values are not allowed here: an unquoted value holds ': ' "
                 "or ends with ':'; use a block scalar (>-) or quotes"
                 % _where(lineno, column + index))
         if ch == "#" and index and value[index - 1] in (" ", "\t"):
@@ -243,7 +243,7 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
             raise ValueError("%s: tabs cannot indent YAML" % _where(lineno, 1))
         indent = len(line) - len(line.lstrip(" "))
         if indent and nested_key is None:
-            raise ValueError("%s: unexpected indented line — a multi-line value needs a "
+            raise ValueError("%s: unexpected indented line; a multi-line value needs a "
                              "block scalar (>-) or quotes" % _where(lineno, 1))
         if indent not in (0, 2):
             raise ValueError("%s: nested keys must be indented by exactly two spaces" % _where(lineno, 1))
@@ -281,7 +281,7 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
 
 def _require_children(key: Any, nested: Dict[str, Any], lineno: int) -> None:
     if key is not None and not nested:
-        raise ValueError("line %d: %r has no value — YAML reads it as null" % (lineno - 1, key))
+        raise ValueError("line %d: %r has no value: YAML reads it as null" % (lineno - 1, key))
 
 
 def validate_metadata(data: Dict[str, Any], expected_name: str) -> List[str]:
@@ -446,7 +446,7 @@ def validate_skill(name: str, errors: List[str]) -> None:
     for page in sorted(skill_dir.rglob("*.md")):
         for where in private_source_deferrals(page.read_text(encoding="utf-8")):
             errors.append("%s: %s defers to a private source (fabric-workspace); a public page states the rule "
-                          "itself and cites the private page for provenance only — %s"
+                          "itself and cites the private page for provenance only (%s)"
                           % (name, page.relative_to(skill_dir), where))
 
     triggers = json.loads((ROOT / "test/evals" / name / "triggers.json").read_text(encoding="utf-8"))
@@ -474,6 +474,7 @@ PIN_FILE = ROOT / "fabric-contract.lock.json"
 PIN_EXCLUDED = ("docs/evidence", "docs/handoffs", "test", "CHANGELOG.md", "fabric-contract.lock.json", "node_modules", ".agent-sync")
 PIN_MENTION = re.compile(r"fabric[- ]agent[- ]contract|contract[-_ ]?(pin|commit|revision)|CONTRACT_COMMIT", re.IGNORECASE)
 PIN_HANDOFF_LINK = re.compile(r"\]\((?:\.\./)*(?:docs/)?handoffs/[^)\s]*\)")
+ACTION_PIN = re.compile(r"^(\s*(?:-\s+)?uses:\s*[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@)[0-9a-f]{40}(?![0-9a-zA-Z])")
 PIN_HEX = re.compile(r"(?<![0-9a-zA-Z:])[0-9a-f]{7,40}(?![0-9a-zA-Z])")
 PIN_ADAPTER = "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_project.py"
 PIN_DEFAULT_COMMIT = "c55f2d5a11c9a0197e958e87212fca7ae1154769"
@@ -496,6 +497,10 @@ def contract_pin_drift(root: Path, commit: str) -> List[str]:
             # A link to a dated handoff names a historical file (docs/handoffs is itself excluded),
             # not the pin: its target is not scanned.
             line = PIN_HANDOFF_LINK.sub("]()", line)
+            # A workflow step pins an action to the commit its release tag points at (FAA-73): that commit is the
+            # action's, not the contract's. Only the ref after `uses: owner/repo@` is exempt; the rest of the line is scanned.
+            if rel.startswith(".github/workflows/"):
+                line = ACTION_PIN.sub(r"\1", line)
             if re.match(r"^#{1,6}\s", line):
                 section = bool(PIN_MENTION.search(line))
             other_repo = "github.com/" in line and "fabric-agent-contract" not in line
@@ -620,6 +625,125 @@ def malformed_board_rows(text: str) -> List[str]:
     return problems
 
 
+# R1 (twin drift, audit 2026-10-22): in Python `$` also matches just before a trailing newline, so
+# `re.match(r"^[a-z]+$", "abc\n")` accepts a value the Node twin's `/^[a-z]+$/.test` refuses. A pattern that
+# validates a whole value ends in `\Z`, or is applied with `re.fullmatch` (which is why a direct `re.fullmatch`
+# call is not checked: fullmatch already demands the end of the string).
+DOLLAR_SCOPES = (
+    ("plugins/fabric-agent-adapter/skills", "*/scripts/**/*.py"),  # every skill's scripts (FAA-72)
+)
+DOLLAR_CALLS = ("compile", "match", "search")
+# (repository-relative path, the pattern exactly as written) -> why `$` is right there. A legitimate entry is a
+# multiline use (re.MULTILINE, where `$` means "end of a line"). Entries that no longer match anything fail, so the
+# list only shrinks by hand and never hides a new pattern.
+DOLLAR_ALLOW = {
+    ('plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session_env.py',
+     '^\\s*\\[\\s*"?mcp_servers"?\\s*\\.\\s*"?fabric"?\\s*\\]\\s*$'): "re.MULTILINE over a whole config.toml: `$` is the end of each line on purpose",
+}
+
+
+def _ends_in_unescaped_dollar(pattern: str) -> bool:
+    if not pattern.endswith("$"):
+        return False
+    body = pattern[:-1]
+    return (len(body) - len(body.rstrip("\\"))) % 2 == 0
+
+
+def dollar_anchored_patterns(source: str) -> List[Tuple[int, str, str]]:
+    """Each `re.compile/match/search(<literal ending in an unescaped $>, ...)` as (line, call, pattern)."""
+    found: List[Tuple[int, str, str]] = []
+    for node in ast.walk(ast.parse(source)):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name) and node.func.value.id == "re"
+                and node.func.attr in DOLLAR_CALLS and node.args):
+            continue
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str) and _ends_in_unescaped_dollar(first.value):
+            found.append((node.lineno, node.func.attr, first.value))
+    return found
+
+
+def dollar_anchor_problems(root: Path = ROOT, allow: Optional[Dict[Tuple[str, str], str]] = None) -> List[str]:
+    allow = DOLLAR_ALLOW if allow is None else allow
+    problems: List[str] = []
+    used = set()
+    for folder, glob in DOLLAR_SCOPES:
+        for path in sorted((root / folder).glob(glob)):
+            rel = path.relative_to(root).as_posix()
+            try:
+                found = dollar_anchored_patterns(path.read_text(encoding="utf-8"))
+            except SyntaxError as exc:
+                problems.append("%s: cannot be parsed for the R1 check (%s)" % (rel, exc))
+                continue
+            for lineno, call, pattern in found:
+                if (rel, pattern) in allow:
+                    used.add((rel, pattern))
+                    continue
+                problems.append("%s:%d re.%s(%r) ends in `$`, which also matches before a trailing newline; "
+                                "end it with \\Z or use re.fullmatch (R1), or allowlist a multiline use in "
+                                "DOLLAR_ALLOW with its reason" % (rel, lineno, call, pattern))
+    for (rel, pattern), reason in sorted(allow.items()):
+        if not reason.strip():
+            problems.append("DOLLAR_ALLOW entry for %s %r has no reason" % (rel, pattern))
+        if (rel, pattern) not in used:
+            problems.append("DOLLAR_ALLOW entry for %s %r matches nothing any more: remove it" % (rel, pattern))
+    return problems
+
+
+# R5 and FAA-72/FAA-73: the hosted gates must be able to fail. Text checks, no YAML library (standard library only).
+WORKFLOW_USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
+PINNED_ACTION = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}")
+
+
+def workflow_problems(root: Path = ROOT) -> List[str]:
+    problems: List[str] = []
+    workflows = sorted((root / ".github/workflows").glob("*.yml"))
+    for path in workflows:
+        rel = path.relative_to(root).as_posix()
+        text = path.read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            match = WORKFLOW_USES.match(line)
+            if match and not match.group(1).startswith("./"):
+                if not PINNED_ACTION.fullmatch(match.group(1)) or not re.match(r"\s*#\s*v\d", match.group(2)):
+                    problems.append("%s:%d pins %s to a moving ref; use the full commit SHA and a `# vX.Y.Z` comment"
+                                    % (rel, lineno, match.group(1)))
+            if re.search(r"@latest\b", line):
+                problems.append("%s:%d installs @latest; name an exact release" % (rel, lineno))
+        runs_on = len(re.findall(r"^    runs-on:", text, re.MULTILINE))
+        timeouts = len(re.findall(r"^    timeout-minutes:\s*\d+", text, re.MULTILINE))
+        if runs_on != timeouts:
+            problems.append("%s: %d job(s) run on a runner but %d carry timeout-minutes; every job needs one"
+                            % (rel, runs_on, timeouts))
+    validate_yml = root / ".github/workflows/validate.yml"
+    text = validate_yml.read_text(encoding="utf-8") if validate_yml.is_file() else ""
+    needles = (
+        ("schedule:", "a nightly schedule (the organization's CI batch)"),
+        ("cron:", "a nightly schedule (the organization's CI batch)"),
+        ("workflow_dispatch:", "workflow_dispatch"),
+        ("workflow_call:", "workflow_call (release.yml runs it)"),
+        ("cancel-in-progress: true", "a concurrency group that cancels superseded runs"),
+        ("FABRIC_CONTRACT_NEW:", "a job that sets FABRIC_CONTRACT_NEW to an installed contract checkout"),
+        ("FABRIC_CONTRACT_OLD:", "a job that sets FABRIC_CONTRACT_OLD to an installed contract checkout"),
+        ("--frozen-lockfile", "the contract installed from its lockfile"),
+        ('python-version: "3.9"', "a Python 3.9 run (the stated floor)"),
+        ('node-version: "18"', "a Node 18 run (package.json engines)"),
+        ("runs-on: macos-", "a macOS job (launchd is the first supervisor)"),
+        ('-p "test_fabric_session.py"', "the session hooks on Windows"),
+    )
+    for needle, what in needles:
+        if needle not in text:
+            problems.append(".github/workflows/validate.yml must carry %s (%r)" % (what, needle))
+    for trigger in ("push:", "pull_request:", "pull_request_target:"):
+        if re.search(r"^  %s" % re.escape(trigger), text, re.MULTILINE):
+            problems.append(".github/workflows/validate.yml must not run on %s (the nightly batch rule)" % trigger.rstrip(":"))
+    release = root / ".github/workflows/release.yml"
+    rtext = release.read_text(encoding="utf-8") if release.is_file() else ""
+    smoke, create = rtext.find("npx --yes --package"), rtext.find("gh release create")
+    if smoke < 0 or create < 0 or smoke > create:
+        problems.append(".github/workflows/release.yml must run the packed-tarball smoke test before `gh release create`")
+    return problems
+
+
 def validate_repo() -> List[str]:
     errors: List[str] = []
     validate_plugin_lifecycle(errors, ROOT / "plugins/fabric-agent-adapter")
@@ -727,6 +851,8 @@ def validate_repo() -> List[str]:
     # What the installer, the CLI and the kit's demo print or show to a person (code comments elsewhere are not scanned).
     people += [ROOT / "install.sh", ROOT / "bin/fabric-agent-adapter.js"]
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/assets/**/*.html"))
+    # R6: the workflows print release titles and messages a person reads on GitHub (FAA-73).
+    people += sorted(path for path in (ROOT / ".github").rglob("*") if path.is_file())
     for path in people:
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if path.is_file() else ():
             if "\u2014" in line:
@@ -750,6 +876,8 @@ def validate_repo() -> List[str]:
     ):
         if command not in workflow:
             errors.append("CI is missing: %s" % command)
+    errors.extend(workflow_problems())
+    errors.extend(dollar_anchor_problems())
     return errors
 
 

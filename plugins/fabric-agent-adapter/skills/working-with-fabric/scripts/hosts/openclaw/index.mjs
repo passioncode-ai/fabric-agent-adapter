@@ -1,6 +1,6 @@
 // #region native-host-context — docs: plugins/fabric-agent-adapter/skills/working-with-fabric/references/native-host-hooks.md
 // Native OpenClaw prompt hook. Never observes conversation content or sends messages.
-import { readContext } from '../context.mjs';
+import { onceEach, readContext } from '../context.mjs';
 
 function fabricRegistered(config) {
   const servers = config?.mcp?.servers;
@@ -14,6 +14,8 @@ function fabricRegistered(config) {
 }
 
 export function createPlugin(contextReader = readContext) {
+  // The helper runs once per workspace and registration in this process, not per prompt (FAA-69).
+  const read = onceEach(contextReader);
   return {
     id: 'fabric-agent-adapter',
     name: 'Fabric Agent Adapter',
@@ -27,7 +29,7 @@ export function createPlugin(contextReader = readContext) {
           // Configured is not connected/admitted. Forward only the boolean,
           // never server configuration, headers, environment or credentials.
           const options = fabricRegistered(api.config) ? { fabricRegistered: true } : {};
-          const context = await contextReader('openclaw', ctx.workspaceDir, options);
+          const context = await read('openclaw', ctx.workspaceDir, options);
           ctx.hookInvocation?.assertActive();
           if (typeof context !== 'string' || !context.trim()) return;
           return { prependContext: context };

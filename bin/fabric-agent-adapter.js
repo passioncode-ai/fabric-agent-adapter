@@ -6,8 +6,9 @@
  * ~/.agents/skills/<name> (read by Codex, Cursor, Gemini, OpenCode and others).
  * Claude Code gets the skills through the plugin, never through a plain copy:
  * a copy in ~/.claude/skills shadows the plugin and serves its frozen version
- * forever. Idempotent; an existing install is skipped unless --force.
- * Zero dependencies.
+ * forever. Idempotent; an existing install is skipped unless --force. Each skill is
+ * copied into a sibling temporary folder and renamed into place, so a failure
+ * leaves the old copy or nothing, never half of each. Zero dependencies.
  */
 'use strict';
 
@@ -46,13 +47,65 @@ Every PassionCode.ai skill for every agent at once:
   npx @passioncode-ai/passioncode@latest update`);
 }
 
+// Bytecode a checkout's own runs left behind is not part of a skill.
+function bytecode(name) { return name === '__pycache__' || name.endsWith('.pyc'); }
+
 function copyDir(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    if (bytecode(entry.name)) continue;
     const s = path.join(src, entry.name);
     const d = path.join(dest, entry.name);
     if (entry.isDirectory()) copyDir(s, d);
     else fs.copyFileSync(s, d);
+  }
+}
+
+// The same files with the same bytes: what "already installed" means.
+function sameTree(src, dest) {
+  let a;
+  let b;
+  try {
+    a = fs.readdirSync(src, { withFileTypes: true }).filter((e) => !bytecode(e.name));
+    // The same filter on both sides: an installed skill whose Python ran has its own __pycache__.
+    b = fs.readdirSync(dest, { withFileTypes: true }).filter((e) => !bytecode(e.name));
+  } catch {
+    return false;
+  }
+  if (a.length !== b.length) return false;
+  const there = new Map(b.map((e) => [e.name, e]));
+  return a.every((e) => {
+    const d = there.get(e.name);
+    if (!d || e.isDirectory() !== d.isDirectory() || d.isSymbolicLink()) return false;
+    const s = path.join(src, e.name);
+    const t = path.join(dest, e.name);
+    if (e.isDirectory()) return sameTree(s, t);
+    try { return fs.readFileSync(s).equals(fs.readFileSync(t)); } catch { return false; }
+  });
+}
+
+// Copy beside, then rename over: the old copy stays until the new one is whole.
+function installSkill(src, dest) {
+  const stamp = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  const temp = path.join(path.dirname(dest), `.${path.basename(dest)}.installing-${stamp}`);
+  const old = path.join(path.dirname(dest), `.${path.basename(dest)}.replaced-${stamp}`);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  try {
+    copyDir(src, temp);
+    if (fs.existsSync(dest)) {
+      fs.renameSync(dest, old);
+      try {
+        fs.renameSync(temp, dest);
+      } catch (err) {
+        fs.renameSync(old, dest);
+        throw err;
+      }
+      fs.rmSync(old, { recursive: true, force: true });
+    } else {
+      fs.renameSync(temp, dest);
+    }
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
   }
 }
 
@@ -144,6 +197,7 @@ function main(argv) {
   }
 
   const destRoot = target === 'claude' ? path.join(home, '.claude', 'skills') : path.join(home, '.agents', 'skills');
+  const failed = [];
   for (const name of names) {
     const dest = path.join(destRoot, name);
     const owner = linkOwner(dest);
@@ -155,13 +209,24 @@ function main(argv) {
         : `skip: ${name} at ${dest} is a link managed elsewhere; remove the link first to install a copy here`);
       continue;
     }
+    const src = path.join(skillRoot, name);
     if (fs.existsSync(dest) && !force) {
-      console.log(`skip: ${name} already installed at ${dest} (rerun with --force to overwrite)`);
+      console.log(sameTree(src, dest)
+        ? `up to date: ${name} at ${dest}`
+        : `skip: ${name} at ${dest} differs from this version (rerun with --force to replace it)`);
       continue;
     }
-    fs.rmSync(dest, { recursive: true, force: true });
-    copyDir(path.join(skillRoot, name), dest);
-    console.log(`Installed ${name} -> ${dest}`);
+    try {
+      installSkill(src, dest);
+      console.log(`Installed ${name} -> ${dest}`);
+    } catch (err) {
+      failed.push(name);
+      console.error(`error: ${name} was not installed (${err.code || 'error'}: ${err.message}); ${fs.existsSync(dest) ? 'the copy that was there is unchanged' : 'nothing was left at ' + dest}`);
+    }
+  }
+  if (failed.length) {
+    console.error(`error: ${failed.length} of ${names.length} skill(s) failed: ${failed.join(', ')}`);
+    return 1;
   }
   if (target === 'agents' && !hasPlugin) {
     console.log(`Claude Code reads plugins, not the hub:\n  claude plugin marketplace add ${REPO} && claude plugin install ${PLUGIN_ID}`);

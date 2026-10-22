@@ -41,8 +41,11 @@ claude plugin validate . --strict
 ```
 
 `npm test` runs the first two plus `node --test 'test/*.test.mjs'`. `python3 test/validate.py --frontmatter
-<SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs all four in two jobs
-(`python`, `claude-plugin`). `.github/workflows/release.yml` validates, creates a GitHub release
+<SKILL.md ...>` parses any SKILL.md front matter strictly, installed copies included. `.github/workflows/validate.yml` runs them
+nightly on `main`, on a manual dispatch, and from `release.yml` before a publish; never on each push or pull request.
+Its jobs (since 0.41.0, FAA-72) cover the Python and Node suites on Linux, macOS and Windows, the Python 3.9 and Node 18
+floors, the contract installed at the pin, and both plugin validations; the file's own job list is the authority. A missing
+or billing-blocked run is not a green one. `.github/workflows/release.yml` validates, creates a GitHub release
 and publishes to npm on a `v*` tag, but only when the repository variables `RELEASE_ENABLED` and
 `PUBLISH_NPMJS` are `"true"`; off by default in a fork, both `true` here
 (`gh variable list -R passioncode-ai/fabric-agent-adapter`). MCP (register + proving call): the
@@ -60,7 +63,9 @@ with `--strict-mcp-config` and a temporary config.
   kit: `building-fabric-services/recipes/`. `fabric_session.py` in working-with-fabric is a facade over
   `fabric_session_{env,mcp,mail,hosts,cli}.py`; hooks and workers always run the facade.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
-  `test/evals/<skill>/`.
+  `test/evals/<skill>/`. `test/evals/run_evals.py` runs the trigger evals against a real client, only when asked
+  (`FABRIC_REAL_CLIENT=1` and `claude` on PATH); hosted CI holds no model credential and does not run it. Measured
+  runs are recorded under `docs/evidence/evals/`.
 - `docs/evidence/`: specs, plans, evals, reports and retrospectives. The scaffold's write set is
   declared in the [delivery brief](docs/evidence/specs/2026-08-27-brief.md).
 - `CHANGELOG.md`, `SECURITY.md` and `SKILL-CARD.md` sit at the root. This repository has no ADR
@@ -115,21 +120,27 @@ this repository both obeys it and ships its service layer
 **Background footprint (LC-09): five session hooks, nothing resident.** The plugin is skills plus
 `plugins/fabric-agent-adapter/hooks/hooks.json`:
 
-- `SessionStart` (matcher `startup|clear`): `dashboard_kit.py notice` reads the repository (`git rev-parse`,
-  `git ls-files`, `git grep`) and the services directory, prints one line when the repository owns a service (a
-  descriptor names it as `source.repository`) whose dashboard has no dashboard kit or an older one, and exits 0, always, within its 5 s timeout; it writes nothing. Measured under a
+- `SessionStart` (matcher `startup|clear`): `dashboard_kit.py notice` asks the repository for its identity
+  (`git rev-parse`, `git config`) and the services directory first; only when the repository owns a service (a
+  descriptor names it as `source.repository`) does it read the tree (`git ls-files` or `git grep`), all within one
+  3.5 s budget. It prints one line when that service's dashboard has no dashboard kit or an older one, prints nothing
+  when the budget runs out, and exits 0, always, within its 5 s timeout; it writes nothing. Measured under a
   load average of about 50: median 294–443 ms per session start.
 - `SessionStart`, `Stop`, `UserPromptSubmit`, `SessionEnd`: `fabric_session.py hook …` (working-with-fabric). Session
   start (matcher `startup|clear`) reads `~/.claude.json` and Fabric's `hub.json`, and prints the preamble only when
   `fabric` is registered and Fabric runs; when Fabric is down, one line, and only in a project that uses Fabric (a
   contract file up to the checkout root, a project-bound registration, or, read last, a service descriptor naming the
-  checkout's origin, one `git config` call). Stop and SessionEnd read
-  `hub.json` first and return, writing nothing, unless the running Fabric advertises `session-hooks/1`; then they
-  write a spool entry (0600, at most 50 per session; a session folder untouched for 7 days is removed by the next spool) in the user's cache folder and start a **detached worker**
-  (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` with a 10 s deadline, reads the board's unread
+  checkout's origin, one `git config` call). Stop and SessionEnd first remove
+  their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
+  running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s) and
+  write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**
+  (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` in its own process group with a 10 s deadline
+  (the whole group is ended at the deadline; a refused or unreadable entry is logged by its code and dropped; an end
+  whose release got no answer stays for the next worker), reads the board's unread
   count (`com.status`) after a turn, and exits. A session rejoins at most once a minute: a turn within 60 s of its
   last successful rejoin stays in the spool for the next worker; the end of a session always starts one (FAA-53). UserPromptSubmit reads two small files in that spool and calls
-  nothing. Every one is silent in a session Fabric launched. Measured 2026-10-11 under a load average of about 220,
+  nothing. Every one is silent in a session Fabric launched; a launched session is remembered by a marker so the process walk
+  runs once, and a walk that cannot read the processes spools nothing (FAA-68). Measured 2026-10-11 under a load average of about 220,
   with the feature absent: medians 282 / 271 / 329 ms for start / stop / end, of which 65 ms is Python's own start
   ([raw](docs/reports/2026-10-11-working-with-fabric/raw/hook-timing.log)); the prompt hook is measured in
   [FAA-12a's raw](docs/reports/2026-10-12-faa-12a-board-participants/raw/hook-timing.log).
@@ -147,8 +158,8 @@ long-lived process, `watch-mail`, runs only while an agent waits on the board, u
 | `fabric_session.py hook session-start\|stop\|session-end` (plugin hooks) | Claude Code | per session start or `/clear`, per turn, per session end | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook user-prompt-submit` (plugin hook) | Claude Code | per prompt | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook session-start --host codex\|kimi` | Codex / Kimi Code, only after `install-host-hooks --apply` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
-| `fabric_session.py watch-mail` | a Claude Code agent, under its own background watcher, while it waits on the board | one look per interval (≥ 10 s, default 60 s ± 20 %; backoff to 15 min while Fabric is down) | nothing | its stdin's end, SIGTERM/SIGINT/SIGHUP, or its parent gone | 0 between looks (a sleeping process; each look one `fabric-mcp --rejoin-only` with a 10 s deadline) |
-| `fabric_session.py deliver` (detached worker) | the Stop / SessionEnd hook, only when Fabric advertises `session-hooks/1` | per turn, at most one start per session a minute (an end always starts one), one per session at a time | finishes its spool | its own 10 s deadline; closes `fabric-mcp`'s stdin, then kills it | 0 |
+| `fabric_session.py watch-mail` | a Claude Code agent, under its own background watcher, while it waits on the board | one look per interval (default 60 s ± 20 %, kept between 10 s and 15 min after the jitter; backoff to 15 min while Fabric is down; a look within a minute of the session's last rejoin waits) | nothing | its stdin's end, SIGTERM/SIGINT/SIGHUP, or its parent gone | 0 between looks (a sleeping process; each look one `fabric-mcp --rejoin-only` with a 10 s deadline) |
+| `fabric_session.py deliver` (detached worker) | the Stop / SessionEnd hook, only when Fabric advertises `session-hooks/1` | per turn, at most one start per session a minute (an end always starts one), one per session at a time | finishes its spool | its own 10 s deadline; closes `fabric-mcp`'s stdin, then ends its whole process group | 0 |
 | Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`), a systemd user unit (`Restart=always`) or a per-user Scheduled Task (logon trigger) | resident | the service | `launchctl bootout` + `disable` or `launchd_uninstall`; `systemctl --user disable --now` or `systemd_uninstall`; `schtasks /End` + `/Change /DISABLE` or `task_uninstall` | declared by each service in its own `AGENTS.md` |
 | Test suites (`npm test`) | a person or CI | on demand | nothing | exit; the lifecycle tests kill their own children in `finally` | 0 |
 

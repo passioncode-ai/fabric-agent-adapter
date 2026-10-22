@@ -105,6 +105,10 @@ def plan(host, path, script, remove):
         return [(path, old, openclaw_edit(old, script, remove))]
     if host == 'hermes':
         if path.is_symlink(): raise fs.Refused('plugin directory is a symlink; nothing was changed')
+        if remove:
+            # Removal reads nothing from the source skill: its hosts/ folder may be gone (FAA-69).
+            desired = dict.fromkeys((path/'__init__.py', path/'plugin.yaml'), '')
+            return _changes(desired, remove)
         module = str(script.parent / 'hosts/hermes/__init__.py')
         loader = ('# ' + MARKER + '\nimport importlib.util\n'
                   '_spec = importlib.util.spec_from_file_location("_fabric_native_hermes", ' + repr(module) + ')\n'
@@ -114,6 +118,10 @@ def plan(host, path, script, remove):
     else:
         module = (script.parent / ('hosts/' + host + '/fabric.mjs')).as_uri()
         desired = {path: '// ' + MARKER + '\nexport { default } from ' + json.dumps(module) + ';\n'}
+    return _changes(desired, remove)
+
+
+def _changes(desired, remove):
     changes = []
     for target, text in desired.items():
         old = fs._read_bytes(target)
@@ -137,7 +145,8 @@ def main(argv=None, env=None, out=print, err=print):
     args=parser.parse_args(argv)
     try:
         script=Path(args.script).expanduser().absolute() if args.script else BASE/'fabric_session.py'
-        if not script.is_file(): raise fs.Refused('shared helper is missing')
+        # Removal needs no helper: the skill it was installed from may be gone (FAA-69).
+        if not args.remove and not script.is_file(): raise fs.Refused('shared helper is missing')
         if not args.remove:
             required = {'hermes':['hosts/hermes/__init__.py','hosts/hermes/plugin.yaml'],
                         'opencode':['hosts/context.mjs','hosts/opencode/fabric.mjs'],

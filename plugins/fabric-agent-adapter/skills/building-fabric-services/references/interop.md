@@ -103,6 +103,11 @@ As a provider:
   caller only. A key that already names a job starts nothing; `jobs.repeat(caller, key, now)` answers `new`, `same`
   (answer with that job) or `run`: a `quota-exhausted` job runs again once its reset passed or you pass
   `limit_holds=False`, a `limit-reached` job once `approval_granted=True`, and an `outcome-unknown` job never.
+  A key admits only the intent it was first used for: the key file keeps a digest of the capability and its input,
+  and the same key with another intent is refused as `idempotency-conflict` (FAA-77). `repeat` takes the intent too
+  (`capability=`, `arguments=`; Node `{capability, input}`) and then answers `conflict` for another intent. A key file
+  written before 0.41.0 holds no intent: it is answered with its job, never a conflict, and its job runs again only
+  for the capability and input that job stored.
 - **Usage you did not measure is `null`, never 0,** but only toward a caller whose request `_meta.protocols` names
   `fabric-interop/0.2`: pass `request_meta` to `result_envelope` (`usage_toward`). Toward any other caller the kit
   writes the measured lower bound, as before. Either way, record that call's usage receipt with

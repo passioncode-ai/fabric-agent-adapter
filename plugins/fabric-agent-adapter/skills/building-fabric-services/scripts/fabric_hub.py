@@ -44,7 +44,7 @@ import fabric_service as _fs  # noqa: E402 - beside this file: token files, atom
 HUB_PROTOCOL = "fabric-hub/0.1"
 MCP_PROTOCOL_VERSION = "2025-06-18"
 READ_CAP = 64 * 1024
-LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{4,5})")
+LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:([0-9]{4,5})")
 TOKEN = re.compile(r"[A-Za-z0-9_-]{43}")
 UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 CAPABILITY = re.compile(r"[a-z][a-z0-9._-]{1,127}")
@@ -163,8 +163,12 @@ def locate_hub(root: Optional[Path] = None, alive: Callable[[int], bool] = pid_a
     if estate is not None and isinstance(doc.get("hubKey"), dict):
         import fabric_estate  # beside this file
         key = doc["hubKey"]
+        # A missing or null applied is "none known", as fabric-hub.mjs reads it (`estate.applied ?? undefined`); only a
+        # present one is checked, and hub_key_certified refuses an explicit null of its own (decision D3).
+        applied = estate.get("applied")
         verdict = fabric_estate.hub_key_certified(estate.get("record"), key.get("kid"), key.get("x"),
-                                                  time.time() if now is None else now, estate.get("applied"))
+                                                  time.time() if now is None else now,
+                                                  fabric_estate._MISSING if applied is None else applied)
         if not verdict.get("certified"):
             raise HubError("hub-key-refused", "The estate record does not certify the hub's key (%s)." % verdict.get("detail"),
                            data={"fault": verdict.get("fault"), "detail": verdict.get("detail")})

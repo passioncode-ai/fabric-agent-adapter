@@ -53,7 +53,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L0 | `fabric_time` | strict RFC 3339, UTC days, formatting, day windows, the clock ([dates](#dates-and-times)) |
 | L0 | `fabric_identifiers` | identifier equality by normal form (DEC-0076) |
 | L0 | `fabric_secrets` | the contract's one credential detector (DEC-0044) |
-| L1 | `fabric_crypto` | Ed25519 and P-256 verification, base64url, sha256: what the verifiers need and nothing more |
+| L1 | `fabric_crypto` | Ed25519 signing (a Montgomery ladder that does not branch on the key) and verification, P-256 verification, base64url, sha256 |
 | L2 | `fabric_estate` | `estate-record/1` revisions and their rules (DEC-0055) |
 | L2 | `fabric_delegation` | the callee's side of `fabric-delegation/0.1` (DEC-0039) |
 | L2 | `fabric_share` | share grants and registrations (DEC-0086) |
@@ -76,7 +76,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools ([interop](interop.md)) |
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
-| L4 | `fabric_board_session` | the board responder: a session, the checkpoint, the fenced request |
+| L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data |
+| L4 | `fabric_board_session` | the board responder: the work context, the fenced request, transfer and recovery |
 | L4 | `fabric_board_fixture` | the scripted board the probe runs a responder against |
 | L4 | `fabric_board` | the facade of the board connector ([board](board.md)) |
 | L4 | `fabric_http` | outbound HTTP: deadline, bounded retries, `Retry-After`, size cap ([connectors](connectors.md)) |

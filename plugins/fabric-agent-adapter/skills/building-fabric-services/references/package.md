@@ -50,7 +50,11 @@ copy. A member named twice in `fabric.package.json` is refused too.
 Then every problem is listed, each with its `rule`: `schema` (the contract's schema), `FAC-SEM-064` (whole: its own
 digest, each path once, every named file listed with the same SHA-256), `FAC-SEM-065` (no secret), `FAC-SEM-066`
 (`agentRef` derived), `FAC-SEM-102` (one role, one server) and `folder` (`file-missing`, `file-digest`, `file-unlisted`,
-`plugin-manifest`, `provider-manifest`). With a problem, `--apply` writes nothing. Repacking drops old signatures and
+`plugin-manifest`, `provider-manifest`) and `path` (a listed or folder path holding a control character, U+2028 or
+U+2029, a `..` segment, a backslash, `//` or a colon, refused by the kit itself whatever the schema's pattern lets
+through, FAA-78). A JSON document is read as strict UTF-8 and nested at most 256 levels; a folder entry the kit cannot
+read is refused as `Cannot read <path>`, and a link, FIFO or other non-regular file is never followed. With a problem,
+`--apply` writes nothing. Repacking drops old signatures and
 says so: a changed package is signed again.
 
 ## sign

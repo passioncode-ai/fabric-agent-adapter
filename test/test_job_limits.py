@@ -144,7 +144,85 @@ class ProviderTests(unittest.TestCase):
         import hashlib
         job_id = self.start(caller="caller-a", key="k-1")
         name = hashlib.sha256('["caller-a","k-1"]'.encode()).hexdigest() + ".json"
-        self.assertEqual(json.loads((self.jobs.dir / "keys" / name).read_text()), {"job": job_id})
+        intent = "sha256:" + hashlib.sha256('["media.order",{"brief":"x"}]'.encode()).hexdigest()
+        self.assertEqual(json.loads((self.jobs.dir / "keys" / name).read_text()), {"job": job_id, "intent": intent})
+        self.assertEqual(fi.intent_digest("media.order", {"brief": "x"}), intent)
+
+    def test_a_limited_key_runs_again_only_for_the_same_intent(self):
+        """FAA-77 item 39: a quota-exhausted key admitted any intent; it admits only the one it was first sent with."""
+        first = self.start()
+        self.jobs.quota_exhausted(first, "hourly quota", retryable=True, resets_at="2026-10-19T11:00:00Z")
+        later = "2026-10-19T11:00:00Z"
+        for capability, given in (("media.order", {"brief": "y"}), ("media.refund", {"brief": "x"}),
+                                  ("media.order", {"brief": "x", "to": "someone-else"})):
+            with self.subTest(capability=capability, given=given):
+                with self.assertRaisesRegex(fi.InteropError, "^idempotency-conflict"):
+                    self.jobs.create(capability, given, caller="caller-a", idempotency_key="k-1", now=later)
+        self.assertEqual(len(list(self.jobs.dir.glob("job_*.json"))), 1, "a refused intent starts nothing")
+        second = self.jobs.create("media.order", {"brief": "x"}, caller="caller-a", idempotency_key="k-1", now=later)["job"]["id"]
+        self.assertNotEqual(first, second)
+        running = self.start(key="k-2")
+        with self.assertRaisesRegex(fi.InteropError, "^idempotency-conflict", msg="a running job's key refuses another intent too"):
+            self.jobs.create("media.order", {"brief": "z"}, caller="caller-a", idempotency_key="k-2")
+        self.assertEqual(self.jobs.repeat("caller-a", "k-2", self.NOW)["job"]["id"], running)
+
+    def legacy(self, job_id, key="k-1"):
+        """Rewrite the key file as a kit before 0.41.0 wrote it: {"job": id}, no intent."""
+        import hashlib
+        name = hashlib.sha256(json.dumps(["caller-a", key], separators=(",", ":")).encode()).hexdigest() + ".json"
+        (self.jobs.dir / "keys" / name).write_text(json.dumps({"job": job_id}) + "\n")
+
+    def test_a_key_file_from_0_40_answers_with_its_job_never_a_conflict(self):
+        """FAA-77: a 0.40.0 key file holds only {"job": id}; a retry with that key is answered with the job, as 0.40.0
+        answered it, never idempotency-conflict (whose advice, a new key, could run the effect twice)."""
+        first = self.start()
+        self.legacy(first)
+        for capability, given in (("media.order", {"brief": "x"}), ("media.order", {"brief": "y"})):
+            with self.subTest(given=given):
+                with self.assertRaisesRegex(fi.InteropError, "^Key k-1 already names job %s; answer with that job" % first):
+                    self.jobs.create(capability, given, caller="caller-a", idempotency_key="k-1")
+        self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW), {"decision": "same", "job": self.jobs.get(first)})
+        self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW, capability="media.order", arguments={"brief": "y"})["decision"],
+                         "same", "a legacy record answers as before, even for another input")
+        self.assertEqual(len(list(self.jobs.dir.glob("job_*.json"))), 1, "nothing started")
+
+    def test_a_limited_key_file_from_0_40_runs_again_only_for_its_own_jobs_input(self):
+        held = self.start()
+        self.jobs.quota_exhausted(held, "budget", retryable=False)
+        self.legacy(held)
+        with self.assertRaisesRegex(fi.InteropError, "^Key k-1 already names job %s" % held,
+                                    msg="another intent under a legacy key never runs: it is answered with the job"):
+            self.jobs.create("media.order", {"brief": "z"}, caller="caller-a", idempotency_key="k-1", limit_holds=False)
+        self.assertEqual(len(list(self.jobs.dir.glob("job_*.json"))), 1)
+        second = self.jobs.create("media.order", {"brief": "x"}, caller="caller-a", idempotency_key="k-1", limit_holds=False)["job"]["id"]
+        self.assertNotEqual(second, held, "the job's own capability and input run again once, as 0.40.0 ran them")
+        self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW, capability="media.order", arguments={"brief": "z"})["decision"],
+                         "conflict", "the new key file carries the intent")
+
+    def test_repeat_with_the_intent_answers_conflict_for_another_one(self):
+        first = self.start()
+        self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW, capability="media.order", arguments={"brief": "x"}),
+                         {"decision": "same", "job": self.jobs.get(first)})
+        for capability, given in (("media.order", {"brief": "y"}), ("media.refund", {"brief": "x"})):
+            with self.subTest(capability=capability, given=given):
+                self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW, capability=capability, arguments=given),
+                                 {"decision": "conflict", "job": self.jobs.get(first)})
+        self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW)["decision"], "same", "without the intent: as before")
+        self.jobs.quota_exhausted(first, "budget", retryable=False)
+        self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW, limit_holds=False, capability="media.order", arguments={"brief": "x"})["decision"], "run")
+        self.assertEqual(self.jobs.repeat("caller-a", "k-1", self.NOW, limit_holds=False, capability="media.order", arguments={"brief": "y"})["decision"], "conflict")
+
+    def test_a_lone_surrogate_in_a_key_or_caller_is_refused_with_a_sentence(self):
+        """Finding 9: Python raised UnicodeEncodeError from the key's file name; both kits now refuse it."""
+        for caller, key in (("caller-a", "\ud800"), ("\udfff", "k-1"), ("caller-a", "a\udc00b")):
+            with self.subTest(caller=caller, key=key):
+                with self.assertRaisesRegex(fi.InteropError, "lone surrogate"):
+                    self.jobs.create("media.order", {"brief": "x"}, caller=caller, idempotency_key=key)
+                with self.assertRaisesRegex(fi.InteropError, "lone surrogate"):
+                    self.jobs.repeat(caller, key, self.NOW)
+        self.assertEqual(list(self.jobs.dir.glob("job_*.json")) if self.jobs.dir.exists() else [], [])
+        with self.assertRaisesRegex(fi.InteropError, "RFC 8785"):
+            self.jobs.create("media.order", {"brief": "\ud800"}, caller="caller-a", idempotency_key="k-9")
 
     def test_the_usage_gate(self):
         measured = {"inputTokens": 1200, "outputTokens": None, "wallMs": 5100, "costUsd": None}

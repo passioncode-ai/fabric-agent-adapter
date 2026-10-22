@@ -87,8 +87,8 @@ gate = fd.delegation_gate(audience=..., jwks=keys, issuer=..., effects=..., esta
   `estate-forked` (the applied number with another digest). A caller cannot cure these by minting again.
 - An unreadable clock (not a finite number of seconds a `Date` can hold) is refused `unknown-state` `no-clock`
   before row 1, in every verifier.
-- Only an absent `estate` skips the check. In the Node kit `null` is an unreadable source; in Python, where `None` is
-  the absent value, pass a function returning `None` for a source that has nothing.
+- Only an absent `estate` skips the check: an option left out. An explicit `null` (Python `None`) is an unreadable
+  source in both kits, and so is `applied: null`; an omitted `applied` means no revision applied yet (FAA-78).
 - **What you pass in.** Pass only a revision that `verify_estate_record` accepted and whose number is not lower than
   the highest the machine applied; a higher one only when you verified its chain from the applied revision.
 - `hub_key_certified(record, kid, x, at, applied, extra_revocations)` /

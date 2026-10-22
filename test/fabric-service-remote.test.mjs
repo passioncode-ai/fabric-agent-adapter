@@ -10,6 +10,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { assertPrivateFile } from './private-file.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
@@ -95,7 +96,7 @@ test('registerRemote writes a 0600 token and a descriptor that claims no port', 
   const file = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com:8443', token: 't'.repeat(40), dir });
   const d = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.equal(d.placement, 'remote');
-  assert.equal(fs.statSync(d.auth.tokenFile).mode & 0o777, 0o600);
+  assertPrivateFile(d.auth.tokenFile);
   assert.equal(fs.readFileSync(d.auth.tokenFile, 'utf8'), 't'.repeat(40));
   assert.throws(() => k.registerRemote({ id: 'other', name: 'O', origin: 'https://o.example.com', token: 'short', dir }), /16 characters/);
   const later = { ...local, id: 'later', origin: 'http://127.0.0.1:8443' };

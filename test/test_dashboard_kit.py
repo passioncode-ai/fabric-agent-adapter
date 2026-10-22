@@ -226,7 +226,15 @@ class Declaration(unittest.TestCase):
         contract = Path(os.environ["FABRIC_CONTRACT_NEW"])
         positive = json.loads((contract / "fixtures/positive/service-dashboard-extension.json").read_text())
         self.assertEqual(fs.dashboard_extension_problems(positive), [])
-        self.assertEqual(positive, fs.dashboard_extension()[KEY])
+        # FAA-72: the fixture names the kit release the contract was written against, the kit names its own; both
+        # are `fabric-dashboard-kit@<semver>`, and everything else must be the same declaration.
+        ours = dict(fs.dashboard_extension()[KEY])
+        theirs = dict(positive)
+        kit_ref = re.compile(r"fabric-dashboard-kit@(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?")
+        for label, value in (("fixture", theirs.pop("kit", None)), ("kit", ours.pop("kit", None))):
+            self.assertIsInstance(value, str, "%s: the kit field is missing" % label)
+            self.assertIsNotNone(kit_ref.fullmatch(value), "%s: %r is not fabric-dashboard-kit@<semver>" % (label, value))
+        self.assertEqual(theirs, ours)
         minimal = contract / "fixtures/positive/service-dashboard-extension-minimal.json"
         if minimal.exists():
             self.assertEqual(fs.dashboard_extension_problems(json.loads(minimal.read_text())), [])

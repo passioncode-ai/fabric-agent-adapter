@@ -49,7 +49,7 @@ USAGE_DAYS = 31
 COST_BASES = ("provider", "price-list", "unknown")
 
 
-_PROVIDER = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
+_PROVIDER = re.compile(r"^[a-z][a-z0-9._-]{0,63}\Z")
 
 
 def make_usage_receipt(provider: str, model: str, *, input_tokens: int, output_tokens: int,
@@ -517,10 +517,10 @@ LIMIT_SCOPES = ("machine", "project", "pool", "job")
 PER_ORDER_KINDS = ("per_job", "approval")
 
 
-_LIMIT_ID = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,63}$")
+_LIMIT_ID = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,63}\Z")
 
 
-_LIMIT_KIND = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+_LIMIT_KIND = re.compile(r"^[a-z][a-z0-9_]{0,31}\Z")
 
 
 _LIMIT_FIELDS = ("id", "scope", "subject", "kind", "period", "windowSeconds", "since", "limitUsd", "spentUsd", "enforced", "tripped")

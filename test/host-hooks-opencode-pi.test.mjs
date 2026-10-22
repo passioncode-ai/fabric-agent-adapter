@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readContext } from '../plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/context.mjs';
+import { onceEach, readContext } from '../plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/context.mjs';
 
 const source = new URL('../plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/hosts/', import.meta.url);
 async function fixture(t, python = "print('[fabric-agent-adapter] fixture context')") {
@@ -25,19 +25,32 @@ test('helper sends only cwd and affirmative registration as JSON without shell i
   const f = await fixture(t, "import json,sys\np=json.load(sys.stdin)\nassert sys.argv[1:]==['hook','session-start','--host','pi']\nassert p=={'cwd':'/example/$safe path','fabric_registered':True}\nprint('context')");
   assert.equal(await readContext('pi','/example/$safe path',{script:f.script,fabricRegistered:true}), 'context');
 });
-test('helper ignores nonzero stdout, missing executable and missing script', async t => {
+test('helper reports a failed run (nonzero exit, missing executable, missing script) as null, not as an empty answer', async t => {
   const f = await fixture(t, "import sys\nprint('untrusted')\nsys.exit(1)");
-  assert.equal(await readContext('pi','/example',{script:f.script}), '');
-  assert.equal(await readContext('pi','/example',{python:join(f.root,'missing')}), '');
-  assert.equal(await readContext('pi','/example',{script:join(f.root,'missing')}), '');
+  assert.equal(await readContext('pi','/example',{script:f.script}), null);
+  assert.equal(await readContext('pi','/example',{python:join(f.root,'missing')}), null);
+  assert.equal(await readContext('pi','/example',{script:join(f.root,'missing')}), null);
+  await writeFile(f.script, '');
+  assert.equal(await readContext('pi','/example',{script:f.script}), '', 'a run that answered nothing is an empty answer');
 });
-test('helper bounds hung and oversized child output', async t => {
+test('helper bounds hung and oversized child output, both failures', async t => {
   const f = await fixture(t, 'import time\ntime.sleep(10)');
   const start=Date.now();
-  assert.equal(await readContext('pi','/example',{script:f.script,timeoutMs:50}), '');
+  assert.equal(await readContext('pi','/example',{script:f.script,timeoutMs:50}), null);
   assert.ok(Date.now()-start<2000);
   await writeFile(f.script,"print('x'*100000)");
-  assert.equal(await readContext('opencode','/example',{script:f.script}), '');
+  assert.equal(await readContext('opencode','/example',{script:f.script}), null);
+});
+test('a failed helper run is not cached: the next request runs the real reader again (FAA-69)', async t => {
+  const f = await fixture(t);
+  let python = join(f.root, 'missing-python3');
+  let runs = 0;
+  const read = onceEach((host, cwd, options) => { runs++; return readContext(host, cwd, {...options, python, script:f.script}); });
+  assert.equal(await read('opencode', f.root), null, 'python3 missing: a failure');
+  python = 'python3';
+  assert.equal(await read('opencode', f.root), '[fabric-agent-adapter] fixture context', 'the second call runs the reader again');
+  assert.equal(await read('opencode', f.root), '[fabric-agent-adapter] fixture context');
+  assert.equal(runs, 2, 'a successful answer is kept');
 });
 test('helper rejects invalid host, cwd, and nontext/control output', async t => {
   const f = await fixture(t, "print('bad\\x1b[31m')");
@@ -61,6 +74,24 @@ test('OpenCode malformed host output and missing context are harmless', async t 
   const output={system:['existing']};
   await hooks['experimental.chat.system.transform']({},output);
   assert.deepEqual(output.system,['existing']);
+});
+test('OpenCode runs the helper once per workspace and registration, not per request (FAA-69)', async t => {
+  const f=await fixture(t,"import json,sys,os\nopen(os.path.join(os.path.dirname(sys.argv[0]),'runs.log'),'a').write('x\\n')\n"+
+    "p=json.load(sys.stdin)\nprint('[fabric-agent-adapter] registered='+str(p.get('fabric_registered') is True))");
+  const {readFile}=await import('node:fs/promises');
+  const runs=async()=>(await readFile(join(f.root,'runs.log'),'utf8')).split('x').length-1; // runs, not bytes: Python writes \r\n on Windows
+  const hooks=await (await f.load('opencode')).default({directory:f.root});
+  for (let n=0;n<3;n++) {
+    const output={system:['existing']};
+    await hooks['experimental.chat.system.transform']({},output);
+    assert.deepEqual(output.system,['existing','[fabric-agent-adapter] registered=False']);
+  }
+  assert.equal(await runs(),1,'one helper run for three requests');
+  await hooks.config({mcp:{fabric:{type:'local',command:['fabric-mcp']}}});
+  const output={system:[]};
+  await hooks['experimental.chat.system.transform']({},output);
+  assert.deepEqual(output.system,['[fabric-agent-adapter] registered=True']);
+  assert.equal(await runs(),2,'a changed registration asks again');
 });
 async function piHandler(f, tools) {
   const handlers=new Map(); const mod=await f.load('pi');

@@ -347,6 +347,15 @@ export function urlRequest(message, url) {
 }
 
 // --- C3.2 jobs: the same file format as fabric_interop.JobStore ------------------------------
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+/** What a key is kept beside (FAA-77): sha256 of the RFC 8785 form of [capability, input]; an input with none is refused. */
+export function intentDigest(capability, input) {
+  let form;
+  try { form = jcs([capability, input]); } catch { throw new InteropError("A job's input with an idempotency key needs a JSON form (RFC 8785)."); }
+  return `sha256:${crypto.createHash('sha256').update(form, 'utf8').digest('hex')}`;
+}
+
 export class JobStore {
   constructor(dir) { this.dir = dir; }
 
@@ -370,36 +379,63 @@ export class JobStore {
 
   // With idempotencyKey the key is kept per caller (the authenticated caller, DEC-0087): a key that already names a job
   // starts nothing and throws, unless repeat() answers 'run'; then the key names the new job.
+  // The key is kept beside the intent's digest (FAA-77): a key that names a job of another intent is idempotency-conflict.
+  // A key file a kit before 0.41.0 wrote carries no intent: it is answered with its job as 0.40.0 answered it (see repeat).
   create(capability, input, { traceparent, pollIntervalMs, caller = null, idempotencyKey, now, limitHolds, approvalGranted = false } = {}) {
+    let intent = null;
     if (idempotencyKey !== undefined) {
-      const decision = this.repeat(caller, idempotencyKey, now ?? nowIso(), { limitHolds, approvalGranted });
+      intent = intentDigest(capability, input);
+      const decision = this.repeat(caller, idempotencyKey, now ?? nowIso(), { limitHolds, approvalGranted, capability, input });
+      if (decision.decision === 'conflict') throw new InteropError(`idempotency-conflict: key ${idempotencyKey} names a job of another intent; send the same capability and input, or a new key.`);
       if (decision.decision === 'same') throw new InteropError(`Key ${idempotencyKey} already names job ${decision.job.id}; answer with that job (JobStore.repeat).`);
     }
     const id = `job_${crypto.randomBytes(12).toString('hex')}`;
     const job = { id, status: 'working' };
     if (pollIntervalMs) job.pollIntervalMs = Math.trunc(pollIntervalMs);
     this.save({ job, private: { capability, input, traceparent: parseTraceparent(traceparent) ? traceparent : null } });
-    if (idempotencyKey !== undefined) atomicWrite(this.keyFile(caller, idempotencyKey), `${JSON.stringify({ job: id })}\n`, 0o600);
+    if (idempotencyKey !== undefined) atomicWrite(this.keyFile(caller, idempotencyKey), `${JSON.stringify({ job: id, intent })}\n`, 0o600);
     return { job: { id, status: 'working' } };
   }
 
   keyFile(caller, key) {
     if (typeof key !== 'string' || key.length === 0) throw new InteropError('An idempotency key is a non-empty string.');
+    if (LONE_SURROGATE.test(key) || (typeof caller === 'string' && LONE_SURROGATE.test(caller))) throw new InteropError('An idempotency key and its caller are Unicode text; a lone surrogate is refused.');
     const dir = path.join(this.dir, 'keys');
     ensurePrivateDir(dir);
     return path.join(dir, `${crypto.createHash('sha256').update(JSON.stringify([caller ?? null, key]), 'utf8').digest('hex')}.json`);
   }
 
-  // The answer to a key this caller sent before: {decision: 'new'|'same'|'run', job}.
-  repeat(caller, key, now, options = {}) {
-    let id;
-    try { id = JSON.parse(fs.readFileSync(this.keyFile(caller, key), 'utf8')).job; } catch (e) {
-      if (e.code === 'ENOENT') return { decision: 'new', job: null };
-      throw new InteropError(`Key ${key} is unreadable on disk.`);
+  keyRecord(caller, key) {
+    let record;
+    try { record = JSON.parse(fs.readFileSync(this.keyFile(caller, key), 'utf8')); } catch (e) {
+      if (e.code === 'ENOENT') return null;
+      if (e instanceof InteropError) throw e;
     }
+    if (record === null || typeof record !== 'object' || Array.isArray(record)) throw new InteropError(`Key ${key} is unreadable on disk.`);
+    return record;
+  }
+
+  // The answer to a key this caller sent before: {decision: 'new'|'same'|'run'|'conflict', job}. 'same': answer with
+  // that job; 'run': the intent runs again, once; 'conflict': given options.capability (and options.input), the key was
+  // kept beside another intent (idempotency-conflict, FAA-77). A key file a kit before 0.41.0 wrote holds only
+  // {"job": id}, no intent: it never answers 'conflict', and 'run' only for the intent its job stored; otherwise 'same'.
+  repeat(caller, key, now, options = {}) {
+    const record = this.keyRecord(caller, key);
+    if (record === null) return { decision: 'new', job: null };
+    const id = record.job;
+    if (typeof id !== 'string') throw new InteropError(`Key ${key} is unreadable on disk.`);
     let job;
     try { job = this.get(id); } catch (e) { if (e instanceof UnknownJob) return { decision: 'new', job: null }; throw e; }
-    return { decision: repeatedKeyDecision(job, now, options), job };
+    let decision = repeatedKeyDecision(job, now, options);
+    if (options.capability === undefined || options.capability === null) return { decision, job };
+    const intent = intentDigest(options.capability, options.input ?? null);
+    if (Object.hasOwn(record, 'intent')) return { decision: record.intent !== intent ? 'conflict' : decision, job };
+    // A 0.40.0 key runs only the intent its job stored (an input with no JSON form is refused, as the Python kit refuses it).
+    if (decision === 'run') {
+      const stored = this.load(id).private ?? {};
+      if (intentDigest(stored.capability ?? null, stored.input ?? null) !== intent) decision = 'same';
+    }
+    return { decision, job };
   }
 
   get(jobId) { return { ...this.load(jobId).job }; }
@@ -448,11 +484,9 @@ export class JobStore {
   // A job a limit paused and its provider will resume: working, the pause grammar, pollIntervalMs reaching the reset.
   pause(jobId, { resetsAt, text } = {}) {
     const statusMessage = pauseMessage({ resetsAt, text });
-    if (resetsAt !== undefined) {
-      const wait = utcTime(resetsAt) - Date.now();
-      if (wait > 0) { const record = this.load(jobId); record.job.pollIntervalMs = Math.trunc(Math.min(wait, 3600000)); this.save(record); }
-    }
-    return this.transition(jobId, 'working', { statusMessage });
+    const wait = resetsAt === undefined ? 0 : utcTime(resetsAt) - Date.now();
+    // One write, after the terminal check: a terminal job does not change, pollIntervalMs included (finding 11).
+    return this.transition(jobId, 'working', { statusMessage, pollIntervalMs: wait > 0 ? Math.trunc(Math.min(wait, 3600000)) : undefined });
   }
 
   // A job a limit stopped and its provider will not resume: failed, quota-exhausted, data {retryable, resetsAt?}.

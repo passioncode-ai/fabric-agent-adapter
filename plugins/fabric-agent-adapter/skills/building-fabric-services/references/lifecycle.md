@@ -273,7 +273,9 @@ that still exits 75 stays down until the next logon.
 a named pipe on Windows (`lock_name` / `lockName`), each gone with the process. The Python kit
 holds the same name beside its file lock, so the two kits exclude each other everywhere, and
 `check_service.py` reports the lock held when either is. The probe only looks (`/proc/net/unix`,
-`WaitNamedPipeW`); it never takes the name, so it cannot make a service that is starting fail.
+`WaitNamedPipeW`); it never takes the name, so it cannot make a service that is starting fail. On Linux the Node kit's
+name needs Node 22 or later: Node 18 and early 20 collapse every abstract socket name into one, and later 20 pads it so
+no Python copy or probe sees it, so the Node kit refuses to start there with a sentence naming Node 22 (FAA-72).
 
 **Token files on Windows.** The privacy of `service.token` is its ACL (service.md *Windows
 token files*): the kits write a protected list: the user, SYSTEM and Administrators, set before the

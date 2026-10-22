@@ -57,7 +57,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.40.0"
+VERSION = "0.41.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -401,22 +401,53 @@ def _process(pid: int) -> Tuple[Optional[str], int]:
         return None, 0
 
 
-def launched_by_ancestor(env: Optional[Dict[str, str]] = None, depth: int = 4) -> bool:
+def launched_by_ancestor(env: Optional[Dict[str, str]] = None, depth: int = 4,
+                         process: Optional[Callable[[int], Tuple[Optional[str], int]]] = None,
+                         platform: str = sys.platform) -> Optional[bool]:
     """A Claude Code Fabric launched runs with `--mcp-config <Fabric>/sessions/<id>/mcp.json` (sessionBundle.ts,
-    adapter mcp-config-flag) and no environment marker yet: look for that in this hook's few ancestors. Only the
-    path is matched; nothing read here is kept or logged."""
+    adapter mcp-config-flag) and no environment marker yet: look for that in this hook's few ancestors. True or False
+    once the walk is done; None when a process could not be read (a `ps` that failed or ran out of time), which is
+    "unknown", never "not launched" (FAA-68). Windows has no walk (`_process` reads no process there): False, so
+    only the environment signals count. Only the path is matched; nothing read here is kept or logged."""
+    if process is None and platform == "win32":
+        return False
     marker = os.path.normpath(str(fabric_root(env=env) / "sessions")) + os.sep
+    process = process or _process
     pid = os.getppid()
     for _ in range(depth):
         if pid <= 1:
             return False
-        command, parent = _process(pid)
+        command, parent = process(pid)
         if command is None:
-            return False
+            return None
         if "--mcp-config" in command and marker in command:
             return True
         pid = parent
     return False
+
+
+#: A session rejoins at most once in this span (FAA-53): every rejoin spends Fabric's per-agent request budget, which
+#: every session of the machine shares. The Stop worker and watch-mail both honour and renew the mark (FAA-68).
+REJOIN_MIN_INTERVAL_S = 60.0
+
+
+#: The file in a session's folder that says Fabric launched it: the ancestor walk ran once and found the launcher.
+LAUNCHED_MARK = "launched"
+
+
+def rejoined_recently(directory: Path, now: Optional[float] = None) -> bool:
+    """Whether this session's last rejoin succeeded within REJOIN_MIN_INTERVAL_S (the worker marks it)."""
+    return rejoin_wait(directory, now) > 0
+
+
+def rejoin_wait(directory: Path, now: Optional[float] = None) -> float:
+    """Seconds until this session may rejoin again; 0 when it may now."""
+    try:
+        mark = (directory / "rejoined").stat().st_mtime
+    except OSError:
+        return 0.0
+    age = (time.time() if now is None else now) - mark
+    return REJOIN_MIN_INTERVAL_S - age if 0 <= age < REJOIN_MIN_INTERVAL_S else 0.0
 
 
 def log(line: str, env: Optional[Dict[str, str]] = None) -> None:

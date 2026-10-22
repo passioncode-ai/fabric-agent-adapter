@@ -100,5 +100,82 @@ test('both kits write the same key file and read each other\'s jobs', (t) => {
   const files = fs.readdirSync(path.join(jobs.dir, 'keys'));
   assert.equal(files.length, 1);
   assert.equal(files[0], `${crypto.createHash('sha256').update('["caller-a","k-1"]').digest('hex')}.json`, 'the name fabric_interop.py writes');
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(jobs.dir, 'keys', files[0]), 'utf8')), { job: id });
+  const intent = `sha256:${crypto.createHash('sha256').update('["media.order",{"brief":"x"}]').digest('hex')}`;
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(jobs.dir, 'keys', files[0]), 'utf8')), { job: id, intent });
+  assert.equal(k.intentDigest('media.order', { brief: 'x' }), intent);
+});
+
+test('FAA-77 item 39: a limited key runs again only for the intent it was first sent with', (t) => {
+  const jobs = store(t);
+  const first = start(jobs);
+  jobs.quotaExhausted(first, 'hourly quota', { retryable: true, resetsAt: '2026-10-19T11:00:00Z' });
+  const later = '2026-10-19T11:00:00Z';
+  for (const [capability, input] of [['media.order', { brief: 'y' }], ['media.refund', { brief: 'x' }], ['media.order', { brief: 'x', to: 'someone-else' }]]) {
+    assert.throws(() => jobs.create(capability, input, { caller: 'caller-a', idempotencyKey: 'k-1', now: later }), /^InteropError: idempotency-conflict|idempotency-conflict/, JSON.stringify(input));
+  }
+  assert.equal(fs.readdirSync(jobs.dir).filter((f) => f.startsWith('job_')).length, 1, 'a refused intent starts nothing');
+  assert.notEqual(jobs.create('media.order', { brief: 'x' }, { caller: 'caller-a', idempotencyKey: 'k-1', now: later }).job.id, first);
+  const running = start(jobs, 'caller-a', 'k-2');
+  assert.throws(() => jobs.create('media.order', { brief: 'z' }, { caller: 'caller-a', idempotencyKey: 'k-2' }), (e) => e.message.startsWith('idempotency-conflict'));
+  assert.equal(jobs.repeat('caller-a', 'k-2', NOW).job.id, running);
+});
+
+// Rewrite a key file as a kit before 0.41.0 wrote it: {"job": id}, no intent.
+const legacy = (jobs, id, key = 'k-1') => fs.writeFileSync(path.join(jobs.dir, 'keys', `${crypto.createHash('sha256').update(JSON.stringify(['caller-a', key])).digest('hex')}.json`), `${JSON.stringify({ job: id })}\n`);
+const jobFiles = (jobs) => fs.readdirSync(jobs.dir).filter((f) => f.startsWith('job_')).length;
+
+test('FAA-77: a key file from 0.40.0 is answered with its job, never idempotency-conflict', (t) => {
+  const jobs = store(t);
+  const first = start(jobs);
+  legacy(jobs, first);
+  for (const input of [{ brief: 'x' }, { brief: 'y' }]) {
+    assert.throws(() => jobs.create('media.order', input, { caller: 'caller-a', idempotencyKey: 'k-1' }), (e) => e.message.startsWith(`Key k-1 already names job ${first}; answer with that job`), JSON.stringify(input));
+  }
+  assert.deepEqual(jobs.repeat('caller-a', 'k-1', NOW), { decision: 'same', job: jobs.get(first) });
+  assert.equal(jobs.repeat('caller-a', 'k-1', NOW, { capability: 'media.order', input: { brief: 'y' } }).decision, 'same', 'a legacy record answers as before');
+  assert.equal(jobFiles(jobs), 1, 'nothing started');
+});
+
+test('FAA-77: a limited key file from 0.40.0 runs again only for its own job\'s input', (t) => {
+  const jobs = store(t);
+  const held = start(jobs);
+  jobs.quotaExhausted(held, 'budget', { retryable: false });
+  legacy(jobs, held);
+  assert.throws(() => jobs.create('media.order', { brief: 'z' }, { caller: 'caller-a', idempotencyKey: 'k-1', limitHolds: false }), (e) => e.message.startsWith(`Key k-1 already names job ${held}`));
+  assert.equal(jobFiles(jobs), 1);
+  const second = jobs.create('media.order', { brief: 'x' }, { caller: 'caller-a', idempotencyKey: 'k-1', limitHolds: false }).job.id;
+  assert.notEqual(second, held);
+  assert.equal(jobs.repeat('caller-a', 'k-1', NOW, { capability: 'media.order', input: { brief: 'z' } }).decision, 'conflict', 'the new key file carries the intent');
+});
+
+test('FAA-77: repeat given the intent answers conflict for another one', (t) => {
+  const jobs = store(t);
+  const first = start(jobs);
+  assert.deepEqual(jobs.repeat('caller-a', 'k-1', NOW, { capability: 'media.order', input: { brief: 'x' } }), { decision: 'same', job: jobs.get(first) });
+  for (const [capability, input] of [['media.order', { brief: 'y' }], ['media.refund', { brief: 'x' }]]) {
+    assert.deepEqual(jobs.repeat('caller-a', 'k-1', NOW, { capability, input }), { decision: 'conflict', job: jobs.get(first) });
+  }
+  assert.equal(jobs.repeat('caller-a', 'k-1', NOW).decision, 'same', 'without the intent: as before');
+  jobs.quotaExhausted(first, 'budget', { retryable: false });
+  assert.equal(jobs.repeat('caller-a', 'k-1', NOW, { limitHolds: false, capability: 'media.order', input: { brief: 'x' } }).decision, 'run');
+  assert.equal(jobs.repeat('caller-a', 'k-1', NOW, { limitHolds: false, capability: 'media.order', input: { brief: 'y' } }).decision, 'conflict');
+});
+
+test('finding 9: a lone surrogate in a key or caller is refused with a sentence, as the Python kit refuses it', (t) => {
+  const jobs = store(t);
+  for (const [caller, key] of [['caller-a', '\ud800'], ['\udfff', 'k-1'], ['caller-a', 'a\udc00b']]) {
+    assert.throws(() => jobs.create('media.order', { brief: 'x' }, { caller, idempotencyKey: key }), (e) => e instanceof k.InteropError && /lone surrogate/.test(e.message), JSON.stringify(key));
+    assert.throws(() => jobs.repeat(caller, key, NOW), (e) => e instanceof k.InteropError && /lone surrogate/.test(e.message));
+  }
+  assert.equal(start(jobs, 'caller-a', 'k-\u{1f600}').startsWith('job_'), true, 'a well-formed pair is text');
+  assert.throws(() => jobs.create('media.order', { brief: '\ud800' }, { caller: 'caller-a', idempotencyKey: 'k-9' }), /RFC 8785/);
+});
+
+test('finding 11: pause on a terminal job changes nothing', (t) => {
+  const jobs = store(t);
+  const id = start(jobs);
+  jobs.cancel(id);
+  const before = jobs.get(id);
+  assert.throws(() => jobs.pause(id, { resetsAt: '2099-01-01T00:00:00Z' }), k.InteropError);
+  assert.deepEqual(jobs.get(id), before);
 });

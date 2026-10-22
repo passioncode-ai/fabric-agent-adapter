@@ -29,7 +29,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import fabric_delegation as _delegation  # noqa: E402 - beside this file: RFC 8785
 import fabric_estate as _estate  # noqa: E402 - beside this file: passkey assertions, times, show
 
 ENROLL_TOKEN_SCHEMA = "enroll-token/1"

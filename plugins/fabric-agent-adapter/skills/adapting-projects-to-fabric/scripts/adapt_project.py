@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import difflib
 import json
 import math
 import os
@@ -41,6 +42,22 @@ GENERATED_PATHS = (
     "fabric/probes/assertions.md",
     "fabric/FABRIC-CONFORMANCE.md",
 )
+
+
+# #region template-sentinels
+# Every value the scaffold invents is a sentinel `check` finds: a fixed string, a `$comment` or Markdown mark, or a
+# JSON pointer listed under TEMPLATE_KEY in the manifest's extensions (a value that is legal but was not chosen by the
+# author, such as dataClasses ["public"]). readyForAdmission stays false while one remains.
+TEMPLATE_KEY = "urn:fabric:adapter:template"
+TEMPLATE_MARK = "fabric-adapter-template"
+AUTHOR_SENTINEL = "urn:fabric:adapter:author"
+WEAK_ASSERTION = "returns a typed result without external effects"
+FIXTURE_SENTINEL = "Return one bounded, non-publishing test result."
+ZERO_HASH = "sha256:" + ("0" * 64)
+PLACEHOLDER_TEXT = ("replace-me", ".invalid")
+DATA_CLASSES = ("public", "project-internal", "confidential", "personal", "credential", "regulated")
+IDENTITY_METHODS = ("tls", "oauth2", "signed-manifest", "local-install")
+# #endregion template-sentinels
 
 
 class AdaptationError(Exception):
@@ -84,7 +101,7 @@ def inspect_project(root: Path) -> Dict[str, Any]:
     if not root.is_dir():
         raise AdaptationError("project path is not a directory: %s" % root)
 
-    evidence: Dict[str, List[str]] = {"mcp": [], "a2a": [], "local-runner": [], "autonomous": []}
+    evidence: Dict[str, List[str]] = {"mcp": [], "a2a": [], "local-runner": [], "autonomous": [], "mcp-client-config": []}
     sampled = 0
     file_count = 0
     for path in _files(root):
@@ -93,7 +110,11 @@ def inspect_project(root: Path) -> Dict[str, Any]:
         lower_rel = rel.lower()
         if lower_rel.endswith("agent-card.json") or ".well-known/agent-card" in lower_rel:
             evidence["a2a"].append("file:%s" % rel)
-        if "mcp" in Path(lower_rel).name:
+        client_config = _is_mcp_client_config(path)
+        if client_config:
+            # A client's server list (.mcp.json, mcpServers) says what the project CALLS, not what it serves.
+            evidence["mcp-client-config"].append("file:%s" % rel)
+        elif "mcp" in Path(lower_rel).name:
             evidence["mcp"].append("file:%s" % rel)
         if lower_rel.startswith("bin/") or lower_rel in {"cli.py", "cli.js", "cli.ts"}:
             evidence["local-runner"].append("file:%s" % rel)
@@ -105,7 +126,7 @@ def inspect_project(root: Path) -> Dict[str, Any]:
             continue
         sampled += 1
         lowered = text.lower()
-        if "@modelcontextprotocol/sdk" in lowered or "fastmcp" in lowered or "model context protocol" in lowered:
+        if not client_config and ("@modelcontextprotocol/sdk" in lowered or "fastmcp" in lowered or "model context protocol" in lowered):
             evidence["mcp"].append("content:%s" % rel)
         if '"a2a"' in lowered or "agent card" in lowered or "/.well-known/agent-card.json" in lowered:
             evidence["a2a"].append("content:%s" % rel)
@@ -136,6 +157,9 @@ def inspect_project(root: Path) -> Dict[str, Any]:
     else:
         recommendation = "undetermined"
         question = "Which capability is being adapted, and who owns its task lifecycle?"
+    if evidence["mcp-client-config"] and "mcp" not in candidates:
+        question = ("The project configures MCP clients (%s); that lists servers it calls, not one it serves. "
+                    "Does it also serve an MCP server Fabric can call? %s" % (", ".join(evidence["mcp-client-config"][:3]), question or ""))
 
     return {
         "project": str(root.resolve()),
@@ -147,6 +171,15 @@ def inspect_project(root: Path) -> Dict[str, Any]:
         "openQuestion": question,
         "warning": "Static inspection does not execute or trust the target project.",
     }
+
+
+def _is_mcp_client_config(path: Path) -> bool:
+    if path.name.lower() in (".mcp.json", "claude_desktop_config.json"):
+        return True
+    if path.suffix.lower() not in (".json", ".toml", ".yaml", ".yml"):
+        return False
+    text = _read_text(path).lower()
+    return "mcpservers" in text or "mcp_servers" in text
 
 
 def _require_absolute_uri(value: str, label: str) -> None:
@@ -171,7 +204,7 @@ def _profile(args: argparse.Namespace, schema_base: str) -> Dict[str, Any]:
         "outputSchema": output_uri,
         "timeoutMs": 30000,
         "sideEffectCeiling": "none",
-        "assertions": ["returns a typed result without external effects"],
+        "assertions": list(getattr(args, "probe_assertion", None) or [WEAK_ASSERTION]),
     }
     if profile == "mcp":
         if args.mcp_mode == "stdio":
@@ -245,6 +278,29 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
         if _secrets.secret_argument(runtime_arg):
             raise AdaptationError("a runtime argument carries a credential; argv is visible to every process (LC-21): read it from a secret reference instead")
 
+    defaulted: List[str] = []
+    created_by = getattr(args, "created_by", None)
+    if created_by:
+        _require_absolute_uri(created_by, "created-by")
+    else:
+        created_by = AUTHOR_SENTINEL
+        defaulted.append("/provider/createdBy")
+    local = args.profile == "local-runner" or (args.profile == "mcp" and args.mcp_mode == "stdio")
+    identity_method = getattr(args, "identity_method", None)
+    if not identity_method:
+        identity_method = "local-install" if local else "tls"
+        if not local:
+            defaulted.append("/provider/identity/method")
+    elif identity_method not in IDENTITY_METHODS:
+        raise AdaptationError("unknown identity method %r (%s)" % (identity_method, ", ".join(IDENTITY_METHODS)))
+    data_classes = list(dict.fromkeys(getattr(args, "data_class", None) or []))
+    if any(c not in DATA_CLASSES for c in data_classes):
+        raise AdaptationError("unknown data class (%s)" % ", ".join(DATA_CLASSES))
+    if not data_classes:
+        data_classes = ["public"]
+        defaulted.append("/capabilities/0/dataClasses")
+    if not getattr(args, "probe_assertion", None):
+        defaulted.append("/capabilities/0/profile/probes/0/assertions")
     created_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     # DEC-0076: a writer emits identifiers in their normal form, so every reader finds them under one spelling.
     provider_id = _normal_identifier(args.provider_id)
@@ -256,11 +312,11 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
             "revision": 1,
             "contentHash": "sha256:" + ("0" * 64),
             "createdAt": created_at,
-            "createdBy": "urn:fabric:adapter:author",
+            "createdBy": created_by,
             "name": args.provider_name,
             "identity": {
                 "subject": provider_id,
-                "method": "local-install" if args.profile == "local-runner" or (args.profile == "mcp" and args.mcp_mode == "stdio") else "tls",
+                "method": identity_method,
             },
             "supportedContractVersions": [CONTRACT_VERSION],
         },
@@ -272,7 +328,7 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
                 "outputSchema": _schema_uri(args.schema_base, "schemas/capability-output.schema.json"),
                 "effect": effect,
                 "idempotency": idempotency,
-                "dataClasses": ["public"],
+                "dataClasses": data_classes,
                 "profile": _profile(args, args.schema_base),
             }
         ],
@@ -282,6 +338,11 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
     presets = _cost_presets(args)
     if presets:
         manifest["costPresets"] = presets
+    if defaulted:
+        manifest["extensions"] = {TEMPLATE_KEY: {
+            "defaulted": defaulted,
+            "note": "The scaffold chose these values. Confirm or replace each one, remove it from this list, and remove this block when the list is empty; check keeps readyForAdmission false while it remains.",
+        }}
     lock = {
         "contract": "fabric-agent-contract",
         "version": CONTRACT_VERSION,
@@ -293,6 +354,7 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": _schema_uri(args.schema_base, "schemas/capability-input.schema.json"),
         "title": "Capability input",
+        "$comment": TEMPLATE_MARK + ": a generic placeholder; replace it with the capability's real input schema.",
         "type": "object",
         "additionalProperties": False,
         "properties": {"request": {"type": "string", "minLength": 1}},
@@ -302,6 +364,7 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": _schema_uri(args.schema_base, "schemas/capability-output.schema.json"),
         "title": "Capability output",
+        "$comment": TEMPLATE_MARK + ": a generic placeholder; replace it with the capability's real output schema.",
         "type": "object",
         "additionalProperties": False,
         "properties": {
@@ -310,8 +373,8 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
         },
         "required": ["summary", "evidence"],
     }
-    fixture = {"request": "Return one bounded, non-publishing test result."}
-    assertions = """# Admission probe assertions
+    fixture = {"request": FIXTURE_SENTINEL}
+    assertions = "<!-- " + TEMPLATE_MARK + ": generic assertions; replace them with what this capability's probe proves. -->\n" + """# Admission probe assertions
 
 - The result validates against `capability-output.schema.json`.
 - Every claimed fact has a resolvable evidence URI.
@@ -324,10 +387,10 @@ Contract: `fabric-agent-contract` 0.1.0 at `%s`
 
 | Gate | Status | Receipt / next action |
 |---|---|---|
-| Declaration shape | NOT VERIFIED | Run `adapt_project.py check . --contract /path/to/fabric-agent-contract`. |
-| Protocol revision and connection | NOT VERIFIED | Replace profile placeholders, then negotiate the exact pinned revision. |
-| Semantic probes | NOT VERIFIED | Implement and run the bounded fixture and assertions against the provider. |
-| Project binding readiness | NOT VERIFIED | Requires an admitted capability and Fabric host runtime. |
+| Declaration shape | NOT_VERIFIED | Run `adapt_project.py check . --contract /path/to/fabric-agent-contract`. |
+| Protocol revision and connection | NOT_VERIFIED | Replace profile placeholders, then negotiate the exact pinned revision. |
+| Semantic probes | NOT_VERIFIED | Implement and run the bounded fixture and assertions against the provider. |
+| Project binding readiness | NOT_VERIFIED | Requires an admitted capability and Fabric host runtime. |
 
 The zero content hash, `replace-me` values, and `.invalid` endpoints are deliberate
 placeholders. Scaffolding is not admission and must not be presented as compatibility.
@@ -345,7 +408,7 @@ placeholders. Scaffolding is not admission and must not be presented as compatib
 
 EFFECT_CLASSES = ("none", "draft", "publish", "send", "reply", "charge", "delete", "merge", "deploy", "change-policy")
 IDEMPOTENCY = ("required", "supported", "none")
-_PRESET_ID = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
+_PRESET_ID = re.compile(r"^[a-z][a-z0-9-]{0,39}\Z")  # \Z, not `$`: `$` also matches before a trailing newline (R1)
 
 
 def _cost_presets(args: argparse.Namespace) -> List[Dict[str, Any]]:
@@ -393,6 +456,23 @@ def scaffold_project(root: Path, args: argparse.Namespace) -> Dict[str, Any]:
         raise AdaptationError("project path is not a directory: %s" % root)
     generated = _generated_files(args)
     collisions = [rel for rel in generated if (root / rel).exists()]
+    if getattr(args, "dry_run", False):
+        diffs: Dict[str, str] = {}
+        for rel in collisions:
+            try:
+                old = (root / rel).read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+            except OSError as exc:
+                old = ["<unreadable: %s>\n" % exc.__class__.__name__]
+            diffs[rel] = "".join(difflib.unified_diff(old, generated[rel].splitlines(keepends=True), fromfile=rel, tofile=rel))
+        return {
+            "project": str(root.resolve()),
+            "profile": args.profile,
+            "dryRun": True,
+            "wouldCreate": sorted(set(generated) - set(collisions)),
+            "wouldReplace": sorted(collisions),
+            "needsForce": bool(collisions) and not args.force,
+            "diffs": diffs,
+        }
     if collisions and not args.force:
         raise AdaptationError("refusing to overwrite existing paths: %s" % ", ".join(collisions))
     for rel, content in generated.items():
@@ -413,8 +493,8 @@ def _load_json(path: Path, errors: List[str]) -> Optional[Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         errors.append("missing:%s" % path.name)
-    except (OSError, json.JSONDecodeError) as exc:
-        errors.append("invalid-json:%s:%s" % (path.name, exc))
+    except (OSError, ValueError) as exc:  # ValueError: JSONDecodeError and UnicodeDecodeError (a non-UTF-8 file)
+        errors.append("invalid-json:%s:%s" % (path.name, exc.__class__.__name__ if isinstance(exc, UnicodeError) else exc))
     return None
 
 
@@ -426,7 +506,9 @@ def _walk_keys(value: Any, prefix: str = "") -> Iterable[Tuple[str, Any]]:
             yield from _walk_keys(item, here)
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            yield from _walk_keys(item, "%s[%d]" % (prefix, index))
+            here = "%s[%d]" % (prefix, index)
+            yield here, item
+            yield from _walk_keys(item, here)
 
 
 def _contract_shape(manifest: Path, contract: Path, selected_commit: str) -> Tuple[str, List[str]]:
@@ -452,8 +534,9 @@ def _contract_shape(manifest: Path, contract: Path, selected_commit: str) -> Tup
         return "NOT_RUN", ["cannot verify clean contract checkout: %s" % exc]
     if dirty:
         return "FAIL", ["contract checkout has modifications; exact selected schema is required"]
-    if not (contract / "node_modules/.bin/tsx").is_file():
-        return "NOT_RUN", ["pinned contract dependencies are missing; run pnpm install --frozen-lockfile"]
+    tsx = contract / "node_modules/.bin/tsx"
+    if not tsx.is_file():
+        return "NOT_RUN", ["pinned contract dependencies are missing; run pnpm install --frozen-lockfile in the contract checkout"]
 
     code = """import {readFile} from 'node:fs/promises';
 import {createValidator,validateDocument} from './src/validator.ts';
@@ -465,13 +548,15 @@ import {SCHEMA_PREFIX} from './src/contract.ts';
   process.exit(result.valid?0:3);
 })().catch((error) => { console.error(error); process.exit(4); });"""
     try:
+        # The checkout's own tsx, called directly: `pnpm exec` may decide the modules folder is stale and purge and
+        # reinstall a checkout that is not this tool's to change (ERR_PNPM_UNSAFE_MODULES_DIR).
         run = subprocess.run(
-            ["pnpm", "exec", "tsx", "-e", code, str(manifest.resolve())],
+            [str(tsx), "-e", code, str(manifest.resolve())],
             cwd=str(contract), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             timeout=120,
         )
-    except FileNotFoundError:
-        return "NOT_RUN", ["pnpm is unavailable; install the pinned contract dependencies"]
+    except OSError as exc:
+        return "NOT_RUN", ["the contract checkout's tsx could not start (%s); is node on PATH?" % exc.__class__.__name__]
     except subprocess.TimeoutExpired:
         return "NOT_RUN", ["contract shape validation timed out"]
     if run.returncode != 0:
@@ -532,6 +617,58 @@ def _plugin_problems(root: Path) -> List[str]:
             if any(isinstance(v, str) and _secrets.secret_value(v) for v in env.values()):
                 problems.append("LC-21: plugin %s's MCP server %s writes a credential value in env; reference it instead" % (name, server))
     return problems
+
+
+def _template_block_warnings(manifest: Dict[str, Any], errors: List[str]) -> List[str]:
+    """The pointers the scaffold recorded as its own choices (TEMPLATE_KEY); each stays a warning until removed."""
+    extensions = manifest.get("extensions")
+    block = extensions.get(TEMPLATE_KEY) if isinstance(extensions, dict) else None
+    if block is None:
+        return []
+    pointers = block.get("defaulted") if isinstance(block, dict) else None
+    if not isinstance(pointers, list) or not all(isinstance(p, str) for p in pointers):
+        errors.append("extensions.%s must be {\"defaulted\": [JSON pointers]}" % TEMPLATE_KEY)
+        return []
+    if not pointers:
+        return ["template-default:extensions.%s is empty; remove the block" % TEMPLATE_KEY]
+    return ["template-default:%s (chosen by the scaffold; confirm or replace it, then remove it from extensions.%s)" % (p, TEMPLATE_KEY)
+            for p in pointers]
+
+
+def _template_file_warnings(root: Path) -> List[str]:
+    """Sentinels in the generated files other than the manifest: placeholder text, the template mark, the generic
+    schemas and fixture (also recognised by shape when the mark was removed but the schema was not replaced)."""
+    warnings: List[str] = []
+    for rel in GENERATED_PATHS[1:]:
+        if rel == "fabric/FABRIC-CONFORMANCE.md":
+            continue  # the status page names the placeholders to explain them; it is the author's to keep
+        path = root / rel
+        if not path.is_file():
+            continue
+        text = _read_text(path)
+        if TEMPLATE_MARK in text:
+            warnings.append("placeholder:%s (the scaffold's generic template)" % rel)
+        elif any(marker in text for marker in PLACEHOLDER_TEXT):
+            warnings.append("placeholder:%s" % rel)
+    generic_shapes = {
+        "fabric/schemas/capability-input.schema.json": {"request"},
+        "fabric/schemas/capability-output.schema.json": {"summary", "evidence"},
+    }
+    for rel, keys in generic_shapes.items():
+        try:
+            schema = json.loads((root / rel).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        properties = schema.get("properties") if isinstance(schema, dict) else None
+        if isinstance(properties, dict) and set(properties) == keys and TEMPLATE_MARK not in json.dumps(schema):
+            warnings.append("placeholder:%s (still the scaffold's generic shape)" % rel)
+    try:
+        fixture = json.loads((root / "fabric/fixtures/admission-input.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        fixture = None
+    if isinstance(fixture, dict) and FIXTURE_SENTINEL in fixture.values():
+        warnings.append("placeholder:fabric/fixtures/admission-input.json (the scaffold's generic fixture)")
+    return warnings
 
 
 def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
@@ -601,12 +738,18 @@ def check_project(root: Path, contract: Optional[Path]) -> Dict[str, Any]:
             normalized = key.lower().replace("_", "").replace("-", "")
             if any(secret in normalized for secret in ("password", "apikey", "accesstoken", "clientsecret", "privatekey")):
                 errors.append("secret-like field is forbidden in manifest: %s" % key)
-            if isinstance(value, str) and ("replace-me" in value or ".invalid" in value):
+            if isinstance(value, str) and any(text in value for text in PLACEHOLDER_TEXT):
                 warnings.append("placeholder:%s" % key)
+            if value == AUTHOR_SENTINEL:
+                warnings.append("placeholder:%s" % key)
+            if value == WEAK_ASSERTION:
+                warnings.append("placeholder:%s (a generic probe assertion; state what the probe proves)" % key)
         errors.extend(_credential_problems(manifest))
         provider = manifest.get("provider")
-        if isinstance(provider, dict) and provider.get("contentHash") == "sha256:" + ("0" * 64):
+        if isinstance(provider, dict) and provider.get("contentHash") == ZERO_HASH:
             warnings.append("placeholder:provider.contentHash")
+        warnings.extend(_template_block_warnings(manifest, errors))
+    warnings.extend(_template_file_warnings(root))
 
     shape_status = "NOT_RUN"
     shape_receipts = ["pass --contract PATH pointing at the pinned checkout"]
@@ -673,7 +816,13 @@ def build_parser() -> argparse.ArgumentParser:
                           help="a fixed cost option a launcher offers (DEC-0037 costPresets); repeat for each")
     scaffold.add_argument("--default-cost-preset", metavar="ID", help="the preset preselected at launch")
     scaffold.add_argument("--job", action="store_true", help="the capability's work may outlive one request (fabric-interop/0.1 job)")
-    scaffold.add_argument("--force", action="store_true")
+    scaffold.add_argument("--created-by", metavar="URI", help="the manifest author (provider.createdBy); a sentinel until given")
+    scaffold.add_argument("--identity-method", choices=IDENTITY_METHODS, help="provider.identity.method; a remote default of tls is a sentinel until given")
+    scaffold.add_argument("--data-class", action="append", choices=DATA_CLASSES, default=[],
+                          help="a data class the capability handles; repeat. Without it [public] is written as a sentinel")
+    scaffold.add_argument("--probe-assertion", action="append", default=[], help="what the admission probe proves; repeat. Without it a generic sentinel is written")
+    scaffold.add_argument("--force", action="store_true", help="replace the generated paths that exist; see --dry-run first")
+    scaffold.add_argument("--dry-run", action="store_true", help="print the planned writes and a unified diff of each existing path; write nothing")
     scaffold.add_argument("--json", action="store_true")
 
     check = sub.add_parser("check", help="check generated structure and optional pinned schema")
@@ -692,7 +841,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result = scaffold_project(args.project, args)
         else:
             result = check_project(args.project, args.contract)
-        _print(result, args.json)
+        if result.get("dryRun") and not args.json:
+            diffs = result.pop("diffs")
+            _print(result, False)
+            for rel in sorted(diffs):
+                print(diffs[rel], end="" if diffs[rel].endswith("\n") or not diffs[rel] else "\n")
+        else:
+            _print(result, args.json)
         if args.command == "check":
             gates = result["gates"]
             if gates["localStructure"]["status"] == "FAIL" or gates["declarationShape"]["status"] == "FAIL":

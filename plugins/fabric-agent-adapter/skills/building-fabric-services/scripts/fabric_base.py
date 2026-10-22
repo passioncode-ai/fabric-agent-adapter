@@ -5,7 +5,9 @@ from __future__ import annotations
 import datetime as _dt
 import os
 import re
+import threading
 from pathlib import Path
+from typing import Dict
 
 
 PROTOCOL = "fabric-service/0.1"
@@ -26,10 +28,10 @@ SUPERVISOR_ENV = "FABRIC_SERVICE_SUPERVISOR"
 DRAIN_SECONDS = 8.0
 
 
-_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}$")
+_ID = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z")
 
 
-_INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
+_INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}\Z")
 
 
 # DEC-0032: a local path is POSIX (`/…`, `~/…`) or Windows (`C:\…`, `C:/…`, `~\…`); a network
@@ -38,10 +40,10 @@ _INSTANCE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 _LOCAL_PATH = re.compile(r"^(~[\\/]|/(?![\\/])|[A-Za-z]:[\\/])")
 
 
-_UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service$")
+_UNIT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9:_.@-]{0,250}\.service\Z")
 
 
-_TASK = re.compile(r"^\\[A-Za-z0-9 ._\\-]{1,254}$")
+_TASK = re.compile(r"^\\[A-Za-z0-9 ._\\-]{1,254}\Z")
 
 
 WINDOWS = os.name == "nt"
@@ -68,6 +70,17 @@ def expand(path: str) -> Path:
     if not p.is_absolute():
         raise ServiceError("Path %r must be absolute or start with ~/." % path)
     return p
+
+
+_STORE_LOCKS: Dict[str, threading.RLock] = {}
+_STORE_LOCKS_GUARD = threading.Lock()
+
+
+def store_lock(path: Path) -> threading.RLock:
+    """One lock per store path in this process (R3): a ThreadingHTTPServer runs a store's load-modify-save callers side
+    by side (the job store, the event log), and two store instances on one path share it."""
+    with _STORE_LOCKS_GUARD:
+        return _STORE_LOCKS.setdefault(str(Path(path).resolve()), threading.RLock())
 
 
 def _require_id(service_id: str) -> None:

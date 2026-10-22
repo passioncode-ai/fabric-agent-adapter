@@ -22,6 +22,7 @@ const NONCE32 = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 const ASSERTION_MEMBERS = 'alg,authenticatorData,clientDataJSON,credentialId,format,sig';
 
 import { isObject, isString, objects as list, show, jsonEqual } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
+import { clockMs as clockOf } from './fabric-time.mjs'; // the core's (FAA-65)
 const matches = (pattern, value) => isString(value) && pattern.test(value);
 const REGISTER = new Map([
   [ENROLL_TOKEN_TYPE, { fields: ENROLL_TOKEN_FIELDS, check: (f) => matches(ESTATE_SCOPE, f.scope) && matches(SHA256, f.genesis) && f.purpose === ENROLL_PURPOSE
@@ -46,9 +47,12 @@ function statementFields(token) {
   return signingStatement(ENROLL_TOKEN_TYPE, fields) ? fields : undefined;
 }
 
-/** The reference verifier of an enroll-token/1 under trust {record, genesis, at: Date}; the first failure answers. */
+/**
+ * The reference verifier of an enroll-token/1 under trust {record, genesis, at}; `at` is a Date or epoch seconds, as
+ * verifyEstateRecord and the Python twin take it. The first failure answers.
+ */
 export function verifyEnrollToken(token, trust) {
-  const at = isObject(trust) && trust.at instanceof Date ? trust.at.getTime() : Number.NaN;
+  const at = isObject(trust) ? clockOf(trust.at) : Number.NaN;
   if (!Number.isFinite(at)) return { ok: false, problem: 'no-clock' };
   const fields = statementFields(token);
   const record = trust.record;

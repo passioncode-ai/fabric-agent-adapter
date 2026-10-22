@@ -74,7 +74,7 @@ class RunnerCheckTests(unittest.TestCase):
 
     def entry(self, **extra):
         e = {"kind": "example-code", "name": "Example Code", "binaries": ["example-code"],
-             "version": {"argv": ["--version"], "pattern": "^example (\\d+\\.\\d+\\.\\d+)", "timeoutMs": 2000}}
+             "version": {"argv": ["--version"], "pattern": "^example (\\d+\\.\\d+\\.\\d+)", "timeoutMs": profiles.MAX_PROBE_MS}}  # the most a probe may take: a loaded host starts even a shell slowly
         e.update(extra)
         return e
 

@@ -65,7 +65,7 @@ def secret_value(value: str) -> bool:
 def _path_like(piece: str) -> bool:
     return bool(_PATH_LIKE.match(piece)) or (
         bool(re.search(r"[\\/]", piece))
-        and (bool(re.search(r"\.[A-Za-z0-9]{1,8}$", piece)) or any(re.fullmatch(r"[a-z][a-z0-9_-]{2,}", s) for s in re.split(r"[\\/]", piece))))
+        and (bool(re.search(r"\.[A-Za-z0-9]{1,8}\Z", piece)) or any(re.fullmatch(r"[a-z][a-z0-9_-]{2,}", s) for s in re.split(r"[\\/]", piece))))
 
 
 def secret_argument(value: str) -> bool:

@@ -20,7 +20,6 @@ in ``fabric_delegation``.
 from __future__ import annotations
 
 import base64
-import datetime as _dt
 import hashlib
 import json
 import math
@@ -397,12 +396,13 @@ def _revision_number(value: Any) -> bool:
     return _safe_integer(value) and value >= 1
 
 
-def hub_key_certified(record: Any, kid: Any, x: Any, at: Any, applied: Any = None,
+def hub_key_certified(record: Any, kid: Any, x: Any, at: Any, applied: Any = _MISSING,
                       extra_revocations: Any = _MISSING) -> Dict[str, Any]:
     """DL-14 (DEC-0055, DEC-0060): whether ``record`` certifies the delegation key ``kid`` with the published key's ``x``
     at ``at`` (an aware datetime or epoch seconds), for a verifier whose machine applied ``applied``
-    (``{"revision", "digest"?}``). ``extra_revocations`` are the revocation delta's entries applied since the revision
-    (DEC-0054). The contract's ``hubKeyCertified``, in its order; never raises. Answers ``{"certified": True, "machine",
+    (``{"revision", "digest"?}``; ``_MISSING``, the default, when none is known; an explicit None is no revision and
+    fails closed as ``estate-unreadable``, as Node's null does, decision D3). ``extra_revocations`` are the revocation
+    delta's entries applied since the revision (DEC-0054). The contract's ``hubKeyCertified``, in its order; never raises. Answers ``{"certified": True, "machine",
     "revision"}`` or ``{"certified": False, "fault": "token"|"estate"|"clock", "detail"}`` with detail
     ``kid-not-certified`` (the token's fault), ``estate-unreadable``, ``estate-outside-window``, ``estate-rolled-back``,
     ``estate-forked`` (the trust source's) or ``no-clock``."""
@@ -421,7 +421,7 @@ def hub_key_certified(record: Any, kid: Any, x: Any, at: Any, applied: Any = Non
     # A window that is not a time, not positive or longer than 30 days is no window: NaN fails every comparison below.
     if math.isnan(issued_at) or math.isnan(valid_until) or valid_until <= issued_at or valid_until - issued_at > _MAX_WINDOW_MS:
         return _refused("estate", "estate-unreadable")
-    if applied is not None:
+    if applied is not _MISSING:
         if (not isinstance(applied, dict) or not _revision_number(_get(applied, "revision"))
                 or (_get(applied, "digest") is not _MISSING and not isinstance(_get(applied, "digest"), str))):
             return _refused("estate", "estate-unreadable")

@@ -291,6 +291,17 @@ class McpServerTests(unittest.TestCase):
         self.assertEqual(self.call("tools/call", {"name": "nope", "arguments": {}})["error"]["code"], -32602)
         self.assertIsNone(self.server.handle({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {}}))
 
+    def test_params_that_are_not_objects_are_invalid_params(self):
+        """Finding 17: a non-object params, _meta or arguments, or a name that is no string, crashed the handler."""
+        for params in ("x", [1], 5, True, {"_meta": "x"}, {"_meta": [1]}, {"_meta": []}, {"_meta": 0}, {"name": "example.echo", "arguments": "x"},
+                       {"name": "example.echo", "arguments": [1]}, {"name": ["example.echo"]}, {"name": {"a": 1}},
+                       {"name": "fabric.job.get", "arguments": "job_x"}, {"name": "fabric.job.cancel", "arguments": [1]}):
+            with self.subTest(params=params):
+                response = self.server.handle({"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": params},
+                                              {"Mcp-Method": "tools/call"})
+                self.assertEqual(response["error"]["code"], -32602)
+        self.assertIn("result", self.server.handle({"jsonrpc": "2.0", "id": 9, "method": "tools/list", "params": None}))
+
     def test_a_request_without_trace_context_starts_a_new_trace(self):
         result = self.call("tools/call", {"name": "example.echo", "arguments": {"text": "hi"}}, traceparent=None)["result"]
         self.assertIsNotNone(fi.parse_traceparent(result["_meta"]["traceparent"]))

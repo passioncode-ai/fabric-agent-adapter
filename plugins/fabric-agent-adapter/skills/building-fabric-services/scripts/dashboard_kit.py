@@ -23,6 +23,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
@@ -34,6 +35,9 @@ JS_BEGIN, JS_END = "/* fabric-dashboard-kit:theme-ids:begin */", "/* fabric-dash
 TOKEN_ORDER = ("bg", "panel", "panel-2", "ink", "muted", "border", "border-strong", "edge", "accent",
                "accent-weak", "accent-ink", "ok", "ok-weak", "warn", "warn-weak", "danger", "danger-weak",
                "info", "info-weak")
+#: The SessionStart notice's total for every git call and the tree walk together: under the hook's 5 s (FAA-69).
+NOTICE_BUDGET_S = 3.5
+
 SKIP_DIRS = {".git", "node_modules", "dist", "build", ".venv", "venv", "__pycache__", ".next", "out"}
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
 
@@ -187,27 +191,44 @@ def is_kit_source(path: Path) -> bool:
         return False
 
 
-def git(repo: Path, *args: str, timeout: float = 2.0) -> Optional[str]:
+class OutOfTime(Exception):
+    """A shared deadline (`until`, a time.monotonic() value) passed before the answer was known."""
+
+
+def git(repo: Path, *args: str, timeout: float = 2.0, until: Optional[float] = None) -> Optional[str]:
+    """git's stdout, or None. With `until`, the call gets at most what is left of that deadline, and a call the
+    deadline cuts short raises OutOfTime instead of answering None."""
+    if until is not None:
+        left = until - time.monotonic()
+        if left <= 0:
+            raise OutOfTime()
+        timeout = min(timeout, left)
     try:
         done = subprocess.run(["git", "-C", str(repo)] + list(args), capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if until is not None and time.monotonic() >= until - 0.05:
+            raise OutOfTime()
+        return None
     except (OSError, subprocess.SubprocessError):
         return None
     return done.stdout if done.returncode == 0 else None
 
 
-def repo_root(start: Path) -> Optional[Path]:
-    out = git(start, "rev-parse", "--show-toplevel")
+def repo_root(start: Path, until: Optional[float] = None) -> Optional[Path]:
+    out = git(start, "rev-parse", "--show-toplevel", until=until)
     return Path(out.strip()) if out and out.strip() else None
 
 
-def find_copies(repo: Path) -> List[Path]:
+def find_copies(repo: Path, until: Optional[float] = None) -> List[Path]:
     listed = git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--",
-                 "*fabric-dashboard.css", "*fabric-dashboard.js", "*fabric-button.js")
+                 "*fabric-dashboard.css", "*fabric-dashboard.js", "*fabric-button.js", until=until)
     if listed is not None:
         paths = [repo / p for p in listed.split("\0") if p]
     else:
         paths = []
         for top, dirs, files in os.walk(repo):
+            if until is not None and time.monotonic() >= until:
+                raise OutOfTime()
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
             if len(Path(top).relative_to(repo).parts) > 6:
                 dirs[:] = []
@@ -256,9 +277,9 @@ def same_repository(a: str, b: str) -> bool:
     return bool(a and b) and norm(a) == norm(b)
 
 
-def services_of(repo: Path, directory: Optional[Path] = None) -> List[str]:
+def services_of(repo: Path, directory: Optional[Path] = None, until: Optional[float] = None) -> List[str]:
     """The services whose descriptor names this repository as its source (`source.repository`)."""
-    origin = (git(repo, "config", "--get", "remote.origin.url") or "").strip()
+    origin = (git(repo, "config", "--get", "remote.origin.url", until=until) or "").strip()
     if not origin:
         return []
     found = []
@@ -277,19 +298,24 @@ def services_of(repo: Path, directory: Optional[Path] = None) -> List[str]:
     return found
 
 
-def declares_dashboard(repo: Path) -> bool:
+def declares_dashboard(repo: Path, until: Optional[float] = None) -> bool:
     """Whether the repository's code declares a dashboard surface (a quick git grep, no network)."""
     out = git(repo, "grep", "--untracked", "-l", "-I", "-E", r"""["']?dashboard["']?[[:space:]]*[:=][[:space:]]*\{?[[:space:]]*["']?path""", "--",
-              "*.py", "*.mjs", "*.js", "*.ts", "*.json", timeout=2.0)
+              "*.py", "*.mjs", "*.js", "*.ts", "*.json", timeout=2.0, until=until)
     return bool(out and out.strip())
 
 
-def status(repo: Path, manifest: Optional[Dict[str, Any]] = None, directory: Optional[Path] = None) -> Dict[str, Any]:
+def status(repo: Path, manifest: Optional[Dict[str, Any]] = None, directory: Optional[Path] = None,
+           services: Optional[List[str]] = None, until: Optional[float] = None) -> Dict[str, Any]:
+    """The kit copies in `repo`, the services it owns and whether it has a dashboard. `services`, when the caller has
+    them already; `until`, a shared deadline (OutOfTime when it passes)."""
     manifest = manifest or load_manifest()
-    copies = [copy_state(p, manifest) for p in find_copies(repo)]
-    services = services_of(repo, directory)
+    if services is None:
+        services = services_of(repo, directory, until=until)
+    copies = [copy_state(p, manifest) for p in find_copies(repo, until=until)]
     return {"repository": str(repo), "kit": "%s@%s" % (KIT_NAME, manifest["version"]), "copies": copies,
-            "services": services, "dashboard": bool(copies) or (bool(services) and declares_dashboard(repo))}
+            "services": services,
+            "dashboard": bool(copies) or (bool(services) and declares_dashboard(repo, until=until))}
 
 
 def notice_line(report: Dict[str, Any], script: Path) -> Optional[str]:
@@ -364,14 +390,22 @@ def hook_cwd(stdin_text: str) -> Path:
 
 
 def notice() -> int:
+    """The SessionStart hook. Asks first whether the repository owns a service and says nothing, having looked at
+    nothing else, when it owns none; every git call and the tree walk share NOTICE_BUDGET_S, and a notice that runs
+    out of it says nothing rather than a half-measured line (FAA-69)."""
+    until = time.monotonic() + NOTICE_BUDGET_S
     try:
         stdin_text = "" if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read(65536)
-        root = repo_root(hook_cwd(stdin_text))
-        if root is not None:
-            line = notice_line(status(root), Path(__file__).resolve())
-            if line:
-                print(line)
-    except Exception:  # noqa: BLE001 — a hook never breaks a session
+        root = repo_root(hook_cwd(stdin_text), until=until)
+        if root is None:
+            return 0
+        services = services_of(root, until=until)
+        if not services:
+            return 0
+        line = notice_line(status(root, services=services, until=until), Path(__file__).resolve())
+        if line:
+            print(line)
+    except Exception:  # noqa: BLE001 - a hook never breaks a session; OutOfTime included
         pass
     return 0
 

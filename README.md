@@ -38,8 +38,8 @@ resume) puts that preamble into the session when the MCP server `fabric` is regi
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
 project that uses Fabric; Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
 and the board's unread count; UserPromptSubmit adds one line only when that count rose; SessionEnd releases what the
-session left claimed. Stop, UserPromptSubmit and SessionEnd act only when the running Fabric advertises
-`session-hooks/1`. All are silent in a session Fabric launched, never block the session, read no token and always
+session left claimed. Stop, UserPromptSubmit and SessionEnd spool and call Fabric only when the running Fabric
+advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched, never block the session, read no token and always
 exit 0. `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks
 --host codex|kimi|hermes|opencode|openclaw|pi` installs each host's native context bridge (dry run unless `--apply`).
 Codex receives structured SessionStart JSON; Hermes, OpenCode, OpenClaw and Pi use native plugin APIs.
@@ -129,7 +129,12 @@ then restart your agents. Alone, without any account:
 ```bash
 npx @passioncode-ai/fabric-agent-adapter        # installs every skill into the agents hub ~/.agents/skills
 npx @passioncode-ai/fabric-agent-adapter --prune-shadow   # remove ~/.claude/skills copies that shadow the plugin
+npx @passioncode-ai/fabric-agent-adapter --force          # update a copy already in the hub (a launcher link is never replaced)
 ```
+
+A copy already in the hub is left alone unless `--force` is given; with it, the new copy is built beside the old one
+and renamed into place, so a failed run leaves the old copy or nothing. `install.sh --force` from a checkout does the
+same.
 
 Claude Code plugin marketplace:
 
@@ -189,7 +194,8 @@ own service by its id once its installer has written the descriptor.
 
 ### Develop
 
-There is no build step and no dependency beyond Python 3.9+ and Node.js:
+There is no build step and no dependency beyond Python 3.9+ and Node.js. The npm CLI (installer, `pack`, `sign`,
+`verify`) needs Node.js 18+, the Node service kit 20+, and a Linux service's instance lock 22+:
 
 ```bash
 npm test                     # validate.py, the Python unit tests, the Node kit tests

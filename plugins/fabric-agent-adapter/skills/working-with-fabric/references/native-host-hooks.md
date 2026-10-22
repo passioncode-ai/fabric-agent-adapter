@@ -26,7 +26,7 @@ python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host opencode
 python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host opencode --remove
 ```
 
-Use `codex`, `kimi`, `hermes`, `opencode`, `openclaw` or `pi`. Default is a dry run. `--config` overrides the native destination, `--script` selects an absolute `fabric_session.py` in a **complete installed skill**. Keep that path stable; a versioned plugin cache disappears on updates. Reapply after moving the skill. The native installer checks the helper and every required host module before writing a loader.
+Use `codex`, `kimi`, `hermes`, `opencode`, `openclaw` or `pi`. Default is a dry run. `--config` overrides the native destination, `--script` selects an absolute `fabric_session.py` in a **complete installed skill**. Keep that path stable; a versioned plugin cache disappears on updates. Reapply after moving the skill: an install refuses a `--script` that is not an existing file, and Codex and Kimi Code rewrite their own hook in place to the new path (`updated`), finding a Kimi `[[hooks]]` table by the command it runs, not by its exact text. The native installer checks the helper and every required host module before writing a loader. Removal needs neither: it reads nothing from the skill it was installed from, so it works after that skill moved or lost its `hosts/` folder.
 
 | Host | Default destination |
 |---|---|
@@ -45,6 +45,7 @@ OpenCode and Pi loader files carry a managed marker. A foreign file at the same 
 
 - Native bridges give the Python helper only a working directory and, when observed, a boolean Fabric registration. Hermes uses its native read-only config, OpenCode its resolved enabled MCP entry, OpenClaw its resolved MCP servers and Pi an exact callable `fabric_whoami` tool name. Config registration is not admission.
 - Missing helper/Python, malformed values, excessive output or a four-second deadline produce no context. Existing host errors and permission failures are not silenced globally.
+- OpenCode and OpenClaw ask for context on every request; their bridges keep the helper's answer per workspace and registration for the life of the host process, so Python runs once, not per request. A failed run (an error, a nonzero exit, a timeout, no `python3`) reads as `null`, distinct from an empty answer `''`, and is not kept, so the next request asks again. A Fabric started later is seen by a new host instance.
 - Fabric-launched sessions are silent. Other native events are not advertised: turn observations, unread counts and rejoin-only release remain Claude-specific and feature-gated.
 - A host in Switchboard's catalog may support MCP, proxy or launch while exposing no startup context hook. Never copy this configuration to another host solely because it can launch an agent.
 

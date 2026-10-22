@@ -1,6 +1,6 @@
-"""The board responder (DEC-0078, FAA-12b): a board session over the hub, the fsynced checkpoint, the request a handler
-sees and the responder loop (enroll, claim, accept the exact digest, effect, progress, complete; stop when fenced).
-Part of the board connector (FAA-65, layer L4)."""
+"""The board responder (DEC-0078, FAA-12b): the work context a handler sees and the responder loop (enroll, claim,
+accept the exact digest, effect, progress, complete; stop when fenced). The session, the checkpoint and the request live
+in fabric_board_link and are re-exported here. Part of the board connector (FAA-65, layer L4)."""
 from __future__ import annotations
 
 import json
@@ -25,15 +25,19 @@ import fabric_hub as _hub
 import fabric_service as _fs
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
     BoardError,
+    LEASE_SECONDS,
     REQUEST_STATES,
-    RESPOND_TOOLS,
     SUMMARY_MAX,
     Stopped,
     _CAPABILITY,
     _is_int,
     outcome_problems,
     receipt_problems,
-    refusal_problems,
+)
+from fabric_board_link import (  # noqa: E402,F401 - re-exported: callers import them from here since 0.40.0
+    BoardRequest,
+    BoardSession,
+    Checkpoint,
 )
 
 
@@ -59,151 +63,17 @@ STOP_CODES = frozenset(["fenced", "lease_expired", "authority_changed"])
 TERMINAL = frozenset(["completed", "failed_known", "cancelled", "expired"])
 
 
+#: A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38).
+LEASE_MARGIN_SECONDS = 10.0
+
+
 #: How long a held slot waits before it asks again: doubling from the poll interval, never past this.
 HOLD_RETRY_MAX_SECONDS = 900.0
 
 
-class BoardSession:
-    """MCP over HTTP with a board session's one-session bearer: `open()` spends it with `initialize` and keeps the
-    `mcp-session-id`; `call(tool, args)` answers the tool's value or raises `BoardError`; `close()` sends the session's
-    DELETE, which releases every slot it holds (DEC-0073 §5). Thread-safe; the bearer never leaves the headers."""
-
-    def __init__(self, grant: _hub.BoardGrant, *, timeout: float = 15.0, post: Callable[..., Any] = _hub.post_mcp):
-        self.grant, self.timeout, self.post = grant, timeout, post
-        self.mcp_session: Optional[str] = None
-        self.protocol_version = _hub.MCP_PROTOCOL_VERSION
-        self._lock = threading.Lock()
-        self._rpc = 0
-
-    def _send(self, body: Dict[str, Any], method: str = "POST"):
-        try:
-            return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session, timeout=self.timeout,
-                             method=method, protocol_version=self.protocol_version if self.mcp_session else None)
-        except _hub.HubError as exc:
-            raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored, so send it again with "
-                             "the same idempotency key.", True) from exc
-
-    def open(self) -> None:
-        with self._lock:
-            self._rpc += 1
-            status, headers, parsed = self._send({"jsonrpc": "2.0", "id": self._rpc, "method": "initialize", "params": {
-                "protocolVersion": _hub.MCP_PROTOCOL_VERSION, "capabilities": {},
-                "clientInfo": {"name": "fabric-agent-adapter-board", "version": "1"}}})
-            if status == 401:
-                raise BoardError("session-ended", "Fabric refused the board session's bearer; join again.", True)
-            if status != 200 or not isinstance(parsed, dict) or not isinstance(parsed.get("result"), dict) or not headers.get("mcp-session-id"):
-                raise BoardError("unreachable", "Fabric did not open the board session (HTTP %d)." % status, True)
-            self.mcp_session = headers["mcp-session-id"]
-            version = parsed["result"].get("protocolVersion")
-            if isinstance(version, str):
-                self.protocol_version = version
-            self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
-
-    def call(self, tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        if tool not in RESPOND_TOOLS:
-            raise BoardError("not-in-scope", "%s is not served to a board session; use a Project session for it." % tool, op=tool)
-        with self._lock:
-            if self.mcp_session is None:
-                raise BoardError("session-ended", "The board session is not open.", True, op=tool)
-            self._rpc += 1
-            status, _, parsed = self._send({"jsonrpc": "2.0", "id": self._rpc, "method": "tools/call",
-                                            "params": {"name": tool, "arguments": args}})
-        if status == 401:
-            raise BoardError("session-ended", "Fabric ended the board session (it left, was revoked or expired); join again.", True, op=tool)
-        try:
-            value = _hub.tool_answer(status, parsed, tool)
-        except _hub.HubError as exc:
-            raise BoardError("unreachable" if exc.retryable else "receipt-shape", exc.message, exc.retryable, op=tool) from None
-        if "error" in value:
-            problems = refusal_problems(value)
-            if problems:
-                raise BoardError("receipt-shape", "Fabric refused %s in a form the contract does not name." % tool, op=tool)
-            e = value["error"]
-            raise BoardError(e["code"], e["message"], e["retryable"], op=tool)
-        return value
-
-    def close(self) -> None:
-        with self._lock:
-            if self.mcp_session is None:
-                return
-            try:
-                self._send({}, method="DELETE")
-            except BoardError:
-                pass  # best effort: the lease lapses in 60 s anyway
-            self.mcp_session = None
-
-
-class Checkpoint:
-    """The responder's own journal: one JSON file (0600) holding every request it has claimed and not yet settled, each
-    with its fence and the idempotency key of the step in flight. Written atomically and fsynced BEFORE the step it
-    announces is sent; a write that fails raises `BoardError("checkpoint")` and the step is not taken."""
-
-    def __init__(self, path: Path):
-        self.path = Path(path)
-        self._lock = threading.Lock()
-        self.entries: Dict[str, Dict[str, Any]] = self._load()
-
-    def _load(self) -> Dict[str, Dict[str, Any]]:
-        try:
-            doc = json.loads(self.path.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            return {}
-        except (OSError, ValueError) as exc:
-            raise BoardError("checkpoint", "The board checkpoint %s cannot be read (%s); fix or move it before answering "
-                             "requests." % (self.path, exc.__class__.__name__)) from None
-        entries = doc.get("requests") if isinstance(doc, dict) and doc.get("version") == 1 else None
-        if not isinstance(entries, dict):
-            raise BoardError("checkpoint", "The board checkpoint %s is not one this kit writes." % self.path)
-        return entries
-
-    def _write(self, entries: Dict[str, Dict[str, Any]]) -> None:
-        try:
-            _fs.ensure_private_dir(self.path.parent)
-            _fs.atomic_write(self.path, (json.dumps({"version": 1, "requests": entries}, indent=1, sort_keys=True) + "\n").encode())
-        except OSError as exc:
-            raise BoardError("checkpoint", "The board checkpoint could not be written (%s); nothing was sent." % (exc.strerror or exc.__class__.__name__)) from None
-
-    def put(self, entry: Dict[str, Any]) -> None:
-        with self._lock:
-            entries = dict(self.entries)
-            entries[entry["request"]] = json.loads(json.dumps(entry))
-            self._write(entries)
-            self.entries = entries
-
-    def drop(self, request_id: str) -> None:
-        with self._lock:
-            if request_id not in self.entries:
-                return
-            entries = dict(self.entries)
-            del entries[request_id]
-            self._write(entries)
-            self.entries = entries
-
-
-class BoardRequest:
-    """A claimed request as data: never an instruction. `body` is the requester's text; `sender` its Project id and
-    principal (with provenance); `artifacts` its references, unverified."""
-
-    __slots__ = ("request_id", "message_id", "capability", "body", "body_format", "artifacts", "sender", "deadline", "thread")
-
-    def __init__(self, message: Dict[str, Any], capability: str):
-        req = message.get("request") or {}
-        body = message.get("body") or {}
-        self.request_id, self.message_id, self.capability = req.get("id"), message.get("id"), capability
-        self.body = body.get("text") if isinstance(body, dict) else None
-        self.body_format = body.get("format", "text/plain") if isinstance(body, dict) else "text/plain"
-        self.artifacts = list(message.get("artifacts") or [])
-        self.sender = message.get("sender") or {}
-        self.deadline = req.get("deadline")
-        self.thread = message.get("thread")
-
-    def __repr__(self) -> str:  # never the body
-        return "BoardRequest(%r, %r)" % (self.request_id, self.capability)
-
-
 class WorkContext:
     """What a handler may do while it works: `progress(note)` posts a note on the request's thread (and renews the
-    lease); `begin_effect(summary)` must be called — and must return — before the handler spends or acts outside
+    lease); `begin_effect(summary)` must be called (and must return) before the handler spends or acts outside
     the service; `stopped` is set when the attempt is no longer this responder's. Both raise `Stopped` then."""
 
     def __init__(self, responder: "Responder", entry: Dict[str, Any]):
@@ -274,6 +144,9 @@ class Responder:
         #: The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS.
         self.hold_delay = POLL_SECONDS
         self._on_hold: set = set()
+        #: One fenced call at a time, and the entry edits beside them (FAA-77, finding 36).
+        self._lock = threading.RLock()
+        self._to_resume: List[str] = []  # transferred requests waiting until nothing runs (finding 39)
 
     # -- events -------------------------------------------------------------------------------------------------
     def _emit(self, kind: str, level: str, text: str, notify: bool = False, episode: Optional[str] = None, **value: Any) -> None:
@@ -433,13 +306,17 @@ class Responder:
         for entry in reconcile:
             if self.slots.get(entry["capability"], {}).get("state") == "held":
                 self._reconcile(entry)
+            elif entry.get("step") != "unknown":
+                entry["step"] = "unknown"  # the slot is not this session's yet: a later tick reconciles it (finding 38)
+                self.checkpoint.put(entry)
 
     def _replace(self, capability: str, entries: List[Dict[str, Any]], generation: Any) -> None:
         if not _is_int(generation, 0):
             generation = 0
-        args = {"idempotency": self._idem(self._key("replace")), "capability": capability, "expectedGeneration": generation,
-                "transfer": {"requests": [e["request"] for e in entries][:64],
-                             "checkpoint": {"summary": "Resumed by the same service after a restart; no effect had begun."}}}
+        args: Dict[str, Any] = {"idempotency": self._idem(self._key("replace")), "capability": capability, "expectedGeneration": generation}
+        if entries:
+            args["transfer"] = {"requests": [e["request"] for e in entries][:64],
+                                "checkpoint": {"summary": "Resumed by the same service after a restart; no effect had begun."}}
         try:
             receipt = self._receipt("com.responder_replace", self._call("com.responder_replace", args))
         except BoardError as exc:
@@ -464,25 +341,74 @@ class Responder:
                            "back a transferred attempt (DEC-0078). It stays held; nothing was done.", notify=True,
                            episode=entry["request"], request=entry["request"], capability=capability)
                 continue
+            if entry.get("step") == "replying" and not entry.get("replied") and (entry.get("keys") or {}).get("reply") \
+                    and not entry.get("probe"):
+                # Finding 35: whether the old reply was stored is asked under the old fence, but only from the resume queue,
+                # after the new attempt is recorded: a second lost answer then leaves the request queued, never stranded.
+                entry["probe"] = {"generation": entry["generation"], "attempt": entry["attempt"], "digest": entry["digest"],
+                                  "revision": entry["revision"], "key": entry["keys"]["reply"]}
             entry.update(generation=item["attempt"]["generation"], attempt=item["attempt"]["id"], digest=item["attempt"]["digest"],
                          revision=item["revision"], step="accepted" if entry.get("step") in ("accepting", "held", "lapsed") else entry.get("step"))
+            # Finding 35: a fenced key's digest named the old attempt; under the new one it is idempotency_conflict.
+            entry["keys"] = {k: v for k, v in (entry.get("keys") or {}).items() if k == "reconcile"}
             self.checkpoint.put(entry)
-            if self.current is None:
-                self._resume(entry)
+            if entry["request"] not in self._to_resume:
+                self._to_resume.append(entry["request"])
+        self._resume_next()
 
-    def _reconcile(self, entry: Dict[str, Any]) -> None:
-        state = self._read_state(entry)
-        if state != "outcome_unknown":
-            if state in TERMINAL or state in ("queued", "claimed"):
-                self.checkpoint.drop(entry["request"])
-            return
+    def _replied_before(self, entry: Dict[str, Any]) -> None:
+        """A reply whose answer was lost under the old attempt (finding 35): a stored key answers before the fence is checked
+        (project-comms.md, Idempotency), so the old call again, under the old fence kept in `probe`, says whether it was
+        stored; a refusal says it was not. A lost answer, or a board that cannot be read now, raises and leaves `probe` for
+        the next try: neither says whether the reply was stored."""
+        probe = entry["probe"]
+        old = dict(entry, **{k: probe[k] for k in ("generation", "attempt", "digest", "revision")})
+        try:
+            self._receipt("com.reply", self._call("com.reply", dict(self._reply_extra(entry), fence=self._fence(old, probe["key"]))))
+        except BoardError as exc:
+            if exc.code in ("unreachable", "session-ended", "authority_changed", "not_authorized", "not_available", "capacity_exceeded"):
+                raise
+        else:
+            entry["replied"] = True
+        del entry["probe"]
+        self.checkpoint.put(entry)
+
+    def _resume_next(self) -> None:
+        """Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves
+        the queue only once its probe has answered: a lost answer keeps it first in line for the next tick (finding 35)."""
+        while self.current is None and self._to_resume and not self.stopping:
+            entry = self.checkpoint.entries.get(self._to_resume[0])
+            if entry is not None and self.slots.get(entry["capability"], {}).get("state") == "held":
+                entry = json.loads(json.dumps(entry))
+                if entry.get("probe"):
+                    self._replied_before(entry)
+                self._to_resume.pop(0)
+                self._resume(entry)
+            else:
+                self._to_resume.pop(0)
+
+    def _observed(self, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """An observed outcome: the one already known, else what `observe(entry)` reads; None when nothing was observed."""
         outcome = entry.get("outcome") if isinstance(entry.get("outcome"), dict) and entry["outcome"].get("observed") is True else None
         if outcome is None and self.observe is not None:
             try:
                 outcome = self.observe(dict(entry))
             except Exception:  # noqa: BLE001 - an observation that failed is no observation
                 outcome = None
-        if not outcome or outcome_problems(dict(outcome, observed=True), True) or outcome.get("observed") is not True:
+        ok = isinstance(outcome, dict) and outcome.get("observed") is True and not outcome_problems(dict(outcome, observed=True), True)
+        return outcome if ok else None
+
+    def _reconcile(self, entry: Dict[str, Any]) -> None:
+        state = self._read_state(entry)
+        if state != "outcome_unknown":
+            if state in TERMINAL or state in ("queued", "claimed"):
+                self.checkpoint.drop(entry["request"])
+            elif state == "in_progress" and entry.get("step") != "unknown":
+                entry["step"] = "unknown"  # no next holder took the slot yet: a later tick tries again (finding 38)
+                self.checkpoint.put(entry)
+            return
+        outcome = self._observed(entry)
+        if outcome is None:
             entry["step"] = "unknown"
             self.checkpoint.put(entry)
             self._emit("board.reconcile.needed", "warn", "A request's outcome is unknown: the work may have happened. It stays "
@@ -517,13 +443,26 @@ class Responder:
                 self._connect()
             self._tick()
             self.backoff.reset()
+            if self.state == "down":  # a lost call was sent again and answered: the session held throughout
+                self.state = "ready"
+                self._said.pop("board.down", None)
             return self.interval()
         except (BoardError, _hub.HubError) as exc:
             return self._fault(exc)
 
+    def _lease_left(self) -> float:
+        """Seconds this session's leases still run, by its own clock: the running attempt's, else the oldest held slot's."""
+        renewed = [self.current.renewed_at or 0.0] if self.current is not None else \
+            [s.get("renewed_at", 0.0) for s in self.slots.values() if s.get("state") == "held"]
+        return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
+
     def _fault(self, exc: Exception) -> float:
         code = getattr(exc, "code", "unreachable")
         wait = self.backoff.next()
+        left = self._lease_left() - LEASE_MARGIN_SECONDS
+        keep = code == "unreachable" and left > 0  # finding 38: the lease holds, so the session and the work stay
+        if keep:
+            wait = max(1.0, min(wait, left))  # and the call goes again before the lease lapses
         self.wait_until = self.now() + wait
         if code in ("not_authorized", "authority_changed", "credential"):
             self.state = "not-authorized"
@@ -535,14 +474,15 @@ class Responder:
             self.state = "paused"
             self._emit("board.held", "info", "The operator holds new work on this Project; the responder waits and asks again "
                        "with a growing pause.", episode="held", reason=code)
-        elif code in ("no-epoch", "schema-unsupported", "checkpoint", "receipt-shape"):
+        elif code in ("no-epoch", "schema-unsupported", "checkpoint", "receipt-shape", "idempotency_conflict"):
+            # idempotency_conflict is a key sent with other content, a defect and not an outage (finding 35)
             self.state = "down"
             self._drop_session()
             self._emit("board.blocked", "error", "The responder stopped answering requests: %s" % getattr(exc, "message", str(exc)),
                        notify=True, episode=code, reason=code)
         else:
             self.state = "down"
-            if code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol"):
+            if code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol") and not keep:
                 self._drop_session()
             self._emit("board.down", "warn", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
                        episode="down", reason=code)
@@ -550,6 +490,7 @@ class Responder:
 
     def _drop_session(self) -> None:
         work, self.current = self.current, None
+        self._to_resume = []  # the next session transfers them again
         if work is not None:
             entry = work.entry
             if work.done.is_set() and work.failure is None and not outcome_problems(work.outcome, bool(entry.get("effect"))):
@@ -582,6 +523,7 @@ class Responder:
                 self._enroll(capability)  # the holder's enroll renews its lease (no event); a lapsed one re-enrolls
         if self.current is None and not self.stopping:
             self._continue_lapsed()
+            self._resume_next()
         if self.current is None and not self.stopping:
             self._reconcile_pending()
             self._claim_next()
@@ -687,7 +629,7 @@ class Responder:
         entry["keys"]["accept"], entry["step"] = key, "accepting"
         self.checkpoint.put(entry)
         try:
-            receipt = self._fenced("com.accept", entry, {"fence": self._fence(entry, key)})
+            receipt = self._fenced("com.accept", entry, key)
         except BoardError as exc:
             if exc.code != "held":
                 raise
@@ -730,87 +672,102 @@ class Responder:
         message = self._call("com.get", {"message": entry["message"]})
         self._run(entry, BoardRequest(message, entry["capability"]))
 
-    def _fenced(self, op: str, entry: Dict[str, Any], args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """A fenced call. On `fenced`, `lease_expired` or `authority_changed` the attempt is lost: the work stops, and
-        answers None (`authority_changed` raises after that, so the responder stops claiming)."""
-        try:
-            return self._receipt(op, self._call(op, args))
-        except BoardError as exc:
-            if exc.code in STOP_CODES or exc.code in ("revision_conflict", "invalid_transition", "digest_conflict"):
-                self._lose(entry, exc.code)
-                if exc.code == "authority_changed":
-                    raise
-                return None
-            raise
+    def _fenced(self, op: str, entry: Dict[str, Any], key: str, extra: Optional[Dict[str, Any]] = None,
+                apply: Optional[Callable[[Dict[str, Any]], None]] = None) -> Optional[Dict[str, Any]]:
+        """A fenced call, one at a time (finding 36): fence built, sent and receipt applied under the lock. A
+        `revision_conflict` on `com.renew` or `com.progress` (they store nothing) reads the revision and sends once more.
+        On a stop code the attempt is lost: the work stops, None (`authority_changed` raises after, to stop claiming)."""
+        again = op in ("com.renew", "com.progress")
+        while True:
+            try:
+                with self._lock:
+                    receipt = self._receipt(op, self._call(op, dict(extra or {}, fence=self._fence(entry, key))))
+                    if apply is not None:
+                        apply(receipt)
+                    return receipt
+            except BoardError as exc:
+                if exc.code == "revision_conflict" and again:
+                    again = False
+                    with self._lock:
+                        self._read_state(entry)
+                    continue
+                if exc.code in STOP_CODES or exc.code in ("revision_conflict", "invalid_transition", "digest_conflict"):
+                    self._lose(entry, exc.code)
+                    if exc.code == "authority_changed":
+                        raise
+                    return None
+                raise
 
     def _lose(self, entry: Dict[str, Any], code: str) -> None:
-        if self.current is not None and self.current.entry is entry:
-            self.current.ctx.stopped.set()
-        if entry.get("effect"):
-            entry["step"] = "unknown"
-            self.checkpoint.put(entry)
-            self._emit("board.reconcile.needed", "warn", "The attempt was lost after its effect began; the outcome stays unknown "
-                       "until this service observes what happened.", notify=True, episode=entry["request"],
-                       request=entry["request"], capability=entry["capability"], reason=code)
-        elif code == "lease_expired" and entry.get("step") not in ("claimed", "accepting"):
-            # Our own lease lapsed on accepted work: the board holds it (C4). It continues only by a checkpoint transfer
-            # to this responder, which the next tick asks for; nothing outside the service had begun.
-            entry["step"] = "lapsed"
-            self.checkpoint.put(entry)
-            self._emit("board.attempt.lost", "warn", "This service's lease on an accepted request lapsed; it stopped working "
-                       "on it and takes it back by a transfer.", request=entry["request"], capability=entry["capability"], reason=code)
-        else:
-            self.checkpoint.drop(entry["request"])
-            self._emit("board.attempt.lost", "warn", "The board took a request back from this service (%s); it stopped working "
-                       "on it, and nothing had been done outside the service." % code, request=entry["request"],
-                       capability=entry["capability"], reason=code)
+        with self._lock:
+            if self.current is not None and self.current.entry is entry:
+                self.current.ctx.stopped.set()
+            if entry.get("effect"):
+                entry["step"] = "unknown"
+                self.checkpoint.put(entry)
+                self._emit("board.reconcile.needed", "warn", "The attempt was lost after its effect began; the outcome stays "
+                           "unknown until this service observes what happened.", notify=True, episode=entry["request"],
+                           request=entry["request"], capability=entry["capability"], reason=code)
+            elif code == "lease_expired" and entry.get("step") not in ("claimed", "accepting"):
+                # Our own lease lapsed on accepted work: the board holds it (C4). It continues only by a checkpoint transfer
+                # to this responder, which the next tick asks for; nothing outside the service had begun.
+                entry["step"] = "lapsed"
+                self.checkpoint.put(entry)
+                self._emit("board.attempt.lost", "warn", "This service's lease on an accepted request lapsed; it stopped working "
+                           "on it and takes it back by a transfer.", request=entry["request"], capability=entry["capability"], reason=code)
+            else:
+                self.checkpoint.drop(entry["request"])
+                self._emit("board.attempt.lost", "warn", "The board took a request back from this service (%s); it stopped working "
+                           "on it, and nothing had been done outside the service." % code, request=entry["request"],
+                           capability=entry["capability"], reason=code)
 
     def _renew(self, work: _Work) -> None:
         entry = work.entry
         if self.now() - (work.renewed_at or 0.0) < RENEW_SECONDS - 0.5:
             return
-        receipt = self._fenced("com.renew", entry, {"fence": self._fence(entry, self._key("renew"))})
-        if receipt is None:
+        if self._fenced("com.renew", entry, self._key("renew")) is None:
             self.current = None
             return
         work.renewed_at = self.now()
         self.slots.setdefault(entry["capability"], {})["renewed_at"] = self.now()
 
     def _progress(self, entry: Dict[str, Any], note: Optional[str], ctx: WorkContext) -> None:
-        args: Dict[str, Any] = {"fence": self._fence(entry, self._key("progress"))}
-        if note is not None:
-            args["note"] = {"text": " ".join(str(note).split())[:SUMMARY_MAX] or "Working."}
-        if self._fenced("com.progress", entry, args) is None:
+        extra = {"note": {"text": " ".join(str(note).split())[:SUMMARY_MAX] or "Working."}} if note is not None else None
+        if self._fenced("com.progress", entry, self._key("progress"), extra) is None:
             raise Stopped()
 
     def _effect_begin(self, entry: Dict[str, Any], summary: Optional[str], ctx: WorkContext) -> None:
-        key = entry["keys"].get("effect_begin") or self._key("effect")
-        entry["keys"]["effect_begin"], entry["step"] = key, "effect-beginning"
-        entry["effect"] = True  # from here a lost attempt is an unknown outcome, never "nothing happened"
-        self.checkpoint.put(entry)
-        args: Dict[str, Any] = {"fence": self._fence(entry, key)}
-        if summary:
-            args["summary"] = " ".join(str(summary).split())[:SUMMARY_MAX]
-        receipt = None
-        lost, delay = 0, self.hold_delay
+        with self._lock:
+            key = entry["keys"].get("effect_begin") or self._key("effect")
+            entry["keys"]["effect_begin"], entry["step"] = key, "effect-beginning"
+            entry["effect"] = True  # from here a lost attempt is an unknown outcome, never "nothing happened"
+            self.checkpoint.put(entry)
+        extra = {"summary": " ".join(str(summary).split())[:SUMMARY_MAX]} if summary else None
+
+        def begun(receipt: Dict[str, Any]) -> None:
+            entry["revision"], entry["step"] = receipt["request"]["revision"], "in-progress"
+            self.checkpoint.put(entry)
+        receipt, lost, delay = None, 0, self.hold_delay
         while True:  # a lost answer: the same key again tells whether it was stored
             try:
-                receipt = self._fenced("com.effect_begin", entry, args)
+                receipt = self._fenced("com.effect_begin", entry, key, extra, begun)
                 break
             except BoardError as exc:
                 if exc.code == "held":
                     # The operator holds this work (DEC-0079): the effect has not begun. Wait, keep the lease (the tick
                     # renews it; com.renew is never held), and ask again with the same key.
-                    entry["effect"], entry["step"] = False, "effect-held"
-                    self.checkpoint.put(entry)
+                    with self._lock:
+                        entry["effect"], entry["step"] = False, "effect-held"
+                        self.checkpoint.put(entry)
                     self._emit("board.request.waiting", "info", "The operator holds this request before its effect: the "
                                "service waits and does nothing outside it until the hold is lifted.", episode=entry["request"],
                                request=entry["request"], capability=entry["capability"])
                     if ctx.stopped.wait(delay):
                         raise Stopped() from None
                     delay = min(HOLD_RETRY_MAX_SECONDS, delay * 2)
-                    entry["effect"], entry["step"] = True, "effect-beginning"
-                    self.checkpoint.put(entry)
+                    with self._lock:
+                        entry["effect"], entry["step"] = True, "effect-beginning"
+                        self.checkpoint.put(entry)
                     continue
                 if exc.code != "unreachable" or lost == 2:
                     raise Stopped() from None
@@ -818,8 +775,6 @@ class Responder:
                 time.sleep(lost)
         if receipt is None:
             raise Stopped()
-        entry["revision"], entry["step"] = receipt["request"]["revision"], "in-progress"
-        self.checkpoint.put(entry)
 
     def _finish(self, work: _Work) -> None:
         entry = work.entry
@@ -828,39 +783,64 @@ class Responder:
             return
         outcome = work.outcome
         if work.failure is not None:
-            if entry.get("effect") or isinstance(work.failure, Stopped):
+            if entry.get("effect"):
+                self._settle_live(entry, "handler-failed")
+                return
+            if isinstance(work.failure, Stopped):
                 self.current = None
-                if entry.get("effect"):
-                    self._lose(entry, "handler-failed")
                 return
             outcome = {"state": "failed_known", "observed": True,
                        "summary": "The service could not do this (%s)." % work.failure.__class__.__name__}
         problems = outcome_problems(outcome, bool(entry.get("effect")))
         if problems:
-            self.current = None
+            self._emit("board.outcome.invalid", "warn", "The handler's outcome was not sent: %s." % problems[0],
+                       request=entry["request"], capability=entry["capability"])
             if entry.get("effect"):
-                self._lose(entry, "observation_required" if any("observation_required" in p for p in problems) else "outcome")
+                self._settle_live(entry, "observation_required" if any("observation_required" in p for p in problems) else "outcome")
             else:
                 entry["outcome"] = {"state": "failed_known", "observed": True, "summary": "The service answered in a form it cannot send."}
                 self._complete(entry)
-            self._emit("board.outcome.invalid", "warn", "The handler's outcome was not sent: %s." % problems[0],
-                       request=entry["request"], capability=entry["capability"])
             return
         entry["outcome"] = dict(outcome, observed=outcome.get("observed", not entry.get("effect")))
         self._complete(entry)
 
+    def _settle_live(self, entry: Dict[str, Any], code: str) -> None:
+        """Finding 37: the handler raised after `begin_effect`, or answered unobserved, while the attempt is live. Only an
+        observed result settles a started effect (project-comms.md, Request lifecycle), so `observe(entry)` is completed
+        under the live fence. With nothing observed, `com.responder_replace` on this responder's own slot is the
+        contract's lost-result operation ("an in_progress one becomes outcome_unknown ... when the next holder takes the
+        slot", Slots end with the session); `com.reconcile` settles it once something is observed."""
+        lost = self.current is not None and self.current.ctx.stopped.is_set()  # the attempt is not live: nothing to settle
+        state = None if lost else self._read_state(entry)
+        if state == "accepted":  # effect_begin was never stored, so nothing began: a known failure
+            entry["effect"], entry["outcome"] = False, {"state": "failed_known", "observed": True, "summary": "The service could not do this (%s)." % code}
+            self._complete(entry)
+            return
+        outcome = self._observed(entry) if state == "in_progress" else None
+        if outcome is not None:
+            entry["outcome"] = dict({k: outcome[k] for k in ("state", "summary", "evidence") if k in outcome}, observed=True)
+            self._complete(entry)
+            return
+        self.current = None
+        self._lose(entry, code)
+        slot = self.slots.get(entry["capability"]) or {}
+        if state == "in_progress" and slot.get("state") == "held":
+            self._replace(entry["capability"], [], slot.get("generation", 0))
+
+    def _reply_extra(self, entry: Dict[str, Any]) -> Dict[str, Any]:
+        reply = entry["outcome"]["reply"]
+        extra: Dict[str, Any] = {"body": {"text": reply["text"], **({"format": reply["format"]} if "format" in reply else {})}}
+        if reply.get("artifacts"):
+            extra["artifacts"] = reply["artifacts"]
+        return extra
+
     def _complete(self, entry: Dict[str, Any]) -> None:
         outcome = entry["outcome"]
-        reply = outcome.get("reply")
-        if reply and not entry.get("replied"):
+        if outcome.get("reply") and not entry.get("replied"):
             key = entry["keys"].get("reply") or self._key("reply")
             entry["keys"]["reply"], entry["step"] = key, "replying"
             self.checkpoint.put(entry)
-            body = {"text": reply["text"], **({"format": reply["format"]} if "format" in reply else {})}
-            args: Dict[str, Any] = {"fence": self._fence(entry, key), "body": body}
-            if reply.get("artifacts"):
-                args["artifacts"] = reply["artifacts"]
-            if self._fenced("com.reply", entry, args) is None:
+            if self._fenced("com.reply", entry, key, self._reply_extra(entry)) is None:
                 self.current = None
                 return
             entry["replied"] = True
@@ -869,7 +849,7 @@ class Responder:
         entry["keys"]["complete"], entry["step"] = key, "completing"
         self.checkpoint.put(entry)
         sent = {k: outcome[k] for k in ("state", "observed", "summary", "evidence") if k in outcome}
-        receipt = self._fenced("com.complete", entry, {"fence": self._fence(entry, key), "outcome": sent})
+        receipt = self._fenced("com.complete", entry, key, {"outcome": sent})
         self.current = None
         if receipt is None:
             return

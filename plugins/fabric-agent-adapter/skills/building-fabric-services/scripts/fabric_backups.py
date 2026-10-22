@@ -46,22 +46,22 @@ _STALE_TEMP_SECONDS = 60 * 60
 _SAFE_INTEGER = 2 ** 53 - 1
 
 
-_TABLE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+_TABLE = re.compile(r"^[a-z][a-z0-9_]{0,62}\Z")
 
 
-_SECRET_TABLE = re.compile(r"^((.+_)?(account_connections?|account_connection_drafts?|tokens?|secrets?|credentials?|passwords?|login_codes?)|(operator_)?sessions?)$")
+_SECRET_TABLE = re.compile(r"^((.+_)?(account_connections?|account_connection_drafts?|tokens?|secrets?|credentials?|passwords?|login_codes?)|(operator_)?sessions?)\Z")
 
 
-_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
+_COLUMN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}\Z")
 
 
-_SECRET_COLUMN = re.compile(r"^(?:.+_)?(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]assphrase|[Aa]pi_?[Kk]ey|[Pp]rivate_[Kk]ey|[Cc]ookie|[Ll]ogin_[Cc]ode|[Oo]tp|[Cc]redential)s?$")
+_SECRET_COLUMN = re.compile(r"^(?:.+_)?(?:[Tt]oken|[Ss]ecret|[Pp]assword|[Pp]assphrase|[Aa]pi_?[Kk]ey|[Pp]rivate_[Kk]ey|[Cc]ookie|[Ll]ogin_[Cc]ode|[Oo]tp|[Cc]redential)s?\Z")
 
 
-_REASON = re.compile(r"^[a-z][a-z0-9_.-]{0,63}$")
+_REASON = re.compile(r"^[a-z][a-z0-9_.-]{0,63}\Z")
 
 
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}\Z")
 
 
 _SURROGATE = re.compile("[\ud800-\udfff]")

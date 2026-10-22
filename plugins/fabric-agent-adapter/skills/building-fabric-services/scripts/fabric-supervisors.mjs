@@ -67,7 +67,11 @@ function checkRun(result, what) {
   if (result?.status !== 0) throw new ServiceError(`${what} failed: ${String(result?.stderr || result?.stdout || result?.error?.message || '').trim().slice(0, 200)}`);
 }
 
-const systemdQuote = (value) => `"${plain(value, 'An argument').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/%/g, '%%').replace(/\$/g, '$$$$')}"`;
+// ExecStart= expands $VAR, so its $ is doubled; Environment= expands none, so `dollar` false leaves it alone (finding 17).
+const systemdQuote = (value, dollar = true) => {
+  const escaped = plain(value, 'An argument').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/%/g, '%%');
+  return `"${dollar ? escaped.replace(/\$/g, '$$$$') : escaped}"`;
+};
 
 /**
  * A systemd user unit (DEC-0032): Restart=always, RestartSec=10, TimeoutStopSec above the drain time,
@@ -87,10 +91,10 @@ export function systemdUnit(unit, programArguments, { workingDirectory, environm
   if (!cwd.startsWith('/')) throw new ServiceError("A systemd unit's working directory is absolute.");
   return [
     '[Unit]', `Description=${plain(description ?? unit, 'The description').replace(/%/g, '%%')}`, '',
-    '[Service]', 'Type=simple', `ExecStart=${argv.map(systemdQuote).join(' ')}`,
+    '[Service]', 'Type=simple', `ExecStart=${argv.map((a) => systemdQuote(a)).join(' ')}`,
     // Not quoted: systemd reads WorkingDirectory= as the rest of the line, quotes included.
     `WorkingDirectory=${cwd.replace(/%/g, '%%')}`,
-    ...Object.keys(env).sort().map((k) => `Environment=${systemdQuote(`${k}=${env[k]}`)}`),
+    ...Object.keys(env).sort().map((k) => `Environment=${systemdQuote(`${k}=${env[k]}`, false)}`),
     'Restart=always', 'RestartSec=10', `TimeoutStopSec=${Math.trunc(stopTimeout)}`, 'KillMode=mixed', '',
     '[Install]', 'WantedBy=default.target', '',
   ].join('\n');

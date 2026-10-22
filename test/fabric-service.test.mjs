@@ -7,6 +7,10 @@ import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { abstractNames } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+// FAA-72: on Linux the lock needs a Node that binds an abstract socket name exactly (22 and later); Node 18 and 20
+// refuse to hold it (fabric-lock.mjs), and lock-old-node-refuses.test.mjs holds that refusal.
+const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 'exact' && `Node ${process.version} cannot hold the Linux lock`;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
@@ -17,7 +21,7 @@ const descriptor = (port, id = 'sample', instance = 'default') => ({
   paths: { data: '/tmp/x', logs: [] }, installedAt: k.nowIso(), installedBy: 'test',
 });
 
-test('second holder of the instance lock is refused with the pid', async () => {
+test('second holder of the instance lock is refused with the pid', { skip: noLinuxLock }, async () => {
   const dir = temp();
   const first = await new k.InstanceLock(dir).acquire();
   await assert.rejects(new k.InstanceLock(dir).acquire(), (e) => e instanceof k.AlreadyRunning && e.holderPid === process.pid);
@@ -175,7 +179,7 @@ test('well-known and events follow the rules', async () => {
   assert.equal(k.parseLimit('999'), k.EVENTS_MAX_LIMIT);
 });
 
-test('holdSingleInstance exits 75 in a second process', async () => {
+test('holdSingleInstance exits 75 in a second process', { skip: noLinuxLock }, async () => {
   const dir = temp();
   const lock = await new k.InstanceLock(dir).acquire();
   const child = spawnSync(process.execPath, ['--input-type=module', '-e',

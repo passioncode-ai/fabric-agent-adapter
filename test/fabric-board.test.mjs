@@ -2,7 +2,7 @@
 // held to the same contract fixtures (contract f00a768, fixtures/contract/comms-vectors.json and canonical.json) and driven
 // against the same fake Fabric hub (test/fake_fabric_hub.py, run as a process).
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import * as fb from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board.mjs';
 import * as fh from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { assertPrivateFile } from './private-file.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const COMMS = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/comms-vectors.json'), 'utf8'));
@@ -148,7 +149,7 @@ test('hub: locate, the door ask, the credential saved once, join, refusals', asy
   assert.equal(allowed.credentialSaved, true);
   assert.ok(!JSON.stringify(allowed).includes(hub.credential));
   assert.equal(fs.readFileSync(target, 'utf8'), hub.credential);
-  assert.equal(fs.statSync(target).mode & 0o777, 0o600);
+  assertPrivateFile(target);
   const grant = await client.joinBoard(hub.project, hub.cred);
   assert.deepEqual(grant.capabilities, ['video.render']);
   assert.ok(!JSON.stringify(grant).includes(grant.bearer()));
@@ -158,7 +159,9 @@ test('hub: locate, the door ask, the credential saved once, join, refusals', asy
   const before = (await hub.control({ op: 'state' })).bindingsSeen.length;
   await assert.rejects(dead.joinBoard(hub.project, hub.cred), (e) => e.code === 'not-running');
   assert.equal((await hub.control({ op: 'state' })).bindingsSeen.length, before); // never sent
-  fs.chmodSync(hub.cred, 0o644);
+  // Readable by others: a mode on macOS and Linux, an Everyone grant on Windows, where a mode is not the privacy (DEC-0032).
+  if (process.platform === 'win32') assert.equal(spawnSync('icacls.exe', [hub.cred, '/grant', '*S-1-1-0:(R)']).status, 0);
+  else fs.chmodSync(hub.cred, 0o644);
   await assert.rejects(client.joinBoard(hub.project, hub.cred), (e) => e.code === 'credential' && !e.message.includes(hub.credential));
 });
 
@@ -521,4 +524,302 @@ test('a claim or a replace refused held pauses the slot and the work waits', asy
   await second.step();
   assert.equal((await h2.state()).requests[b].state, 'completed');
   hang?.({ state: 'completed' });
+});
+
+// --- FAA-77: the audit's findings 35 to 39 (2026-10-22), the faults the reviewer reproduced -----------------------------
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function settle(h, r, rounds = 6, seconds = 31) {
+  for (let i = 0; i < rounds; i += 1) {
+    await sleep(20);
+    await h.advance(Math.max(seconds, r.waitUntil - h.clock.t));
+    await r.step();
+  }
+}
+function gate() {
+  let open;
+  const promise = new Promise((resolve) => { open = resolve; });
+  return { promise, open };
+}
+
+test('FAA-77 35: a reply lost before a transfer is not sent twice, keys are made again, idempotency_conflict is its own event', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = { state: 'completed', summary: 'ok', reply: { text: 'here' } };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await hub.control({ op: 'drop', tool: 'com.reply' }); // the reply is stored; its answer is lost
+  await r.step();
+  await hub.control({ op: 'end-sessions' }); // and the session ends before the same key goes again
+  await settle(h, r, 3);
+  let s = await h.state();
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(s.replies.length, 1); // the old key told the reply was stored: never a second one
+  assert.ok(!JSON.stringify(h.events).includes('idempotency_conflict'));
+
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  h2.outcome = h.outcome;
+  const { request: rid2 } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const r2 = h2.responder();
+  await hub2.control({ op: 'fail', tool: 'com.reply', code: 'not_available' }); // refused before anything is stored
+  await r2.step();
+  const old = h2.checkpoint()[rid2].keys.reply;
+  await hub2.control({ op: 'end-sessions' });
+  await settle(h2, r2, 3);
+  s = await h2.state();
+  assert.equal(s.requests[rid2].state, 'completed');
+  const keys = s.callArgs.filter((a, i) => s.calls[i] === 'com.reply').map((a) => a.fence.idempotency.key);
+  assert.equal(keys[0], old);
+  assert.notEqual(keys.at(-1), old);
+  assert.equal(s.replies.length, 1);
+
+  const hub3 = await fakeHub(t);
+  const h3 = harness(hub3);
+  h3.outcome = h.outcome;
+  await hub3.control({ op: 'queue', capability: 'video.render' });
+  await hub3.control({ op: 'fail', tool: 'com.reply', code: 'idempotency_conflict' });
+  await h3.responder().step();
+  const blocked = h3.events.filter((e) => e[0] === 'board.blocked');
+  assert.equal(blocked[0]?.[3].data.value.reason, 'idempotency_conflict');
+  assert.ok(!h3.kinds().includes('board.down'));
+});
+
+test('FAA-77 35: a second lost answer, on the replied-before probe after the transfer, still completes with one reply', async (t) => {
+  // The replace just renewed the slot, so the session is kept and recovery does not run again: the transferred entry
+  // must already carry the new attempt and wait in the resume queue, and the probe is asked again from there.
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = { state: 'completed', summary: 'ok', reply: { text: 'here' } };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await hub.control({ op: 'drop', tool: 'com.reply' }); // the reply is stored; its answer is lost
+  await r.step();
+  await hub.control({ op: 'end-sessions' });
+  let dropped = false;
+  for (let i = 0; i < 12; i += 1) {
+    if (!dropped && !r.session) {
+      await hub.control({ op: 'drop', tool: 'com.reply' }); // the probe after the replace: stored, answer lost again
+      dropped = true;
+    }
+    await h.advance(Math.max(31, r.waitUntil - h.clock.t));
+    await r.step();
+  }
+  assert.ok(dropped);
+  const s = await h.state();
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(s.replies.length, 1);
+  assert.deepEqual(h.checkpoint(), {});
+  assert.equal(r.state, 'ready');
+
+  // not_available says nothing about whether the old reply was stored: reading it as "not stored" sent a second reply.
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  h2.outcome = h.outcome;
+  const { request: rid2 } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const r2 = h2.responder();
+  await hub2.control({ op: 'drop', tool: 'com.reply' });
+  await r2.step();
+  await hub2.control({ op: 'end-sessions' });
+  let refused = false;
+  for (let i = 0; i < 12; i += 1) {
+    if (!refused && !r2.session) {
+      await hub2.control({ op: 'fail', tool: 'com.reply', code: 'not_available' }); // the probe after the replace
+      refused = true;
+    }
+    await h2.advance(Math.max(31, r2.waitUntil - h2.clock.t));
+    await r2.step();
+  }
+  assert.ok(refused);
+  const s2 = await h2.state();
+  assert.equal(s2.requests[rid2].state, 'completed');
+  assert.equal(s2.replies.length, 1);
+  assert.deepEqual(h2.checkpoint(), {});
+});
+
+test('FAA-77 36: renew never races effect_begin; a revision_conflict on renew or progress reads again and keeps the attempt', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const release = gate();
+  h.outcome = async (request, ctx) => {
+    await ctx.beginEffect('x');
+    await release.promise;
+    return { state: 'completed', observed: true, summary: 'done' };
+  };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  let r;
+  let raced = null;
+  r = h.responder({
+    sessionFactory: (grant) => {
+      const s = new fb.BoardSession(grant);
+      const real = s.call.bind(s);
+      s.call = async (tool, args) => {
+        const out = await real(tool, args);
+        if (tool === 'com.effect_begin' && !raced) {
+          await h.advance(20); // the tick renews while this receipt is not applied yet
+          raced = r.renew(r.current).then(() => 'renewed', (e) => e.code);
+          await sleep(30);
+        }
+        return out;
+      };
+      return s;
+    },
+  });
+  await r.step();
+  for (let i = 0; i < 50 && !raced; i += 1) await sleep(10);
+  assert.equal(await raced, 'renewed');
+  assert.ok(!h.kinds().includes('board.reconcile.needed'));
+  release.open();
+  await settle(h, r, 2, 5);
+  let s = await h.state();
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(s.requests[rid].effect, 'succeeded_observed');
+
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  const release2 = gate();
+  h2.outcome = async (request, ctx) => {
+    await ctx.beginEffect('x');
+    await release2.promise;
+    await ctx.progress('almost');
+    return { state: 'completed', observed: true, summary: 'done' };
+  };
+  const { request: rid2 } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const r2 = h2.responder();
+  await r2.step();
+  await hub2.control({ op: 'fail', tool: 'com.renew', code: 'revision_conflict' });
+  await h2.advance(20);
+  await r2.step();
+  assert.ok(r2.current);
+  assert.deepEqual((await h2.tools()).slice(-3), ['com.renew', 'com.get', 'com.renew']);
+  await hub2.control({ op: 'fail', tool: 'com.progress', code: 'revision_conflict' });
+  release2.open();
+  await settle(h2, r2, 2, 5);
+  s = await h2.state();
+  assert.equal(s.requests[rid2].state, 'completed');
+  assert.ok(!h2.kinds().includes('board.reconcile.needed'));
+});
+
+test('FAA-77 37: an effect the handler failed or left unobserved is settled from what is observed, else given to the lost-result operation', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = async (request, ctx) => {
+    await ctx.beginEffect('x');
+    throw new Error('crashed mid-effect');
+  };
+  h.observed = { state: 'completed', observed: true, summary: 'on disk' };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await r.step();
+  await settle(h, r, 2, 5); // the handler's calls finish after the tick that started it
+  let s = await h.state();
+  assert.deepEqual([s.requests[rid].state, s.requests[rid].effect], ['completed', 'succeeded_observed']);
+  assert.deepEqual(h.checkpoint(), {});
+
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  h2.outcome = async (request, ctx) => {
+    await ctx.beginEffect();
+    return { state: 'completed', observed: false };
+  };
+  h2.observed = { state: 'failed_known', observed: true, summary: 'nothing was written' };
+  const { request: rid2 } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const r2 = h2.responder();
+  await r2.step();
+  await settle(h2, r2, 2, 5);
+  assert.equal((await h2.state()).requests[rid2].state, 'failed_known');
+  assert.deepEqual(h2.checkpoint(), {});
+
+  const hub3 = await fakeHub(t);
+  const h3 = harness(hub3);
+  h3.outcome = h.outcome;
+  const { request: rid3 } = await hub3.control({ op: 'queue', capability: 'video.render' });
+  const r3 = h3.responder();
+  await r3.step();
+  await settle(h3, r3, 1, 5);
+  s = await h3.state();
+  assert.equal(s.requests[rid3].state, 'outcome_unknown'); // the lost-result operation: the slot's next holder took it
+  assert.equal(h3.checkpoint()[rid3].step, 'unknown');
+  assert.ok(h3.kinds().includes('board.reconcile.needed'));
+  h3.observed = { state: 'completed', observed: true, summary: 'on disk after all' };
+  await settle(h3, r3, 12);
+  s = await h3.state();
+  assert.equal(s.requests[rid3].state, 'completed');
+  assert.ok(s.calls.includes('com.reconcile'));
+  assert.deepEqual(h3.checkpoint(), {});
+});
+
+test('FAA-77 38: one lost answer keeps the session and the work; a lost session with work in progress is reconciled without a restart', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const release = gate();
+  h.outcome = async (request, ctx) => {
+    await ctx.beginEffect('x');
+    await release.promise;
+    return { state: 'completed', observed: true, summary: 'done' };
+  };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await r.step();
+  const work = r.current;
+  await hub.control({ op: 'drop', tool: 'com.renew' }); // the renewal is stored; its answer is lost
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.current, work);
+  assert.equal(work.ctx.stopped, false);
+  assert.ok(r.waitUntil - h.clock.t < 40); // tried again while the lease still holds
+  release.open();
+  await settle(h, r, 2, 5);
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  assert.equal(r.state, 'ready');
+  assert.ok(!h.kinds().includes('board.reconcile.needed'));
+
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  const inside = gate();
+  h2.outcome = async (request, ctx) => {
+    await ctx.beginEffect('x');
+    inside.open();
+    return new Promise(() => {});
+  };
+  const { request: rid2 } = await hub2.control({ op: 'queue', capability: 'video.render' });
+  const r2 = h2.responder();
+  await r2.step();
+  await inside.promise;
+  await hub2.control({ op: 'forget-sessions' }); // the session is gone but no DELETE came: the slot lapses on its own
+  h2.observed = { state: 'completed', observed: true, summary: 'on disk' };
+  await settle(h2, r2, 1, 20); // the renew learns the session ended
+  await settle(h2, r2, 2, 5); // a new session while the old slot is live: contested
+  assert.ok(h2.kinds().includes('board.slot.contested'));
+  await settle(h2, r2, 24);
+  const s = await h2.state();
+  assert.equal(s.requests[rid2].state, 'completed');
+  assert.ok(s.calls.includes('com.reconcile'));
+  assert.deepEqual(h2.checkpoint(), {});
+});
+
+test('FAA-77 39: every transferred request resumes, one per idle tick', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = () => new Promise(() => {}); // each first responder dies inside its work
+  const rids = [(await hub.control({ op: 'queue', capability: 'video.render' })).request, (await hub.control({ op: 'queue', capability: 'video.render' })).request];
+  const merged = {};
+  for (const i of [0, 1]) {
+    const file = path.join(hub.data, `cp-${i}.json`);
+    await h.responder({ checkpointFile: file }).step();
+    Object.assign(merged, JSON.parse(fs.readFileSync(file, 'utf8')).requests);
+    await hub.control({ op: 'end-sessions' });
+  }
+  let s = await h.state();
+  assert.deepEqual(rids.map((x) => s.requests[x].state), ['accepted', 'accepted']);
+  fs.writeFileSync(path.join(hub.data, 'board-checkpoint.json'), JSON.stringify({ version: 1, requests: merged }), { mode: 0o600 });
+  h.outcome = async () => {
+    await sleep(30);
+    return { state: 'completed', summary: 'resumed' };
+  };
+  const r = h.responder();
+  await r.step();
+  await settle(h, r, 4, 5);
+  s = await h.state();
+  assert.deepEqual(rids.map((x) => s.requests[x].state), ['completed', 'completed']);
+  assert.deepEqual(h.checkpoint(), {});
 });
