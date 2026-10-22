@@ -153,7 +153,7 @@
     },
     "refusal": {
       "type": "object",
-      "description": "The receiver's refusal of a registration after the request authenticated (devices.md transport steps 0 to 8) and its revision is one it reads: 400 malformed, 403 wrong-organization or unassigned-device, 409 already-withdrawn, agent-mismatch, stale-revision or revision-conflict.",
+      "description": "The receiver's refusal of a registration after the request authenticated (devices.md transport steps 0 to 8) and its revision is one it reads: 400 malformed, 403 wrong-organization or unassigned-device, 409 already-withdrawn, agent-mismatch, stale-revision or revision-conflict; 403 purpose-not-collected when the person's acknowledged notice does not name a share registration's purposes (DEC-0100), sent again when the notice changes.",
       "required": [
         "error"
       ],
@@ -173,7 +173,8 @@
                 "already-withdrawn",
                 "agent-mismatch",
                 "stale-revision",
-                "revision-conflict"
+                "revision-conflict",
+                "purpose-not-collected"
               ]
             },
             "message": {

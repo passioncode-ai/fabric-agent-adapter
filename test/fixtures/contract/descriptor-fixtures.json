@@ -2750,6 +2750,47 @@
           "machine": "render-pc"
         }
       }
+    },
+    {
+      "name": "service-descriptor-peer-processor-hosted",
+      "valid": true,
+      "descriptor": {
+        "protocol": "fabric-service/0.1",
+        "id": "report-writer",
+        "instance": "default",
+        "name": "Report Writer",
+        "summary": "Writes the weekly report for the organization; hosted on an organization-managed machine.",
+        "origin": "http://127.0.0.1:47231",
+        "auth": {
+          "tokenFile": "~/.local/share/passioncode-fabric/services/report-writer.default.token"
+        },
+        "lifecycle": {
+          "manager": "node"
+        },
+        "paths": {
+          "data": "~/.local/share/report-writer",
+          "logs": [
+            "~/.local/state/report-writer/logs/service.log"
+          ]
+        },
+        "installedAt": "2026-10-12T09:00:00Z",
+        "installedBy": {
+          "by": "organization",
+          "tool": "node.lifecycle install 0.1.0 (example)"
+        },
+        "peer": {
+          "endpoint": "https://agents.example.com/report-writer/mcp",
+          "custody": "processor-hosted",
+          "residency": [
+            "DE"
+          ],
+          "maxDataClass": "confidential"
+        },
+        "runner": {
+          "kind": "codex",
+          "credentialKind": "key"
+        }
+      }
     }
   ],
   "semantic": [

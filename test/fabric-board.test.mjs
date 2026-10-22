@@ -99,6 +99,14 @@ test('receipts, refusals and directory pages as the catalogue says', () => {
   assert.deepEqual(fb.receiptProblems(replace, 'com.responder_replace'), []);
   assert.ok(fb.receiptProblems(replace, 'com.claim').length);
   assert.ok(fb.receiptProblems({ ...replace, transferred: [replace.transferred[0], replace.transferred[0]] }, 'com.responder_replace').some((p) => p.includes('each request once')));
+  // DEC-0098: marked, alreadyRead and more answer com.read_ack; noResponder answers a request's com.submit.
+  const ack = FIXTURES['comms-receipt-read-ack-thread'].document;
+  assert.deepEqual(fb.receiptProblems(ack, 'com.read_ack'), []);
+  assert.ok(fb.receiptProblems(ack, 'com.submit').some((p) => p.includes('com.read_ack only')));
+  const submit = FIXTURES['comms-receipt-submit-no-responder'].document;
+  assert.deepEqual(fb.receiptProblems(submit, 'com.submit'), []);
+  assert.ok(fb.receiptProblems(submit, 'com.reply').some((p) => p.includes('com.submit only')));
+  assert.deepEqual(fb.receiptProblems({ ...ack, marked: -1 }, 'com.read_ack'), ['/marked is an integer ≥ 0']);
 });
 
 test('FAC-SEM-107: findings equal the contract, find_project refuses a page that lists one twice and compares as written (FAA-40)', () => {

@@ -174,7 +174,7 @@ export function descriptorMemberProblems(d) {
     const m = typeof peer.endpoint === 'string' && peer.endpoint.length <= 2048 ? PEER_ENDPOINT.exec(peer.endpoint) : null;
     if (!m) problems.push('peer.endpoint is https://<dns-name>[:<port>][/<path>], no query, fragment, userinfo or IP literal');
     else if (RESERVED_HOST.test(m[1])) problems.push(`FAC-SEM-085: a service offered to others cannot be reached at the reserved name ${m[1]}`);
-    if (!['organization-managed', 'personal'].includes(peer.custody)) problems.push('peer.custody is organization-managed or personal');
+    if (!['organization-managed', 'personal', 'processor-hosted'].includes(peer.custody)) problems.push('peer.custody is organization-managed, personal or processor-hosted'); // processor-hosted: DEC-0099
     const r = peer.residency;
     if (!Array.isArray(r) || r.length < 1 || r.length > 32 || new Set(r.map((x) => JSON.stringify(x))).size !== r.length || !r.every((x) => typeof x === 'string' && RESIDENCY.test(x))) {
       problems.push('peer.residency is 1 to 32 distinct ISO 3166-1 alpha-2 codes in upper case, EU admitted, no user-assigned code');

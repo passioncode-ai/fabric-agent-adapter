@@ -90,11 +90,20 @@
     "memory": [
       "0.1"
     ],
+    "node-summary": [
+      "1"
+    ],
     "pairing-message": [
       "1"
     ],
     "pipeline": [
       "0.1"
+    ],
+    "repair-request": [
+      "1"
+    ],
+    "repair-result": [
+      "1"
     ],
     "revocation-delta": [
       "1"

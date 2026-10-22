@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.45.0 (2026-10-22)
+
+### Changed
+
+- **Pinned to contract `e742016`** (FAA-100; `bfa9a67` stays supported): DEC-0098 to DEC-0103. Every vendored vector
+  is regenerated from the contract's own functions at the pin.
+- **The board kit reads the board as Fabric 0.3.9 serves it** (DEC-0098, DEC-0102), both twins: a request may be
+  `answered` (the target Project's participant message answered it; a responder's fenced reply never does), a bulk
+  `com.read_ack` receipt carries `marked`, `alreadyRead` and `more`, and a request's `com.submit` receipt may carry
+  `noResponder` (nobody can answer that capability now; the request is stored). Each is refused outside the call that
+  answers it.
+- **`peer.custody` admits `processor-hosted`** (DEC-0099): an organization's cloud a processor runs under a processing
+  agreement. Both descriptor checks and `references/protocol.md`.
+- **The protocol register gains `node-summary/1`, `repair-request/1` and `repair-result/1`** (DEC-0101), both twins.
+- The kit's `share-registration.schema.json` carries the refusal code `purpose-not-collected` (DEC-0100).
+
 ## 0.44.2 (2026-10-22)
 
 ### Fixed
