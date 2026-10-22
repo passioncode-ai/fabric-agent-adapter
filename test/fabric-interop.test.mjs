@@ -5,6 +5,7 @@ import test from 'node:test';
 import * as i from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-interop.mjs';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { assertPrivateFile } from './private-file.mjs';
 
 const PARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -43,7 +44,7 @@ test('jobs: a stable handle, the Python file format, terminal states stay termin
   assert.deepEqual(Object.keys(handle.job), ['id', 'status']);
   const store = new i.JobStore(dir);
   assert.equal(store.get(handle.job.id).status, 'working');
-  assert.equal((fs.statSync(path.join(dir, `${handle.job.id}.json`)).mode & 0o777), 0o600);
+  assertPrivateFile(path.join(dir, `${handle.job.id}.json`));
   assert.throws(() => store.get('job_nope'), i.UnknownJob);
   assert.equal(i.unknownJobResult('job_nope').structuredContent.error.code, 'unknown-job');
   assert.equal(store.complete(handle.job.id, envelope()).status, 'completed');

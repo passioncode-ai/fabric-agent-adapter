@@ -5,16 +5,18 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { assertPrivateFile } from './private-file.mjs';
 import { abstractNames } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
 // FAA-72: on Linux the lock needs a Node that binds an abstract socket name exactly (22 and later); Node 18 and 20
 // refuse to hold it (fabric-lock.mjs), and lock-old-node-refuses.test.mjs holds that refusal.
 const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 'exact' && `Node ${process.version} cannot hold the Linux lock`;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const kit = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs');
+// A file URL: a child's `import` takes no bare Windows path (D:\... reads as the scheme d:).
+const kit = pathToFileURL(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs')).href;
 
 function withTemp(t) {
   const dir = tempDir('fabric-life-');
@@ -97,9 +99,9 @@ test('LC-12 writing past the cap rotates; files 0600, directory 0700', (t) => {
   for (const name of names) {
     const info = fs.statSync(path.join(path.dirname(file), name));
     assert.ok(info.size <= 1000);
-    assert.equal(info.mode & 0o777, 0o600);
+    assertPrivateFile(path.join(path.dirname(file), name)); // on Windows the folder's protected list, inherited
   }
-  assert.equal(fs.statSync(path.dirname(file)).mode & 0o777, 0o700);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.dirname(file)).mode & 0o777, 0o700);
   const last = JSON.parse(fs.readFileSync(file, 'utf8').trim().split('\n').at(-1));
   assert.ok(last.message.startsWith('line 299 '));
   assert.equal(last.level, 'info');
@@ -128,6 +130,10 @@ test('LC-12 the launchd stdout file is capped at start', (t) => {
 });
 
 // --- LC-01: SIGTERM reaches exit within the deadline -----------------------------------------
+
+// Windows has no SIGTERM: child.kill() ends the process at once and no handler runs (so does `schtasks /End`), so a
+// drain on a signal cannot be observed there.
+const noSignals = process.platform === 'win32' && 'Windows delivers no SIGTERM to a handler';
 
 const DRAIN_PROBE = (workSeconds, deadline, hang) => `
 import * as k from ${JSON.stringify(kit)};
@@ -167,7 +173,7 @@ function runUntilSignal(workSeconds, deadline, hang = false) {
   });
 }
 
-test('LC-01 an idle service exits at once and refuses new work', async () => {
+test('LC-01 an idle service exits at once and refuses new work', { skip: noSignals }, async () => {
   const { code, elapsed, out } = await runUntilSignal(0, 8);
   assert.equal(code, 0);
   assert.ok(elapsed < 2000, `took ${elapsed} ms`);
@@ -176,14 +182,14 @@ test('LC-01 an idle service exits at once and refuses new work', async () => {
   assert.match(out, /new work refused/);
 });
 
-test('LC-01 a busy service finishes its work, then exits', async () => {
+test('LC-01 a busy service finishes its work, then exits', { skip: noSignals }, async () => {
   const { code, elapsed, out } = await runUntilSignal(1, 8);
   assert.equal(code, 0);
   assert.ok(elapsed < 5000, `took ${elapsed} ms`);
   assert.ok(out.indexOf('job finished') < out.indexOf('drained'));
 });
 
-test('LC-01 work past the deadline is interrupted inside it', async () => {
+test('LC-01 work past the deadline is interrupted inside it', { skip: noSignals }, async () => {
   const { code, elapsed, out } = await runUntilSignal(30, 1);
   assert.equal(code, 0);
   assert.ok(elapsed < 4000, `took ${elapsed} ms`);
@@ -191,7 +197,7 @@ test('LC-01 work past the deadline is interrupted inside it', async () => {
   assert.doesNotMatch(out, /job finished/);
 });
 
-test('LC-01 a hung hand-over is cut by the hard exit', async () => {
+test('LC-01 a hung hand-over is cut by the hard exit', { skip: noSignals }, async () => {
   const { code, elapsed } = await runUntilSignal(0, 1, true);
   assert.equal(code, k.EXIT_HARD_STOP);
   assert.ok(elapsed < 4000, `took ${elapsed} ms`);

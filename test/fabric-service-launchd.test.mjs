@@ -119,7 +119,7 @@ test('both kits write byte-identical plists', { skip: spawnSync('python3', ['--v
   const env = { EXAMPLE_MODE: 'a & b', EXAMPLE_TOKEN_FILE: '/tmp/t', A_FIRST: '1' };
   const py = spawnSync('python3', ['-c', `
 import json, sys
-from pathlib import Path
+from pathlib import PurePosixPath as Path  # launchd paths are POSIX on every OS the test runs on
 sys.path.insert(0, ${JSON.stringify(scripts)})
 import fabric_service as fs
 argv, env = json.loads(sys.argv[1]), json.loads(sys.argv[2])
@@ -138,7 +138,7 @@ test('LC-14: a first install writes, lints, enables, bootstraps and waits for th
   assert.deepEqual(fake.overrides, { [s.name]: 'enabled' });
   assert.ok(fake.loaded.includes(s.name));
   assert.equal(fs.readFileSync(s.plist, 'utf8'), s.body('1'));
-  assert.equal(fs.statSync(s.plist).mode & 0o777, 0o644);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(s.plist).mode & 0o777, 0o644);
   assert.deepEqual(fake.calls[0], ['plutil', '-lint', s.plist], 'the plist is linted before launchd sees it');
 });
 

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import * as fb from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board.mjs';
 import * as fh from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs';
 import { tempDir } from './temp-dir.mjs';
+import { assertPrivateFile } from './private-file.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const COMMS = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/comms-vectors.json'), 'utf8'));
@@ -148,7 +149,7 @@ test('hub: locate, the door ask, the credential saved once, join, refusals', asy
   assert.equal(allowed.credentialSaved, true);
   assert.ok(!JSON.stringify(allowed).includes(hub.credential));
   assert.equal(fs.readFileSync(target, 'utf8'), hub.credential);
-  assert.equal(fs.statSync(target).mode & 0o777, 0o600);
+  assertPrivateFile(target);
   const grant = await client.joinBoard(hub.project, hub.cred);
   assert.deepEqual(grant.capabilities, ['video.render']);
   assert.ok(!JSON.stringify(grant).includes(grant.bearer()));

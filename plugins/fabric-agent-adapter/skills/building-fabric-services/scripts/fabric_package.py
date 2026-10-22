@@ -900,9 +900,10 @@ def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
 
 
 def fd_write(path: Path, text: str) -> None:
-    """Write through a temporary file in the same folder and rename it over, so a reader never sees half a file."""
+    """Write through a temporary file in the same folder and rename it over, so a reader never sees half a file. The
+    bytes as given: text mode would write \r\n on Windows, and the Node kit writes the same file with \n (FAA-72)."""
     temp = path.with_name(".%s.tmp-%d" % (path.name, os.getpid()))
-    temp.write_text(text, encoding="utf-8")
+    temp.write_bytes(text.encode("utf-8"))
     os.replace(temp, path)
 
 
