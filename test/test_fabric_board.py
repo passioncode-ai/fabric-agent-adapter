@@ -526,6 +526,16 @@ class RestartTests(Conversation):
         self.assertEqual(self.checkpoint()[rid]["step"], "unknown")
         self.assertIn("board.reconcile.needed", self.kinds())
 
+    def test_a_request_answered_while_the_responder_was_down_leaves_the_checkpoint(self):
+        """DEC-0098, DEC-0102: a held request back in the queue may be answered by the target's participant reply; it
+        is no longer this responder's, so the restarted responder drops it and reconciles nothing (FAA-100)."""
+        rid, _ = self._crash_after(effect=False)
+        self.board.requests[rid]["state"] = "answered"
+        second = self.responder()
+        second.step()
+        self.assertEqual(self.checkpoint(), {})
+        self.assertNotIn("com.reconcile", self.tools())
+
     def test_accepted_work_is_transferred_and_finished(self):
         rid, _ = self._crash_after(effect=False)
         self.assertEqual(self.board.requests[rid]["state"], "accepted")

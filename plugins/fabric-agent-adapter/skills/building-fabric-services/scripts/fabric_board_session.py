@@ -61,6 +61,9 @@ STOP_CODES = frozenset(["fenced", "lease_expired", "authority_changed"])
 
 
 TERMINAL = frozenset(["completed", "failed_known", "cancelled", "expired"])
+#: No longer this responder's to work on: back in the queue, claimed again, or answered by the target Project's
+#: participant reply (DEC-0098, DEC-0102; not terminal, the requester may still cancel it, and nobody claims it).
+NOT_OURS = frozenset(["queued", "claimed", "answered"])
 
 
 #: A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38).
@@ -283,7 +286,7 @@ class Responder:
                     self.checkpoint.drop(entry["request"])
                     continue
                 raise
-            if state is None or state in TERMINAL or state in ("queued", "claimed"):
+            if state is None or state in TERMINAL or state in NOT_OURS:
                 self.checkpoint.drop(entry["request"])  # settled, or back in the queue for whoever claims next
             elif state == "accepted":
                 transfer.setdefault(entry["capability"], []).append(entry)
@@ -401,7 +404,7 @@ class Responder:
     def _reconcile(self, entry: Dict[str, Any]) -> None:
         state = self._read_state(entry)
         if state != "outcome_unknown":
-            if state in TERMINAL or state in ("queued", "claimed"):
+            if state in TERMINAL or state in NOT_OURS:
                 self.checkpoint.drop(entry["request"])
             elif state == "in_progress" and entry.get("step") != "unknown":
                 entry["step"] = "unknown"  # no next holder took the slot yet: a later tick tries again (finding 38)

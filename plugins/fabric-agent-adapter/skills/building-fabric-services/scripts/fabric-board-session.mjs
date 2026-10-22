@@ -22,6 +22,9 @@ export const EVENT_SCHEMA = 'urn:fabric:schema:board-responder-event:1';
 export const STOP_CODES = Object.freeze(new Set(['fenced', 'lease_expired', 'authority_changed']));
 
 const TERMINAL = new Set(['completed', 'failed_known', 'cancelled', 'expired']);
+// No longer this responder's to work on: back in the queue, claimed again, or answered by the target Project's
+// participant reply (DEC-0098, DEC-0102; not terminal, the requester may still cancel it, and nobody claims it).
+const NOT_OURS = new Set(['queued', 'claimed', 'answered']);
 
 /** A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38). */
 export const LEASE_MARGIN_SECONDS = 10;
@@ -226,7 +229,7 @@ export class Responder {
         }
         throw e;
       }
-      if (state === null || TERMINAL.has(state) || state === 'queued' || state === 'claimed') this.checkpoint.drop(entry.request);
+      if (state === null || TERMINAL.has(state) || NOT_OURS.has(state)) this.checkpoint.drop(entry.request);
       else if (state === 'accepted') (transfer[entry.capability] ??= []).push(entry);
       else reconcile.push(entry);
     }
@@ -348,7 +351,7 @@ export class Responder {
   async reconcile(entry) {
     const state = await this.readState(entry);
     if (state !== 'outcome_unknown') {
-      if (state !== null && (TERMINAL.has(state) || state === 'queued' || state === 'claimed')) this.checkpoint.drop(entry.request);
+      if (state !== null && (TERMINAL.has(state) || NOT_OURS.has(state))) this.checkpoint.drop(entry.request);
       else if (state === 'in_progress' && entry.step !== 'unknown') {
         entry.step = 'unknown'; // no next holder took the slot yet: a later tick tries again (finding 38)
         this.checkpoint.put(entry);

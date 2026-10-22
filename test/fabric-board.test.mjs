@@ -312,6 +312,20 @@ test('Fabric down: bounded backoff, one event, then recovery', async (t) => {
   assert.equal((await h.state()).requests[rid].state, 'completed');
 });
 
+test('restart: a request answered while the responder was down leaves the checkpoint (DEC-0098, DEC-0102, FAA-100)', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = () => new Promise(() => {}); // the process "dies" inside the work
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await h.responder().step();
+  await hub.control({ op: 'end-sessions' });
+  await hub.control({ op: 'answer', request: rid });
+  await h.responder().step();
+  const s = await h.state();
+  assert.deepEqual(h.checkpoint(), {});
+  assert.ok(!s.calls.includes('com.reconcile'));
+});
+
 test('restart: accepted work transferred and finished; without transferred it stays held; in-progress reconciled', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

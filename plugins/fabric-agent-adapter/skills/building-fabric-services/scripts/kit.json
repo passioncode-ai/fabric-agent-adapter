@@ -355,7 +355,7 @@
     "fabric_hub",
     "fabric_service"
    ],
-   "sha256": "878ceed970a84087a320fd8eb971c210613a0fa2c524b68793fb32042910581e"
+   "sha256": "c917a3486c7d7c9075b3f59184a911485a7b46e461e798d0d5cf2ca24e41d81c"
   },
   {
    "module": "fabric_board_fixture",
@@ -747,7 +747,7 @@
     "fabric-hub",
     "fabric-service"
    ],
-   "sha256": "744a8c9a518c27f2ddfd20b1b22afebc3ccc4f59aeeb7a38d7c12c2ddcae158d"
+   "sha256": "e9eefb5d34dc66f6d6b528a9c9e85960fd884e6ea5e179c26cbfe3c054ccf7bc"
   },
   {
    "module": "fabric-board-fixture",
@@ -2148,7 +2148,7 @@
    "fabric_hub.py": "b9ac852e601b1d54cf61351677a628afc69faeed7d1fc74ebe541c1cf38e0c2a",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "b5bff994cb615c6a4bb0d88d020e3a59504166180e1fa1aea3be93224f2aeccb",
-   "fabric_board_session.py": "878ceed970a84087a320fd8eb971c210613a0fa2c524b68793fb32042910581e",
+   "fabric_board_session.py": "c917a3486c7d7c9075b3f59184a911485a7b46e461e798d0d5cf2ca24e41d81c",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "0f075894b3e352194fcaf3fc7d08dee4e9f1c215e859769ed85fa5010e4a1599",
    "fabric_http.py": "5d7f72af3a73fdbe8c1f487ecf60cef23a7c46289eba542b03aff4706b8218d4",
@@ -2184,7 +2184,7 @@
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
    "fabric-board-link.mjs": "4cd6d4e21713a38c8e56f7d59db3148638b8c27c08e774d96a0f6283c6049e0a",
-   "fabric-board-session.mjs": "744a8c9a518c27f2ddfd20b1b22afebc3ccc4f59aeeb7a38d7c12c2ddcae158d",
+   "fabric-board-session.mjs": "e9eefb5d34dc66f6d6b528a9c9e85960fd884e6ea5e179c26cbfe3c054ccf7bc",
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
    "fabric-board.mjs": "9e7bfe4d412521982224ef12bebfc2ff255eeeaf8d96cf40234ac18de68e7a59",
    "fabric-http.mjs": "f886bcb49c4353d039387ac9568738dda26697a94dd07fc6a6204500f0bc27bf",

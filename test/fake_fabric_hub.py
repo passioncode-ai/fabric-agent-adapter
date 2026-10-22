@@ -681,6 +681,9 @@ class FakeHub:
             for st in list(self.sessions.values()):
                 b.release(st["id"])
             self.sessions.clear()
+        elif op == "answer":  # the board's pass: the target Project's participant reply answered it (DEC-0098, DEC-0102)
+            req = b.requests[cmd["request"]]
+            req["state"], req["revision"] = "answered", req.get("revision", 0) + 1
         elif op == "forget-sessions":  # the sessions end but no DELETE arrives: their slots lapse on their own (FAA-77)
             self.sessions.clear()
         elif op != "state":
