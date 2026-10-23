@@ -134,6 +134,15 @@ for (const [name, value] of [
   varied('a view machine with no id beside a secret with no from', fromView, (r) => { delete view(r).id; for (const m of r.machines) for (const x of m.secrets ?? []) delete x.from; return r; });
   varied('a secret from a view machine named by an equal string', fromView, (r) => r);
   varied('a profile written as full', ok, (r) => { r.machines[0].profile = 'full'; return r; });
+  // FAA-107: a view machine's id of another JSON type against each secret's `from`: the contract's Set matches by
+  // SameValueZero (1 and 1.0 alike, an object only itself, true never 1).
+  for (const [id, from] of [[null, null], [null, 'x'], [1, 1.0], [1, '1'], [true, 1], [true, true], [{}, {}], [[], []], [0, -0]]) {
+    varied(`a view machine with id ${JSON.stringify(id)} and a secret from ${JSON.stringify(from)}`, fromView, (r) => {
+      view(r).id = id;
+      for (const m of r.machines) for (const x of m.secrets ?? []) x.from = from;
+      return r;
+    });
+  }
   for (const profile of ['Full', 'VIEW', '', null, 1, ['view'], { toString: 1 }]) varied(`a profile of ${JSON.stringify(profile)}`, ok, (r) => { r.machines[1].profile = profile; return r; });
   varied('a non-object before the machines', fromView, (r) => { r.machines = [7, ...r.machines]; return r; });
 }

@@ -157,7 +157,8 @@ def double(value: Any) -> float:
 
 
 def same(a: Any, b: Any) -> bool:
-    """JavaScript's === (and a Set's SameValueZero) on parsed JSON: an object equals only itself."""
+    """JavaScript's === on parsed JSON: an object equals only itself. A Set's SameValueZero differs only for NaN, which
+    no JSON value is: use ``set_has`` where the contract keeps a Set (FAA-107)."""
     if a is MISSING or b is MISSING:
         return a is b
     if isinstance(a, (dict, list)) or isinstance(b, (dict, list)):
@@ -171,6 +172,12 @@ def same(a: Any, b: Any) -> bool:
 
 def contains(items: List[Any], value: Any) -> bool:
     return any(same(item, value) for item in items)
+
+
+def set_has(items: List[Any], value: Any) -> bool:
+    """A JavaScript Set's ``has`` over ``items``: SameValueZero, which is ``same`` except that NaN matches NaN."""
+    nan = isinstance(value, float) and math.isnan(value)
+    return any(same(item, value) or (nan and isinstance(item, float) and math.isnan(item)) for item in items)
 
 
 #: The characters JavaScript's StringToNumber trims: WhiteSpace and LineTerminator (ECMA-262 §12.2, §12.3).

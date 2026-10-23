@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.47.1 (2026-10-23)
+
+### Fixed
+
+- **The three risks of 0.47.0's blind unit reading** (FAA-107; the reading passed with nothing broken).
+  - The Python estate reader matched a `view` machine's id against a secret's `from` with `===`, where the contract
+    keeps the ids in a `Set` (SameValueZero), so a NaN id never matched a NaN `from`. No JSON the kit loads carries
+    NaN; a Python caller building the record itself could. The core gains `set_has` (a Set's `has`), used by
+    `FAC-SEM-134`, and `same`'s docstring no longer claims SameValueZero. The Node twin already matched.
+  - `profile-forbids`' 403 is asserted in both delegation kits (status, no `WWW-Authenticate`, the message); it was
+    held only by the default branch.
+  - Nine vendored `FAC-SEM-134` variants put a `view` machine id of another JSON type (null, a number, a boolean, an
+    object, an array, `-0`) against each secret's `from`, answered by the contract's own rules.
+
 ## 0.47.0 (2026-10-23)
 
 ### Changed

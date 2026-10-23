@@ -92,6 +92,15 @@ class ContractVectors(unittest.TestCase):
             self.assertEqual(fe.machine_profile(case.get("record"), case.get("machineId")), case["expected"], case["name"])
         self.assertEqual(fe.MACHINE_PROFILES, ("full", "member", "view"))
 
+    def test_a_view_machine_id_is_matched_as_a_set_matches_it(self):
+        # The contract keeps the view machines' ids in a Set, whose membership is SameValueZero: NaN matches NaN, which
+        # === does not. No JSON the kit loads carries NaN; a Python caller can build one (FAA-107).
+        nan = float("nan")
+        record = {"machines": [{"id": nan, "profile": "view"}, {"id": "a", "secrets": [{"from": nan}]}]}
+        found = [f for f in fe.estate_record_rules("estate-record", record) if f["code"] == "FAC-SEM-134"]
+        self.assertEqual([f["instancePath"] for f in found], ["/machines/1/secrets/0/from"])
+        self.assertEqual(found[0]["message"], "machine NaN is a view machine: it is the source of no secret")
+
     def test_p256_keys_and_passkey_keys(self):
         for case in V["p256"]:
             self.assertEqual(fe.is_valid_p256_key(bytes.fromhex(case["raw"])), case["expected"], case["name"])
