@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.2 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
+/* fabric-dashboard-kit@1.1.3 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
    Load it same-origin with <script src="fabric-dashboard.js" defer></script>: no inline script, no
    eval, nothing from a CDN. It applies the host's appearance (ED-6, ED-8), folds navigation that
    does not fit into a More menu (ED-3), makes wide boxes keyboard-reachable (ED-4) and keeps
@@ -8,7 +8,7 @@
   'use strict';
 
   var KIT = 'fabric-dashboard-kit';
-  var VERSION = '1.1.2';
+  var VERSION = '1.1.3';
   /* fabric-dashboard-kit:theme-ids:begin */
   var THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 /* fabric-dashboard-kit:theme-ids:end */
@@ -176,23 +176,47 @@
     var summaryEl = more.querySelector('summary');
     var label = nav.getAttribute('data-fd-more-label') || 'More';
 
+    // An item that sticks out by a fraction of a pixel is cut but leaves scrollWidth (rounded) unchanged: compare the
+    // last item's edge with the list's, on the side the text runs to.
+    var overflows = function () {
+      if (list.scrollWidth > list.clientWidth + 1) return true;
+      var last = list.lastElementChild;
+      if (!last) return false;
+      var a = last.getBoundingClientRect(), b = list.getBoundingClientRect();
+      return root.getComputedStyle(list).direction === 'rtl' ? a.left < b.left - 0.5 : a.right > b.right + 0.5;
+    };
+    function summarize() {
+      var current = menuList.querySelector('[aria-current]');
+      summaryEl.textContent = current ? label + ': ' + current.textContent.trim() : label + ' (' + menuList.children.length + ')';
+    }
     function layout() {
       // Put every item back in its place, then move the last ones out until the rest fit.
       while (menuList.firstChild) list.appendChild(menuList.firstChild);
       more.hidden = true;
-      if (list.scrollWidth <= list.clientWidth + 1) { summaryEl.textContent = label; return; }
+      if (!overflows()) { summaryEl.textContent = label; return; }
       more.hidden = false;
       var items = list.children;
-      while (items.length > 1 && list.scrollWidth > list.clientWidth + 1) {
-        menuList.insertBefore(items[items.length - 1], menuList.firstChild);
+      // The summary names the current section or counts the folded ones, and its text takes room from the list, so
+      // set it after every move and measure again with it in place (a longer summary left a half-cut item, FAA-104).
+      summarize();
+      while (items.length && overflows()) {
+        menuList.insertBefore(items[items.length > 1 ? items.length - 1 : 0], menuList.firstChild);
+        summarize();
       }
-      if (list.scrollWidth > list.clientWidth + 1 && items.length) menuList.insertBefore(items[0], menuList.firstChild);
-      var current = menuList.querySelector('[aria-current]');
-      summaryEl.textContent = current ? label + ': ' + current.textContent.trim() : label + ' (' + menuList.children.length + ')';
     }
     layout();
     if (typeof root.ResizeObserver === 'function') new root.ResizeObserver(function () { layout(); }).observe(nav);
     else root.addEventListener('resize', layout);
+    // A page that moves aria-current (its route changed) gets a fresh summary and fit, without telling the kit.
+    if (typeof root.MutationObserver === 'function') {
+      new root.MutationObserver(layout).observe(nav, { subtree: true, attributes: true, attributeFilter: ['aria-current'] });
+    }
+    nav.fdRefresh = layout;
+  }
+
+  /* A page can also ask for a new fit itself, for example after it changed the items' text. */
+  function refreshNav(nav) {
+    if (nav && typeof nav.fdRefresh === 'function') nav.fdRefresh();
   }
 
   /* ---- wide boxes: keyboard-reachable, with a name, marked when they overflow (ED-4) ---- */
@@ -247,6 +271,7 @@
   api.applyAppearance = applyAppearance;
   api.prepareScrollBox = prepareScrollBox;
   api.foldNav = foldNav;
+  api.refreshNav = refreshNav;
   // Apply the theme before first paint when loaded without defer; the rest waits for the DOM.
   applyAppearance();
   if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', init); else init();

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.46.1 (2026-10-23)
+
+### Fixed
+
+- **Dashboard kit 1.1.3: the section navigation no longer leaves a half-cut link beside More** (FAA-104, a finding
+  from research-agent on board thread `288afbce`). `foldNav` measured the fit, then wrote the summary (`More: <current>`
+  or `More (N)`), whose longer text narrowed the list after the measurement; it now measures with the summary in place,
+  and also catches a link that sticks out by a fraction of a pixel. The summary follows `aria-current` when a page
+  moves it (a `MutationObserver`), and `FabricDashboard.refreshNav(nav)` refits after a page changes the links' text.
+  Held by a WebKit test that sweeps 360 to 640 px at every current section (`test/fabric-dashboard-fold.test.mjs`, run
+  with `FABRIC_PLAYWRIGHT`). Services pick it up by re-vendoring the kit (`dashboard_kit.py`; the session-start notice
+  names an older copy).
+
 ## 0.46.0 (2026-10-23)
 
 ### Changed
