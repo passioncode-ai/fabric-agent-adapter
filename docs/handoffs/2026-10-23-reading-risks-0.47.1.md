@@ -11,8 +11,10 @@ pin `87d384f`.
 
 **Checks actually run.** The new NaN test red on the Python twin before the change, green after; the Node twin
 already answered it. Targeted suites: Python (`test_fabric_estate`, `test_kit_hostile_estate`, `test_fabric_delegation`,
-`test_fabric_kit`) OK, Node 32 pass 0 fail; `validate.py` and both `claude plugin validate --strict` exit 0. The full
-suites and the release run are recorded in the PR.
+`test_fabric_kit`) OK, Node 32 pass 0 fail; `validate.py` and both `claude plugin validate --strict` exit 0. Full
+suites: Node 321 tests 0 fail; Python 1003 tests with 2 failures in `test_fabric_profiles` (a fake runner's `--version`
+missed its 5000 ms deadline under a load average near 30; the module passes alone, its code is not in this change),
+filed as FAA-108. The hosted suite runs in `release.yml` before the publish.
 
 **Process note.** A blanket `sed s/0.47.0/0.47.1/` over `kit.json` also renamed the released `0.47.0` history entry;
 only the `version` member moves (Fabric memory `project / kit-json-version-before-build`).
