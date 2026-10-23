@@ -64,6 +64,13 @@ router answers it, usually `404` or `421`. The probe counts that as the refusal 
 the body is not the well-known document. The Origin and cross-site checks name the right `Host`,
 reach the service, and still need its own `403`.
 
+Without the token the well-known route answers `401` with none of the service's data (DEC-0109). The kit's server
+answers it with an empty body. An identity proxy in front of the service (Cloudflare Access, for one) may answer that
+`401` with its own sign-in page: `well-known.requires-token` passes it when the page neither parses as the well-known
+document nor names the service's identity values (its id, `id.instance`, build, or pid, as whole words). The probe
+takes the service's own host name out first, because a sign-in page names the address it guards, and does not look for
+a value shorter than four characters, because a platform's pid is often `1`.
+
 ## What a host does and will not do
 
 | Situation | Host |

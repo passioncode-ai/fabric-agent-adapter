@@ -310,21 +310,65 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
   return report;
 }
 
-/** Spend in a rolling window, from the receipts' own times; null when every call in it is unpriced. */
+/**
+ * What a host shows for usage rows (DEC-0110, the contract's usageSpend): money spent apart from a subscription's
+ * estimate. `rows` are `days[].byModel[]` rows. Money is the `costUsd` of every row whose `route` is `key`,
+ * `platform-metered` or absent; a `subscription` row's `costUsd` is an estimate at list price, summed apart. A window
+ * whose calls were all on a subscription spent 0; money is null only when it has calls off a subscription and none of
+ * them is priced, and a lower bound while some are priced and some are not. An unknown `route`, or counts or a cost the
+ * schema refuses, answers undefined. It never throws on a JSON value.
+ */
+export function usageSpend(rows) {
+  if (!Array.isArray(rows)) return undefined;
+  const known = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+  const money = [], estimate = [];
+  let calls = 0, subscriptionCalls = 0;
+  const paid = { calls: 0, priced: 0, unpriced: false }, sub = { calls: 0, priced: 0, unpriced: false };
+  for (const row of rows) {
+    if (!isPlainObject(row)) return undefined;
+    const { route } = row;
+    if (route !== undefined && !(typeof route === 'string' && USAGE_ROUTES.includes(route))) return undefined;
+    const rowCalls = row.calls, unpriced = row.unpricedCalls === undefined ? 0 : row.unpricedCalls, rowCost = row.costUsd;
+    if (!Number.isSafeInteger(rowCalls) || rowCalls < 0 || !Number.isSafeInteger(unpriced) || unpriced < 0 || unpriced > rowCalls) return undefined;
+    if (rowCost !== null && !known(rowCost)) return undefined;
+    if (rowCalls > 0 && (rowCost === null) !== (unpriced === rowCalls)) return undefined; // FAC-SEM-025's own pairing
+    calls += rowCalls;
+    const side = route === 'subscription' ? sub : paid;
+    if (route === 'subscription') subscriptionCalls += rowCalls;
+    side.calls += rowCalls;
+    side.priced += rowCalls - unpriced;
+    if (unpriced > 0) side.unpriced = true;
+    if (known(rowCost)) (route === 'subscription' ? estimate : money).push(rowCost);
+  }
+  const total = (side, costs) => (side.calls > 0 && side.priced === 0 ? null : costs.sort((a, b) => a - b).reduce((n, x) => n + x, 0));
+  return {
+    calls,
+    moneyUsd: total(paid, money),
+    moneyLowerBound: paid.priced > 0 && paid.unpriced,
+    estimateUsd: total(sub, estimate),
+    estimateLowerBound: sub.priced > 0 && sub.unpriced,
+    subscriptionCalls,
+  };
+}
+
+/** CT-115: a limit counts money only, never a subscription's estimate (DEC-0110). */
+function money(spend) {
+  return spend === undefined || spend.moneyUsd === null ? null : Math.round(spend.moneyUsd * 1e6) / 1e6;
+}
+
+/** Money spent in a rolling window, from the receipts' own times; null when no call off a subscription in it is priced. */
 function spentSince(receipts, start, end) {
   const iso = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
   const lo = iso(start), hi = iso(end);
   const inside = [...receipts].filter((r) => String(r.at ?? '') > lo && String(r.at ?? '') <= hi);
-  if (inside.length && inside.every((r) => r.costUsd === null || r.costUsd === undefined)) return null;
-  return Math.round(inside.reduce((n, r) => n + (r.costUsd ?? 0), 0) * 1e6) / 1e6;
+  const priced = (r) => r.costUsd !== null && r.costUsd !== undefined;
+  return money(usageSpend(inside.map((r) => ({ ...(r.route ? { route: r.route } : {}), calls: 1, unpricedCalls: priced(r) ? 0 : 1, costUsd: priced(r) ? r.costUsd : null }))));
 }
 
-/** Spend in the current UTC day or month; null when every call in it is unpriced. */
+/** Money spent in the current UTC day or month, over the window's model rows; null when no call off a subscription in it is priced. */
 function spentIn(outDays, period, last) {
   const prefix = period === 'day' ? last : last.slice(0, 7);
-  const window = outDays.filter((d) => d.date.startsWith(prefix));
-  const unknown = window.length > 0 && window.every((d) => d.costUsd === null);
-  return unknown ? null : Math.round(window.reduce((n, d) => n + (d.costUsd ?? 0), 0) * 1e6) / 1e6;
+  return money(usageSpend(outDays.filter((d) => d.date.startsWith(prefix)).flatMap((d) => d.byModel)));
 }
 
 export const LIMIT_SCOPES = Object.freeze(['machine', 'project', 'pool', 'job']);

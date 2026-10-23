@@ -27,7 +27,7 @@ test('every verify case answers as the contract does', () => {
 test('every rule case answers as the contract does (FAC-SEM-072…076)', () => {
   for (const c of V.rules) assert.deepEqual(e.estateRecordRules(c.kind, c.value), c.expected, c.name);
   const codes = new Set(V.rules.flatMap((c) => (c.expected ?? []).map((f) => f.code)));
-  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114', 'FAC-SEM-122', 'FAC-SEM-134']);
+  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114', 'FAC-SEM-122', 'FAC-SEM-134', 'FAC-SEM-137']);
 });
 
 test('the digest, the challenge, placement trust, P-256 keys and passkey keys', () => {
@@ -43,6 +43,9 @@ test('the digest, the challenge, placement trust, P-256 keys and passkey keys', 
   assert.ok(V.machineProfile.length >= 17);
   for (const c of V.machineProfile) assert.equal(e.machineProfile(c.record, c.machineId) ?? null, c.expected, c.name);
   assert.deepEqual([...e.MACHINE_PROFILES], ['full', 'member', 'view']);
+  // DEC-0107: the anchor a record vouches for; FAC-SEM-137's variants run with the rule cases.
+  assert.ok(V.deltaAnchor.length >= 10);
+  for (const c of V.deltaAnchor) assert.deepEqual(e.deltaAnchorOf(c.record) ?? null, c.expected, JSON.stringify(c.record));
   // The contract keeps the view machines' ids in a Set: NaN matches NaN there (FAA-107; no JSON carries NaN).
   const nanFound = e.estateRecordRules('estate-record', { machines: [{ id: NaN, profile: 'view' }, { id: 'a', secrets: [{ from: NaN }] }] }).filter((f) => f.code === 'FAC-SEM-134');
   assert.deepEqual(nanFound.map((f) => f.instancePath), ['/machines/1/secrets/0/from']);

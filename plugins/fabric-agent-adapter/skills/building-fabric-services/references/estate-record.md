@@ -3,7 +3,8 @@
 Fabric Agent Contract DEC-0055, `docs/specification/estate-record.md`, schema `schemas/estate-record.schema.json`,
 rules `FAC-SEM-072…076`, with contexts (DEC-0082, `docs/specification/contexts.md`, `FAC-SEM-110`, `FAC-SEM-111`) and a
 partner's scoped publisher key (DEC-0090, `docs/specification/partner-channel.md`, `FAC-SEM-122`) and each machine's
-profile (DEC-0106, `docs/specification/machine-calls.md`, `FAC-SEM-134`).
+profile (DEC-0106, `docs/specification/machine-calls.md`, `FAC-SEM-134`), and the revocation delta's head a
+revision vouches for (DEC-0107, `deltaAnchor`, `FAC-SEM-137`).
 One revision of one person's estate lists:
 - the passkeys that sign it;
 - the machines, with their device keys, a certificate of each machine's hub key and, optionally, a profile;
@@ -21,6 +22,7 @@ derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fab
 - Trusting a delegation key
 - Contexts: one agent for you and for an organization
 - Machine profiles: full, member, view
+- The delta anchor
 - The estate ceremonies
 - Share grants into an organization
 - Checking a record you produce
@@ -59,7 +61,8 @@ It checks, in the order of the ER table:
 7. **The window.** At most 30 days. A revision may be issued up to 60 s ahead of the verifier's clock (DEC-0066,
    `CLOCK_SKEW_SECONDS`); earlier than that it is `not-yet-valid`.
 8. **The record's own rules.** A violation is `rule-violation` with its `codes`, `FAC-SEM-072…076`, `FAC-SEM-110`,
-   `FAC-SEM-111`, `FAC-SEM-122`, `FAC-SEM-134` and `FAC-SEM-092`
+   `FAC-SEM-111`, `FAC-SEM-122`, `FAC-SEM-134` and `FAC-SEM-092`, and against the parent `FAC-SEM-114` and
+   `FAC-SEM-137`
    (each passkey the record lists is a signing credential, its origins within its RP ID).
 
 Dates are strict RFC 3339: a `T`, an offset, and a day that exists. `:60` and a space are refused. Passkey JWK `x`
@@ -159,6 +162,16 @@ own profile vectors (`fixtures/vectors/machine-call.json`) and hostile inputs (`
   profile (`machineCallVerdict`) and sealing it (`fabric-agent-call/1`, HPKE) are a relay node's duties; no kit-built
   service is one yet (FAA-106). A delegation verifier still names the refusal: `profile-forbids` is a DL-19 code
   ([delegation](delegation.md)).
+
+## The delta anchor
+
+DEC-0107 lets a revision name the revocation delta's head it vouches for: `deltaAnchor {sequence, sha256}`. Every
+revocation of the delta's entries up to it is in the record. `FAC-SEM-137` keeps it from moving back: once a parent
+anchors the delta, its next revision anchors it too, at the parent's sequence or later, with the parent's hash at the
+same sequence. `delta_anchor_of(record)` / `deltaAnchorOf(record)` answers the anchor, or `None` / `undefined` when the
+record names none or one of another shape. Applying the delta against the anchor (`anchorDelta`) is a machine's duty
+when it applies revisions; the kit verifies the revision and does not hold a delta. Fabric writes `deltaAnchor` only
+once every reader is pinned at or after DEC-0107: update a copied kit first, as for `profile`.
 
 ## The estate ceremonies
 

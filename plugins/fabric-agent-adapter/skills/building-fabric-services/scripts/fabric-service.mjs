@@ -70,6 +70,7 @@ export {
   attributionSettingFindings,
   attributionHeaders,
   usageReport,
+  usageSpend,
   LIMIT_SCOPES,
   PER_ORDER_KINDS,
   isTimestamp,

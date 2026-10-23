@@ -211,6 +211,29 @@ test('usage report: days, models, sums and unknown cost as null — same numbers
   assert.throws(() => k.usageReport([], { id: 'example-agent', budget: { period: 'week', limitUsd: 1 } }), k.ServiceError);
 });
 
+test('usageSpend answers as the contract (DEC-0110), and a limit counts money, never a subscription estimate (CT-115)', () => {
+  const cases = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/usage-spend-vectors.json'), 'utf8')).cases;
+  assert.ok(cases.length >= 40);
+  for (const c of cases) assert.deepEqual(k.usageSpend(c.rows) ?? null, c.expected, c.name);
+  const now = Date.parse('2026-10-04T12:00:00Z');
+  const at = '2026-10-04T01:00:00Z';
+  const sub = k.makeUsageReceipt('anthropic', 'm', { inputTokens: 1, outputTokens: 1, costUsd: 2, costBasis: 'price-list', at, route: 'subscription' });
+  const key = k.makeUsageReceipt('openrouter', 'm', { inputTokens: 1, outputTokens: 1, costUsd: 0.5, costBasis: 'provider', at, route: 'key' });
+  const local = k.makeUsageReceipt('local', 'llama', { inputTokens: 1, outputTokens: 1, at });
+  const limits = [{ id: 'day', scope: 'machine', kind: 'spend', period: 'day', limitUsd: 5, enforced: false },
+    { id: 'hour', scope: 'machine', kind: 'spend', windowSeconds: 86400, limitUsd: 5, enforced: false }];
+  const spent = (receipts) => {
+    const budget = k.usageReport(receipts, { id: 'example-agent', now, budget: { period: 'day', limitUsd: 5 } });
+    const listed = k.usageReport(receipts, { id: 'example-agent', now, budgets: limits });
+    return [[budget.budget.spentUsd, ...listed.budgets.map((b) => b.spentUsd)], budget];
+  };
+  const [got, r] = spent([sub, key]);
+  assert.equal(r.days[0].costUsd, 2.5, "the day's costUsd still sums every route");
+  assert.deepEqual(got, [0.5, 0.5, 0.5]);
+  assert.deepEqual(spent([sub])[0], [0, 0, 0], 'only a subscription: no money spent');
+  assert.deepEqual(spent([sub, local])[0], [null, null, null], 'an unpriced call off the subscription leaves money unknown');
+});
+
 test('usage receipt refuses what the report cannot carry; the ledger is private, bounded and survives a torn line', () => {
   assert.throws(() => k.makeUsageReceipt('Anthropic', 'm', { inputTokens: 1, outputTokens: 1 }), k.ServiceError);
   assert.throws(() => k.makeUsageReceipt('anthropic', 'm', { inputTokens: 1, outputTokens: 1, costUsd: 0.1, costBasis: 'unknown' }), k.ServiceError);

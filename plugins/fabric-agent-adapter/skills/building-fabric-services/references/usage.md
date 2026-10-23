@@ -78,7 +78,11 @@ ledger.report(service_id=ID, budget={"period": "month", "limitUsd": 100}, budget
 ```
 
 - A machine limit with a `period` and no `spentUsd` is counted by the kit from the receipts, the
-  way `budget` is, so `budget` and its twin in `budgets` never disagree. A per-order limit
+  way `budget` is, so `budget` and its twin in `budgets` never disagree. Both count money only (DEC-0110):
+  a `subscription` route's `costUsd` is an estimate at list price, never spent money, so a window
+  spent only on a subscription spends `0`, and money is `null` only while no call off a subscription
+  is priced. `usage_spend(rows)` / `usageSpend(rows)` is the contract's `usageSpend` over
+  `days[].byModel[]` rows: money and the subscription's estimate apart. A per-order limit
   (`per_job`, `approval`) gets `spentUsd: null`. Every other limit states its own spend.
 - `scope` is `machine`, `project`, `pool` or `job`; a `project` or `pool` limit names its
   `subject`. A limit has at most one window (`period`, `windowSeconds` or `since`), and it agrees

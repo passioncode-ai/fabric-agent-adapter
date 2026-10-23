@@ -88,6 +88,32 @@ def guard_verdict(rule: str, remote: bool, status: int, body: bytes) -> Tuple[st
     return "FAIL", "HTTP %d%s" % (status, ", and the body is the well-known document" if disclosed else "")
 
 
+def no_token_verdict(status: int, body: bytes, identities: List[str], host: str = "") -> Tuple[str, str]:
+    """DEC-0109 (`well-known.requires-token` on a remote placement): the no-token answer is `401` and carries none of
+    the service's data. An empty body passes; so does an identity proxy's page in front of the service, as long as it
+    neither parses as the well-known document nor names one of the service's own identity values (its id, its
+    `id.instance`, its build or its pid, as whole words). The service's own host name is taken out first: a sign-in page
+    names the address it guards, and the address is not the document's data. A value shorter than four characters
+    names nothing on its own (a platform's pid is often 1) and is not looked for."""
+    if status != 401:
+        return "FAIL", "HTTP %d without a token" % status
+    if not body:
+        return "PASS", "HTTP 401 without a token, an empty body"
+    text = body.decode("utf-8", "replace")
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        doc = None
+    if isinstance(doc, dict) and (doc.get("protocol") == fs.PROTOCOL or "service" in doc or "process" in doc):
+        return "FAIL", "HTTP 401, and the body is the well-known document"
+    if host:
+        text = re.sub(re.escape(host), " ", text, flags=re.IGNORECASE)
+    for value in identities:
+        if len(value) >= 4 and re.search(r"(?<![A-Za-z0-9_.-])%s(?![A-Za-z0-9_-])" % re.escape(value), text):
+            return "FAIL", "HTTP 401, and the %d-byte body names the service's identity value %r" % (len(body), value)
+    return "PASS", "HTTP 401 without a token, a %d-byte page that is not the service's (an identity proxy's, DEC-0109)" % len(body)
+
+
 def board_responder_verdict(wk: Any, kit: Optional[str] = None) -> Tuple[str, str]:
     """board.responder: NOT_RUN when the well-known document declares no fabric-project-comms revision; FAIL when it
     declares one this kit does not read or the kit's fixture conversation finds a problem; PASS otherwise. `kit` is the

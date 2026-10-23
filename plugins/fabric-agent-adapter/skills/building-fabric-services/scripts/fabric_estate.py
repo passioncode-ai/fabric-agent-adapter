@@ -12,6 +12,8 @@ at the pin, ported answer for answer and held to the contract's own vectors (`te
 - ``estate_record_rules(kind, value)`` — FAC-SEM-072…076 for `estate-record`, `estate-record-revision` and
   `estate-placement`, with FAC-SEM-134 on each machine's profile (DEC-0106);
 - ``machine_profile(record, machine_id)`` — a machine's profile (DEC-0106): `full`, `member`, `view`, or None;
+- ``delta_anchor_of(record)`` — the revocation delta's head a revision vouches for (DEC-0107), or None; a revision
+  never moves it back (FAC-SEM-137, in the revision rules and the verdict);
 - ``hub_key_certified(record, kid, x, at)`` — DL-14: a delegation verifier that reads the estate record trusts a token's
   `kid` only while a current revision certifies it for a machine (``fabric_delegation`` calls it).
 
@@ -356,7 +358,7 @@ def verify_estate_record(record: Any, *, at: Any, parent: Any = _MISSING, author
         return {"ok": False, "problem": "expired"}
     codes: List[str] = []
     # With a parent, what the revision drops it revokes (FAC-SEM-114, DEC-0084): a removed machine, a replaced key.
-    dropped = _dropped_findings(parent, record) if isinstance(parent, dict) else []
+    dropped = _dropped_findings(parent, record) + _anchor_findings(parent, record) if isinstance(parent, dict) else []
     for finding in _record_findings(record) + dropped:
         if finding["code"] not in codes:
             codes.append(finding["code"])
@@ -640,7 +642,7 @@ def _secret_references(value: Dict[str, Any], flag) -> None:
                 flag("%s/from" % at, "the slot is filled from a machine of this estate")
             elif not _same(_context_of(secret), PERSONAL_CONTEXT) and not _same(_get(secret, "from"), _get(machine, "id")):
                 # An envelope names no context (DEC-0082): an organization's instance fills its slot on its own machine.
-                flag("%s/from" % at, "an organization's instance fills its slot from its own machine's vault, never by an envelope from another machine")
+                flag("%s/from" % at, "an organization's instance fills its slot from its own machine's vault, never by a secret envelope from another machine")
             key = _key_of(_get(secret, "agentRef"), _get(secret, "slot"), _context_of(secret))
             if key in slots:
                 flag("%s/slot" % at, "slot %s is placed twice for one agent in one context on one machine" % _show(_get(secret, "slot")))
@@ -782,6 +784,38 @@ def _placement_grants(value: Dict[str, Any], flag) -> None:
                 flag("/machines/%d/packages/%d%s" % (m, p, suffix), message)
 
 
+_ANCHOR_HASH = re.compile(r"[a-f0-9]{64}")
+
+
+def delta_anchor_of(record: Any) -> Optional[Dict[str, Any]]:
+    """The anchor a record vouches for (DEC-0107), or None when it names none or its shape is not the schema's. The
+    contract's ``deltaAnchorOf``."""
+    if not isinstance(record, dict) or not isinstance(_get(record, "deltaAnchor"), dict):
+        return None
+    sequence, sha = _get(record["deltaAnchor"], "sequence"), _get(record["deltaAnchor"], "sha256")
+    if _safe_integer(sequence) and sequence >= 1 and isinstance(sha, str) and _ANCHOR_HASH.fullmatch(sha):
+        return {"sequence": sequence, "sha256": sha}
+    return None
+
+
+def _anchor_findings(parent: Dict[str, Any], nxt: Dict[str, Any]) -> List[Dict[str, str]]:
+    """FAC-SEM-137 across two revisions (DEC-0107): the delta anchor never moves back. A revision whose parent anchors
+    the delta anchors it too, at the parent's sequence or later, with the parent's hash at the same sequence."""
+    findings: List[Dict[str, str]] = []
+    flag = _finding(findings, "FAC-SEM-137")
+    before = delta_anchor_of(parent)
+    if before is None:
+        return findings
+    after = delta_anchor_of(nxt)
+    if after is None:
+        flag("/next/deltaAnchor", "the parent anchors the delta at %s: a revision keeps an anchor once one is set" % _js_string(before["sequence"]))
+    elif after["sequence"] < before["sequence"]:
+        flag("/next/deltaAnchor/sequence", "the anchor moves back from %s to %s" % (_js_string(before["sequence"]), _js_string(after["sequence"])))
+    elif after["sequence"] == before["sequence"] and after["sha256"] != before["sha256"]:
+        flag("/next/deltaAnchor/sha256", "another hash at sequence %s: two delta histories" % _js_string(after["sequence"]))
+    return findings
+
+
 def _dropped_findings(parent: Dict[str, Any], nxt: Dict[str, Any]) -> List[Dict[str, str]]:
     """FAC-SEM-114 across two revisions (DEC-0084): what a revision drops, it revokes in the same revision. A removed
     machine as ``machine <id>`` and its hub key as ``hub-key <kid>``; a replaced or dropped device key of a kept machine
@@ -895,7 +929,7 @@ def estate_record_rules(kind: str, value: Any) -> Optional[List[Dict[str, str]]]
     if kind == "estate-record-revision":
         parent = value["parent"] if isinstance(_get(value, "parent"), dict) else {}
         nxt = value["next"] if isinstance(_get(value, "next"), dict) else {}
-        return _revision_chain(value) + _dropped_findings(parent, nxt)
+        return _revision_chain(value) + _dropped_findings(parent, nxt) + _anchor_findings(parent, nxt)
     if kind == "estate-placement":
         return _installation(value)
     return None

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.48.0 (2026-10-23)
+
+### Changed
+
+- **Pinned to contract `2f020a6`**, its first tagged release `v0.1.0+2026-10-23` (FAA-109; `87d384f` stays
+  supported): DEC-0107, DEC-0109, DEC-0110 and DEC-0111. Every vendored vector is regenerated from the contract's own
+  functions at the pin.
+- **`check_service.py` `well-known.requires-token` follows DEC-0109 (CT-114).** A remote service's no-token `401` may
+  carry an identity proxy's page: it passes when the page neither parses as the well-known document nor names the
+  service's id, `id.instance`, build or pid. The service's host name is taken out first, and a value shorter than four
+  characters is not looked for. Fabric Inbox's remote placement on this machine now passes 34 of 34 rules (it failed
+  this one before).
+- **A spending limit counts money only (DEC-0110, CT-115)**, both twins: `budget.spentUsd` and a machine limit's
+  `spentUsd` leave out a `subscription` route's `costUsd`, an estimate at list price; a window spent only on a
+  subscription spends `0`. New: `usage_spend` / `usageSpend`, the contract's `usageSpend`, held to 42 cases its own
+  function answers (`test/fixtures/contract/usage-spend-vectors.json`). The day's `costUsd` still sums every route.
+- **Both estate readers read `deltaAnchor` (DEC-0107)**: `FAC-SEM-137` in the revision rules and the verdict, and
+  `delta_anchor_of` / `deltaAnchorOf`, held to the contract's fixtures and hostile variants. `FAC-SEM-075`'s message
+  says "a secret envelope", as the contract's.
+- **The protocol register gains `call-record/1`, `credential-decision/1`, `credential-request/1`,
+  `credential-revocation/1` and `fabric-credential-envelope/1`** (DEC-0111), both twins. Credentials on request are a
+  node's and Project Observatory's duty, not the kit's.
+- `references/remote-placement.md`, `usage.md`, `estate-record.md` and `protocol.md` say so.
+
 ## 0.47.1 (2026-10-23)
 
 ### Fixed

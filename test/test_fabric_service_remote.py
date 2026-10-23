@@ -228,3 +228,35 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
         results = {r["rule"]: r for r in json.loads(out.getvalue())["results"]}
         self.assertEqual(rc, 1)
         self.assertEqual(results["well-known.answers"]["verdict"], "FAIL")
+
+
+class NoTokenVerdict(unittest.TestCase):
+    """DEC-0109, CT-114: a remote service's no-token 401 carries none of its data; an identity proxy's page may answer it."""
+
+    ids = ["example-agent", "example-agent.default", "0123456789abcdef0123456789abcdef01234567", "48213"]
+
+    def test_an_empty_401_passes_and_another_status_fails(self):
+        self.assertEqual(probe.no_token_verdict(401, b"", self.ids)[0], "PASS")
+        for status in (200, 302, 403, 404):
+            self.assertEqual(probe.no_token_verdict(status, b"", self.ids)[0], "FAIL", status)
+
+    def test_an_identity_proxys_page_passes(self):
+        page = b"<html><title>Sign in</title><p>Access to example-agent.example.workers.dev requires sign-in. Ray ID 9a1b2c</p></html>"
+        verdict, evidence = probe.no_token_verdict(401, page, self.ids, "example-agent.example.workers.dev")
+        self.assertEqual(verdict, "PASS", evidence)
+        self.assertEqual(probe.no_token_verdict(401, b'{"error":"unauthorized"}', self.ids)[0], "PASS")
+
+    def test_the_document_or_an_identity_value_in_the_body_fails(self):
+        doc = json.dumps({"protocol": "fabric-service/0.1", "status": "ready"}).encode()
+        self.assertEqual(probe.no_token_verdict(401, doc, self.ids)[0], "FAIL")
+        self.assertEqual(probe.no_token_verdict(401, b'{"service": {"id": "x"}}', self.ids)[0], "FAIL")
+        for named in (b"<p>example-agent is down</p>", b"build 0123456789abcdef0123456789abcdef01234567", b"pid 48213 ready",
+                      b"instance example-agent.default"):
+            self.assertEqual(probe.no_token_verdict(401, named, self.ids, "example-agent.example.workers.dev")[0], "FAIL", named)
+
+    def test_a_value_inside_another_word_is_not_a_name(self):
+        self.assertEqual(probe.no_token_verdict(401, b"pid 482130, my-example-agent2", self.ids)[0], "PASS")
+
+    def test_a_short_value_is_not_looked_for(self):
+        # A Worker reports pid 1, and a sign-in page has a 1 somewhere: it names nothing (fabric-inbox, 2026-10-23).
+        self.assertEqual(probe.no_token_verdict(401, b"<p>step 1 of 2</p>", self.ids + ["1"])[0], "PASS")

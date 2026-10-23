@@ -135,6 +135,7 @@ from fabric_usage import (  # noqa: F401
     _is_openrouter,
     attribution_headers,
     usage_report,
+    usage_spend,
     _spent_since,
     _spent_in,
     LIMIT_SCOPES,
