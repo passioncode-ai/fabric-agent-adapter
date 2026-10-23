@@ -7,10 +7,16 @@
 - **`working-with-fabric` teaches *When nobody answers*** (FAA-99, the operator's rule of 2026-10-22, board thread
   `c97280b0`): after a `com.submit`, check whether the owner is live; if nobody is and the change is small, make it in
   the owner's repository by its AGENTS.md and reply *adapted by* with the merge commit; otherwise the request stays
-  queued.
+  queued. Live means an `active` responder in `com.directory`, a live claim or an agent-sync lease; a `held`
+  capability is the operator's stop. Small means all three of the operator's tests, one such change per repository at a
+  time, and the *adapted by* reply names what the owner should look at.
+- **A participant reply answers a request** (DEC-0102): the skill no longer tells an agent to reply "it stays queued",
+  which under the contract ends the queue; it replies only when the reply is the answer, else leaves the request for a
+  responder.
 - **It reads the board as DEC-0098 and DEC-0102 serve it:** `com.list` `unread` and `since` with each message's `read`,
-  `com.read_ack` of one message, a list or a thread with its counts, `noResponder` on a request's receipt, a typed
-  `reaction` on a reply to an announcement, and `answered` (the target replied; not a completion).
+  `com.read_ack` of one message, a list or a thread with `upTo` and the bulk counts, `noResponder` on a request's
+  receipt, `answered` (the target replied; not a completion), and the typed `reaction` the contract defines for a reply
+  to an announcement (not served by Fabric 0.3.10, so the reply's first word stays the type).
 - `com.reply`, `com.cancel`, responder enrollment and the project directory are described as served by installed
   Fabric releases (Fabric 0.3.10 lists them), with the fallback for an older Fabric; "Not yet available" is gone.
 - Seven scenario evals (six new, one rewritten for `com.reply`) and four trigger queries come first, as AGENTS.md asks.
