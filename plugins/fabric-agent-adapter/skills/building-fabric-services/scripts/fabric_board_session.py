@@ -378,15 +378,18 @@ class Responder:
 
     def _resume_next(self) -> None:
         """Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves
-        the queue only once its probe has answered: a lost answer keeps it first in line for the next tick (finding 35)."""
+        the queue only once it has resumed: a lost answer, of its probe (finding 35) or of the `com.complete` that sends
+        a known outcome (FAA-86), keeps it first in line, and the next tick sends the same keys again from the
+        checkpoint."""
         while self.current is None and self._to_resume and not self.stopping:
             entry = self.checkpoint.entries.get(self._to_resume[0])
             if entry is not None and self.slots.get(entry["capability"], {}).get("state") == "held":
                 entry = json.loads(json.dumps(entry))
                 if entry.get("probe"):
                     self._replied_before(entry)
-                self._to_resume.pop(0)
                 self._resume(entry)
+                if self._to_resume and self._to_resume[0] == entry["request"]:
+                    self._to_resume.pop(0)
             else:
                 self._to_resume.pop(0)
 
