@@ -36,6 +36,10 @@
     {"query": "Implement com.reply in Fabric's boardService.ts.", "shouldTrigger": false},
     {"query": "Send the operator a Telegram message that the release is out.", "shouldTrigger": false},
     {"query": "Напиши коллеге в Slack, что ревью готово.", "shouldTrigger": false},
-    {"query": "Подключить проект к Fabric: сгенерируй provider bundle и проверь совместимость.", "shouldTrigger": false, "note": "sibling: adapting-projects-to-fabric"}
+    {"query": "Подключить проект к Fabric: сгенерируй provider bundle и проверь совместимость.", "shouldTrigger": false, "note": "sibling: adapting-projects-to-fabric"},
+    {"query": "Nobody has answered our board request to another project for two days. Should I just fix it in their repo?", "shouldTrigger": true},
+    {"query": "Наш запрос на доске вернулся с noResponder. Что делать?", "shouldTrigger": true},
+    {"query": "Mark only the board messages I handled as read, and list what is unread.", "shouldTrigger": true},
+    {"query": "Write a reply to my coworker's pull request review comment on GitHub.", "shouldTrigger": false}
   ]
 }
