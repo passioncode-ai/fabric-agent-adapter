@@ -116,6 +116,8 @@ def no_token_verdict(status: int, body: bytes, identities: List[str], host: str 
     text = body.decode("utf-8", "replace")
     try:
         doc = json.loads(text)
+    except RecursionError:
+        return "FAIL", "HTTP 401, and the body nests deeper than any page does"
     except ValueError:
         doc = None
     if _carries_document(doc):

@@ -286,9 +286,39 @@ class NoTokenRecordedOnEveryPath(unittest.TestCase):
         p.auth_headers = lambda: {"Authorization": "Bearer x"}
         return p
 
+    def test_every_path_records_the_no_token_verdict_once_before_the_answer(self):
+        leak = json.dumps({"protocol": "fabric-service/0.1", "service": {"id": "example-agent"}}).encode()
+        doc = json.dumps({"protocol": "fabric-service/0.1", "service": {"id": "example-agent", "instance": "default"},
+                          "process": {"pid": 4242}, "status": "ready", "degraded": [], "surfaces": {"events": "/e"}}).encode()
+        paths = {
+            "a timeout": ([(401, {}, leak), TimeoutError("timed out")], "FAIL"),
+            "a TLS reset": ([(401, {}, b""), ConnectionResetError("reset")], "PASS"),
+            "a 403": ([(401, {}, b"")] + [(403, {}, b"")] * 3, "PASS"),
+            "a body that is not JSON": ([(401, {}, leak)] + [(200, {}, b"<html>")] * 3, "FAIL"),
+            "success": ([(401, {}, b"<html>sign in</html>")] + [(200, {}, doc)] * 3, "PASS"),
+        }
+        for name, (answers, verdict) in paths.items():
+            with self.subTest(name):
+                p = self.probe_with(answers)
+                try:
+                    p.well_known_rules()
+                except StopIteration:
+                    pass  # the success path goes on to rules this stub does not answer
+                rules = [r["rule"] for r in p.results]
+                self.assertEqual(rules.count("well-known.requires-token"), 1, p.results)
+                self.assertLess(rules.index("well-known.requires-token"), rules.index("well-known.answers"))
+                self.assertEqual([r["verdict"] for r in p.results if r["rule"] == "well-known.requires-token"], [verdict], name)
+        p = self.probe_with([(401, {}, b"")])
+        p.read_token = lambda: None
+        p.well_known_rules()
+        self.assertEqual([r["rule"] for r in p.results], ["well-known.requires-token", "well-known.answers"])
+
+    def test_a_body_nested_past_the_parser_fails_without_a_traceback(self):
+        self.assertEqual(probe.no_token_verdict(401, b"[" * 100000 + b"]" * 100000, ["example-agent"])[0], "FAIL")
+
     def test_a_timeout_after_the_no_token_answer_still_records_it_once(self):
         leak = json.dumps({"protocol": "fabric-service/0.1", "service": {"id": "example-agent"}}).encode()
-        p = self.probe_with([(200, {}, leak), TimeoutError("timed out")])
+        p = self.probe_with([(401, {}, leak), TimeoutError("timed out")])
         p.well_known_rules()
         rules = [r["rule"] for r in p.results]
         self.assertEqual(rules.count("well-known.requires-token"), 1, p.results)
