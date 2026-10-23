@@ -6,6 +6,8 @@
 //   it has checked the revision against estate-record.schema.json (the verifier does not check the schema);
 // - estateRecordRules(kind, value) — FAC-SEM-072…076, with FAC-SEM-134 on each machine's profile (DEC-0106);
 // - machineProfile(record, machineId) — a machine's profile (DEC-0106): `full`, `member`, `view`, or undefined;
+// - deltaAnchorOf(record) — the revocation delta's head a revision vouches for (DEC-0107), or undefined; a revision
+//   never moves it back (FAC-SEM-137, in the revision rules and the verdict);
 // - hubKeyCertified(record, kid, x, at) — DL-14: a delegation verifier that reads the estate record trusts a token's
 //   `kid` only while a current revision certifies it for a machine (fabric-delegation.mjs calls it).
 //
@@ -228,7 +230,7 @@ export function verifyEstateRecord(record, trust) {
   if (at < issuedAt - CLOCK_SKEW_SECONDS * 1000) return { ok: false, problem: 'not-yet-valid' };
   if (at > validUntil) return { ok: false, problem: 'expired' };
   // With a parent, what the revision drops it revokes (FAC-SEM-114, DEC-0084): a removed machine, a replaced key.
-  const dropped = isObject(trust.parent) ? droppedFindings(trust.parent, record) : [];
+  const dropped = isObject(trust.parent) ? [...droppedFindings(trust.parent, record), ...anchorFindings(trust.parent, record)] : [];
   const codes = [...new Set([...recordFindings(record), ...dropped].map((finding) => finding.code))];
   if (codes.length > 0) return { ok: false, problem: 'rule-violation', codes };
   return { ok: true, digest, revision: record.revision, signedBy: credential.credentialId, signCount: assertion.signCount };
@@ -460,7 +462,7 @@ function secretReferences(value, flag) {
       if (!placed.has(keyOf(secret.agentRef, contextOf(secret)))) flag(`${at}/agentRef`, "a secret goes only where a placed package declares it (v4 Path 2): this agent is not placed on this machine in the secret's context");
       if (!machineIds.has(secret.from)) flag(`${at}/from`, 'the slot is filled from a machine of this estate');
       // An envelope names no context (DEC-0082), so an organization's instance fills its slot on its own machine.
-      else if (contextOf(secret) !== PERSONAL_CONTEXT && secret.from !== machine.id) flag(`${at}/from`, "an organization's instance fills its slot from its own machine's vault, never by an envelope from another machine");
+      else if (contextOf(secret) !== PERSONAL_CONTEXT && secret.from !== machine.id) flag(`${at}/from`, "an organization's instance fills its slot from its own machine's vault, never by a secret envelope from another machine");
       const key = keyOf(secret.agentRef, secret.slot, contextOf(secret));
       if (slots.has(key)) flag(`${at}/slot`, `slot ${show(secret.slot)} is placed twice for one agent in one context on one machine`);
       slots.add(key);
@@ -642,6 +644,29 @@ function installation(value) {
   return findings;
 }
 
+/** The anchor a record vouches for (DEC-0107), or undefined when it names none or its shape is not the schema's. */
+export function deltaAnchorOf(record) {
+  if (!isObject(record) || !isObject(record.deltaAnchor)) return undefined;
+  const { sequence, sha256 } = record.deltaAnchor;
+  return Number.isSafeInteger(sequence) && sequence >= 1 && isString(sha256) && /^[a-f0-9]{64}$/.test(sha256) ? { sequence, sha256 } : undefined;
+}
+
+/**
+ * FAC-SEM-137 across two revisions (DEC-0107): the delta anchor never moves back. A revision whose parent anchors the
+ * delta anchors it too, at the parent's sequence or later, with the parent's hash at the same sequence.
+ */
+function anchorFindings(parent, next) {
+  const findings = [];
+  const flag = flagger(findings, 'FAC-SEM-137');
+  const before = deltaAnchorOf(parent);
+  if (before === undefined) return findings;
+  const after = deltaAnchorOf(next);
+  if (after === undefined) flag('/next/deltaAnchor', `the parent anchors the delta at ${before.sequence}: a revision keeps an anchor once one is set`);
+  else if (after.sequence < before.sequence) flag('/next/deltaAnchor/sequence', `the anchor moves back from ${before.sequence} to ${after.sequence}`);
+  else if (after.sequence === before.sequence && after.sha256 !== before.sha256) flag('/next/deltaAnchor/sha256', `another hash at sequence ${after.sequence}: two delta histories`);
+  return findings;
+}
+
 /**
  * FAC-SEM-114 across two revisions (DEC-0084): what a revision drops, it revokes in the same revision. A removed machine
  * as `machine <id>` and its hub key as `hub-key <kid>`; a replaced or dropped device key of a kept machine as `device-key`
@@ -680,7 +705,11 @@ function droppedFindings(parent, next) {
 export function estateRecordRules(kind, value) {
   const doc = isObject(value) ? value : {};
   if (kind === 'estate-record') return recordFindings(doc);
-  if (kind === 'estate-record-revision') return [...revisionChain(doc), ...droppedFindings(isObject(doc.parent) ? doc.parent : {}, isObject(doc.next) ? doc.next : {})];
+  if (kind === 'estate-record-revision') {
+    const parent = isObject(doc.parent) ? doc.parent : {};
+    const next = isObject(doc.next) ? doc.next : {};
+    return [...revisionChain(doc), ...droppedFindings(parent, next), ...anchorFindings(parent, next)];
+  }
   if (kind === 'estate-placement') return installation(doc);
   return undefined;
 }

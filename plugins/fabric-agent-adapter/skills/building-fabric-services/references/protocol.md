@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `87d384ffce2757081b7ab227e5dad3dddd08328f`
+Pinned to `fabric-agent-contract` commit `2f020a696453ae299b123517f14957f6a1354379`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -12,7 +12,9 @@ by normal form DEC-0076; the project board's directory page DEC-0077 and a repla
 DEC-0096; a schema pattern never uses a bare dot DEC-0097; the board as Fabric 0.3.9 serves it DEC-0098 and DEC-0102, a
 `processor-hosted` peer DEC-0099, three device protocols in the register DEC-0101; a call queue's `queue-full` and
 the `agent-directory`, `fabric-load` and `service-load` protocols DEC-0104; a machine's `profile` in the estate record,
-`profile-forbids` and the `fabric-agent-call` protocol DEC-0106). The contract's schemas are normative;
+`profile-forbids` and the `fabric-agent-call` protocol DEC-0106; the delta anchor DEC-0107; a remote service's
+no-token `401` DEC-0109; money apart from a subscription's estimate DEC-0110; the five credential and call-record
+protocols of DEC-0111 in the register). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 

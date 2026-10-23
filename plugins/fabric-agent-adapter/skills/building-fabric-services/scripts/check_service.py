@@ -9,7 +9,7 @@
 
 A remote placement (DEC-0019 — an online agent or dashboard at an https origin) is probed over
 TLS with the certificate verified: the well-known document must refuse a request without the
-token (401, empty body), the guards must refuse a foreign Host/Origin and cross-site requests,
+token (401 with none of the service's data: an empty body, or an identity proxy's page, DEC-0109), the guards must refuse a foreign Host/Origin and cross-site requests,
 and the session cookie must be __Host- and Secure. Loopback, launchd, lock and state rules do
 not apply to it and are reported NOT_RUN with that reason.
 
@@ -62,7 +62,7 @@ from check_service_rules import PLATFORM_HOST_REFUSALS  # noqa: E402,F401 - move
 from check_service_rules import plist_problems  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import marker_problem  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import priority_problems  # noqa: E402,F401 - moved (FAA-65)
-from check_service_rules import guard_verdict  # noqa: E402,F401 - moved (FAA-65)
+from check_service_rules import guard_verdict, no_token_verdict  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import board_responder_verdict  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import session_lifetime_problem  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import _semver  # noqa: E402,F401 - moved (FAA-65)
@@ -190,10 +190,10 @@ class Probe:
             except (OSError, ssl.SSLError) as exc:
                 self.add("well-known.answers", "FAIL", "no TLS answer on %s: %s" % (self.d.get("origin"), exc))
                 return
-            self.add("well-known.requires-token", "PASS" if status == 401 and not body else "FAIL",
-                     "HTTP %d without a token, %d byte(s)" % (status, len(body)))
+            no_token = (status, body)  # judged once the document names the identity values (DEC-0109)
             self.read_token()
             if not self.token:
+                self.add_no_token(no_token, None)
                 self.add("well-known.answers", "NOT_RUN", "no readable token to ask with")
                 return
             protected = self.auth_headers()
@@ -204,16 +204,24 @@ class Probe:
                 status, headers, body = self.request("GET", "/.well-known/fabric-service", protected)
                 timings.append((time.perf_counter() - started) * 1000)
         except OSError as exc:
+            if self.remote:
+                self.add_no_token(no_token, None)
             self.add("well-known.answers", "FAIL", "no answer on %s: %s" % (self.d.get("origin"), exc))
             return
         if status != 200:
+            if self.remote:
+                self.add_no_token(no_token, None)
             self.add("well-known.answers", "FAIL", "HTTP %d" % status)
             return
         try:
             self.wk = json.loads(body)
         except ValueError:
+            if self.remote:
+                self.add_no_token(no_token, None)
             self.add("well-known.answers", "FAIL", "body is not JSON")
             return
+        if self.remote:
+            self.add_no_token(no_token, self.wk)
         self.add("well-known.answers", "PASS", "HTTP 200")
         median = sorted(timings)[1]
         if self.remote:
@@ -256,6 +264,25 @@ class Probe:
         ready_bad = wk.get("status") == "ready" and bool(wk.get("degraded"))
         self.add("well-known.ready-means-healthy", "FAIL" if ready_bad else "PASS",
                  "status %s, %d degraded" % (wk.get("status"), len(wk.get("degraded") or [])))
+
+    def add_no_token(self, answer: Tuple[int, bytes], wk: Any) -> None:
+        """`well-known.requires-token` (DEC-0109): the no-token answer, against the identity values the descriptor
+        names and, when the document was read, its build and pid."""
+        status, body = answer
+        sid, instance = str(self.d.get("id") or ""), str(self.d.get("instance") or "default")
+        values = [sid, "%s.%s" % (sid, instance)]
+        if isinstance(wk, dict):
+            svc = wk.get("service") if isinstance(wk.get("service"), dict) else {}
+            build = svc.get("build") if isinstance(svc.get("build"), dict) else {}
+            process = wk.get("process") if isinstance(wk.get("process"), dict) else {}
+            if svc.get("id"):
+                values.append(str(svc["id"]))
+                values.append("%s.%s" % (svc["id"], svc.get("instance") or instance))
+            values += [str(build[k]) for k in ("commit", "digest") if build.get(k)]
+            if isinstance(process.get("pid"), int) and not isinstance(process.get("pid"), bool):
+                values.append(str(process["pid"]))
+        verdict, evidence = no_token_verdict(status, body, list(dict.fromkeys(values)), self.host_name)
+        self.add("well-known.requires-token", verdict, evidence)
 
     # network ------------------------------------------------------------------
     def network_rules(self) -> None:

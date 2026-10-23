@@ -669,6 +669,37 @@ class UsageReportTests(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             self.report(budget={"period": "week", "limitUsd": 1})
 
+    def test_usage_spend_answers_as_the_contract(self):
+        # DEC-0110: the contract's usageSpend, its own test's cases and hostile ones (usage-spend-vectors.json).
+        cases = json.loads((ROOT / "test/fixtures/contract/usage-spend-vectors.json").read_text())["cases"]
+        self.assertGreaterEqual(len(cases), 40)
+        for case in cases:
+            self.assertEqual(fs.usage_spend(case["rows"]), case["expected"], case["name"])
+        # JSON can carry an integer beyond the double range, which JavaScript reads as Infinity; no vector can (the
+        # blind reading of 0.48.0). The contract answers undefined, never an error.
+        self.assertIsNone(fs.usage_spend(json.loads('[{"calls": 1, "costUsd": 1' + '0' * 400 + '}]')))
+        self.assertIsNone(fs.usage_spend(json.loads('[{"calls": 1' + '0' * 400 + ', "costUsd": 1}]')))
+
+    def test_a_limit_counts_money_never_a_subscriptions_estimate(self):
+        # CT-115 (DEC-0110): a subscription's costUsd is an estimate at list price, not money spent.
+        at = "2026-10-04T01:00:00Z"
+        sub = fs.make_usage_receipt("anthropic", "m", input_tokens=1, output_tokens=1, cost_usd=2.0, cost_basis="price-list", at=at, route="subscription")
+        key = fs.make_usage_receipt("openrouter", "m", input_tokens=1, output_tokens=1, cost_usd=0.5, cost_basis="provider", at=at, route="key")
+        local = fs.make_usage_receipt("local", "llama", input_tokens=1, output_tokens=1, at=at)
+        limits = [{"id": "day", "scope": "machine", "kind": "spend", "period": "day", "limitUsd": 5, "enforced": False},
+                  {"id": "hour", "scope": "machine", "kind": "spend", "windowSeconds": 86400, "limitUsd": 5, "enforced": False}]
+
+        def spent(receipts):
+            budget = fs.usage_report(receipts, service_id="example-agent", now=self.now, budget={"period": "day", "limitUsd": 5})
+            limits_report = fs.usage_report(receipts, service_id="example-agent", now=self.now, budgets=limits)
+            return [budget["budget"]["spentUsd"]] + [b["spentUsd"] for b in limits_report["budgets"]], budget
+
+        got, r = spent([sub, key])
+        self.assertEqual(r["days"][0]["costUsd"], 2.5, "the day's costUsd still sums every route")
+        self.assertEqual(got, [0.5, 0.5, 0.5])
+        self.assertEqual(spent([sub])[0], [0, 0, 0], "only a subscription: no money spent")
+        self.assertEqual(spent([sub, local])[0], [None, None, None], "an unpriced call off the subscription leaves money unknown")
+
     def test_receipt_refuses_what_the_report_cannot_carry(self):
         with self.assertRaises(fs.ServiceError):
             fs.make_usage_receipt("Anthropic", "m", input_tokens=1, output_tokens=1)

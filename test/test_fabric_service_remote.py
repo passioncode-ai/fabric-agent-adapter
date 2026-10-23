@@ -228,3 +228,99 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
         results = {r["rule"]: r for r in json.loads(out.getvalue())["results"]}
         self.assertEqual(rc, 1)
         self.assertEqual(results["well-known.answers"]["verdict"], "FAIL")
+
+
+class NoTokenVerdict(unittest.TestCase):
+    """DEC-0109, CT-114: a remote service's no-token 401 carries none of its data; an identity proxy's page may answer it."""
+
+    ids = ["example-agent", "example-agent.default", "0123456789abcdef0123456789abcdef01234567", "48213"]
+
+    def test_an_empty_401_passes_and_another_status_fails(self):
+        self.assertEqual(probe.no_token_verdict(401, b"", self.ids)[0], "PASS")
+        for status in (200, 302, 403, 404):
+            self.assertEqual(probe.no_token_verdict(status, b"", self.ids)[0], "FAIL", status)
+
+    def test_an_identity_proxys_page_passes(self):
+        page = b"<html><title>Sign in</title><p>Access to example-agent.example.workers.dev requires sign-in. Ray ID 9a1b2c</p></html>"
+        verdict, evidence = probe.no_token_verdict(401, page, self.ids, "example-agent.example.workers.dev")
+        self.assertEqual(verdict, "PASS", evidence)
+        self.assertEqual(probe.no_token_verdict(401, b'{"error":"unauthorized"}', self.ids)[0], "PASS")
+
+    def test_the_document_or_an_identity_value_in_the_body_fails(self):
+        doc = json.dumps({"protocol": "fabric-service/0.1", "status": "ready"}).encode()
+        self.assertEqual(probe.no_token_verdict(401, doc, self.ids)[0], "FAIL")
+        self.assertEqual(probe.no_token_verdict(401, b'{"service": {"id": "x"}}', self.ids)[0], "FAIL")
+        for named in (b"<p>example-agent is down</p>", b"build 0123456789abcdef0123456789abcdef01234567", b"pid 48213 ready",
+                      b"instance example-agent.default"):
+            self.assertEqual(probe.no_token_verdict(401, named, self.ids, "example-agent.example.workers.dev")[0], "FAIL", named)
+
+    def test_a_value_inside_another_word_is_not_a_name(self):
+        self.assertEqual(probe.no_token_verdict(401, b"pid 482130, my-example-agent2", self.ids)[0], "PASS")
+
+    def test_a_short_value_is_not_looked_for(self):
+        # A Worker reports pid 1, and a sign-in page has a 1 somewhere: it names nothing (fabric-inbox, 2026-10-23).
+        self.assertEqual(probe.no_token_verdict(401, b"<p>step 1 of 2</p>", self.ids + ["1"])[0], "PASS")
+
+    def test_a_copy_of_the_document_inside_the_body_fails_whatever_the_ids_length(self):
+        # The blind reading of 0.48.0: a 3-character id is not looked for, so a wrapped copy must fail as the document.
+        doc = {"protocol": "fabric-service/0.1", "service": {"id": "ink", "instance": "default"}}
+        for body in (json.dumps([doc]), json.dumps({"data": doc}), json.dumps({"a": [{"b": doc}]})):
+            self.assertEqual(probe.no_token_verdict(401, body.encode(), ["ink", "ink.default"], "ink.example.workers.dev")[0], "FAIL", body)
+
+
+class NoTokenRecordedOnEveryPath(unittest.TestCase):
+    """The blind reading of 0.48.0: a later request's failure must not drop the no-token verdict."""
+
+    def probe_with(self, answers):
+        p = probe.Probe(Path("x.json"), {"id": "example-agent", "instance": "default", "origin": "https://agent.example.com",
+                                         "placement": "remote"}, Path("."), True)
+        calls = iter(answers)
+
+        def request(method, path, headers=None, *rest, **kw):
+            answer = next(calls)
+            if isinstance(answer, BaseException):
+                raise answer
+            return answer
+        p.request = request
+        p.read_token = lambda: setattr(p, "token", "t" * 32)
+        p.auth_headers = lambda: {"Authorization": "Bearer x"}
+        return p
+
+    def test_every_path_records_the_no_token_verdict_once_before_the_answer(self):
+        leak = json.dumps({"protocol": "fabric-service/0.1", "service": {"id": "example-agent"}}).encode()
+        doc = json.dumps({"protocol": "fabric-service/0.1", "service": {"id": "example-agent", "instance": "default"},
+                          "process": {"pid": 4242}, "status": "ready", "degraded": [], "surfaces": {"events": "/e"}}).encode()
+        paths = {
+            "a timeout": ([(401, {}, leak), TimeoutError("timed out")], "FAIL"),
+            "a TLS reset": ([(401, {}, b""), ConnectionResetError("reset")], "PASS"),
+            "a 403": ([(401, {}, b"")] + [(403, {}, b"")] * 3, "PASS"),
+            "a body that is not JSON": ([(401, {}, leak)] + [(200, {}, b"<html>")] * 3, "FAIL"),
+            "success": ([(401, {}, b"<html>sign in</html>")] + [(200, {}, doc)] * 3, "PASS"),
+        }
+        for name, (answers, verdict) in paths.items():
+            with self.subTest(name):
+                p = self.probe_with(answers)
+                try:
+                    p.well_known_rules()
+                except StopIteration:
+                    pass  # the success path goes on to rules this stub does not answer
+                rules = [r["rule"] for r in p.results]
+                self.assertEqual(rules.count("well-known.requires-token"), 1, p.results)
+                self.assertLess(rules.index("well-known.requires-token"), rules.index("well-known.answers"))
+                self.assertEqual([r["verdict"] for r in p.results if r["rule"] == "well-known.requires-token"], [verdict], name)
+        p = self.probe_with([(401, {}, b"")])
+        p.read_token = lambda: None
+        p.well_known_rules()
+        self.assertEqual([r["rule"] for r in p.results], ["well-known.requires-token", "well-known.answers"])
+
+    def test_a_body_nested_past_the_parser_fails_without_a_traceback(self):
+        self.assertEqual(probe.no_token_verdict(401, b"[" * 100000 + b"]" * 100000, ["example-agent"])[0], "FAIL")
+
+    def test_a_timeout_after_the_no_token_answer_still_records_it_once(self):
+        leak = json.dumps({"protocol": "fabric-service/0.1", "service": {"id": "example-agent"}}).encode()
+        p = self.probe_with([(401, {}, leak), TimeoutError("timed out")])
+        p.well_known_rules()
+        rules = [r["rule"] for r in p.results]
+        self.assertEqual(rules.count("well-known.requires-token"), 1, p.results)
+        self.assertLess(rules.index("well-known.requires-token"), rules.index("well-known.answers"))
+        self.assertEqual([r["verdict"] for r in p.results if r["rule"] == "well-known.requires-token"], ["FAIL"])

@@ -494,21 +494,95 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
     return report
 
 
-def _spent_since(receipts: List[Dict[str, Any]], start: _dt.datetime, end: _dt.datetime) -> Optional[float]:
-    """Spend in a rolling window, from the receipts' own times; None when every call in it is unpriced."""
-    lo, hi = start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
-    inside = [r for r in receipts if lo < str(r.get("at", "")) <= hi]
-    if inside and all(r.get("costUsd") is None for r in inside):
+def usage_spend(rows: Any) -> Optional[Dict[str, Any]]:
+    """What a host shows for usage rows (DEC-0110, the contract's ``usageSpend``): money spent apart from a
+    subscription's estimate. ``rows`` are ``days[].byModel[]`` rows. Money is the ``costUsd`` of every row whose
+    ``route`` is ``key``, ``platform-metered`` or absent; a ``subscription`` row's ``costUsd`` is an estimate at list
+    price, summed apart. A window whose calls were all on a subscription spent 0; money is None only when it has calls
+    off a subscription and none of them is priced, and a lower bound while some are priced and some are not. An unknown
+    ``route``, or counts or a cost the schema refuses, answers None. It never raises on a JSON value."""
+    if not isinstance(rows, list):
         return None
-    return round(sum(r.get("costUsd") or 0.0 for r in inside), 6)
+    money: List[float] = []
+    estimate: List[float] = []
+    calls = subscription_calls = 0
+    paid = {"calls": 0, "priced": 0, "unpriced": False}
+    sub = {"calls": 0, "priced": 0, "unpriced": False}
+    for row in rows:
+        if not isinstance(row, dict):
+            return None
+        route = row.get("route", _jsv.MISSING)
+        if route is not _jsv.MISSING and not (isinstance(route, str) and route in USAGE_ROUTES):
+            return None
+        row_calls, cost = row.get("calls", _jsv.MISSING), row.get("costUsd", _jsv.MISSING)
+        unpriced = row.get("unpricedCalls", 0)
+        if not _whole(row_calls) or not _whole(unpriced) or unpriced > row_calls:
+            return None
+        if cost is not None and not _known_cost(cost):
+            return None
+        if row_calls > 0 and (cost is None) != (unpriced == row_calls):  # FAC-SEM-025's own pairing
+            return None
+        calls += int(row_calls)
+        side = sub if route == "subscription" else paid
+        if route == "subscription":
+            subscription_calls += int(row_calls)
+        side["calls"] += int(row_calls)
+        side["priced"] += int(row_calls) - int(unpriced)
+        if unpriced > 0:
+            side["unpriced"] = True
+        if _known_cost(cost):
+            (estimate if route == "subscription" else money).append(_jsv.double(cost))
+
+    def total(side: Dict[str, Any], costs: List[float]) -> Optional[float]:
+        if side["calls"] > 0 and side["priced"] == 0:
+            return None
+        n: Any = 0
+        for x in sorted(costs):  # in a fixed order, one addition at a time, as JavaScript's reduce adds
+            n = n + x
+        return n
+
+    return {"calls": calls, "moneyUsd": total(paid, money), "moneyLowerBound": paid["priced"] > 0 and paid["unpriced"],
+            "estimateUsd": total(sub, estimate), "estimateLowerBound": sub["priced"] > 0 and sub["unpriced"],
+            "subscriptionCalls": subscription_calls}
+
+
+def _whole(value: Any) -> bool:
+    """Number.isSafeInteger(value) and not negative."""
+    return _jsv.safe_integer(value) and value >= 0
+
+
+def _known_cost(value: Any) -> bool:
+    """A finite cost of at least 0, the number read as JavaScript holds it (an integer past the double range is
+    Infinity, never an OverflowError)."""
+    return _number(value) and math.isfinite(_jsv.double(value)) and value >= 0
+
+
+def _money(spend: Optional[Dict[str, Any]]) -> Optional[float]:
+    """CT-115: a limit counts money only, never a subscription's estimate (DEC-0110)."""
+    if spend is None or spend["moneyUsd"] is None:
+        return None
+    return round(float(spend["moneyUsd"]), 6)
+
+
+def _spent_since(receipts: List[Dict[str, Any]], start: _dt.datetime, end: _dt.datetime) -> Optional[float]:
+    """Money spent in a rolling window, from the receipts' own times; None when no call off a subscription in it is
+    priced. A subscription's calls cost no money (DEC-0110, CT-115)."""
+    lo, hi = start.strftime("%Y-%m-%dT%H:%M:%SZ"), end.strftime("%Y-%m-%dT%H:%M:%SZ")
+    rows = []
+    for r in receipts:
+        if lo < str(r.get("at", "")) <= hi:
+            row = {"calls": 1, "unpricedCalls": 1 if r.get("costUsd") is None else 0, "costUsd": r.get("costUsd")}
+            if r.get("route"):
+                row["route"] = r["route"]
+            rows.append(row)
+    return _money(usage_spend(rows))
 
 
 def _spent_in(out_days: List[Dict[str, Any]], period: str, last: str) -> Optional[float]:
-    """Spend in the current UTC day or month; None when every call in it is unpriced."""
+    """Money spent in the current UTC day or month, over the window's model rows; None when no call off a subscription
+    in it is priced. A subscription's calls cost no money (DEC-0110, CT-115)."""
     prefix = last if period == "day" else last[:7]
-    window = [d for d in out_days if d["date"].startswith(prefix)]
-    unknown = bool(window) and all(d["costUsd"] is None for d in window)
-    return None if unknown else round(sum(d["costUsd"] or 0.0 for d in window), 6)
+    return _money(usage_spend([m for d in out_days if d["date"].startswith(prefix) for m in d["byModel"]]))
 
 
 LIMIT_SCOPES = ("machine", "project", "pool", "job")

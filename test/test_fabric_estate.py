@@ -65,7 +65,7 @@ class ContractVectors(unittest.TestCase):
             with self.subTest(case["name"]):
                 self.assertEqual(fe.estate_record_rules(case["kind"], case["value"]), case.get("expected"))
         codes = {f["code"] for c in V["rules"] for f in (c.get("expected") or [])}
-        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076", "FAC-SEM-110", "FAC-SEM-111", "FAC-SEM-114", "FAC-SEM-122", "FAC-SEM-134"})
+        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076", "FAC-SEM-110", "FAC-SEM-111", "FAC-SEM-114", "FAC-SEM-122", "FAC-SEM-134", "FAC-SEM-137"})
 
     def test_a_grants_context_answers_as_the_contract_does(self):
         """FAC-SEM-110 (DEC-0082) on a grant of its own, against the contract's grant-context fixtures and variants."""
@@ -91,6 +91,12 @@ class ContractVectors(unittest.TestCase):
         for case in V["machineProfile"]:
             self.assertEqual(fe.machine_profile(case.get("record"), case.get("machineId")), case["expected"], case["name"])
         self.assertEqual(fe.MACHINE_PROFILES, ("full", "member", "view"))
+
+    def test_delta_anchor_of_answers_as_the_contract(self):
+        # DEC-0107: the anchor a record vouches for; FAC-SEM-137's variants run with the rule cases above.
+        self.assertGreaterEqual(len(V["deltaAnchor"]), 10)
+        for case in V["deltaAnchor"]:
+            self.assertEqual(fe.delta_anchor_of(case["record"]), case["expected"], case["record"])
 
     def test_a_view_machine_id_is_matched_as_a_set_matches_it(self):
         # The contract keeps the view machines' ids in a Set, whose membership is SameValueZero: NaN matches NaN, which

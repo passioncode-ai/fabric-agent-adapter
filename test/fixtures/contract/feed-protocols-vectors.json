@@ -14,7 +14,19 @@
     "agent-directory": [
       "1"
     ],
+    "call-record": [
+      "1"
+    ],
     "coding-agents": [
+      "1"
+    ],
+    "credential-decision": [
+      "1"
+    ],
+    "credential-request": [
+      "1"
+    ],
+    "credential-revocation": [
       "1"
     ],
     "enroll-token": [
@@ -40,6 +52,9 @@
     ],
     "fabric-connections": [
       "0.1"
+    ],
+    "fabric-credential-envelope": [
+      "1"
     ],
     "fabric-load": [
       "0.1"
