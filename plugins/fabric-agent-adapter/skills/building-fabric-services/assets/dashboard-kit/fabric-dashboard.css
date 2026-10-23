@@ -115,7 +115,7 @@ html.fd-js .fd-chrome { position: sticky; top: var(--fd-chrome-top, 0px); z-inde
   text-decoration: none; white-space: nowrap; cursor: pointer;
   transition: background-color var(--dur-hover) var(--motion-ease), color var(--dur-hover) var(--motion-ease); }
 .fd-nav a:hover, .fd-more > summary:hover { background: var(--panel-2); color: var(--ink); }
-.fd-nav a[aria-current] { background: var(--accent-weak); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.fd-nav a[aria-current]:not([aria-current="false"]) { background: var(--accent-weak); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
 .fd-more { position: relative; flex: none; }
 .fd-more[hidden] { display: none; }
 .fd-more > summary { list-style: none; border: 1px solid var(--edge); }

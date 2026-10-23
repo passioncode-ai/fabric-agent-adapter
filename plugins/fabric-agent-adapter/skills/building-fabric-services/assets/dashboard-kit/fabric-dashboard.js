@@ -150,6 +150,7 @@
 
   /* ---- navigation: fold what does not fit into More (ED-3) ---- */
   function foldNav(nav) {
+    if (typeof nav.fdRefresh === 'function') { nav.fdRefresh(); return; } // folded already: refit, no second observers
     var list = nav.querySelector('.fd-nav-list');
     if (!list) return;
     nav.classList.add('fd-nav--fold');
@@ -186,10 +187,16 @@
       return root.getComputedStyle(list).direction === 'rtl' ? a.left < b.left - 0.5 : a.right > b.right + 0.5;
     };
     function summarize() {
-      var current = menuList.querySelector('[aria-current]');
+      var current = menuList.querySelector('[aria-current]:not([aria-current="false"])');
       summaryEl.textContent = current ? label + ': ' + current.textContent.trim() : label + ' (' + menuList.children.length + ')';
     }
     function layout() {
+      // Moving a focused link out of the document loses focus: keep it on the same link across the refit.
+      var focused = doc.activeElement && nav.contains(doc.activeElement) ? doc.activeElement : null;
+      fit();
+      if (focused && focused.isConnected && doc.activeElement !== focused) focused.focus({ preventScroll: true });
+    }
+    function fit() {
       // Put every item back in its place, then move the last ones out until the rest fit.
       while (menuList.firstChild) list.appendChild(menuList.firstChild);
       more.hidden = true;

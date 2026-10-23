@@ -9,6 +9,8 @@
   or `More (N)`), whose longer text narrowed the list after the measurement; it now measures with the summary in place,
   and also catches a link that sticks out by a fraction of a pixel. The summary follows `aria-current` when a page
   moves it (a `MutationObserver`), and `FabricDashboard.refreshNav(nav)` refits after a page changes the links' text.
+  A refit keeps keyboard focus on the link it was on, `aria-current="false"` (as React renders it) is not current, and
+  folding a nav a second time refits it instead of adding observers.
   Held by a WebKit test that sweeps 360 to 640 px at every current section (`test/fabric-dashboard-fold.test.mjs`, run
   with `FABRIC_PLAYWRIGHT`). Services pick it up by re-vendoring the kit (`dashboard_kit.py`; the session-start notice
   names an older copy).

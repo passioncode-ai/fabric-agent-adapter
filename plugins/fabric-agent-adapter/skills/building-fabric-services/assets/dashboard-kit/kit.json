@@ -15,8 +15,8 @@
     "contrast"
   ],
   "files": {
-    "fabric-dashboard.css": "0bf773ea2ed1346d69a6c0ca74997f1a01c5b709708026c0ed1a57a094403527",
-    "fabric-dashboard.js": "0174a154f48e5af270ede9724c6e7bdeb57687a67131836d454513d795efaaac",
+    "fabric-dashboard.css": "fdcc7dadea987f0b89c63a5460b3b2b2c870768decc9ee981824a0dc0095169e",
+    "fabric-dashboard.js": "a69f80211132bb36c7a8d297d89674f0fafc087121289abf8cbebb6034e03235",
     "fabric-button.js": "7f35ff22226e2c57e6ba980424fc839207ad150d1f235043296f9ac0fb5425a1",
     "themes.json": "511839f1a1a83eb37fadfd132791474497d5c28c5091700b9aa31ad076e359b5"
   },
@@ -41,8 +41,8 @@
       "fabric-button.js": "9f76e604140c8f7d3f97c21530c601d652348639403a1721c0c7fb8abe9b9209"
     },
     "1.1.3": {
-      "fabric-dashboard.css": "0bf773ea2ed1346d69a6c0ca74997f1a01c5b709708026c0ed1a57a094403527",
-      "fabric-dashboard.js": "0174a154f48e5af270ede9724c6e7bdeb57687a67131836d454513d795efaaac",
+      "fabric-dashboard.css": "fdcc7dadea987f0b89c63a5460b3b2b2c870768decc9ee981824a0dc0095169e",
+      "fabric-dashboard.js": "a69f80211132bb36c7a8d297d89674f0fafc087121289abf8cbebb6034e03235",
       "fabric-button.js": "7f35ff22226e2c57e6ba980424fc839207ad150d1f235043296f9ac0fb5425a1"
     }
   }

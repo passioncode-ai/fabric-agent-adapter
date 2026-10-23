@@ -103,3 +103,57 @@ test('the More summary follows aria-current when the page moves it', { skip }, a
     await browser.close();
   }
 });
+
+test('a refit keeps keyboard focus, aria-current="false" is not current, and folding twice refits once', { skip }, async () => {
+  const browser = await webkit.launch();
+  try {
+    const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await open(p, 5);
+    // Focus a link in the open More menu, then move aria-current onto it: focus stays on that link.
+    const kept = await p.evaluate(async () => {
+      const more = document.querySelector('.fd-more');
+      more.open = true;
+      const link = more.querySelector('.fd-more-list a');
+      link.focus();
+      document.querySelectorAll('.fd-nav a').forEach((a) => a.removeAttribute('aria-current'));
+      link.setAttribute('aria-current', 'page');
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return document.activeElement === link;
+    });
+    assert.equal(kept, true, 'focus stays on the link across a refit');
+    // aria-current="false" (React's aria-current={false}) does not name a section.
+    const summary = await p.evaluate(async () => {
+      document.querySelectorAll('.fd-nav a').forEach((a) => a.removeAttribute('aria-current'));
+      const links = [...document.querySelectorAll('.fd-nav a')];
+      links.find((a) => a.textContent === 'Цепочки').setAttribute('aria-current', 'false');
+      links.find((a) => a.textContent === 'Настройки').setAttribute('aria-current', 'page');
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return document.querySelector('.fd-more > summary').textContent;
+    });
+    assert.match(summary, /Настройки/);
+    // A second foldNav on the same nav adds no second set of observers: one aria-current move, one refit.
+    const runs = await p.evaluate(async () => {
+      const nav = document.querySelector('.fd-nav');
+      window.FabricDashboard.foldNav(nav);
+      let moves = 0;
+      new MutationObserver((records) => { moves += records.filter((r) => r.type === 'childList').length; })
+        .observe(document.querySelector('.fd-more-list'), { childList: true });
+      document.querySelectorAll('.fd-nav a').forEach((a) => a.removeAttribute('aria-current'));
+      document.querySelectorAll('.fd-nav a')[0].setAttribute('aria-current', 'page');
+      await new Promise((r) => setTimeout(r, 300));
+      return moves;
+    });
+    const once = await p.evaluate(async () => {
+      let moves = 0;
+      new MutationObserver((records) => { moves += records.filter((r) => r.type === 'childList').length; })
+        .observe(document.querySelector('.fd-more-list'), { childList: true });
+      document.querySelectorAll('.fd-nav a').forEach((a) => a.removeAttribute('aria-current'));
+      document.querySelectorAll('.fd-nav a')[6].setAttribute('aria-current', 'page');
+      await new Promise((r) => setTimeout(r, 300));
+      return moves;
+    });
+    assert.ok(runs <= once * 1.5 + 2, `a second foldNav doubled the refits: ${runs} moves against ${once}`);
+  } finally {
+    await browser.close();
+  }
+});
