@@ -803,6 +803,43 @@
       "expected": null
     },
     {
+      "name": "three rows of 2^53 - 1 calls (the total past 2^53 as a double, FAA-110)",
+      "rows": [
+        {
+          "provider": "p",
+          "model": "m",
+          "route": "key",
+          "calls": 9007199254740991,
+          "unpricedCalls": 0,
+          "costUsd": 1
+        },
+        {
+          "provider": "p",
+          "model": "m",
+          "route": "key",
+          "calls": 9007199254740991,
+          "unpricedCalls": 0,
+          "costUsd": 1
+        },
+        {
+          "provider": "p",
+          "model": "m",
+          "route": "subscription",
+          "calls": 9007199254740991,
+          "unpricedCalls": 0,
+          "costUsd": 1
+        }
+      ],
+      "expected": {
+        "calls": 27021597764222972,
+        "moneyUsd": 2,
+        "moneyLowerBound": false,
+        "estimateUsd": 1,
+        "estimateLowerBound": false,
+        "subscriptionCalls": 9007199254740991
+      }
+    },
+    {
       "name": "calls written 1.0",
       "rows": [
         {

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.48.1 (2026-10-23)
+
+### Fixed
+
+- **The Python usage kit rounds a cost as the Node twin does** (FAA-110, a risk of 0.48.0's blind reading). Python's
+  `round(x, 6)` rounds half to even on the exact binary value; Node's `Math.round(x * 1e6) / 1e6` rounds half up on the
+  double product, so the twins' `costUsd` and `spentUsd` could differ by a micro-dollar (927 of 3000 sampled values).
+  The Python kit now rounds as Node does (`_round_usd`), held to 3014 cases Node answers
+  (`test/fixtures/kit-rounding-cases.json`).
+- **`usage_spend` adds call counts as doubles**, as the contract and the Node twin do, so a total past 2^53 agrees (a
+  new vector: three rows of 2^53 - 1 calls).
+
 ## 0.48.0 (2026-10-23)
 
 ### Changed
