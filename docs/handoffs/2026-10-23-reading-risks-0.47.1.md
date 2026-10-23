@@ -7,7 +7,10 @@ on the operator: FAA-107, the three risks the blind unit reading of 0.47.0 found
 estate reader's `FAC-SEM-134` uses it where the contract keeps a `Set`; `same`'s docstring says `===` only.
 `profile-forbids`' 403 is asserted in both delegation kits. `make_estate_vectors.mjs` gains nine `FAC-SEM-134` variants
 (a `view` machine id of another JSON type against each `from`), regenerated from the contract's staged sources at the
-pin `87d384f`.
+pin `87d384f`. PR [#176](https://github.com/passioncode-ai/fabric-agent-adapter/pull/176) (`084ebbe`), tag `v0.47.1`,
+npm 0.47.1 (the release run's eight jobs green); launcher 0.2.30
+([passioncode#148](https://github.com/passioncode-ai/passioncode/pull/148)), installed here byte-identical to the tag
+(155 of 155 files).
 
 **Checks actually run.** The new NaN test red on the Python twin before the change, green after; the Node twin
 already answered it. Targeted suites: Python (`test_fabric_estate`, `test_kit_hostile_estate`, `test_fabric_delegation`,
