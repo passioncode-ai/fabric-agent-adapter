@@ -680,6 +680,17 @@ class UsageReportTests(unittest.TestCase):
         self.assertIsNone(fs.usage_spend(json.loads('[{"calls": 1, "costUsd": 1' + '0' * 400 + '}]')))
         self.assertIsNone(fs.usage_spend(json.loads('[{"calls": 1' + '0' * 400 + ', "costUsd": 1}]')))
 
+    def test_a_cost_rounds_to_the_micro_dollar_as_the_node_twin_rounds(self):
+        # FAA-110: Math.round(x * 1e6) / 1e6, half up on the double product (kit-rounding-cases.json, written by Node).
+        cases = json.loads((ROOT / "test/fixtures/kit-rounding-cases.json").read_text())["cases"]
+        self.assertGreaterEqual(len(cases), 3000)
+        wrong = [(c["x"], fs._round_usd(c["x"]), c["rounded"]) for c in cases if fs._round_usd(c["x"]) != c["rounded"]]
+        self.assertEqual(wrong[:5], [], "%d of %d differ" % (len(wrong), len(cases)))
+        receipt = fs.make_usage_receipt("openrouter", "m", input_tokens=1, output_tokens=1, cost_usd=5e-7, cost_basis="provider",
+                                        at="2026-10-04T01:00:00Z", route="key")
+        r = fs.usage_report([receipt], service_id="example-agent", now=self.now, budget={"period": "day", "limitUsd": 5})
+        self.assertEqual((r["days"][0]["costUsd"], r["budget"]["spentUsd"]), (1e-6, 1e-6), "half a micro-dollar rounds up, as in Node")
+
     def test_a_limit_counts_money_never_a_subscriptions_estimate(self):
         # CT-115 (DEC-0110): a subscription's costUsd is an estimate at list price, not money spent.
         at = "2026-10-04T01:00:00Z"

@@ -157,9 +157,19 @@ def _add_totals(row: Dict[str, Any], receipt: Dict[str, Any]) -> None:
         row["_cost"] += float(receipt["costUsd"])
 
 
+def _round_usd(value: float) -> float:
+    """Math.round(value * 1e6) / 1e6, as the Node twin rounds: half up on the double product, where Python's round()
+    is half to even on the exact binary value, so the twins differed by 1e-6 (FAA-110)."""
+    product = value * 1e6
+    whole = math.floor(product)
+    if product - whole >= 0.5:
+        whole += 1
+    return whole / 1e6
+
+
 def _close_totals(row: Dict[str, Any]) -> Dict[str, Any]:
     cost = row.pop("_cost")
-    row["costUsd"] = None if row["calls"] and row["unpricedCalls"] == row["calls"] else round(cost, 6)
+    row["costUsd"] = None if row["calls"] and row["unpricedCalls"] == row["calls"] else _round_usd(cost)
     return row
 
 
@@ -187,7 +197,7 @@ def _exceeds(a: float, b: float) -> bool:
 
 
 def _usd(value: float) -> str:
-    rounded = round(value * 1e6) / 1e6
+    rounded = _round_usd(value)
     return str(int(rounded)) if rounded == int(rounded) else repr(rounded)
 
 
@@ -522,10 +532,10 @@ def usage_spend(rows: Any) -> Optional[Dict[str, Any]]:
             return None
         if row_calls > 0 and (cost is None) != (unpriced == row_calls):  # FAC-SEM-025's own pairing
             return None
-        calls += int(row_calls)
+        calls += _jsv.double(row_calls)  # a double, as the contract adds: past 2**53 the sums round alike (FAA-110)
         side = sub if route == "subscription" else paid
         if route == "subscription":
-            subscription_calls += int(row_calls)
+            subscription_calls += _jsv.double(row_calls)
         side["calls"] += int(row_calls)
         side["priced"] += int(row_calls) - int(unpriced)
         if unpriced > 0:
@@ -541,9 +551,9 @@ def usage_spend(rows: Any) -> Optional[Dict[str, Any]]:
             n = n + x
         return n
 
-    return {"calls": calls, "moneyUsd": total(paid, money), "moneyLowerBound": paid["priced"] > 0 and paid["unpriced"],
+    return {"calls": int(calls), "moneyUsd": total(paid, money), "moneyLowerBound": paid["priced"] > 0 and paid["unpriced"],
             "estimateUsd": total(sub, estimate), "estimateLowerBound": sub["priced"] > 0 and sub["unpriced"],
-            "subscriptionCalls": subscription_calls}
+            "subscriptionCalls": int(subscription_calls)}
 
 
 def _whole(value: Any) -> bool:
@@ -561,7 +571,7 @@ def _money(spend: Optional[Dict[str, Any]]) -> Optional[float]:
     """CT-115: a limit counts money only, never a subscription's estimate (DEC-0110)."""
     if spend is None or spend["moneyUsd"] is None:
         return None
-    return round(float(spend["moneyUsd"]), 6)
+    return _round_usd(float(spend["moneyUsd"]))
 
 
 def _spent_since(receipts: List[Dict[str, Any]], start: _dt.datetime, end: _dt.datetime) -> Optional[float]:

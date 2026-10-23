@@ -136,6 +136,7 @@ from fabric_usage import (  # noqa: F401
     attribution_headers,
     usage_report,
     usage_spend,
+    _round_usd,
     _spent_since,
     _spent_in,
     LIMIT_SCOPES,

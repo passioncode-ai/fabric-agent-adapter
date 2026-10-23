@@ -59,6 +59,7 @@ const inputs = [
   ['many tenths', Array.from({ length: 10 }, () => row('key', 1, 0.1))],
   ['calls at 2^53 - 1', [row('key', 9007199254740991, 1)]],
   ['calls past 2^53', [row('key', 9007199254740992, 1)]],
+  ['three rows of 2^53 - 1 calls (the total past 2^53 as a double, FAA-110)', [row('key', 9007199254740991, 1), row('key', 9007199254740991, 1), row('subscription', 9007199254740991, 1)]],
   ['calls written 1.0', [row('key', 1.0, 1)]],
   ['a zero cost of -0', [row('key', 1, -0)]],
 ];
