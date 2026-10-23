@@ -19,6 +19,7 @@
    "principal-unproven",
    "credential-source-refused",
    "chain-too-deep",
+   "profile-forbids",
    "issuer-unavailable",
    "unknown-state"
   ]

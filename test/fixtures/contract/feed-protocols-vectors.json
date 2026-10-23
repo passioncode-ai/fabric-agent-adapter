@@ -35,6 +35,9 @@
     "fabric-activity": [
       "0.1"
     ],
+    "fabric-agent-call": [
+      "1"
+    ],
     "fabric-connections": [
       "0.1"
     ],

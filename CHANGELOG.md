@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.47.0 (2026-10-23)
+
+### Changed
+
+- **Pinned to contract `87d384f`** (FAA-105; `0a4ce77` stays supported): DEC-0105 (the home-path detector and a node
+  summary's silence) and DEC-0106 (calls between machines of one estate). Every vendored vector is regenerated from
+  the contract's own functions at the pin.
+- **The estate reader reads a machine's `profile`** (DEC-0106), both twins. `FAC-SEM-134` joins the record's rules:
+  a profile is `full`, `member` or `view`; only a `full` machine carries a `hubKey`; a `view` machine places no agent,
+  holds no secret and fills none. `verify_estate_record` / `verifyEstateRecord` refuses a revision that breaks it
+  (`rule-violation`). New: `machine_profile(record, machine_id)` / `machineProfile(record, machineId)` and
+  `MACHINE_PROFILES`, held to the contract's profile vectors and hostile inputs.
+- **`profile-forbids` is a DL-19 refusal code** in both delegation kits (403), with its message.
+- **The protocol register gains `fabric-agent-call/1`**, both twins.
+- `references/estate-record.md` gains *Machine profiles*; `references/delegation.md` and `references/protocol.md` name
+  DEC-0106. Placing a relay caller, judging a call by profile and sealing it stay a relay node's duties, not the kit's
+  yet (FAA-106). DEC-0105 changes no kit: the kits do not port the activity rules' home-path detector.
+
 ## 0.46.1 (2026-10-23)
 
 ### Fixed

@@ -90,7 +90,8 @@ DL-19: an MCP tool answers `refusal_tool_result(r)` / `refusalToolResult(r)`: `i
 `structuredContent: {error: {code, message, data: {detail}}}`; an HTTP route answers `refusal_http(r)` /
 `refusalHttp(r)` with the code's status (401 for `unauthenticated`, `token-expired`, `principal-unproven`, with
 `WWW-Authenticate: Bearer error="invalid_token"`; 503 for `issuer-unavailable` and `unknown-state`; 403 for the
-rest). A published key the service cannot use (of small order, for another use, or published twice) is the
+rest, `profile-forbids` included: DEC-0106's refusal of a call between two machines of one estate that a machine's
+profile does not allow). A published key the service cannot use (of small order, for another use, or published twice) is the
 issuer's fault, `issuer-unavailable` (DEC-0045); a gate without a trusted issuer refuses everything as
 `no-trusted-issuer`. `detail` is a short machine word; the token, the approval and the keys never appear in a result or a log.
 

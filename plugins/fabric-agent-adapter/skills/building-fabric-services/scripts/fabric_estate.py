@@ -10,7 +10,8 @@ at the pin, ported answer for answer and held to the contract's own vectors (`te
 - ``verify_estate_record(record, at=..., parent=... | authorities=...)`` — the verdict a machine applies a revision on,
   after it has checked the revision against `estate-record.schema.json` (the verifier does not check the schema);
 - ``estate_record_rules(kind, value)`` — FAC-SEM-072…076 for `estate-record`, `estate-record-revision` and
-  `estate-placement`;
+  `estate-placement`, with FAC-SEM-134 on each machine's profile (DEC-0106);
+- ``machine_profile(record, machine_id)`` — a machine's profile (DEC-0106): `full`, `member`, `view`, or None;
 - ``hub_key_certified(record, kid, x, at)`` — DL-14: a delegation verifier that reads the estate record trusts a token's
   `kid` only while a current revision certifies it for a machine (``fabric_delegation`` calls it).
 
@@ -645,6 +646,54 @@ def _secret_references(value: Dict[str, Any], flag) -> None:
             slots.append(key)
 
 
+#: DEC-0106: what a machine of the estate may be. Absent is `full`, and a writer omits `full`.
+MACHINE_PROFILES = ("full", "member", "view")
+
+
+def _is_profile(value: Any) -> bool:
+    return isinstance(value, str) and value in MACHINE_PROFILES
+
+
+def machine_profile(record: Any, machine_id: Any) -> Optional[str]:
+    """A machine's profile in a record (DEC-0106): ``full`` when the machine is listed once with no ``profile``, its value
+    when that is one of the three, None otherwise (not listed, listed twice, an unreadable record or id, an unknown
+    value). The contract's ``machineProfile``; never raises."""
+    if not isinstance(record, dict) or not isinstance(machine_id, str):
+        return None
+    found = [m for m in _list(_get(record, "machines")) if _same(_get(m, "id"), machine_id)]
+    if len(found) != 1:
+        return None
+    profile = _get(found[0], "profile")
+    if profile is _MISSING:
+        return "full"
+    return profile if _is_profile(profile) else None
+
+
+def _machine_profiles(value: Dict[str, Any], flag) -> None:
+    """FAC-SEM-134 (DEC-0106): a profile, when present, is `full`, `member` or `view`; only a `full` machine carries a
+    `hubKey`; a `view` machine has no placement and no secret placement, and no secret placement names it as `from`."""
+    views: List[Any] = []
+    for machine, m in _indexed(_get(value, "machines")):
+        profile = _get(machine, "profile")
+        if profile is _MISSING:
+            continue
+        if not _is_profile(profile):
+            flag("/machines/%d/profile" % m, "profile %s is none of full, member, view" % _show(profile))
+            continue
+        if profile != "full" and _get(machine, "hubKey") is not _MISSING:
+            flag("/machines/%d/hubKey" % m, "a %s machine is never the hub's: only a full machine carries a hub key" % profile)
+        if profile == "view":
+            views.append(_get(machine, "id"))
+            if _list(_get(machine, "packages")):
+                flag("/machines/%d/packages" % m, "a view machine runs no agent: it has no placement")
+            if _list(_get(machine, "secrets")):
+                flag("/machines/%d/secrets" % m, "a view machine holds none of the estate's secrets")
+    for machine, m in _indexed(_get(value, "machines")):
+        for secret, s in _indexed(_get(machine, "secrets")):
+            if _contains(views, _get(secret, "from")):
+                flag("/machines/%d/secrets/%d/from" % (m, s), "machine %s is a view machine: it is the source of no secret" % _show(_get(secret, "from")))
+
+
 def _grant_key(ident: Any) -> Any:
     """A grant's id is a URI, so grants and their revocations are keyed by its normal form (DEC-0076)."""
     import fabric_identifiers  # noqa: E402 - beside this file
@@ -783,6 +832,7 @@ def _record_findings(value: Dict[str, Any]) -> List[Dict[str, str]]:
     for grant, index in _indexed(_get(value, "shareGrants")):  # FAC-SEM-110 (DEC-0082)
         findings.extend(grant_context_findings(grant, "/shareGrants/%d" % index))
     _placement_grants(value, _finding(findings, "FAC-SEM-111"))
+    _machine_profiles(value, _finding(findings, "FAC-SEM-134"))
     for authority, index in _indexed(_get(value, "authorities")):  # FAC-SEM-092 (DEC-0063)
         _signing_credential(authority, "/authorities/%d" % index, _finding(findings, "FAC-SEM-092"))
     return findings
