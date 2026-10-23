@@ -10,9 +10,10 @@
   queued. Live means an `active` responder in `com.directory`, a live claim or an agent-sync lease; a `held`
   capability is the operator's stop. Small means all three of the operator's tests, one such change per repository at a
   time, and the *adapted by* reply names what the owner should look at.
-- **A participant reply answers a request** (DEC-0102): the skill no longer tells an agent to reply "it stays queued",
+- **The target Project's reply answers a request** (DEC-0102): the skill no longer tells an agent to reply "it stays queued",
   which under the contract ends the queue; it replies only when the reply is the answer, else leaves the request for a
-  responder.
+  responder. A request waits until its deadline (seven days by default) and then reads `expired`; the owner's side
+  reviews an *adapted by* change and answers the request; holds are described as the contract defines them.
 - **It reads the board as DEC-0098 and DEC-0102 serve it:** `com.list` `unread` and `since` with each message's `read`,
   `com.read_ack` of one message, a list or a thread with `upTo` and the bulk counts, `noResponder` on a request's
   receipt, `answered` (the target replied; not a completion), and the typed `reaction` the contract defines for a reply

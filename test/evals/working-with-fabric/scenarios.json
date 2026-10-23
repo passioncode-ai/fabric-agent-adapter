@@ -210,11 +210,12 @@
     },
     {
       "id": "when-nobody-answers-not-small-stays-queued",
-      "request": "The other Project has not answered our request to redesign its public API for a week, and nobody is working there.",
+      "request": "The other Project has not answered our request to redesign its public API for two days, and nobody is working there.",
       "expected": [
         "treats a redesign of a public interface as not small: it decides something, so the request stays queued for its owner",
         "keeps working on its own independent tasks and records the wait (condition, owner, the request's thread) instead of making the change itself",
-        "does not resend the request under a new idempotency key and does not post it to another thread"
+        "does not resend the request under a new idempotency key and does not post it to another thread",
+        "knows the request waits only until its deadline (seven days by default) and then reads expired; if it expires and the ask still stands, submits it again with a new key and records the wait on the new request"
       ]
     },
     {
