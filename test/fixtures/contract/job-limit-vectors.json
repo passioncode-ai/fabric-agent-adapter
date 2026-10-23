@@ -922,6 +922,28 @@
       }
     },
     {
+      "name": "queue-full never ends a job (DEC-0104): invalid",
+      "answer": {
+        "job": {
+          "id": "job_7f3a",
+          "status": "failed",
+          "updatedAt": "2026-10-19T10:00:00Z",
+          "error": {
+            "code": "queue-full",
+            "message": "stopped",
+            "data": {
+              "retryable": true,
+              "retryAfterSeconds": 30
+            }
+          }
+        }
+      },
+      "now": "2026-10-19T10:00:00Z",
+      "expected": {
+        "action": "invalid"
+      }
+    },
+    {
       "name": "an integer code: failed",
       "answer": {
         "job": {

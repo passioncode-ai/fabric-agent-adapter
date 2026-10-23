@@ -54,6 +54,7 @@ from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     trace_ids,
     _usage,
     QUOTA_EXHAUSTED,
+    QUEUE_FULL,
     OUTCOME_UNKNOWN,
     LIMIT_REACHED,
     INTEROP_NULL_USAGE,

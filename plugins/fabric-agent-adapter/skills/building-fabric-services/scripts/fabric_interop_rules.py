@@ -121,6 +121,8 @@ def _usage(usage: Any, nulls: bool = False) -> Dict[str, Any]:
 # here answers and never raises on malformed input.
 
 QUOTA_EXHAUSTED = "quota-exhausted"
+#: DEC-0104: a refusal at a job's start; a job it ended is malformed, so a caller answers it `invalid`.
+QUEUE_FULL = "queue-full"
 OUTCOME_UNKNOWN = "outcome-unknown"
 LIMIT_REACHED = "limit-reached"
 INTEROP_NULL_USAGE = "fabric-interop/0.2"
@@ -224,6 +226,8 @@ def job_caller_action(answer: Any, now: Any = _ABSENT) -> Dict[str, Any]:
     code_ok = (isinstance(code, str) and bool(_ERROR_CODE.match(code))) or _is_integer(code)
     shape_ok = isinstance(error, dict) and all(name in ("code", "message", "data") for name in error)
     if not shape_ok or not code_ok or not isinstance(message, str) or not message or _code_points(message) > _MAX_ERROR_MESSAGE:
+        return {"action": "invalid"}
+    if code == QUEUE_FULL:
         return {"action": "invalid"}
     if code == OUTCOME_UNKNOWN:
         return {"action": "reconcile"}

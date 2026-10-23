@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.46.0 (2026-10-23)
+
+### Changed
+
+- **Pinned to contract `0a4ce77`** (FAA-102; `e742016` stays supported): DEC-0104, the agent network's call queue,
+  directory and load report. Every vendored vector is regenerated from the contract's own functions at the pin.
+- **`job_caller_action` / `jobCallerAction` answer a job that `queue-full` ended `invalid`**, both twins: `queue-full`
+  is a refusal at a job's start and never ends a job. `QUEUE_FULL` names the code in the rule layer and both facades.
+- **The protocol register gains `agent-directory/1`, `fabric-load/0.1` and `service-load/1`**, both twins.
+- `references/interop.md` says how a node's call queue answers and that the kit does not queue yet (FAA-103);
+  `references/protocol.md` names DEC-0098 to DEC-0104.
+
 ## 0.45.1 (2026-10-23)
 
 ### Changed

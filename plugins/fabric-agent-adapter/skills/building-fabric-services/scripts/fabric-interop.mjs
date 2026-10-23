@@ -24,6 +24,7 @@ export {
   childTraceparent,
   traceIds,
   QUOTA_EXHAUSTED,
+  QUEUE_FULL,
   OUTCOME_UNKNOWN,
   LIMIT_REACHED,
   INTEROP_NULL_USAGE,

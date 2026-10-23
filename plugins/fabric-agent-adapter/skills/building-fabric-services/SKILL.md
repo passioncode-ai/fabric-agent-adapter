@@ -14,10 +14,10 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.45.1"
+  version: "0.46.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "e742016dc396aa31e5a13a893489e43f15786c69"
+  extension-commit: "0a4ce773c4b9e6bec40c6387eb3f988af7152c0e"
 ---
 
 # Building Fabric services
