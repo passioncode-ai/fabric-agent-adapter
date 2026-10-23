@@ -122,11 +122,14 @@ for an agent's own design is in `creating-fabric-agents/references/resilience-an
 
 **A node's call queue (DEC-0104).** A provider that queues refuses a start past its queue with `queue-full`: an `isError`
 result with one text item whose JSON is `{error: {code: "queue-full", message, data: {retryable, retryAfterSeconds}}}`,
-never `structuredContent`; the caller starts again after `retryAfterSeconds` under the same key. `queue-full` never ends
-a job, so `job_caller_action` / `jobCallerAction` answers a job it ended `invalid` (`QUEUE_FULL` names the code). The kit
-does not queue: it declares no load extension (`extensions/load/0.1`) and serves no `fabric.job.list`, so its
-`unknown-job` and repeated keys keep the rules above. A node that will queue needs `jobCallerKey`, the `caller` vectors
-and the load report first (FAA-103).
+never `structuredContent`; the caller starts again after `retryAfterSeconds` under the same key. Read that refusal
+from the start's own `isError` result, before any answer reaches `job_caller_action` / `jobCallerAction`: those read a
+job, and `queue-full` never ends one, so they answer a job it ended `invalid` (`QUEUE_FULL` names the code, and the
+kit's job store refuses to end a job with it). The kit has no reader for the refusal yet (FAA-103). Through Fabric's hub
+a caller today sees `product-error` instead, kept under the key for 24 hours, until the hub relays `queue-full`
+(Fabric CO-376). The kit does not queue: it declares no load extension (`extensions/load/0.1`) and serves no
+`fabric.job.list`, so its `unknown-job` and repeated keys keep the rules above. A node that will queue needs
+`jobCallerKey`, the contract's `agent-network.json` vectors and the load report first (FAA-103).
 
 ## What the probe checks
 

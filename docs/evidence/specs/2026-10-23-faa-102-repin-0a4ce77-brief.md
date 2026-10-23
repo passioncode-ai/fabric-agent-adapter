@@ -25,7 +25,7 @@ on board thread `c451a1ce` (answered *row*, due 2026-10-27). Route: task-pipelin
 
 | Id | Decision | Source |
 |---|---|---|
-| D1 | The kit does not queue in this release: no load extension, no `fabric.job.list`, no `jobCallerKey`. The duties for "a kit-built node that queues" apply only to such a node; building one waits for an agent that needs a queue (FAA-103) | `agent-network.md`, duties table, "a kit-built node that queues" |
+| D1 | The kit does not queue in this release: no load extension, no `fabric.job.list`, no `jobCallerKey`. The duties for "a kit-built node that queues" apply only to such a node, and the line that every adopter runs `fixtures/vectors/agent-network.json` is read for the kits as the vectors their row names (the `caller` vectors, a node that queues). Building one, with a caller-side reader of a `queue-full` start refusal, waits for an agent that needs it (FAA-103). The job store refuses to end a job with `queue-full`, which the pinned schema forbids (the first blind reading) | `agent-network.md`, duties table and the adopters' line |
 | D2 | No kit module keeps a list of extension keys (each module names its own key), so the contract's sixth key needs no edit | `grep -rn "extensions/" scripts` |
 | D3 | `QUEUE_FULL` is exported beside `QUOTA_EXHAUSTED` from the rule layer and both facades, so a caller can name the code | the kit's own constant pattern |
 | D4 | The launcher moves once, to 0.46.0, skipping a separate release for 0.45.1 hours earlier | the operator's "choose the best solutions"; one release is enough |

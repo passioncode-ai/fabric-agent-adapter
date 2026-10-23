@@ -8,9 +8,11 @@
   directory and load report. Every vendored vector is regenerated from the contract's own functions at the pin.
 - **`job_caller_action` / `jobCallerAction` answer a job that `queue-full` ended `invalid`**, both twins: `queue-full`
   is a refusal at a job's start and never ends a job. `QUEUE_FULL` names the code in the rule layer and both facades.
+  The job store refuses to end a job with it (`InteropError`), as the pinned job schema does.
 - **The protocol register gains `agent-directory/1`, `fabric-load/0.1` and `service-load/1`**, both twins.
 - `references/interop.md` says how a node's call queue answers and that the kit does not queue yet (FAA-103);
-  `references/protocol.md` names DEC-0098 to DEC-0104.
+  `references/protocol.md` names DEC-0098, DEC-0099, DEC-0101, DEC-0102 and DEC-0104 (DEC-0100 and DEC-0103 change no
+  service wire). Through Fabric's hub a caller sees `product-error` for a full queue until the hub relays `queue-full`.
 
 ## 0.45.1 (2026-10-23)
 

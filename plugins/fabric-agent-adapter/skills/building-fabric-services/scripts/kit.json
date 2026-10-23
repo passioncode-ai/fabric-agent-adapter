@@ -313,7 +313,7 @@
     "fabric_interop_rules",
     "fabric_service"
    ],
-   "sha256": "b31733defbaf7cece9eaeb4efba77a51b8705b7b2b0c412c21d529d46d476f2e"
+   "sha256": "f92fa111328fe3811438f733d8f0eb5295e6941c774123a78e26318bdcb35fc3"
   },
   {
    "module": "fabric_hub",
@@ -705,7 +705,7 @@
     "fabric-interop-rules",
     "fabric-service"
    ],
-   "sha256": "2f07bc22928a796afa45af484065352eb3edaf3d65a35ee202f8429fdb499f97"
+   "sha256": "581983ec3e197e5c2340ad25e8468320c69a2459c90097c7fcf2699766b4fb26"
   },
   {
    "module": "fabric-hub",
@@ -2296,7 +2296,7 @@
    "fabric_service.py": "d411433ce6ff3e81189b10b2c1a8462335a97cd99574ab0ee7d1c28cf48e1694",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "b5f0ecb1791b4c50c5ac151f987f692ed7001bc74841a8a161125ec775145e09",
-   "fabric_interop.py": "b31733defbaf7cece9eaeb4efba77a51b8705b7b2b0c412c21d529d46d476f2e",
+   "fabric_interop.py": "f92fa111328fe3811438f733d8f0eb5295e6941c774123a78e26318bdcb35fc3",
    "fabric_hub.py": "b9ac852e601b1d54cf61351677a628afc69faeed7d1fc74ebe541c1cf38e0c2a",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "b5bff994cb615c6a4bb0d88d020e3a59504166180e1fa1aea3be93224f2aeccb",
@@ -2332,7 +2332,7 @@
    "fabric-service.mjs": "bc67550e52aa6aa9c6d2ed6cbae52418a3e836623e17164166699f953d8aafa8",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "57a8081307956e8c381119b361fa5232a7bf791815be8e3541eb5492820e2ea5",
-   "fabric-interop.mjs": "2f07bc22928a796afa45af484065352eb3edaf3d65a35ee202f8429fdb499f97",
+   "fabric-interop.mjs": "581983ec3e197e5c2340ad25e8468320c69a2459c90097c7fcf2699766b4fb26",
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
    "fabric-board-link.mjs": "4cd6d4e21713a38c8e56f7d59db3148638b8c27c08e774d96a0f6283c6049e0a",

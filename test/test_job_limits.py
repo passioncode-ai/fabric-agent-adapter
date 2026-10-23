@@ -74,6 +74,15 @@ class ProviderTests(unittest.TestCase):
     def start(self, caller="caller-a", key="k-1"):
         return self.jobs.create("media.order", {"brief": "x"}, caller=caller, idempotency_key=key)["job"]["id"]
 
+    def test_queue_full_never_ends_a_job(self):
+        """DEC-0104: queue-full is a refusal at a job's start, never a job's end; the schema refuses a job it ended, so
+        the store refuses to write one. QUEUE_FULL names the code in the facade."""
+        self.assertEqual(fi.QUEUE_FULL, "queue-full")
+        job_id = self.start()
+        with self.assertRaises(fi.InteropError):
+            self.jobs.fail(job_id, fi.QUEUE_FULL, "the queue is full")
+        self.assertEqual(self.jobs.fail(job_id, "provider-error", "stopped")["status"], "failed")
+
     def test_a_paused_job_reads_as_paused_and_a_caller_waits(self):
         job_id = self.start()
         job = self.jobs.pause(job_id, resets_at="2026-10-19T12:00:00Z", text="the provider's hourly quota")
