@@ -24,6 +24,7 @@ export {
   childTraceparent,
   traceIds,
   QUOTA_EXHAUSTED,
+  QUEUE_FULL,
   OUTCOME_UNKNOWN,
   LIMIT_REACHED,
   INTEROP_NULL_USAGE,
@@ -41,7 +42,7 @@ export {
   pauseMessage,
   repeatedKeyDecision,
 } from './fabric-interop-rules.mjs';
-import { PROTOCOL, EXTENSION_KEY, MCP_REVISION, TERMINAL, CONTRACT_VERSION, JOB_HANDLE_SCHEMA, InteropError, UnknownJob, parseTraceparent, childTraceparent, traceIds, QUOTA_EXHAUSTED, OUTCOME_UNKNOWN, LIMIT_REACHED, INTEROP_NULL_USAGE, PROTOCOLS_READ, utcTime, quotaDataOk, readJobPause, jobCallerAction, intentIdempotencyKey, readsNullUsage, requestMeta, usageFindings, usageToward, jobLimitRules, pauseMessage, repeatedKeyDecision, OUTCOMES, ENVELOPE_REQUIRED, JOB_ID, KEY, SECRET_WORDS } from './fabric-interop-rules.mjs'; // the rule layer (FAA-92)
+import { PROTOCOL, EXTENSION_KEY, MCP_REVISION, TERMINAL, CONTRACT_VERSION, JOB_HANDLE_SCHEMA, InteropError, UnknownJob, parseTraceparent, childTraceparent, traceIds, QUOTA_EXHAUSTED, QUEUE_FULL, OUTCOME_UNKNOWN, LIMIT_REACHED, INTEROP_NULL_USAGE, PROTOCOLS_READ, utcTime, quotaDataOk, readJobPause, jobCallerAction, intentIdempotencyKey, readsNullUsage, requestMeta, usageFindings, usageToward, jobLimitRules, pauseMessage, repeatedKeyDecision, OUTCOMES, ENVELOPE_REQUIRED, JOB_ID, KEY, SECRET_WORDS } from './fabric-interop-rules.mjs'; // the rule layer (FAA-92)
 
 // --- C3.1 capabilities as tools ----------------------------------------------------------
 export function expectedAnnotations(effect, idempotency) {
@@ -256,7 +257,11 @@ export class JobStore {
     return this.transition(jobId, 'completed', { result });
   }
 
-  fail(jobId, code, message, data) { return this.transition(jobId, 'failed', { error: data === undefined || data === null ? { code, message } : { code, message, data } }); }
+  fail(jobId, code, message, data) {
+    // DEC-0104: a refusal at a job's start, never a job's end (the schema refuses one).
+    if (code === QUEUE_FULL) throw new InteropError('queue-full refuses a start and never ends a job (DEC-0104)');
+    return this.transition(jobId, 'failed', { error: data === undefined || data === null ? { code, message } : { code, message, data } });
+  }
 
   // A job a limit paused and its provider will resume: working, the pause grammar, pollIntervalMs reaching the reset.
   pause(jobId, { resetsAt, text } = {}) {

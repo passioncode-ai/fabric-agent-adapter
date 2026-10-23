@@ -77,6 +77,8 @@ export function checkUsage(usage, nulls = false) {
 // fabric_interop.py. Every function here answers and never throws on malformed input.
 
 export const QUOTA_EXHAUSTED = 'quota-exhausted';
+/** DEC-0104: a refusal at a job's start; a job it ended is malformed, so a caller answers it `invalid`. */
+export const QUEUE_FULL = 'queue-full';
 export const OUTCOME_UNKNOWN = 'outcome-unknown';
 export const LIMIT_REACHED = 'limit-reached';
 export const INTEROP_NULL_USAGE = 'fabric-interop/0.2';
@@ -151,6 +153,7 @@ export function jobCallerAction(answer, now) {
   const codeOk = (isString(code) && ERROR_CODE.test(code)) || Number.isInteger(code);
   const shapeOk = isObject(error) && Object.keys(error).every((name) => name === 'code' || name === 'message' || name === 'data');
   if (!shapeOk || !codeOk || !isString(message) || message.length === 0 || codePoints(message) > MAX_ERROR_MESSAGE) return { action: 'invalid' };
+  if (code === QUEUE_FULL) return { action: 'invalid' };
   if (code === OUTCOME_UNKNOWN) return { action: 'reconcile' };
   if (code === LIMIT_REACHED) return { action: 'person' };
   if (code !== QUOTA_EXHAUSTED) return { action: 'failed' };

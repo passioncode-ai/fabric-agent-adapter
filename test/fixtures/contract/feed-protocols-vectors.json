@@ -11,6 +11,9 @@
     "activity-summary": [
       "1"
     ],
+    "agent-directory": [
+      "1"
+    ],
     "coding-agents": [
       "1"
     ],
@@ -33,6 +36,9 @@
       "0.1"
     ],
     "fabric-connections": [
+      "0.1"
+    ],
+    "fabric-load": [
       "0.1"
     ],
     "fabric-dashboard": [
@@ -109,6 +115,9 @@
       "1"
     ],
     "session-handoff": [
+      "1"
+    ],
+    "service-load": [
       "1"
     ],
     "share-registration": [

@@ -54,6 +54,7 @@ from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     trace_ids,
     _usage,
     QUOTA_EXHAUSTED,
+    QUEUE_FULL,
     OUTCOME_UNKNOWN,
     LIMIT_REACHED,
     INTEROP_NULL_USAGE,
@@ -392,6 +393,8 @@ class JobStore:
         return self._transition(job_id, "completed", result=envelope)
 
     def fail(self, job_id: str, code: Any, message: str, data: Any = None) -> Dict[str, Any]:
+        if code == QUEUE_FULL:  # DEC-0104: a refusal at a job's start, never a job's end (the schema refuses one)
+            raise InteropError("queue-full refuses a start and never ends a job (DEC-0104)")
         error: Dict[str, Any] = {"code": code, "message": message}
         if data is not None:
             error["data"] = data

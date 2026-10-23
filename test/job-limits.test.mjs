@@ -21,6 +21,14 @@ function store(t) {
 }
 const start = (jobs, caller = 'caller-a', key = 'k-1') => jobs.create('media.order', { brief: 'x' }, { caller, idempotencyKey: key }).job.id;
 
+test('queue-full never ends a job (DEC-0104): the store refuses it; QUEUE_FULL names the code', (t) => {
+  assert.equal(k.QUEUE_FULL, 'queue-full');
+  const jobs = store(t);
+  const id = start(jobs);
+  assert.throws(() => jobs.fail(id, k.QUEUE_FULL, 'the queue is full'), k.InteropError);
+  assert.equal(jobs.fail(id, 'provider-error', 'stopped').status, 'failed');
+});
+
 test('every pause, caller, key, usage and reader case answers as the contract does', () => {
   for (const c of V.pause) assert.deepEqual(k.readJobPause(c.answer), c.expected, c.name);
   for (const c of V.caller) assert.deepEqual('now' in c ? k.jobCallerAction(c.answer, c.now) : k.jobCallerAction(c.answer), c.expected, c.name);
