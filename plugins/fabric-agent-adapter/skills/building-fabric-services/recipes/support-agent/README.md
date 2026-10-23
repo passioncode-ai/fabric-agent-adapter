@@ -31,7 +31,10 @@ country prefix may be left out).
 Limits: the check reads digits, links, addresses and phone numbers, not meaning. A promise written in words
 ("your full refund is approved", "fifty dollars", "thirty days") is not caught, and neither is a host whose
 top-level domain is not on the list. A word run into the next sentence without a space (`Settings.No`) can read as a
-link; that reply is handed to a person, which costs a review, never a wrong answer.
+link; that reply is handed to a person, which costs a review, never a wrong answer. So does a file name whose extension
+is also a country code (`README.md`, `setup.py`, `install.sh`: Moldova, Paraguay, Saint Helena): the list keeps those
+codes, because a host on them must still be caught, so such a reply is handed to a person unless an entry it cites
+names the same file.
 
 ## Install into a service
 
