@@ -59,6 +59,7 @@ Never edit the copied files: the page's own rules go in its own stylesheet, cons
 | Grids | `.fd-grid` (cards, 320 px columns), `.fd-grid--tiles` (160 px), `.fd-grid--wide` (480 px); `--fd-col` sets your own |
 | Wide content | `<div class="fd-scroll" data-fd-label="Jobs table"><table class="fd-table">…</table></div>`, `<pre class="fd-scroll">` |
 | Atoms | `.fd-card`, `.fd-tile`, `.fd-chip` + `.fd-dot` + `.fd-s-ok\|warn\|danger\|info`, `.fd-btn`, `.fd-btn--primary`, `.fd-input`, `.fd-select`, `.fd-banner`, `.fd-empty`, `.fd-pairs` |
+| Navigation that folds | with the script, links that do not fit move into **More** (`data-fd-more-label` names it, `data-fd-no-fold` keeps a nav as is); the summary names the current section (`aria-current`) or counts the folded links, and the fit is measured with that text in place. Moving `aria-current` refits on its own; after changing the links' text call `FabricDashboard.refreshNav(nav)` (since 1.1.3) |
 | Own appearance controls | `<select data-fd-theme-picker>`, `<select data-fd-scheme-picker>` (the script fills them; hidden while the host owns appearance) |
 
 Tokens are the workbench layer (`--bg`, `--panel`, `--panel-2`, `--ink`, `--muted`, `--border`,

@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.2 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
+/* fabric-dashboard-kit@1.1.3 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
    A Fabric service dashboard shown inside a host pane: usable from 360 CSS px up, navigation always
    reachable, wide content in its own scroll box, one vertical scroller, appearance from the host.
    Copy this file next to fabric-dashboard.js; do not edit it in place. Put the page's own rules in
@@ -115,7 +115,7 @@ html.fd-js .fd-chrome { position: sticky; top: var(--fd-chrome-top, 0px); z-inde
   text-decoration: none; white-space: nowrap; cursor: pointer;
   transition: background-color var(--dur-hover) var(--motion-ease), color var(--dur-hover) var(--motion-ease); }
 .fd-nav a:hover, .fd-more > summary:hover { background: var(--panel-2); color: var(--ink); }
-.fd-nav a[aria-current] { background: var(--accent-weak); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.fd-nav a[aria-current]:not([aria-current="false"]) { background: var(--accent-weak); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
 .fd-more { position: relative; flex: none; }
 .fd-more[hidden] { display: none; }
 .fd-more > summary { list-style: none; border: 1px solid var(--edge); }
