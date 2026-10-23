@@ -1,5 +1,6 @@
 // Runner and model profiles (DEC-0046, FAA-19) and the credential detector (DEC-0044) in the Node kit, against vectors
 // whose expected answers come from the contract's own functions at the pin (make_profile_vectors.mjs).
+import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,12 +31,17 @@ test('runnerCheck runs only the catalogued binary and argv, bounded, and reads t
   const dir = tempDir('runner-');
   const tool = (body) => { const f = path.join(dir, 'example-code'); fs.writeFileSync(f, `#!/bin/sh\n${body}\n`); fs.chmodSync(f, 0o755); };
   const entry = (extra = {}) => ({ kind: 'example-code', binaries: ['example-code'], version: { argv: ['--version'], pattern: '^example (\\d+\\.\\d+\\.\\d+)', timeoutMs: p.MAX_PROBE_MS }, ...extra });
+  // The probe's own run, recorded, with room to answer on a loaded host: the deadline it asks for is checked here, and the
+  // deadline itself by the slow cases below, which use a real one (FAA-108).
+  const asked = [];
+  const unbounded = (binary, argv, options) => { asked.push(options.timeout); return spawnSync(binary, argv, { ...options, timeout: 120000 }); };
   assert.equal(p.runnerCheck(entry(), { searchPath: dir }).installed, false);
   assert.equal(p.runnerCheck(entry(), { searchPath: dir }).probe, 'not-installed');
   tool('if [ "$1" = "--version" ]; then echo "example 2.0.1"; exit 0; fi; if [ "$1" = "auth" ]; then exit 4; fi');
-  const got = p.runnerCheck(entry({ auth: ['auth', 'status'] }), { searchPath: dir });
+  const got = p.runnerCheck(entry({ auth: ['auth', 'status'] }), { searchPath: dir, run: unbounded });
+  assert.deepEqual(asked, [p.MAX_PROBE_MS, p.MAX_PROBE_MS], 'both probes ask for the catalogued bound');
   assert.deepEqual([got.installed, got.version, got.signedIn, got.probe], [true, '2.0.1', false, 'not-connected']);
-  assert.equal(p.runnerCheck(entry(), { searchPath: dir }).probe, null, 'no auth probe: answering is enough');
+  assert.equal(p.runnerCheck(entry(), { searchPath: dir, run: unbounded }).probe, null, 'no auth probe: answering is enough');
   tool('sleep 5');
   const slow = p.runnerCheck(entry({ version: { argv: ['--version'], pattern: '(x)', timeoutMs: 300 } }), { searchPath: dir });
   assert.ok(slow.problems.some((m) => m.includes('did not answer')), slow.problems.join('; '));

@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -63,6 +64,7 @@ class RunnerCheckTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.bin = Path(self.temp.name)
+        self.asked = []
 
     def tearDown(self):
         self.temp.cleanup()
@@ -71,6 +73,12 @@ class RunnerCheckTests(unittest.TestCase):
         path = self.bin / name
         path.write_text("#!/bin/sh\n" + body + "\n")
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+    def unbounded(self, argv, **kw):
+        """The probe's own run, recorded, with room to answer on a loaded host: the deadline it asks for is checked
+        here, and the deadline itself by the slow cases below, which use a real one (FAA-108)."""
+        self.asked.append(kw.get("timeout"))
+        return subprocess.run(argv, **dict(kw, timeout=120))
 
     def entry(self, **extra):
         e = {"kind": "example-code", "name": "Example Code", "binaries": ["example-code"],
@@ -81,15 +89,16 @@ class RunnerCheckTests(unittest.TestCase):
     @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
     def test_installed_measured_and_signed_in(self):
         self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "example 1.4.2"; exit 0; fi; if [ "$1" = "auth" ]; then exit 0; fi; exit 3')
-        got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))
+        got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin), run=self.unbounded)
         self.assertEqual((got["installed"], got["version"], got["signedIn"], got["problems"]), (True, "1.4.2", True, []))
+        self.assertEqual(self.asked, [profiles.MAX_PROBE_MS / 1000.0] * 2, "both probes ask for the catalogued bound")
         self.assertIsNone(got["probe"], "it can serve")
         self.assertTrue(got["binary"].endswith("example-code"))
 
     @unittest.skipIf(sys.platform == "win32", "a shell script stands in for the runner")
     def test_not_signed_in_and_unreadable_version(self):
         self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "something else"; exit 0; fi; exit 1')
-        got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))
+        got = profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin), run=self.unbounded)
         self.assertEqual((got["installed"], got["version"], got["signedIn"]), (True, None, False))
         self.assertTrue(any("version" in p for p in got["problems"]))
         self.assertEqual(got["probe"], "not-responding", "the walk's order: responding before connected")
@@ -98,8 +107,8 @@ class RunnerCheckTests(unittest.TestCase):
     def test_the_closed_probe_results(self):
         self.assertEqual(profiles.runner_check(self.entry(), path=str(self.bin))["probe"], "not-installed")
         self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "example 1.4.2"; exit 0; fi; exit 1')
-        self.assertEqual(profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin))["probe"], "not-connected")
-        self.assertIsNone(profiles.runner_check(self.entry(), path=str(self.bin))["probe"], "no auth probe: answering is enough")
+        self.assertEqual(profiles.runner_check(self.entry(auth=["auth", "status"]), path=str(self.bin), run=self.unbounded)["probe"], "not-connected")
+        self.assertIsNone(profiles.runner_check(self.entry(), path=str(self.bin), run=self.unbounded)["probe"], "no auth probe: answering is enough")
         self.tool("example-code", 'if [ "$1" = "--version" ]; then echo "example 1.4.2"; exit 0; fi; sleep 5')
         got = profiles.runner_check(self.entry(auth=["auth", "status"], version={"argv": ["--version"], "pattern": "^example (\\d+\\.\\d+\\.\\d+)", "timeoutMs": 300}),
                                     path=str(self.bin))
