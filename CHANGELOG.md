@@ -20,7 +20,7 @@
   to an announcement (not served by Fabric 0.3.10, so the reply's first word stays the type).
 - `com.reply`, `com.cancel`, responder enrollment and the project directory are described as served by installed
   Fabric releases (Fabric 0.3.10 lists them), with the fallback for an older Fabric; "Not yet available" is gone.
-- Seven scenario evals (six new, one rewritten for `com.reply`) and four trigger queries come first, as AGENTS.md asks.
+- Seven new scenario evals (one for the owner reviewing an *adapted by* change) and two rewritten (`com.reply` is served; a participant reply answers a request) and four trigger queries come first, as AGENTS.md asks.
 
 ## 0.45.0 (2026-10-22)
 

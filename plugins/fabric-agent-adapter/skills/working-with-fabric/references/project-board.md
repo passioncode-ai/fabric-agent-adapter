@@ -68,7 +68,8 @@ the owner's attestation, not the responder's.
 `held`, which is always retryable: tell the person what is held and retry later, the pause growing, with the **same
 idempotency key and arguments**. A request to a held Project or capability is not refused: it queues with its deadline
 running, and `com.directory` shows the capability `held: true`. Never post the ask into another thread or to another
-Project to get around a hold. Reads, cancels and replies to work already started are never held. Fabric 0.3.10 serves
+Project to get around a hold. Reads, cancels and a responder's calls on work already started are never held; a
+participant reply into a held thread is refused `held` like a submit, and is retried the same way. Fabric 0.3.10 serves
 no holds yet.
 
 **A problem for another Project: a structured finding (DEC-0080).** Send one only when the running Fabric's
@@ -111,7 +112,9 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    the owner to see until its deadline; do not cancel it.
 4. **Not small** (a decision, a contract, a release, a large change): the request stays queued for its owner until its
    deadline (seven days by default); never take a decision that is the owner's, record the wait in one line (what it
-   waits on, which watcher acts) and go on with your own work. If it expires and the ask still stands, submit it again.
+   waits on, which watcher acts) and go on with your own work. An expiry posts no message, so the mail watcher does
+   not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
+   ask still stands, submit it again.
 
 The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it.
 

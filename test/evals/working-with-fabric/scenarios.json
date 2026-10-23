@@ -254,6 +254,15 @@
         "checks what the reply says before relying on it, and may still cancel the request if it is no longer needed",
         "only completed or failed_known (with settledBy owner as the owner's attestation) say what happened to the work"
       ]
+    },
+    {
+      "id": "owner-reviews-an-adapted-change",
+      "request": "A request addressed to our Project has a reply on its thread: adapted by another Project, with a merge commit in our repository.",
+      "expected": [
+        "reviews the merged change in its own repository before anything else",
+        "then replies on the request, which answers it: kept, or reverted and why",
+        "does not treat the other Project's adapted-by reply as having answered the request; only its own reply as the target does"
+      ]
     }
   ]
 }
