@@ -432,7 +432,9 @@ class StopAndEndActive(Base):
         the claim release was never retried. The end entry stays; a later worker sends the release once."""
         _, spawned = self.spool("end", reason="prompt_input_exit")
         self.env["FAKE_MCP_HANG_ON"] = "fabric_work_release"
-        fs.deliver(spawned[0], self.env, deadline_s=1.5)
+        # The deadline is what ends the hanging call, so it must leave the fake fabric-mcp time to start, shake hands and
+        # receive the call even on a loaded machine: at 1.5 s it sometimes had not reached the call (FAA-101).
+        fs.deliver(spawned[0], self.env, deadline_s=6)
         self.assertIn("outcome=unknown", self.log_text())
         self.assertTrue(spawned[0].is_dir(), "the session's folder stays while its end is undelivered")
         self.assertEqual(len(list(spawned[0].glob("*-end.json"))), 1, "the end entry stays for the next worker")
