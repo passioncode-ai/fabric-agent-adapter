@@ -27,7 +27,7 @@ test('every verify case answers as the contract does', () => {
 test('every rule case answers as the contract does (FAC-SEM-072…076)', () => {
   for (const c of V.rules) assert.deepEqual(e.estateRecordRules(c.kind, c.value), c.expected, c.name);
   const codes = new Set(V.rules.flatMap((c) => (c.expected ?? []).map((f) => f.code)));
-  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114', 'FAC-SEM-122']);
+  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114', 'FAC-SEM-122', 'FAC-SEM-134']);
 });
 
 test('the digest, the challenge, placement trust, P-256 keys and passkey keys', () => {
@@ -39,6 +39,10 @@ test('the digest, the challenge, placement trust, P-256 keys and passkey keys', 
   assert.ok(V.grantContext.length >= 7);
   for (const c of V.grantContext) assert.deepEqual(plain(e.grantContextFindings(c.value, '')), c.expected, c.name);
   for (const c of V.placementTrust) assert.deepEqual(plain('context' in c ? e.placementTrust(c.record, c.machine, c.agentRef, c.context) : e.placementTrust(c.record, c.machine, c.agentRef)), c.expected);
+  // DEC-0106: the contract's own profile vectors (fixtures/vectors/machine-call.json) and hostile inputs.
+  assert.ok(V.machineProfile.length >= 17);
+  for (const c of V.machineProfile) assert.equal(e.machineProfile(c.record, c.machineId) ?? null, c.expected, c.name);
+  assert.deepEqual([...e.MACHINE_PROFILES], ['full', 'member', 'view']);
   for (const c of V.p256) assert.equal(e.isValidP256Key(Buffer.from(c.raw, 'hex')), c.expected, c.name);
   for (const c of V.credentialKeys) {
     const found = e.credentialKey(c.publicKey, c.alg);

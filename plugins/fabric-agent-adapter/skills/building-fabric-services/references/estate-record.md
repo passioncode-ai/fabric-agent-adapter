@@ -2,10 +2,11 @@
 
 Fabric Agent Contract DEC-0055, `docs/specification/estate-record.md`, schema `schemas/estate-record.schema.json`,
 rules `FAC-SEM-072…076`, with contexts (DEC-0082, `docs/specification/contexts.md`, `FAC-SEM-110`, `FAC-SEM-111`) and a
-partner's scoped publisher key (DEC-0090, `docs/specification/partner-channel.md`, `FAC-SEM-122`).
+partner's scoped publisher key (DEC-0090, `docs/specification/partner-channel.md`, `FAC-SEM-122`) and each machine's
+profile (DEC-0106, `docs/specification/machine-calls.md`, `FAC-SEM-134`).
 One revision of one person's estate lists:
 - the passkeys that sign it;
-- the machines, with their device keys and a certificate of each machine's hub key;
+- the machines, with their device keys, a certificate of each machine's hub key and, optionally, a profile;
 - the packages placed on each machine, each in a context: the person's own, or an organization's;
 - where each secret slot is filled from (by reference only);
 - share grants and revocations.
@@ -19,6 +20,7 @@ derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fab
 - Applying a revision
 - Trusting a delegation key
 - Contexts: one agent for you and for an organization
+- Machine profiles: full, member, view
 - The estate ceremonies
 - Share grants into an organization
 - Checking a record you produce
@@ -57,7 +59,7 @@ It checks, in the order of the ER table:
 7. **The window.** At most 30 days. A revision may be issued up to 60 s ahead of the verifier's clock (DEC-0066,
    `CLOCK_SKEW_SECONDS`); earlier than that it is `not-yet-valid`.
 8. **The record's own rules.** A violation is `rule-violation` with its `codes`, `FAC-SEM-072…076`, `FAC-SEM-110`,
-   `FAC-SEM-111`, `FAC-SEM-122` and `FAC-SEM-092`
+   `FAC-SEM-111`, `FAC-SEM-122`, `FAC-SEM-134` and `FAC-SEM-092`
    (each passkey the record lists is a signing credential, its origins within its RP ID).
 
 Dates are strict RFC 3339: a `T`, an offset, and a day that exists. `:60` and a space are refused. Passkey JWK `x`
@@ -127,6 +129,36 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
 answer the contract's contexts fixtures and variants of them (`test/fixtures/contract/estate-vectors.json`).
+
+## Machine profiles: full, member, view
+
+DEC-0106 gives a machine an optional `profile`. It says what the machine may be when other machines of the estate call
+it over the relay.
+
+- **`full`**, the default. A record omits it: a machine with no `profile` is `full`. Only a `full` machine carries a
+  `hubKey`.
+- **`member`** takes calls from the estate's machines and holds only the secret slots the record places on it. It has
+  no `hubKey`.
+- **`view`** only reads. It has no `hubKey`, no placement and no secret placement, and no secret placement names it as
+  `from`.
+
+`FAC-SEM-134` checks all of it: an unknown value, a hub key on a `member` or `view` machine, and a `view` machine that
+places, holds or fills a secret. A revision that breaks it is `rule-violation`. A profile changes only by a revision
+the passkey signs.
+
+`machine_profile(record, machine_id)` / `machineProfile(record, machineId)` answers a machine's profile: `full` for a
+machine listed once with no `profile`, its value when it is one of the three, and `None` / `undefined` otherwise (not
+listed, listed twice, an unreadable record or id, an unknown value). It never raises. Both kits answer the contract's
+own profile vectors (`fixtures/vectors/machine-call.json`) and hostile inputs (`test/fixtures/contract/estate-vectors.json`).
+
+- **Update a copied kit before a record carries `profile`.** A copy older than 0.47.0 refuses a record with `profile`
+  only when it checks the schema; its rules find nothing broken on a `view` machine that places agents. Fabric writes
+  `profile` only once every reader of its records is pinned at or after DEC-0106, the kits included:
+  `fabric_kit.py install <dir> --module fabric_estate` (or `--lang node --module fabric-estate`).
+- **The kit does not take calls between machines.** Placing a relay caller (`relayCallerTier`), judging a call by
+  profile (`machineCallVerdict`) and sealing it (`fabric-agent-call/1`, HPKE) are a relay node's duties; no kit-built
+  service is one yet (FAA-106). A delegation verifier still names the refusal: `profile-forbids` is a DL-19 code
+  ([delegation](delegation.md)).
 
 ## The estate ceremonies
 

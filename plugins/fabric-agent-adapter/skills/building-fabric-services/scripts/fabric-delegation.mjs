@@ -19,7 +19,7 @@ import { atomicWrite } from './fabric-paths.mjs'; // the kit's private writer (F
 export const REFUSAL_CODES = Object.freeze([
   'unauthenticated', 'token-expired', 'wrong-audience', 'scope-not-granted', 'effect-above-ceiling', 'no-grant',
   'grant-expired', 'grant-revoked', 'limit-reached', 'approval-required', 'approval-invalid', 'approval-reused',
-  'principal-unproven', 'credential-source-refused', 'chain-too-deep', 'issuer-unavailable', 'unknown-state',
+  'principal-unproven', 'credential-source-refused', 'chain-too-deep', 'profile-forbids', 'issuer-unavailable', 'unknown-state',
 ]);
 export const EFFECT_CLASSES = Object.freeze(['none', 'draft', 'publish', 'send', 'reply', 'charge', 'delete', 'merge', 'deploy', 'change-policy']);
 export const DELEGATION_HEADER = 'Fabric-Delegation';
@@ -52,6 +52,7 @@ export const REFUSAL_MESSAGES = Object.freeze({
   'principal-unproven': "The caller's proof is missing or stale.",
   'credential-source-refused': 'The grant names a credential source that is not allowed.',
   'chain-too-deep': 'The actor chain is deeper than four.',
+  'profile-forbids': "The caller's or the target's machine profile does not allow this call.",
   'issuer-unavailable': "The estate's published keys cannot be read.",
   'unknown-state': 'The state cannot be established, so the call is refused.',
 });

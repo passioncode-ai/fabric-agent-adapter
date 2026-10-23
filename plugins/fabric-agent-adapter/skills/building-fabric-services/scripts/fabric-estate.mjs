@@ -4,7 +4,8 @@
 //
 // - verifyEstateRecord(record, { at, parent } | { at, authorities }) — the verdict a machine applies a revision on, after
 //   it has checked the revision against estate-record.schema.json (the verifier does not check the schema);
-// - estateRecordRules(kind, value) — FAC-SEM-072…076;
+// - estateRecordRules(kind, value) — FAC-SEM-072…076, with FAC-SEM-134 on each machine's profile (DEC-0106);
+// - machineProfile(record, machineId) — a machine's profile (DEC-0106): `full`, `member`, `view`, or undefined;
 // - hubKeyCertified(record, kid, x, at) — DL-14: a delegation verifier that reads the estate record trusts a token's
 //   `kid` only while a current revision certifies it for a machine (fabric-delegation.mjs calls it).
 //
@@ -540,6 +541,50 @@ function placementGrants(value, flag) {
   });
 }
 
+/** DEC-0106: what a machine of the estate may be. Absent is `full`, and a writer omits `full`. */
+export const MACHINE_PROFILES = Object.freeze(['full', 'member', 'view']);
+const isProfile = (value) => typeof value === 'string' && MACHINE_PROFILES.includes(value);
+
+/**
+ * A machine's profile in a record (DEC-0106): `full` when the machine is listed once with no `profile`, its value when
+ * that is one of the three, undefined otherwise (not listed, listed twice, an unreadable record or id, an unknown
+ * value). The contract's machineProfile; it never throws.
+ */
+export function machineProfile(record, machineId) {
+  if (!isObject(record) || !isString(machineId)) return undefined;
+  const found = list(record.machines).filter((machine) => machine.id === machineId);
+  if (found.length !== 1) return undefined;
+  const { profile } = found[0];
+  if (profile === undefined) return 'full';
+  return isProfile(profile) ? profile : undefined;
+}
+
+/**
+ * FAC-SEM-134 (DEC-0106): a profile, when present, is `full`, `member` or `view`; only a `full` machine carries a
+ * `hubKey`; a `view` machine has no placement and no secret placement, and no secret placement names it as `from`.
+ */
+function machineProfiles(value, flag) {
+  const views = new Set();
+  indexed(value.machines).forEach(([machine, m]) => {
+    if (machine.profile === undefined) return;
+    if (!isProfile(machine.profile)) {
+      flag(`/machines/${m}/profile`, `profile ${show(machine.profile)} is none of full, member, view`);
+      return;
+    }
+    if (machine.profile !== 'full' && machine.hubKey !== undefined) flag(`/machines/${m}/hubKey`, `a ${machine.profile} machine is never the hub's: only a full machine carries a hub key`);
+    if (machine.profile === 'view') {
+      views.add(machine.id);
+      if (list(machine.packages).length > 0) flag(`/machines/${m}/packages`, 'a view machine runs no agent: it has no placement');
+      if (list(machine.secrets).length > 0) flag(`/machines/${m}/secrets`, "a view machine holds none of the estate's secrets");
+    }
+  });
+  indexed(value.machines).forEach(([machine, m]) => {
+    indexed(machine.secrets).forEach(([secret, s]) => {
+      if (views.has(secret.from)) flag(`/machines/${m}/secrets/${s}/from`, `machine ${show(secret.from)} is a view machine: it is the source of no secret`);
+    });
+  });
+}
+
 function recordFindings(value) {
   const findings = [];
   revisionWhole(value, flagger(findings, 'FAC-SEM-072'));
@@ -550,6 +595,7 @@ function recordFindings(value) {
   grantsAndRevocations(value, flagger(findings, 'FAC-SEM-076'));
   indexed(value.shareGrants).forEach(([grant, index]) => findings.push(...grantContextFindings(grant, `/shareGrants/${index}`)));
   placementGrants(value, flagger(findings, 'FAC-SEM-111'));
+  machineProfiles(value, flagger(findings, 'FAC-SEM-134'));
   // FAC-SEM-092 (DEC-0063) on each passkey the record lists.
   indexed(value.authorities).forEach(([authority, index]) => signingCredential(authority, `/authorities/${index}`, flagger(findings, 'FAC-SEM-092')));
   return findings;

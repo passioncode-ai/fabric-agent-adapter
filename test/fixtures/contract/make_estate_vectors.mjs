@@ -7,7 +7,7 @@
 //   node test/fixtures/contract/make_estate_vectors.mjs --contract-src <dir with the staged .ts sources>
 //     --vectors <fixtures/vectors/estate-record.json> --semantic <dir of the fixtures/semantic/estate-*.json and grant-context-*.json files>
 //     --positive <dir with estate-record-first.json, estate-record-second.json, fabric-package-agent.json>
-//     [--out test/fixtures/contract/estate-vectors.json]
+//     --machine-call <fixtures/vectors/machine-call.json> [--out test/fixtures/contract/estate-vectors.json]
 //
 // Needs Node 24 or later (type stripping); the staged sources import each other as .ts. The contract's vectors carry
 // the private test keys that made their signatures; they are dropped here: the kits verify and never sign.
@@ -117,6 +117,43 @@ for (const [name, value] of [
   broken('an installation in an organization context', (r) => ({ record: r, machine: r.machines[0].id, package: agentPkg, context: (r.machines[0].packages.find((p) => p.context) ?? {}).context }), 'estate-placement');
 }
 
+// FAC-SEM-134 (DEC-0106): a machine's profile, varied on the profile fixture the contract writes as passing, and
+// answered by the contract's rules: a hub key of any value (null too) beside a member or view profile, non-objects in
+// a view machine's lists (they place nothing), a secret with no `from` beside a view machine with no id, a profile that
+// is not a string.
+{
+  const fixture = (file) => read(path.join(args.semantic, file)).input;
+  const varied = (name, file, edit) => { const value = edit(clone(fixture(file))); rules.push({ name: `profile: ${name}`, kind: 'estate-record', value, expected: estate.estateRecordRules('estate-record', value) }); };
+  const ok = 'estate-profile-ok.json';
+  const fromView = 'estate-profile-secret-from-view.json';
+  const view = (r) => r.machines.find((m) => m.profile === 'view');
+  const member = (r) => r.machines.find((m) => m.profile === 'member');
+  varied('a member machine with a null hub key', ok, (r) => { member(r).hubKey = null; return r; });
+  varied('a view machine with a hub key of zero', fromView, (r) => { view(r).hubKey = 0; return r; });
+  varied('a view machine whose packages and secrets hold only non-objects', fromView, (r) => { view(r).packages = [1, null, 'x']; view(r).secrets = [false]; return r; });
+  varied('a view machine with no id beside a secret with no from', fromView, (r) => { delete view(r).id; for (const m of r.machines) for (const x of m.secrets ?? []) delete x.from; return r; });
+  varied('a secret from a view machine named by an equal string', fromView, (r) => r);
+  varied('a profile written as full', ok, (r) => { r.machines[0].profile = 'full'; return r; });
+  for (const profile of ['Full', 'VIEW', '', null, 1, ['view'], { toString: 1 }]) varied(`a profile of ${JSON.stringify(profile)}`, ok, (r) => { r.machines[1].profile = profile; return r; });
+  varied('a non-object before the machines', fromView, (r) => { r.machines = [7, ...r.machines]; return r; });
+}
+
+// machineProfile (DEC-0106): the contract's own cases from machine-call.json, re-answered here, and hostile inputs.
+const machineCall = read(args['machine-call']);
+const machineProfile = machineCall.profile.map((c) => {
+  const record = 'record' in c ? c.record : machineCall.record;
+  const answer = estate.machineProfile(record, c.machineId) ?? null;
+  if (JSON.stringify(answer) !== JSON.stringify(c.expect)) throw new Error(`the contract's profile vector "${c.name}" no longer answers as written`);
+  return { name: c.name, record, machineId: c.machineId, expected: answer };
+});
+for (const [name, record, machineId] of [
+  ['a record that is not an object', 'x', 'm-a'], ['a record that is an array', [machineCall.record], 'm-a'], ['an id that is not a string', machineCall.record, 7],
+  ['an id that is null', machineCall.record, null], ['machines that is not an array', { ...machineCall.record, machines: { 'm-a': {} } }, 'm-a'],
+  ['a machine whose profile is an object', { ...machineCall.record, machines: [{ id: 'm-a', profile: { toString: 1 } }] }, 'm-a'],
+  ['a machine whose profile is null', { ...machineCall.record, machines: [{ id: 'm-a', profile: null }] }, 'm-a'],
+  ['a non-object before the machine', { ...machineCall.record, machines: [null, { id: 'm-a', profile: 'view' }] }, 'm-a'],
+]) machineProfile.push({ name: `hostile: ${name}`, record, machineId, expected: estate.machineProfile(record, machineId) ?? null });
+
 // FAC-SEM-110 on a grant of its own (kind `grant`): the grant-context-*.json fixtures and that grant varied one way,
 // answered by the contract's grantContextFindings at the document root.
 const grantContext = fs.readdirSync(args.semantic).filter((f) => f.startsWith('grant-context-') && f.endsWith('.json')).sort().flatMap((file) => {
@@ -202,7 +239,7 @@ const keys = Object.fromEntries(Object.entries(contract.keys).map(([name, entry]
 }));
 const out = args.out ?? path.join(here, 'estate-vectors.json');
 fs.writeFileSync(out, `${JSON.stringify({
-  $comment: 'Generated by make_estate_vectors.mjs from the contract pin\'s src/estate-record-rules.ts, src/webauthn.ts and src/p256.ts and its fixtures (vectors/estate-record.json, semantic/estate-*.json, grant-context-*.json); do not edit by hand. The private test keys are dropped.',
-  keys, digests, verify, rules, grantContext, placementTrust: trusts, p256: p256Cases, credentialKeys,
+  $comment: 'Generated by make_estate_vectors.mjs from the contract pin\'s src/estate-record-rules.ts, src/webauthn.ts and src/p256.ts and its fixtures (vectors/estate-record.json, the profile cases of vectors/machine-call.json, semantic/estate-*.json, grant-context-*.json); do not edit by hand. The private test keys are dropped.',
+  keys, digests, verify, rules, grantContext, placementTrust: trusts, machineProfile, p256: p256Cases, credentialKeys,
 }, null, 2)}\n`);
 console.log(`wrote ${verify.length} verify cases, ${rules.length} rule cases (${rules.reduce((n, c) => n + (c.expected?.length ?? 0), 0)} findings), ${p256Cases.length} P-256 cases, ${credentialKeys.length} key cases to ${out}`);

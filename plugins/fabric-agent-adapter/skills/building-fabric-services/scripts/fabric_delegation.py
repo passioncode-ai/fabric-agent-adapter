@@ -49,7 +49,8 @@ from fabric_paths import atomic_write as _atomic_write  # noqa: E402 - the kit's
 REFUSAL_CODES = (
     "unauthenticated", "token-expired", "wrong-audience", "scope-not-granted", "effect-above-ceiling", "no-grant",
     "grant-expired", "grant-revoked", "limit-reached", "approval-required", "approval-invalid", "approval-reused",
-    "principal-unproven", "credential-source-refused", "chain-too-deep", "issuer-unavailable", "unknown-state",
+    "principal-unproven", "credential-source-refused", "chain-too-deep", "profile-forbids", "issuer-unavailable",
+    "unknown-state",
 )
 EFFECT_CLASSES = ("none", "draft", "publish", "send", "reply", "charge", "delete", "merge", "deploy", "change-policy")
 DELEGATION_HEADER = "Fabric-Delegation"
@@ -88,6 +89,7 @@ REFUSAL_MESSAGES = {
     "principal-unproven": "The caller's proof is missing or stale.",
     "credential-source-refused": "The grant names a credential source that is not allowed.",
     "chain-too-deep": "The actor chain is deeper than four.",
+    "profile-forbids": "The caller's or the target's machine profile does not allow this call.",
     "issuer-unavailable": "The estate's published keys cannot be read.",
     "unknown-state": "The state cannot be established, so the call is refused.",
 }
