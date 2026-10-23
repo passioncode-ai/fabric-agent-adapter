@@ -184,7 +184,7 @@
     "fabric_paths",
     "fabric_time"
    ],
-   "sha256": "beee67de6e47e0f7b088bb1a284b1b1c52126f429718e1d24a65766f19f599f1"
+   "sha256": "70e984ec3ff9f4ee31539df8d503f01ef8e6dd870e65e9546c0a2cb4aa040a88"
   },
   {
    "module": "fabric_backups",
@@ -473,7 +473,7 @@
     "fabric-secrets",
     "fabric-time"
    ],
-   "sha256": "9e44bb949c54bfed725139e8c8b6a1fcc3a0cadf3eb2bf11dcd32bc9d4742947"
+   "sha256": "b6610aaad9d00d8a7f42955627fb81725950841455bcedfc050abb0e079f0f93"
   },
   {
    "module": "fabric-delegation",
@@ -2590,7 +2590,7 @@
    "fabric_protocols.py": "28e693282cddff8e4396ae39ce6fa935e875e8ddac7375bea2c189dd6fb04970",
    "fabric_connections.py": "77d3ccf863c70e9209d21ef45c46a6db9c06237019bc20d54f8d3946873f3f11",
    "fabric_lock.py": "ba2399d2137c7a7791b7133b9db9cca36693f4eb7e30955b25a75ade814e95ba",
-   "fabric_usage.py": "beee67de6e47e0f7b088bb1a284b1b1c52126f429718e1d24a65766f19f599f1",
+   "fabric_usage.py": "70e984ec3ff9f4ee31539df8d503f01ef8e6dd870e65e9546c0a2cb4aa040a88",
    "fabric_backups.py": "02dc5eb66ec956723d3ddba07b6dd15f6a9726d901f4d60edfd02eee57880ceb",
    "fabric_descriptor.py": "daf16f95b1810283b1386488e006e940a0cdfa5c3c8d09386ac33d29d58df78d",
    "fabric_auth.py": "55794587750f6c9f40935b74295d83d7096cb4b26a0b36ac292334cd87d8f853",
@@ -2617,7 +2617,7 @@
    "fabric-base.mjs": "7804b2df7715dbbf9702a9b61b6b8cef2110f9a52b04cabd8fb0a66458d87512",
    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",
    "fabric-paths.mjs": "2201b4ed7126f260931b63e8386377b4317d8dcad419d109bf22c683e44b7f29",
-   "fabric-estate.mjs": "9e44bb949c54bfed725139e8c8b6a1fcc3a0cadf3eb2bf11dcd32bc9d4742947",
+   "fabric-estate.mjs": "b6610aaad9d00d8a7f42955627fb81725950841455bcedfc050abb0e079f0f93",
    "fabric-delegation.mjs": "dafde9ea327c88d92dc73d1400282b43dc6f84dd345a2d2b9b154304f65fc9d7",
    "fabric-share.mjs": "d40a7405d7bd4c3213ed691330b7549afe8e023db0753b582e249714e672010d",
    "fabric-ceremonies.mjs": "117d4374c9e95c930a38de7adbd4323774798f4fe6ec6f24afcd6f2c7298ca44",

@@ -531,7 +531,7 @@ def usage_spend(rows: Any) -> Optional[Dict[str, Any]]:
         if unpriced > 0:
             side["unpriced"] = True
         if _known_cost(cost):
-            (estimate if route == "subscription" else money).append(float(cost))
+            (estimate if route == "subscription" else money).append(_jsv.double(cost))
 
     def total(side: Dict[str, Any], costs: List[float]) -> Optional[float]:
         if side["calls"] > 0 and side["priced"] == 0:
@@ -552,7 +552,9 @@ def _whole(value: Any) -> bool:
 
 
 def _known_cost(value: Any) -> bool:
-    return _number(value) and math.isfinite(float(value)) and value >= 0
+    """A finite cost of at least 0, the number read as JavaScript holds it (an integer past the double range is
+    Infinity, never an OverflowError)."""
+    return _number(value) and math.isfinite(_jsv.double(value)) and value >= 0
 
 
 def _money(spend: Optional[Dict[str, Any]]) -> Optional[float]:

@@ -10,12 +10,14 @@
 - **`check_service.py` `well-known.requires-token` follows DEC-0109 (CT-114).** A remote service's no-token `401` may
   carry an identity proxy's page: it passes when the page neither parses as the well-known document nor names the
   service's id, `id.instance`, build or pid. The service's host name is taken out first, and a value shorter than four
-  characters is not looked for. Fabric Inbox's remote placement on this machine now passes 34 of 34 rules (it failed
+  characters is not looked for; a copy of the document anywhere inside a JSON body fails. The rule is recorded on every
+  path, a later request's timeout included. Fabric Inbox's remote placement on this machine now passes 34 of 34 rules (it failed
   this one before).
 - **A spending limit counts money only (DEC-0110, CT-115)**, both twins: `budget.spentUsd` and a machine limit's
   `spentUsd` leave out a `subscription` route's `costUsd`, an estimate at list price; a window spent only on a
   subscription spends `0`. New: `usage_spend` / `usageSpend`, the contract's `usageSpend`, held to 42 cases its own
-  function answers (`test/fixtures/contract/usage-spend-vectors.json`). The day's `costUsd` still sums every route.
+  function answers (`test/fixtures/contract/usage-spend-vectors.json`). A cost or a count past the double range answers
+  `None` in Python, as the contract answers `undefined`. The day's `costUsd` still sums every route.
 - **Both estate readers read `deltaAnchor` (DEC-0107)**: `FAC-SEM-137` in the revision rules and the verdict, and
   `delta_anchor_of` / `deltaAnchorOf`, held to the contract's fixtures and hostile variants. `FAC-SEM-075`'s message
   says "a secret envelope", as the contract's.

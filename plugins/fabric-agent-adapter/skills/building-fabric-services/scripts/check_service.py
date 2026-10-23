@@ -204,6 +204,8 @@ class Probe:
                 status, headers, body = self.request("GET", "/.well-known/fabric-service", protected)
                 timings.append((time.perf_counter() - started) * 1000)
         except OSError as exc:
+            if self.remote:
+                self.add_no_token(no_token, None)
             self.add("well-known.answers", "FAIL", "no answer on %s: %s" % (self.d.get("origin"), exc))
             return
         if status != 200:

@@ -69,7 +69,10 @@ answers it with an empty body. An identity proxy in front of the service (Cloudf
 `401` with its own sign-in page: `well-known.requires-token` passes it when the page neither parses as the well-known
 document nor names the service's identity values (its id, `id.instance`, build, or pid, as whole words). The probe
 takes the service's own host name out first, because a sign-in page names the address it guards, and does not look for
-a value shorter than four characters, because a platform's pid is often `1`.
+a value shorter than four characters, because a platform's pid is often `1`. A copy of the document anywhere inside a JSON body
+fails, however short the id. One false FAIL remains possible: when the document was read, a proxy page that happens to
+contain the service's pid as a whole number (an inline script's constant, say) fails the rule; the evidence names the
+value it found.
 
 ## What a host does and will not do
 

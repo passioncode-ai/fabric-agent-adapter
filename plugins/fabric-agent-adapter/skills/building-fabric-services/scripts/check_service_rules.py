@@ -88,6 +88,20 @@ def guard_verdict(rule: str, remote: bool, status: int, body: bytes) -> Tuple[st
     return "FAIL", "HTTP %d%s" % (status, ", and the body is the well-known document" if disclosed else "")
 
 
+def _carries_document(value: Any, depth: int = 0) -> bool:
+    """Whether a parsed body is, or holds anywhere inside it, an object that reads as the well-known document: its
+    `protocol` is the extension's, or it carries `service` or `process` (D3 of FAA-109)."""
+    if depth > 64:
+        return True  # nothing honest nests that deep; refuse rather than recurse without bound
+    if isinstance(value, dict):
+        if value.get("protocol") == fs.PROTOCOL or "service" in value or "process" in value:
+            return True
+        return any(_carries_document(v, depth + 1) for v in value.values())
+    if isinstance(value, list):
+        return any(_carries_document(v, depth + 1) for v in value)
+    return False
+
+
 def no_token_verdict(status: int, body: bytes, identities: List[str], host: str = "") -> Tuple[str, str]:
     """DEC-0109 (`well-known.requires-token` on a remote placement): the no-token answer is `401` and carries none of
     the service's data. An empty body passes; so does an identity proxy's page in front of the service, as long as it
@@ -104,8 +118,8 @@ def no_token_verdict(status: int, body: bytes, identities: List[str], host: str 
         doc = json.loads(text)
     except ValueError:
         doc = None
-    if isinstance(doc, dict) and (doc.get("protocol") == fs.PROTOCOL or "service" in doc or "process" in doc):
-        return "FAIL", "HTTP 401, and the body is the well-known document"
+    if _carries_document(doc):
+        return "FAIL", "HTTP 401, and the body carries the well-known document"
     if host:
         text = re.sub(re.escape(host), " ", text, flags=re.IGNORECASE)
     for value in identities:

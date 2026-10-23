@@ -644,11 +644,6 @@ function installation(value) {
   return findings;
 }
 
-/**
- * FAC-SEM-114 across two revisions (DEC-0084): what a revision drops, it revokes in the same revision. A removed machine
- * as `machine <id>` and its hub key as `hub-key <kid>`; a replaced or dropped device key of a kept machine as `device-key`
- * by its reference or its kid; a hub key no longer certified as it was as `hub-key <old kid>`.
- */
 /** The anchor a record vouches for (DEC-0107), or undefined when it names none or its shape is not the schema's. */
 export function deltaAnchorOf(record) {
   if (!isObject(record) || !isObject(record.deltaAnchor)) return undefined;
@@ -672,6 +667,11 @@ function anchorFindings(parent, next) {
   return findings;
 }
 
+/**
+ * FAC-SEM-114 across two revisions (DEC-0084): what a revision drops, it revokes in the same revision. A removed machine
+ * as `machine <id>` and its hub key as `hub-key <kid>`; a replaced or dropped device key of a kept machine as `device-key`
+ * by its reference or its kid; a hub key no longer certified as it was as `hub-key <old kid>`.
+ */
 function droppedFindings(parent, next) {
   const findings = [];
   const flag = flagger(findings, 'FAC-SEM-114');

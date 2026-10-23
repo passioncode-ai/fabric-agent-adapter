@@ -675,6 +675,10 @@ class UsageReportTests(unittest.TestCase):
         self.assertGreaterEqual(len(cases), 40)
         for case in cases:
             self.assertEqual(fs.usage_spend(case["rows"]), case["expected"], case["name"])
+        # JSON can carry an integer beyond the double range, which JavaScript reads as Infinity; no vector can (the
+        # blind reading of 0.48.0). The contract answers undefined, never an error.
+        self.assertIsNone(fs.usage_spend(json.loads('[{"calls": 1, "costUsd": 1' + '0' * 400 + '}]')))
+        self.assertIsNone(fs.usage_spend(json.loads('[{"calls": 1' + '0' * 400 + ', "costUsd": 1}]')))
 
     def test_a_limit_counts_money_never_a_subscriptions_estimate(self):
         # CT-115 (DEC-0110): a subscription's costUsd is an estimate at list price, not money spent.
