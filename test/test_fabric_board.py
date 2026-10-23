@@ -702,6 +702,34 @@ class AuditFaultTests(Conversation):
         self.assertEqual(len(self.board.replies), 1)
         self.assertEqual(self.checkpoint(), {})
 
+    def test_a_lost_complete_answer_on_a_resumed_request_settles_on_the_next_tick(self):
+        # FAA-86: the transferred request's known outcome is completed, the board stores it, and the answer is lost while
+        # the session holds. The entry stays first in the resume queue, and the next tick sends the same key again,
+        # instead of the checkpoint keeping it at `completing` until the next connect drops it.
+        self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
+        self.board.drop_next["com.complete"] = 1
+        self.board.fail_next["com.complete"] = "not_available"  # the first attempt's complete is refused, nothing stored
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        r.step()
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+        self.hub.control({"op": "end-sessions"})
+        self.board.drop_next.clear()
+        second = self.responder()
+        self.board.drop_next["com.complete"] = 1  # the resumed complete is stored; its answer is lost
+        second.step()
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        session = second.session
+        self.assertIsNotNone(session, "the lease holds, so the session is kept")
+        for _ in range(3):
+            self.board.advance(max(1, second.wait_until - self.board.now))
+            second.step()
+        self.assertIs(second.session, session, "settled within the same session, not at the next connect")
+        self.assertEqual(self.checkpoint(), {})
+        self.assertEqual(len(self.board.replies), 1)
+        self.assertEqual(len(self.handled), 1)
+        self.assertEqual(second.state, "ready")
+
     def test_keys_of_the_old_attempt_are_made_again_after_a_transfer(self):
         self.outcome = {"state": "completed", "summary": "ok", "reply": {"text": "here"}}
         rid = self.board.queue("video.render")

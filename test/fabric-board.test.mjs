@@ -728,6 +728,42 @@ test('FAA-77 36: renew never races effect_begin; a revision_conflict on renew or
   assert.ok(!h2.kinds().includes('board.reconcile.needed'));
 });
 
+test('FAA-86: a lost complete answer on a resumed request settles on the next tick, in the same session', async (t) => {
+  // The transferred request's known outcome is completed, the board stores it, and the answer is lost while the session
+  // holds: the entry stays first in the resume queue and the next tick sends the same key again.
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = { state: 'completed', summary: 'ok', reply: { text: 'here' } };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await hub.control({ op: 'fail', tool: 'com.complete', code: 'not_available' }); // the first attempt's complete stores nothing
+  await r.step();
+  assert.equal((await h.state()).requests[rid].state, 'accepted');
+  await hub.control({ op: 'end-sessions' });
+  let session = null;
+  for (let i = 0; i < 12 && session === null; i += 1) {
+    if (!r.session) {
+      await hub.control({ op: 'drop', tool: 'com.complete' }); // the resumed complete is stored; its answer is lost
+      await h.advance(Math.max(31, r.waitUntil - h.clock.t));
+      await r.step();
+      if (r.session) session = r.session;
+    } else {
+      await h.advance(Math.max(31, r.waitUntil - h.clock.t));
+      await r.step();
+    }
+  }
+  assert.ok(session, 'the lease holds, so the session is kept');
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  for (let i = 0; i < 3; i += 1) {
+    await h.advance(Math.max(1, r.waitUntil - h.clock.t));
+    await r.step();
+  }
+  assert.equal(r.session, session, 'settled within the same session, not at the next connect');
+  assert.deepEqual(h.checkpoint(), {});
+  assert.equal((await h.state()).replies.length, 1);
+  assert.equal(r.state, 'ready');
+});
+
 test('FAA-77 37: an effect the handler failed or left unobserved is settled from what is observed, else given to the lost-result operation', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

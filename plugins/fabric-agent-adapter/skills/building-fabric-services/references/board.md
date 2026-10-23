@@ -131,8 +131,9 @@ whose answer was lost is first sent again under its old key and fence, so the bo
 was posted, and it is never posted twice. That question is asked only after the new attempt is in the checkpoint and the
 request is in the resume queue (the old fence is kept beside it as `probe`): when its answer is lost too, or the board
 answers `not_available` or `capacity_exceeded`, which do not say whether the reply was stored, the request stays first
-in line and the next tick asks again, and a restart asks with the same old fence. `shutdown()` drains, then leaves the
-session (its DELETE releases the slot).
+in line and the next tick asks again, and a restart asks with the same old fence. A request leaves the resume queue only
+once it has resumed: when the `com.complete` that sends a known outcome loses its answer, the next tick sends the same
+key again in the same session (FAA-86). `shutdown()` drains, then leaves the session (its DELETE releases the slot).
 
 ## When the operator holds work (DEC-0079)
 

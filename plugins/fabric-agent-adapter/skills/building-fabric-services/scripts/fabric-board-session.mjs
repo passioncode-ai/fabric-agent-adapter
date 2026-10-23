@@ -319,7 +319,8 @@ export class Responder {
 
   /**
    * Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves the
-   * queue only once its probe has answered: a lost answer keeps it first in line for the next tick (finding 35).
+   * queue only once it has resumed: a lost answer, of its probe (finding 35) or of the `com.complete` that sends a known
+   * outcome (FAA-86), keeps it first in line, and the next tick sends the same keys again from the checkpoint.
    */
   async resumeNext() {
     while (!this.current && this.toResume.length && !this.stopping) {
@@ -330,8 +331,8 @@ export class Responder {
       }
       const entry = JSON.parse(JSON.stringify(stored));
       if (entry.probe) await this.repliedBefore(entry);
-      this.toResume.shift();
       await this.resume(entry);
+      if (this.toResume[0] === entry.request) this.toResume.shift();
     }
   }
 

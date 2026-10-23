@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.48.2 (2026-10-23)
+
+### Fixed
+
+- **The board responder settles a resumed request whose `com.complete` answer was lost, on the next tick** (FAA-86),
+  both twins. A transferred request with a known outcome left the resume queue before it was sent; when the board
+  stored the completion but its answer was lost while the session held, the checkpoint kept the entry at `completing`
+  until the next connect dropped it. It now leaves the queue only once it has resumed, and the next tick sends the same
+  key again (one reply, the request completed, the checkpoint empty, the same session).
+
 ## 0.48.1 (2026-10-23)
 
 ### Fixed
