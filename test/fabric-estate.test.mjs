@@ -43,6 +43,10 @@ test('the digest, the challenge, placement trust, P-256 keys and passkey keys', 
   assert.ok(V.machineProfile.length >= 17);
   for (const c of V.machineProfile) assert.equal(e.machineProfile(c.record, c.machineId) ?? null, c.expected, c.name);
   assert.deepEqual([...e.MACHINE_PROFILES], ['full', 'member', 'view']);
+  // The contract keeps the view machines' ids in a Set: NaN matches NaN there (FAA-107; no JSON carries NaN).
+  const nanFound = e.estateRecordRules('estate-record', { machines: [{ id: NaN, profile: 'view' }, { id: 'a', secrets: [{ from: NaN }] }] }).filter((f) => f.code === 'FAC-SEM-134');
+  assert.deepEqual(nanFound.map((f) => f.instancePath), ['/machines/1/secrets/0/from']);
+  assert.equal(nanFound[0].message, 'machine NaN is a view machine: it is the source of no secret');
   for (const c of V.p256) assert.equal(e.isValidP256Key(Buffer.from(c.raw, 'hex')), c.expected, c.name);
   for (const c of V.credentialKeys) {
     const found = e.credentialKey(c.publicKey, c.alg);

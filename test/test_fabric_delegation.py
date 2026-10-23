@@ -359,6 +359,11 @@ class GateTests(unittest.TestCase):
         self.assertEqual(json.loads(body)["error"]["code"], "unauthenticated")
         for code in VECTORS["constants"]["refusalCodes"]:
             self.assertIn(dl.refusal_http({"ok": False, "code": code, "detail": "x"})[0], (401, 403, 503))
+        # DL-19 (DEC-0106): profile-forbids is the callee's refusal, 403 with no challenge.
+        status, headers, body = dl.refusal_http({"ok": False, "code": "profile-forbids", "detail": "target-view"})
+        self.assertEqual(status, 403)
+        self.assertNotIn("WWW-Authenticate", headers)
+        self.assertEqual(json.loads(body)["error"]["message"], "The caller's or the target's machine profile does not allow this call.")
         self.assertNotIn(self.case["token"], json.dumps(result))
 
     def test_mcp_tool_server_runs_the_gate_before_the_handler(self):

@@ -57,6 +57,7 @@ from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
     objects as _list,
     safe_integer as _safe_integer,
     same as _same,
+    set_has as _set_has,
     show as _show,
 )
 from fabric_time import (  # noqa: E402 - the core (FAA-65)
@@ -690,7 +691,7 @@ def _machine_profiles(value: Dict[str, Any], flag) -> None:
                 flag("/machines/%d/secrets" % m, "a view machine holds none of the estate's secrets")
     for machine, m in _indexed(_get(value, "machines")):
         for secret, s in _indexed(_get(machine, "secrets")):
-            if _contains(views, _get(secret, "from")):
+            if _set_has(views, _get(secret, "from")):  # the contract's Set: NaN matches NaN
                 flag("/machines/%d/secrets/%d/from" % (m, s), "machine %s is a view machine: it is the source of no secret" % _show(_get(secret, "from")))
 
 

@@ -136,6 +136,11 @@ test('the gate refuses in the DL-19 shape and never echoes the token', async () 
   assert.equal(http.status, 401);
   assert.equal(http.headers['WWW-Authenticate'], 'Bearer error="invalid_token"');
   for (const code of V.constants.refusalCodes) assert.ok([401, 403, 503].includes(d.refusalHttp({ ok: false, code, detail: 'x' }).status));
+  // DL-19 (DEC-0106): profile-forbids is the callee's refusal, 403 with no challenge.
+  const forbids = d.refusalHttp({ ok: false, code: 'profile-forbids', detail: 'target-view' });
+  assert.equal(forbids.status, 403);
+  assert.equal(forbids.headers['WWW-Authenticate'], undefined);
+  assert.equal(JSON.parse(forbids.body).error.message, "The caller's or the target's machine profile does not allow this call.");
   assert.ok(!JSON.stringify(result).includes(c.token));
   // DL-26: a T0 or T1 caller is never required to present a token; a present one is verified at every tier.
   for (const tier of ['T0', 'T1']) {
