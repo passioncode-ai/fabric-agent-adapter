@@ -7,7 +7,9 @@ The operator's standing request: «давай доделывай все сам �
 
 **Done.** 0.48.2: `_resume_next` / `resumeNext` takes a transferred request off the resume queue only after it has
 resumed, in both twins. A lost answer of the `com.complete` that sends a known outcome keeps it first in line, and the
-next tick sends the same key again from the checkpoint, as finding 35 already did for the replied-before probe.
+next tick sends the same key again from the checkpoint, as finding 35 already did for the replied-before probe. PR
+[#183](https://github.com/passioncode-ai/fabric-agent-adapter/pull/183) (`565eaed`), tag `v0.48.2`, npm 0.48.2; launcher
+0.2.33, installed here byte-identical to the tag (155 of 155 files).
 
 **Checks actually run.** The new tests (`test_a_lost_complete_answer_on_a_resumed_request_settles_on_the_next_tick`,
 the Node `FAA-86` test) red on the old code (the checkpoint held the entry at `completing`), green after; the board
