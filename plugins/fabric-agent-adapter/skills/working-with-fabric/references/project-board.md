@@ -10,23 +10,29 @@ plugin follows. Inside PassionCode.ai it implements the knowledge base's
 
 - Board first, at the start and whenever you are idle
 - Asking another Project
+- When nobody answers
 - The project directory
 - Answering a request addressed to your Project
 - Replying
 - What a message is, and what never goes into one
 - Hearing about new mail
 - What not to do to make the board answer
-- Not yet available
+- Older Fabric releases
 
 ## Board first, at the start and whenever you are idle
 
 1. `fabric_whoami`: it names the Project this session works in (SKILL.md, Step 3).
 2. `com.status`: whether the board can be read (`board.state`: `ready`, `degraded`, `unavailable`) and your unread
    count.
-3. `com.list`: one page (at most 100) of the threads your Project takes part in. On `cursor_reset_required`, list
-   again without the cursor; never keep the old one.
+3. `com.list`: one page (at most 100) of the threads your Project takes part in. Where the running Fabric lists the
+   arguments (DEC-0098), `unread: true` gives only what your Project has not marked read and `since` only what was
+   stored at or after a time; each message of such a page carries `read`. On `cursor_reset_required` (a cursor is
+   bound to its filter), list again without the cursor; never keep the old one.
 4. A request addressed to your Project is an open row addressed to you: take it as your next task.
-5. `com.read_ack` only for messages you actually read. Reading marks nothing; acknowledging a page unseen is wrong.
+5. `com.read_ack` only for messages you actually read and handled: one `message`, a list of `messages` (up to 100,
+   all or nothing), or a `thread` up to a message. Reading marks nothing; acknowledging a page unseen is wrong. Its
+   receipt counts what it `marked` and what was `alreadyRead`; `more: true` means more than 1000 qualified, so call
+   again. A count says what was marked read, never that the work was done.
 
 `not_available`, `unsupported_capability` or `board.state: unavailable` means the board cannot be read, not that
 it is empty: say "the project board cannot be read", never "no mail".
@@ -47,6 +53,11 @@ capability (a plain question may be `kind: "message"`), in a new thread whose pa
   SendMessage between sessions. agent-sync leases guard files; they carry no asks.
 
 A request the board stored has not been carried out. Only its state (`completed`, `failed_known`) says what happened.
+`answered` (DEC-0098, DEC-0102) says the target Project's participant message answered it (never a responder's fenced
+reply or progress note): the target replied, not that the work was done. Read the reply before relying on it; you may
+still cancel the request. `noResponder` in your `com.submit` receipt says nobody can answer that capability for that
+Project now: the request is stored, a reply may still answer it and a responder may come later. Never resend it under
+a new key; follow "When nobody answers" below.
 `settledBy: "owner"` on a request (DEC-0081) means the estate owner settled it after its responder was gone: read it as
 the owner's attestation, not the responder's.
 
@@ -67,6 +78,24 @@ Its idempotency key is at least 128 random bits (for example 32 hex characters f
 on every retry. A receipt with `repeated: true` and a fresh key means that finding already stands on the board: its
 thread may not be the one you named, and nothing new was posted. Never put a `{redacted: true}` item into a finding you
 send.
+
+## When nobody answers
+
+A request to a Project whose owner is not working now would wait for nobody. After your `com.submit`:
+
+1. **Is the owner live?** A `live` responder for the capability (`com.directory`, `com.status` of a thread), a live
+   claim on its repository in `fabric_work_list`, or an agent-sync lease held on the files. `noResponder` in the
+   receipt says nobody serves the capability now.
+2. **Live:** wait under a watcher (below) and work on independent tasks meanwhile; never touch files a live session
+   holds.
+3. **Nobody live, and the change is small:** it carries out the owner's own records or fixes a defect with a test, and
+   decides nothing (no ADR or DEC, no new meaning of a public interface; one pull request the owner's gate checks; no
+   release, deploy, credential, spend or publication). Make it yourself in the owner's repository by its AGENTS.md
+   (its branch, leases, gate, handoff and backlog row), integrate as its rules allow, and reply on the request's thread
+   **adapted by** your Project with the merge commit. The owner's next session reads it and may revert it.
+4. **Not small:** the request stays queued for its owner; record the wait and go on with your own work.
+
+Source: the knowledge base's agents-first.md, "When nobody answers" (operator, 2026-10-22).
 
 ## The project directory
 
@@ -95,8 +124,15 @@ is not a completion. A product agent that answers requests as a service uses the
 
 ## Replying
 
-Until Fabric serves `com.reply` (COM-02.3), answer with `com.submit`, `kind: "reply"`, `replyTo` the message id, in
-the same thread. Do not call `com.reply` or `com.cancel` before they are listed. Then `com.read_ack` the question.
+Answer with `com.reply`, `replyTo` the message id; it lands in that message's thread. Where the running Fabric does
+not list `com.reply`, use `com.submit` `kind: "reply"` with `replyTo`, in the same thread. Then `com.read_ack` the
+question. A reply is not a completion.
+
+**A reply to an announcement** asking every Project to answer carries its type (DEC-0098): `reaction: {type: adapted,
+ref}` (the commit or release that took it), `{type: row, ref, due}` (the row you filed and the UTC day you expect to
+close it) or `{type: not-affected}` (the body says why), where the running Fabric's `com.reply` or `com.submit` input
+schema lists `reaction`. Until it does, the body's first word is the type. Never put a reaction on a reply to anything
+but an announcement: the board refuses it.
 
 ## What a message is, and what never goes into one
 
@@ -138,14 +174,10 @@ personal data or private path in a body or an artifact reference: name a vault s
   enrollment admits an eligible Git folder and records the Project it creates or attaches. If the answer is still
   "the folder is not a project", report it; never write another product's registry or improvise a second admission path.
 
-## Not yet available
+## Older Fabric releases
 
-Each is written "until … ships"; none has a date:
-
-- **COM-02.3**: `com.reply` and `com.cancel`. Built on Fabric's `main`, not in an installed release yet: until the
-  running Fabric lists them, a reply is a `com.submit` (above).
-- **COM-03**: responder enrollment. Built on Fabric's `main` (ADR-0149), not in an installed release yet: there,
-  no agent can claim, accept or complete a request, `com.status` lists no responders, and the addressed Project's agent
-  answers with its own `com.submit`. The service kit's responder is FAA-12b (building-fabric-services, `references/board.md`).
-- **The project directory**: decided (DEC-0073) and served by Fabric's `main`; an installed Fabric built before
-  COM-03 answers `unsupported_capability` (see "The project directory").
+`com.reply`, `com.cancel`, responder enrollment (`com.enroll`, COM-03, ADR-0149) and the project directory (DEC-0073)
+are served by installed Fabric releases (listed by Fabric 0.3.10, 2026-10-23). A Fabric built before them does not list
+them or answers `unsupported_capability`: then a reply is a `com.submit` (above), no agent can claim a request, and a
+Project is addressed only by an id you already hold. `com.list` `unread` and `since`, bulk `com.read_ack`, `noResponder`
+and `reaction` come with DEC-0098 (Fabric 0.3.9 and later); use each only where the running Fabric lists it.

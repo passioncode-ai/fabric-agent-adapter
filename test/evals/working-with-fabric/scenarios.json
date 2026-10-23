@@ -99,12 +99,12 @@
       ]
     },
     {
-      "id": "reply-until-com-reply-ships",
+      "id": "reply-with-com-reply-where-served",
       "request": "Answer the question the other project sent on the board.",
       "expected": [
-        "replies with com.submit kind reply and replyTo the message id in that thread",
-        "does not call com.reply, which is not served until Fabric COM-02.3",
-        "marks the question read with com.read_ack after reading it"
+        "replies with com.reply and replyTo the message id where the running Fabric lists com.reply; only where it does not, com.submit kind reply with replyTo in the same thread",
+        "marks the question read with com.read_ack after reading it, and only it",
+        "a reply to a request is not a completion: it may move the request to answered, never to completed"
       ]
     },
     {
@@ -154,9 +154,9 @@
     },
     {
       "id": "limit-stop-restarts-at-once",
-      "request": "Two of my workflow lanes stopped with \"You've hit your session limit \u00b7 resets 5am\" and a subagent has written nothing for 20 minutes. What now?",
+      "request": "Two of my workflow lanes stopped with \"You've hit your session limit · resets 5am\" and a subagent has written nothing for 20 minutes. What now?",
       "expected": [
-        "restarts at once instead of waiting for the reset: the workflow is stopped and resumed with the same run id and the same args; the subagent gets \u00abresume\u00bb at its id",
+        "restarts at once instead of waiting for the reset: the workflow is stopped and resumed with the same run id and the same args; the subagent gets «resume» at its id",
         "checks the silent subagent is not running a long command of its own before treating it as stalled",
         "retries on a 2, 5, 10, then 15-minute backoff only if a restart stops again at once, and does other work meanwhile",
         "does not retry a spend, credit or billing limit on a timer: it goes to the operator once as a human gate",
@@ -194,6 +194,63 @@
         "Explains that when the process table cannot be read the hook treats the session as unknown and spools nothing, and that a session Fabric launched is remembered by a marker",
         "Explains that the worker ends fabric-mcp's whole process group at its 10 s deadline and that stale spool folders are pruned even while the hooks are inert",
         "Points at the hooks log and references/session-hooks.md for evidence instead of guessing, and never edits the spool by hand"
+      ]
+    },
+    {
+      "id": "when-nobody-answers-small-change",
+      "trap": "the agent asked another Project on the board, saw noResponder in the receipt and nobody working in that repository, and waited for days on a one-line fix it could have made under the owner's rules",
+      "request": "Our build needs a one-line fix in the other Project's schema file; its responder slot is empty and nobody has worked in that repository today.",
+      "expected": [
+        "asks through com.submit first, then checks whether the owner is live: a live responder for the capability, a live claim in fabric_work_list, or an agent-sync lease on the files",
+        "nobody live and the change small (it carries out the owner's own records or fixes a defect with a test; no decision, no new meaning of a public interface, no release, deploy, credential, spend or publication): makes it in the owner's repository by that repository's AGENTS.md (its branch, leases, gate, handoff and backlog row) and integrates as its rules allow",
+        "replies on the request's thread adapted by its own Project, with the merge commit, so the owner's next session can read it and revert it",
+        "never touches files a live session holds"
+      ]
+    },
+    {
+      "id": "when-nobody-answers-not-small-stays-queued",
+      "request": "The other Project has not answered our request to redesign its public API for a week, and nobody is working there.",
+      "expected": [
+        "treats a redesign of a public interface as not small: it decides something, so the request stays queued for its owner",
+        "keeps working on its own independent tasks and records the wait (condition, owner, the request's thread) instead of making the change itself",
+        "does not resend the request under a new idempotency key and does not post it to another thread"
+      ]
+    },
+    {
+      "id": "new-mail-with-unread-and-since",
+      "request": "Check the project board for what is new since your last session and mark what you handled.",
+      "expected": [
+        "reads only what is new with com.list unread true (or since a time) where the running Fabric lists those arguments; each message of such a page carries read",
+        "marks read only the messages it actually read and handled, with com.read_ack of one message, of a list of messages (up to 100), or of a thread up to a message; reading marks nothing",
+        "on a com.read_ack receipt with more true, calls again; marked and alreadyRead are counts, not proof the work was done",
+        "an unreadable board (not_available or board.state unavailable) is reported as unreadable, never as no mail"
+      ]
+    },
+    {
+      "id": "no-responder-receipt",
+      "request": "Our com.submit request to the analytics Project came back with noResponder in its receipt.",
+      "expected": [
+        "reads noResponder as: the request is stored, but nobody can answer that capability for that Project now; it is not a refusal and not a failure",
+        "does not resend it under a new key; a reply from the target may still answer it and a responder may come later",
+        "applies When nobody answers: checks whether the owner is live and, only for a small change, makes it in the owner's repository and replies adapted by with the merge commit; otherwise keeps it queued and works on"
+      ]
+    },
+    {
+      "id": "reaction-on-an-announcement",
+      "request": "Reply to the announcement asking every Project whether it adopted the new rule; we adopted it in our last release.",
+      "expected": [
+        "replies once to the announcement with a typed reaction where the running Fabric's com.reply or com.submit input schema lists reaction: adapted with ref the commit or release, row with ref the row id and due the day it closes, or not-affected with the reason in the body",
+        "where reaction is not listed, starts the body with the type's word (adapted, row, not affected)",
+        "never puts a reaction on a reply to anything but an announcement"
+      ]
+    },
+    {
+      "id": "answered-is-not-done",
+      "request": "Our request to the other Project now reads answered. Can we treat the work as done?",
+      "expected": [
+        "reads answered as: the target Project's participant message answered it (never a responder's fenced reply or progress note); it says the target replied, never that the work was done",
+        "checks what the reply says before relying on it, and may still cancel the request if it is no longer needed",
+        "only completed or failed_known (with settledBy owner as the owner's attestation) say what happened to the work"
       ]
     }
   ]

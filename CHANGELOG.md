@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.45.1 (2026-10-23)
+
+### Changed
+
+- **`working-with-fabric` teaches *When nobody answers*** (FAA-99, the operator's rule of 2026-10-22, board thread
+  `c97280b0`): after a `com.submit`, check whether the owner is live; if nobody is and the change is small, make it in
+  the owner's repository by its AGENTS.md and reply *adapted by* with the merge commit; otherwise the request stays
+  queued.
+- **It reads the board as DEC-0098 and DEC-0102 serve it:** `com.list` `unread` and `since` with each message's `read`,
+  `com.read_ack` of one message, a list or a thread with its counts, `noResponder` on a request's receipt, a typed
+  `reaction` on a reply to an announcement, and `answered` (the target replied; not a completion).
+- `com.reply`, `com.cancel`, responder enrollment and the project directory are described as served by installed
+  Fabric releases (Fabric 0.3.10 lists them), with the fallback for an older Fabric; "Not yet available" is gone.
+- Seven scenario evals (six new, one rewritten for `com.reply`) and four trigger queries come first, as AGENTS.md asks.
+
 ## 0.45.0 (2026-10-22)
 
 ### Changed
