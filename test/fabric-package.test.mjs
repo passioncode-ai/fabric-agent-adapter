@@ -338,3 +338,35 @@ test('both kits pack and sign the same folder to the same bytes', { skip: !hasPy
   k.main(['pack', path.join(dir, 'nowhere')], (line) => lines.push(line));
   assert.equal(pyRefusal.stdout.trim(), lines.join('\n'));
 });
+
+test('FAA-91: a folder swapped for a link while its files are read, and swapped back before the walk ends, is refused', (t) => {
+  // Node has no openat: readFolder lists a folder by its path. A swap that lasts while a file is opened, and is undone
+  // before the folder's closing check, used to read the file through the link; the folder is now checked after each read.
+  const root = tempDir(t);
+  const outside = tempDir(t);
+  fs.mkdirSync(path.join(root, 'sub'));
+  for (const name of ['a.txt', 'b.txt']) {
+    fs.writeFileSync(path.join(root, 'sub', name), 'inside\n');
+    fs.writeFileSync(path.join(outside, name), 'outside\n');
+  }
+  const sub = path.join(root, 'sub');
+  const real = path.join(root, 'sub.real');
+  const open = fs.openSync;
+  let opened = 0;
+  fs.openSync = (file, ...rest) => {
+    if (String(file).startsWith(`${sub}${path.sep}`)) {
+      opened += 1;
+      if (opened === 1) { fs.renameSync(sub, real); fs.symlinkSync(outside, sub); } // swapped as the first file opens
+      if (opened === 2) { fs.unlinkSync(sub); fs.renameSync(real, sub); } // and back before the second
+    }
+    return open(file, ...rest);
+  };
+  try {
+    assert.throws(() => k.readFolder(root), /sub \(a symlink\)/);
+  } finally {
+    fs.openSync = open;
+    if (fs.lstatSync(sub).isSymbolicLink()) { fs.unlinkSync(sub); fs.renameSync(real, sub); }
+  }
+  assert.equal(opened, 1, 'refused at the first file read through the swapped folder, before the swap is undone');
+  assert.equal(fs.readFileSync(path.join(root, 'sub', 'a.txt'), 'utf8'), 'inside\n');
+});
