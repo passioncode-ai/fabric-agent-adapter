@@ -53,6 +53,27 @@ class Manifest(unittest.TestCase):
     def test_kit_json_is_what_the_sources_say(self):
         self.assertEqual(fabric_kit.build(check=True), [], "run: python3 %s build" % (SCRIPTS / "fabric_kit.py"))
 
+    def test_build_refuses_to_rewrite_a_released_version(self):
+        """FAA-111: a build run before kit.json's version moves on rewrote the last release's digests three times
+        (0.41.0, 0.47.0, 0.49.0); `build` now refuses when its version already has a release tag and other digests."""
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest = dict(KIT, history=dict(KIT["history"]))
+            manifest["history"][manifest["version"]] = {"fabric_jsvalue.py": "0" * 64}
+            path = Path(tmp) / "kit.json"
+            path.write_text(json.dumps(manifest, indent=1) + "\n", encoding="utf-8")
+            saved, released = fabric_kit.MANIFEST, fabric_kit._released
+            fabric_kit.MANIFEST, fabric_kit._released = path, lambda version: True
+            try:
+                with self.assertRaises(SystemExit) as refused:
+                    fabric_kit.build()
+                self.assertIn("v%s" % manifest["version"], str(refused.exception))
+                self.assertEqual(json.loads(path.read_text(encoding="utf-8")), manifest, "nothing written")
+                self.assertIn("kit.json history %s" % manifest["version"], fabric_kit.build(check=True), "check only reports")
+                fabric_kit._released = lambda version: False
+                self.assertIn("kit.json history %s" % manifest["version"], fabric_kit.build())
+            finally:
+                fabric_kit.MANIFEST, fabric_kit._released = saved, released
+
     def test_a_released_version_keeps_its_digests(self):
         """A release's history entry is what that release shipped. `build` writes the entry of kit.json's own version, so
         a build run before the version moves on would rewrite the last release's digests and make its genuine copies read

@@ -110,4 +110,6 @@ A probe result in an event is one of `PROBE_RESULTS`; a host never appends a run
 ## Usage by route
 
 `make_usage_receipt(..., route="subscription"|"key")` records how the call was paid: the operator's own login in its
-vendor's runner, or an issued key. The usage report keeps the rows of one model on two routes apart.
+vendor's runner, or an issued key. The usage report keeps the rows of one model on two routes apart. A subscription
+row's `costUsd` is an estimate at list price, never money spent: a limit's `spentUsd` leaves it out (DEC-0110,
+[usage](usage.md)).

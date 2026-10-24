@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.49.0 (2026-10-24)
+
+The operator's sweep (FAA-111): blind seam and product readings of 0.47.0 to 0.48.3, their findings fixed, documented
+or filed ([dispositions](docs/evidence/reports/2026-10-24-faa-111-tiers/README.md)), and three open rows closed.
+
+### Changed
+
+- **The session start says less in a folder that does not use Fabric** (FAA-60). The plugin's `SessionStart` hook
+  printed the whole Fabric preamble (about 900 characters) in every session wherever `fabric` was registered, a project
+  Fabric never served included. It now prints the preamble only where `project_uses_fabric` finds a sign (a contract
+  file up to the checkout root, a project-scope registration, a service descriptor naming the checkout's origin), and
+  elsewhere one line that points at `fabric_whoami`, so a project Fabric serves without a contract file still finds it.
+- **`watch-mail` delivers the turns the hooks spooled** (FAA-89). A look that finds spooled turns runs the worker's own
+  `deliver` (one rejoin that reports the turns and reads the unread count) instead of a second rejoin beside them, so
+  the once-a-minute budget no longer holds a turn back while an agent waits on the board. The count it reads must be a
+  whole number of zero or more, and a look that delivered the session's end says the session ended.
+- **The trigger descriptions of three skills name their boundaries** (FAA-88): `building-fabric-services`,
+  `creating-fabric-agents` and `working-with-fabric`, after their first trigger evals against a real client
+  ([report](docs/evidence/evals/2026-10-24-trigger-run.md): 26/26, 44/45, 38/39 with Claude Code 2.1.299 and haiku).
+- **`fabric_kit.py build` refuses to rewrite a released version's digests**: when `kit.json`'s `"version"` already has
+  a release tag and the sources differ, it stops and says to move the version first (the mistake happened three times).
+
+### Fixed
+
+- **A resumed board handler ran twice** (a regression of 0.48.2). FAA-86 kept a resumed request first in the queue
+  until its resume returned; a handler that finished inside the resume (a synchronous `spawn`, the kit's fixture among
+  them) settled, the settle resumed the queue again and found the same request still first, so it ran the handler and
+  sent `com.effect_begin` a second time. Both twins now take the request off before resuming it and put it back first
+  only when the resume raises and no effect has begun (a request whose effect began waits for reconcile), which keeps
+  FAA-86's behaviour.
+- **The OpenRouter ceiling counts money only** (DEC-0110). `Client.spent_usd` / `spentUsd` and `totals()` counted a
+  `subscription` receipt's cost in a shared ledger as spent, while the usage report has counted money only since 0.48.0.
+  A `subscription` receipt is now never money; `totals()` answers `spentUsd: 0` when every call was on a subscription
+  or there was no call.
+- **The network guards no longer pass a 403 that carries the well-known document.** `guard_verdict` passed any 403;
+  a 403 whose JSON body holds the document or a part of it now fails, judged by the same shape as the no-token check.
+- **The no-token check reads the document by its shape** (D4 of FAA-111). A proxy's JSON error with a `service` string
+  of its own failed as "the well-known document"; only a `protocol` of the extension, a `service` object with an `id` or
+  a `process` object with a `pid` counts. `references/remote-placement.md` lists the two false FAILs that remain.
+
+### Documentation
+
+- `references/usage.md`: a service built with a kit older than 0.48.0 counts a subscription's estimate until it
+  re-vendors `fabric_usage`; a self-stated `spentUsd` on the twin of `budget` must match the receipts or the report is
+  refused; a counted `null` means unknown. `references/profiles.md` and `references/protocol.md`: a `subscription`
+  row's cost is an estimate, and `platform-metered` is a route.
+- Probe order on a remote placement: `auth.token-file` now comes before `well-known.requires-token` (since 0.48.0); a
+  reader that indexes the results by position should read them by rule id.
+- `test/validate.py` scans the recipes' README for em dashes. The FAA-107 and FAA-84 backlog rows are corrected.
+- Filed from the seam reading: FAA-112 (FAC-SEM-137 has no verify-path vectors) and FAA-113 (the remaining Python
+  estate lookups that mirror a Node `Set`).
+
 ## 0.48.3 (2026-10-24)
 
 ### Fixed

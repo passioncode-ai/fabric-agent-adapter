@@ -179,6 +179,17 @@ class Rules(unittest.TestCase):
             unmeasured_call_usd=0.0)
         self.assertEqual(c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=100)["content"], "x")
 
+    def test_a_subscription_estimate_is_not_spent_against_the_ceiling(self):
+        # DEC-0110 (the seam reading of 0.48.3): a shared ledger holds the subscription runner's receipts too; their
+        # cost is an estimate at list price, so the ceiling, like the usage report's limits, counts money only.
+        sub = {"at": "2026-10-21T01:00:00Z", "provider": "anthropic", "model": "m", "route": "subscription",
+               "costUsd": 5.0, "costBasis": "price-list"}
+        c, _ = client({"ceilingUsd": 1.0}, [], Ledger([sub]))
+        self.assertEqual(c.spent_usd(), 0.0)
+        key = dict(sub, route="key", provider="openrouter", costUsd=0.25)
+        c, _ = client({"ceilingUsd": 1.0}, [], Ledger([sub, key]))
+        self.assertEqual(c.spent_usd(), 0.25)
+
     def test_calls_in_flight_are_reserved(self):
         started, release = threading.Event(), threading.Event()
         ok = json.dumps({"choices": [{"finish_reason": "stop", "message": {"content": "x"}}],
@@ -267,6 +278,13 @@ class Rules(unittest.TestCase):
         self.assertEqual(fo.totals([{"costUsd": 0.5}, {"costUsd": None}, {"costUsd": 0.25}]),
                          {"calls": 3, "spentUsd": 0.75, "unpricedCalls": 1})
         self.assertEqual(fo.totals([{"costUsd": None}]), {"calls": 1, "spentUsd": None, "unpricedCalls": 1})
+        self.assertEqual(fo.totals([]), {"calls": 0, "spentUsd": 0.0, "unpricedCalls": 0}, "no call spent nothing")
+        # DEC-0110 (the seam reading of 0.48.3): a subscription's cost is an estimate, never money spent.
+        self.assertEqual(fo.totals([{"costUsd": 2.0, "route": "subscription"}, {"costUsd": 0.5, "route": "key"}]),
+                         {"calls": 2, "spentUsd": 0.5, "unpricedCalls": 0})
+        self.assertEqual(fo.totals([{"costUsd": 2.0, "route": "subscription"}]), {"calls": 1, "spentUsd": 0.0, "unpricedCalls": 0})
+        self.assertEqual(fo.totals([{"costUsd": 2.0, "route": "subscription"}, {"costUsd": None}]),
+                         {"calls": 2, "spentUsd": None, "unpricedCalls": 1})
 
 
 if __name__ == "__main__":

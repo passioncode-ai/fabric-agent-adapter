@@ -118,6 +118,7 @@ from fabric_session_hosts import (  # noqa: F401
 from fabric_session_cli import (  # noqa: F401
     REJOIN_MIN_INTERVAL_S,
     PREAMBLE,
+    POINTER,
     DOWN_NOTICE,
     QUIET_SOURCES,
     read_hook_input,

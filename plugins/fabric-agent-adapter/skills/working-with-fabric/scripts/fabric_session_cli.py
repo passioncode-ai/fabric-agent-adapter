@@ -65,6 +65,16 @@ PREAMBLE = (
 )
 
 
+#: FAA-60: one line where Fabric runs and `fabric` is registered, but nothing says this folder works through it (a
+#: user-scope registration reaches every folder of the machine). It hides nothing: `fabric_whoami` names the project
+#: when Fabric serves the folder all the same.
+POINTER = (
+    "[fabric-agent-adapter] Fabric is running and this {host} has `fabric` registered; this folder carries no sign that "
+    "it works through Fabric. If it does, call `fabric_whoami`: it names the project. The working-with-fabric skill has "
+    "the routine."
+)
+
+
 #: One line, and only in a project that uses Fabric (project_uses_fabric): everywhere else a Fabric that is down is
 #: nothing the session needs to hear.
 DOWN_NOTICE = (
@@ -89,8 +99,8 @@ def read_hook_input() -> Dict[str, Any]:
 def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None,
                        host: str = "claude") -> Optional[str]:
     """What to print, or None: Claude/Codex hook JSON, plain context for native plugins and Kimi. The preamble when the
-    host has `fabric` registered and Fabric runs; when it is down, one line, and only in a project that uses Fabric
-    (project_uses_fabric). Silent on a compacted or resumed session (`source`), which already holds what it was told,
+    host has `fabric` registered, Fabric runs and the project uses Fabric (project_uses_fabric); a one-line pointer
+    when the project shows no sign (FAA-60); when Fabric is down, one line, and only in a project that uses Fabric. Silent on a compacted or resumed session (`source`), which already holds what it was told,
     and in a session Fabric launched. How to read the machine's Fabric services is the host instructions' to say."""
     if host not in HOSTS or payload.get("source") in QUIET_SOURCES or fabric_launched(env):
         return None
@@ -102,7 +112,7 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     if not registered:
         return None
     if locate_hub(fabric_root(env=env))["state"] == "running":
-        context = PREAMBLE.format(host=HOSTS[host])
+        context = (PREAMBLE if project_uses_fabric(cwd, env, registration) else POINTER).format(host=HOSTS[host])
     elif project_uses_fabric(cwd, env, registration):
         context = DOWN_NOTICE
     else:

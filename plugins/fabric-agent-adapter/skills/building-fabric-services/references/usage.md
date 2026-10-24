@@ -82,8 +82,15 @@ ledger.report(service_id=ID, budget={"period": "month", "limitUsd": 100}, budget
   a `subscription` route's `costUsd` is an estimate at list price, never spent money, so a window
   spent only on a subscription spends `0`, and money is `null` only while no call off a subscription
   is priced. `usage_spend(rows)` / `usageSpend(rows)` is the contract's `usageSpend` over
-  `days[].byModel[]` rows: money and the subscription's estimate apart. A per-order limit
-  (`per_job`, `approval`) gets `spentUsd: null`. Every other limit states its own spend.
+  `days[].byModel[]` rows: money and the subscription's estimate apart. A day's `costUsd` still sums every
+  route, so beside a subscription it is larger than the limit's `spentUsd`. A service built with a kit older than
+  0.48.0 keeps counting the estimate as spent until it re-vendors `fabric_usage`
+  (`fabric_kit.py install <dir> --module fabric_usage`, or `--lang node --module fabric-usage`). A per-order limit
+  (`per_job`, `approval`) gets `spentUsd: null`. Every other limit states its own spend. The machine twin of
+  `budget` may leave `spentUsd` out (the kit counts it) or state the same number the receipts give; a different
+  number makes the twins disagree, and the report is refused (`FAC-SEM-031`). A counted `spentUsd` of `null` means
+  unknown, never zero: no call off a subscription in the window is priced, or one receipt in it names a `route` the
+  contract does not know or a cost its schema refuses, and then the whole window is unknown rather than guessed.
 - `scope` is `machine`, `project`, `pool` or `job`; a `project` or `pool` limit names its
   `subject`. A limit has at most one window (`period`, `windowSeconds` or `since`), and it agrees
   with the kind (`daily`: the day or 86400 s; `monthly`: the month or 28–31 days; `velocity`: a

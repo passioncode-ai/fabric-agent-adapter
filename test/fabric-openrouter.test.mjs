@@ -153,6 +153,11 @@ test('config refusals and totals', () => {
   }
   assert.deepEqual(fo.totals([{ costUsd: 0.5 }, { costUsd: null }, { costUsd: 0.25 }]), { calls: 3, spentUsd: 0.75, unpricedCalls: 1 });
   assert.deepEqual(fo.totals([{ costUsd: null }]), { calls: 1, spentUsd: null, unpricedCalls: 1 });
+  assert.deepEqual(fo.totals([]), { calls: 0, spentUsd: 0, unpricedCalls: 0 }); // no call spent nothing
+  // DEC-0110 (the seam reading of 0.48.3): a subscription's cost is an estimate, never money spent.
+  assert.deepEqual(fo.totals([{ costUsd: 2, route: 'subscription' }, { costUsd: 0.5, route: 'key' }]), { calls: 2, spentUsd: 0.5, unpricedCalls: 0 });
+  assert.deepEqual(fo.totals([{ costUsd: 2, route: 'subscription' }]), { calls: 1, spentUsd: 0, unpricedCalls: 0 });
+  assert.deepEqual(fo.totals([{ costUsd: 2, route: 'subscription' }, { costUsd: null }]), { calls: 2, spentUsd: null, unpricedCalls: 1 });
 });
 
 test('unencodable requests and answers over the cap', async () => {

@@ -148,6 +148,15 @@ class GuardVerdict(unittest.TestCase):
         self.assertEqual(probe.guard_verdict("network.host-check", True, 200, doc)[0], "FAIL")
         self.assertEqual(probe.guard_verdict("network.host-check", True, 401, b"")[0], "FAIL")
 
+    def test_a_403_that_carries_the_document_does_not_pass(self):
+        doc = json.dumps({"error": "forbidden", "service": {"id": "example-agent", "instance": "main"}}).encode()
+        for rule in ("network.host-check", "network.origin-check", "network.cross-site-check"):
+            verdict, evidence = probe.guard_verdict(rule, True, 403, doc)
+            self.assertEqual(verdict, "FAIL", rule)
+            self.assertIn("well-known document", evidence)
+        refusal = json.dumps({"error": {"code": "forbidden-host", "service": "example-agent"}}).encode()
+        self.assertEqual(probe.guard_verdict("network.host-check", True, 403, refusal)[0], "PASS", "a refusal naming its service")
+
 
 def free_port() -> int:
     """A port the system says is free on 127.0.0.1 now."""
@@ -256,6 +265,15 @@ class NoTokenVerdict(unittest.TestCase):
 
     def test_a_value_inside_another_word_is_not_a_name(self):
         self.assertEqual(probe.no_token_verdict(401, b"pid 482130, my-example-agent2", self.ids)[0], "PASS")
+
+    def test_a_proxy_json_error_naming_its_own_service_is_not_the_document(self):
+        # The product reading of 0.48.3: a proxy's JSON error may carry a `service` member of its own (a string); only
+        # the document's shape fails: its protocol, a `service` object with an id, a `process` object with a pid.
+        for body in (b'{"error":"unauthorized","service":"cloudflare-access"}', b'{"process":"login","status":401}'):
+            verdict, evidence = probe.no_token_verdict(401, body, self.ids, "agent.example.com")
+            self.assertEqual(verdict, "PASS", (body, evidence))
+        for body in (b'{"service":{"id":"x"}}', b'{"process":{"pid":7}}', b'[{"protocol":"fabric-service/0.1"}]'):
+            self.assertEqual(probe.no_token_verdict(401, body, self.ids)[0], "FAIL", body)
 
     def test_a_short_value_is_not_looked_for(self):
         # A Worker reports pid 1, and a sign-in page has a 1 somewhere: it names nothing (fabric-inbox, 2026-10-23).

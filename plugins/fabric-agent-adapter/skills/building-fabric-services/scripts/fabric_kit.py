@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List
@@ -61,6 +62,16 @@ def load_manifest() -> Dict:
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
 
+def _released(version: str) -> bool:
+    """Whether the checkout the kit sits in carries the release tag `v<version>` (False outside a Git checkout)."""
+    try:
+        listed = subprocess.run(["git", "-C", str(HERE), "tag", "--list", "v%s" % version],
+                                capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return listed.returncode == 0 and bool(listed.stdout.strip())
+
+
 def build(check: bool = False) -> List[str]:
     """Refresh every module's imports and sha256 in kit.json, and record this release's digests in its history.
     Returns what changed (with check=True nothing is written)."""
@@ -83,6 +94,10 @@ def build(check: bool = False) -> List[str]:
     current = {e["file"]: e["sha256"] for e in manifest["python"] + manifest["node"]}
     current.update(digests)
     if manifest.setdefault("history", {}).get(manifest["version"]) != current:
+        if not check and manifest["version"] in manifest["history"] and _released(manifest["version"]):
+            # A build before the version moves on would rewrite a released version's digests (FAA-111).
+            raise SystemExit("kit.json's version %s is released (tag v%s): move its \"version\" to the next release, "
+                             "then build" % (manifest["version"], manifest["version"]))
         manifest["history"][manifest["version"]] = current
         changed.append("kit.json history %s" % manifest["version"])
     if changed and not check:

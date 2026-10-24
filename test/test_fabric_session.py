@@ -270,6 +270,7 @@ class SessionStart(Base):
     def test_the_preamble_when_registered_and_running(self):
         self.register()
         self.hub()
+        (self.repo / "fabric-agent.json").write_text("{}")  # the project works through Fabric (FAA-60)
         done, elapsed = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
         self.assertEqual(done.returncode, 0)
         out = json.loads(done.stdout)["hookSpecificOutput"]
@@ -279,6 +280,24 @@ class SessionStart(Base):
             self.assertIn(word, out["additionalContext"])
         self.assertNotIn("DOOR-TOKEN-SENTINEL", done.stdout)
         self.assertLess(elapsed, 2.0)
+
+    def test_a_pointer_when_running_in_a_project_without_a_sign(self):
+        # FAA-60: `fabric` at user scope reaches every folder; one line points at fabric_whoami instead of the routine.
+        self.register()
+        self.hub()
+        done, elapsed = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
+        context = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
+        self.assertEqual(context, fs.POINTER.format(host="Claude Code"))
+        self.assertEqual(len(context.splitlines()), 1)
+        self.assertLessEqual(len(context), 320)
+        self.assertIn("fabric_whoami", context)
+        self.assertIn("working-with-fabric", context)
+        self.assertNotIn("com.status", context)
+        self.assertNotIn("\u2014", context)
+        self.assertLess(elapsed, 2.0)
+        self.register(scope="project")  # bound to this folder: the routine
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
+        self.assertEqual(json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"], fs.PREAMBLE.format(host="Claude Code"))
 
     def test_one_short_line_when_registered_down_and_the_project_uses_fabric(self):
         self.register()
@@ -851,6 +870,49 @@ class WatchMail(Active):
         self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8)[0], "down")
         self.assertEqual(len(self.records("argv")), 2, "no fabric-mcp starts while Fabric is down")
 
+    def test_a_look_delivers_the_spooled_turns_in_the_same_rejoin(self):
+        # FAA-89: while watch-mail runs, its looks keep the session's rejoin mark fresh, so a Stop-hook turn waits in the
+        # spool. The look delivers it: one fabric-mcp, the turn observed, the board's count read, the spool empty.
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=lambda directory: None)
+        directory = fs.session_dir(SID, self.env)
+        self.assertEqual(len(list(directory.glob("*-turn.json"))), 1)
+        self.unread(4)
+        self.assertEqual(fs.poll_unread(SID, self.repo, self.env, deadline_s=8), ("ok", 4))
+        self.assertEqual(len(self.records("argv")), 1, "one rejoin for the look and the spool")
+        self.assertEqual([c["name"] for c in self.records("call")], ["fabric_session_observe", "com.status"])
+        self.assertEqual(list(directory.glob("*-*.json")), [])
+        kind, left = fs.poll_unread(SID, self.repo, self.env, deadline_s=8)
+        self.assertEqual(kind, "wait")
+        self.assertGreater(left, 0)
+        self.assertEqual(len(self.records("argv")), 1, "the next look within the minute starts no fabric-mcp")
+
+    def test_the_count_after_delivering_is_read_strictly(self):
+        # The unit reading of 0.49.0: a negative count is no count; a fresh board.json that does not parse means the
+        # board was answered but cannot be read; a session whose end the look delivered is gone, not down.
+        mail = sys.modules["fabric_session_mail"]
+        directory = fs.session_dir(SID, self.env)
+        cases = [('{"unread": -1}', "unavailable"), ("[3]", "unavailable"), ("{not json", "unavailable"),
+                 ('{"unread": 2}', "ok"), (None, "ended")]
+        saved = mail.deliver
+        try:
+            for body, kind in cases:
+                directory.mkdir(parents=True, exist_ok=True)
+
+                def deliver(folder, env, deadline_s, body=body):
+                    if body is None:
+                        shutil.rmtree(folder)
+                    else:
+                        (folder / "board.json").write_text(body, encoding="utf-8")
+                mail.deliver = deliver
+                verdict = mail._deliver_and_count(directory, self.env, 8)
+                self.assertEqual(verdict[0], "down" if kind == "ended" else kind, body)
+                if kind == "ok":
+                    self.assertEqual(verdict[1], 2)
+                if kind == "ended":
+                    self.assertIn("session ended", verdict[1])
+        finally:
+            mail.deliver = saved
+
     def test_the_cli_needs_a_session_id_and_exits_on_stdin_close(self):
         done = subprocess.run([sys.executable, str(SCRIPT), "watch-mail", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)
@@ -948,6 +1010,7 @@ class NoServicesLine(Base):
         self.services()
         self.register()
         self.hub()
+        (self.repo / "fabric-agent.json").write_text("{}")
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
         context = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertEqual(context, fs.PREAMBLE.format(host="Claude Code"))
@@ -1037,6 +1100,9 @@ class OtherHosts(Base):
         codex.mkdir()
         (codex / "config.toml").write_text('[mcp_servers.fabric]\ncommand = "/opt/Fabric/resources/bin/fabric-mcp"\n')
         self.hub()
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
+        self.assertIn("this Codex has `fabric` registered; this folder carries no sign", done.stdout, "FAA-60: the pointer")
+        (self.repo / "fabric-agent.json").write_text("{}")
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo)}, args=["--host", "codex"])
         self.assertIn("this Codex has its MCP server `fabric`", done.stdout)
         for word in ("fabric_whoami", "com.status", "com.list", "com.submit"):

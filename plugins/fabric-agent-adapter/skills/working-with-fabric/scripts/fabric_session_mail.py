@@ -2,11 +2,12 @@
 agent waits on it, with backoff while Fabric is down. Standard library only."""
 from __future__ import annotations
 
+import json
 import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     BOARD_STATUS_TOOL,
@@ -28,6 +29,7 @@ from fabric_session_mcp import (  # noqa: E402 - the kit (FAA-65)
     NoSessionError,
     _wait_for_session_tools,
     board_unread,
+    deliver,
 )
 
 
@@ -43,7 +45,8 @@ def poll_unread(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None
     answers but the board cannot be read, ("down", why) when Fabric cannot be reached, ("wait", seconds) when the
     session rejoined within the last minute (the Stop worker's mark, or this one's): the rejoin budget is shared, so
     no fabric-mcp starts then (FAA-68). No fabric-mcp starts unless the running Fabric advertises session-hooks/1
-    (the rejoin). A successful rejoin renews the mark in the session's folder when the hooks made one."""
+    (the rejoin). A successful rejoin renews the mark in the session's folder when the hooks made one. Turns the hooks
+    spooled while the mark held them back are delivered by this look, through the same rejoin (FAA-89)."""
     env = dict(os.environ if env is None else env)
     directory = session_dir(session_id, env)
     left = rejoin_wait(directory)
@@ -57,6 +60,8 @@ def poll_unread(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None
     registration = claude_registration(cwd, env)
     if not registration:
         return "down", "Claude Code has no MCP server named fabric"
+    if directory.is_dir() and any(directory.glob("*-*.json")):
+        return _deliver_and_count(directory, env, deadline_s)
     client: Optional[McpStdio] = None
     try:
         deadline = time.monotonic() + deadline_s
@@ -84,6 +89,35 @@ def poll_unread(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None
     finally:
         if client is not None:
             client.close()
+
+
+def _deliver_and_count(directory: Path, env: Dict[str, str], deadline_s: float) -> Tuple[str, Any]:
+    """FAA-89: the hooks' worker drains the spool through one rejoin and writes the board's unread count beside it;
+    this look reads that count instead of rejoining a second time within the minute."""
+    started = time.time()
+    deliver(directory, env, deadline_s)
+    if not directory.is_dir():  # the look delivered the session's end, and the worker removed its folder
+        return "down", "the session ended: its spooled turns were delivered"
+    board = directory / "board.json"
+    try:
+        fresh = board.stat().st_mtime >= started - 1
+    except OSError:
+        fresh = False
+    unread = None
+    if fresh:
+        try:
+            data = json.loads(board.read_text(encoding="utf-8"))
+            unread = data.get("unread") if isinstance(data, dict) else None
+        except (OSError, ValueError):
+            unread = None
+    if isinstance(unread, int) and not isinstance(unread, bool) and unread >= 0:
+        return "ok", unread
+    if fresh:
+        return "unavailable", "the project board cannot be read"
+    left = rejoin_wait(directory)
+    if left > 0:
+        return "wait", left
+    return "down", "the spooled turns could not be delivered now"
 
 
 def watch_mail(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None, interval: float = 60, *,

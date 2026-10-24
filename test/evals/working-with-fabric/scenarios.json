@@ -263,6 +263,16 @@
         "then replies on the request, which answers it: kept, or reverted and why",
         "does not treat the other Project's adapted-by reply as having answered the request; only its own reply as the target does"
       ]
+    },
+    {
+      "id": "pointer-in-a-project-without-fabric-signs",
+      "trap": "the session start gave only the one-line pointer (no contract file, no project-bound registration, no service of this checkout), and the agent either ran the whole board routine on a task that has nothing to do with Fabric, or concluded Fabric does not serve this folder and never asked",
+      "request": "Rename the helper in utils.py and update its callers. (The session start said: Fabric is running and `fabric` is registered; this folder carries no sign that it works through Fabric. If it does, call `fabric_whoami`: it names the project; the working-with-fabric skill has the routine.)",
+      "expected": [
+        "for a task that does not touch Fabric, does the task without claiming work or reading the board, and does not invent a project for this folder",
+        "when the task or the person mentions Fabric, the board or a claim, calls fabric_whoami once and follows the routine only if it names a project for this folder",
+        "never treats the pointer as proof that Fabric does not serve the folder"
+      ]
     }
   ]
 }

@@ -318,9 +318,10 @@ export class Responder {
   }
 
   /**
-   * Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves the
-   * queue only once it has resumed: a lost answer, of its probe (finding 35) or of the `com.complete` that sends a known
-   * outcome (FAA-86), keeps it first in line, and the next tick sends the same keys again from the checkpoint.
+   * Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A lost answer, of its
+   * probe (finding 35) or of the `com.complete` that sends a known outcome (FAA-86), puts the request back first in
+   * line, and the next tick sends the same keys again from the checkpoint. It leaves the queue before it resumes, so a
+   * handler that settles inside the resume (and reaches `replace`, which resumes the queue again) never runs it twice.
    */
   async resumeNext() {
     while (!this.current && this.toResume.length && !this.stopping) {
@@ -331,8 +332,15 @@ export class Responder {
       }
       const entry = JSON.parse(JSON.stringify(stored));
       if (entry.probe) await this.repliedBefore(entry);
-      await this.resume(entry);
-      if (this.toResume[0] === entry.request) this.toResume.shift();
+      this.toResume.shift();
+      try {
+        await this.resume(entry);
+      } catch (error) {
+        // Back first only while it can still be resumed: once its effect began it waits for reconcile.
+        const held = this.checkpoint.entries[entry.request];
+        if (held && !held.effect && held.step !== 'unknown' && !this.toResume.includes(entry.request)) this.toResume.unshift(entry.request);
+        throw error;
+      }
     }
   }
 

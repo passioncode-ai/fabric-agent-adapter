@@ -84,7 +84,7 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   (a key not entered, a model not chosen). It is not an outage, and a watcher does not alert on it. The kits pass
   entries through unchanged.
 - `configuration` (DEC-0046) MAY say which runner and model profile the service resolved and from where
-  (`request`, `agent`, `binding`, `estate`); a usage receipt MAY carry the `route` (`subscription` or `key`). The kits
+  (`request`, `agent`, `binding`, `estate`); a usage receipt MAY carry the `route` (`subscription`, `key` or `platform-metered`; a `subscription` row's cost is an estimate, never money, DEC-0110). The kits
   build both: `fabric_profiles.configuration` and `make_usage_receipt(route=)` ([profiles](profiles.md)).
 - `build` needs `commit` or `digest` (`sha256:<64 hex>`).
 - `summary`: at most six tiles; `attention: true` counts toward the host's badge.

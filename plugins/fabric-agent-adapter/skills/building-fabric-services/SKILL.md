@@ -1,20 +1,20 @@
 ---
 name: building-fabric-services
 description: >-
-  Use when running an agent as a Fabric service (fabric-service/0.1, its kits and probe): a local
-  service (launchd, systemd, Windows), an ONLINE agent or dashboard on https, its dashboard link,
-  spend report, answering a Project's board requests, or packing and signing it. «сделай агенту
-  дашборд», «локальный сервис агента», «подключи агента к Fabric Dashboards», «отвечать на запросы с
-  доски проекта», «расходы агента на модели», "make this agent a local service", "make an online dashboard a Fabric service",
-  "add the well-known endpoint". NOT for a one-off script or cron job, a hosted product with no
-  agent, the provider manifest (adapting-projects-to-fabric), a new agent's design
-  (creating-fabric-agents), a session using Fabric or its board (working-with-fabric), or building
-  Fabric Dashboards.
+  Use when running an agent as a Fabric service (fabric-service/0.1, its kits and probe): a local service (launchd,
+  systemd, Windows), an ONLINE agent or dashboard on https, its dashboard link and kit (narrow panel, themes), data
+  and cache paths, how callers reach and authenticate it, long jobs (fabric.job.*), spend report and limits, runner
+  routes and model profiles, the estate record and delegation tokens, answering a Project's board requests, or packing
+  and signing it. «сделай агенту дашборд», «локальный сервис агента», «подключи агента к Fabric Dashboards», «отвечать
+  на запросы с доски проекта», «расходы агента на модели», "make this agent a local service", "make an online
+  dashboard a Fabric service", "add the well-known endpoint". NOT for a one-off script or cron job, a hosted product
+  with no agent, the provider manifest (adapting-projects-to-fabric), a new agent's design (creating-fabric-agents), a
+  session using Fabric or its board (working-with-fabric), or building the Dashboards app (window, tray).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.48.3"
+  version: "0.49.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "2f020a696453ae299b123517f14957f6a1354379"

@@ -621,6 +621,59 @@ class RestartTests(Conversation):
         self.assertEqual(self.board.requests[rid]["state"], "completed")
         self.assertEqual(len(self.handled), 1)  # the outcome was known: the handler did not run again
 
+    def test_a_resumed_handler_that_settles_inside_the_resume_runs_once(self):
+        # The seam reading of 0.48.3: FAA-86 kept a resumed request first in the queue until _resume returned, and a
+        # handler that finished inside it (begin_effect, then raised, nothing observed) reached _replace, whose nested
+        # _resume_next ran the same request again: two handler calls, two com.effect_begin.
+        rid, _ = self._crash_after(effect=False)
+        calls = []
+
+        def acts(request, ctx):
+            calls.append(1)
+            ctx.begin_effect("x")
+            raise RuntimeError("crashed mid-effect")
+        self.outcome = acts
+        self.observed = None
+        self.responder().step()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([t for t in self.tools() if t == "com.effect_begin"].__len__(), 1)
+
+    def test_a_request_whose_effect_began_is_not_put_back_to_resume(self):
+        # The unit reading of 0.49.0: when the nested _replace above loses its answer, the resume raises; a request whose
+        # effect has begun (its step now `unknown`) waits for reconcile and is never resumed again, or its handler and
+        # com.effect_begin would run a second time.
+        rid, _ = self._crash_after(effect=False)
+        effects = []
+
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            effects.append(1)
+            raise RuntimeError("crashed after the effect")
+        self.outcome = acts
+        self.observed = None
+        lose = fb.Responder._lose
+
+        def lose_then_down(r, entry, code):
+            lose(r, entry, code)
+            self.hub.down = True  # the nested com.responder_replace never reaches the board
+        fb.Responder._lose = lose_then_down
+        try:
+            r = self.responder()
+            try:
+                r.step()
+            except Exception:
+                pass
+        finally:
+            fb.Responder._lose = lose
+        self.hub.down = False
+        for _ in range(3):
+            self.board.advance(2)
+            r.wait_until = 0
+            r.step()
+        self.assertEqual(len(effects), 1)
+        self.assertEqual(self.tools().count("com.effect_begin"), 1)
+        self.assertEqual(self.checkpoint()[rid]["step"], "unknown")
+
     def test_shutdown_leaves_the_session_and_releases_the_slot(self):
         r = self.responder()
         r.step()

@@ -212,11 +212,14 @@ class Client:
         return day == today if self.window == "day" else day[:7] == today[:7]
 
     def spent_usd(self, *, unmeasured_usd: float = 0.0) -> float:
-        """What the ledger records for the current window; a receipt without a cost counts as `unmeasured_usd`."""
+        """What the ledger records for the current window; a receipt without a cost counts as `unmeasured_usd`. A
+        `subscription` receipt in a shared ledger is an estimate at list price, never money spent (DEC-0110)."""
         today = fabric_time.utc_day(fabric_time.now_ms(self._now))
         total = 0.0
         for receipt in self.ledger.receipts():
             if not isinstance(receipt, dict) or not self._in_window(receipt.get("at"), today):
+                continue
+            if receipt.get("route") == "subscription":
                 continue
             cost = receipt.get("costUsd")
             measured = isinstance(cost, (int, float)) and _price(cost) is not None
@@ -419,13 +422,18 @@ class Client:
 
 
 def totals(receipts: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
-    """Calls, priced spend and unpriced calls over receipts (what a dashboard line shows); `spentUsd` is None when
-    every call is unpriced."""
-    calls = priced = 0
+    """Calls, money spent and unpriced calls over receipts (what a dashboard line shows). A `subscription` receipt's
+    cost is an estimate, never money (DEC-0110): `spentUsd` is None only when calls off a subscription exist and none of
+    them is priced, and 0.0 when every call was on a subscription."""
+    calls = priced = paid = paid_priced = 0
     spent = 0.0
     for r in receipts:
         calls += 1
+        on_subscription = r.get("route") == "subscription"
+        paid += 0 if on_subscription else 1
         if isinstance(r.get("costUsd"), (int, float)) and _price(r.get("costUsd")) is not None:
             priced += 1
-            spent += float(r["costUsd"])
-    return {"calls": calls, "spentUsd": spent if priced else None, "unpricedCalls": calls - priced}
+            if not on_subscription:
+                paid_priced += 1
+                spent += float(r["costUsd"])
+    return {"calls": calls, "spentUsd": None if paid and not paid_priced else spent, "unpricedCalls": calls - priced}

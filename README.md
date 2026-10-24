@@ -34,7 +34,8 @@ python3 plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_s
 ```
 
 In Claude Code the plugin adds four session hooks: SessionStart (at startup and `/clear`, never on compact or
-resume) puts that preamble into the session when the MCP server `fabric` is registered and Fabric runs; when Fabric
+resume) puts that preamble into the session when the MCP server `fabric` is registered, Fabric runs and the project
+uses Fabric (one line pointing at `fabric_whoami` in a folder with no sign of it); when Fabric
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
 project that uses Fabric; Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
 and the board's unread count; UserPromptSubmit adds one line only when that count rose; SessionEnd releases what the
