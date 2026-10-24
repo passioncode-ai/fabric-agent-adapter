@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.49.2 (2026-10-24)
+
+### Fixed
+
+- **The probe judges a remote service's session cookie by its name** (FAA-115, a finding from a service on
+  DigitalOcean App Platform). `check_service.py` kept one `Set-Cookie` per answer, so when a CDN edge added its own
+  cookie to the login redirect (`__cf_bm` from Cloudflare) `login.cookie-host-bound` and `login.single-use` judged the
+  edge's cookie and failed a service that does everything right. The probe now keeps every `Set-Cookie`
+  (`merge_headers`) and picks the session cookie by name, `__Host-fabric_session` or `fabric_session`; with neither,
+  the first cookie a known edge does not set (`session_cookie` in `check_service_rules.py`). A session cookie that is
+  not host-bound still fails.
+
 ## 0.49.1 (2026-10-24)
 
 ### Fixed

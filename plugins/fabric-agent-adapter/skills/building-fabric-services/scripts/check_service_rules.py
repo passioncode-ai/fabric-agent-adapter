@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
@@ -183,6 +183,36 @@ def board_responder_verdict(wk: Any, kit: Optional[str] = None) -> Tuple[str, st
         return "FAIL", "; ".join(problems)
     return "PASS", "declares %s; the kit%s answers the fixture conversation (whole, fenced, no epoch)" % (
         ", ".join(declared), " at %s" % kit if kit else " beside this probe")
+
+
+def merge_headers(pairs: Iterable[Tuple[str, str]]) -> Dict[str, str]:
+    """Response headers by lower-case name. Every Set-Cookie is kept, one per line (a header value never holds a
+    newline): an edge in front of a service adds its own (FAA-115), so the last or the first is not the service's."""
+    merged: Dict[str, str] = {}
+    for name, value in pairs:
+        key = name.lower()
+        merged[key] = merged[key] + "\n" + value if key == "set-cookie" and key in merged else value
+    return merged
+
+
+def session_cookie(set_cookie: str, remote: bool) -> str:
+    """The service's session cookie among the Set-Cookie lines merge_headers kept: the one named as the kit names it
+    (`__Host-fabric_session` remote, `fabric_session` local, either accepted), else the first a CDN edge does not
+    set, so a service that names its cookie otherwise is still judged on its own cookie. "" when none was set."""
+    lines = [line.strip() for line in set_cookie.split("\n") if line.strip()]
+    names = (fs.REMOTE_SESSION_COOKIE, fs.SESSION_COOKIE) if remote else (fs.SESSION_COOKIE, fs.REMOTE_SESSION_COOKIE)
+    for wanted in names:
+        for line in lines:
+            if line.split("=", 1)[0].strip() == wanted:
+                return line
+    for line in lines:
+        if line.split("=", 1)[0].strip() not in EDGE_COOKIES:
+            return line
+    return lines[0] if lines else ""
+
+
+# Cookies CDN edges add on their own (Cloudflare, AWS load balancers, Akamai); never a service's session.
+EDGE_COOKIES = frozenset({"__cf_bm", "_cfuvid", "cf_clearance", "__cflb", "AWSALB", "AWSALBCORS", "ak_bmsc", "bm_sv"})
 
 
 def session_lifetime_problem(set_cookie: str, now: Optional[float] = None) -> Optional[str]:

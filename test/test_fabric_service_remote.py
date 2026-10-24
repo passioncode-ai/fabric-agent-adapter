@@ -342,3 +342,48 @@ class NoTokenRecordedOnEveryPath(unittest.TestCase):
         self.assertEqual(rules.count("well-known.requires-token"), 1, p.results)
         self.assertLess(rules.index("well-known.requires-token"), rules.index("well-known.answers"))
         self.assertEqual([r["verdict"] for r in p.results if r["rule"] == "well-known.requires-token"], ["FAIL"])
+
+
+class SessionCookieBehindAnEdge(unittest.TestCase):
+    """FAA-115: a CDN in front of a remote service (DigitalOcean's Cloudflare edge) adds its own Set-Cookie to the
+    login redirect; the probe judges the session cookie by its name, never the first or last header it reads."""
+
+    EDGE = "__cf_bm=abc; path=/; expires=Sat, 24-Oct-26 13:00:00 GMT; domain=.example.com; HttpOnly; Secure; SameSite=None"
+    SESSION = "__Host-fabric_session=v; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600"
+
+    def test_every_set_cookie_header_is_kept(self):
+        merged = probe.merge_headers([("Set-Cookie", "a=1"), ("X-One", "y"), ("set-cookie", "b=2")])
+        self.assertEqual(merged, {"set-cookie": "a=1\nb=2", "x-one": "y"})
+
+    def test_the_session_cookie_is_picked_by_its_name(self):
+        for lines in ("%s\n%s" % (self.EDGE, self.SESSION), "%s\n%s" % (self.SESSION, self.EDGE)):
+            self.assertEqual(probe.session_cookie(lines, remote=True), self.SESSION)
+        self.assertEqual(probe.session_cookie("fabric_session=v; Path=/; HttpOnly; SameSite=Strict", remote=False),
+                         "fabric_session=v; Path=/; HttpOnly; SameSite=Strict")
+        self.assertEqual(probe.session_cookie("", remote=True), "")
+        # A service that names its cookie wrongly is still judged on its own cookie, not the edge's.
+        self.assertEqual(probe.session_cookie("%s\nsid=v; Path=/" % self.EDGE, remote=True), "sid=v; Path=/")
+
+    def login_probe(self, redeem_headers):
+        p = probe.Probe(Path("x.json"), {"id": "example-agent", "instance": "default", "origin": "https://agent.example.com",
+                                         "placement": "remote"}, Path("."), False)
+        p.wk = {"surfaces": {"dashboard": {"path": "/", "login": "/fabric/v1/login"}}}
+        p.token = "t" * 32
+        p.auth_headers = lambda: {"Authorization": "Bearer x"}
+        answers = iter([(200, {}, json.dumps({"url": "/fabric/v1/login?code=c"}).encode()),
+                        (302, redeem_headers, b""), (403, {"set-cookie": self.EDGE}, b"")])
+        p.request = lambda *a, **kw: next(answers)
+        p.login_rules()
+        return {r["rule"]: r for r in p.results}
+
+    def test_an_edge_cookie_before_the_session_cookie_is_not_a_fail(self):
+        results = self.login_probe({"set-cookie": "%s\n%s" % (self.EDGE, self.SESSION)})
+        failed = {k: v["evidence"] for k, v in results.items() if v["verdict"] == "FAIL"}
+        self.assertEqual(failed, {})
+        for rule in ("login.cookie-host-bound", "login.single-use", "login.session-lifetime"):
+            self.assertEqual(results[rule]["verdict"], "PASS", rule)
+
+    def test_a_session_cookie_that_is_not_host_bound_still_fails(self):
+        results = self.login_probe({"set-cookie": "%s\nfabric_session=v; Path=/; HttpOnly; SameSite=Strict; Max-Age=60" % self.EDGE})
+        self.assertEqual(results["login.cookie-host-bound"]["verdict"], "FAIL")
+        self.assertIn("fabric_session", results["login.cookie-host-bound"]["evidence"])
