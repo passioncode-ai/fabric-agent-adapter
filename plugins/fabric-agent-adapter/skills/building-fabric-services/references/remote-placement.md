@@ -3,6 +3,15 @@
 Normative source: `fabric-agent-contract` `docs/specification/service.md` → *Remote placement*,
 DEC-0019, at the commit this skill pins. This page is the how-to.
 
+## Contents
+
+- [Is it a remote service?](#is-it-a-remote-service)
+- [The descriptor](#the-descriptor)
+- [On the platform](#on-the-platform)
+- [Checking it](#checking-it)
+- [What a host does and will not do](#what-a-host-does-and-will-not-do)
+- [Rotation](#rotation)
+
 ## Is it a remote service?
 
 It is, when it runs outside the operator's computer and the operator wants it in Fabric beside
@@ -76,6 +85,10 @@ object with an `id`, a `process` object with a `pid`. A proxy's own JSON error w
 FAILs remain possible, and the evidence names the value it found: a proxy page that names the service's id or
 `id.instance` (an application the proxy titles after the service), and, when the document was read, a page that happens
 to contain the service's pid as a whole number (an inline script's constant, say).
+
+A CDN edge may add its own cookie to the login redirect (DigitalOcean App Platform's Cloudflare edge sets `__cf_bm`).
+The login rules keep every `Set-Cookie` of the answer and judge the session cookie by its name, `__Host-fabric_session`
+(or `fabric_session`); with neither, the first cookie that is not a known edge cookie (FAA-115).
 
 ## What a host does and will not do
 

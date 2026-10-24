@@ -68,6 +68,7 @@ from check_service_rules import session_lifetime_problem  # noqa: E402,F401 - mo
 from check_service_rules import _semver  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import usage_problems  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-65)
+from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
 
 
 class _PinnedHTTPS(http.client.HTTPSConnection):
@@ -131,7 +132,7 @@ class Probe:
         try:
             conn.request(method, path, body=body, headers=base)
             resp = conn.getresponse()
-            return resp.status, {k.lower(): v for k, v in resp.getheaders()}, resp.read()
+            return resp.status, merge_headers(resp.getheaders()), resp.read()
         finally:
             conn.close()
 
@@ -444,7 +445,7 @@ class Probe:
         except (OSError, ValueError, KeyError) as exc:
             self.add("login.single-use", "FAIL", "login-code flow broke: %s" % exc)
             return
-        cookie = headers1.get("set-cookie", "")
+        cookie = session_cookie(headers1.get("set-cookie", ""), self.remote)
         ok = status1 in (302, 303) and "HttpOnly" in cookie and "SameSite=Strict" in cookie and status2 not in (302, 303)
         if self.remote:
             host_bound = cookie.startswith("__Host-") and "Secure" in cookie and "Path=/" in cookie and "domain=" not in cookie.lower()
