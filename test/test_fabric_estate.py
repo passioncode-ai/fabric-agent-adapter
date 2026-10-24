@@ -8,6 +8,7 @@ with an estate record, a token's kid is trusted only while a current revision ce
 import copy
 import datetime as dt
 import json
+import re
 from pathlib import Path
 import unittest
 
@@ -107,6 +108,18 @@ class ContractVectors(unittest.TestCase):
         found = [f for f in fe.estate_record_rules("estate-record", record) if f["code"] == "FAC-SEM-134"]
         self.assertEqual([f["instancePath"] for f in found], ["/machines/1/secrets/0/from"])
         self.assertEqual(found[0]["message"], "machine NaN is a view machine: it is the source of no secret")
+
+    def test_every_lookup_matches_as_the_contracts_set_or_includes_does(self):
+        # FAA-113: every membership the contract keeps in a Set or tests with includes is SameValueZero, so a NaN id
+        # is listed twice and a secret from a NaN machine comes from this estate, as the Node twin reads it.
+        nan = float("nan")
+        record = {"machines": [{"id": nan}, {"id": nan, "secrets": [{"from": nan, "agentRef": "x", "slot": "s"}]}],
+                  "authorities": [{"credentialId": nan}, {"credentialId": nan}], "publisherKeys": [{"kid": nan}, {"kid": nan}]}
+        found = [[f["code"], f["instancePath"], f["message"]] for f in fe.estate_record_rules("estate-record", record)
+                 if re.search(r"/id$|credentialId|/kid$|/from$", f["instancePath"])]
+        self.assertEqual(found, [["FAC-SEM-073", "/machines/1/id", "machine NaN is listed twice"],
+                                 ["FAC-SEM-073", "/authorities/1/credentialId", "a passkey is listed once"],
+                                 ["FAC-SEM-074", "/publisherKeys/1/kid", "publisher key NaN is pinned twice"]])
 
     def test_p256_keys_and_passkey_keys(self):
         for case in V["p256"]:
