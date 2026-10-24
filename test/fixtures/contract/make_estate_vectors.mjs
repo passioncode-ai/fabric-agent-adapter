@@ -12,6 +12,7 @@
 // Needs Node 24 or later (type stripping); the staged sources import each other as .ts. The contract's vectors carry
 // the private test keys that made their signatures; they are dropped here: the kits verify and never sign.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -34,6 +35,46 @@ const verify = contract.cases.map((c) => {
   if (JSON.stringify(answer) !== JSON.stringify(c.expected)) throw new Error(`the contract's vector "${c.name}" no longer answers as written`);
   return { name: c.name, record: c.record, trust: c.trust, expected: answer };
 });
+
+// FAC-SEM-137 (DEC-0107) on the verify path (FAA-112): the delta anchor varied on the contract's own EdDSA revision 2
+// checked against its parent. The revision is re-signed with the vectors' EdDSA test seed (Ed25519 is deterministic),
+// and every verdict is the contract's verifyEstateRecord; a case that should pass and does not stops the generator.
+{
+  const base = contract.cases.find((c) => c.name.startsWith('revision 2, signed by a passkey its parent lists (EdDSA)'));
+  const seed = Buffer.from(contract.keys.passkeyEdDSA.seed, 'hex');
+  const key = crypto.createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), seed]), format: 'der', type: 'pkcs8' });
+  const b64url = (bytes) => Buffer.from(bytes).toString('base64url');
+  const resign = (record) => {
+    record.digest = estate.estateRecordDigest(record);
+    const client = JSON.parse(Buffer.from(record.signature.clientDataJSON, 'base64url').toString('utf8'));
+    const clientData = Buffer.from(JSON.stringify({ ...client, challenge: b64url(estate.estateChallenge(record.digest)) }), 'utf8');
+    const authData = Buffer.from(record.signature.authenticatorData, 'base64url');
+    const signed = Buffer.concat([authData, crypto.createHash('sha256').update(clientData).digest()]);
+    record.signature = { ...record.signature, clientDataJSON: b64url(clientData), sig: b64url(crypto.sign(null, signed, key)) };
+    return record;
+  };
+  const anchor = (sequence, c) => ({ sequence, sha256: c.repeat(64) });
+  for (const [name, before, after, passes] of [
+    ['the delta anchor moves forward', anchor(5, 'a'), anchor(6, 'b'), true],
+    ['the same delta anchor kept', anchor(5, 'a'), anchor(5, 'a'), true],
+    ['a delta anchor first appears', undefined, anchor(1, 'a'), true],
+    ['the delta anchor moves back', anchor(6, 'b'), anchor(5, 'a'), false],
+    ['the delta anchor dropped', anchor(5, 'a'), undefined, false],
+    ['the same sequence under another hash', anchor(5, 'a'), anchor(5, 'b'), false],
+  ]) {
+    const parent = clone(base.trust.parent);
+    const record = clone(base.record);
+    if (before) parent.deltaAnchor = before;
+    if (after) record.deltaAnchor = after;
+    parent.digest = estate.estateRecordDigest(parent);
+    record.parent = parent.digest;
+    resign(record);
+    const trust = { ...base.trust, parent };
+    const expected = estate.verifyEstateRecord(record, { ...trust, at: new Date(trust.at) });
+    if (expected.ok !== passes) throw new Error(`anchor on the verify path, "${name}": the contract answers ${JSON.stringify(expected)}`);
+    verify.push({ name: `anchor: ${name} (EdDSA, re-signed revision 2)`, record, trust, expected });
+  }
+}
 
 // estateRecordRules: every estate semantic fixture, through the contract's own rules.
 const rules = fs.readdirSync(args.semantic).filter((f) => f.startsWith('estate-') && f.endsWith('.json')).sort().map((file) => {

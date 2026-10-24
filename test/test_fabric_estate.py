@@ -1,7 +1,7 @@
 """`estate-record/1` (contract DEC-0055) in the Python kit (FAA-31); the twin of fabric-estate.test.mjs.
 
 Every answer here was given by the contract's own functions at the pin (test/fixtures/contract/estate-vectors.json,
-made by make_estate_vectors.mjs): verifyEstateRecord's 49 cases (DEC-0063's signing RP and DEC-0066's skew among them), estateRecordRules over the contract's semantic
+made by make_estate_vectors.mjs): verifyEstateRecord's 55 cases (DEC-0063's signing RP, DEC-0066's skew and, FAA-112, DEC-0107's delta anchor among them), estateRecordRules over the contract's semantic
 fixtures, the digest and challenge, P-256 keys and passkey keys. The last classes hold the delegation verifier to DL-14:
 with an estate record, a token's kid is trusted only while a current revision certifies it (CT-20), and to DEC-0060's
 `hubKeyCertified` (test/fixtures/contract/hub-key-vectors.json, vendor_vectors.mjs)."""
@@ -44,7 +44,8 @@ def clock(text):
 
 class ContractVectors(unittest.TestCase):
     def test_every_verify_case_answers_as_the_contract_does(self):
-        self.assertEqual(len(V["verify"]), 49)
+        self.assertEqual(len(V["verify"]), 55)
+        self.assertEqual(sum(1 for c in V["verify"] if c["name"].startswith("anchor: ") and c["expected"].get("codes") == ["FAC-SEM-137"]), 3)
         problems = set()
         for case in V["verify"]:
             trust = case["trust"]
