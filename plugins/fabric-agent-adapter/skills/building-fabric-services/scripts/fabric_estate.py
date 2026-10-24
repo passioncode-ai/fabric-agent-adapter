@@ -49,7 +49,6 @@ from fabric_crypto import (  # noqa: E402 - the core (FAA-65)
 )
 from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
     MISSING as _MISSING,
-    contains as _contains,
     get as _get,
     get_string as _s,
     indexed_objects as _indexed,
@@ -59,7 +58,7 @@ from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
     objects as _list,
     safe_integer as _safe_integer,
     same as _same,
-    set_has as _set_has,
+    set_has as _set_has,  # every membership the contract keeps in a Set or tests with includes (FAA-113)
     show as _show,
 )
 from fabric_time import (  # noqa: E402 - the core (FAA-65)
@@ -331,7 +330,7 @@ def verify_estate_record(record: Any, *, at: Any, parent: Any = _MISSING, author
     if not matches:
         return {"ok": False, "problem": "unknown-authority"}
     authority = matches[0]
-    if _contains(revoked, _get(authority, "credentialId")):
+    if _set_has(revoked, _get(authority, "credentialId")):
         return {"ok": False, "problem": "revoked-authority"}
     origins = _get(authority, "origins")
     credential = {"credentialId": _s(authority, "credentialId"), "alg": _s(authority, "alg"),
@@ -385,7 +384,7 @@ def _scope_admits(record: Any, kid: Any, context: Any) -> bool:
     """DEC-0090: a key no `publisherScopes[]` entry names is trusted in any context; a partner's key, only in a context
     one of its scopes lists."""
     scopes = [s for s in _list(_get(record, "publisherScopes")) if _same(_get(s, "kid"), kid)]
-    return not scopes or any(isinstance(_get(s, "contexts"), list) and _contains(s["contexts"], context) for s in scopes)
+    return not scopes or any(isinstance(_get(s, "contexts"), list) and _set_has(s["contexts"], context) for s in scopes)
 
 
 #: v4 §7, Freshness: an estate revision's window is at most 30 days (DEC-0055 item 2).
@@ -545,7 +544,7 @@ def _keys(value: Dict[str, Any], flag) -> None:
     hub_keys: List[Any] = []
     for machine, m in _indexed(_get(value, "machines")):
         at = "/machines/%d" % m
-        if _contains(ids, _get(machine, "id")):
+        if _set_has(ids, _get(machine, "id")):
             flag("%s/id" % at, "machine %s is listed twice" % _show(_get(machine, "id")))
         ids.append(_get(machine, "id"))
         device_keys = _list(_get(machine, "deviceKeys"))
@@ -562,15 +561,15 @@ def _keys(value: Dict[str, Any], flag) -> None:
                 flag("%s/deviceKeys/%d/publicKey" % (at, k), "a device key's octets are written in canonical padded base64, the one form a key reference can name (DEC-0084)")
             elif not _valid_device_key(key):
                 flag("%s/deviceKeys/%d/publicKey" % (at, k), "an Ed25519 key is never of small order (DEC-0045) and a P-256 key is a valid point (SEC 1 §3.2.2)")
-            if _contains(seen, _get(key, "publicKey")):
+            if _set_has(seen, _get(key, "publicKey")):
                 flag("%s/deviceKeys/%d/publicKey" % (at, k), "one key is never used for the other role")
             seen.append(_get(key, "publicKey"))
         hub = _get(machine, "hubKey")
         if isinstance(hub, dict):
-            if _contains(hub_kids, _get(hub, "kid")):
+            if _set_has(hub_kids, _get(hub, "kid")):
                 flag("%s/hubKey/kid" % at, "hub key %s is certified for two machines: one kid per machine" % _show(_get(hub, "kid")))
             hub_kids.append(_get(hub, "kid"))
-            if _contains(hub_keys, _get(hub, "x")):
+            if _set_has(hub_keys, _get(hub, "x")):
                 flag("%s/hubKey/x" % at, "one hub public key is certified for two machines under two kids: one key per machine")
             hub_keys.append(_get(hub, "x"))
             x = _get(hub, "x")
@@ -579,7 +578,7 @@ def _keys(value: Dict[str, Any], flag) -> None:
                 flag("%s/hubKey/x" % at, "a hub key of small order verifies forged tokens and is never certified (DEC-0045)")
     credentials: List[Any] = []
     for authority, index in _indexed(_get(value, "authorities")):
-        if _contains(credentials, _get(authority, "credentialId")):
+        if _set_has(credentials, _get(authority, "credentialId")):
             flag("/authorities/%d/credentialId" % index, "a passkey is listed once")
         credentials.append(_get(authority, "credentialId"))
         if "problem" in credential_key(_get(authority, "publicKey"), _show(_get(authority, "alg"))):
@@ -589,7 +588,7 @@ def _keys(value: Dict[str, Any], flag) -> None:
 def _placements(value: Dict[str, Any], flag) -> None:
     kids: List[Any] = []
     for key, index in _indexed(_get(value, "publisherKeys")):
-        if _contains(kids, _get(key, "kid")):
+        if _set_has(kids, _get(key, "kid")):
             flag("/publisherKeys/%d/kid" % index, "publisher key %s is pinned twice" % _show(_get(key, "kid")))
         kids.append(_get(key, "kid"))
     for machine, m in _indexed(_get(value, "machines")):
@@ -601,7 +600,7 @@ def _placements(value: Dict[str, Any], flag) -> None:
                 flag("%s/agentRef" % at, "%s is placed twice on one machine in the context %s"
                      % (_show(_get(placement, "agentRef")), _show(_context_of(placement))))
             agents.append(key)
-            if not _contains(kids, _get(placement, "publisherKid")):
+            if not _set_has(kids, _get(placement, "publisherKid")):
                 flag("%s/publisherKid" % at, "publisher key %s is not in publisherKeys, so the machine pins no key to verify the package under" % _show(_get(placement, "publisherKid")))
 
 
@@ -611,10 +610,10 @@ def _partner_scopes(value: Dict[str, Any], flag) -> None:
     pinned = [_get(k, "kid") for k in _list(_get(value, "publisherKeys"))]
     scoped: List[Any] = []
     for scope, index in _indexed(_get(value, "publisherScopes")):
-        if _contains(scoped, _get(scope, "kid")):
+        if _set_has(scoped, _get(scope, "kid")):
             flag("/publisherScopes/%d/kid" % index, "publisher key %s is scoped twice" % _show(_get(scope, "kid")))
         scoped.append(_get(scope, "kid"))
-        if not _contains(pinned, _get(scope, "kid")):
+        if not _set_has(pinned, _get(scope, "kid")):
             flag("/publisherScopes/%d/kid" % index, "publisher key %s is not in publisherKeys, so the scope limits no key" % _show(_get(scope, "kid")))
     for machine, m in _indexed(_get(value, "machines")):
         for placement, p in _indexed(_get(machine, "packages")):
@@ -638,7 +637,7 @@ def _secret_references(value: Dict[str, Any], flag) -> None:
                     flag("%s/%s" % (at, field), "a secret placement names a slot, never a value: this looks like a credential")
             if _key_of(_get(secret, "agentRef"), _context_of(secret)) not in placed:
                 flag("%s/agentRef" % at, "a secret goes only where a placed package declares it (v4 Path 2): this agent is not placed on this machine in the secret's context")
-            if not _contains(machine_ids, _get(secret, "from")):
+            if not _set_has(machine_ids, _get(secret, "from")):
                 flag("%s/from" % at, "the slot is filled from a machine of this estate")
             elif not _same(_context_of(secret), PERSONAL_CONTEXT) and not _same(_get(secret, "from"), _get(machine, "id")):
                 # An envelope names no context (DEC-0082): an organization's instance fills its slot on its own machine.
@@ -693,7 +692,7 @@ def _machine_profiles(value: Dict[str, Any], flag) -> None:
                 flag("/machines/%d/secrets" % m, "a view machine holds none of the estate's secrets")
     for machine, m in _indexed(_get(value, "machines")):
         for secret, s in _indexed(_get(machine, "secrets")):
-            if _set_has(views, _get(secret, "from")):  # the contract's Set: NaN matches NaN
+            if _set_has(views, _get(secret, "from")):
                 flag("/machines/%d/secrets/%d/from" % (m, s), "machine %s is a view machine: it is the source of no secret" % _show(_get(secret, "from")))
 
 
@@ -709,7 +708,7 @@ def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
         if _get(grant, "principalKind") != "external":
             flag("/shareGrants/%d/principalKind" % index, "a share grant is to a principal outside the estate: principalKind external")
         ident = _get(_get(grant, "meta"), "id") if isinstance(_get(grant, "meta"), dict) else _MISSING
-        if _contains(grant_ids, _grant_key(ident)):
+        if _set_has(grant_ids, _grant_key(ident)):
             flag("/shareGrants/%d/meta/id" % index, "grant %s is listed twice" % _show(ident))
         grant_ids.append(_grant_key(ident))
     machines = _list(_get(value, "machines"))
@@ -735,7 +734,7 @@ def _grants_and_revocations(value: Dict[str, Any], flag) -> None:
         if _get(revocation, "kind") == "device-key" and isinstance(raw_ref, str) and "@" in raw_ref and not KEY_REFERENCE.match(raw_ref):
             flag("/revocations/%d/ref" % index, "a device-key revocation names a kid or a key reference <kid>@sha256:<64 lower-case hex digits> (DEC-0084)")
         seen.append(key)
-        if _contains(listed.get(kind, []), ref):
+        if _set_has(listed.get(kind, []), ref):
             flag("/revocations/%d/ref" % index, "the record still lists the %s it revokes: revocation outranks addition" % kind)
 
 
@@ -906,7 +905,7 @@ def _installation(value: Dict[str, Any]) -> List[Dict[str, str]]:
     declared = [_get(slot, "name") for slot in _list(_get(pkg, "secrets"))]
     flag075 = _finding(findings, "FAC-SEM-075")
     for secret, index in _indexed(_get(machine, "secrets")):
-        if _same(_get(secret, "agentRef"), _get(pkg, "agentRef")) and _same(_context_of(secret), context) and not _contains(declared, _get(secret, "slot")):
+        if _same(_get(secret, "agentRef"), _get(pkg, "agentRef")) and _same(_context_of(secret), context) and not _set_has(declared, _get(secret, "slot")):
             flag075("/record/machines/%d/secrets/%d/slot" % (machine_index, index),
                     "the package declares no slot %s: a secret goes only where a placed package declares it" % _show(_get(secret, "slot")))
     if placement is not None and not _scope_admits(record, _get(placement, "publisherKid"), context):

@@ -158,7 +158,7 @@ def double(value: Any) -> float:
 
 def same(a: Any, b: Any) -> bool:
     """JavaScript's === on parsed JSON: an object equals only itself. A Set's SameValueZero differs only for NaN, which
-    no JSON value is: use ``set_has`` where the contract keeps a Set (FAA-107)."""
+    no JSON value is: use ``set_has`` where the contract keeps a Set or tests with ``includes`` (FAA-107, FAA-113)."""
     if a is MISSING or b is MISSING:
         return a is b
     if isinstance(a, (dict, list)) or isinstance(b, (dict, list)):

@@ -51,6 +51,12 @@ test('the digest, the challenge, placement trust, P-256 keys and passkey keys', 
   const nanFound = e.estateRecordRules('estate-record', { machines: [{ id: NaN, profile: 'view' }, { id: 'a', secrets: [{ from: NaN }] }] }).filter((f) => f.code === 'FAC-SEM-134');
   assert.deepEqual(nanFound.map((f) => f.instancePath), ['/machines/1/secrets/0/from']);
   assert.equal(nanFound[0].message, 'machine NaN is a view machine: it is the source of no secret');
+  // FAA-113: the same record the Python twin is held to; every lookup is a Set or includes (SameValueZero).
+  const nanRecord = { machines: [{ id: NaN }, { id: NaN, secrets: [{ from: NaN, agentRef: 'x', slot: 's' }] }],
+    authorities: [{ credentialId: NaN }, { credentialId: NaN }], publisherKeys: [{ kid: NaN }, { kid: NaN }] };
+  assert.deepEqual(e.estateRecordRules('estate-record', nanRecord).filter((f) => /\/id$|credentialId|\/kid$|\/from$/.test(f.instancePath))
+    .map((f) => [f.code, f.instancePath, f.message]), [['FAC-SEM-073', '/machines/1/id', 'machine NaN is listed twice'],
+    ['FAC-SEM-073', '/authorities/1/credentialId', 'a passkey is listed once'], ['FAC-SEM-074', '/publisherKeys/1/kid', 'publisher key NaN is pinned twice']]);
   for (const c of V.p256) assert.equal(e.isValidP256Key(Buffer.from(c.raw, 'hex')), c.expected, c.name);
   for (const c of V.credentialKeys) {
     const found = e.credentialKey(c.publicKey, c.alg);

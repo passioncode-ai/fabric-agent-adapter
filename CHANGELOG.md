@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.49.1 (2026-10-24)
+
+### Fixed
+
+- **The Python estate kit matches every membership as the contract does** (FAA-113, from the 0.49.0 seam reading).
+  The contract keeps machine ids, passkeys, publisher keys, grants and revocations in a `Set`, or tests them with
+  `includes`; both match NaN with NaN. Fifteen lookups in `fabric_estate.py` used `===`-style matching, so a record a
+  Python caller builds with a NaN id was read differently from the Node twin: a NaN id listed twice passed, and a
+  secret from a NaN machine was flagged as coming from outside the estate. They now use `set_has`. No JSON the kit
+  loads carries NaN (`parse_constant` refuses it), so a service reading records from JSON saw no difference.
+
+### Tests
+
+- FAC-SEM-137 on the verify path (FAA-112): six `verify` vectors vary the delta anchor on the contract's EdDSA
+  revision 2, re-signed with the vectors' test seed and answered by the contract's `verifyEstateRecord`.
+- The board restart cases wait on their condition, not a fixed 20 ms (FAA-114).
+
 ## 0.49.0 (2026-10-24)
 
 The operator's sweep (FAA-111): blind seam and product readings of 0.47.0 to 0.48.3, their findings fixed, documented
