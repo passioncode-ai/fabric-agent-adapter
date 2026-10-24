@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.48.3 (2026-10-24)
+
+### Fixed
+
+- **The Node package reader narrows the window for a folder swapped for a link** (FAA-91). `readFolder` checked a
+  folder by lstat before and after listing it; a swap that lasted while a file was read and was undone before the
+  closing check read that file through the link. It now checks the folder after each file it reads too, and refuses it
+  as a symlink. Node has no openat, so a swap made and undone between two checks is still not seen; the Python kit holds
+  each folder open and is not affected. `references/package.md` says so.
+
+### Documentation
+
+- **The support recipe's limits name the file names that read as links** (FAA-84): `README.md`, `setup.py`,
+  `install.sh` end in country codes, so a reply naming such a file goes to a person unless a cited entry names it; the
+  country codes stay so that a host on them is still caught. A test pins both sides.
+
 ## 0.48.2 (2026-10-23)
 
 ### Fixed

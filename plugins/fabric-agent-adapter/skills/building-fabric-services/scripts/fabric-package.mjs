@@ -393,7 +393,8 @@ function readRegular(file) {
  * cache litter, and a file that is a credential by its name, each named, so the person can remove it or pack a clean
  * copy. A file or folder it cannot read is a refusal naming it (`Cannot read <path>: EACCES.`), never a crash (FAA-78,
  * finding 41); a file is opened without following a link and read only when it is a regular file (finding 42). Node
- * has no openat, so a folder swapped for a link mid-walk is checked by lstat before and after it is listed; the Python
+ * has no openat, so a folder swapped for a link mid-walk is checked by lstat before it is listed, after each file it
+ * reads and after it is listed (FAA-91); a swap made and undone between two of those checks is not seen. The Python
  * twin holds each folder open instead.
  */
 export function readFolder(folder) {
@@ -402,6 +403,11 @@ export function readFolder(folder) {
   if (!stat?.isDirectory()) throw new PackageError(`${folder} is not a folder.`);
   const files = new Map();
   const refused = [];
+  const moved = (dir, before) => {
+    let now;
+    try { now = fs.lstatSync(dir); } catch { return true; }
+    return !now.isDirectory() || now.ino !== before.ino || now.dev !== before.dev;
+  };
   const walk = (dir, rel) => {
     let entries;
     let before;
@@ -419,15 +425,15 @@ export function readFolder(folder) {
       if (!why) {
         let read;
         try { read = readRegular(path.join(dir, entry.name)); } catch (error) { throw unreadable(where, error); }
+        if (before && moved(dir, before)) { refused.push(`${rel} (a symlink)`); return; } // read through a swapped folder
         if (read.why === undefined) { files.set(where, read.bytes); continue; }
         why = read.why;
       }
       refused.push(`${where} (${why})`);
     }
     if (before) {
-      let after;
-      try { after = fs.lstatSync(dir); } catch (error) { throw unreadable(rel, error); }
-      if (!after.isDirectory() || after.ino !== before.ino || after.dev !== before.dev) refused.push(`${rel} (a symlink)`);
+      try { fs.lstatSync(dir); } catch (error) { throw unreadable(rel, error); }
+      if (moved(dir, before)) refused.push(`${rel} (a symlink)`);
     }
   };
   walk(folder, '');

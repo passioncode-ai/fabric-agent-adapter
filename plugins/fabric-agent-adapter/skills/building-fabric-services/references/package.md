@@ -45,7 +45,10 @@ python3 scripts/fabric_package.py pack <folder> --apply   # writes fabric.packag
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
 `*.pyc`, and files that are credentials by name (`.env` and `.env.*` but `.env.example|sample|template`, `*.pem`, `*.key`,
 `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa`-style keys, `.npmrc`, `.netrc`, `.pypirc`). Remove them or pack a clean
-copy. A member named twice in `fabric.package.json` is refused too.
+copy. A member named twice in `fabric.package.json` is refused too. A folder swapped for a link while it is read is refused as a
+symlink. The Python kit reads each folder through an open handle, so a swap cannot redirect it. The Node kit has no
+such call: it checks each folder before listing it, after each file it reads and after listing it (FAA-91), and does not
+see a swap made and undone between two of those checks. Pack from a folder only you can write to.
 
 Then every problem is listed, each with its `rule`: `schema` (the contract's schema), `FAC-SEM-064` (whole: its own
 digest, each path once, every named file listed with the same SHA-256), `FAC-SEM-065` (no secret), `FAC-SEM-066`
