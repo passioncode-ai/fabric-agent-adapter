@@ -17,7 +17,8 @@ const HUB = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/hub-ke
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null));
 
 test('every verify case answers as the contract does', () => {
-  assert.equal(V.verify.length, 49);
+  assert.equal(V.verify.length, 55);
+  assert.equal(V.verify.filter((c) => c.name.startsWith('anchor: ') && JSON.stringify(c.expected.codes) === '["FAC-SEM-137"]').length, 3); // FAA-112
   for (const c of V.verify) {
     const trust = { ...c.trust, at: c.trust.at === undefined || c.trust.at === null ? c.trust.at : new Date(c.trust.at) };
     assert.deepEqual(plain(e.verifyEstateRecord(c.record, trust)), c.expected, c.name);
