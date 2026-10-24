@@ -7,7 +7,8 @@
 **Done.** 0.48.3: `readFolder` in `fabric-package.mjs` checks each folder after every file it reads, beside the checks
 before and after listing; a folder swapped for a link while a file is read is refused as a symlink.
 `references/package.md` names what is still not seen (a swap made and undone between two checks: Node has no openat).
-The release also carries FAA-84's recipe README.
+The release also carries FAA-84's recipe README. PR [#186](https://github.com/passioncode-ai/fabric-agent-adapter/pull/186)
+(`7dab86a`), tag `v0.48.3`, npm 0.48.3; launcher 0.2.34, installed here byte-identical to the tag (155 of 155 files).
 
 **Checks actually run.** The new Node test (`FAA-91`) red on the old code (the swap went unseen), green after; the
 package suite 19 of 19. Full suites: Python 1018 tests OK (28 skipped by environment flags), Node 324 tests 0 fail;
