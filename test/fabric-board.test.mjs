@@ -18,6 +18,15 @@ const CANONICAL = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/
 const FIXTURES = Object.fromEntries(COMMS.fixtures.map((f) => [f.name, f]));
 
 // --- the fake hub as a process ---------------------------------------------------------------------------------------
+// Waits for a condition the code under test reaches on its own schedule; a fixed sleep fails on a slow machine (FAA-114).
+async function until(cond, what, ms = 10000) {
+  const deadline = Date.now() + ms;
+  while (!(await cond())) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 async function fakeHub(t, capabilities = ['video.render']) {
   const dir = tempDir('faa12b-');
   const root = path.join(dir, 'fabric');
@@ -257,8 +266,7 @@ test('lease_expired while working stops the handler; accepted work comes back by
   await h.advance(70);
   await r.step();
   release();
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.equal(seen.stopped, true);
+  await until(() => seen.stopped === true, 'the handler to see its context stopped');
   const s = await h.state();
   assert.ok(s.calls.includes('com.responder_replace'));
   assert.equal(s.slots['video.render'].generation, 2);
@@ -368,8 +376,8 @@ test('restart: accepted work transferred and finished; without transferred it st
   };
   const { request: busy } = await hub3.control({ op: 'queue', capability: 'video.render' });
   await h3.responder().step();
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.equal(h3.checkpoint()[busy].step, 'in-progress');
+  await until(async () => h3.checkpoint()[busy]?.step === 'in-progress'
+    && (await hub3.control({ op: 'state' })).requests[busy].state === 'in_progress', 'the effect to begin on both sides');
   await hub3.control({ op: 'end-sessions' });
   h3.observed = { state: 'completed', observed: true, summary: 'The render is on disk; checked its hash.' };
   await h3.responder().step();
