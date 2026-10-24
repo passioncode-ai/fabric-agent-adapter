@@ -79,22 +79,39 @@ def priority_problems(plist: dict) -> list:
 PLATFORM_HOST_REFUSALS = (400, 404, 421)
 
 
+def _body_carries_document(body: bytes) -> bool:
+    """Whether a raw answer body parses as JSON that carries the well-known document or a part of it."""
+    try:
+        return _carries_document(json.loads((body or b"").decode("utf-8", "replace")))
+    except RecursionError:
+        return True
+    except ValueError:
+        return False
+
+
 def guard_verdict(rule: str, remote: bool, status: int, body: bytes) -> Tuple[str, str]:
+    """A guard refuses with the service's own 403, and no refusal carries the well-known document (a 403 whose body is
+    the document refused nothing). Elsewhere the substring `fabric-service/` alone already counts as disclosure."""
     if status == 403:
+        if _body_carries_document(body):
+            return "FAIL", "HTTP 403, and the body carries the well-known document"
         return "PASS", "HTTP 403"
-    disclosed = b"fabric-service/" in (body or b"")
+    disclosed = b"fabric-service/" in (body or b"") or _body_carries_document(body)
     if rule == "network.host-check" and remote and status in PLATFORM_HOST_REFUSALS and not disclosed:
         return "PASS", "HTTP %d from the platform router: a foreign Host never reaches the service" % status
     return "FAIL", "HTTP %d%s" % (status, ", and the body is the well-known document" if disclosed else "")
 
 
 def _carries_document(value: Any, depth: int = 0) -> bool:
-    """Whether a parsed body is, or holds anywhere inside it, an object that reads as the well-known document: its
-    `protocol` is the extension's, or it carries `service` or `process` (D3 of FAA-109)."""
+    """Whether a parsed body is, or holds anywhere inside it, an object that reads as the well-known document or a part
+    of it: its `protocol` is the extension's, its `service` is an object with an `id`, or its `process` an object with
+    a `pid` (D3 of FAA-109). A proxy's own error with a `service` string is none of these."""
     if depth > 64:
         return True  # nothing honest nests that deep; refuse rather than recurse without bound
     if isinstance(value, dict):
-        if value.get("protocol") == fs.PROTOCOL or "service" in value or "process" in value:
+        service, process = value.get("service"), value.get("process")
+        if value.get("protocol") == fs.PROTOCOL or (isinstance(service, dict) and "id" in service) \
+                or (isinstance(process, dict) and "pid" in process):
             return True
         return any(_carries_document(v, depth + 1) for v in value.values())
     if isinstance(value, list):

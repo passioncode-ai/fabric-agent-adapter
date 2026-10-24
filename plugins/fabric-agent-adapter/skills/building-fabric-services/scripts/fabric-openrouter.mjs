@@ -142,6 +142,7 @@ export class Client {
     let total = 0;
     for (const r of this.ledger.receipts()) {
       if (!isObject(r) || !this.inWindow(r.at, today)) continue;
+      if (r.route === 'subscription') continue; // an estimate at list price, never money spent (DEC-0110)
       if (typeof r.costUsd === 'number' && price(r.costUsd) !== null) total += r.costUsd;
       else total += this.unmeasuredWorst.get(`${r.at} ${r.model}`) ?? unmeasuredUsd; // known here, else unmeasuredUsd
     }
@@ -322,14 +323,22 @@ export class Client {
   }
 }
 
-// Calls, priced spend and unpriced calls over receipts; spentUsd is null when every call is unpriced.
+// Calls, money spent and unpriced calls over receipts. A subscription receipt's cost is an estimate, never money
+// (DEC-0110): spentUsd is null only when calls off a subscription exist and none is priced, 0 when all were on one.
 export function totals(receipts) {
   let calls = 0;
   let priced = 0;
+  let paid = 0;
+  let paidPriced = 0;
   let spent = 0;
   for (const r of receipts) {
     calls += 1;
-    if (typeof r.costUsd === 'number' && price(r.costUsd) !== null) { priced += 1; spent += r.costUsd; }
+    const onSubscription = r.route === 'subscription';
+    if (!onSubscription) paid += 1;
+    if (typeof r.costUsd === 'number' && price(r.costUsd) !== null) {
+      priced += 1;
+      if (!onSubscription) { paidPriced += 1; spent += r.costUsd; }
+    }
   }
-  return { calls, spentUsd: priced ? spent : null, unpricedCalls: calls - priced };
+  return { calls, spentUsd: paid && !paidPriced ? null : spent, unpricedCalls: calls - priced };
 }

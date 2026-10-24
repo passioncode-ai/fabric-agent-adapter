@@ -1,0 +1,382 @@
+{
+  "model": "haiku",
+  "threshold": 0.85,
+  "skills": [
+    {
+      "skill": "building-fabric-services",
+      "cases": 45,
+      "passed": 44,
+      "passRate": 0.9778,
+      "positivesPassed": "27/27",
+      "negativesPassed": "17/18",
+      "errors": 0,
+      "aboveThreshold": true
+    }
+  ],
+  "cases": {
+    "building-fabric-services": [
+      {
+        "query": "Make this agent a local service with an always-on dashboard that survives a reboot.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Сделай агенту дашборд, который всегда работает и не плодит копии.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Где нашему агенту хранить настройки и кэш, чтобы они пережили переустановку?",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключи Example Agent к Fabric Dashboards по протоколу.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Add the fabric-service well-known endpoint and an events feed to example-agent.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Migrate maker's server to the fabric-service protocol.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Our Writer server starts twice sometimes; make sure only one copy runs and launchd restarts it.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "How should other agents talk to this local agent (MCP or CLI), and how do they authenticate?",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Локальный сервис агента: как сделать авторизацию дашборда и уведомления оператору?",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Check whether the observatory server conforms to fabric-service/0.1.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Write a cron job that exports yesterday's sales to CSV at 6am.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Deploy our Next.js SaaS dashboard to DigitalOcean App Platform.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Generate the fabric-agent.json provider manifest for this MCP server.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Build the Fabric Dashboards desktop app window and tray icon.",
+        "shouldTrigger": false,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": false,
+        "error": null
+      },
+      {
+        "query": "Design a colour palette for the analytics dashboard.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Сделай лендинг для нового продукта.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Write a system prompt for the research agent.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Set up Stripe checkout for the Pro plan.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Fix the typo in the README heading.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Добавь график выручки на дашборд в Grafana.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Our service's report tool can run for ten minutes; how should Fabric call it without holding the request open?",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Write a generic OpenTelemetry exporter for our Kubernetes cluster.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Give me the dashboard link for the registered Fabric service example-agent.default.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Open this Fabric service dashboard in the installed Fabric Dashboards application.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Print the API base URL for this hosted SaaS integration.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Add an OAuth callback URL to a hosted login flow.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Make my agent service report how much it spends on LLM calls so the dashboard can show it.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Пусть агент сам отдаёт свои расходы на модели по протоколу, чтобы дашборд их показал.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Our agent's dashboard loses its tabs when Fabric Dashboards puts the console beside it; make it work in a narrow pane.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Дашборд агента ломается в узкой панели Fabric Dashboards рядом с консолью. Поправь вёрстку и подключи темы.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "example-agent runs as a local Fabric service on my Mac; install it on our Linux box so it comes back after a reboot, and on the Windows laptop too.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Поставь example-agent как сервис Fabric на Linux через systemd и на Windows через планировщик задач, чтобы он поднимался после входа.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "A reinstall of example-agent wiped which projects it serves and their key slots; make it keep backups of the operator's settings and restore them.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "В отчёте о расходах example-agent видно только месячный бюджет, а он ещё режет заказы дороже $2 и проекты по $5 в день. Покажи все лимиты.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Our agent chat should fall back from Claude Code to Codex to Hermes in the project's order, and its doctor must say which runner is signed out. Wire the runner route checks.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Apply the operator's signed estate record on each machine and only trust delegation tokens under the hub key it certifies.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Our render service should answer video.render requests other Projects post on Fabric's project board: enroll, claim, accept and complete them from inside the service.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Сделай так, чтобы агент-сервис отвечал на запросы с доски проекта в Fabric: com.enroll, com.claim, com.complete, с чекпоинтом перед каждым шагом.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Post a question to another Project on the board from my Claude Code session.",
+        "shouldTrigger": false,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Pack example-agent as a fabric-package/1 folder and sign it with our publisher key.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Упакуй агента в пакет Fabric и подпиши его, чтобы поставить в организацию.",
+        "shouldTrigger": true,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Zip this folder and upload it to S3.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключи этот проект к Fabric: сгенерируй provider bundle для его MCP-сервера.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Create a brand-new Fabric-compatible agent from scratch and run its intake grill.",
+        "shouldTrigger": false,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключись к Fabric и возьми задачу через fabric_work_claim.",
+        "shouldTrigger": false,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      }
+    ]
+  },
+  "scenarios": "NOT_RUN: scenario evals need a judge of free-form behaviour",
+  "costUsd": 0.01873
+}

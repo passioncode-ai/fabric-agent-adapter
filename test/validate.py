@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.48.3"
+VERSION = "0.49.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -847,6 +847,7 @@ def validate_repo() -> List[str]:
     people = [ROOT / n for n in ("README.md", "AGENTS.md", "SKILL-CARD.md", "CONTRIBUTING.md", "SECURITY.md")]
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/SKILL.md"))
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/references/*.md"))
+    people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/recipes/*/README.md"))  # FAA-111
     people += sorted((ROOT / "test/evals").glob("*/*.json"))
     # What the installer, the CLI and the kit's demo print or show to a person (code comments elsewhere are not scanned).
     people += [ROOT / "install.sh", ROOT / "bin/fabric-agent-adapter.js"]

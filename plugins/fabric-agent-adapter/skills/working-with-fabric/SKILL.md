@@ -2,15 +2,15 @@
 name: working-with-fabric
 description: >-
   Use when a coding agent (Claude Code, Codex, Kimi Code, Kilo, Hermes) works in a project through Fabric from a
-  terminal: finding Fabric, having the lifecycle broker start it, registering fabric-mcp once with no secret,
-  fabric_whoami first, the project board (com.status, com.list, com.read_ack; asking another Project only through
-  com.submit; unread-mail lines, watch-mail), claiming and releasing work (fabric_work_claim, fabric_work_release),
-  reports, handoffs, refusals. Triggers: "connect to Fabric", "register fabric-mcp", "claim the task in Fabric",
-  "check the project board", "ask the other project through Fabric", "Fabric is not running", «подключись к
-  Fabric», «возьми задачу в Fabric», «проверь доску проекта»,
-  «Fabric не запущен», "hit your limit, resets at". Explains the plugin's session
-  hooks. NOT for building or adapting an agent or a board responder (creating-fabric-agents,
-  adapting-projects-to-fabric, building-fabric-services), changing Fabric's own code, or messaging people.
+  terminal: finding Fabric, having the lifecycle broker start Fabric (not other apps), registering fabric-mcp once
+  with no secret, fabric_whoami first, the project board (com.status, com.list, com.read_ack; asking another Project
+  only through com.submit; unread-mail lines, watch-mail), claiming and releasing work (fabric_work_claim,
+  fabric_work_release), reports, handoffs, refusals. Triggers: "connect to Fabric", "register fabric-mcp", "claim the
+  task in Fabric", "check the project board", "ask the other project through Fabric", "Fabric is not running",
+  «подключись к Fabric», «возьми задачу в Fabric», «проверь доску проекта», «Fabric не запущен», "hit your limit,
+  resets at". Explains the plugin's session hooks. NOT for building or adapting an agent or a board responder
+  (creating-fabric-agents, adapting-projects-to-fabric, building-fabric-services), changing Fabric's own code, or
+  messaging people.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: >-
   Needs the Fabric desktop app (0.4.0 or later for fabric-mcp and the fabric_work tools) and an MCP client.
@@ -19,7 +19,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.48.3"
+  version: "0.49.0"
 ---
 
 # Working with Fabric
@@ -227,8 +227,9 @@ and do the work without claiming Fabric saw it.
 
 ## The session hooks
 
-In Claude Code this plugin ships four: at session start and `/clear` (not on compact or resume) the preamble above,
-or, when Fabric is down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
+In Claude Code this plugin ships four: at session start and `/clear` (not on compact or resume) the preamble above
+in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
+down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count; at each prompt one line only when that count rose; at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
 Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no token. Read

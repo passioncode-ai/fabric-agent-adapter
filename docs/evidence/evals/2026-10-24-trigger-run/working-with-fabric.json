@@ -1,0 +1,334 @@
+{
+  "model": "haiku",
+  "threshold": 0.85,
+  "skills": [
+    {
+      "skill": "working-with-fabric",
+      "cases": 39,
+      "passed": 38,
+      "passRate": 0.9744,
+      "positivesPassed": "23/23",
+      "negativesPassed": "15/16",
+      "errors": 0,
+      "aboveThreshold": true
+    }
+  ],
+  "cases": {
+    "working-with-fabric": [
+      {
+        "query": "Connect this Claude Code session to Fabric and claim my task before I start.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "My subagent hit its usage limit and says it resets at 9pm. Should I wait for the reset?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Воркфлоу упёрся в лимит сессии, ждать сброса?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "How do I register fabric-mcp in Codex?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "fabric_whoami says it is waiting for the operator. What now?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Fabric is not running; start it and then report my progress to it.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Before touching this repo, ask Fabric who else is working on it.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "fabric_work_claim refused: held by another agent. How should I proceed?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Create a Fabric task for backlog row FAA-18 without copying the row.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Release my Fabric claim and hand the work over at the end of this session.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключи этого агента к Fabric и возьми задачу через fabric_work_claim.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Работай через Fabric: сначала fabric_whoami, потом отчёт по этапам.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Зарегистрируй fabric-mcp в Claude Code без секрета.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Фабрика не запущена. Подними её через брокер и продолжай.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Check the Fabric project board for unread messages before you start.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Ask the project that owns the analytics service, through Fabric, whether its retention numbers are final.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Reply to the board message the other project sent us in Fabric.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "I'm waiting for an answer on the project board. Tell me when mail arrives.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Проверь доску проекта в Fabric: есть ли непрочитанные сообщения?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Спроси другой проект через доску Fabric (com.submit), готов ли их API.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Adapt this existing MCP server to the Fabric Agent Contract.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Create a new Fabric-compatible agent from scratch.",
+        "shouldTrigger": false,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Turn this agent into an always-on Fabric service with a dashboard.",
+        "shouldTrigger": false,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Fix the enrollment bug in Fabric's sessionEnroll.ts.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Add the Notion MCP server to my Claude Code config.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Take a lease on CHANGELOG.md with agent-sync before editing it.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Сделай существующего агента совместимым с Fabric.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Напиши Stop-хук для Claude Code, который форматирует код.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Explain what the Fabric Agent Contract's provider manifest contains.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Restart the example-agent app through the lifecycle broker.",
+        "shouldTrigger": false,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": false,
+        "error": null
+      },
+      {
+        "query": "Build a responder service that answers com.submit requests for my project.",
+        "shouldTrigger": false,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Implement com.reply in Fabric's boardService.ts.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Send the operator a Telegram message that the release is out.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Напиши коллеге в Slack, что ревью готово.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключить проект к Fabric: сгенерируй provider bundle и проверь совместимость.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Nobody has answered our board request to another project for two days. Should I just fix it in their repo?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Наш запрос на доске вернулся с noResponder. Что делать?",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Mark only the board messages I handled as read, and list what is unread.",
+        "shouldTrigger": true,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Write a reply to my coworker's pull request review comment on GitHub.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      }
+    ]
+  },
+  "scenarios": "NOT_RUN: scenario evals need a judge of free-form behaviour",
+  "costUsd": 0.015887
+}

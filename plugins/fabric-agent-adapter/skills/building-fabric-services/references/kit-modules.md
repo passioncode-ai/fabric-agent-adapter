@@ -25,7 +25,7 @@ python3 $K/fabric_kit.py install <service-dir> --lang node          # fabric-ser
 python3 $K/fabric_kit.py install <service-dir> --module fabric_openrouter --module fabric_board
 python3 $K/fabric_kit.py install <service-dir> --all --dry-run      # every module, nothing written
 python3 $K/fabric_kit.py status <service-dir> [--json]              # current, older (the release), modified, missing
-python3 $K/fabric_kit.py build [--check]                            # maintainers: refresh kit.json from the sources
+python3 $K/fabric_kit.py build [--check]                            # maintainers: refresh kit.json from the sources (refuses a tagged version)
 ```
 
 - `install` copies the closure of the named modules and nothing else. It refuses to overwrite a file it does not

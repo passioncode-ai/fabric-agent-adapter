@@ -1,0 +1,230 @@
+{
+  "model": "haiku",
+  "threshold": 0.85,
+  "skills": [
+    {
+      "skill": "creating-fabric-agents",
+      "cases": 26,
+      "passed": 26,
+      "passRate": 1.0,
+      "positivesPassed": "12/12",
+      "negativesPassed": "14/14",
+      "errors": 0,
+      "aboveThreshold": true
+    }
+  ],
+  "cases": {
+    "creating-fabric-agents": [
+      {
+        "query": "Create a new agent that is compatible with the Passion Code fabric from day one.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Build a fabric-ready SEO agent from scratch for the estate.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Создай агента, совместимого с фабрикой Passion Code.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Новый агент под Fabric: исследователь трендов, профиль MCP.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Design a brand-new Fabric provider for campaign reporting and scaffold its bundle.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Start a new fabric-compatible marketing agent; its consumer is the weekly review routine.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Сделай нового агента для фабрики: возможность collect.spend, потребитель: портфельный обсервер.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Greenfield: build a content-drafting agent that must pass Fabric admission later.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "New Fabric provider from zero: run the intake grill and create the skeleton.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Спроектируй с нуля fabric-совместимого агента поддержки и заведи ему knowledge pack.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Adapt this existing MCP server to the Fabric Agent Contract.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Сделай существующего агента совместимым со стандартом Fabric.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Design the Fabric host registry and admission runtime.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Build a multi-agent orchestrator for our product.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Make an agent that posts to LinkedIn every day.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Write a better system prompt for the research agent.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Add this MCP server to my Claude Code config.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Wrap our terminal coding agent as a Fabric local runner.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Проведи общий аудит проекта и найди баги.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Create a generic A2A server from scratch.",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Build a new Fabric agent that runs in our organization's cloud and picks its models on OpenRouter.",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "создай агента под фабрику, который работает в облаке организации и сам учится на ошибках",
+        "shouldTrigger": true,
+        "chosen": "creating-fabric-agents",
+        "answer": "creating-fabric-agents",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Which OpenRouter model is cheapest for classifying support tickets in my existing script?",
+        "shouldTrigger": false,
+        "chosen": "none",
+        "answer": "none",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Turn example-agent into an always-on local Fabric service with a dashboard and launchd.",
+        "shouldTrigger": false,
+        "chosen": "building-fabric-services",
+        "answer": "building-fabric-services",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключись к Fabric и проверь доску проекта перед работой.",
+        "shouldTrigger": false,
+        "chosen": "working-with-fabric",
+        "answer": "working-with-fabric",
+        "passed": true,
+        "error": null
+      },
+      {
+        "query": "Подключи существующий проект к Fabric: подготовь fabric-agent.json для его CLI.",
+        "shouldTrigger": false,
+        "chosen": "adapting-projects-to-fabric",
+        "answer": "adapting-projects-to-fabric",
+        "passed": true,
+        "error": null
+      }
+    ]
+  },
+  "scenarios": "NOT_RUN: scenario evals need a judge of free-form behaviour",
+  "costUsd": 0.010864
+}

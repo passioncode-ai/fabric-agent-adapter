@@ -377,19 +377,27 @@ class Responder:
         self.checkpoint.put(entry)
 
     def _resume_next(self) -> None:
-        """Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A request leaves
-        the queue only once it has resumed: a lost answer, of its probe (finding 35) or of the `com.complete` that sends
-        a known outcome (FAA-86), keeps it first in line, and the next tick sends the same keys again from the
-        checkpoint."""
+        """Resume a transferred request while nothing runs; each idle tick takes the next (finding 39). A lost answer,
+        of its probe (finding 35) or of the `com.complete` that sends a known outcome (FAA-86), puts the request back
+        first in line, and the next tick sends the same keys again from the checkpoint. It leaves the queue before it
+        resumes, so a handler that settles inside the resume (and reaches `_replace`, which resumes the queue again)
+        never runs it twice."""
         while self.current is None and self._to_resume and not self.stopping:
             entry = self.checkpoint.entries.get(self._to_resume[0])
             if entry is not None and self.slots.get(entry["capability"], {}).get("state") == "held":
                 entry = json.loads(json.dumps(entry))
                 if entry.get("probe"):
                     self._replied_before(entry)
-                self._resume(entry)
-                if self._to_resume and self._to_resume[0] == entry["request"]:
-                    self._to_resume.pop(0)
+                self._to_resume.pop(0)
+                try:
+                    self._resume(entry)
+                except BaseException:
+                    # Back first only while it can still be resumed: once its effect began it waits for reconcile.
+                    held = self.checkpoint.entries.get(entry["request"])
+                    if held is not None and not held.get("effect") and held.get("step") != "unknown" \
+                            and entry["request"] not in self._to_resume:
+                        self._to_resume.insert(0, entry["request"])
+                    raise
             else:
                 self._to_resume.pop(0)
 

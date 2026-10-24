@@ -1,11 +1,11 @@
 ---
 name: creating-fabric-agents
-description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit, «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch", «агент в облаке организации», "which models and OpenRouter key for a new Fabric agent". Runs the intake grill (capability, named consumer, workflow or agent, profile, effects, where it runs, models, who pays, how it learns), turns source projects' recorded failures into planted eval fixtures, scaffolds the pinned contract bundle and sets the canary expectation. NOT for adapting an existing project (adapting-projects-to-fabric), making an agent a local or online Fabric service with a dashboard (building-fabric-services), a coding session working through Fabric or its board (working-with-fabric), the Fabric host or orchestrator, or agent design without Fabric.
+description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit, «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch", «агент в облаке организации», "which models and OpenRouter key for a new Fabric agent". Runs the intake grill (capability, named consumer, workflow or agent, profile, effects, where it runs, models, who pays, how it learns), turns source projects' recorded failures into planted eval fixtures, scaffolds the pinned contract bundle and sets the canary expectation. NOT for adapting an existing project (adapting-projects-to-fabric), making an agent a local or online Fabric service with a dashboard (building-fabric-services), a coding session working through Fabric or its board (working-with-fabric), the Fabric host or orchestrator, or an agent, bot or A2A server that need not speak Fabric.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.48.3"
+  version: "0.49.0"
   contract-version: "0.1.0"
   contract-commit: "2f020a696453ae299b123517f14957f6a1354379"
 ---
