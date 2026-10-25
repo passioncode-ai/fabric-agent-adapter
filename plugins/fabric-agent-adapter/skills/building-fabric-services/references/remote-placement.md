@@ -42,7 +42,8 @@ same objects (well-known document, events feed, login code) at the same paths.
 - `commands` may carry `doctor` (a local executable); never `update`.
 - `source.repository` names the repository of the service's code, so Fabric Dashboards can tell code apart from a store
   that versions data. Pass it as `registerRemote({ ..., source: { repository } })` / `register_remote(..., source=...)`
-  (since 0.49.3); the kit checks it as the schema's URI and refuses a `user:password@` in it.
+  (since 0.49.3); the kit checks it as the schema's URI (RFC 3986 characters, a host and a valid port when it names an
+  authority) and refuses a `user:password@` or any value shaped like a credential in it.
 - `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or
   `{by, role?, tool}` where `by` is `person`, `node` or `organization` and `role` (`operator`, `administrator`) is a
   person's only. There is no `agent` kind: an agent that registers a service writes the string form, or

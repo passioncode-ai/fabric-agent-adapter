@@ -125,10 +125,19 @@ export const SUBSCRIPTION_RUNNERS = Object.freeze({ 'claude-code': 'claude', 'ki
 
 const PEER_ENDPOINT = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?$/;
 
-// FAA-120: source.repository is the schema's common `uri` (RFC 3986, ASCII only: a scheme, a colon, then printable
-// ASCII with no space), as the contract's ajv-formats checks it, and the same in both twins; a user:password@ in it is
-// a credential, never the name of a repository.
-const SOURCE_URI = /^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/;
+// FAA-120: source.repository is the schema's common `uri`: RFC 3986 characters only (unreserved, reserved and %HH),
+// the same in both twins; an authority, when there is one, names a host and a port of digits up to 65535, as Fabric's
+// `new URL` reads it. A user:password@ in it is a credential, never the name of a repository.
+const SOURCE_URI = /^[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9._~:/?#@!$&'()*+,;=-]|%[0-9A-Fa-f]{2})+$/;
+// Brackets belong to an IP-literal host only (RFC 3986 3.2.2); the literal is set aside before the character check.
+const IP_LITERAL = /^([A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^/?#@[\]]*@)?)\[[0-9A-Fa-f:.vV]+\]/;
+const URI_AUTHORITY = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^/?#@]*@)?(\[[^\]]*\]|[^/?#:]*)(?::([^/?#]*))?/;
+function authorityOk(uri) {
+  const m = URI_AUTHORITY.exec(uri);
+  if (!m) return true;
+  const port = m[2];
+  return Boolean(m[1]) && (port === undefined || port === '' || (/^[0-9]{1,5}$/.test(port) && Number(port) <= 65535));
+}
 const URI_PASSWORD = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#@]*:[^/?#@]*@/;
 const RESIDENCY = /^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$/;
 
@@ -178,7 +187,8 @@ export function descriptorMemberProblems(d) {
     for (const k of Object.keys(source)) if (k !== 'repository') problems.push(`source has no member ${k}`);
     if ('repository' in source) {
       const repository = source.repository;
-      if (!(typeof repository === 'string' && SOURCE_URI.test(repository))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
+      if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
+      else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
       else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential');
       places.push(['/source/repository', repository]);
     }

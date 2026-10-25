@@ -106,6 +106,13 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
     [{ repository: 'https://github.com/example/agent\u0085' }, 'source.repository is a URI'],
     [{ repository: 'https://github.com/example/agent\ufeff' }, 'source.repository is a URI'],
     [{ repository: 'https://github.com/\u00fc/\u00df' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a<b' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a%zz' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a|b' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a[b]' }, 'source.repository is a URI'],
+    [{ repository: 'https://' }, 'source.repository names a host'],
+    [{ repository: 'https://host:port/x' }, 'source.repository names a host'],
+    [{ repository: 'https://gh.example:65536/x' }, 'source.repository names a host'],
     [{ repository: 'https://bot:hunter2@github.com/example/agent' }, 'source.repository carries no password'],
     [{ repository: `https://github.com/example/agent?t=ghp_${'a1B2'.repeat(9)}` }, 'FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository'],
   ]) {
@@ -116,7 +123,9 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
   }
   const written = JSON.parse(fs.readFileSync(bare, 'utf8'));
   assert.deepEqual(k.validateDescriptor({ ...written, source: { repository: 'ssh://git@example.com/a.git' } }), [], 'a user without a password is a name, not a credential');
-  assert.deepEqual(k.validateDescriptor({ ...written, source: { repository: 'https://host.example:8443/a@b' } }), []);
+  for (const good of ['https://host.example:8443/a@b', 'https://github.com/a%20b', 'https://[::1]:8080/x', 'urn:example:agent', 'https://h.example:/x']) {
+    assert.deepEqual(k.validateDescriptor({ ...written, source: { repository: good } }), [], good);
+  }
   const none = k.registerRemote({ id: 'example-none', name: 'None', origin: 'https://none.example.com', token: 't'.repeat(40), dir, source: null });
   assert.ok(!('source' in JSON.parse(fs.readFileSync(none, 'utf8'))), 'null is no source, as None is in Python');
 });

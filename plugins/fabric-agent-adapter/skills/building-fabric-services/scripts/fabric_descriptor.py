@@ -217,10 +217,13 @@ SUBSCRIPTION_RUNNERS = {"claude-code": "claude", "kimi-code": "kimi", "codex": "
 _PEER_ENDPOINT = re.compile(r"^https://(?P<host>([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?\Z", re.ASCII)
 
 
-# FAA-120: source.repository is the schema's common `uri` (RFC 3986, ASCII only: a scheme, a colon, then printable
-# ASCII with no space), as the contract's ajv-formats checks it, and the same in both twins; a user:password@ in it is
-# a credential, never the name of a repository.
-_SOURCE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+\Z")
+# FAA-120: source.repository is the schema's common `uri`: RFC 3986 characters only (unreserved, reserved and %HH),
+# the same in both twins; an authority, when there is one, names a host and a port of digits up to 65535, as Fabric's
+# `new URL` reads it. A user:password@ in it is a credential, never the name of a repository.
+_SOURCE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9._~:/?#@!$&'()*+,;=-]|%[0-9A-Fa-f]{2})+\Z")
+# Brackets belong to an IP-literal host only (RFC 3986 3.2.2); the literal is set aside before the character check.
+_IP_LITERAL = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@\[\]]*@)?)\[[0-9A-Fa-f:.vV]+\]")
+_URI_AUTHORITY = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@]*@)?(?P<host>\[[^\]]*\]|[^/?#:]*)(?::(?P<port>[^/?#]*))?")
 _URI_PASSWORD = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#@]*:[^/?#@]*@")
 
 
@@ -237,6 +240,14 @@ def _pointer(name: str) -> str:
 
 def _text(value: Any, low: int = 1, high: int = 200) -> bool:
     return isinstance(value, str) and low <= len(value) <= high
+
+
+def _authority_ok(uri: str) -> bool:
+    m = _URI_AUTHORITY.match(uri)
+    if not m:
+        return True
+    port = m.group("port")
+    return bool(m.group("host")) and (port is None or port == "" or (port.isdigit() and len(port) <= 5 and int(port) <= 65535))
 
 
 def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
@@ -288,8 +299,10 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
         problems += ["source has no member %s" % k for k in source if k != "repository"]
         if "repository" in source:
             repository = source["repository"]
-            if not (isinstance(repository, str) and _SOURCE_URI.match(repository)):
+            if not (isinstance(repository, str) and _SOURCE_URI.match(_IP_LITERAL.sub(r"\1h", repository, count=1))):
                 problems.append("source.repository is a URI (RFC 3986), such as https://github.com/owner/name")
+            elif not _authority_ok(repository):
+                problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
             elif _URI_PASSWORD.match(repository):
                 problems.append("source.repository carries no password: it names the repository, never a credential")
             places.append(("/source/repository", repository))
