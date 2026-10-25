@@ -292,7 +292,8 @@ def services_of(repo: Path, directory: Optional[Path] = None, until: Optional[fl
             d = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        source = str(((d.get("source") or {}) if isinstance(d, dict) else {}).get("repository") or "")
+        own = d.get("source") if isinstance(d, dict) else None
+        source = str(own.get("repository") or "") if isinstance(own, dict) else ""
         if same_repository(source, origin):
             found.append("%s.%s" % (d.get("id"), d.get("instance", "default")))
     return found

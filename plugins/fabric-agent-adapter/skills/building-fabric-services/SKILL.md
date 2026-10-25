@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.49.2"
+  version: "0.49.3"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "2f020a696453ae299b123517f14957f6a1354379"
@@ -357,8 +357,9 @@ things change and the kits implement each:
    so the platform's copy is known rather than invisible. Without Project Observatory, record
    where the key lives in the person's own secret manager.
 3. **Register it on the operator's computer**, the installer side, run there:
-   `registerRemote({ id, name, origin, token })` / `register_remote(...)` writes the token file
-   (0600) and the descriptor; pass the token from a file or stdin, never in argv. Public names
+   `registerRemote({ id, name, origin, token, source })` / `register_remote(...)` writes the token file
+   (0600) and the descriptor, with `source.repository` naming the code's repository; pass the token from a file or
+   stdin, never in argv. Public names
    only in public artifacts: a private service is registered by a local descriptor and nowhere
    else.
 4. **Verify** with the probe: `check_service.py <id>` checks TLS, the token-gated well-known

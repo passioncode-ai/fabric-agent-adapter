@@ -89,6 +89,47 @@ test('the remote session cookie is __Host-, Secure, HttpOnly, Strict, Path=/ and
   assert.ok(!/Domain=/i.test(h));
 });
 
+test('registerRemote writes source.repository, checked as the schema URI (FAA-120)', () => {
+  const dir = path.join(temp(), 'services');
+  const file = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 't'.repeat(40), dir,
+    source: { repository: 'https://github.com/example/agent' } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).source, { repository: 'https://github.com/example/agent' });
+  const bare = k.registerRemote({ id: 'example-bare', name: 'Bare', origin: 'https://bare.example.com', token: 't'.repeat(40), dir });
+  assert.ok(!('source' in JSON.parse(fs.readFileSync(bare, 'utf8'))), 'no source given, none written');
+  for (const [source, needle] of [
+    [['https://github.com/example/agent'], 'source is {repository?}'],
+    [{ repository: 'https://github.com/example/agent', branch: 'main' }, 'source has no member branch'],
+    [{ repository: '' }, 'source.repository is a URI'],
+    [{ repository: 'git@github.com:example/agent.git' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/example/my agent' }, 'source.repository is a URI'],
+    [{ repository: 42 }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/example/agent\u0085' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/example/agent\ufeff' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/\u00fc/\u00df' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a<b' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a%zz' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a|b' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/a[b]' }, 'source.repository is a URI'],
+    [{ repository: 'https://' }, 'source.repository names a host'],
+    [{ repository: 'https://host:port/x' }, 'source.repository names a host'],
+    [{ repository: 'https://gh.example:65536/x' }, 'source.repository names a host'],
+    [{ repository: 'https://bot:hunter2@github.com/example/agent' }, 'source.repository carries no password'],
+    [{ repository: `https://github.com/example/agent?t=ghp_${'a1B2'.repeat(9)}` }, 'FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository'],
+  ]) {
+    assert.throws(() => k.registerRemote({ id: 'example-bad', name: 'Bad', origin: 'https://bad.example.com', token: 't'.repeat(40), dir, source }),
+      (err) => String(err.message).includes(needle), JSON.stringify(source));
+    assert.ok(!fs.existsSync(path.join(dir, 'example-bad.default.json')), 'a refused descriptor is never written');
+    assert.ok(!fs.existsSync(k.remoteTokenFile('example-bad', 'default', dir)), 'nor its token');
+  }
+  const written = JSON.parse(fs.readFileSync(bare, 'utf8'));
+  assert.deepEqual(k.validateDescriptor({ ...written, source: { repository: 'ssh://git@example.com/a.git' } }), [], 'a user without a password is a name, not a credential');
+  for (const good of ['https://host.example:8443/a@b', 'https://github.com/a%20b', 'https://[::1]:8080/x', 'urn:example:agent', 'https://h.example:/x']) {
+    assert.deepEqual(k.validateDescriptor({ ...written, source: { repository: good } }), [], good);
+  }
+  const none = k.registerRemote({ id: 'example-none', name: 'None', origin: 'https://none.example.com', token: 't'.repeat(40), dir, source: null });
+  assert.ok(!('source' in JSON.parse(fs.readFileSync(none, 'utf8'))), 'null is no source, as None is in Python');
+});
+
 test('registerRemote writes a 0600 token and a descriptor that claims no port', () => {
   const dir = path.join(temp(), 'services');
   const local = { protocol: k.PROTOCOL, id: 'maker', instance: 'default', name: 'Maker', origin: 'http://127.0.0.1:8443', auth: { tokenFile: '/tmp/m.token' }, lifecycle: { manager: 'none' }, paths: { data: '/tmp/m', logs: [] }, installedAt: k.nowIso(), installedBy: 'test' };

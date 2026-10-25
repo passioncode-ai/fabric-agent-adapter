@@ -106,6 +106,50 @@ class RemotePlacement(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             fs.register_remote(service_id="other", name="O", origin="https://o.example.com", token="short", directory=root)
 
+    def test_register_remote_source(self):
+        # FAA-120: the repository of the service's code goes into source.repository, checked as the schema's URI.
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        root = temp / "services"
+        path = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                  token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
+        self.assertEqual(json.loads(path.read_text())["source"], {"repository": "https://github.com/example/agent"})
+        path = fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
+                                  directory=root)
+        self.assertNotIn("source", json.loads(path.read_text()), "no source given, none written")
+        for source, needle in ((["https://github.com/example/agent"], "source is {repository?}"),
+                               ({"repository": "https://github.com/example/agent", "branch": "main"}, "source has no member branch"),
+                               ({"repository": ""}, "source.repository is a URI"),
+                               ({"repository": "git@github.com:example/agent.git"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/example/my agent"}, "source.repository is a URI"),
+                               ({"repository": 42}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/example/agent\u0085"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/example/agent\ufeff"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/\u00fc/\u00df"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/a<b"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/a%zz"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/a|b"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/a[b]"}, "source.repository is a URI"),
+                               ({"repository": "https://"}, "source.repository names a host"),
+                               ({"repository": "https://host:port/x"}, "source.repository names a host"),
+                               ({"repository": "https://gh.example:65536/x"}, "source.repository names a host"),
+                               ({"repository": "https://bot:hunter2@github.com/example/agent"}, "source.repository carries no password"),
+                               ({"repository": "https://github.com/example/agent?t=ghp_" + "a1B2" * 9}, "FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository")):
+            with self.subTest(source=source):
+                with self.assertRaises(fs.ServiceError) as caught:
+                    fs.register_remote(service_id="example-bad", name="Bad", origin="https://bad.example.com", token="t" * 40,
+                                       directory=root, source=source)
+                self.assertIn(needle, str(caught.exception))
+                self.assertFalse((root / "example-bad.default.json").exists(), "a refused descriptor is never written")
+                self.assertFalse(fs.remote_token_file("example-bad", "default", root).exists(), "nor its token")
+        self.assertEqual(fs.validate_descriptor({**json.loads(path.read_text()), "source": {"repository": "ssh://git@example.com/a.git"}}), [],
+                         "a user without a password is a name, not a credential")
+        for good in ("https://host.example:8443/a@b", "https://github.com/a%20b", "https://[::1]:8080/x", "urn:example:agent", "https://h.example:/x"):
+            self.assertEqual(fs.validate_descriptor({**json.loads(path.read_text()), "source": {"repository": good}}), [], good)
+        path = fs.register_remote(service_id="example-none", name="None", origin="https://none.example.com", token="t" * 40,
+                                  directory=root, source=None)
+        self.assertNotIn("source", json.loads(path.read_text()), "None is no source, as undefined and null are in Node")
+
 
 if __name__ == "__main__":
     unittest.main()

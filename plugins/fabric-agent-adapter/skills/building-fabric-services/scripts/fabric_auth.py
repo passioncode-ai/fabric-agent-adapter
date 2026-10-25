@@ -367,14 +367,17 @@ def remote_token_file(service_id: str, instance: str = "default", directory: Opt
 def register_remote(*, service_id: str, name: str, origin: str, token: str, instance: str = "default",
                     summary: Optional[str] = None, doctor: Optional[List[str]] = None,
                     directory: Optional[Path] = None, installed_by: Any = None,
-                    runner: Optional[Dict[str, str]] = None, peer: Optional[Dict[str, Any]] = None) -> Path:
+                    runner: Optional[Dict[str, str]] = None, peer: Optional[Dict[str, Any]] = None,
+                    source: Optional[Dict[str, str]] = None) -> Path:
     """DEC-0019, installer side: register an online service on THIS computer — the token file
     (0600, never printed) and the descriptor. The same token is set on the platform as a secret.
 
     DEC-0061: ``installed_by`` defaults to ``{"by": "person", "role": "operator", "tool": "fabric-service
     register-remote"}`` (a person runs this); pass ``role: "administrator"`` for an organization's administrator, or a
     string as before. ``runner`` (``{kind?, credentialKind}``) says how its model calls sign in, as a kind and never a
-    credential; ``peer`` (``{endpoint, custody, residency, maxDataClass}``) offers it to others and needs ``runner``."""
+    credential; ``peer`` (``{endpoint, custody, residency, maxDataClass}``) offers it to others and needs ``runner``.
+    FAA-120: ``source`` (``{"repository": "https://github.com/owner/name"}``) names the repository of its code, as the
+    schema's ``source.repository``; Fabric Dashboards reads it."""
     if not token or len(token.strip()) < 16:
         raise ServiceError("the service token must be at least 16 characters.")
     root = directory or services_dir()
@@ -390,6 +393,8 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
         descriptor["runner"] = dict(runner)
     if peer is not None:
         descriptor["peer"] = dict(peer)
+    if source is not None:
+        descriptor["source"] = dict(source) if isinstance(source, dict) else source
     if doctor:
         descriptor["commands"] = {"doctor": list(doctor)}
     problems = validate_descriptor(descriptor)

@@ -1,16 +1,17 @@
-/* fabric-dashboard-kit@1.1.3 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+/* fabric-dashboard-kit@1.1.4 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
    Load it same-origin, after fabric-dashboard.css, with the service it opens Fabric on:
      <script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
              data-project="project-a" data-project-name="Project A"></script>
    One floating menu button: "Chat with Fabric about <service>" and, when the page knows its project, "Open a coding
-   session in <project>". Its links carry ids only and open a view in Fabric, nothing more (FB-8). It hides itself
+   session in <project>", in Russian on a page whose lang is ru; data-label-chat and data-label-session ({name} is the
+   service or the project), data-label-open and data-label-absent set the page's own words. Its links carry ids only and open a view in Fabric, nothing more (FB-8). It hides itself
    when the host draws its own (the fabric_button cookie, FB-6) and says how to get Fabric when Fabric is absent
    (FB-5). No inline script, no eval, nothing from a CDN; the only address it names is passioncode.ai/fabric.
    Do not edit in place; `dashboard_kit.py install` replaces it on an upgrade. */
 (function (root) {
   'use strict';
 
-  var VERSION = '1.1.3';
+  var VERSION = '1.1.4';
   var COOKIE = 'fabric_button';
   var GET_FABRIC = 'https://passioncode.ai/fabric';
   var ABSENT_AFTER_MS = 1500;
@@ -155,16 +156,38 @@
     return null;
   }
 
+  // The words a person reads (FAA-119): English, or Russian on a page whose lang is ru; the Russian is written as
+  // escapes so the file reads the same whatever charset it is served with. Checked with Copylot (en-US and ru-RU).
+  var LABELS = {
+    en: { chat: 'Chat with Fabric about {name}', session: 'Open a coding session in {name}', open: 'Open Fabric',
+      absent: 'Fabric is not installed. Get it at' },
+    ru: { chat: '\u0427\u0430\u0442 \u0441 Fabric \u043e \u0441\u0435\u0440\u0432\u0438\u0441\u0435 {name}', session: '\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0435\u0441\u0441\u0438\u044e \u0432 \u043f\u0440\u043e\u0435\u043a\u0442\u0435 {name}', open: '\u041e\u0442\u043a\u0440\u044b\u0442\u044c Fabric',
+      absent: 'Fabric \u043d\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d. \u0421\u043a\u0430\u0447\u0430\u0439\u0442\u0435 \u0435\u0433\u043e \u043d\u0430' }
+  };
+
+  /** The labels for a page language, each one replaced by a non-blank string the page gives (data-label-*). */
+  function labelsFor(lang, overrides) {
+    var base = LABELS[/^ru(-|$)/i.test(String(lang || '')) ? 'ru' : 'en'];
+    var out = {};
+    Object.keys(base).forEach(function (k) {
+      var own = overrides ? overrides[k] : undefined;
+      out[k] = typeof own === 'string' && own.trim() ? own.trim() : base[k];
+    });
+    return out;
+  }
+  function named(label, name) { return label.split('{name}').join(name); }
+
   /** The menu items for a page: the chat link always, the session link when the page knows its project. */
-  function menuItems(options) {
+  function menuItems(options, labels) {
+    var words = labels || labelsFor();
     var items = [];
     var chat = { action: 'chat', service: options.service };
     if (options.project) chat.project = options.project;
-    items.push({ label: 'Chat with Fabric about ' + (options.serviceName || options.service), href: buildFabricLink(chat) });
+    items.push({ label: named(words.chat, options.serviceName || options.service), href: buildFabricLink(chat) });
     if (options.project) {
       var session = { action: 'session.new', project: options.project };
       if (options.runner) session.runner = options.runner;
-      items.push({ label: 'Open a coding session in ' + (options.projectName || options.project), href: buildFabricLink(session) });
+      items.push({ label: named(words.session, options.projectName || options.project), href: buildFabricLink(session) });
     }
     return items;
   }
@@ -197,11 +220,12 @@
   function mount(doc, options) {
     var cookie = parseButtonCookie(doc.cookie);
     if (cookie && cookie.owner === 'host') return null;
-    var items = menuItems(options);
+    var words = labelsFor(options.lang !== undefined ? options.lang : doc.documentElement.getAttribute('lang'), options.labels);
+    var items = menuItems(options, words);
     var absent = options.fabric === 'absent' || (cookie && cookie.fabric === 'absent');
 
     var wrap = el(doc, 'div', { 'class': 'fd-fabric-button-wrap' });
-    var button = el(doc, 'button', { type: 'button', 'class': 'fd-fabric-button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': 'Open Fabric' });
+    var button = el(doc, 'button', { type: 'button', 'class': 'fd-fabric-button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-label': words.open });
     button.appendChild(mark(doc));
     button.appendChild(el(doc, 'span', { 'class': 'fd-fabric-button-label', 'aria-hidden': 'true' }, 'Fabric'));
     var menu = el(doc, 'div', { role: 'menu', 'class': 'fd-fabric-button-menu', 'aria-label': 'Fabric' });
@@ -212,7 +236,7 @@
       return a;
     });
     var note = el(doc, 'p', { 'class': 'fd-fabric-button-note', role: 'note' });
-    note.appendChild(doc.createTextNode('Fabric is not installed. Get it at '));
+    note.appendChild(doc.createTextNode(words.absent + ' '));
     // The way to get Fabric is a menu item too, so the arrows reach it whenever the note shows.
     var get = el(doc, 'a', { role: 'menuitem', href: GET_FABRIC, target: '_blank', rel: 'noopener', tabindex: '-1', 'class': 'fd-fabric-button-get' }, 'passioncode.ai/fabric');
     note.appendChild(get);
@@ -274,18 +298,19 @@
 
   function optionsFrom(script) {
     var d = script.dataset;
-    return { service: d.service, serviceName: d.serviceName, project: d.project, projectName: d.projectName, runner: d.runner, fabric: d.fabric };
+    return { service: d.service, serviceName: d.serviceName, project: d.project, projectName: d.projectName, runner: d.runner, fabric: d.fabric,
+      labels: { chat: d.labelChat, session: d.labelSession, open: d.labelOpen, absent: d.labelAbsent } };
   }
 
   var api = { version: VERSION, parseFabricLink: parseFabricLink, buildFabricLink: buildFabricLink, parseButtonCookie: parseButtonCookie,
-    menuItems: menuItems, credentialName: credentialName, secretValue: secretValue, nameWords: nameWords, mount: mount };
+    menuItems: menuItems, labelsFor: labelsFor, credentialName: credentialName, secretValue: secretValue, nameWords: nameWords, mount: mount };
   root.FabricButton = api;
 
   var doc = root.document;
   var script = doc && doc.currentScript;
   if (script && script.dataset && script.dataset.service) {
     var start = function () {
-      try { mount(doc, optionsFrom(script)); } catch (err) { if (root.console) root.console.warn('fabric-button: not shown — ' + err.message); }
+      try { mount(doc, optionsFrom(script)); } catch (err) { if (root.console) root.console.warn('fabric-button: not shown: ' + err.message); }
     };
     if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', start); else start();
   }

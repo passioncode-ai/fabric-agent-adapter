@@ -262,15 +262,18 @@ export function remoteTokenFile(id, instance = 'default', dir = servicesDir()) {
  * descriptor. DEC-0061: `installedBy` defaults to `{by: 'person', role: 'operator', tool: 'fabric-service register-remote'}`
  * (a person runs this); `runner` (`{kind?, credentialKind}`) says how its model calls sign in, as a kind and never a
  * credential; `peer` (`{endpoint, custody, residency, maxDataClass}`) offers it to others and needs `runner`.
+ * FAA-120: `source` (`{repository: 'https://github.com/owner/name'}`) names the repository of its code, as the schema's
+ * `source.repository`; Fabric Dashboards reads it.
  */
 export function registerRemote({ id, instance = 'default', name, summary, origin, token, doctor, dir = servicesDir(),
-  installedBy = { by: 'person', role: 'operator', tool: 'fabric-service register-remote' }, runner, peer }) {
+  installedBy = { by: 'person', role: 'operator', tool: 'fabric-service register-remote' }, runner, peer, source }) {
   if (!token || String(token).trim().length < 16) throw new ServiceError('the service token must be at least 16 characters.');
   const tokenFile = remoteTokenFile(id, instance, dir);
   const d = {
     protocol: PROTOCOL, id, instance, name, ...(summary ? { summary } : {}), placement: 'remote', origin,
     auth: { tokenFile }, lifecycle: { manager: 'none' }, ...(doctor ? { commands: { doctor } } : {}),
     installedAt: nowIso(), installedBy, ...(runner ? { runner: { ...runner } } : {}), ...(peer ? { peer: { ...peer } } : {}),
+    ...(source != null ? { source: isPlainObject(source) ? { ...source } : source } : {}),
   };
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);

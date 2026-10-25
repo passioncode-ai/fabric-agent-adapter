@@ -93,9 +93,15 @@ service. Load it after the stylesheet, with ids only:
 
 - **The menu (FB-4):** "Chat with Fabric about *Example Agent*" always; "Open a coding session in *Project A*" when
   the page knows its project (`data-runner` picks the runner kind). Arrows move, Escape closes and returns focus.
+- **Words (since 1.1.4):** English by default, Russian when the page says `<html lang="ru">` (any `ru-*`). The page
+  sets its own with `data-label-chat` and `data-label-session` (`{name}` is the service or the project),
+  `data-label-open` (the button's accessible name) and `data-label-absent` (the sentence before the link to
+  passioncode.ai/fabric). A blank attribute keeps the built-in words; `FabricButton.labelsFor(lang, overrides)` returns
+  what a page gets. Product names stay in English in every language.
 - **Placement and look (FB-2, FB-3):** bottom-right (bottom-left right-to-left), 16 px off and clear of the safe
   area, above the sticky chrome and below dialogs; the page keeps its height plus 16 px free at the end of the
-  scroll. The mark and the word *Fabric*, the mark alone below 480 px; the accessible name is always *Open Fabric*;
+  scroll. The mark and the word *Fabric*, the mark alone below 480 px; the accessible name is *Open Fabric* (*Открыть
+  Fabric* on a Russian page, or the page's `data-label-open`);
   `--ink` on `--panel` with an `--edge` boundary, the pairs the themes are measured on.
 - **Links (FL-1…FL-6):** built with the kit's port of the contract's `buildFabricLink`; a value outside the grammar
   (or one shaped like a credential) means no button, never a bad link. A press opens a view in Fabric and starts

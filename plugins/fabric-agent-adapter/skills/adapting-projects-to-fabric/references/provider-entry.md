@@ -53,7 +53,9 @@ It refuses, with one sentence that never quotes a value:
   1024 characters), a shell-string command, more than 32 arguments or one over 1024 characters, more than 64 env
   names, a `source.repository` that is not an absolute URI, an `installedAt` that is not an RFC 3339 date-time,
   unknown fields. The patterns are the schema's, copied (`test_provider.SchemaParityTests` compares them with a
-  contract checkout at the pin when `FABRIC_CONTRACT_NEW` names one).
+  contract checkout at the pin when `FABRIC_CONTRACT_NEW` names one);
+- a `source.repository` with a `user:password@` or a value shaped like a credential: it names the repository, never
+  reaches it (since 0.49.3, as the service kit's descriptor check).
 
 `validate` also checks that the file is named `<id>.json` (FAC-SEM-014, slug half).
 From Python: `write_provider_entry(entry)`, `remove_provider_entry(id)`,
