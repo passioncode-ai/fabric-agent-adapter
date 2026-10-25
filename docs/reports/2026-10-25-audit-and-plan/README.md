@@ -15,8 +15,8 @@ report:
     the tag and npm, nightly validate green; nothing was unmerged. Cleaned: 34 merged remote
     branches, one abandoned clone, one expired lease. Open: two board requests addressed to the
     adapter (DEC-0121 actions, the Dashboards-only rule), three findings on the dashboard kit and
-    the remote registration, a contract 71 commits past the pin, fourteen contract rows whose
-    adapter part is done but not reported. Rows FAA-117 to FAA-122.
+    the remote registration, a contract 71 commits past the pin, seventeen contract rows whose
+    adapter part is done but not reported. Rows FAA-117 to FAA-124.
 ---
 
 # Adapter state at 0.49.2: audit and plan
@@ -71,7 +71,7 @@ release is tagged and on npm; they can be closed.
 |---|---|---|
 | FAA-117 | repin to `v0.1.0+2026-10-25` and adopt DEC-0121 (actions and relayed operator decisions) | every service with a dashboard (CT-127), Fabric's hub (CT-125); deadline 2026-11-07 |
 | FAA-118 | the Dashboards-only rule in the three skills, the templates and the probe | the operator's rule of 2026-10-24; deadline 2026-10-31 |
-| FAA-121 | tell the contract owner which fourteen CT rows have the adapter's part done | the contract board shows the adapter as late where it is not |
+| FAA-121 | tell the contract owner which seventeen CT rows have the adapter's part done (sent, thread `c06f2991`) | the contract board shows the adapter as late where it is not |
 | FAA-87 | npm trusted publishing, the publish token removed | a human gate: the operator's `npm login` on npmjs.com |
 
 ### P2: next, on demand
@@ -114,14 +114,18 @@ release is tagged and on npm; they can be closed.
    (`org:<id>` placement, DEC-0082) and its dashboard opened from Fabric Dashboards; what fails becomes a row.
 5. **Then** FAA-116 when its reference lands, FAA-28 and FAA-63 when their owners publish.
 
-## 5. Questions for the operator
+## 5. Questions for the operator, and the answers (2026-10-25)
 
-The answers are recorded in the handoff of this run once given.
+Asked and answered in the session; the answer follows each question.
 
-1. Which organization is "the first": the RM-28 pilot pair (PassionCode.ai and Appvillis in Vesta), or one customer
-   organization?
-2. "One new finished project that we integrate": one adapter release that carries P0 and P1 (proposed: 0.49.3 then
-   0.50.0), or a merge of several repositories' work?
-3. The dashboard kit's labels: overridable only, or Russian as well, chosen by the page's `lang`?
-4. FAA-87 needs `npm login` on npmjs.com: when?
-5. A2A (FAA-10, RM-17): stays waiting on the contract, or the adapter proposes `surfaces.a2a` itself?
+1. Which organization is "the first"? **The RM-28 pilot pair** (PassionCode.ai and Appvillis in Vesta).
+2. "One new finished project that we integrate"? **An estate release:** the adapter, the contract, Fabric's hub
+   (CT-125) and the services with a dashboard ship in order, coordinated by the adapter (FAA-124; proposed on the board,
+   thread `0144d916`).
+3. The dashboard kit's labels? **Data attributes and built-in Russian** chosen by the page's `lang`, English by default
+   (FAA-119); the strings go through Copylot.
+4. FAA-87 needs `npm login` on npmjs.com: not answered; it stays a human gate.
+5. A2A? **The adapter drafts `surfaces.a2a` and proposes it to the contract** (FAA-123).
+
+The plan in section 4 stands, with FAA-124 as its frame and FAA-123 after 0.50.0. FAA-121's message went to the
+contract's owner (thread `c06f2991`): it covers 17 rows, not 14 (CT-03, CT-81 and CT-82 were found done too).

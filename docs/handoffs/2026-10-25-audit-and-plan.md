@@ -16,4 +16,11 @@ wait for the operator to close them. The operator's questions are in section 5 o
 
 **Checks actually run.** `python3 test/validate.py`; no code changed.
 
+**Decisions (operator, 2026-10-25).** The first organization is the RM-28 pilot pair; integration is an estate release
+the adapter coordinates (FAA-124, board thread `0144d916`); kit labels by data attributes plus Russian by `lang`
+(FAA-119); the adapter proposes `surfaces.a2a` (FAA-123). FAA-121 sent (thread `c06f2991`, 17 rows).
+
+**Waits.** Answers on threads `0144d916` (fabric, fabric-dashboards, fabric-agent-contract) and `c06f2991` (contract);
+the next session reads them with `com.list {unread: true}`. FAA-87: the operator's `npm login`.
+
 **Exact next task.** FAA-119 and FAA-120 as 0.49.3, then FAA-121, then FAA-117 with FAA-118 as 0.50.0.
