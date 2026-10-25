@@ -89,6 +89,31 @@ test('the remote session cookie is __Host-, Secure, HttpOnly, Strict, Path=/ and
   assert.ok(!/Domain=/i.test(h));
 });
 
+test('registerRemote writes source.repository, checked as the schema URI (FAA-120)', () => {
+  const dir = path.join(temp(), 'services');
+  const file = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 't'.repeat(40), dir,
+    source: { repository: 'https://github.com/example/agent' } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).source, { repository: 'https://github.com/example/agent' });
+  const bare = k.registerRemote({ id: 'example-bare', name: 'Bare', origin: 'https://bare.example.com', token: 't'.repeat(40), dir });
+  assert.ok(!('source' in JSON.parse(fs.readFileSync(bare, 'utf8'))), 'no source given, none written');
+  for (const [source, needle] of [
+    [['https://github.com/example/agent'], 'source is {repository?}'],
+    [{ repository: 'https://github.com/example/agent', branch: 'main' }, 'source has no member branch'],
+    [{ repository: '' }, 'source.repository is a URI'],
+    [{ repository: 'git@github.com:example/agent.git' }, 'source.repository is a URI'],
+    [{ repository: 'https://github.com/example/my agent' }, 'source.repository is a URI'],
+    [{ repository: 42 }, 'source.repository is a URI'],
+    [{ repository: 'https://bot:hunter2@github.com/example/agent' }, 'source.repository carries no password'],
+  ]) {
+    assert.throws(() => k.registerRemote({ id: 'example-bad', name: 'Bad', origin: 'https://bad.example.com', token: 't'.repeat(40), dir, source }),
+      (err) => String(err.message).includes(needle), JSON.stringify(source));
+    assert.ok(!fs.existsSync(path.join(dir, 'example-bad.default.json')), 'a refused descriptor is never written');
+    assert.ok(!fs.existsSync(k.remoteTokenFile('example-bad', 'default', dir)), 'nor its token');
+  }
+  const written = JSON.parse(fs.readFileSync(bare, 'utf8'));
+  assert.deepEqual(k.validateDescriptor({ ...written, source: { repository: 'ssh://git@example.com/a.git' } }), [], 'a user without a password is a name, not a credential');
+});
+
 test('registerRemote writes a 0600 token and a descriptor that claims no port', () => {
   const dir = path.join(temp(), 'services');
   const local = { protocol: k.PROTOCOL, id: 'maker', instance: 'default', name: 'Maker', origin: 'http://127.0.0.1:8443', auth: { tokenFile: '/tmp/m.token' }, lifecycle: { manager: 'none' }, paths: { data: '/tmp/m', logs: [] }, installedAt: k.nowIso(), installedBy: 'test' };

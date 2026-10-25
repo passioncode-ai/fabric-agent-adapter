@@ -13,7 +13,7 @@ import { ROUTES } from './fabric-usage.mjs';
 // document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 
-export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.3';
+export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.4';
 
 export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 
@@ -125,6 +125,10 @@ export const SUBSCRIPTION_RUNNERS = Object.freeze({ 'claude-code': 'claude', 'ki
 
 const PEER_ENDPOINT = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?$/;
 
+// FAA-120: source.repository is the schema's common `uri` (RFC 3986: a scheme, a colon, then no space or control
+// character); a user:password@ in it is a credential, never the name of a repository.
+const SOURCE_URI = /^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+$/;
+const URI_PASSWORD = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#@]*:[^/?#@]*@/;
 const RESIDENCY = /^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$/;
 
 const RUNNER_KIND_NAME = /^[a-z][a-z0-9-]{1,62}$/;
@@ -166,6 +170,17 @@ export function descriptorMemberProblems(d) {
     if ('kind' in runner && !(typeof runner.kind === 'string' && RUNNER_KIND_NAME.test(runner.kind))) problems.push("runner.kind is a runner kind's name");
     if (runner.credentialKind === 'subscription' && !Object.hasOwn(SUBSCRIPTION_RUNNERS, runner.kind)) problems.push("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex");
     for (const [k, v] of Object.entries(runner)) places.push([`/runner/${pointer(k)}`, v]);
+  }
+  if ('source' in d) {
+    const source = isObj(d.source) ? d.source : {};
+    if (!isObj(d.source)) problems.push('source is {repository?}');
+    for (const k of Object.keys(source)) if (k !== 'repository') problems.push(`source has no member ${k}`);
+    if ('repository' in source) {
+      const repository = source.repository;
+      if (!(typeof repository === 'string' && SOURCE_URI.test(repository))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
+      else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential');
+      places.push(['/source/repository', repository]);
+    }
   }
   if ('peer' in d) {
     let peer = d.peer;

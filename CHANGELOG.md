@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.49.3 (2026-10-25)
+
+### Fixed
+
+- **Fabric's button speaks the page's language and carries no em dash** (dashboard kit 1.1.4, FAA-119; asked by two
+  services on the board). The button wrote U+2014 into the console message a person reads when it is not shown, and
+  its four strings were English only, so a Russian dashboard could not mount it without editing a vendored file that
+  `dashboard_kit.py install` then refuses as changed. The message now uses a colon. The button reads the page's `lang`
+  and shows Russian on a Russian page, English otherwise; `data-label-chat`, `data-label-session` (with `{name}`),
+  `data-label-open` and `data-label-absent` set a page's own words. The strings were checked with Copylot in the
+  PassionCode.ai site voice (en-US report `239ff62c-e0af-4b8b-96e1-0c45c5eca02a`, ru-RU report
+  `be37143c-aff1-4502-b9d0-f8b1be56bbf3`, no findings). A test fails on U+2014 in any kit asset, and the WebKit test
+  opens a Russian page and a page with its own words.
+- **A remote service registers where its code lives** (FAA-120, a finding from a service that patched its descriptor
+  after the kit wrote it). `registerRemote` and `register_remote` take `source` (`{repository}`), which the contract's
+  `service-descriptor.schema.json` describes and Fabric Dashboards reads. The descriptor check now validates `source`
+  in every descriptor: an object with `repository` only, a URI (RFC 3986) as the schema's common `uri`, no
+  `user:password@`, and no value shaped like a credential.
+
 ## 0.49.2 (2026-10-24)
 
 ### Fixed

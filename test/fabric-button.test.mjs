@@ -55,6 +55,39 @@ test('the host cookie (FB-6) and the menu items (FB-4)', () => {
   assert.throws(() => fb.menuItems({ service: 'Example Agent' }), TypeError, 'a bad id never becomes a link');
 });
 
+// FAA-119: the strings a person reads, as checked with Copylot (en-US 239ff62c-e0af-4b8b-96e1-0c45c5eca02a,
+// ru-RU be37143c-aff1-4502-b9d0-f8b1be56bbf3, voice PassionCode.ai site voice v2).
+const RU = {
+  chat: 'Чат с Fabric о сервисе {name}', session: 'Открыть сессию в проекте {name}', open: 'Открыть Fabric',
+  absent: 'Fabric не установлен. Скачайте его на',
+};
+
+test('labels: English by default, Russian for a page in Russian, and a page overrides each (FAA-119)', () => {
+  const fb = load();
+  const en = plain(fb.labelsFor());
+  assert.deepEqual(en, { chat: 'Chat with Fabric about {name}', session: 'Open a coding session in {name}', open: 'Open Fabric', absent: 'Fabric is not installed. Get it at' });
+  for (const lang of ['', 'en', 'en-GB', 'fr', 'rus', 'ruby', null, undefined]) assert.deepEqual(plain(fb.labelsFor(lang)), en, String(lang));
+  for (const lang of ['ru', 'RU', 'ru-RU', 'ru-ua']) assert.deepEqual(plain(fb.labelsFor(lang)), RU, lang);
+  assert.deepEqual(plain(fb.labelsFor('ru', { chat: 'Спросить про {name}', open: '  ', session: 42, absent: ' Нет Fabric. Возьмите на ' })),
+    { ...RU, chat: 'Спросить про {name}', absent: 'Нет Fabric. Возьмите на' }, 'blank and non-string overrides keep the built-in label');
+  const options = { service: 'example-agent.default', serviceName: 'Example Agent', project: 'project-a', projectName: 'Project A' };
+  assert.deepEqual(plain(fb.menuItems(options, fb.labelsFor('ru'))).map((i) => i.label), ['Чат с Fabric о сервисе Example Agent', 'Открыть сессию в проекте Project A']);
+  assert.deepEqual(plain(fb.menuItems(options, fb.labelsFor('en', { session: '{name}: {name}' }))).map((i) => i.label),
+    ['Chat with Fabric about Example Agent', 'Project A: Project A'], '{name} is replaced everywhere, as text');
+  assert.deepEqual(plain(fb.menuItems({ ...options, serviceName: '$& $1' }, fb.labelsFor('en'))).map((i) => i.label)[0], 'Chat with Fabric about $& $1',
+    'a name is never read as a replacement pattern');
+});
+
+test('no kit asset carries an em dash (U+2014) (FAA-119)', () => {
+  const files = fs.readdirSync(KIT).filter((f) => fs.statSync(path.join(KIT, f)).isFile());
+  assert.ok(files.includes('fabric-button.js') && files.includes('fabric-dashboard.js') && files.includes('fabric-dashboard.css'));
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(KIT, f), 'utf8');
+    const at = text.indexOf('\u2014');
+    assert.equal(at, -1, `${f} carries U+2014 at line ${text.slice(0, at).split('\n').length}`);
+  }
+});
+
 test('the script is CSP-clean and names one address only', () => {
   for (const banned of ['eval(', 'new Function', 'innerHTML', 'outerHTML', 'document.write', 'insertAdjacentHTML']) assert.ok(!SOURCE.includes(banned), banned);
   const urls = SOURCE.match(/https?:\/\/[^\s'"`)]+/g) ?? [];
@@ -109,6 +142,8 @@ test('in WebKit: placement, name, menu and keyboard, the host cookie, Fabric abs
     '/host': { html: page(attrs), cookie: 'v%3D1%26owner%3Dhost' },
     '/absent': { html: page(attrs), cookie: 'v%3D1%26owner%3Dpage%26fabric%3Dabsent' },
     '/chat-only': { html: page({ service: 'example-agent' }) },
+    '/ru': { html: page(attrs).replace('lang="en"', 'lang="ru"') },
+    '/labels': { html: page({ ...attrs, 'label-chat': 'Ask Fabric about {name}', 'label-open': 'Fabric menu', 'label-absent': 'No Fabric here. See' }), cookie: 'v%3D1%26owner%3Dpage%26fabric%3Dabsent' },
   });
   const origin = `http://127.0.0.1:${server.address().port}`;
   try {
@@ -179,6 +214,18 @@ test('in WebKit: placement, name, menu and keyboard, the host cookie, Fabric abs
     await p.keyboard.press('Escape');
     await p.keyboard.press('ArrowUp');
     assert.equal(await focused(), 'passioncode.ai/fabric', 'ArrowUp on the button opens at the last item');
+    await p.keyboard.press('Escape');
+    // FAA-119: a page in Russian gets the Russian labels; a page's data-label-* attributes win.
+    await p.goto(`${origin}/ru`);
+    await p.getByRole('button', { name: RU.open }).click();
+    // The cookie from /absent still says fabric=absent, so the Russian note shows too.
+    assert.deepEqual(await p.getByRole('menuitem').allTextContents(), ['Чат с Fabric о сервисе Example Agent', 'Открыть сессию в проекте Project A', 'passioncode.ai/fabric']);
+    assert.equal(await p.locator('.fd-fabric-button-note').textContent(), 'Fabric не установлен. Скачайте его на passioncode.ai/fabric');
+    await p.keyboard.press('Escape');
+    await p.goto(`${origin}/labels`);
+    await p.getByRole('button', { name: 'Fabric menu' }).click();
+    assert.deepEqual(await p.getByRole('menuitem').allTextContents(), ['Ask Fabric about Example Agent', 'Open a coding session in Project A', 'passioncode.ai/fabric']);
+    assert.equal(await p.locator('.fd-fabric-button-note').textContent(), 'No Fabric here. See passioncode.ai/fabric');
     await p.keyboard.press('Escape');
     // FB-5: with no signal, following a link that nothing takes leaves the page focused: the note shows after 1.5 s.
     await context.clearCookies();

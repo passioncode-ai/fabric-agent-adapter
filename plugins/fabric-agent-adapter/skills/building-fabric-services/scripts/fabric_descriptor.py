@@ -46,7 +46,7 @@ from fabric_usage import (
 DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
 
 
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.3"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.4"
 
 
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
@@ -217,6 +217,12 @@ SUBSCRIPTION_RUNNERS = {"claude-code": "claude", "kimi-code": "kimi", "codex": "
 _PEER_ENDPOINT = re.compile(r"^https://(?P<host>([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?\Z", re.ASCII)
 
 
+# FAA-120: source.repository is the schema's common `uri` (RFC 3986: a scheme, a colon, then no space or control
+# character); a user:password@ in it is a credential, never the name of a repository.
+_SOURCE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+\Z")
+_URI_PASSWORD = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#@]*:[^/?#@]*@")
+
+
 _RESIDENCY = re.compile(r"^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])\Z", re.ASCII)
 
 
@@ -233,7 +239,7 @@ def _text(value: Any, low: int = 1, high: int = 200) -> bool:
 
 
 def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
-    """DEC-0061 and DEC-0069 on a descriptor's `installedBy`, `runner` and `peer`, as the schema shapes them, with
+    """DEC-0061 and DEC-0069 on a descriptor's `installedBy`, `runner` and `peer`, and `source` (FAA-120), as the schema shapes them, with
     FAC-SEM-085 (a peer on a reserved name) and FAC-SEM-086 (a credential-shaped value in `runner` or `installedBy`,
     named by its place, never its value)."""
     import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
@@ -273,6 +279,19 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
         if runner.get("credentialKind") == "subscription" and runner.get("kind") not in SUBSCRIPTION_RUNNERS:
             problems.append("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex")
         places += [("/runner/%s" % _pointer(k), v) for k, v in runner.items()]
+    if "source" in descriptor:
+        source = descriptor.get("source")
+        if not isinstance(source, dict):
+            problems.append("source is {repository?}")
+            source = {}
+        problems += ["source has no member %s" % k for k in source if k != "repository"]
+        if "repository" in source:
+            repository = source["repository"]
+            if not (isinstance(repository, str) and _SOURCE_URI.match(repository)):
+                problems.append("source.repository is a URI (RFC 3986), such as https://github.com/owner/name")
+            elif _URI_PASSWORD.match(repository):
+                problems.append("source.repository carries no password: it names the repository, never a credential")
+            places.append(("/source/repository", repository))
     if "peer" in descriptor:
         peer = descriptor.get("peer")
         if not isinstance(peer, dict):

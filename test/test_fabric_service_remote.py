@@ -106,6 +106,34 @@ class RemotePlacement(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             fs.register_remote(service_id="other", name="O", origin="https://o.example.com", token="short", directory=root)
 
+    def test_register_remote_source(self):
+        # FAA-120: the repository of the service's code goes into source.repository, checked as the schema's URI.
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        root = temp / "services"
+        path = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                  token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
+        self.assertEqual(json.loads(path.read_text())["source"], {"repository": "https://github.com/example/agent"})
+        path = fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
+                                  directory=root)
+        self.assertNotIn("source", json.loads(path.read_text()), "no source given, none written")
+        for source, needle in ((["https://github.com/example/agent"], "source is {repository?}"),
+                               ({"repository": "https://github.com/example/agent", "branch": "main"}, "source has no member branch"),
+                               ({"repository": ""}, "source.repository is a URI"),
+                               ({"repository": "git@github.com:example/agent.git"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/example/my agent"}, "source.repository is a URI"),
+                               ({"repository": 42}, "source.repository is a URI"),
+                               ({"repository": "https://bot:hunter2@github.com/example/agent"}, "source.repository carries no password")):
+            with self.subTest(source=source):
+                with self.assertRaises(fs.ServiceError) as caught:
+                    fs.register_remote(service_id="example-bad", name="Bad", origin="https://bad.example.com", token="t" * 40,
+                                       directory=root, source=source)
+                self.assertIn(needle, str(caught.exception))
+                self.assertFalse((root / "example-bad.default.json").exists(), "a refused descriptor is never written")
+                self.assertFalse(fs.remote_token_file("example-bad", "default", root).exists(), "nor its token")
+        self.assertEqual(fs.validate_descriptor({**json.loads(path.read_text()), "source": {"repository": "ssh://git@example.com/a.git"}}), [],
+                         "a user without a password is a name, not a credential")
+
 
 if __name__ == "__main__":
     unittest.main()

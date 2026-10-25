@@ -31,7 +31,8 @@ same objects (well-known document, events feed, login code) at the same paths.
   "auth": { "tokenFile": "~/Library/Application Support/ai.passioncode.fabric/tokens/example-agent.default.token" },
   "lifecycle": { "manager": "none" },
   "installedAt": "2026-10-02T18:00:00Z",
-  "installedBy": "fabric-service register-remote"
+  "installedBy": "fabric-service register-remote",
+  "source": { "repository": "https://github.com/example/agent" }
 }
 ```
 
@@ -39,6 +40,9 @@ same objects (well-known document, events feed, login code) at the same paths.
   literal; not `localhost`, `*.local`, `*.internal`, `*.home.arpa`, `*.lan`, `*.localdomain`.
 - `lifecycle.manager` is `none`, with no `label` or `plist`. `paths` is optional.
 - `commands` may carry `doctor` (a local executable); never `update`.
+- `source.repository` names the repository of the service's code, so Fabric Dashboards can tell code apart from a store
+  that versions data. Pass it as `registerRemote({ ..., source: { repository } })` / `register_remote(..., source=...)`
+  (since 0.49.3); the kit checks it as the schema's URI and refuses a `user:password@` in it.
 - `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or
   `{by, role?, tool}` where `by` is `person`, `node` or `organization` and `role` (`operator`, `administrator`) is a
   person's only. There is no `agent` kind: an agent that registers a service writes the string form, or
