@@ -209,7 +209,7 @@
     "fabric_secrets",
     "fabric_usage"
    ],
-   "sha256": "919417392e363bdd55292031911907da041a6a78e6bd7046fad23d01e3396737"
+   "sha256": "25503010dde839281f7c297191dcf651239ca5e5c258d303991bae6c6f5dbee7"
   },
   {
    "module": "fabric_auth",
@@ -604,7 +604,7 @@
     "fabric-secrets",
     "fabric-usage"
    ],
-   "sha256": "18fad7c71f304be8c1834fa07bad622df0f137e74acfa736350265b1f252b305"
+   "sha256": "57a3c78e1ed5bdd5179363275f85e4cc8851bd5dcebdca2bb4e487b8203409d9"
   },
   {
    "module": "fabric-auth",
@@ -617,7 +617,7 @@
     "fabric-platform",
     "fabric-usage"
    ],
-   "sha256": "56d71b862a4a036362ae21b3228c746c72b85b333ef0ab766bcd7018222cdd64"
+   "sha256": "782c2aa732f8320f604194660117640a7ea145e12b8155c04e88cef7c516a5b3"
   },
   {
    "module": "fabric-events",
@@ -3124,7 +3124,7 @@
    "fabric_lock.py": "ba2399d2137c7a7791b7133b9db9cca36693f4eb7e30955b25a75ade814e95ba",
    "fabric_usage.py": "b1f335cab4625171a616cf68cf3fd892b18bdadcf4baec3a3a0fdcf12785c170",
    "fabric_backups.py": "02dc5eb66ec956723d3ddba07b6dd15f6a9726d901f4d60edfd02eee57880ceb",
-   "fabric_descriptor.py": "919417392e363bdd55292031911907da041a6a78e6bd7046fad23d01e3396737",
+   "fabric_descriptor.py": "25503010dde839281f7c297191dcf651239ca5e5c258d303991bae6c6f5dbee7",
    "fabric_auth.py": "71115d18c67b7b806cb57b64b77e01ad97fc0e63e6f49ee850f778123617d905",
    "fabric_events.py": "0086886c2c29dbd5c9d152be9d375c5bdf4a29f89b8095baff8490c2bcd64e47",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
@@ -3160,8 +3160,8 @@
    "fabric-lock.mjs": "ac219ab0a326d5c43c7c4c255e0c3843d4794de795a60e3af661e7d5350ea052",
    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7",
    "fabric-backups.mjs": "849acdc6eba0fff648c8158e61f6b68cccd7bedf0880f7d5ec03a6a20f1e7005",
-   "fabric-descriptor.mjs": "18fad7c71f304be8c1834fa07bad622df0f137e74acfa736350265b1f252b305",
-   "fabric-auth.mjs": "56d71b862a4a036362ae21b3228c746c72b85b333ef0ab766bcd7018222cdd64",
+   "fabric-descriptor.mjs": "57a3c78e1ed5bdd5179363275f85e4cc8851bd5dcebdca2bb4e487b8203409d9",
+   "fabric-auth.mjs": "782c2aa732f8320f604194660117640a7ea145e12b8155c04e88cef7c516a5b3",
    "fabric-events.mjs": "c463d6ffcae24229a5c608d8fcea4268d2ccc5024b19fa10e5a452284068fa71",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
    "fabric-supervisors.mjs": "9d61c1a17538a5e2453e33e5ae347337336748041bc054478a96dd51f3d4fc51",

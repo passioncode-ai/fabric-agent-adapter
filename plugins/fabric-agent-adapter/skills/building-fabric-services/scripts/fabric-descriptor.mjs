@@ -125,9 +125,10 @@ export const SUBSCRIPTION_RUNNERS = Object.freeze({ 'claude-code': 'claude', 'ki
 
 const PEER_ENDPOINT = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?$/;
 
-// FAA-120: source.repository is the schema's common `uri` (RFC 3986: a scheme, a colon, then no space or control
-// character); a user:password@ in it is a credential, never the name of a repository.
-const SOURCE_URI = /^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+$/;
+// FAA-120: source.repository is the schema's common `uri` (RFC 3986, ASCII only: a scheme, a colon, then printable
+// ASCII with no space), as the contract's ajv-formats checks it, and the same in both twins; a user:password@ in it is
+// a credential, never the name of a repository.
+const SOURCE_URI = /^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+$/;
 const URI_PASSWORD = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#@]*:[^/?#@]*@/;
 const RESIDENCY = /^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$/;
 
@@ -199,7 +200,7 @@ export function descriptorMemberProblems(d) {
     else if (isObj(runner) && runner.credentialKind === 'subscription') problems.push('a service offered to others never runs on a subscription (DEC-0061)');
   }
   for (const [place, value] of places) {
-    if (typeof value === 'string' && secretArgument(value)) problems.push(`FAC-SEM-086: ${place} holds a value shaped like a credential; it names a kind, a role or an installer`);
+    if (typeof value === 'string' && secretArgument(value)) problems.push(`FAC-SEM-086: ${place} holds a value shaped like a credential; it names ${place.startsWith('/source/') ? 'a repository' : 'a kind, a role or an installer'}`);
   }
   return problems;
 }

@@ -742,7 +742,8 @@ class Probe:
             return
         top = inside.stdout.strip()
         remote = subprocess.run(["git", "-C", top, "remote", "get-url", "origin"], capture_output=True, text=True)
-        source = str((self.d.get("source") or {}).get("repository") or "")
+        own = self.d.get("source")
+        source = str(own.get("repository") or "") if isinstance(own, dict) else ""
         if not source:
             self.add(rule, "NOT_RUN", "data is inside repository %s and the descriptor names no source.repository to tell code from data" % top)
         elif remote.returncode == 0 and same_repository(remote.stdout.strip(), source):

@@ -600,6 +600,19 @@ class StateRuleTests(unittest.TestCase):
         p.state_rule(Path(data), inside)
         return p.results[-1]["verdict"]
 
+    def test_a_malformed_source_is_no_source(self):
+        # descriptor.valid already fails it; the state rule must not raise on the shape the validator refuses.
+        checker = load("check_service")
+        with tempfile.TemporaryDirectory() as tmp:
+            self.repo(Path(tmp), "https://github.com/example-org/x")
+            for bad in ("https://github.com/example-org/x", ["https://github.com/example-org/x"]):
+                d = descriptor(47110, data=tmp)
+                d["source"] = bad
+                p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
+                inside = subprocess.run(["git", "-C", tmp, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+                p.state_rule(Path(tmp), inside)
+                self.assertEqual(p.results[-1]["verdict"], "NOT_RUN", repr(bad))
+
     def repo(self, root, remote):
         subprocess.run(["git", "init", "-q", str(root)], check=True)
         subprocess.run(["git", "-C", str(root), "remote", "add", "origin", remote], check=True)

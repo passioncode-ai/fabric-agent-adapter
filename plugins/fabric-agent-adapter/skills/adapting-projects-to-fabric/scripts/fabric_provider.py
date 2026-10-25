@@ -47,6 +47,7 @@ ENV_MAX = 64
 # Whole-value patterns end in \Z, never `$` (R1: `$` also matches before a trailing newline).
 _ID = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z")
 _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*\Z")
+_URI_PASSWORD = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#@]*:[^/?#@]*@")
 _SECRET_REF = re.compile(r"^secret-ref:([A-Za-z0-9][A-Za-z0-9._/:@-]{0,255})\Z")
 _LOCAL_PATH = re.compile(LOCAL_PATH_PATTERN)
 _URL = re.compile(URL_PATTERN)
@@ -131,6 +132,9 @@ def validate_provider_entry(entry: Any) -> List[str]:
             problems.append("source is {repository?}")
         elif "repository" in source and not _is_uri(source["repository"]):
             problems.append("source.repository is an absolute URI")
+        elif "repository" in source and (_URI_PASSWORD.match(source["repository"]) or _secrets.secret_argument(source["repository"])):
+            # FAA-120, as the service kit: a repository is named, never reached with a credential in its URI.
+            problems.append("source.repository carries no password or credential: it names the repository")
     if not isinstance(entry["installedAt"], str) or not _TIMESTAMP.fullmatch(entry["installedAt"]):
         problems.append("installedAt is an RFC 3339 date-time")
     if not isinstance(entry["installedBy"], str) or not 1 <= len(entry["installedBy"]) <= 200:

@@ -273,7 +273,7 @@ export function registerRemote({ id, instance = 'default', name, summary, origin
     protocol: PROTOCOL, id, instance, name, ...(summary ? { summary } : {}), placement: 'remote', origin,
     auth: { tokenFile }, lifecycle: { manager: 'none' }, ...(doctor ? { commands: { doctor } } : {}),
     installedAt: nowIso(), installedBy, ...(runner ? { runner: { ...runner } } : {}), ...(peer ? { peer: { ...peer } } : {}),
-    ...(source !== undefined ? { source: isPlainObject(source) ? { ...source } : source } : {}),
+    ...(source != null ? { source: isPlainObject(source) ? { ...source } : source } : {}),
   };
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);

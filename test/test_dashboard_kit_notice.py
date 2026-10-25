@@ -81,6 +81,14 @@ class Notice(unittest.TestCase):
         done, _ = self.notice()
         self.assertIn("example-agent.default (this repository) is built from fabric-dashboard-kit 0.9.0", done.stdout)
 
+    def test_a_malformed_source_elsewhere_does_not_silence_the_line(self):
+        # Another service's descriptor with a string or list source is refused by the validator; the notice skips it.
+        (self.services / "a-string.default.json").write_text(json.dumps({"id": "a-string", "source": "https://github.com/x/y"}))
+        (self.services / "b-list.default.json").write_text(json.dumps({"id": "b-list", "source": ["https://github.com/x/y"]}))
+        self.own()
+        done, _ = self.notice()
+        self.assertIn("example-agent.default (this repository) is built from fabric-dashboard-kit 0.9.0", done.stdout)
+
     def test_slow_git_calls_share_one_deadline_under_the_hooks_ceiling(self):
         self.own()
         done, elapsed = self.notice(slow="rev-parse config ls-files grep", sleep="1.9")

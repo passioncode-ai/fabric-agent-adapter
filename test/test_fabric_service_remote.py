@@ -123,7 +123,11 @@ class RemotePlacement(unittest.TestCase):
                                ({"repository": "git@github.com:example/agent.git"}, "source.repository is a URI"),
                                ({"repository": "https://github.com/example/my agent"}, "source.repository is a URI"),
                                ({"repository": 42}, "source.repository is a URI"),
-                               ({"repository": "https://bot:hunter2@github.com/example/agent"}, "source.repository carries no password")):
+                               ({"repository": "https://github.com/example/agent\u0085"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/example/agent\ufeff"}, "source.repository is a URI"),
+                               ({"repository": "https://github.com/\u00fc/\u00df"}, "source.repository is a URI"),
+                               ({"repository": "https://bot:hunter2@github.com/example/agent"}, "source.repository carries no password"),
+                               ({"repository": "https://github.com/example/agent?t=ghp_" + "a1B2" * 9}, "FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository")):
             with self.subTest(source=source):
                 with self.assertRaises(fs.ServiceError) as caught:
                     fs.register_remote(service_id="example-bad", name="Bad", origin="https://bad.example.com", token="t" * 40,
@@ -133,6 +137,10 @@ class RemotePlacement(unittest.TestCase):
                 self.assertFalse(fs.remote_token_file("example-bad", "default", root).exists(), "nor its token")
         self.assertEqual(fs.validate_descriptor({**json.loads(path.read_text()), "source": {"repository": "ssh://git@example.com/a.git"}}), [],
                          "a user without a password is a name, not a credential")
+        self.assertEqual(fs.validate_descriptor({**json.loads(path.read_text()), "source": {"repository": "https://host.example:8443/a@b"}}), [])
+        path = fs.register_remote(service_id="example-none", name="None", origin="https://none.example.com", token="t" * 40,
+                                  directory=root, source=None)
+        self.assertNotIn("source", json.loads(path.read_text()), "None is no source, as undefined and null are in Node")
 
 
 if __name__ == "__main__":

@@ -12,12 +12,17 @@
   `data-label-open` and `data-label-absent` set a page's own words. The strings were checked with Copylot in the
   PassionCode.ai site voice (en-US report `239ff62c-e0af-4b8b-96e1-0c45c5eca02a`, ru-RU report
   `be37143c-aff1-4502-b9d0-f8b1be56bbf3`, no findings). A test fails on U+2014 in any kit asset, and the WebKit test
-  opens a Russian page and a page with its own words.
+  opens a Russian page and a page with its own words. The button's accessible name follows the page too (*Открыть Fabric*, or
+  `data-label-open`), which departs from the pinned contract's FB-3 ("Open Fabric" in every case) the way Fabric
+  Dashboards' own button already does; the amendment to allow a localized name is proposed to the contract.
 - **A remote service registers where its code lives** (FAA-120, a finding from a service that patched its descriptor
   after the kit wrote it). `registerRemote` and `register_remote` take `source` (`{repository}`), which the contract's
   `service-descriptor.schema.json` describes and Fabric Dashboards reads. The descriptor check now validates `source`
-  in every descriptor: an object with `repository` only, a URI (RFC 3986) as the schema's common `uri`, no
-  `user:password@`, and no value shaped like a credential.
+  in every descriptor: an object with `repository` only, a URI (RFC 3986, printable ASCII, as the contract's
+  ajv-formats `uri`), no `user:password@`, and no value shaped like a credential; `None` and `null` mean no source in
+  both twins. A provider entry's `source.repository` (`fabric_provider.py`) refuses a password or a credential the same
+  way. The probe's data rule and the SessionStart notice no longer raise on a descriptor whose `source` is not an
+  object.
 
 ## 0.49.2 (2026-10-24)
 

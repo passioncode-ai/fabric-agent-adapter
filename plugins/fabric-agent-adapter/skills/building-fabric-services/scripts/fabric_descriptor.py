@@ -217,9 +217,10 @@ SUBSCRIPTION_RUNNERS = {"claude-code": "claude", "kimi-code": "kimi", "codex": "
 _PEER_ENDPOINT = re.compile(r"^https://(?P<host>([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(:([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?(/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?\Z", re.ASCII)
 
 
-# FAA-120: source.repository is the schema's common `uri` (RFC 3986: a scheme, a colon, then no space or control
-# character); a user:password@ in it is a credential, never the name of a repository.
-_SOURCE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+\Z")
+# FAA-120: source.repository is the schema's common `uri` (RFC 3986, ASCII only: a scheme, a colon, then printable
+# ASCII with no space), as the contract's ajv-formats checks it, and the same in both twins; a user:password@ in it is
+# a credential, never the name of a repository.
+_SOURCE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[!-~]+\Z")
 _URI_PASSWORD = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#@]*:[^/?#@]*@")
 
 
@@ -318,7 +319,8 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("a service offered to others never runs on a subscription (DEC-0061)")
     for place, value in places:
         if isinstance(value, str) and fabric_secrets.secret_argument(value):
-            problems.append("FAC-SEM-086: %s holds a value shaped like a credential; it names a kind, a role or an installer" % place)
+            problems.append("FAC-SEM-086: %s holds a value shaped like a credential; it names %s" % (
+                place, "a repository" if place.startswith("/source/") else "a kind, a role or an installer"))
     return problems
 
 
