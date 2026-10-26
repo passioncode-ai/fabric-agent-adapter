@@ -21,7 +21,10 @@
    "chain-too-deep",
    "profile-forbids",
    "issuer-unavailable",
-   "unknown-state"
+   "unknown-state",
+   "operator-decision-required",
+   "decision-invalid",
+   "human-step-required"
   ]
  },
  "jwks": {

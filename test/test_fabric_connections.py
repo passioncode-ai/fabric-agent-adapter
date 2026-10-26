@@ -19,7 +19,7 @@ EXTRA = json.loads((Path(__file__).resolve().parent / "fixtures/contract/connect
 
 class Vectors(unittest.TestCase):
     def test_every_case_answers_as_the_contract_does(self):
-        self.assertEqual(len(V["cases"]), 127)
+        self.assertEqual(len(V["cases"]), 134)
         for case in V["cases"]:
             with self.subTest(case["name"]):
                 view = fc.connections_view(case["input"])
