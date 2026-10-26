@@ -631,7 +631,8 @@ class McpToolServer:
             import fabric_delegation as _fd  # noqa: E402 - only an action-gated server needs it
             try:
                 digest = _fd.action_digest({"tool": name, "arguments": arguments})
-            except TypeError:  # a lone surrogate or a non-finite number: no canonical form, so no digest to bind
+            except (TypeError, ValueError, RecursionError):  # no canonical form (a lone surrogate, a non-finite number,
+                # nesting past the recursion limit), as intent_digest reads it: no digest to bind
                 return {"ok": False, "invalid": "Invalid params: the arguments have no canonical form."}
             outcome = self._approve(name, arguments, headers, digest) if self._approve is not None else None
             if isinstance(outcome, dict) and outcome.get("ok") is True:
@@ -639,7 +640,10 @@ class McpToolServer:
             elif isinstance(outcome, dict) and outcome.get("code") not in (None, "approval-required"):
                 # DL-18: the presented approval's own refusal; an outcome that is not verify_approval's is the service's.
                 readable = outcome.get("code") in _fd.REFUSAL_CODES and isinstance(outcome.get("detail"), str) and outcome["detail"]
-                return {"ok": False, "refusal": outcome if readable else {"ok": False, "code": "unknown-state", "detail": "service-fault"}}
+                if readable:
+                    return {"ok": False, "refusal": outcome}
+                return {"ok": False, "refusal": {"ok": False, "code": "unknown-state", "detail": "service-fault"},
+                        "fault": "approval-outcome-unreadable"}
         elicited = action["gate"] == "relayed" and self._elicited is not None and self._elicited(name, arguments, caller) is True
         return action_gate(action, tier=tier, caller=caller, meta=meta, target=target, elicited=elicited, approval=approval,
                            action_digest=digest, human_step_url=url, now=format_rfc3339(self._clock() * 1000))

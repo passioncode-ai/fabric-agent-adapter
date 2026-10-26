@@ -194,10 +194,11 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
   approval the call presented, or `None`. `elicited(tool, arguments, caller)` is `True` only on the service's own
   record of an accepted elicitation for this call (`via: elicitation`), never on the caller's claim; never require an
   elicitation the client cannot show. `on_fault(tool, fault)` hears a service fault the caller sees only as
-  `unknown-state` (for example `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
+  `unknown-state` (`approval-outcome-unreadable` when `approve` answers something that is not `verify_approval`'s, or
+  `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
   since `handle` defaults to T2 and a T2 call names nobody without them).
-- **Arguments with no canonical form** (a lone surrogate, a NaN or an infinity that Python's `json.loads` lets in)
-  have no digest to bind: a relayed tool answers JSON-RPC `-32602`, never an exception.
+- **Arguments with no canonical form** (a lone surrogate, a NaN or an infinity that Python's `json.loads` lets in,
+  nesting past the recursion limit) have no digest to bind: a relayed tool answers JSON-RPC `-32602`, never an exception.
 - **The handler** reads `ctx.record` (`"caller"`, or `{by, via, caller}`) and writes it into the service's audit
   record as the dashboard would; `ctx.decision` is the operator's decision it took. Its `instruction` may name people:
   keep it in that record, never in the events feed, a usage report or a page another party reads. `ctx.tier`,
@@ -210,6 +211,8 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
 - **Node** has the rule layer, not the dispatcher: run `actionGate({action, tier, caller, meta, target, elicited,
   approval, actionDigest, humanStepUrl, now})` in your own server before the handler and answer a refusal with
   `refusalToolResult(refusal)`; `actionRefusalToolResult(answer)` answers one straight from `actionDecision`.
+  `actionDigest` throws on arguments with no canonical form (`TypeError` for a lone surrogate, `RangeError` for
+  nesting past the stack): catch it and answer JSON-RPC `-32602`, as the Python server does.
 
 **As a caller (AP-3).** An agent built on the kit relays the operator's decision with
 `request_meta(traceparent, decision=operator_decision(action, instruction, target=, at=))` (`fabric_actions`) /
@@ -238,6 +241,6 @@ The probe reads the declaration (`well-known.actions`), checks that `tools/list`
 | `interop.unknown-job` | `fabric.job.get` for a made-up id answers `isError` with `unknown-job` | `fabric.job.get` is not served |
 | `interop.trace-propagation` | the answer's `_meta.traceparent` has the probe's trace id and a new span | the answer carries no traceparent |
 | `interop.events-trace` | every event with a trace carries both `traceId` and `spanId`, well formed | no events page was read |
-| `interop.action-tools` | every action the well-known `extensions/actions/0.1` declares names a tool `tools/list` serves (DEC-0121 AP-1); one it does not serve is a `FAIL` | no declaration, an unreadable one (`well-known.actions` reports it), or no listing was read |
+| `interop.action-tools` | every action the well-known `extensions/actions/0.1` declares names a tool `tools/list` serves (DEC-0121 AP-1); one it does not serve is a `FAIL`, and so is a local service that declares actions with no MCP surface (beyond FAC-SEM-142, which reads only a present list) | no declaration, an unreadable one (`well-known.actions` reports it), no listing was read, or a remote service with no MCP surface (its twin may be on A2A or behind a gateway) |
 
 `python3 scripts/check_service.py <id>` prints them with the rest; `--json` for a machine.

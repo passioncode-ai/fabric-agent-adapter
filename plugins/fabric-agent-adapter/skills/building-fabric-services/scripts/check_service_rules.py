@@ -323,15 +323,20 @@ def well_known_actions_verdict(wk: Any) -> Tuple[str, str]:
 
 
 def action_tools_verdict(wk: Any, tools: Optional[Dict[str, Any]], why_not: str = "tools/list was not read",
-                         no_surface: bool = False) -> Tuple[str, str]:
+                         no_surface: bool = False, remote: bool = False) -> Tuple[str, str]:
     """`interop.action-tools`: every declared action's tool is served by tools/list, the live surface (FAC-SEM-142
-    checks only the list the document names). `tools` None means no listing was read; `why_not` says why. Declared
-    actions with no MCP surface at all fail: every action has a tool on that surface (DEC-0121 AP-1)."""
+    checks only the list the document names). `tools` None means no listing was read; `why_not` says why. A local
+    service that declares actions and has no MCP surface fails: every action has a tool on its agent surface
+    (DEC-0121 AP-1), and a local service's is MCP. A remote agent's surface may be A2A or MCP behind a gateway (the
+    contract's surfaces table), so there it is NOT_RUN. This goes beyond FAC-SEM-142, which reads only a present list."""
     view = fa.actions_view(wk)
     if not view["declared"]:
         return "NOT_RUN", "no extensions/actions/0.1 declaration"
     if not view["valid"]:
         return "NOT_RUN", "the actions declaration is not readable (well-known.actions): a reader treats it as not declared"
+    if no_surface and remote:
+        return "NOT_RUN", ("%d action(s) declared and no MCP surface: a remote agent's twin may be on A2A or behind a "
+                           "gateway, which this probe does not read" % len(view["actions"]))
     if no_surface:
         return "FAIL", ("%d action(s) declared but the service has no MCP surface: buttons without an agent twin "
                         "(DEC-0121 AP-1)" % len(view["actions"]))

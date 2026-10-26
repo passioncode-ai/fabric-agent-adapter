@@ -29,7 +29,8 @@ the whole conversation, a fenced accept and a board session without an epoch, wi
 touched; that smoke needs a disposable Fabric and is reported separately.
 
 Actions (fabric-actions/0.1, DEC-0121): `well-known.actions` holds a declared extensions/actions/0.1 to FAC-SEM-142,
-`interop.action-tools` fails a declared action whose tool tools/list does not serve, and `dashboard.actions-declared`
+`interop.action-tools` fails a declared action whose tool tools/list does not serve (and a local service that declares
+actions with no MCP surface; a remote one there is NOT_RUN, its twin may be on A2A), and `dashboard.actions-declared`
 is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboard cannot declare an empty list).
 
 dashboard.opens-in-host (FAA-118, the operator rule of 2026-10-24): the service's checkout (--repo, else the one of
@@ -578,7 +579,8 @@ class Probe:
                       else "no readable token")
             for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
                 self.add(rule, "NOT_RUN", reason)
-            self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason, no_surface=not mcp_surface))
+            self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason, no_surface=not mcp_surface,
+                                                                    remote=self.remote))
         else:
             try:
                 listing = self.mcp_call("tools/list", {})

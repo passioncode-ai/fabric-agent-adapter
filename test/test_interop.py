@@ -411,7 +411,8 @@ class ActionGateTests(unittest.TestCase):
         # Seam reading of 0.50.0: a lone surrogate or a non-finite number has no JCS form, so no digest; the call is
         # answered -32602 at every tier, and a tool with no action still takes it as before.
         for tier in ("T0", "T1", "T2"):
-            for bad in ("\ud800", float("nan"), float("inf")):
+            deep = json.loads('[' * 900 + '1' + ']' * 900)  # past the JCS recursion, still valid JSON
+            for bad in ("\ud800", float("nan"), float("inf"), deep):
                 with self.subTest(tier=tier, bad=repr(bad)):
                     server = self.server()
                     params = {"name": "reviews.approve", "arguments": {"reply": "reply-7", "x": bad}, "_meta": {"traceparent": PARENT}}
@@ -428,6 +429,12 @@ class ActionGateTests(unittest.TestCase):
         error = self.refusal(self.call(server, "reviews.approve", meta={"decision": DECISION}, tier="T2"))
         self.assertEqual((error["code"], error["data"]["detail"]), ("unknown-state", "service-fault"))
         self.assertEqual(faults, [("reviews.approve", "caller-missing")])
+        faults.clear()
+        server = self.server(on_fault=lambda tool, fault: faults.append((tool, fault)), approve=lambda *a: {"ok": False, "code": "weird"},
+                             identify=lambda headers, tier: "agent:example")
+        error = self.refusal(self.call(server, "reviews.approve", meta={"decision": DECISION}, tier="T2"))
+        self.assertEqual((error["code"], error["data"]["detail"]), ("unknown-state", "service-fault"))
+        self.assertEqual(faults, [("reviews.approve", "approval-outcome-unreadable")])
 
     def test_a_relayed_action_from_t0_without_a_decision_is_operator_decision_required(self):
         server = self.server()

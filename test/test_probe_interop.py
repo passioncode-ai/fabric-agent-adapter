@@ -302,6 +302,10 @@ class ProbeActionsRuleTests(unittest.TestCase):
         self.assertEqual(verdict, "FAIL")
         self.assertIn("AP-1", evidence)
         self.assertEqual(self.rules.action_tools_verdict(with_actions(None), None, "no MCP surface", no_surface=True)[0], "NOT_RUN")
+        # A remote agent's surface may be A2A or MCP behind a gateway (the contract's surfaces table): not judged here.
+        verdict, evidence = self.rules.action_tools_verdict(ok, None, "no MCP surface", no_surface=True, remote=True)
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("remote", evidence)
 
     def test_a_dashboard_without_a_declaration_is_not_run_never_a_failure(self):
         verdict, evidence = self.rules.actions_declared_verdict(with_actions(None))
