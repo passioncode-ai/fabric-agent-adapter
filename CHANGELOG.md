@@ -34,6 +34,12 @@
   (after CT-125), the service's elicitation, or the action's page in Fabric Dashboards, in that order (confirmed by
   the contract's owner on board thread `92c6f277`). On `human-step-required` it hands the person the link.
 
+- **Fabric's button follows contract DEC-0124** (dashboard kit 1.1.5; FB-3 amended on the adapter's request, board
+  thread `4801da8d`, contract PR #189, after this release's pin). The accessible name and the menu follow the page's
+  language, which the contract now states, so 0.49.3's note that the kit departs from FB-3 no longer holds. A page's
+  own words (`data-label-*`) are taken only when they keep the word *Fabric* (WCAG 2.2 SC 2.5.3, Label in Name);
+  otherwise the built-in words stay.
+
 ### Changed (guidance)
 
 - **Agent pages open only in Fabric Dashboards** (FAA-118, the operator's rule of 2026-10-24): the rule now sits in

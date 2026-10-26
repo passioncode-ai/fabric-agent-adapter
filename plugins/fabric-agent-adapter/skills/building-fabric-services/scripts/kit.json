@@ -221,7 +221,7 @@
     "fabric_secrets",
     "fabric_usage"
    ],
-   "sha256": "030d9066cf9b9c8567f0c4e9e872d75ba8371e46101ea0933b22eb3e162cad0d"
+   "sha256": "361610f7c5bc94642a26a6dd7e4b6a5849efa0bd2aa814a8e2034eaed30368b6"
   },
   {
    "module": "fabric_auth",
@@ -632,7 +632,7 @@
     "fabric-secrets",
     "fabric-usage"
    ],
-   "sha256": "ecf3e68bdc86f9a183ac0c01a92c0d37ef9f31999fc3905a93ad4cdb9d75569f"
+   "sha256": "c1ccaa9dff5edf90b82d6d77e2e5189a5d0f677fd48cc0aed3cccb83ad2a1f12"
   },
   {
    "module": "fabric-auth",
@@ -3231,7 +3231,7 @@
    "fabric_lock.py": "ba2399d2137c7a7791b7133b9db9cca36693f4eb7e30955b25a75ade814e95ba",
    "fabric_usage.py": "b1f335cab4625171a616cf68cf3fd892b18bdadcf4baec3a3a0fdcf12785c170",
    "fabric_backups.py": "1f3f0d7ecf361b29e9101e07f1c53e5dc304d598bf26fd59ec89f16b9fed2420",
-   "fabric_descriptor.py": "030d9066cf9b9c8567f0c4e9e872d75ba8371e46101ea0933b22eb3e162cad0d",
+   "fabric_descriptor.py": "361610f7c5bc94642a26a6dd7e4b6a5849efa0bd2aa814a8e2034eaed30368b6",
    "fabric_auth.py": "71115d18c67b7b806cb57b64b77e01ad97fc0e63e6f49ee850f778123617d905",
    "fabric_events.py": "0086886c2c29dbd5c9d152be9d375c5bdf4a29f89b8095baff8490c2bcd64e47",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
@@ -3268,7 +3268,7 @@
    "fabric-lock.mjs": "ac219ab0a326d5c43c7c4c255e0c3843d4794de795a60e3af661e7d5350ea052",
    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7",
    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
-   "fabric-descriptor.mjs": "ecf3e68bdc86f9a183ac0c01a92c0d37ef9f31999fc3905a93ad4cdb9d75569f",
+   "fabric-descriptor.mjs": "c1ccaa9dff5edf90b82d6d77e2e5189a5d0f677fd48cc0aed3cccb83ad2a1f12",
    "fabric-auth.mjs": "782c2aa732f8320f604194660117640a7ea145e12b8155c04e88cef7c516a5b3",
    "fabric-events.mjs": "c463d6ffcae24229a5c608d8fcea4268d2ccc5024b19fa10e5a452284068fa71",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",

@@ -14,7 +14,7 @@ import { ROUTES } from './fabric-usage.mjs';
 // document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 
-export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.4';
+export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.5';
 
 export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 
