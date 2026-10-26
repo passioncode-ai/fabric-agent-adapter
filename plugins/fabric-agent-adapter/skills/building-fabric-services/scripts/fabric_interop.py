@@ -372,8 +372,9 @@ class JobStore:
     def _transition(self, job_id: str, status: str, private: Optional[Dict[str, Any]] = None, **fields: Any) -> Dict[str, Any]:
         with self._lock:
             record = self._load(job_id)
-            if private:  # written in the same file write as the transition
-                record["private"].setdefault("steps", {}).update(private.get("steps", {}))
+            if private is not None and "steps" in private:  # in the same file write as the transition
+                # Each question replaces the kept steps: a step outlives neither its question nor its answer.
+                record["private"]["steps"] = dict(private["steps"])
             job = record["job"]
             if job["status"] in TERMINAL:
                 raise InteropError("Job %s is already %s; a terminal job does not change." % (job_id, job["status"]))
@@ -401,7 +402,7 @@ class JobStore:
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
-        return self._transition(job_id, "input_required", {"steps": dict(steps)} if steps else None,
+        return self._transition(job_id, "input_required", {"steps": dict(steps or {})},
                                 inputRequests=input_requests, statusMessage=message)
 
     def answer(self, job_id: str, input_responses: Dict[str, Any]) -> Dict[str, Any]:
@@ -795,6 +796,8 @@ class McpToolServer:
             action = {"id": key, "title": "Answer %s" % key, "tool": "fabric.job.get", "gate": "relayed"}
             step, mandate = steps.get(key), {}
             if self.agent_id is not None and isinstance(step, dict):
+                # A kept step is read as approval_step read it: under the job's own capability, not fabric.job.get.
+                action["tool"] = self.jobs.private(job_id).get("capability") or "fabric.job.get"
                 agent = (verdict or {}).get("caller")
                 mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),
                            "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None}

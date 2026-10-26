@@ -1,13 +1,12 @@
 # Changelog
 
-## 0.52.0 (2026-11-02)
+## 0.52.0 (2026-10-26)
 
 ### Changed
 
-- The session hooks' notes on nudges follow Fabric 0.3.14's final behaviour (board `b605a636`): a turn's answer
-  shows a nudge, at most five, and keeps it for `fabric_work_list` and `fabric_heartbeat`, so the nudges of turns
-  spooled before a `/clear` are not lost, as 0.51.2's notes said; they reach the new session there.
-
+- **Pinned to the contract release `v0.1.0+2026-10-26.12` (`1197a90d`)** (FAA-138). It carries DEC-0126 to DEC-0137;
+  `e6c4fc16`, `a3a66eb0` and `52c7d798` stay supported. Brief:
+  `docs/evidence/specs/2026-10-26-faa-138-134-repin-1197a90d-brief.md`.
 - **DEC-0126, where the operator said the words (`source`).** A mandate and a decision may carry `source`; both kits
   read it as the contract's schema does, return it in the record (`recordAs`, `ctx.record`, `input_records`), keep it
   on a hand-over, and build it with `operator_mandate(source=)` / `operator_decision(source=)` (Node: `source`).
@@ -17,7 +16,8 @@
   the server reads `source`. Nothing writes it to an event, a usage report, a log or a page (a test holds that).
 - **A job's approval step reads the operator's mandate** (contract interop C3.3, `conformance.md`; part of FAA-135):
   `job_step` / `jobStep`, `CallContext.approval_step`, `request_input(steps=)` / `requestInput(..., {steps})`; with
-  `input_actions` on, an answer's `_meta.mandate` that covers a kept step is read too.
+  `input_actions` on, an answer's `_meta.mandate` that covers a kept step is read too, under the job's own capability
+  as at the start. Each question replaces the kept steps, so a step outlives neither its question nor its answer.
 - **DEC-0136 closes at the pin:** MD-2a is the pinned contract's rule, the by-name test override is gone, and both
   twins run the contract's 30 `handOn` cases; FAC-SEM-144's message ends `(DEC-0125 MD-1, MD-2; DEC-0136 MD-2a)`.
   Vectors at `.12`: mandate 40 cases and 5 fixtures, actions 67 cases and 16 action calls.
@@ -36,8 +36,21 @@
 - An organization instance whose context the record does not pin still starts (`fabric_context`); its tokens are
   refused `kid-not-certified` (brief D5).
 - Vectors regenerated at `.12`: `estate-vectors.json` (the organizations positive, seven context and organization
-  semantic fixtures, 39 generated context and revision cases), `hub-key-vectors.json` (`contextCases` 33,
+  semantic fixtures, 38 generated context and revision cases), `hub-key-vectors.json` (`contextCases` 33,
   `contextVerifier` 10); the hostile estate inputs cover `contextHubKeys`, `organizations` and hub-key contexts.
+- **DEC-0135, who a reply reaches** (narrowing). A reply reaches the sender of the message it answers; send
+  `deliverTo: "thread"` for every participant, or a list, and on a board pinned before DEC-0135, which refuses the
+  member, a new message to the thread instead. The kit's responder posts only fenced replies, which carry none.
+  Narrowed for a 0.51.x reader on a board pinned at or after DEC-0135: `com.list {unread: true}` and the unread count
+  cover only what was delivered to your Project, so a reply sent only to another Project no longer shows; a thread
+  `com.read_ack` with `upTo` marks only what your Project did not send.
+- **DEC-0130 and DEC-0137, the family and the agent network** (wording, no code change): `delegation.md` names the
+  operator's family (T0 and T1) and the agent network, and `estate-record.md` says a tokenless call runs in the
+  instance's context.
+- The session hooks' notes on nudges follow Fabric 0.3.14's final behaviour (board `b605a636`, Fabric
+  `release/0.3.14` `b97ec351`): a turn's answer shows a nudge, at most five, and a repeated turn answers the same; it
+  stays for `fabric_work_list` and `fabric_heartbeat`, so it may come again there. The nudges of turns spooled before a
+  `/clear` are therefore not lost (0.51.2's notes said they were).
 
 ### Added
 
@@ -49,12 +62,6 @@
   `machine-report/1`, `operator-source/1`, `org-authority/1`, `org-authority-draft/1`, `org-key-set/1`,
   `org-key-set-draft/1`, `org-membership/1` and `org-root-registration/1` in `fabric_protocols` and
   `fabric-protocols.mjs`, so the kits' register equals the contract's at the pin.
-
-### Changed
-
-- **Pinned to the contract release `v0.1.0+2026-10-26.12` (`1197a90d`)** (FAA-138). It carries DEC-0126 to DEC-0137;
-  `e6c4fc16`, `a3a66eb0` and `52c7d798` stay supported. Brief:
-  `docs/evidence/specs/2026-10-26-faa-138-134-repin-1197a90d-brief.md`.
 
 ## 0.51.2 (2026-10-26)
 

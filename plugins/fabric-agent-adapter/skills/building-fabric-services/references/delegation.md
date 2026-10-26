@@ -60,9 +60,10 @@ placed on a machine of his estate and his own local sessions; a callee recognise
 or T1 (DL-27). It is neither a context (`personal` and `org:<orgId>` stay the only ones) nor a tier: it is open to
 what DL-26 opens, everything open to the operator in the call's context, which for a tokenless call is the callee
 instance's own context. No claim of a caller places it in the family: a call relayed onto loopback stays T2 unless the
-relay proves the origin's tier, and a caller under another OS account stays T2 (DL-28). Every other reachable agent
-is the agent network, T2, with a token per call (DL-29). Money limits, human gates and a relayed action's decision or
-mandate still bind inside the family. The kit's tiers already do this; nothing changes in code.
+relay proves the origin's tier, and a caller under another OS account stays T2 (DL-28). The agent network is every
+agent a caller can reach, the family included; outside the family a caller is T2, with a token per call (DL-29). Money
+limits, human gates, the credential source (never another agent's key or vault slot), the machine profiles on calls
+over the relay, and a relayed action's decision or mandate still bind inside the family (DEC-0137). The kit's tiers already do this; nothing changes in code.
 
 The token is read from `Fabric-Delegation` first (a forwarded call; present but empty is refused, never skipped),
 then from `Authorization: Bearer` when the bearer is a delegation JWT (DL-9, DL-10). A tool with no declared
@@ -143,8 +144,9 @@ current verified revision as `estate=` / `{ estate }`, as a value or as a functi
 - **Which hub key a token is checked against** (DL-14a, DEC-0128). An organization's tokens are signed by that
   organization context's own hub key (`machines[].contextHubKeys`), under the context issuer its pin names
   (`organizations[].iss`, `urn:fabric:context:<opaque>`, never the estate id). An instance that serves an organization
-  passes its context as `estate_context=` / `{ estateContext }` to `delegation_gate` or `verify_delegation`, and that
-  pin's `iss` as `issuer`: the `kid` is then trusted only when one machine lists it for that context with that key and
+  passes its context as `estate_context=` / `{ estateContext }` to `delegation_gate` or `verify_delegation`, once the
+  record pins its organization (until then its tokens are refused `kid-not-certified`, brief D5), and that pin's `iss`
+  as `issuer`: the `kid` is then trusted only when one machine lists it for that context with that key and
   the record pins the organization. Without it, or with `personal`, the personal `hubKey` is read, so a context key
   never verifies a personal token and the personal key never an organization's; any other value (`Org:x`, a trailing
   space, a number) certifies nothing. `verify_approval` takes no context (the contract's `VerifyApprovalOptions`

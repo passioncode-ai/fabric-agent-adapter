@@ -251,7 +251,8 @@ export class JobStore {
 
   transition(jobId, status, fields = {}, privatePart) {
     const record = this.load(jobId);
-    if (privatePart?.steps) record.private.steps = { ...(record.private.steps ?? {}), ...privatePart.steps }; // one write
+    // One write; each question replaces the kept steps, so a step outlives neither its question nor its answer.
+    if (privatePart && Object.hasOwn(privatePart, 'steps')) record.private.steps = { ...privatePart.steps };
     if (TERMINAL.includes(record.job.status)) throw new InteropError(`Job ${jobId} is already ${record.job.status}; a terminal job does not change.`);
     for (const key of ['inputRequests', 'result', 'error', 'statusMessage']) delete record.job[key];
     record.job.status = status;
@@ -272,7 +273,7 @@ export class JobStore {
     for (const [key, request] of entries) if (!KEY.test(key) || request?.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
     const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
     if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);
-    return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, steps && Object.keys(steps).length ? { steps } : undefined);
+    return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, { steps: { ...(steps ?? {}) } });
   }
 
   answer(jobId, inputResponses) {

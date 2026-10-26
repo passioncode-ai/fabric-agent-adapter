@@ -1072,6 +1072,35 @@ class JobApprovalStepTests(unittest.TestCase):
         public = json.dumps([self.jobs.get(job_id), refused])  # OA-7: the job's public state and the refusal
         self.assertFalse(any(word in public for word in SOURCE_WORDS))
 
+    def answer(self, server, job_id, meta):
+        return server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"approve-reply": {"action": "accept", "content": {"choice": "yes"}}}},
+            "_meta": dict({"traceparent": PARENT}, **meta)}}, tier="T0")["result"]
+
+    def test_a_capabilities_scoped_mandate_reads_the_same_at_the_start_and_on_the_answer(self):
+        # Seam round 1: the answer path read the step under fabric.job.get; it reads it under the job's capability.
+        scope = {"capabilities": ["reviews.approve"], "actions": ["approve-reply"], "effects": ["reply"]}
+        self.start({"mandate": relayed_mandate(scope)})
+        _, record = self.step()
+        self.assertIsNotNone(record, "covered at the start")
+        server = self.start({}, input_actions=True)
+        job_id, _ = self.step()
+        self.assertFalse(self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], "and on the answer")
+        self.assertEqual(self.jobs.get(job_id)["status"], "working")
+
+    def test_a_kept_step_does_not_outlive_its_question(self):
+        # Seam round 1: a later plain question under the same key is not answered by a mandate alone.
+        server = self.start({}, input_actions=True)
+        job_id, _ = self.step()
+        self.assertFalse(self.answer(server, job_id, {"mandate": relayed_mandate()})["isError"])
+        request = fi.choice_request("Publish another reply?", "choice", [("yes", "Yes"), ("no", "No")])
+        self.jobs.request_input(job_id, {"approve-reply": request})
+        self.assertEqual(self.jobs.private(job_id)["steps"], {})
+        refused = self.answer(server, job_id, {"mandate": relayed_mandate()})
+        self.assertTrue(refused["isError"])
+        self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
+        self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
+
     def test_a_step_names_its_effect(self):
         self.start({"mandate": lead_mandate()})
         with self.assertRaises(fi.InteropError):

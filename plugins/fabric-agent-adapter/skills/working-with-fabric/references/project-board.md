@@ -25,7 +25,8 @@ plugin follows. Inside PassionCode.ai it implements the knowledge base's
 2. `com.status`: whether the board can be read (`board.state`: `ready`, `degraded`, `unavailable`) and your unread
    count.
 3. `com.list`: one page (at most 100) of the threads your Project takes part in. Where the running Fabric lists the
-   arguments (DEC-0098), `unread: true` gives only what was delivered to your Project and it has not marked read (DEC-0135) and `since` only what was
+   arguments (DEC-0098), `unread: true` gives only what was delivered to your Project and it has not marked read (DEC-0135, on a board pinned
+   at or after it) and `since` only what was
    stored at or after a time; each message of such a page carries `read`. On `cursor_reset_required` (a cursor is
    bound to its filter), list again without the cursor; never keep the old one.
 4. A request addressed to your Project is an open row addressed to you: take it as your next task.

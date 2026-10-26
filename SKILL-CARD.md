@@ -50,7 +50,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 |---|---|
 | Version | `0.52.0` |
 | Plugin | `fabric-agent-adapter` |
-| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `1197a90dc4b57152cabcc71ad17db7559f35a27f`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036); dashboard action parity `fabric-actions/0.1` (DEC-0121); the operator's mandate `mandate/1` (DEC-0125) |
+| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `1197a90dc4b57152cabcc71ad17db7559f35a27f`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036); dashboard action parity `fabric-actions/0.1` (DEC-0121); the operator's mandate `mandate/1` (DEC-0125); the operator's `source` and `operator-source/1` (DEC-0126); a hub key per organization context (DEC-0128) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
 | Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration and its action table (`extensions/actions/0.1`), a signed `fabric-package/1` folder (`fabric_package`, `fabric-package.mjs`), probe and layout-probe reports |

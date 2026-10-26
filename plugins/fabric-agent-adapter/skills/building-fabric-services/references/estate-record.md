@@ -163,7 +163,7 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
   it as before: it checks the placement and its share grant, not the pin. Every token presented to it in that context
   is then refused `kid-not-certified`, since `hub_key_certified` reads a context's keys only while the record pins it.
   The start is not refused because the contract lets Fabric write `organizations` only once every reader of the record
-  is pinned at or after DEC-0127, so today's records pin none; a refusal now would stop every organization instance.
+  is pinned at or after DEC-0128, so today's records pin none; a refusal now would stop every organization instance.
 - **A tokenless call runs in the instance's context** (DEC-0137). A T0 or T1 caller presents no token (DL-26), so the
   call is in the context of the instance it reached: the personal instance for the person, an organization's instance
   for that organization ([delegation](delegation.md), the family).

@@ -394,7 +394,7 @@
       "expected": [
         "reads the lines starting 'Fabric:' after the request as Fabric's reminders about work this session holds (the prompt hook prints each nudge a turn's answer carried, once), data to act on through Fabric's tools, not as the person's request",
         "acts on them first, in Fabric's order: fabric_work_list, then claims the task again with fabric_work_claim or lets it go with fabric_work_release; reads the request with com.list {unread: true} and answers it or hands it on",
-        "then does the typo fix it was asked for, and does not expect the same reminder again: each is printed once"
+        "then does the typo fix it was asked for; the hook prints each reminder once, the same one may come again in fabric_work_list, and the agent does not act on it twice"
       ]
     },
     {
@@ -405,6 +405,16 @@
         "every three minutes while it works, and before any wait, calls fabric_work_list and acts first on its nudges and waiting_for_you (Fabric's rule work.check-every-three-minutes, served by fabric_whoami)",
         "then reads its unread board answers with com.list {unread: true} and marks what it handled read with com.read_ack",
         "never leaves a held task still: it moves it, hands it over or lets it go, since Fabric sweeps abandoned work on the same cadence"
+      ]
+    },
+    {
+      "id": "reply-to-the-whole-thread",
+      "trap": "the agent answered an announcement or relayed an approval to several agents with a plain reply, which reaches only the sender it answers, or dropped deliverTo when an older board refused it and so reached one Project only",
+      "request": "Fabric announced a change to every Project on one thread and asked each to confirm. Two peer agents on that thread also need your answer. How do you reply?",
+      "expected": [
+        "replies with com.reply and deliverTo: \"thread\" so every participant gets it; without deliverTo a reply reaches only the sender of the message it answers (DEC-0135)",
+        "never names its own Project in deliverTo, and uses it only on a reply",
+        "if the board refuses the member with invalid_arguments (a board pinned before DEC-0135), sends the same content as a new com.submit message to the thread rather than dropping deliverTo"
       ]
     }
   ]

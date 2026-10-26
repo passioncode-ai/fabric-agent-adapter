@@ -326,4 +326,8 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   assert.deepEqual(onDisk.private.steps, { 'approve-reply': { effect: 'reply', spendUsd: 0 } });
   assert.equal(onDisk.job.status, 'input_required');
   assert.equal(JSON.stringify(onDisk.job).includes('steps'), false);
+  // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
+  store.working(job.id);
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish another?');
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, {});
 });
