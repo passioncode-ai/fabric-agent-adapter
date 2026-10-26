@@ -57,7 +57,9 @@ test('every kit document', () => {
 });
 
 test('every scope pair and the scope in force', () => {
-  for (const c of EXTRA.scopes) assert.equal(scopeWithin(c.child, c.parent), c.within, c.name);
+  // Answered by the contract at the pin; DEC-0136 MD-2a (brief D28) narrows the pairs that add a naming list.
+  const md2a = { 'a capability list under no list': false };
+  for (const c of EXTRA.scopes) assert.equal(scopeWithin(c.child, c.parent), Object.hasOwn(md2a, c.name) ? md2a[c.name] : c.within, c.name);
   assert.ok(EXTRA.effective.length > 50);
   for (const c of EXTRA.effective) assert.deepEqual(effectiveScope(c.mandate), c.scope, c.name);
 });
@@ -118,4 +120,9 @@ test('effectClosure is defined once', () => {
   assert.deepEqual([...effectClosure(['charge'])].sort(), ['charge', 'draft', 'none']);
   assert.deepEqual([...effectClosure(['none'])], ['none']);
   assert.equal(delegationClosure, effectClosure);
+});
+
+test('DEC-0136 MD-2a: a hand-over adds no naming list the scope in force leaves out', () => {
+  const cases = JSON.parse(fs.readFileSync(new URL('./fixtures/kit-mandate-md2a-cases.json', import.meta.url), 'utf8')).cases;
+  for (const c of cases) assert.equal(scopeWithin(c.child, c.parent), c.within, c.name);
 });

@@ -144,12 +144,22 @@ def _ceiling_within(child: Any, parent: Any) -> bool:
     return parent is MISSING or (child is not MISSING and child <= parent)
 
 
+def _naming_within(child: Dict[str, Any], parent: Dict[str, Any]) -> bool:
+    """DEC-0136 MD-2a (adopted ahead of the pin, brief D28): a naming list (`capabilities`, `actions`) left out names no
+    relayed action or external effect (MD-3), so a hand-over never adds one the scope in force leaves out; `actions`
+    may be added where `capabilities` is listed, and narrows the relayed actions those name."""
+    caps, acts = get(parent, "capabilities"), get(parent, "actions")
+    caps_ok = get(child, "capabilities") is MISSING if caps is MISSING else _list_within(get(child, "capabilities"), caps)
+    acts_ok = (get(child, "actions") is MISSING or caps is not MISSING) if acts is MISSING else _list_within(get(child, "actions"), acts)
+    return caps_ok and acts_ok
+
+
 def scope_within(child: Dict[str, Any], parent: Dict[str, Any]) -> bool:
-    """True when `child` asks for nothing `parent` does not give (MD-2): each list a subset, the effects within, the
-    ceiling no higher. Both are scopes the schema reads."""
+    """True when `child` asks for nothing `parent` does not give (MD-2): each list a subset, no naming list added where
+    the scope in force has none (DEC-0136 MD-2a), the effects within, the ceiling no higher. Both are scopes the schema
+    reads."""
     ceiling = effect_closure(parent["effects"])
-    return (_list_within(get(child, "capabilities"), get(parent, "capabilities"))
-            and _list_within(get(child, "actions"), get(parent, "actions"))
+    return (_naming_within(child, parent)
             and _list_within(get(child, "projects"), get(parent, "projects"))
             and all(effect in ceiling for effect in child["effects"])
             and _ceiling_within(get(child, "perCallMaxUsd"), get(parent, "perCallMaxUsd")))

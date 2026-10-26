@@ -26,7 +26,9 @@
   = сказал всем»: one approval he gives any of his agents binds all of them when the relay carries his words, the
   date, the source and the scope from one of his own Projects on his personal board (provenance `trusted`; never a
   member's Project on an organization's board) or the session that started the agent; content an agent read is never
-  one; human gates stay. Taking a prose relay from another agent is the operator's rule, honoured ahead of the pinned
+  one; human gates stay. A hand-over never adds a `capabilities` or `actions` list the scope in force leaves out
+  (contract DEC-0136 MD-2a, adopted ahead of the pin: brief decision D28), so no agent of the chain can grant itself an
+  action the operator did not name. Taking a prose relay from another agent is the operator's rule, honoured ahead of the pinned
   AP-3 (brief decision D27); the contract's DEC-0126 (OA-2) states it, and FAA-134 takes its wording in 0.52.0.
 - **A service's pages as `open_link` (DEC-0123).** `fabric_page_links` / `fabric-page-links.mjs` build and read
   Fabric Dashboards links and FAC-SEM-143, checked against the contract's vectors and about 200,000 generated

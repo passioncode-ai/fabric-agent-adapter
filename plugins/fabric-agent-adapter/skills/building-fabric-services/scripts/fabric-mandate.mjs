@@ -107,12 +107,22 @@ const listWithin = (child, parent) => parent === undefined || (child !== undefin
 /** A per-call ceiling no higher: none in the child only when the parent names none. */
 const ceilingWithin = (child, parent) => parent === undefined || (child !== undefined && child <= parent);
 
-/** True when `child` asks for nothing `parent` does not give (MD-2): each list a subset, the effects within, the ceiling
- * no higher. Both are scopes the schema reads. */
+/** DEC-0136 MD-2a (adopted ahead of the pin, brief D28): a naming list (`capabilities`, `actions`) left out names no
+ * relayed action or external effect (MD-3), so a hand-over never adds one the scope in force leaves out; `actions` may
+ * be added where `capabilities` is listed, and narrows the relayed actions those name. */
+function namingWithin(child, parent) {
+  const caps = member(parent, 'capabilities');
+  const acts = member(parent, 'actions');
+  const capsOk = caps === undefined ? member(child, 'capabilities') === undefined : listWithin(member(child, 'capabilities'), caps);
+  const actsOk = acts === undefined ? member(child, 'actions') === undefined || caps !== undefined : listWithin(member(child, 'actions'), acts);
+  return capsOk && actsOk;
+}
+
+/** True when `child` asks for nothing `parent` does not give (MD-2): each list a subset, no naming list added where the
+ * scope in force has none (DEC-0136 MD-2a), the effects within, the ceiling no higher. Both are scopes the schema reads. */
 export function scopeWithin(child, parent) {
   const ceiling = effectClosure(parent.effects);
-  return listWithin(member(child, 'capabilities'), member(parent, 'capabilities'))
-    && listWithin(member(child, 'actions'), member(parent, 'actions'))
+  return namingWithin(child, parent)
     && listWithin(member(child, 'projects'), member(parent, 'projects'))
     && child.effects.every((effect) => ceiling.has(effect))
     && ceilingWithin(member(child, 'perCallMaxUsd'), member(parent, 'perCallMaxUsd'));

@@ -67,9 +67,11 @@ class KitInputs(unittest.TestCase):
                 self.assertEqual(fm.mandate_rules("mandate", case["mandate"]), case["findings"])
 
     def test_every_scope_pair(self):
+        # Answered by the contract at the pin; DEC-0136 MD-2a (brief D28) narrows the pairs that add a naming list.
+        md2a = {"a capability list under no list": False}
         for case in EXTRA["scopes"]:
             with self.subTest(case["name"]):
-                self.assertIs(fm.scope_within(case["child"], case["parent"]), case["within"])
+                self.assertIs(fm.scope_within(case["child"], case["parent"]), md2a.get(case["name"], case["within"]))
 
     def test_the_scope_in_force(self):
         self.assertGreater(len(EXTRA["effective"]), 50)
@@ -162,3 +164,14 @@ class Building(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NamingListsMd2a(unittest.TestCase):
+    """DEC-0136 MD-2a (adopted ahead of the pin, brief D28): a hand-over never adds a naming list the scope in force
+    leaves out, which would let a callee cover a relayed action the operator never named."""
+
+    def test_scope_within(self):
+        cases = json.loads((Path(__file__).parent / "fixtures/kit-mandate-md2a-cases.json").read_text(encoding="utf-8"))["cases"]
+        for case in cases:
+            with self.subTest(case["name"]):
+                self.assertIs(fm.scope_within(case["child"], case["parent"]), case["within"])

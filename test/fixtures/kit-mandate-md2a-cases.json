@@ -1,0 +1,137 @@
+{
+  "about": "DEC-0136 MD-2a: a hand-over adds no capabilities or actions list the scope in force leaves out (actions may be added under capabilities; projects may be added). Expected answers from contract src/mandate.ts at v0.1.0+2026-10-26.9 (b0cd1dc4) scopeWithin.",
+  "cases": [
+    {
+      "name": "no naming list in force, an actions list added",
+      "parent": {
+        "effects": [
+          "draft"
+        ]
+      },
+      "child": {
+        "effects": [
+          "draft"
+        ],
+        "actions": [
+          "publish-page"
+        ]
+      },
+      "within": false
+    },
+    {
+      "name": "no naming list in force, a capabilities list added",
+      "parent": {
+        "effects": [
+          "draft"
+        ]
+      },
+      "child": {
+        "effects": [
+          "draft"
+        ],
+        "capabilities": [
+          "notes.write"
+        ]
+      },
+      "within": false
+    },
+    {
+      "name": "capabilities in force, actions added narrows",
+      "parent": {
+        "effects": [
+          "publish"
+        ],
+        "capabilities": [
+          "pages.publish"
+        ]
+      },
+      "child": {
+        "effects": [
+          "publish"
+        ],
+        "capabilities": [
+          "pages.publish"
+        ],
+        "actions": [
+          "publish-page"
+        ]
+      },
+      "within": true
+    },
+    {
+      "name": "actions alone in force, capabilities added",
+      "parent": {
+        "effects": [
+          "publish"
+        ],
+        "actions": [
+          "publish-page"
+        ]
+      },
+      "child": {
+        "effects": [
+          "publish"
+        ],
+        "actions": [
+          "publish-page"
+        ],
+        "capabilities": [
+          "pages.publish"
+        ]
+      },
+      "within": false
+    },
+    {
+      "name": "projects may be added",
+      "parent": {
+        "effects": [
+          "draft"
+        ]
+      },
+      "child": {
+        "effects": [
+          "draft"
+        ],
+        "projects": [
+          "alpha"
+        ]
+      },
+      "within": true
+    },
+    {
+      "name": "a subset of a list in force",
+      "parent": {
+        "effects": [
+          "draft"
+        ],
+        "capabilities": [
+          "a",
+          "b"
+        ]
+      },
+      "child": {
+        "effects": [
+          "draft"
+        ],
+        "capabilities": [
+          "a"
+        ]
+      },
+      "within": true
+    },
+    {
+      "name": "nothing added",
+      "parent": {
+        "effects": [
+          "draft"
+        ]
+      },
+      "child": {
+        "effects": [
+          "draft"
+        ]
+      },
+      "within": true
+    }
+  ]
+}

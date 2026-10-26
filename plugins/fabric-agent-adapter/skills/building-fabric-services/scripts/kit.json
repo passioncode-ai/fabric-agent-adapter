@@ -88,7 +88,7 @@
     "fabric_jsvalue",
     "fabric_time"
    ],
-   "sha256": "b8557e703091474f039472e11292bf2caf1a809b23037a6c5578cbae40f69339"
+   "sha256": "e7742f3c64b37251f76ffa44b5ee8e865e55f6feefcbc8439d0b1658247b272f"
   },
   {
    "module": "fabric_delegation",
@@ -555,7 +555,7 @@
     "fabric-jsvalue",
     "fabric-time"
    ],
-   "sha256": "efd6d0d963ada7b5a1b3a6dc7d1dfb469d40c8632cb45c5a46686a55a1b2b11c"
+   "sha256": "e72bddcec16915ff0ae148fb88c1082d71d99b911e1c45236dca0ecfc3663067"
   },
   {
    "module": "fabric-delegation",
@@ -3406,7 +3406,7 @@
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",
    "fabric_paths.py": "8a1ee742f80f436e9f28c61b4f049a9545de2a9e0d66bfc61faa6ee5d1ba3734",
    "fabric_estate.py": "bcc2af6ddf3fee3def7a5c5a738a0397c0e27e815ac9cb462714acef47b0c8c5",
-   "fabric_mandate.py": "b8557e703091474f039472e11292bf2caf1a809b23037a6c5578cbae40f69339",
+   "fabric_mandate.py": "e7742f3c64b37251f76ffa44b5ee8e865e55f6feefcbc8439d0b1658247b272f",
    "fabric_delegation.py": "39ca0b8ed853eea125b616eb7ccc46a8aba0cd08b96202e2b55d5b50ab07ac50",
    "fabric_share.py": "da36a466426fc29dd7dd40013167f3959a18375f8fedd228bf64f298cec1040c",
    "fabric_ceremonies.py": "a59e83cf4adb2669a9b98008e3d3a0cba991a35cbff97bc604fc82fe81cfd49f",
@@ -3447,7 +3447,7 @@
    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",
    "fabric-paths.mjs": "aa630d611e748a899e7043480f4a4e46b444f2e15ff945f30c2fbef21c1ceea5",
    "fabric-estate.mjs": "e2959b3986f1bd67b9594131d8a4057543f94d3193b57b6c65b19d05adf8d6e6",
-   "fabric-mandate.mjs": "efd6d0d963ada7b5a1b3a6dc7d1dfb469d40c8632cb45c5a46686a55a1b2b11c",
+   "fabric-mandate.mjs": "e72bddcec16915ff0ae148fb88c1082d71d99b911e1c45236dca0ecfc3663067",
    "fabric-delegation.mjs": "770eacf79c16fef95cd390199da9ad5d056faed8bed8f9c05bfb9c4cd954e58d",
    "fabric-share.mjs": "bfb26581c21ad984c2a337da02429f9f3a165cc582f8ba48de4d3dfb7d163a59",
    "fabric-ceremonies.mjs": "117d4374c9e95c930a38de7adbd4323774798f4fe6ec6f24afcd6f2c7298ca44",
