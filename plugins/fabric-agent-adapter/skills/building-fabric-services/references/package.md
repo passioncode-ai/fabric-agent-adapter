@@ -121,8 +121,10 @@ PA-03).
 
 - **ES256.** It waits for Fabric's decision D2; until then a verifier refuses it as `unknown-algorithm` (FAA-29).
 - **Hub signing for the person's own machines, and the passkey.** Stage 3 of target architecture v4.
-- **The organization's countersignature as a passkey assertion.** It waits for `org-countersign/1` and
-  `org-authority/1`; this version's countersignature is a detached Ed25519 signature.
+- **The organization's countersignature as a passkey assertion.** It waits for the decision that defines the
+  `org-countersign/1` verifier (contract `docs/specification/package.md`, "Signatures" and "Not decided here"; its
+  challenge type is registered with DEC-0063). DEC-0129 decided `org-authority/1` only as the organization's member
+  list for relay admission. This version's countersignature is a detached Ed25519 signature.
 - **Fabric recording packages by `agentRef`.** It waits for the ADR-0138 D2b amendment.
 - **`publish --to org`** (FAA-28; an organization cloud's import API is FAA-63, under FAA-28's rule that publishing to
   an organization is the person's own act).
