@@ -6,7 +6,8 @@
 //
 //   node test/fixtures/contract/make_estate_vectors.mjs --contract-src <dir with the staged .ts sources>
 //     --vectors <fixtures/vectors/estate-record.json> --semantic <dir of the fixtures/semantic/estate-*.json and grant-context-*.json files>
-//     --positive <dir with estate-record-first.json, estate-record-second.json, fabric-package-agent.json>
+//     --positive <dir with estate-record-first.json, estate-record-second.json, estate-record-organizations.json,
+//     fabric-package-agent.json>
 //     --machine-call <fixtures/vectors/machine-call.json> [--out test/fixtures/contract/estate-vectors.json]
 //
 // Needs Node 24 or later (type stripping); the staged sources import each other as .ts. The contract's vectors carry
@@ -205,6 +206,81 @@ for (const [name, value] of [
   anchored('no anchor before, one after', (v) => { delete v.parent.deltaAnchor; return v; });
   anchored('next is not an object', (v) => ({ parent: v.parent, next: 7 }));
 }
+// DEC-0128: context hub keys and organization pins (FAC-SEM-073, 076, 114, 134, 147), varied on the positive record the
+// contract writes with two organizations pinned and one context key, answered by its rules (as test/context-keys.test.ts
+// varies it), with the hostile shapes a reader must survive.
+{
+  const orgs = read(path.join(args.positive, 'estate-record-organizations.json'));
+  rules.push({ name: 'positive/estate-record-organizations', kind: 'estate-record', value: orgs, expected: estate.estateRecordRules('estate-record', orgs) });
+  const ORG = 'org:org_3fh9p1zc';
+  const hubMachine = orgs.machines.find((machine) => machine.hubKey);
+  const CONTEXT_KEY = hubMachine.contextHubKeys[0].key;
+  const PERSONAL_KEY = hubMachine.hubKey;
+  const redigest = (record) => ({ ...record, digest: estate.estateRecordDigest(record) });
+  const onHub = (change) => redigest({ ...clone(orgs), machines: clone(orgs.machines).map((machine) => (machine.id === hubMachine.id ? change(machine) : machine)) });
+  // Answered on the value as JSON carries it: an object shared between two members would be one object to a Set here and
+  // two to a reader of the vectors.
+  const record = (name, built) => { const value = clone(built); rules.push({ name: `context: ${name}`, kind: 'estate-record', value, expected: estate.estateRecordRules('estate-record', value) }); };
+  record('an estate id the issuer does not contain', redigest({ ...clone(orgs), estate: 'e' }));
+  record('an estate id in upper case inside the issuer', redigest({ ...clone(orgs), estate: 'C7D2A91F' }));
+  record('an estate id of seven characters inside the issuer', redigest({ ...clone(orgs), estate: 'C7D2A91' }));
+  record('an estate id that is the issuer prefix', redigest({ ...clone(orgs), estate: 'urn:fabric:context' }));
+  record('a member machine with a context key and no hub key', onHub((machine) => { const { hubKey: _drop, ...rest } = machine; return { ...rest, profile: 'member' }; }));
+  record('a view machine with a context key', onHub((machine) => ({ ...machine, profile: 'view' })));
+  record('a context twice on one machine', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: CONTEXT_KEY }, { context: ORG, key: { ...CONTEXT_KEY, kid: 'hub-ctx-a-2', x: 'Q2T0QOvPprzOcLfCCzIP1Ef2bIRiTqgZQB8uwN3qqUA' } }] })));
+  record('a context key reusing the personal public key', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: { ...CONTEXT_KEY, x: PERSONAL_KEY.x } }] })));
+  record('a context key reusing the personal kid', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: { ...CONTEXT_KEY, kid: PERSONAL_KEY.kid } }] })));
+  record('a context key of small order', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: { ...CONTEXT_KEY, x: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' } }] })));
+  record('a context key of the wrong length', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: { ...CONTEXT_KEY, x: 'AAAA' } }] })));
+  record('a context key that is not an object', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: 'none' }] })));
+  record('a context key on a machine without the personal hub key', onHub((machine) => { const { hubKey: _drop, ...rest } = machine; return rest; }));
+  record('a context the record does not pin', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: 'org:nobody', key: CONTEXT_KEY }] })));
+  record('a context key whose kid is revoked while listed', redigest({ ...clone(orgs), revocations: [{ kind: 'hub-key', ref: CONTEXT_KEY.kid, revokedAt: orgs.issuedAt }] }));
+  record('a context key with no kid and a hub-key revocation with no ref', (() => {
+    const { kid: _kid, ...noKid } = CONTEXT_KEY;
+    const r = onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: noKid }] }));
+    r.revocations = [{ kind: 'hub-key', revokedAt: orgs.issuedAt }];
+    return redigest(r);
+  })());
+  record('an organization pinned twice', redigest({ ...clone(orgs), organizations: [...clone(orgs.organizations), clone(orgs.organizations[0])] }));
+  record('a context issuer used twice', redigest({ ...clone(orgs), organizations: orgs.organizations.map((pin) => ({ ...pin, iss: orgs.organizations[0].iss })) }));
+  record('a root of small order', redigest({ ...clone(orgs), organizations: orgs.organizations.map((pin, i) => (i === 0 ? { ...pin, root: { ...pin.root, x: 'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' } } : pin)) }));
+  // Hostile shapes: non-objects among the pins and the context keys, members of other JSON types, a toString of data.
+  const hostile = { toString: 1 };
+  record('hostile: non-objects before the pins, then a pin twice', redigest({ ...clone(orgs), organizations: [3, null, ...clone(orgs.organizations), clone(orgs.organizations[1])] }));
+  record('hostile: organizations that is not an array', redigest({ ...clone(orgs), organizations: { org: ORG } }));
+  record('hostile: a pin whose org has its own toString, twice', redigest({ ...clone(orgs), organizations: [{ ...clone(orgs.organizations[0]), org: hostile }, { ...clone(orgs.organizations[1]), org: hostile }] }));
+  record('hostile: a pin whose iss and root are other types', redigest({ ...clone(orgs), organizations: [{ ...clone(orgs.organizations[0]), iss: 7, root: 'x' }, { ...clone(orgs.organizations[1]), iss: null, root: { x: 1 } }] }));
+  record('hostile: a pin with no org beside a context key with no context', (() => { const r = onHub((machine) => ({ ...machine, contextHubKeys: [{ key: CONTEXT_KEY }] })); delete r.organizations[0].org; return redigest(r); })());
+  record('hostile: non-objects before the context keys, then a context twice', onHub((machine) => ({ ...machine, contextHubKeys: [7, 'x', { context: ORG, key: CONTEXT_KEY }, { context: ORG, key: { ...CONTEXT_KEY, kid: 'k-2', x: 'Q2T0QOvPprzOcLfCCzIP1Ef2bIRiTqgZQB8uwN3qqUA' } }] })));
+  record('hostile: contextHubKeys that is not an array', onHub((machine) => ({ ...machine, contextHubKeys: { context: ORG, key: CONTEXT_KEY } })));
+  record('hostile: a context key whose kid and context have their own toString', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: hostile, key: { ...CONTEXT_KEY, kid: hostile } }, { context: hostile, key: { ...CONTEXT_KEY, kid: hostile, x: 'Q2T0QOvPprzOcLfCCzIP1Ef2bIRiTqgZQB8uwN3qqUA' } }] })));
+  record('hostile: a context key whose x is a number', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: { ...CONTEXT_KEY, x: 5 } }] })));
+  record('hostile: an estate id of another type', redigest({ ...clone(orgs), estate: 12345678 }));
+  // FAC-SEM-114 across two revisions: a context key dropped, replaced, moved to another context, or its machine removed.
+  const parent = orgs;
+  const revision = (name, change, revocations = [], machines = undefined) => {
+    const next = redigest({ ...clone(parent), revision: parent.revision + 1, parent: parent.digest, revocations: [...clone(parent.revocations ?? []), ...revocations],
+      machines: machines ?? clone(parent.machines).map((machine) => (machine.id === hubMachine.id ? change(machine) : machine)) });
+    const value = clone({ parent, next });
+    rules.push({ name: `context revision: ${name}`, kind: 'estate-record-revision', value, expected: estate.estateRecordRules('estate-record-revision', value) });
+  };
+  const revokedAt = parent.issuedAt;
+  revision('the context key kept', (machine) => machine);
+  revision('the context key dropped', (machine) => ({ ...machine, contextHubKeys: [] }));
+  revision('the context key dropped and revoked', (machine) => ({ ...machine, contextHubKeys: [] }), [{ kind: 'hub-key', ref: CONTEXT_KEY.kid, revokedAt }]);
+  revision('the context key replaced under the same kid', (machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: { ...CONTEXT_KEY, x: 'Q2T0QOvPprzOcLfCCzIP1Ef2bIRiTqgZQB8uwN3qqUA' } }] }));
+  revision('the context key moved to the other pinned organization', (machine) => ({ ...machine, contextHubKeys: [{ context: 'org:org_7kq2m4xw', key: CONTEXT_KEY }] }));
+  revision('the context key list made a non-array', (machine) => ({ ...machine, contextHubKeys: 'none' }));
+  const withoutHub = clone(parent.machines).filter((machine) => machine.id !== hubMachine.id);
+  const removal = [{ kind: 'machine', ref: hubMachine.id, revokedAt }, { kind: 'hub-key', ref: PERSONAL_KEY.kid, revokedAt }];
+  revision('the hub machine removed, its context key not revoked', null, removal, withoutHub);
+  revision('the hub machine removed with its context key revoked', null, [...removal, { kind: 'hub-key', ref: CONTEXT_KEY.kid, revokedAt }], withoutHub);
+  revision('a parent context key that is not an object', null, [], clone(parent.machines));
+  rules[rules.length - 1].value.parent = (() => { const p = clone(parent); p.machines.find((m) => m.id === hubMachine.id).contextHubKeys = [{ context: ORG, key: 'k' }, 3]; return p; })();
+  rules[rules.length - 1].expected = estate.estateRecordRules('estate-record-revision', rules[rules.length - 1].value);
+}
+
 const deltaAnchor = [{ deltaAnchor: { sequence: 1, sha256: 'a'.repeat(64) } }, { deltaAnchor: { sequence: 1.5, sha256: 'a'.repeat(64) } }, { deltaAnchor: { sequence: 1, sha256: 'A'.repeat(64) } },
   { deltaAnchor: { sequence: -1, sha256: 'a'.repeat(64) } }, { deltaAnchor: 'x' }, {}, null, 'record', [{ deltaAnchor: { sequence: 1, sha256: 'a'.repeat(64) } }],
   { deltaAnchor: { sequence: 1, sha256: 'a'.repeat(64), extra: true } }].map((record) => ({ record, expected: estate.deltaAnchorOf(record) ?? null }));

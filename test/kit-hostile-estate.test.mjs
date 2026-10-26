@@ -22,6 +22,33 @@ test('hubKeyCertified: an explicit null or any other non-revision applied fails 
   }
 });
 
+// DEC-0128: hostile `contextHubKeys` and `organizations` answer as the contract does (FAC-SEM-073, 076, 134, 147).
+const ORGS = ESTATE.rules.find((r) => r.name === 'positive/estate-record-organizations').value;
+const hubMachine = (record) => record.machines.find((m) => m.hubKey);
+const findings = (value) => fe.estateRecordRules('estate-record', value).filter((f) => f.code !== 'FAC-SEM-072').map((f) => [f.code, f.instancePath]);
+
+test('hostile context hub keys answer as the contract does', () => {
+  for (const c of CASES.contextHubKeys) {
+    const value = structuredClone(ORGS);
+    hubMachine(value).contextHubKeys = structuredClone(c.contextHubKeys);
+    assert.deepEqual(findings(value), c.expected, c.name);
+  }
+});
+
+test('hostile organization pins answer as the contract does', () => {
+  for (const c of CASES.organizations) {
+    const value = structuredClone(ORGS);
+    value.organizations = structuredClone(c.organizations);
+    if (Object.hasOwn(c, 'estate')) value.estate = c.estate;
+    assert.deepEqual(findings(value), c.expected, c.name);
+  }
+});
+
+test('a hostile context certifies no hub key', () => {
+  const key = hubMachine(ORGS).contextHubKeys[0].key;
+  for (const c of CASES.hubKeyContext) assert.deepEqual(fe.hubKeyCertified(ORGS, key.kid, key.x, 1792454400, undefined, { context: c.context }), c.expected, c.name);
+});
+
 test('a device key finding names the key by its position in the list as written', () => {
   const base = ESTATE.rules.find((r) => r.name === 'estate-contexts-ok.json');
   for (const c of CASES.deviceKeys) {

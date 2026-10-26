@@ -387,14 +387,16 @@ def _readable_clock(now: Any) -> bool:
 
 
 def _estate_problem(estate: Any, kid: str, x: str, now: float, applied: Any = _MISSING,
-                    revocations: Any = _MISSING) -> Optional[Tuple[str, str]]:
+                    revocations: Any = _MISSING, context: Any = _MISSING) -> Optional[Tuple[str, str]]:
     """DL-14 row 4a (DEC-0055, DEC-0060), right after the signature: when the callee reads the estate record, the
     token's kid and the published key must be certified by that revision. `estate` is a revision the caller verified
     (fabric_estate.verify_estate_record) and its machine applied, or a callable returning it; only an omitted `estate`
     skips the rule, and None (given, or returned by the callable) is an unreadable source, as Node's null is (D3).
     `applied` is the highest revision the machine applied (`{"revision", "digest"?}`); `revocations` the revocation
-    delta's entries applied since (a list or a callable). An omitted one is absent; None is unreadable. A source that
-    raises is unreadable, never a pass. Returns ("token" | "issuer", detail) or None."""
+    delta's entries applied since (a list or a callable). An omitted one is absent; None is unreadable. `context` is the
+    context this callee serves (DEC-0128): an organization's `org:<orgId>` reads that context's hub keys while the record
+    pins it; omitted or `personal`, the personal hub keys. A source that raises is unreadable, never a pass. Returns
+    ("token" | "issuer", detail) or None."""
     if estate is _MISSING:
         return None
     try:
@@ -404,8 +406,10 @@ def _estate_problem(estate: Any, kid: str, x: str, now: float, applied: Any = _M
         return ("issuer", "estate-unreadable")
     if applied is None:  # the contract's hubKeyCertified refuses a null applied mark after its record checks: unreadable
         return ("issuer", "estate-unreadable")
-    import fabric_estate  # beside this file; imported here, since fabric_estate imports this module
+    import fabric_estate  # beside this file; imported where it is used
     given = {} if applied is _MISSING else {"applied": applied}
+    if context is not _MISSING:
+        given["context"] = context
     verdict = fabric_estate.hub_key_certified(record, kid, x, now, extra_revocations=extra, **given)
     if verdict["certified"]:
         return None
@@ -415,14 +419,17 @@ def _estate_problem(estate: Any, kid: str, x: str, now: float, applied: Any = _M
 
 def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capability: str, effect: str,
                       issuer: Optional[str], read_only: bool = False, estate: Any = _MISSING,
-                      estate_applied: Any = _MISSING, estate_revocations: Any = _MISSING) -> Dict[str, Any]:
+                      estate_applied: Any = _MISSING, estate_revocations: Any = _MISSING,
+                      estate_context: Any = _MISSING) -> Dict[str, Any]:
     """DL-13, in its fixed order: nothing about a token is believed before its signature is.
     `now` is seconds since the epoch. Returns {ok: True, claims, principal, caller, chain, kid} or a refusal
     {ok: False, code, detail[, data]} whose detail is a short machine word, never the token. `issuer` is required.
     With `estate` (a verified estate revision, or a callable returning the current one), the token's kid must be one
     the revision certifies for a machine (DL-14, DEC-0055, DEC-0060); `estate_applied` is the highest revision the
-    machine applied and `estate_revocations` the revocation delta's entries since. A clock that is not a number of
-    seconds is refused `unknown-state` `no-clock` before row 1."""
+    machine applied and `estate_revocations` the revocation delta's entries since. `estate_context` is the context this
+    callee serves (DL-14a, DEC-0128): an organization's `org:<orgId>` verifies the token under that context's hub key,
+    and `issuer` is then that organization pin's context issuer (`organizations[].iss`); omitted or `personal`, the
+    personal hub key. A clock that is not a number of seconds is refused `unknown-state` `no-clock` before row 1."""
     # Before row 1: every time row compares against the clock, and a comparison with NaN is always false.
     if not _readable_clock(now):
         return _refuse("unknown-state", "no-clock")
@@ -433,7 +440,7 @@ def verify_delegation(token: Any, *, audience: str, jwks: Any, now: float, capab
     checked = _authentic(token, jwks, DELEGATION_TYP)
     if "problem" in checked:
         return _refuse("issuer-unavailable" if checked.get("issuer") else "unauthenticated", checked["problem"])
-    uncertified = _estate_problem(estate, checked["kid"], checked["x"], now, estate_applied, estate_revocations)
+    uncertified = _estate_problem(estate, checked["kid"], checked["x"], now, estate_applied, estate_revocations, estate_context)
     if uncertified:
         return _refuse("issuer-unavailable" if uncertified[0] == "issuer" else "unauthenticated", uncertified[1])
     claims = checked["compact"]["payload"]
@@ -756,7 +763,8 @@ TIERS = ("T0", "T1", "T2")
 
 def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], issuer: str,
                     read_only: bool = False, clock: Callable[[], float] = time.time, estate: Any = _MISSING,
-                    estate_applied: Any = _MISSING, estate_revocations: Any = _MISSING) -> Callable[..., Dict[str, Any]]:
+                    estate_applied: Any = _MISSING, estate_revocations: Any = _MISSING,
+                    estate_context: Any = _MISSING) -> Callable[..., Dict[str, Any]]:
     """A check for one tools/call: `gate(tool, headers, tier="T2")` answers the accepted delegation or a DL-19
     refusal. `effects` maps each tool to its declared effect class (its manifest entry); a tool with none is
     refused rather than guessed. `jwks` is a JwksCache or a key set; `issuer` (auth.delegation.issuer) is required.
@@ -767,7 +775,9 @@ def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], iss
     passes with no delegation ({ok: True, tier, principal: None, ...}). A present token is verified at every tier
     and refused when invalid. Unknown tiers count as T2. `estate` (a callable returning the current verified estate
     revision) makes the gate trust only kids that revision certifies (DL-14, DEC-0055, DEC-0060); `estate_applied` and
-    `estate_revocations` pass the applied mark and the revocation delta's entries through."""
+    `estate_revocations` pass the applied mark and the revocation delta's entries through, and `estate_context` the
+    context the service's instance runs in (DL-14a, DEC-0128: an organization's instance passes its `org:<orgId>`, and
+    `issuer` its pin's context issuer)."""
     if not _is_string(issuer):
         raise ValueError("the gate needs the issuer it trusts (auth.delegation.issuer)")
 
@@ -783,7 +793,8 @@ def delegation_gate(*, audience: str, jwks: Any, effects: Mapping[str, str], iss
         keys = jwks.get(_kid_of(carried["token"])) if isinstance(jwks, JwksCache) else jwks
         verdict = verify_delegation(carried["token"], audience=audience, jwks=keys, now=clock(), capability=tool,
                                     effect=effect, issuer=issuer, read_only=read_only, estate=estate,
-                                    estate_applied=estate_applied, estate_revocations=estate_revocations)
+                                    estate_applied=estate_applied, estate_revocations=estate_revocations,
+                                    estate_context=estate_context)
         if verdict["ok"]:
             verdict["tier"] = tier if tier in TIERS else "T2"
         return verdict

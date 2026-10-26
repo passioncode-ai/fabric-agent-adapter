@@ -38,6 +38,43 @@ class HubKeyAppliedTests(unittest.TestCase):
         self.assertEqual(fe.hub_key_certified(HUB["record"], HUB["kid"], HUB["x"], HUB["at"], fe._MISSING), HUB["expected"])
 
 
+ORGS = next(r for r in ESTATE["rules"] if r.get("name") == "positive/estate-record-organizations")["value"]
+
+
+def _hub_machine(record):
+    return next(m for m in record["machines"] if "hubKey" in m)
+
+
+class ContextHubKeyShapeTests(unittest.TestCase):
+    """DEC-0128: hostile `contextHubKeys` and `organizations` answer as the contract does (FAC-SEM-073, 076, 134, 147)."""
+
+    def findings(self, value):
+        return [[f["code"], f["instancePath"]] for f in fe.estate_record_rules("estate-record", value) if f["code"] != "FAC-SEM-072"]
+
+    def test_every_context_hub_keys_case(self):
+        for case in CASES["contextHubKeys"]:
+            with self.subTest(case["name"]):
+                value = copy.deepcopy(ORGS)
+                _hub_machine(value)["contextHubKeys"] = copy.deepcopy(case["contextHubKeys"])
+                self.assertEqual(self.findings(value), case["expected"])
+
+    def test_every_organizations_case(self):
+        for case in CASES["organizations"]:
+            with self.subTest(case["name"]):
+                value = copy.deepcopy(ORGS)
+                value["organizations"] = copy.deepcopy(case["organizations"])
+                if "estate" in case:
+                    value["estate"] = case["estate"]
+                self.assertEqual(self.findings(value), case["expected"])
+
+    def test_every_hostile_context_of_a_hub_key(self):
+        key = _hub_machine(ORGS)["contextHubKeys"][0]["key"]
+        for case in CASES["hubKeyContext"]:
+            with self.subTest(case["name"]):
+                got = fe.hub_key_certified(ORGS, key["kid"], key["x"], 1792454400, context=case["context"])
+                self.assertEqual(got, case["expected"])
+
+
 class DeviceKeyPathTests(unittest.TestCase):
     def test_every_device_key_case(self):
         base = next(r for r in ESTATE["rules"] if r.get("name") == "estate-contexts-ok.json")

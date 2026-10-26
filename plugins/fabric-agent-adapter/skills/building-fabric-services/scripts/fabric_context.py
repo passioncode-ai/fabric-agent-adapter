@@ -8,7 +8,14 @@ does; an organization's instance runs only under a placement of this machine's e
 share grant for that context (FAC-SEM-111), inside the grant's window; a data folder never changes context (its
 ``fabric-context.json`` marker). A refusal exits 78 (EX_CONFIG) with nothing created. The facade ``fabric_service`` does
 not re-export this module, so a service that does not run per context keeps the estate reader out of its closure:
-``fabric_kit.py install <dir> --module fabric_context``. Docs: references/estate-record.md (Contexts)."""
+``fabric_kit.py install <dir> --module fabric_context``. Docs: references/estate-record.md (Contexts).
+
+An organization's instance whose context the record does not pin (``organizations``, DEC-0127) still starts: the helper
+checks the placement and its share grant, not the pin (decision D5 of 0.52.0). Its tokens are refused instead:
+``fabric_estate.hub_key_certified`` reads a context's hub keys only while the record pins that organization (DL-14a,
+DEC-0128), so the service passes ``estate_context=info["context"]`` to its delegation gate. The contract lets Fabric
+write ``organizations`` only once every reader is pinned at or after DEC-0127, so a refusal at start would stop every
+organization instance on today's records."""
 from __future__ import annotations
 
 import hashlib

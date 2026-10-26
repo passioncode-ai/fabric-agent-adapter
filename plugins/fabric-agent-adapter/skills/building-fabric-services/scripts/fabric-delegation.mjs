@@ -263,10 +263,11 @@ const readableClock = (now) => typeof now === 'number' && Number.isFinite(now) &
  * `kid` and the published key must be certified by that revision. `estate` is a revision the caller verified
  * (fabric-estate.mjs verifyEstateRecord) and its machine applied, or a function returning it; only an absent `estate`
  * skips the rule (null is an unreadable source). `estateApplied` is the highest revision the machine applied,
- * `estateRevocations` the revocation delta's entries since (an array or a function). A source that throws is
- * unreadable, never a pass. `[kind, detail]` or null.
+ * `estateRevocations` the revocation delta's entries since (an array or a function), `estateContext` the context this
+ * callee serves (DEC-0128: an organization's `org:<orgId>` reads that context's hub keys while the record pins it;
+ * absent or `personal`, the personal ones). A source that throws is unreadable, never a pass. `[kind, detail]` or null.
  */
-function estateProblem({ estate, estateApplied, estateRevocations }, kid, x, now) {
+function estateProblem({ estate, estateApplied, estateRevocations, estateContext }, kid, x, now) {
   if (estate === undefined) return null;
   let record;
   let extra;
@@ -276,7 +277,10 @@ function estateProblem({ estate, estateApplied, estateRevocations }, kid, x, now
   } catch {
     return ['issuer', 'estate-unreadable'];
   }
-  const verdict = hubKeyCertified(record, kid, x, now, estateApplied, extra === undefined ? undefined : { extraRevocations: extra });
+  const verdict = hubKeyCertified(record, kid, x, now, estateApplied, {
+    ...(extra === undefined ? {} : { extraRevocations: extra }),
+    ...(estateContext === undefined ? {} : { context: estateContext }),
+  });
   // The clock was refused before row 1, so a verdict here is the token's or the trust source's.
   return verdict.certified ? null : [verdict.fault === 'token' ? 'token' : 'issuer', verdict.detail];
 }
@@ -284,16 +288,18 @@ function estateProblem({ estate, estateApplied, estateRevocations }, kid, x, now
 /**
  * DL-13, in its fixed order: nothing about a token is believed before its signature is. `now` is seconds since
  * the epoch; a clock that is not one is refused `unknown-state` `no-clock` before row 1. Answers {ok: true, claims,
- * principal, caller, chain, kid} or {ok: false, code, detail}.
+ * principal, caller, chain, kid} or {ok: false, code, detail}. `estateContext` (DL-14a, DEC-0128): the context this
+ * callee serves; an organization's `org:<orgId>` verifies the token under that context's hub key, and `issuer` is then
+ * that organization pin's context issuer (`organizations[].iss`); absent or `personal`, the personal hub key.
  */
-export function verifyDelegation(token, { audience, jwks, now, capability, effect, issuer, readOnly, estate, estateApplied, estateRevocations } = {}) {
+export function verifyDelegation(token, { audience, jwks, now, capability, effect, issuer, readOnly, estate, estateApplied, estateRevocations, estateContext } = {}) {
   // Before row 1: every time row compares against the clock, and a comparison with NaN is always false.
   if (!readableClock(now)) return refuse('unknown-state', 'no-clock');
   if (!isNonEmptyString(issuer)) return refuse('issuer-unavailable', 'no-trusted-issuer');
   if (!hasKeys(jwks)) return refuse('issuer-unavailable', 'no-published-keys');
   const checked = authentic(token, jwks, DELEGATION_TYP);
   if ('problem' in checked) return refuse(checked.issuer ? 'issuer-unavailable' : 'unauthenticated', checked.problem);
-  const uncertified = estateProblem({ estate, estateApplied, estateRevocations }, checked.kid, checked.x, now);
+  const uncertified = estateProblem({ estate, estateApplied, estateRevocations, estateContext }, checked.kid, checked.x, now);
   if (uncertified) return refuse(uncertified[0] === 'issuer' ? 'issuer-unavailable' : 'unauthenticated', uncertified[1]);
   const shaped = delegationShape(checked.compact.payload);
   if ('problem' in shaped) return refuse('unauthenticated', shaped.problem);
@@ -465,8 +471,10 @@ export const TIERS = Object.freeze(['T0', 'T1', 'T2']);
  * service's own local floor authenticated, T1 an enrolled machine of the same owner, T2 everything else (and any call
  * relayed from off the machine). A T0 or T1 caller is never required to present a token: with none, the call passes
  * with no delegation. A present token is verified at every tier. `issuer` (auth.delegation.issuer) is required.
+ * `estateContext` is the context the service's instance runs in (DL-14a, DEC-0128: an organization's instance passes its
+ * `org:<orgId>`, and `issuer` its pin's context issuer).
  */
-export function delegationGate({ audience, jwks, effects, issuer, readOnly = false, clock = () => Date.now() / 1000, estate, estateApplied, estateRevocations }) {
+export function delegationGate({ audience, jwks, effects, issuer, readOnly = false, clock = () => Date.now() / 1000, estate, estateApplied, estateRevocations, estateContext }) {
   if (!isNonEmptyString(issuer)) throw new Error('the gate needs the issuer it trusts (auth.delegation.issuer)');
   return async (tool, headers, tier = 'T2') => {
     const effect = effects?.[tool];
@@ -477,7 +485,7 @@ export function delegationGate({ audience, jwks, effects, issuer, readOnly = fal
       return refuse('unauthenticated', 'no-token');
     }
     const keys = jwks instanceof JwksCache ? await jwks.get(kidOf(carried.token)) : jwks;
-    const verdict = verifyDelegation(carried.token, { audience, jwks: keys, now: clock(), capability: tool, effect, readOnly, issuer, estate, estateApplied, estateRevocations });
+    const verdict = verifyDelegation(carried.token, { audience, jwks: keys, now: clock(), capability: tool, effect, readOnly, issuer, estate, estateApplied, estateRevocations, estateContext });
     if (verdict.ok) verdict.tier = TIERS.includes(tier) ? tier : 'T2';
     return verdict;
   };

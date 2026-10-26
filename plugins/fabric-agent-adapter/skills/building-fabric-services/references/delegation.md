@@ -140,6 +140,15 @@ current verified revision as `estate=` / `{ estate }`, as a value or as a functi
   applied mark or its revocations is an unreadable source, `estate-unreadable`, in both kits (FAA-78).
 - Every verifier refuses a clock that is not a number of seconds `unknown-state` `no-clock` before row 1: a NaN clock
   would make every time row false and pass an expired token.
+- **Which hub key a token is checked against** (DL-14a, DEC-0128). An organization's tokens are signed by that
+  organization context's own hub key (`machines[].contextHubKeys`), under the context issuer its pin names
+  (`organizations[].iss`, `urn:fabric:context:<opaque>`, never the estate id). An instance that serves an organization
+  passes its context as `estate_context=` / `{ estateContext }` to `delegation_gate` or `verify_delegation`, and that
+  pin's `iss` as `issuer`: the `kid` is then trusted only when one machine lists it for that context with that key and
+  the record pins the organization. Without it, or with `personal`, the personal `hubKey` is read, so a context key
+  never verifies a personal token and the personal key never an organization's; any other value (`Org:x`, a trailing
+  space, a number) certifies nothing. `verify_approval` takes no context (the contract's `VerifyApprovalOptions`
+  declares none at the pin), so it reads the personal keys. Held to `contextCases` and `contextVerifier` in `test/fixtures/contract/hub-key-vectors.json`.
 
 ## What the kit does not do
 
