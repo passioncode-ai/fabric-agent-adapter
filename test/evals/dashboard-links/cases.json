@@ -254,6 +254,69 @@
         }
       },
       "expected_ok": true
+    },
+    {
+      "id": "legacy-open-link-refused",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://open?service=example-agent.default&path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://open?service=example-agent.default&path=%2Fdashboard%23%2Fjobs%2F1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "space-in-path",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fa%20b",
+          "http_url": "http://127.0.0.1:47195/a%20b"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fa%20b"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "numeric-loopback-http-url",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://2130706433:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "not_installed"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://2130706433:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": false
     }
   ]
 }
