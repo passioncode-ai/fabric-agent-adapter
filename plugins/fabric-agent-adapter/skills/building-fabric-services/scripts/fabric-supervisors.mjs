@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { credentialName, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabric-base.mjs';
-import { atomicWrite, serviceDirs } from './fabric-paths.mjs';
+import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
 
@@ -370,14 +370,15 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
 /**
  * Symmetric with launchdInstall (LC-14): bootout and WAIT until the job is gone, remove the plist, and reset the
  * override to enabled — launchctl has no verb that deletes an override, and a leftover `disabled` would keep a later
- * fresh install off. Data stays unless `purge` (then `serviceId` names whose data, logs and cache go). A job still
+ * fresh install off. Data stays unless `purge` (then `serviceId` names whose data, logs and cache go, and `instance` which
+ * instance's, so one context's purge never reaches another's, FAA-125). A job still
  * loaded at `timeout` seconds throws, leaving the plist and the data in place.
  */
-export async function launchdUninstall(label, plistPath, { timeout = 30, purge = false, serviceId, run = defaultRun, platform = process.platform, uid, sleep = pause } = {}) {
+export async function launchdUninstall(label, plistPath, { timeout = 30, purge = false, serviceId, instance = 'default', run = defaultRun, platform = process.platform, uid, sleep = pause } = {}) {
   const domain = launchdDomain(platform, uid);
   launchdLabel(label);
   if (purge && !serviceId) throw new ServiceError('purge needs the service id whose data, logs and cache to remove.');
-  const dirs = purge ? serviceDirs(serviceId, platform) : {};
+  const dirs = purge ? instanceDirs(serviceId, instance, platform) : {}; // one instance's folders only (FAA-125)
   const opts = { run, platform, uid };
   const target = `${domain}/${label}`;
   run(['launchctl', 'bootout', target]);
