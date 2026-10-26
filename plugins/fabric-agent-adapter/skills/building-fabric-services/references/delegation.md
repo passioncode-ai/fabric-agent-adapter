@@ -100,7 +100,10 @@ operator's decision), `decision-invalid` (a decision for another action or objec
 and `human-step-required`, which carries `data.humanStep` (`sign-in`, `consent`, `payment`, `secret`,
 `spend-above-limit`, `passkey`) and `data.url` (an https URL or a path on the service's origin) beside `detail`.
 `refusal_from_action` / `refusalFromAction` turn an action decision into that refusal; a service's own fault never
-reaches the caller and reads as `unknown-state`. The gate that answers them is in
+reaches the caller and reads as `unknown-state`. Since 0.51.0 the `operator-decision-required` message (free text in
+DL-19, at most 500 characters) also names, in order, the routes for a client that cannot set `_meta`: Fabric's
+`agent.call` with `call.decision` once the hub forwards it (CT-125), the service's own elicitation, else the action's
+page as Fabric Dashboards' `open_link`; both kits carry the same sentence. The gate that answers them is in
 [the interop reference](interop.md#actions).
 
 ## Keys and the cache

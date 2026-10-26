@@ -93,7 +93,11 @@ REFUSAL_MESSAGES = {
     "issuer-unavailable": "The estate's published keys cannot be read.",
     "unknown-state": "The state cannot be established, so the call is refused.",
     # DEC-0121 (AP-2, AP-4): the refusals of an action call; each answers 403.
-    "operator-decision-required": "This action is the operator's decision; ask the operator and call again with it in _meta.decision.",
+    "operator-decision-required": ("This action is the operator's decision; ask the operator and call again with it in "
+                                   "_meta.decision. A client that cannot set _meta: Fabric's agent.call with "
+                                   "call.decision, once the hub forwards it; else this service's own elicitation, "
+                                   "where the client shows one; else the action's page handed to the operator as "
+                                   "Fabric Dashboards' open_link."),
     "decision-invalid": "The call's decision is not valid for this action, object or time.",
     "human-step-required": "This step is the person's own; hand them the link in error.data.url.",
 }
