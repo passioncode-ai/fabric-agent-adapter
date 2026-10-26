@@ -245,8 +245,25 @@ Report:
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates
 passed against a real provider and the project binding is valid.
 
-## Dashboard handoff: also for consumers
+## Agent pages open only in Fabric Dashboards
 
-When handing a registered service dashboard to a person, or writing the generated agent's
-completion or notification instructions, read and apply [dashboard links](references/dashboard-links.md)
-and run its output gate before delivery, in any host. Headless agents need no dashboard.
+The operator's rule (2026-10-24) for every page of an agent or a local Fabric service, in any host: a
+link in an answer or a notification, `<tool> dashboard`, a completion message, a page the agent opens
+itself. Hand over the `open_link` the `fabric-dashboards` MCP's `link` tool returns for the exact
+registered service key (`list_services`, never guessed) and the page's path; open it only with the
+host's `open` and `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
+`webbrowser.open` or `shell.openExternal` aimed at the agent's pages. A browser only on a confirmed
+`not_installed` host; an installed host that failed to open is reported, never replaced by HTTP.
+Links carry no token or login code.
+
+The agent's `AGENTS.md` carries this as its dashboard rule block, and its checks run
+`scripts/check_dashboard_link.py` on every completion and notification action before delivery:
+[dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case.
+Headless agents need no dashboard.
+
+## An agent with a page and no service descriptor
+
+A local page no service descriptor names cannot open in Fabric Dashboards. Never open it in a browser
+instead: make the agent a `fabric-service/0.1` service with `building-fabric-services` (the descriptor,
+the well-known document, the login-code routes and a declared dashboard), and until that lands file a
+board row for it and say the page waits on it.

@@ -336,7 +336,8 @@ first commit:
 - an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
   and a `CLAUDE.md` whose first line is `@AGENTS.md`.
 
-org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
+Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
+(below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
 choice, nothing about it is published or listed by the organization, and none of these files is
 required of it, though the verified MCP quick start is still how anyone learns to drive it.
@@ -426,8 +427,28 @@ the probe table verbatim with every `NOT_RUN` explained; the lock and kill-9 res
 with pids; and the one next command. Never call a service conformant while the probe
 reports a `FAIL`.
 
-## Dashboard handoff: also for consumers
+## Agent pages open only in Fabric Dashboards
 
-When handing a registered service dashboard to a person, or writing the generated agent's
-completion or notification instructions, read and apply [dashboard links](references/dashboard-links.md)
-and run its output gate before delivery, in any host. Headless agents need no dashboard.
+The operator's rule (2026-10-24) for every page of an agent or a local Fabric service, in any host: a link in an
+answer or a notification, `<tool> dashboard`, a completion message, a page the agent opens itself.
+
+1. Resolve the exact registered service key (`id.instance`) with the `fabric-dashboards` MCP (`list_services`);
+   never guess it from a project name or a port.
+2. Hand over the `open_link` its `link` tool returns for the service and the page's path, as the primary action.
+3. To open it, use the host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
+   `start <url>`, `webbrowser.open` or `shell.openExternal` aimed at the service's pages.
+4. A browser only on a confirmed `not_installed` host (`host_status`); an installed host that failed to open is
+   reported, never replaced by HTTP.
+5. Links carry no token or login code: the host signs in.
+
+Run `scripts/check_dashboard_link.py` on an action before it is printed or opened, and put it into the project's
+checks for every completion and notification renderer. The generated `AGENTS.md` carries the rule as its dashboard
+rule block; [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case. The
+probe's `dashboard.opens-in-host` fails a tracked file that opens the dashboard with a browser opener. Headless agents
+need no dashboard.
+
+## An agent with a page and no service descriptor
+
+A local page no service descriptor names cannot open in Fabric Dashboards. Never open it in a browser instead:
+make the agent a `fabric-service/0.1` service (this skill: the descriptor, the well-known document, the login-code
+routes and a declared dashboard), and until that lands file a board row for it and say the page waits on it.

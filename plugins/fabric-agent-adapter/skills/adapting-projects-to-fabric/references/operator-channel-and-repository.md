@@ -52,6 +52,10 @@ For a PassionCode.ai repository, the agent's repository follows the organization
 - an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
   and a `CLAUDE.md` whose first line is `@AGENTS.md`.
 
+Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
+(pages open only in Fabric Dashboards; the block is in `references/dashboard-links.md`), and its
+checks run `scripts/check_dashboard_link.py`.
+
 org-index `scripts/check_format.py` reports 0 findings for it before it is called done. An agent
 someone builds for themselves is not a PassionCode.ai repository: its licence is its owner's
 choice, nothing about it is published or listed by the organization, and none of these files is
