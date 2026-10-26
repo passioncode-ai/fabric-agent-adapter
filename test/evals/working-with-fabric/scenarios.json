@@ -409,11 +409,11 @@
     },
     {
       "id": "reply-to-the-whole-thread",
-      "trap": "the agent answered an announcement or relayed an approval to several agents with a plain reply, which reaches only the sender it answers, or dropped deliverTo when an older board refused it and so reached one Project only",
-      "request": "Fabric announced a change to every Project on one thread and asked each to confirm. Two peer agents on that thread also need your answer. How do you reply?",
+      "trap": "the agent sent an announcement's confirmation to every participant with deliverTo \"thread\", the fan-out DEC-0135's default exists to stop, or dropped deliverTo when an older board refused it and so reached one Project only",
+      "request": "Fabric announced a change to every Project on one thread and asked each to confirm; separately, two peer agents on that thread must also see your answer about the shared migration. How do you reply?",
       "expected": [
-        "replies with com.reply and deliverTo: \"thread\" so every participant gets it; without deliverTo a reply reaches only the sender of the message it answers (DEC-0135)",
-        "never names its own Project in deliverTo, and uses it only on a reply",
+        "confirms the announcement to the announcer alone: a plain com.reply without deliverTo, which reaches the sender of the message it answers (DEC-0135), its first word adapted, row or not affected",
+        "for the answer the two peers must see, sends deliverTo as a list naming their Projects (and the announcer's if it needs it), and deliverTo \"thread\" only when every participant needs the answer; never its own Project, and only on a reply",
         "if the board refuses the member with invalid_arguments (a board pinned before DEC-0135), sends the same content as a new com.submit message to the thread rather than dropping deliverTo"
       ]
     }

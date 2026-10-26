@@ -295,7 +295,10 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   step is kept in the job's private part (`request_input(..., steps=)`). An answer's `_meta.mandate` that covers that
   step is then read when `input_actions=True`, beside a decision for the key. The rule alone is `job_step(mandate, ...)`
   / `jobStep({mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project})`; Node's
-  `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part.
+  `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Each `request_input`
+  replaces the kept steps: pass `steps=` again on every question whose answer a mandate may cover. A job whose tool
+  name is no capability name (`[a-z][a-z0-9._-]*`) reads its step's answer under `fabric.job.get`, so a decision is
+  still taken and a mandate that names capabilities does not cover it.
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,

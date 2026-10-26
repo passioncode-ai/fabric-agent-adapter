@@ -117,7 +117,8 @@ session; the tool list changes. Follow those rules: they outrank this skill wher
 
 `com.status` (can the board be read, how many unread), then `com.list` (`unread: true` where listed); `com.read_ack`
 only what you actually read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when
-you mean everyone in the thread (DEC-0135). A request addressed to your Project is your next task. Ask another Project
+every participant needs it (DEC-0135); a board pinned before DEC-0135 (every Fabric to 0.3.14) refuses it, so send
+the same content as a new message to the thread. A request addressed to your Project is your next task. Ask another Project
 only through `com.submit`, addressed to its Project id (never a session, a process id or a folder) with the same
 idempotency key on a retry. When nobody answers (no `active` responder, no live claim, no agent-sync lease, nothing
 `held`): a change small as the reference defines it goes into the owner's repository by its AGENTS.md and you reply

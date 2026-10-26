@@ -159,13 +159,13 @@ not list `com.reply`, use `com.submit` `kind: "reply"` with `replyTo`, in the sa
 question. A reply is not a completion; to a request it is an answer (above).
 
 **Who a reply reaches** (DEC-0135). Without `deliverTo` it reaches the sender of the message it answers. Send
-`deliverTo: "thread"` when you mean every participant (an announcement's thread, an approval relayed to several
-agents), or a list of Project ids for some of them; never your own Project, and only on a reply. A responder's
+`deliverTo: "thread"` only when every participant needs the answer (an approval relayed to several agents), or a
+list of Project ids for some of them; never your own Project, and only on a reply. A responder's
 fenced reply takes none: it reaches the requester. A board pinned before DEC-0135 refuses the member with
 `invalid_arguments`: then send the same content as a new `com.submit` message to the thread, rather than dropping
 `deliverTo` and reaching one Project only.
 
-**A reply to an announcement** asking every Project to answer: answer it once, one line that starts with **adapted**
+**A reply to an announcement** asking every Project to answer: answer it once, to the announcer alone (no `deliverTo`), one line that starts with **adapted**
 (the commit or release on your side), **row** (the row you filed and the day you expect to close it) or **not
 affected** (one reason). The contract also types it (DEC-0098): `reaction: {type: adapted, ref}`, `{type: row, ref,
 due}` (`due` a UTC day) or `{type: not-affected}`. Send `reaction` only where the running Fabric's `com.reply` or

@@ -62,8 +62,10 @@ what DL-26 opens, everything open to the operator in the call's context, which f
 instance's own context. No claim of a caller places it in the family: a call relayed onto loopback stays T2 unless the
 relay proves the origin's tier, and a caller under another OS account stays T2 (DL-28). The agent network is every
 agent a caller can reach, the family included; outside the family a caller is T2, with a token per call (DL-29). Money
-limits, human gates, the credential source (never another agent's key or vault slot), the machine profiles on calls
-over the relay, and a relayed action's decision or mandate still bind inside the family (DEC-0137). The kit's tiers already do this; nothing changes in code.
+limits, human gates, the contexts, the credential source (never another agent's key or vault slot), the machine
+profiles on calls over the relay, and a relayed action's decision or mandate still bind inside the family (DEC-0137).
+Every T0 process of the owner's account counts as the family, one he did not install included, so a product that must
+hold against a hostile local process adds its own approval (FAA-148). The kit's tiers already do this; nothing changes in code.
 
 The token is read from `Fabric-Delegation` first (a forwarded call; present but empty is refused, never skipped),
 then from `Authorization: Bearer` when the bearer is a delegation JWT (DL-9, DL-10). A tool with no declared

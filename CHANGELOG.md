@@ -41,7 +41,8 @@
 - **DEC-0135, who a reply reaches** (narrowing). A reply reaches the sender of the message it answers; send
   `deliverTo: "thread"` for every participant, or a list, and on a board pinned before DEC-0135, which refuses the
   member, a new message to the thread instead. The kit's responder posts only fenced replies, which carry none.
-  Narrowed for a 0.51.x reader on a board pinned at or after DEC-0135: `com.list {unread: true}` and the unread count
+  Narrowed once the board (Fabric) is pinned at or after DEC-0135, for every agent whichever adapter it runs (Fabric to
+  0.3.14 keeps the old count): `com.list {unread: true}` and the unread count
   cover only what was delivered to your Project, so a reply sent only to another Project no longer shows; a thread
   `com.read_ack` with `upTo` marks only what your Project did not send.
 - **DEC-0130 and DEC-0137, the family and the agent network** (wording, no code change): `delegation.md` names the
