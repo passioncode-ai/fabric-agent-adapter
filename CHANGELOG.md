@@ -17,7 +17,8 @@
 - **A job's approval step reads the operator's mandate** (contract interop C3.3, `conformance.md`; part of FAA-135):
   `job_step` / `jobStep`, `CallContext.approval_step`, `request_input(steps=)` / `requestInput(..., {steps})`; with
   `input_actions` on, an answer's `_meta.mandate` that covers a kept step is read too, under the job's own capability
-  as at the start. Each question replaces the kept steps, so a step outlives neither its question nor its answer.
+  as at the start (`action_gate(mandate_capability=)` / `actionGate({mandateCapability})`). Each question replaces the
+  kept steps and an answer clears them, so a step outlives neither its question nor its answer.
 - **DEC-0136 closes at the pin:** MD-2a is the pinned contract's rule, the by-name test override is gone, and both
   twins run the contract's 30 `handOn` cases; FAC-SEM-144's message ends `(DEC-0125 MD-1, MD-2; DEC-0136 MD-2a)`.
   Vectors at `.12`: mandate 40 cases and 5 fixtures, actions 67 cases and 16 action calls.
@@ -31,7 +32,7 @@
 - Both estate readers check organization pins and context hub keys as the contract's `estate-record-rules.ts` does at
   `.12`: `FAC-SEM-147` is new; `FAC-SEM-073`, `076`, `114` and `134` read context hub keys.
 - `fabric_estate` splits its record rules into the new kit module `fabric_estate_rules` (Node:
-  `fabric-estate-rules.mjs`), listed just before it in `kit.json`; `fabric_estate` re-exports every name, so callers
+  `fabric-estate-rules.mjs`), listed just before it in `kit.json`; `fabric_estate` re-exports every public name, so callers
   keep their imports, and `fabric_kit.py install --module fabric_estate` copies both.
 - An organization instance whose context the record does not pin still starts (`fabric_context`); its tokens are
   refused `kid-not-certified` (brief D5).
@@ -41,8 +42,8 @@
 - **DEC-0135, who a reply reaches** (narrowing). A reply reaches the sender of the message it answers; send
   `deliverTo: "thread"` for every participant, or a list, and on a board pinned before DEC-0135, which refuses the
   member, a new message to the thread instead. The kit's responder posts only fenced replies, which carry none.
-  Narrowed once the board (Fabric) is pinned at or after DEC-0135, for every agent whichever adapter it runs (Fabric to
-  0.3.14 keeps the old count): `com.list {unread: true}` and the unread count
+  Narrowed once Fabric adopts DEC-0135 (planned for its 0.3.15), for a reader it takes as pinned at or after
+  DEC-0135 (DR-5); Fabric to 0.3.14 keeps the old count for every reader: `com.list {unread: true}` and the unread count
   cover only what was delivered to your Project, so a reply sent only to another Project no longer shows; a thread
   `com.read_ack` with `upTo` marks only what your Project did not send.
 - **DEC-0130 and DEC-0137, the family and the agent network** (wording, no code change): `delegation.md` names the

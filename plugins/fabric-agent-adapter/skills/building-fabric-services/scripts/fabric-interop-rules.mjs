@@ -262,7 +262,7 @@ export function jobStep({ mandate, tier, now, self, capability, key, effect, cal
  * {ok: true, record: {by: 'operator', via: 'mandate', task, chain, caller}, decision: null, mandate}; without `self` the
  * mandate is not read and the call is answered as before it existed.
  */
-export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project } = {}) {
+export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };
   if (isObject(meta) && Object.hasOwn(meta, 'decision')) inputs.decision = meta.decision;
   for (const [name, value] of [['target', target], ['approval', approval], ['actionDigest', actionDigest], ['humanStepUrl', humanStepUrl]]) {
@@ -270,7 +270,7 @@ export function actionGate({ action, tier, caller, meta, target, elicited = fals
   }
   if (self !== undefined && self !== null && isObject(meta) && Object.hasOwn(meta, 'mandate')) {
     Object.assign(inputs, { mandate: meta.mandate, self });
-    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', spendUsd], ['project', project]]) {
+    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', spendUsd], ['project', project], ['mandateCapability', mandateCapability]]) {
       if (value !== undefined && value !== null) inputs[name] = value;
     }
   }

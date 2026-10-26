@@ -416,8 +416,8 @@ class JobStore:
             matched = {key: value for key, value in (input_responses or {}).items()
                        if key in job.get("inputRequests", {}) and isinstance(value, dict)
                        and value.get("action") in ("accept", "decline", "cancel")}
-            if matched:
-                self.working(job_id)
+            if matched:  # the answered question's kept steps go in the same write: none outlives its answer
+                self._transition(job_id, "working", {"steps": {}})
             return matched
 
     def complete(self, job_id: str, envelope: Dict[str, Any]) -> Dict[str, Any]:
@@ -796,15 +796,13 @@ class McpToolServer:
             action = {"id": key, "title": "Answer %s" % key, "tool": "fabric.job.get", "gate": "relayed"}
             step, mandate = steps.get(key), {}
             if self.agent_id is not None and isinstance(step, dict):
-                # A kept step is read as approval_step read it: under the job's own capability, not fabric.job.get. A
-                # tool name that is no capability name keeps fabric.job.get, so the action stays readable: a decision
-                # is still taken, and a mandate naming capabilities does not cover it (fails closed).
+                # A kept step's mandate is read as approval_step read it, under the job's own capability; the action
+                # itself stays fabric.job.get, so it is readable whatever the tool is named.
                 capability = self.jobs.private(job_id).get("capability")
-                if readable_action(dict(action, tool=capability)):
-                    action["tool"] = capability
                 agent = (verdict or {}).get("caller")
                 mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),
-                           "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None}
+                           "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None,
+                           "mandate_capability": capability if isinstance(capability, str) else None}
             gated = self._gate_action(action, "fabric.job.get", {"id": job_id, "inputResponses": {key: value}}, None, None,
                                       headers, tier, meta, caller, mandate)
             if not gated["ok"]:

@@ -25,8 +25,8 @@ plugin follows. Inside PassionCode.ai it implements the knowledge base's
 2. `com.status`: whether the board can be read (`board.state`: `ready`, `degraded`, `unavailable`) and your unread
    count.
 3. `com.list`: one page (at most 100) of the threads your Project takes part in. Where the running Fabric lists the
-   arguments (DEC-0098), `unread: true` gives only what was delivered to your Project and it has not marked read (DEC-0135, on a board pinned
-   at or after it) and `since` only what was
+   arguments (DEC-0098), `unread: true` gives only what was delivered to your Project and it has not marked read (DEC-0135, once Fabric adopts
+   it and takes you as pinned at or after it, DR-5; Fabric to 0.3.14 keeps the old count) and `since` only what was
    stored at or after a time; each message of such a page carries `read`. On `cursor_reset_required` (a cursor is
    bound to its filter), list again without the cursor; never keep the old one.
 4. A request addressed to your Project is an open row addressed to you: take it as your next task.
@@ -199,7 +199,7 @@ personal data or private path in a body or an artifact reference: name a vault s
 - **Claude Code, with this plugin:** when the running Fabric advertises `session-hooks/1`, the Stop hook's worker
   reads `com.status` after each turn and keeps the count in the session's spool; at your next prompt the
   UserPromptSubmit hook adds ONE line (`N unread on the project board: com.list`; the board's own count, over
-  deliveries once it is pinned at or after DEC-0135) only when the count rose, then
+  deliveries once Fabric adopts DEC-0135, DR-5) only when the count rose, then
   each nudge a turn's answer carried, once (FAA-142). It never reads a message ([session hooks](session-hooks.md)).
 - **Idle, waiting for an answer:** start the watcher in the background (Claude Code: a `run_in_background` Bash call,
   or Monitor) and keep working on independent tasks:

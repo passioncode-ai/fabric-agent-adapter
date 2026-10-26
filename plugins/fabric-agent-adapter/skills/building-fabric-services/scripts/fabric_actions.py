@@ -224,7 +224,11 @@ def _by_mandate(inputs: Any, action: Dict[str, Any], caller: str) -> Dict[str, A
         return {"fault": "effect-missing"}
     if not isinstance(me, str):
         return {"fault": "self-missing"}
-    call: Dict[str, Any] = {"capability": action["tool"], "action": action["id"], "effect": effect}
+    # A job's kept step is read under the job's own capability, as job_step read it at the start (`mandateCapability`,
+    # the kit's input; the action itself stays fabric.job.get).
+    capability = get(inputs, "mandateCapability")
+    call: Dict[str, Any] = {"capability": capability if isinstance(capability, str) else action["tool"],
+                            "action": action["id"], "effect": effect}
     spend, project = get(inputs, "spendUsd"), get(inputs, "project")
     if is_number(spend):
         call["spendUsd"] = spend

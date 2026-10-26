@@ -331,3 +331,21 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   store.requestInput(job.id, { 'approve-reply': request }, 'Publish another?');
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, {});
 });
+
+test('actionGate reads a kept job step under mandateCapability, not the action\'s tool (seam round 3)', () => {
+  const step = { id: 'approve-reply', title: 'Answer approve-reply', tool: 'fabric.job.get', gate: 'relayed' };
+  const mandate = leadMandate({ capabilities: ['reviews.approve'], actions: ['approve-reply'], effects: ['reply'] });
+  const gate = (extra) => i.actionGate({ action: step, tier: 'T0', caller: 'local:T0', meta: { mandate }, now: NOW, self: 'example-agent', effect: 'reply', ...extra });
+  assert.equal(gate({}).ok, false, 'under fabric.job.get the capability is not the job\'s');
+  assert.equal(gate({ mandateCapability: 'reviews.approve' }).ok, true);
+});
+
+test('answer clears the answered question\'s kept steps in the same write', () => {
+  const dir = temp();
+  const store = new i.JobStore(dir);
+  const { job } = store.create('reviews.approve', {}, { traceparent: PARENT });
+  const request = i.choiceRequest('Publish the reply?', 'choice', [['yes', 'Yes'], ['no', 'No']]);
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': { effect: 'reply' } } });
+  store.answer(job.id, { 'approve-reply': { action: 'accept', content: { choice: 'yes' } } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, {});
+});

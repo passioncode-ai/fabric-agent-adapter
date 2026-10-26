@@ -178,7 +178,8 @@ function byMandate(field, action, caller) {
   const answer = mandateCovers({
     mandate: field('mandate'), tier: field('tier'), now: field('now'), self,
     ...(field('callerAgent') === undefined ? {} : { callerAgent: field('callerAgent') }),
-    call: { capability: action.tool, action: action.id, effect, ...(typeof spendUsd === 'number' ? { spendUsd } : {}), ...(typeof project === 'string' ? { project } : {}) },
+    // A job's kept step is read under the job's own capability (mandateCapability), as jobStep read it at the start.
+    call: { capability: typeof field('mandateCapability') === 'string' ? field('mandateCapability') : action.tool, action: action.id, effect, ...(typeof spendUsd === 'number' ? { spendUsd } : {}), ...(typeof project === 'string' ? { project } : {}) },
   });
   if ('recordAs' in answer) return { ok: true, recordAs: { ...answer.recordAs, caller } };
   return answer; // never `ignored`: the tier was read first, so a T2 call answered approval-required before (MD-5)

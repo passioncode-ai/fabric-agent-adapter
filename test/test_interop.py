@@ -1088,8 +1088,7 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertFalse(self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], "and on the answer")
         self.assertEqual(self.jobs.get(job_id)["status"], "working")
 
-    def test_a_tool_name_that_is_no_capability_still_takes_a_decision_on_a_kept_step(self):
-        # Seam round 2: a camelCase tool keeps fabric.job.get for the action, so a decision is still taken.
+    def camel_server(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
@@ -1098,14 +1097,37 @@ class JobApprovalStepTests(unittest.TestCase):
                                   input_actions=True, on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
                                   on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)))
         server.add_tool({"name": "reviewsApprove", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        return server
+
+    def start_camel(self, server, meta):
         server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
-            "name": "reviewsApprove", "arguments": {}, "_meta": {"traceparent": PARENT}}}, tier="T0")
+            "name": "reviewsApprove", "arguments": {}, "_meta": dict({"traceparent": PARENT}, **meta)}}, tier="T0")
+
+    def test_a_tool_name_that_is_no_capability_still_takes_a_decision_on_a_kept_step(self):
+        # Seam round 2: a camelCase tool keeps the action readable, so a decision is still taken.
+        server = self.camel_server()
+        self.start_camel(server, {})
         job_id, _ = self.step()
         decision = {"by": "operator", "via": "relayed-instruction", "action": "approve-reply",
                     "instruction": "Agent: Publish the reply? Operator: yes", "at": "2026-10-24T09:30:00Z"}
         taken = self.answer(server, job_id, {"decision": decision})
         self.assertFalse(taken["isError"], taken)
         self.assertEqual(self.jobs.get(job_id)["status"], "working")
+        self.assertEqual(self.jobs.private(job_id)["steps"], {}, "the answered step is gone in the same write")
+
+    def test_the_start_and_the_answer_read_a_mandate_alike_whatever_the_tool_is_named(self):
+        # Seam round 3: under a mandate naming fabric.job.get the start refused and the answer took; now both refuse.
+        # A mandate cannot name a tool that is no capability name, so only one naming no capabilities covers both.
+        for scope, covered in (({"capabilities": ["fabric.job.get"], "actions": ["approve-reply"], "effects": ["reply"]}, False),
+                               ({"actions": ["approve-reply"], "effects": ["reply"]}, True)):
+            server = self.camel_server()
+            self.start_camel(server, {"mandate": relayed_mandate(scope)})
+            _, record = self.step()
+            self.assertEqual(record is not None, covered, scope)
+            server = self.camel_server()
+            self.start_camel(server, {})
+            job_id, _ = self.step()
+            self.assertEqual(not self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], covered, scope)
 
     def test_a_kept_step_does_not_outlive_its_question(self):
         # Seam round 1: a later plain question under the same key is not answered by a mandate alone.

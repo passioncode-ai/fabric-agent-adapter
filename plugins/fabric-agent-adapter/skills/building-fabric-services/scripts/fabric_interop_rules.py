@@ -364,7 +364,7 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
                 elicited: bool = False, approval: Any = None, action_digest: Optional[str] = None,
                 human_step_url: Optional[str] = None, now: Any = None, self_id: Optional[str] = None,
                 effect: Optional[str] = None, caller_agent: Optional[str] = None, spend_usd: Any = None,
-                project: Optional[str] = None) -> Dict[str, Any]:
+                project: Optional[str] = None, mandate_capability: Optional[str] = None) -> Dict[str, Any]:
     """One call of a declared action, before its handler runs (DEC-0121 AP-2, AP-4): fabric_actions.action_decision over
     the call's `_meta.decision` (read from `meta` only, never from arguments, decision D11), the service's authenticated
     `caller` (fabric_actions.action_caller), `target` (the object the call acts on), `elicited` (the service's own
@@ -376,7 +376,8 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     DEC-0125: a service that names its own agent id (`self_id`) reads the call's `_meta.mandate` when it carries no
     decision, given `effect` (the action's effect class, required: without it the call is the service's fault
     effect-missing), `caller_agent` (only an agent id the service authenticated: a delegation's caller, its own
-    per-agent credential; never a name the call carries), `spend_usd` (its own estimate) and `project`. A covered call
+    per-agent credential; never a name the call carries), `spend_usd` (its own estimate), `project`, and `mandate_capability` (a job's kept step: the job's capability
+    the mandate is read under, not the action's tool). A covered call
     answers {ok: True, record: {by: operator, via: mandate, task, chain, caller}, decision: None, mandate}; without
     `self_id` the mandate is not read and the call is answered as before it existed."""
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19
@@ -388,7 +389,8 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
             inputs[name] = value
     if self_id is not None and isinstance(meta, dict) and "mandate" in meta:
         inputs.update({"mandate": meta["mandate"], "self": self_id})
-        for name, value in (("effect", effect), ("callerAgent", caller_agent), ("spendUsd", spend_usd), ("project", project)):
+        for name, value in (("effect", effect), ("callerAgent", caller_agent), ("spendUsd", spend_usd), ("project", project),
+                            ("mandateCapability", mandate_capability)):
             if value is not None:
                 inputs[name] = value
     answer = action_decision(inputs)
