@@ -317,6 +317,69 @@
         }
       },
       "expected_ok": false
+    },
+    {
+      "id": "nbsp-in-path",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fa%C2%A0b",
+          "http_url": "http://127.0.0.1:47195/a%C2%A0b"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fa%C2%A0b"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "bom-in-path",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fa%EF%BB%BFb",
+          "http_url": "http://127.0.0.1:47195/a%EF%BB%BFb"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fa%EF%BB%BFb"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "nbsp-raw-in-http-url",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fa%C2%A0b",
+          "http_url": "http://127.0.0.1:47195/a b"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fa%C2%A0b"
+        }
+      },
+      "expected_ok": false
     }
   ]
 }

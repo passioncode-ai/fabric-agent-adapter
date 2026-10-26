@@ -74,7 +74,9 @@ def login_path(path):
 
 def safe_path(path):
     return (isinstance(path, str) and path.startswith('/') and not path.startswith('//')
-            and len(path) <= 2048 and not re.search(r'[\\\x00-\x1f\x7f]', path))
+            and len(path) <= 2048 and not re.search(r'[\\\x00-\x1f\x7f]', path)
+            # JavaScript's whitespace (\s), which the contract's parseDashboardsLink refuses in a page (DEC-0123)
+            and not re.search('[ \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]', path))
 
 
 def check(data):
