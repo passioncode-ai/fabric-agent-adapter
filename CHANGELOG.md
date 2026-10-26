@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `references/package.md` no longer says the passkey countersignature waits for `org-authority/1`: DEC-0129 decided
+  that protocol only as the organization's member list for relay admission, and the countersignature waits for the
+  decision that defines the `org-countersign/1` verifier (contract finding on board thread `6c50c84f`).
+
 ## 0.51.0 (2026-10-26)
 
 ### Changed
