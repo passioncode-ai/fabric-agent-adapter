@@ -23,6 +23,7 @@ python3 $K/fabric_kit.py install <service-dir> --module fabric_service --module 
                                                                     # what sample_service.py imports
 python3 $K/fabric_kit.py install <service-dir> --lang node          # fabric-service.mjs and its closure
 python3 $K/fabric_kit.py install <service-dir> --module fabric_openrouter --module fabric_board
+python3 $K/fabric_kit.py install <service-dir> --module fabric_service --module fabric_context   # one instance per context
 python3 $K/fabric_kit.py install <service-dir> --all --dry-run      # every module, nothing written
 python3 $K/fabric_kit.py status <service-dir> [--json]              # current, older (the release), modified, missing
 python3 $K/fabric_kit.py build [--check]                            # maintainers: refresh kit.json from the sources (refuses a tagged version)
@@ -56,11 +57,11 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L1 | `fabric_crypto` | Ed25519 signing (a Montgomery ladder that does not branch on the key) and verification, P-256 verification, base64url, sha256 |
 | L1 | `fabric_base` | the protocol name, `ServiceError`, small shared helpers |
 | L1 | `fabric_platform` | Windows: named pipes, owner-only files (DEC-0032) |
-| L1 | `fabric_paths` | the services directory, a service's folders, atomic and private writes (L1 since 0.44.2, so `fabric_delegation` writes its consumed approval ids with them, FAA-85) |
+| L1 | `fabric_paths` | the services directory, a service's folders and one instance's (`instance_dirs`, FAA-125), atomic and private writes (L1 since 0.44.2, so `fabric_delegation` writes its consumed approval ids with them, FAA-85) |
 | L2 | `fabric_estate` | `estate-record/1` revisions and their rules (DEC-0055) |
 | L2 | `fabric_mandate` | the operator's mandate `mandate/1`: what a callee takes under it (`mandate_covers`), FAC-SEM-144, stating and handing it on narrowed (DEC-0125); the effect closure, defined here once |
 | L2 | `fabric_delegation` | the callee's side of `fabric-delegation/0.1` (DEC-0039) |
-| L2 | `fabric_share` | share grants and registrations (DEC-0086) |
+| L2 | `fabric_share` | share grants and registrations (DEC-0086); whether an organization's instance may run under its grant (`instance_share_grant`, FAA-125) |
 | L2 | `fabric_ceremonies` | the headless join token (DEC-0084) |
 | L2 | `fabric_package_schema` | the reading of `fabric-package.schema.json` with JavaScript's pattern and format semantics (FAA-92) |
 | L2 | `fabric_package` | `fabric-package/1`: pack, sign, verify; re-exports `schema_problems` (DEC-0050, DEC-0051) |
@@ -71,6 +72,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |
 | L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document |
+| L3 | `fabric_context` | one instance per context (FAA-125, N-11): a context's instance, folders, descriptor, lock and marker; not in the facade, installed with `--module fabric_context` ([contexts](estate-record.md#one-instance-per-context-the-helper)) |
 | L3 | `fabric_auth` | the token, the network guard, login codes |
 | L3 | `fabric_events` | events, paging, the JSONL event log (DEC-0029) |
 | L3 | `fabric_logs` | rotating logs, the stop signal and the drain (LC-12) |

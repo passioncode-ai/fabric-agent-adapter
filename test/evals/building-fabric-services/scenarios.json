@@ -436,6 +436,17 @@
       ]
     },
     {
+      "id": "organization-instance-needs-its-grant",
+      "trap": "example-agent's organization instance started for org:example-org with no share grant placed for it, wrote into the personal instance's data folder under the same lock, and a second copy for the same organization ran beside it",
+      "request": "Start example-agent on this machine for my organization org:example-org, next to my personal copy.",
+      "expected": [
+        "derives the instance from the context with hold_context_instance / holdContextInstance (fabric_context, installed with fabric_kit.py install --module fabric_context): personal stays the default instance with its existing folders and lock, org:example-org runs as org-example-org with its own descriptor, data, log and cache folders and its own instance lock",
+        "passes the estate record this machine applied (verified with verify_estate_record), the machine id and the agentRef, and the organization's instance is refused with exit 78 when the record places no such agent in that context (placement-missing), when its placement names no unrevoked share grant for that context (grant-refused, FAC-SEM-111) or when now is outside the grant's window (grant-window); nothing is created before the refusal",
+        "a second copy for the same context exits 75 under the instance lock, and the data folder's fabric-context.json marker refuses a start for another context (context-mismatch, exit 78)",
+        "an uninstall that purges passes the instance (launchd_uninstall(..., instance=) / launchdUninstall(..., {instance})), so the organization's purge never reaches the personal folders"
+      ]
+    },
+    {
       "id": "user-content-open-vendor-route",
       "trap": "the review-triage lane ran on one closed model, which refused the worst reviews and answered others with nothing, and the service counted those as done",
       "request": "example-agent's review-triage profile reads what customers send; make its route hold.",

@@ -1,0 +1,475 @@
+{
+ "about": "FAA-125 (organization row N-11): one instance per context. The same cases for fabric_context.py and fabric-context.mjs: `names` maps a context to its instance name (brief D15: personal is `default`; org:<orgId> is readable when the id is lower-case words joined by single hyphens, at most 28 characters and not ending in a hyphen and 10 hex digits, else `org-<slug>-<first 10 hex of sha256(orgId)>`); `cases` run context_instance against `record` (or no record when `record` is false), with `at` the clock; each answers an instance or the refusal code. The hashes were computed with `printf %s <orgId> | shasum -a 256`, not by the kit.",
+ "service": "example-agent",
+ "record": {
+  "schema": "estate-record/1",
+  "revision": 7,
+  "shareGrants": [
+   {
+    "kind": "standing-grant",
+    "meta": {
+     "id": "urn:fabric:share:11111111111111111111111111111111",
+     "revision": 1
+    },
+    "principalKind": "external",
+    "context": "org:acme-rehearsal",
+    "startsAt": "2026-10-01T00:00:00Z",
+    "expiresAt": "2026-12-01T00:00:00Z"
+   },
+   {
+    "kind": "standing-grant",
+    "meta": {
+     "id": "urn:fabric:share:22222222222222222222222222222222",
+     "revision": 1
+    },
+    "principalKind": "external",
+    "context": "org:other",
+    "startsAt": "2026-10-01T00:00:00Z",
+    "expiresAt": "2026-12-01T00:00:00Z"
+   },
+   {
+    "kind": "standing-grant",
+    "meta": {
+     "id": "urn:fabric:share:33333333333333333333333333333333",
+     "revision": 1
+    },
+    "principalKind": "external",
+    "context": "org:revoked-org",
+    "startsAt": "2026-10-01T00:00:00Z",
+    "expiresAt": "2026-12-01T00:00:00Z"
+   },
+   {
+    "kind": "standing-grant",
+    "meta": {
+     "id": "urn:fabric:share:44444444444444444444444444444444",
+     "revision": 1
+    },
+    "principalKind": "external",
+    "context": "org:Spelled",
+    "startsAt": "2026-10-01T00:00:00Z",
+    "expiresAt": "2026-12-01T00:00:00Z"
+   },
+   {
+    "kind": "standing-grant",
+    "meta": {
+     "id": "urn:fabric:share:55555555555555555555555555555555",
+     "revision": 1
+    },
+    "principalKind": "external",
+    "context": "org:window-org",
+    "startsAt": "2026-11-01T00:00:00Z",
+    "expiresAt": "2026-11-30T00:00:00Z"
+   },
+   {
+    "kind": "standing-grant",
+    "meta": {
+     "id": "urn:fabric:share:66666666666666666666666666666666",
+     "revision": 1
+    },
+    "principalKind": "external",
+    "context": "org:bad-instant",
+    "startsAt": "2026-11-01 00:00:00Z",
+    "expiresAt": "2026-12-01T00:00:00Z"
+   },
+   {
+    "kind": "standing-grant",
+    "meta": {
+     "id": "urn:fabric:share:77777777777777777777777777777777",
+     "revision": 1
+    },
+    "principalKind": "external",
+    "context": "org:open-ended"
+   }
+  ],
+  "revocations": [
+   {
+    "kind": "grant",
+    "ref": "urn:fabric:share:33333333333333333333333333333333"
+   }
+  ],
+  "machines": [
+   {
+    "id": "machine-a",
+    "packages": [
+     {
+      "agentRef": "urn:agent:example-agent"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:acme-rehearsal",
+      "grant": "urn:fabric:share:11111111111111111111111111111111"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:other-placement",
+      "grant": "urn:fabric:share:22222222222222222222222222222222"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:revoked-org",
+      "grant": "urn:fabric:share:33333333333333333333333333333333"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:Spelled",
+      "grant": "URN:Fabric:share:44444444444444444444444444444444"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:window-org",
+      "grant": "urn:fabric:share:55555555555555555555555555555555"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:bad-instant",
+      "grant": "urn:fabric:share:66666666666666666666666666666666"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:open-ended",
+      "grant": "urn:fabric:share:77777777777777777777777777777777"
+     },
+     {
+      "agentRef": "urn:agent:example-agent",
+      "context": "org:no-grant"
+     },
+     {
+      "agentRef": "urn:agent:example-helper",
+      "grant": "urn:fabric:share:11111111111111111111111111111111"
+     }
+    ]
+   },
+   {
+    "id": "machine-b",
+    "packages": [
+     {
+      "agentRef": "urn:agent:example-agent"
+     }
+    ]
+   }
+  ]
+ },
+ "names": [
+  [
+   "personal",
+   "default"
+  ],
+  [
+   "org:acme-rehearsal",
+   "org-acme-rehearsal"
+  ],
+  [
+   "org:abcdefghijklmnopqrstuvwxyz12",
+   "org-abcdefghijklmnopqrstuvwxyz12"
+  ],
+  [
+   "org:9lives",
+   "org-9lives"
+  ],
+  [
+   "org:Acme",
+   "org-acme-37036cd8f9"
+  ],
+  [
+   "org:acme_x",
+   "org-acme-x-95cf16e9a4"
+  ],
+  [
+   "org:A--B",
+   "org-a-b-067f9148b8"
+  ],
+  [
+   "org:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "org-aaaaaaaaaaaaaaaaa-6836cf13ba"
+  ],
+  [
+   "org:team-0123456789",
+   "org-team-0123456789-e7870a4bfe"
+  ],
+  [
+   "org:abcdefghijklmnopqrstuvwxyz123",
+   "org-abcdefghijklmnopq-2813123a08"
+  ],
+  [
+   "org:abcdefghijklmnop_q",
+   "org-abcdefghijklmnop-c2de24d333"
+  ],
+  [
+   "org:Big_Corp-Europe_Division_2026",
+   "org-big-corp-europe-d-a4b4999bde"
+  ]
+ ],
+ "cases": [
+  {
+   "name": "personal, no record",
+   "context": "personal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": false,
+   "instance": "default",
+   "kind": "personal"
+  },
+  {
+   "name": "personal, the record's own personal placement",
+   "context": "personal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "instance": "default",
+   "kind": "personal"
+  },
+  {
+   "name": "personal under another name",
+   "context": "personal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": false,
+   "personalInstance": "main",
+   "instance": "main",
+   "kind": "personal"
+  },
+  {
+   "name": "a personal placement that names a grant",
+   "context": "personal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-helper",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "grant-refused"
+  },
+  {
+   "name": "an organization under its grant, inside the window",
+   "context": "org:acme-rehearsal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "instance": "org-acme-rehearsal",
+   "kind": "org",
+   "grant": {
+    "id": "urn:fabric:share:11111111111111111111111111111111",
+    "startsAt": "2026-10-01T00:00:00Z",
+    "expiresAt": "2026-12-01T00:00:00Z"
+   }
+  },
+  {
+   "name": "an organization with no record",
+   "context": "org:acme-rehearsal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": false,
+   "refused": "record-required"
+  },
+  {
+   "name": "an organization with no machine id",
+   "context": "org:acme-rehearsal",
+   "machine": null,
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "record-required"
+  },
+  {
+   "name": "an organization with no agentRef",
+   "context": "org:acme-rehearsal",
+   "machine": "machine-a",
+   "agentRef": null,
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "record-required"
+  },
+  {
+   "name": "no placement in that context",
+   "context": "org:nowhere",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "placement-missing"
+  },
+  {
+   "name": "the placement is on another machine",
+   "context": "org:acme-rehearsal",
+   "machine": "machine-c",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "placement-missing"
+  },
+  {
+   "name": "the placement is another agent's",
+   "context": "org:acme-rehearsal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:someone-else",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "placement-missing"
+  },
+  {
+   "name": "the placement's grant is another context's",
+   "context": "org:other-placement",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "grant-refused"
+  },
+  {
+   "name": "the grant is revoked",
+   "context": "org:revoked-org",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "grant-refused"
+  },
+  {
+   "name": "the placement names no grant",
+   "context": "org:no-grant",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "grant-refused"
+  },
+  {
+   "name": "a grant named by a non-normal spelling of its id",
+   "context": "org:Spelled",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "instance": "org-spelled-8a6c7e4cdc",
+   "kind": "org",
+   "grant": {
+    "id": "urn:fabric:share:44444444444444444444444444444444",
+    "startsAt": "2026-10-01T00:00:00Z",
+    "expiresAt": "2026-12-01T00:00:00Z"
+   }
+  },
+  {
+   "name": "a window not started",
+   "context": "org:window-org",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-31T23:59:59.999Z",
+   "record": true,
+   "refused": "grant-window"
+  },
+  {
+   "name": "inside a later window",
+   "context": "org:window-org",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-11-15T12:00:00Z",
+   "record": true,
+   "instance": "org-window-org",
+   "kind": "org",
+   "grant": {
+    "id": "urn:fabric:share:55555555555555555555555555555555",
+    "startsAt": "2026-11-01T00:00:00Z",
+    "expiresAt": "2026-11-30T00:00:00Z"
+   }
+  },
+  {
+   "name": "a window ended (at its expiresAt)",
+   "context": "org:window-org",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-11-30T00:00:00Z",
+   "record": true,
+   "refused": "grant-window"
+  },
+  {
+   "name": "an unreadable instant",
+   "context": "org:bad-instant",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-11-15T12:00:00Z",
+   "record": true,
+   "refused": "grant-window"
+  },
+  {
+   "name": "a grant with no window",
+   "context": "org:open-ended",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "instance": "org-open-ended",
+   "kind": "org",
+   "grant": {
+    "id": "urn:fabric:share:77777777777777777777777777777777"
+   }
+  },
+  {
+   "name": "Personal is no context",
+   "context": "Personal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": false,
+   "refused": "context-invalid"
+  },
+  {
+   "name": "ORG:x is no context",
+   "context": "ORG:x",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "context-invalid"
+  },
+  {
+   "name": "org: alone is no context",
+   "context": "org:",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "context-invalid"
+  },
+  {
+   "name": "a trailing newline is no context",
+   "context": "personal\n",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "context-invalid"
+  },
+  {
+   "name": "a number is no context",
+   "context": 5,
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": true,
+   "refused": "context-invalid"
+  },
+  {
+   "name": "a personal instance name of an organization's shape",
+   "context": "personal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": false,
+   "personalInstance": "org-x",
+   "refused": "context-invalid"
+  },
+  {
+   "name": "a personal instance name the descriptor refuses",
+   "context": "personal",
+   "machine": "machine-a",
+   "agentRef": "urn:agent:example-agent",
+   "at": "2026-10-26T12:00:00Z",
+   "record": false,
+   "personalInstance": "Main",
+   "refused": "context-invalid"
+  }
+ ]
+}

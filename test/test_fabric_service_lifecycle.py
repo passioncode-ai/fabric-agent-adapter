@@ -289,6 +289,31 @@ class LaunchdUninstallTests(unittest.TestCase):
             self.assertFalse(any(d.exists() for d in dirs.values()))
             self.assertEqual(sorted(result["purged"]), sorted(str(d) for d in dirs.values()))
 
+    def test_lc14_purge_of_one_instance_keeps_the_others(self):
+        """FAA-125 (REQ-9): an organization's instance has its own folders (D16), and purging it removes only those;
+        the personal instance (``instance`` absent or ``default``) purges what it always did."""
+        paths = load("fabric_paths")
+        with tempfile.TemporaryDirectory() as home, mock.patch.dict(os.environ, {"HOME": home, "XDG_DATA_HOME": "",
+                                                                                 "XDG_STATE_HOME": "", "XDG_CACHE_HOME": ""}):
+            personal = fs.service_dirs("example-agent")
+            org = paths.instance_dirs("example-agent", "org-acme-rehearsal")
+            for d in list(personal.values()) + list(org.values()):
+                d.mkdir(parents=True, exist_ok=True)
+                (d / "keep.txt").write_text("x")
+            with FakeLaunchd():
+                result = fs.launchd_uninstall(self.label, self.plist, timeout=1, purge=True, service_id="example-agent",
+                                              instance="org-acme-rehearsal")
+            self.assertFalse(any(d.exists() for d in org.values()))
+            self.assertTrue(all((d / "keep.txt").exists() for d in personal.values()), "the personal instance stays")
+            self.assertEqual(sorted(result["purged"]), sorted(str(d) for d in org.values()))
+            with FakeLaunchd():
+                result = fs.launchd_uninstall(self.label, self.plist, timeout=1, purge=True, service_id="example-agent",
+                                              instance="default")
+            self.assertEqual(sorted(result["purged"]), sorted(str(d) for d in personal.values()))
+            with FakeLaunchd(), self.assertRaises(fs.ServiceError):
+                fs.launchd_uninstall(self.label, self.plist, timeout=1, purge=True, service_id="example-agent",
+                                     instance="Not An Instance")
+
     def test_lc14_purge_needs_the_service_id(self):
         with FakeLaunchd():
             with self.assertRaises(fs.ServiceError):

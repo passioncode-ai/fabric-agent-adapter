@@ -9,6 +9,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
+import { instanceDirs } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-paths.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
@@ -310,6 +311,26 @@ test('LC-14: purge removes data only when asked, and needs the service id', asyn
   assert.ok(Object.values(dirs).every((dir) => !fs.existsSync(dir)));
   assert.deepEqual([...result.purged].sort(), Object.values(dirs).sort());
   assert.ok(fs.existsSync(path.join(outside, 'kept.txt')), 'a symlinked folder is unlinked, never followed');
+});
+
+test('FAA-125: purging one instance removes only its folders; the personal instance purges what it always did', async (t) => {
+  const s = setup(t);
+  const home = temp();
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const saved = { HOME: process.env.HOME, XDG_DATA_HOME: process.env.XDG_DATA_HOME, XDG_STATE_HOME: process.env.XDG_STATE_HOME, XDG_CACHE_HOME: process.env.XDG_CACHE_HOME };
+  t.after(() => { for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });
+  Object.assign(process.env, { HOME: home, XDG_DATA_HOME: '', XDG_STATE_HOME: '', XDG_CACHE_HOME: '' });
+  const personal = k.serviceDirs('example-agent', 'darwin');
+  const org = instanceDirs('example-agent', 'org-acme-rehearsal', 'darwin');
+  for (const dir of [...Object.values(personal), ...Object.values(org)]) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'keep.txt'), 'x'); }
+  const opts = { timeout: 1, run: fakeLaunchd().run, platform: 'darwin', uid: UID, sleep: noSleep, purge: true, serviceId: 'example-agent' };
+  const result = await k.launchdUninstall(s.name, s.plist, { ...opts, instance: 'org-acme-rehearsal' });
+  assert.ok(Object.values(org).every((dir) => !fs.existsSync(dir)));
+  assert.ok(Object.values(personal).every((dir) => fs.existsSync(path.join(dir, 'keep.txt'))), 'the personal instance stays');
+  assert.deepEqual([...result.purged].sort(), Object.values(org).sort());
+  const again = await k.launchdUninstall(s.name, s.plist, { ...opts, instance: 'default' });
+  assert.deepEqual([...again.purged].sort(), Object.values(personal).sort());
+  await assert.rejects(k.launchdUninstall(s.name, s.plist, { ...opts, instance: 'Not An Instance' }), k.ServiceError);
 });
 
 test('the override reader answers as the Python one does', () => {

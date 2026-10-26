@@ -101,7 +101,9 @@ version is still read and never written; delete it once its messages are past th
 - Replace the example knowledge with the product's own, and run real past questions through it ([practices](../../../creating-fabric-agents/references/practices.md#judges-and-evals), *Judges
   and evals*): count handoffs and read a sample of replies.
 - Show spend: `fabric_usage.usage_report` over the ledger, or `fabric_openrouter.totals`.
-- One decision per message id holds in one process; a service runs one instance per context under its instance lock.
-  Each process reads `decisions.jsonl` once and keeps the index in memory, so a second process writing the same
-  state folder is not seen.
+- One decision per message id holds in one process. Each process reads `decisions.jsonl` once and keeps the index in
+  memory, so a second process writing the same state folder is not seen: a service runs one instance per context with
+  `fabric_context.hold_context_instance` (Node: `holdContextInstance`) and points `stateDir` at that instance's data
+  folder, so a second copy for the same context exits 75 and an organization's copy keeps its own folder
+  ([one instance per context](../../references/estate-record.md#one-instance-per-context-the-helper)).
 - Set the outbox's retention and schedule `prune`.
