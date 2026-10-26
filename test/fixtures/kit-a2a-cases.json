@@ -1,0 +1,1779 @@
+{
+ "about": "The kit's own cases for fabric_a2a / fabric-a2a.mjs (DEC-0122, decisions D5 and D6 of the 0.51.0 brief), read by test_fabric_a2a.py and fabric-a2a.test.mjs. surfaces: the member's findings as the schema's keywords name them (ajv counts maxLength in code points, and JavaScript's \\s is the whitespace set); cards: agent_card_findings' codes and places. \"@SK@\" is a key-shaped sample both tests build from parts.",
+ "surfaces": [
+  {
+   "name": "the default path",
+   "value": {
+    "path": "/.well-known/agent-card.json",
+    "protocolVersion": "1.0"
+   },
+   "findings": []
+  },
+  {
+   "name": "the root path",
+   "value": {
+    "path": "/",
+    "protocolVersion": "1.0"
+   },
+   "findings": []
+  },
+  {
+   "name": "a path of 2048 characters",
+   "value": {
+    "path": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "protocolVersion": "1.0"
+   },
+   "findings": []
+  },
+  {
+   "name": "a path of 2049 characters",
+   "value": {
+    "path": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "maxLength"
+    }
+   ]
+  },
+  {
+   "name": "2048 code points outside the BMP (ajv counts code points)",
+   "value": {
+    "path": "/\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00\ud83d\ude00",
+    "protocolVersion": "1.0"
+   },
+   "findings": []
+  },
+  {
+   "name": "a space in the path",
+   "value": {
+    "path": "/agent card.json",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "a no-break space (JavaScript whitespace)",
+   "value": {
+    "path": "/agent\u00a0card",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "a byte order mark (JavaScript whitespace, not Python's)",
+   "value": {
+    "path": "/agent\ufeffcard",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "a line separator",
+   "value": {
+    "path": "/agent\u2028card",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "U+001C (Python whitespace, not JavaScript's)",
+   "value": {
+    "path": "/agent\u001ccard",
+    "protocolVersion": "1.0"
+   },
+   "findings": []
+  },
+  {
+   "name": "U+0085 (Python whitespace, not JavaScript's)",
+   "value": {
+    "path": "/agent\u0085card",
+    "protocolVersion": "1.0"
+   },
+   "findings": []
+  },
+  {
+   "name": "a trailing newline",
+   "value": {
+    "path": "/agent-card.json\n",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "a protocol-relative path",
+   "value": {
+    "path": "//agents.example/card",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "a relative path",
+   "value": {
+    "path": "agent-card.json",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "an empty path",
+   "value": {
+    "path": "",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "a full URL",
+   "value": {
+    "path": "https://agents.example/.well-known/agent-card.json",
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "pattern"
+    }
+   ]
+  },
+  {
+   "name": "a path that is a number",
+   "value": {
+    "path": 1,
+    "protocolVersion": "1.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/path",
+     "keyword": "type"
+    }
+   ]
+  },
+  {
+   "name": "protocolVersion as a number",
+   "value": {
+    "path": "/a",
+    "protocolVersion": 1
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/protocolVersion",
+     "keyword": "const"
+    }
+   ]
+  },
+  {
+   "name": "protocolVersion with a space",
+   "value": {
+    "path": "/a",
+    "protocolVersion": "1.0 "
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/protocolVersion",
+     "keyword": "const"
+    }
+   ]
+  },
+  {
+   "name": "protocolVersion 1.0.0",
+   "value": {
+    "path": "/a",
+    "protocolVersion": "1.0.0"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a/protocolVersion",
+     "keyword": "const"
+    }
+   ]
+  },
+  {
+   "name": "a binding member (the card's own)",
+   "value": {
+    "path": "/a",
+    "protocolVersion": "1.0",
+    "binding": "JSONRPC"
+   },
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a",
+     "keyword": "additionalProperties"
+    }
+   ]
+  },
+  {
+   "name": "neither member",
+   "value": {},
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a",
+     "keyword": "required"
+    },
+    {
+     "instancePath": "/surfaces/a2a",
+     "keyword": "required"
+    }
+   ]
+  },
+  {
+   "name": "null",
+   "value": null,
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a",
+     "keyword": "type"
+    }
+   ]
+  },
+  {
+   "name": "a list",
+   "value": [
+    {
+     "path": "/a",
+     "protocolVersion": "1.0"
+    }
+   ],
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a",
+     "keyword": "type"
+    }
+   ]
+  },
+  {
+   "name": "true",
+   "value": true,
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a",
+     "keyword": "type"
+    }
+   ]
+  },
+  {
+   "name": "a string",
+   "value": "/.well-known/agent-card.json",
+   "findings": [
+    {
+     "instancePath": "/surfaces/a2a",
+     "keyword": "type"
+    }
+   ]
+  }
+ ],
+ "cards": [
+  {
+   "name": "a clean local card",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": []
+  },
+  {
+   "name": "a clean remote card",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "https://agents.example/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "https://agents.example",
+    "remote": true,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": []
+  },
+  {
+   "name": "an interface on the origin itself",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": []
+  },
+  {
+   "name": "the well-known document's process members",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ],
+    "build": {
+     "commit": "8b80be9"
+    },
+    "pid": 51234,
+    "status": "ready",
+    "summary": [
+     {
+      "label": "Jobs",
+      "value": 1
+     }
+    ],
+    "degraded": [],
+    "process": {
+     "pid": 51234
+    }
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "process-member",
+     "instancePath": "/build"
+    },
+    {
+     "code": "process-member",
+     "instancePath": "/process"
+    },
+    {
+     "code": "process-member",
+     "instancePath": "/pid"
+    },
+    {
+     "code": "process-member",
+     "instancePath": "/status"
+    },
+    {
+     "code": "process-member",
+     "instancePath": "/summary"
+    },
+    {
+     "code": "process-member",
+     "instancePath": "/degraded"
+    }
+   ]
+  },
+  {
+   "name": "a key-shaped value in the description",
+   "card": {
+    "name": "Example Agent",
+    "description": "Call with @SK@.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "secret",
+     "instancePath": "/description"
+    }
+   ]
+  },
+  {
+   "name": "a key-shaped value deep in a skill, after an index-like key",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft",
+      "examples": [
+       "fine",
+       "use @SK@"
+      ]
+     }
+    ],
+    "7": "@SK@"
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "secret",
+     "instancePath": "/7"
+    },
+    {
+     "code": "secret",
+     "instancePath": "/skills/0/examples/1"
+    }
+   ]
+  },
+  {
+   "name": "the descriptor's header as an API key (A2A 1.0 shape)",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "fabric": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "x-fabric-token"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "X-Fabric-Token"
+   },
+   "findings": [
+    {
+     "code": "descriptor-token-scheme",
+     "instancePath": "/securitySchemes/fabric"
+    }
+   ]
+  },
+  {
+   "name": "the descriptor's header as an API key (OpenAPI shape)",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "a/b~c": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-Fabric-Token"
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "X-Fabric-Token"
+   },
+   "findings": [
+    {
+     "code": "descriptor-token-scheme",
+     "instancePath": "/securitySchemes/a~1b~0c"
+    }
+   ]
+  },
+  {
+   "name": "the descriptor's header in a query (not the header)",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "q": {
+      "apiKeySecurityScheme": {
+       "location": "query",
+       "name": "X-Fabric-Token"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "X-Fabric-Token"
+   },
+   "findings": []
+  },
+  {
+   "name": "Authorization cannot be told apart on a card (D5)",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "bearer": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "Authorization"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": []
+  },
+  {
+   "name": "a Fabric extension that is required",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "required": true
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "fabric-extension-required",
+     "instancePath": "/capabilities/extensions/0"
+    }
+   ]
+  },
+  {
+   "name": "a Fabric extension with no required member",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "extensions": [
+      {
+       "uri": "HTTPS://Fabric.PassionCode.ai/limits"
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "fabric-extension-required",
+     "instancePath": "/capabilities/extensions/0"
+    }
+   ]
+  },
+  {
+   "name": "another extension that is required is the service's",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "extensions": [
+      {
+       "uri": "https://standards.example/citations/v1",
+       "required": true
+      },
+      {
+       "uri": "https://fabric.passioncode.ai.evil.example/x",
+       "required": true
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": []
+  },
+  {
+   "name": "an interface on another loopback port",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47001/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     },
+     {
+      "url": "http://127.0.0.1:470001/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "interface-origin",
+     "instancePath": "/supportedInterfaces/0/url"
+    },
+    {
+     "code": "interface-origin",
+     "instancePath": "/supportedInterfaces/1/url"
+    }
+   ]
+  },
+  {
+   "name": "an interface on localhost",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://localhost:47000/a2a",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "interface-origin",
+     "instancePath": "/supportedInterfaces/0/url"
+    }
+   ]
+  },
+  {
+   "name": "a remote card with a loopback interface",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "https://agents.example",
+    "remote": true,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "interface-scheme",
+     "instancePath": "/supportedInterfaces/0/url"
+    }
+   ]
+  },
+  {
+   "name": "an interface of another A2A version",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "0.3"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "interface-version",
+     "instancePath": "/supportedInterfaces/0/protocolVersion"
+    }
+   ]
+  },
+  {
+   "name": "no interfaces",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "interfaces-missing",
+     "instancePath": "/supportedInterfaces"
+    }
+   ]
+  },
+  {
+   "name": "an empty list of interfaces",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "interfaces-missing",
+     "instancePath": "/supportedInterfaces"
+    }
+   ]
+  },
+  {
+   "name": "an interface that is not an object, one without a url",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     "http://127.0.0.1:47000/a2a",
+     {
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "streaming": false,
+     "extensions": [
+      {
+       "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+       "description": "The service's load.",
+       "required": false
+      }
+     ]
+    },
+    "securitySchemes": {
+     "own": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": "X-Example-Key"
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "interface-shape",
+     "instancePath": "/supportedInterfaces/0"
+    },
+    {
+     "code": "interface-shape",
+     "instancePath": "/supportedInterfaces/1"
+    }
+   ]
+  },
+  {
+   "name": "hostile members are read, never thrown on",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "extensions": {
+      "uri": "https://fabric.passioncode.ai/x"
+     }
+    },
+    "securitySchemes": [
+     1,
+     null
+    ],
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": []
+  },
+  {
+   "name": "hostile members inside",
+   "card": {
+    "name": "Example Agent",
+    "description": "Drafts notes.",
+    "version": "0.2.0",
+    "supportedInterfaces": [
+     {
+      "url": "http://127.0.0.1:47000/a2a/v1",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+     }
+    ],
+    "capabilities": {
+     "extensions": [
+      null,
+      1,
+      {
+       "uri": 5,
+       "required": true
+      }
+     ]
+    },
+    "securitySchemes": {
+     "a": null,
+     "b": {
+      "apiKeySecurityScheme": null
+     },
+     "c": {
+      "apiKeySecurityScheme": {
+       "location": "header",
+       "name": 7
+      }
+     }
+    },
+    "defaultInputModes": [
+     "text/plain"
+    ],
+    "defaultOutputModes": [
+     "text/plain"
+    ],
+    "skills": [
+     {
+      "id": "draft",
+      "name": "Draft a note",
+      "description": "Drafts a note.",
+      "tags": [
+       "notes"
+      ],
+      "examples": [
+       "Draft a note about Monday."
+      ]
+     }
+    ]
+   },
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "X-Fabric-Token"
+   },
+   "findings": []
+  },
+  {
+   "name": "null",
+   "card": null,
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "card-shape",
+     "instancePath": ""
+    }
+   ]
+  },
+  {
+   "name": "a list",
+   "card": [
+    {
+     "name": "Example Agent",
+     "description": "Drafts notes.",
+     "version": "0.2.0",
+     "supportedInterfaces": [
+      {
+       "url": "http://127.0.0.1:47000/a2a/v1",
+       "protocolBinding": "JSONRPC",
+       "protocolVersion": "1.0"
+      }
+     ],
+     "capabilities": {
+      "streaming": false,
+      "extensions": [
+       {
+        "uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+        "description": "The service's load.",
+        "required": false
+       }
+      ]
+     },
+     "securitySchemes": {
+      "own": {
+       "apiKeySecurityScheme": {
+        "location": "header",
+        "name": "X-Example-Key"
+       }
+      }
+     },
+     "defaultInputModes": [
+      "text/plain"
+     ],
+     "defaultOutputModes": [
+      "text/plain"
+     ],
+     "skills": [
+      {
+       "id": "draft",
+       "name": "Draft a note",
+       "description": "Drafts a note.",
+       "tags": [
+        "notes"
+       ],
+       "examples": [
+        "Draft a note about Monday."
+       ]
+      }
+     ]
+    }
+   ],
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "card-shape",
+     "instancePath": ""
+    }
+   ]
+  },
+  {
+   "name": "a string",
+   "card": "card",
+   "options": {
+    "origin": "http://127.0.0.1:47000",
+    "remote": false,
+    "descriptorHeader": "Authorization"
+   },
+   "findings": [
+    {
+     "code": "card-shape",
+     "instancePath": ""
+    }
+   ]
+  }
+ ]
+}

@@ -1,5 +1,14 @@
 # Surfaces and auth
 
+## Contents
+
+- [MCP for agents](#mcp-for-agents)
+- [CLI for people and scripts](#cli-for-people-and-scripts)
+- [A2A for remote agents](#a2a-for-remote-agents)
+- [Token](#token)
+- [Dashboard session](#dashboard-session)
+- [Headers every response carries](#headers-every-response-carries)
+
 ## MCP for agents
 
 - One server inside the service process, `streamable-http`, at `/mcp` on the service
@@ -44,6 +53,31 @@ Remote reach goes through A2A `1.0` over HTTPS or an authenticated gateway in fr
 MCP, never by binding a LAN address. A tunnel (Tailscale Serve and the like) is an
 outward surface with its own token lifetime; watch it like a service, because nothing
 else will notice it expire.
+
+A service that answers A2A peers names its public Agent Card in the well-known document's `surfaces.a2a`
+(DEC-0122; [the wire reference](protocol.md)). What that card may say:
+
+- On a local placement the public card answers without the token (Host and Origin checks still apply) and its
+  interface URLs are on the service's loopback origin, for peers on this computer; on a remote placement they are
+  `https`, and a card that is not open is gated by the service's own credentials or an identity proxy.
+- An A2A peer is never given the descriptor's token: no interface accepts it and no `securitySchemes` entry names
+  it. A2A callers bring the service's own credentials or the estate's delegation tokens; the extended card needs
+  one of them.
+- The public card carries no secret and none of the well-known document's process members (`build`, `process`,
+  `pid`, `status`, `summary`, `degraded`). An extension it declares for a Fabric fact (`uri` under
+  `https://fabric.passioncode.ai/`) carries `required: false`.
+
+`agent_card_findings(card, origin=, remote=, descriptor_header=)` / `agentCardFindings(card, {origin, remote,
+descriptorHeader})` report each of these by `code` and place, never the value. The probe runs two rules:
+
+| Rule | PASS when | NOT_RUN when |
+|---|---|---|
+| `well-known.a2a` | `surfaces.a2a` is the schema's (`FAIL` names each schema error's place and keyword) | no `surfaces.a2a` |
+| `a2a.card` | the card at `surfaces.a2a.path`, asked with no `Authorization` header and never the descriptor's token, answers 200 with JSON that has no finding; on a local placement any other answer is a `FAIL` | no member, an unreadable one, or a remote card that answers 401 or 403 (a card that is not open; a refusal is not nonconformance) |
+
+A probe cannot see whether an interface would take the descriptor's token without sending it, which DEC-0122
+forbids, so it reads the card only and never calls an interface: an API-key scheme in the descriptor's own
+`auth.header` is a finding, and with `Authorization` (the default) the card cannot show it.
 
 ## Token
 

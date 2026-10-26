@@ -1,7 +1,7 @@
 """The probe's rules that read one thing and need no running service (FAA-65): a plist's marker and priority, the
 network guard's verdict, the board responder's fixture conversation, a session cookie's lifetime, a usage report,
 whether two repository URLs name one repository, a service's actions declaration (DEC-0121) and whether its checkout
-opens its pages in a browser (FAA-118). ``check_service.py`` runs them against a live service.
+opens its pages in a browser (FAA-118), and its A2A member and public Agent Card (DEC-0122). ``check_service.py`` runs them against a live service.
 Standard library only, Python 3.9+."""
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
+import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 
 
 def plist_problems(plist: dict, label: object, token: object = None) -> list:
@@ -368,6 +369,51 @@ def actions_declared_verdict(wk: Any) -> Tuple[str, str]:
         return "FAIL", "the dashboard's actions declaration breaks FAC-SEM-142 in %d place(s) (well-known.actions)" % len(findings)
     return "PASS", "the dashboard declares %d action(s) with their tools (DEC-0121 AP-1)" % len(view["actions"])
 
+
+
+# A2A (DEC-0122; decisions D4 to D6 of the 0.51.0 brief) -------------------------------------------------------------
+def well_known_a2a_verdict(wk: Any) -> Tuple[str, str]:
+    """`well-known.a2a`: a present `surfaces.a2a` is the schema's (`{path, protocolVersion: "1.0"}`, nothing else). No
+    member is NOT_RUN: the member is a SHOULD for a service that serves a card, and nothing says this one does."""
+    view = fa2.a2a_view(wk)
+    if not view["declared"]:
+        return "NOT_RUN", "no surfaces.a2a: the service names no A2A Agent Card (DEC-0122)"
+    if not view["valid"]:
+        return "FAIL", "; ".join("%s %s: %s" % (f["instancePath"], f["keyword"], f["message"]) for f in view["findings"][:5])
+    return "PASS", "the public Agent Card at %s, A2A %s" % (view["path"], view["protocolVersion"])
+
+
+def a2a_card_verdict(wk: Any, status: int, body: bytes, *, remote: bool, origin: str, descriptor_header: str,
+                     error: Optional[str] = None) -> Tuple[str, str]:
+    """`a2a.card`: the public card, fetched at `surfaces.a2a.path` with no Authorization header and no descriptor
+    token (D5; the caller sends none). On a local placement it answers 200 with a JSON card; on a remote one 401 or
+    403 is a card that is not open, NOT_RUN, never a failure (DEC-0122 item 2: a host and a probe never report a
+    refusal as nonconformance). A card read is judged by fabric_a2a.agent_card_findings (D5, D6). The card's interfaces
+    are never called."""
+    view = fa2.a2a_view(wk)
+    if not view["declared"]:
+        return "NOT_RUN", "no surfaces.a2a: no card to read"
+    if not view["valid"]:
+        return "NOT_RUN", "surfaces.a2a is not readable (well-known.a2a): a host does not know where the card is"
+    where = "%s without the token" % view["path"]
+    if error is not None:
+        return "FAIL", "no answer at %s: %s" % (where, error)
+    if remote and status in (401, 403):
+        return "NOT_RUN", ("HTTP %d at %s: a card that is not open, gated by the service's own credentials or an "
+                           "identity proxy; a refusal is not nonconformance (DEC-0122 item 2)" % (status, where))
+    if status != 200:
+        return "FAIL", ("HTTP %d at %s: %s" % (status, where, "the public card answers 200" if remote else
+                        "on a local placement the public card answers without authentication (DEC-0122 item 2)"))
+    try:
+        card = json.loads(body)
+    except (ValueError, RecursionError):
+        return "FAIL", "the answer at %s is not JSON" % where
+    findings = fa2.agent_card_findings(card, origin=origin or None, remote=remote, descriptor_header=descriptor_header)
+    if findings:
+        return "FAIL", "; ".join("%s: %s" % (f["code"], f["message"]) for f in findings[:5]) + (
+            " (%d more)" % (len(findings) - 5) if len(findings) > 5 else "")
+    return "PASS", "%d interface(s), A2A %s, read at %s; no process member, secret or descriptor token scheme" % (
+        len(card["supportedInterfaces"]), fa2.A2A_PROTOCOL_VERSION, where)
 
 # dashboard.opens-in-host (FAA-118; the operator rule of 2026-10-24; decision D13) ----------------------------------
 # A service's own pages open only through Fabric Dashboards: the `open_link` of the fabric-dashboards MCP `link` tool,

@@ -187,6 +187,17 @@
    "sha256": "77d3ccf863c70e9209d21ef45c46a6db9c06237019bc20d54f8d3946873f3f11"
   },
   {
+   "module": "fabric_a2a",
+   "file": "fabric_a2a.py",
+   "layer": "L3",
+   "imports": [
+    "fabric_base",
+    "fabric_jsvalue",
+    "fabric_secrets"
+   ],
+   "sha256": "ad4153fefbb14da4f69a8d230c6f1524f13da406d383f4fd7a128709cad3f49a"
+  },
+  {
    "module": "fabric_lock",
    "file": "fabric_lock.py",
    "layer": "L3",
@@ -226,6 +237,7 @@
    "file": "fabric_descriptor.py",
    "layer": "L3",
    "imports": [
+    "fabric_a2a",
     "fabric_actions",
     "fabric_base",
     "fabric_connections",
@@ -626,6 +638,17 @@
    "sha256": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc"
   },
   {
+   "module": "fabric-a2a",
+   "file": "fabric-a2a.mjs",
+   "layer": "L3",
+   "imports": [
+    "fabric-base",
+    "fabric-jsvalue",
+    "fabric-secrets"
+   ],
+   "sha256": "6bbb80925c3bc9570eb6c1e8ea0050cf733eaa0567e3b71b44c9a011945f75c5"
+  },
+  {
    "module": "fabric-lock",
    "file": "fabric-lock.mjs",
    "layer": "L3",
@@ -665,6 +688,7 @@
    "file": "fabric-descriptor.mjs",
    "layer": "L3",
    "imports": [
+    "fabric-a2a",
     "fabric-actions",
     "fabric-base",
     "fabric-connections",

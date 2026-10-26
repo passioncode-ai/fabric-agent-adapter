@@ -8,6 +8,7 @@ import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
 import { ACTIONS_EXTENSION_KEY, actionsExtension, actionsExtensionRules } from './fabric-actions.mjs';
+import { a2aSurfaceProblems } from './fabric-a2a.mjs';
 import { ROUTES } from './fabric-usage.mjs';
 
 // The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
@@ -382,9 +383,21 @@ export function configurationProblems(doc) {
 // that performs it and its gate, written under extensions/actions/0.1 by actionsExtension. A declaration FAC-SEM-142
 // finds, passed either way, is refused: not its schema's, an id named twice, a humanStep that disagrees with the gate,
 // or a tool surfaces.mcp.capabilities does not list.
-export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions, configuration, protocols, actions }) {
+// `a2a` (DEC-0122) is surfaces.a2a, where the service serves its public Agent Card (a2aSurface builds one); passed here
+// or in `surfaces`, never both, and refused when it is not the schema's. A reader pinned before DEC-0122 refuses the
+// member, so a service carries it only once its readers are pinned at or after it.
+export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions, configuration, protocols, actions, a2a }) {
   if (!STATUSES.includes(status)) throw new ServiceError(`status must be one of ${STATUSES.join(', ')}.`);
   if (!surfaces?.events) throw new ServiceError('surfaces.events is required.');
+  if (a2a !== undefined && a2a !== null) {
+    if (Object.hasOwn(surfaces, 'a2a')) throw new ServiceError('surfaces.a2a: pass it in surfaces or as a2a, not both.');
+    surfaces = { ...surfaces, a2a };
+  }
+  if (Object.hasOwn(surfaces, 'a2a')) {
+    // DEC-0122: a host reads the member by the schema; a service never publishes one it would refuse.
+    const problems = a2aSurfaceProblems(surfaces.a2a);
+    if (problems.length) throw new ServiceError(`surfaces.a2a: ${problems.join('; ')}.`);
+  }
   if (!(build?.commit || build?.digest)) throw new ServiceError('build needs a commit or a digest.');
   const doc = {
     protocol: PROTOCOL,
