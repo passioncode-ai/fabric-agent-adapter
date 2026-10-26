@@ -30,6 +30,8 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     lock_held,
     log,
     no_session_held,
+    take_nudges,
+    nudge_shown,
     project_uses_fabric,
     prune_stale_sessions,
     read_small,
@@ -133,13 +135,8 @@ def _read_count(path: Path) -> Optional[int]:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
 
 
-def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None) -> Optional[str]:
-    """ONE line when the board's unread count (written by the Stop worker) rose since the last line, else None.
-    Reads two small files in the session's own folder; never calls Fabric."""
-    session_id = payload.get("session_id")
-    if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id) or fabric_launched(env):
-        return None
-    directory = session_dir(session_id, env)
+def _unread_line(directory: Path) -> Optional[str]:
+    """The unread line when the board's count (written by the Stop worker) rose since the last line, else None."""
     unread = _read_count(directory / "board.json")
     if unread is None:
         return None
@@ -149,10 +146,21 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
             _write_private(directory / "board.shown", json.dumps({"unread": unread}))
         except OSError:
             return None  # cannot remember it: say nothing rather than repeat it every prompt
-    if unread <= shown:
+    return UNREAD_LINE % unread if unread > shown else None
+
+
+def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """The unread line when the board's count rose since the last one, then each nudge a turn's answer carried
+    (FAA-142), once; None when there is neither. Reads small files in the session's own folder; never calls Fabric."""
+    session_id = payload.get("session_id")
+    if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id) or fabric_launched(env):
+        return None
+    directory = session_dir(session_id, env)
+    lines = [line for line in [_unread_line(directory)] if line] + [nudge_shown(line) for line in take_nudges(directory)]
+    if not lines:
         return None
     return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
-                                              "additionalContext": UNREAD_LINE % unread}})
+                                              "additionalContext": "\n".join(lines)}})
 
 
 def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]] = None, spawn=spawn_worker) -> str:

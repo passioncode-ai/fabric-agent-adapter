@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 from typing import Dict
+from typing import List
 
 
 HUB_PROTOCOL = "fabric-hub/0.1"
@@ -57,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.51.0"
+VERSION = "0.51.2"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -82,6 +83,42 @@ FABRIC_MARKERS = ("fabric-agent.json", "fabric-contract.lock.json", "fabric.pack
 
 
 UNREAD_LINE = "%d unread on the project board: com.list"
+
+#: FAA-142 (Fabric 0.3.14, ask dfb43ffb): a turn's `fabric_session_observe` answer may carry `nudges`, each
+#: {kind, says, task_id?, request_id?} and given once. The worker keeps their `says` here and the prompt hook prints
+#: them once: at most MAX_NUDGES lines, each one line of at most MAX_NUDGE_CHARS characters.
+NUDGES_FILE = "nudges.json"
+#: Each nudge's line names its source, so the agent sees Fabric's words, data to act on through its tools, never the
+#: person's request. Fabric 0.3.14 starts every `says` with "Fabric:" (board e94ec9c0, release/0.3.14 b63dedb6); a
+#: line that does not gets this tag.
+NUDGE_PREFIX = "Fabric reminder: "
+
+
+def nudge_shown(line: str) -> str:
+    return line if line.startswith("Fabric:") else NUDGE_PREFIX + line
+#: The nudges of turns a `watch-mail` look delivered (FAA-89): that look prints them, the prompt hook never does.
+WATCH_NUDGES_FILE = "nudges.watch.json"
+MAX_NUDGES = 5
+MAX_NUDGE_CHARS = 400
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+
+
+def nudge_lines(value: Any, limit: Optional[int] = MAX_NUDGES) -> List[str]:
+    """The `says` of a nudges list as clean lines: one line each (controls and line breaks become a space), cut to
+    MAX_NUDGE_CHARS, blanks and repeats dropped, at most `limit` (None: all). Anything that is not such a list gives []."""
+    lines: List[str] = []
+    if not isinstance(value, list):
+        return lines
+    for item in value:
+        says = item.get("says") if isinstance(item, dict) else None
+        if not isinstance(says, str):
+            continue
+        line = " ".join(_CONTROL.sub(" ", says).split())[:MAX_NUDGE_CHARS].rstrip()
+        if line and line not in lines:
+            lines.append(line)
+        if limit is not None and len(lines) == limit:
+            break
+    return lines
 
 
 def _home(env: Optional[Dict[str, str]] = None) -> Path:
@@ -529,6 +566,28 @@ def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[flo
         except OSError:
             continue
     return removed
+
+
+def take_nudges(directory: Path, name: str = NUDGES_FILE) -> List[str]:
+    """The nudges the worker kept in `directory`, taken once: the file is renamed away first, so a merge the worker
+    makes meanwhile lands in a new file for the next take: the worker's merge takes the same way, so one of the two holds
+    each line at a time. [] on any trouble."""
+    path = directory / name
+    taken = directory / (".%s.taken.%d" % (name, os.getpid()))
+    try:
+        os.replace(str(path), str(taken))
+    except OSError:
+        return []
+    try:
+        value = json.loads(read_small(taken) or "null")
+    except ValueError:
+        value = None
+    finally:
+        try:
+            taken.unlink()
+        except OSError:
+            pass
+    return nudge_lines([{"says": line} for line in value] if isinstance(value, list) else [])
 
 
 def lock_held(directory: Path) -> bool:

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.51.2 (2026-10-26)
+
+### Added
+
+- **Reminders Fabric gives on a turn reach the agent** (FAA-142, Fabric ask `dfb43ffb`). From Fabric 0.3.14, the
+  answer to a turn's `fabric_session_observe` may carry `nudges`: lapsed claims, unread board answers, requests nobody
+  moved. The Stop hook's worker keeps their text in the session's spool (`nudges.json`), and the UserPromptSubmit
+  hook prints each one once on the next prompt, after the unread line, as Fabric writes it (each starts `Fabric:`; any other line gets the tag `Fabric reminder: `): one line each, at most five lines of at most
+  400 characters. An empty or absent list prints nothing. A turn that `watch-mail` delivers has its nudges printed by
+  `watch-mail`, once. Not carried across `/clear`: nudges of turns spooled before it stay in the old id's folder and are
+  lost, since Fabric gives each nudge once and the turn's answer took it (carrying them would make the new id's folder before the launched-session check of FAA-68). Claude Code only: the Codex and Kimi
+  Code hooks run at session start and send no turns.
+
+### Fixed
+
+- The hooks now name this release to Fabric: 0.51.1 still said 0.51.0, and `test/validate.py` now checks it.
+  Copylot check `4028969a-aa35-48f9-9300-331da036fb1d`: no findings.
+
 ## 0.51.1 (2026-10-26)
 
 The tag `v0.51.0` was never published: its release run stopped at the Node 18 floor, so 0.51.1 is the first npm

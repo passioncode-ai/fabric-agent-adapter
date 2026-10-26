@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.51.1"
+VERSION = "0.51.2"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -806,6 +806,13 @@ def validate_repo() -> List[str]:
         if in_this_tree(path):
             validate_python_imports(path, errors)
     validate_links(errors)
+
+    # The session hooks name the adapter's version to Fabric in clientInfo (`fabric-agent-adapter-hooks`); 0.51.1
+    # shipped it at 0.51.0 because nothing read it here.
+    hooks_env = (ROOT / "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session_env.py").read_text(encoding="utf-8")
+    hooks_version = re.search(r'^VERSION = "([^"]+)"$', hooks_env, re.MULTILINE)
+    if not hooks_version or hooks_version.group(1) != VERSION:
+        errors.append("fabric_session_env.py VERSION is out of sync")
 
     card = (ROOT / "SKILL-CARD.md").read_text(encoding="utf-8")
     card_versions = re.findall(r"^\| Version \| `([^`]+)` \|$", card, re.MULTILINE)

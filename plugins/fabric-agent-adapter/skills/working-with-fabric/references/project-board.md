@@ -188,8 +188,8 @@ personal data or private path in a body or an artifact reference: name a vault s
 
 - **Claude Code, with this plugin:** when the running Fabric advertises `session-hooks/1`, the Stop hook's worker
   reads `com.status` after each turn and keeps the count in the session's spool; at your next prompt the
-  UserPromptSubmit hook adds ONE line (`N unread on the project board: com.list`) only when the count rose. It
-  never reads a message ([session hooks](session-hooks.md)).
+  UserPromptSubmit hook adds ONE line (`N unread on the project board: com.list`) only when the count rose, then
+  each nudge a turn's answer carried, once (FAA-142). It never reads a message ([session hooks](session-hooks.md)).
 - **Idle, waiting for an answer:** start the watcher in the background (Claude Code: a `run_in_background` Bash call,
   or Monitor) and keep working on independent tasks:
 
@@ -197,7 +197,8 @@ personal data or private path in a body or an artifact reference: name a vault s
   python3 <skill-dir>/scripts/fabric_session.py watch-mail --interval 60
   ```
 
-  It prints one line each time the unread count rises; when Fabric is down it says so once and backs off (to 15
+  It prints one line each time the unread count rises, and each reminder (nudge) of a turn its look delivered,
+  once; when Fabric is down it says so once and backs off (to 15
   minutes); it exits when its stdin closes, on SIGTERM/SIGINT/SIGHUP, or when its parent is gone. Do not poll
   `com.status` in your own loop.
 - **Codex and Kimi Code:** no unread line (they cannot rejoin their Fabric session yet; see session hooks, D1). Call

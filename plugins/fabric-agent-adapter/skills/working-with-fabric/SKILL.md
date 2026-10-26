@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.51.1"
+  version: "0.51.2"
 ---
 
 # Working with Fabric
@@ -306,7 +306,8 @@ and do the work without claiming Fabric saw it.
 In Claude Code this plugin ships four: at session start and `/clear` (not on compact or resume) the preamble above
 in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
-and removed) and the board's unread count; at each prompt one line only when that count rose; at the end, the
+and removed) and the board's unread count; at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
+`watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list`; at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
 Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no token. Read
 [session hooks](references/session-hooks.md) when a person asks what the hooks do, where they log, how to turn them

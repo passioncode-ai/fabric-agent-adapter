@@ -22,6 +22,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     HOOK_FEATURE,
     LOCK_STALE_S,
     NO_SESSION_MARK,
+    NUDGES_FILE,
     SESSION_ID,
     VERSION,
     WORKER_DEADLINE_S,
@@ -31,6 +32,8 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     fabric_root,
     locate_hub,
     log,
+    nudge_lines,
+    take_nudges,
     read_small,
 )
 
@@ -400,7 +403,8 @@ def _entry_cwd(entries: List[Path]) -> Path:
     return Path(os.getcwd())
 
 
-def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: float = WORKER_DEADLINE_S) -> List[str]:
+def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: float = WORKER_DEADLINE_S,
+            nudges_file: str = NUDGES_FILE) -> List[str]:
     """Drain one session's spool through fabric-mcp --rejoin-only. Returns the log lines it wrote. An entry that
     cannot be read, or a call answered with a JSON-RPC error, is logged and dropped; the rest still goes out (FAA-68).
     Only an answer that never came leaves the spool for the next worker: the session's folder goes only once its end
@@ -420,13 +424,16 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
     client: Optional[McpStdio] = None
     ended = False
 
-    def call(event: str, tool: str, arguments: Dict[str, Any]) -> None:
+    def call(event: str, tool: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         assert client is not None
+        result: Dict[str, Any] = {}
         try:
-            answer = _answer_said(client.request("tools/call", {"name": tool, "arguments": arguments}))
+            result = client.request("tools/call", {"name": tool, "arguments": arguments})
+            answer = _answer_said(result)
         except JsonRpcError as exc:
             answer = exc.said()
         note("session=%s event=%s tool=%s answer=%s" % (session_id[:8], event, tool, answer))
+        return result
 
     try:
         entries = _drop_stale_ends(sorted(directory.glob("*-*.json")), note, session_id)
@@ -477,7 +484,9 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                                      observedAt=entry.get("observedAt"), idempotencyKey=key)
                     if event == "end":
                         arguments["reason"] = reason
-                    call(event, OBSERVE_TOOL, arguments)
+                    answered = call(event, OBSERVE_TOOL, arguments)
+                    if event == "turn" and not answered.get("isError"):
+                        _keep_nudges(directory, _answer_json(answered).get("nudges"), note, session_id, nudges_file)
                 elif not (directory / "observe.degraded").exists():
                     note("session=%s event=%s outcome=degraded reason=%r" % (session_id[:8], event, "no %s" % OBSERVE_TOOL))
                     (directory / "observe.degraded").touch()
@@ -521,6 +530,32 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
         if ended:
             _remove_tree(directory)
     return said
+
+
+def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], session_id: str,
+                 name: str = NUDGES_FILE) -> None:
+    """FAA-142: add a turn's nudges to the ones the prompt hook has not printed yet (NUDGES_FILE), without repeats and
+    at most MAX_NUDGES. The log names how many, never what they say. A file that cannot be written loses this turn's
+    nudges: Fabric gives each once (a turn's answer takes it from the queue `fabric_work_list` reads), so a lost one is
+    gone. The pending file is taken by renaming it away, as a reader takes it, so a prompt in between prints nothing
+    twice; when the write fails, the kept ones are written back once more before the loss is logged."""
+    offered = nudge_lines(value, limit=None)
+    if not offered:
+        return
+    kept = take_nudges(directory, name)
+    merged = nudge_lines([{"says": line} for line in kept + offered])
+    dropped = len([line for line in offered if line not in merged])
+    try:
+        _write_private(directory / name, json.dumps(merged))
+        note("session=%s event=turn nudges=%d dropped=%d" % (session_id[:8], len(offered), dropped))
+    except OSError as exc:
+        try:
+            if kept:
+                _write_private(directory / name, json.dumps(kept))
+        except OSError:
+            kept = []
+        note("session=%s event=turn nudges=%d outcome=lost lost=%d reason=%r"
+             % (session_id[:8], len(offered), len(merged) - len(kept), type(exc).__name__))
 
 
 def _drop_stale_ends(entries: List[Path], note: Callable[[str], None], session_id: str) -> List[Path]:
