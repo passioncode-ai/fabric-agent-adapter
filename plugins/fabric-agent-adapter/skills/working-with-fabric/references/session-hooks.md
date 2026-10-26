@@ -22,7 +22,7 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 | SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running, in a project that uses Fabric (below): adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric running in a folder with no such sign (a user-scope registration reaches every folder): one line pointing at `fabric_whoami`, which names the project when Fabric serves the folder anyway (FAA-60). Fabric down, in a project that uses Fabric: one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
 | Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | measures the turn's facts (HEAD, files changed, lines added and removed: counts and ids only, git sharing 1.5 s), spools them in one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}` as stored, keeps the `nudges` its answer carries (Fabric 0.3.14: each `{kind, says, task_id?, request_id?}`, given once) in `nudges.json`, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
 | UserPromptSubmit | the session's spool holds a count or nudges | adds ONE line, `N unread on the project board: com.list`, only when the count rose since the last line (a fall or the same count says nothing), then each nudge's `says` once, one line each, at most five lines of at most 400 characters; the nudges file goes before they are printed (FAA-142). It reads small files and never calls Fabric. |
-| SessionEnd | as for Stop | spools the end; the worker sends `fabric_work_release {claims: "session", outcome: "let-go", …}` (with `observedAt`, the time the hook fired, where the tool's input schema names it: Fabric 0.3.9 then refuses an end from before the session enrolled), then `fabric_session_observe {event: "end", reason}`, and removes the session's spool. Reason `clear` ends nothing: `/clear` keeps the agent process and its fabric-mcp, so no claim is released and no end observed; turns already spooled still go out (since 0.42.0), and their nudges reach the new session's prompts: the end leaves a pointer by folder, which the SessionStart of `/clear` adopts within two minutes (FAA-142) |
+| SessionEnd | as for Stop | spools the end; the worker sends `fabric_work_release {claims: "session", outcome: "let-go", …}` (with `observedAt`, the time the hook fired, where the tool's input schema names it: Fabric 0.3.9 then refuses an end from before the session enrolled), then `fabric_session_observe {event: "end", reason}`, and removes the session's spool. Reason `clear` ends nothing: `/clear` keeps the agent process and its fabric-mcp, so no claim is released and no end observed; turns already spooled still go out (since 0.42.0). Their nudges stay in the old id's folder and are not printed: the new session's preamble sends the agent to `fabric_work_list`, which shows the same reminders (decision of 0.51.2, FAA-142) |
 
 **A resumed session and a session Fabric does not hold** (since 0.42.0, board thread `02bf19c5`). `claude --resume`
 keeps the session id, so an end that was kept for a retry (its release got no answer) would be delivered to the resumed
@@ -71,13 +71,15 @@ They consume the same context through their own APIs. They never use the Claude-
 
 `fabric_session.py watch-mail [--interval 60]` is for an idle Claude Code session waiting on the board; the agent
 starts it under a background watcher. It rejoins the session (`CLAUDE_CODE_SESSION_ID`, or `--session-id`) through
-`fabric-mcp --rejoin-only` for each look, prints one line each time the unread count rises, and waits `interval`
+`fabric-mcp --rejoin-only` for each look, prints one line each time the unread count rises (and the nudges of turns its
+look delivered), and waits `interval`
 ± 20 % between looks (after the jitter never under 10 s and never over 15 minutes). It shares the session's
 once-a-minute rejoin with the Stop worker: a look within a minute of the last rejoin (the worker's `rejoined` mark or
 its own) waits instead, and its own rejoin renews that mark when the session's folder exists. Because its looks keep
 that mark fresh, a Stop-hook turn usually waits in the spool while it runs: a look that finds spooled turns delivers
-them through its own rejoin, as the worker would, and reads the board's count the worker writes (FAA-89). Nudges such a
-turn carried are printed by the look, each once, and the prompt hook then has none of them to repeat (FAA-142). While Fabric is down or
+them through its own rejoin, as the worker would, and reads the board's count the worker writes (FAA-89). The nudges of
+turns its own look delivered it prints, each once (`nudges.watch.json`); those the Stop worker delivered wait for the
+next prompt (FAA-142). While Fabric is down or
 the board unreadable it says so once and backs off, doubling to at most 15 minutes. It exits on its stdin's end (when started with a pipe), SIGTERM, SIGINT or SIGHUP,
 or when its parent is gone. It refuses to start in a session Fabric launched, and without a `fabric` registration.
 
@@ -125,7 +127,8 @@ only variable names are looked at, never a value (two of them carry the session'
 One line per event that did something, never content: `~/Library/Caches/ai.passioncode.fabric-agent-adapter/hooks.log`
 (macOS), `$XDG_CACHE_HOME/fabric-agent-adapter/hooks.log` (Linux, default `~/.cache`),
 `%LOCALAPPDATA%\fabric-agent-adapter\hooks.log` (Windows). Mode 0600, rotated at 1 MB to `hooks.log.1`. The
-per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, `board.json`, `board.shown`; a
+per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, `board.json`, `board.shown`, and the nudges not yet printed: `nudges.json` for the prompt
+hook, `nudges.watch.json` for `watch-mail`, each taken by renaming it away; a
 folder untouched for 7 days, whose worker failed or whose session ended without SessionEnd, is removed by the next
 Stop or SessionEnd hook, even while the hooks are inert; an end entry whose release or observation got no answer stays
 for the next worker, and the folder goes only once the end is delivered; a stale worker lock is taken by renaming it, never by a
@@ -146,6 +149,6 @@ launched-session check exact.
 | D1 | `fabric-mcp` enrolls with the runtime session id | for `--runner claude-code`, `runtimeSessionId` = env `CLAUDE_CODE_SESSION_ID` in `fabric.session.enroll {cwd, runtimeSessionId}` (Claude Code 2.1.296 gives MCP stdio servers and Bash commands that variable, equal to the hooks' `session_id`) |
 | D2 | rejoin only | `fabric-mcp --runner claude-code --rejoin-only --runtime-session-id <id>` attaches to that runtime session's live enrolled session; never asks, never mints; otherwise only `fabric_whoami`, as not enrolled; Fabric 0.3.9 exits 3 at once when no session holds the id |
 | D3 | the flag | `hub.json` `"features": ["session-hooks/1"]` once D1, D2, D4 and D5 ship |
-| D4 | `fabric_session_observe` | `{event: "turn" or "end", runtime: "claude-code", runtimeSessionId, observedAt, head, filesChanged, linesAdded, linesRemoved, reason (end only), idempotencyKey}` → `session.turn.observed@1`, `session.ended@1` |
+| D4 | `fabric_session_observe` | `{event: "turn" or "end", runtime: "claude-code", runtimeSessionId, observedAt, head, filesChanged, linesAdded, linesRemoved, reason (end only), idempotencyKey}` → `session.turn.observed@1`, `session.ended@1`; from Fabric 0.3.14 a turn's answer may carry `nudges` (FAA-142) |
 | D5 | release a whole session | `fabric_work_release {claims: "session", outcome: "let-go", reason, idempotencyKey}`; `observedAt` too where its input schema names it (Fabric 0.3.9: `stale-end` for an end observed before the session enrolled) |
 | D6 | a launched-session marker | `FABRIC_LAUNCHED_SESSION=1` in the environment of every session Fabric launches, whatever its adapter; until then, the inference above |

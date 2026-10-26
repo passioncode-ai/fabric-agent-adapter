@@ -402,7 +402,8 @@ def _entry_cwd(entries: List[Path]) -> Path:
     return Path(os.getcwd())
 
 
-def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: float = WORKER_DEADLINE_S) -> List[str]:
+def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: float = WORKER_DEADLINE_S,
+            nudges_file: str = NUDGES_FILE) -> List[str]:
     """Drain one session's spool through fabric-mcp --rejoin-only. Returns the log lines it wrote. An entry that
     cannot be read, or a call answered with a JSON-RPC error, is logged and dropped; the rest still goes out (FAA-68).
     Only an answer that never came leaves the spool for the next worker: the session's folder goes only once its end
@@ -484,7 +485,7 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                         arguments["reason"] = reason
                     answered = call(event, OBSERVE_TOOL, arguments)
                     if event == "turn" and not answered.get("isError"):
-                        _keep_nudges(directory, _answer_json(answered).get("nudges"), note, session_id)
+                        _keep_nudges(directory, _answer_json(answered).get("nudges"), note, session_id, nudges_file)
                 elif not (directory / "observe.degraded").exists():
                     note("session=%s event=%s outcome=degraded reason=%r" % (session_id[:8], event, "no %s" % OBSERVE_TOOL))
                     (directory / "observe.degraded").touch()
@@ -530,14 +531,15 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
     return said
 
 
-def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], session_id: str) -> None:
+def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], session_id: str,
+                 name: str = NUDGES_FILE) -> None:
     """FAA-142: add a turn's nudges to the ones the prompt hook has not printed yet (NUDGES_FILE), without repeats and
     at most MAX_NUDGES. The log names how many, never what they say. A file that cannot be written loses this turn's
     nudges: Fabric gives each once, and a lost one stays in its `fabric_work_list` answer."""
     lines = nudge_lines(value)
     if not lines:
         return
-    path = directory / NUDGES_FILE
+    path = directory / name
     try:
         kept = json.loads(read_small(path) or "null")
     except ValueError:

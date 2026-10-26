@@ -21,7 +21,8 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     fabric_launched,
     fabric_root,
     locate_hub,
-    pending_nudges,
+    WATCH_NUDGES_FILE,
+    take_nudges,
     rejoin_wait,
     session_dir,
 )
@@ -96,7 +97,7 @@ def _deliver_and_count(directory: Path, env: Dict[str, str], deadline_s: float) 
     """FAA-89: the hooks' worker drains the spool through one rejoin and writes the board's unread count beside it;
     this look reads that count instead of rejoining a second time within the minute."""
     started = time.time()
-    deliver(directory, env, deadline_s)
+    deliver(directory, env, deadline_s, nudges_file=WATCH_NUDGES_FILE)
     if not directory.is_dir():  # the look delivered the session's end, and the worker removed its folder
         return "down", "the session ended: its spooled turns were delivered"
     board = directory / "board.json"
@@ -125,7 +126,8 @@ def watch_mail(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None,
                poll: Optional[Callable[[], Tuple[str, Any]]] = None, out: Callable[[str], None] = print,
                wait: Callable[[float], bool], stop: Callable[[], bool], rng: Callable[[], float]) -> int:
     """Poll the board every `interval` seconds (±20 % jitter; the delay after jitter stays within WATCH_MIN_INTERVAL_S
-    and WATCH_MAX_BACKOFF_S) and print ONE line each time the unread count rises. While Fabric is down or the board
+    and WATCH_MAX_BACKOFF_S) and print ONE line each time the unread count rises, and each nudge of a turn its own look
+    delivered (FAA-142). While Fabric is down or the board
     unreadable, say so once and back off, doubling up to WATCH_MAX_BACKOFF_S. A look the shared rejoin mark holds back
     ("wait") changes nothing and waits it out. `wait(seconds)` returns True when it was told to stop."""
     interval = max(float(WATCH_MIN_INTERVAL_S), float(interval))
@@ -133,7 +135,7 @@ def watch_mail(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None,
     last, trouble, backoff = 0, None, interval
     while not stop():
         kind, value = poll()
-        for line in pending_nudges(session_id, env):  # FAA-142: a turn a look delivered may carry Fabric's nudges
+        for line in take_nudges(session_dir(session_id, env), WATCH_NUDGES_FILE):  # FAA-142: its own look's turns
             out(line)
         if kind == "wait":
             delay = float(value)
@@ -162,7 +164,8 @@ def watch_mail_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = None) ->
     import threading
     env = os.environ if env is None else env
     parser = argparse.ArgumentParser(prog="fabric_session.py watch-mail",
-                                     description="Print one line each time the project board's unread count rises.")
+                                     description="Print one line each time the project board's unread count rises, and each "
+                                                 "nudge of a turn this watcher's look delivered.")
     parser.add_argument("--interval", type=int, default=60, help="seconds between looks (at least %d)" % WATCH_MIN_INTERVAL_S)
     parser.add_argument("--cwd", default=".")
     parser.add_argument("--session-id", default=None, help="the Claude Code session id (default: CLAUDE_CODE_SESSION_ID)")

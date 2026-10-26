@@ -197,7 +197,8 @@ personal data or private path in a body or an artifact reference: name a vault s
   python3 <skill-dir>/scripts/fabric_session.py watch-mail --interval 60
   ```
 
-  It prints one line each time the unread count rises; when Fabric is down it says so once and backs off (to 15
+  It prints one line each time the unread count rises, and each reminder (nudge) of a turn its look delivered,
+  once; when Fabric is down it says so once and backs off (to 15
   minutes); it exits when its stdin closes, on SIGTERM/SIGINT/SIGHUP, or when its parent is gone. Do not poll
   `com.status` in your own loop.
 - **Codex and Kimi Code:** no unread line (they cannot rejoin their Fabric session yet; see session hooks, D1). Call

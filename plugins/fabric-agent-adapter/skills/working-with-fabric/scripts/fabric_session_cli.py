@@ -30,9 +30,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     lock_held,
     log,
     no_session_held,
-    leave_cleared_pointer,
-    adopt_cleared,
-    pending_nudges,
+    take_nudges,
     project_uses_fabric,
     prune_stale_sessions,
     read_small,
@@ -107,10 +105,6 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     and in a session Fabric launched. How to read the machine's Fabric services is the host instructions' to say."""
     if host not in HOSTS or payload.get("source") in QUIET_SOURCES or fabric_launched(env):
         return None
-    session_id = payload.get("session_id")
-    if host == "claude" and payload.get("source") == "clear" and isinstance(session_id, str) \
-            and SESSION_ID.fullmatch(session_id):
-        adopt_cleared(session_id, Path(payload.get("cwd") or os.getcwd()), env)  # FAA-142
     cwd = Path(payload.get("cwd") or os.getcwd())
     registration = claude_registration(cwd, env) if host == "claude" else None
     registered = registration is not None if host == "claude" else host_registered(host, cwd, env)
@@ -161,7 +155,7 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id) or fabric_launched(env):
         return None
     directory = session_dir(session_id, env)
-    lines = [line for line in [_unread_line(directory)] if line] + pending_nudges(session_id, env)
+    lines = [line for line in [_unread_line(directory)] if line] + take_nudges(directory)
     if not lines:
         return None
     return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
@@ -200,7 +194,6 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
         # later hook comes for this id. The new worker waits for the lock and finds an empty spool at worst.
         if any(directory.glob("*-turn.json")):
             spawn(directory)
-        leave_cleared_pointer(session_id, cwd, env)  # FAA-142: those turns' nudges reach the new id's prompts
         return "skipped: /clear keeps the Fabric session"
     if no_session_held(directory):
         # A rejoin found no Fabric session for this id (02bf19c5, ask 4): recorded once, never retried every turn.
