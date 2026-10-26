@@ -126,7 +126,7 @@ class Manifest(unittest.TestCase):
     def test_every_kit_module_is_documented(self):
         """FAA-65 REQ-10: the module map names every module kit.json lists, in its layer, and nothing kit.json lacks."""
         text = (SCRIPTS.parent / "references/kit-modules.md").read_text(encoding="utf-8")
-        rows = {name: layer for layer, name in re.findall(r"^\| (L[0-9]) \| `([a-z_]+)` \|", text, re.M)}
+        rows = {name: layer for layer, name in re.findall(r"^\| (L[0-9]) \| `([a-z0-9_]+)` \|", text, re.M)}
         self.assertEqual(rows, {e["module"]: e["layer"] for e in KIT["python"]})
 
     def test_the_version_is_the_adapters(self):

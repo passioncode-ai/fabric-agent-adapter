@@ -37,6 +37,7 @@ from fabric_protocols import (
 )
 from fabric_connections import CONNECTIONS_EXTENSION_KEY, connections_view  # noqa: E402 - the kit (FAA-62)
 from fabric_actions import ACTIONS_EXTENSION_KEY, actions_extension, actions_extension_rules  # noqa: E402 - DEC-0121
+from fabric_a2a import a2a_surface_problems  # noqa: E402 - DEC-0122
 from fabric_usage import (
     ROUTES,
 )
@@ -579,7 +580,8 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
                      extensions: Optional[Dict[str, Any]] = None,
                      configuration: Optional[Dict[str, Any]] = None,
                      protocols: Optional[Sequence[str]] = None,
-                     actions: Optional[Sequence[Dict[str, Any]]] = None) -> Dict[str, Any]:
+                     actions: Optional[Sequence[Dict[str, Any]]] = None,
+                     a2a: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The unauthenticated identity answer. `degraded` is always present; ready means empty.
     `configuration` (DEC-0046) says what the operator can configure and what applies now; fabric_profiles builds it.
     `extensions` is kept as given (a reader ignores keys it does not know); a dashboard declaration
@@ -587,7 +589,10 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
     `actions` (DEC-0121 AP-1) is the service's action table, every button its dashboard, app or page offers with the
     tool that performs it and its gate; it is written under extensions/actions/0.1 by fabric_actions.actions_extension.
     A declaration FAC-SEM-142 finds, passed either way, is refused: one that is not its schema's, an id named twice, a
-    humanStep that disagrees with the gate, or a tool `surfaces.mcp.capabilities` does not list."""
+    humanStep that disagrees with the gate, or a tool `surfaces.mcp.capabilities` does not list.
+    `a2a` (DEC-0122) is `surfaces.a2a`, where the service serves its public Agent Card (fabric_a2a.a2a_surface builds
+    one); passed here or in `surfaces`, never both, and refused when it is not the schema's. A reader pinned before
+    DEC-0122 refuses the member, so a service carries it only once its readers are pinned at or after it."""
     if status not in STATUSES:
         raise ServiceError("status must be one of %s." % ", ".join(STATUSES))
     degraded = list(degraded)
@@ -595,6 +600,15 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
         status = "degraded"
     if "events" not in surfaces:
         raise ServiceError("surfaces.events is required.")
+    if a2a is not None:
+        if "a2a" in surfaces:
+            raise ServiceError("surfaces.a2a: pass it in surfaces or as a2a, not both.")
+        surfaces = dict(surfaces, a2a=a2a)
+    if "a2a" in surfaces:
+        # DEC-0122: a host reads the member by the schema; a service never publishes one it would refuse.
+        problems = a2a_surface_problems(surfaces["a2a"])
+        if problems:
+            raise ServiceError("surfaces.a2a: %s." % "; ".join(problems))
     doc: Dict[str, Any] = {
         "protocol": PROTOCOL,
         "service": {"id": service_id, "instance": instance, "name": name, "version": version, "build": build},
