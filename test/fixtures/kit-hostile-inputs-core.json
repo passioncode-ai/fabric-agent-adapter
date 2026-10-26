@@ -51,6 +51,20 @@
     {"name": "another port in the request Origin", "fn": "remoteRequest", "args": ["https://agent.example.com", "agent.example.com", "https://agent.example.com:8443"], "expect": "refused"},
     {"name": "http's default port is not https's", "fn": "remoteRequest", "args": ["https://agent.example.com", "agent.example.com:80", null], "expect": "refused"},
     {"name": "another host", "fn": "remoteRequest", "args": ["https://agent.example.com", "other.example.com", null], "expect": "refused"},
-    {"name": "a host in upper case is the same host", "fn": "remoteRequest", "args": ["https://agent.example.com", "AGENT.example.com", null], "expect": "accepted"}
+    {"name": "a host in upper case is the same host", "fn": "remoteRequest", "args": ["https://agent.example.com", "AGENT.example.com", null], "expect": "accepted"},
+    {"name": "URL mode: an open_link to a page", "fn": "urlRequest", "args": ["fabric-dashboards://service/example-agent.default?path=%2Fdrafts%2F7"], "expect": "accepted"},
+    {"name": "URL mode: an https page", "fn": "urlRequest", "args": ["https://publish.example/connect"], "expect": "accepted"},
+    {"name": "URL mode: loopback as one decimal number", "fn": "urlRequest", "args": ["http://2130706433/"], "expect": "refused"},
+    {"name": "URL mode: loopback in octal parts", "fn": "urlRequest", "args": ["http://0177.0.0.1:4100/"], "expect": "refused"},
+    {"name": "URL mode: loopback in upper-case scheme", "fn": "urlRequest", "args": ["HTTP://LOCALHOST:4100/"], "expect": "refused"},
+    {"name": "URL mode: loopback after credentials", "fn": "urlRequest", "args": ["https://agents.example@127.0.0.1/"], "expect": "refused"},
+    {"name": "URL mode: loopback mapped into IPv6", "fn": "urlRequest", "args": ["http://[::ffff:127.0.0.1]/"], "expect": "refused"},
+    {"name": "URL mode: a full-width localhost", "fn": "urlRequest", "args": ["http://\uff4c\uff4f\uff43\uff41\uff4c\uff48\uff4f\uff53\uff54/"], "expect": "refused"},
+    {"name": "URL mode: an open_link with a login route behind dot segments", "fn": "urlRequest", "args": ["fabric-dashboards://service/example-agent.default?path=%2Fx%2F%252e%252e%2Ffabric%2Fv1%2Flogin"], "expect": "refused"},
+    {"name": "URL mode: an open_link carrying a token", "fn": "urlRequest", "args": ["fabric-dashboards://service/example-agent.default?path=%2Fjobs%3Ftoken%3Dabc"], "expect": "refused"},
+    {"name": "URL mode: the legacy open?service= link", "fn": "urlRequest", "args": ["fabric-dashboards://open?service=example-agent.default"], "expect": "refused"},
+    {"name": "URL mode: an open_link behind a tab in its scheme", "fn": "urlRequest", "args": ["fabric-\tdashboards://service/example-agent.default"], "expect": "refused"},
+    {"name": "URL mode: plain http to another host", "fn": "urlRequest", "args": ["http://agents.example/"], "expect": "refused"},
+    {"name": "URL mode: not a string", "fn": "urlRequest", "args": [7], "expect": "refused"}
   ]
 }

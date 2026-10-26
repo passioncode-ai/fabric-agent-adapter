@@ -69,6 +69,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_actions` | every action a person has and its agent tool, `fabric-actions/0.1`: the gate a tool runs (`action_decision`), the reader and FAC-SEM-142, the declaration (DEC-0121) |
 | L3 | `fabric_connections` | what an agent uses, `fabric-connections/0.1`: the reference reading and the declaration (DEC-0096, FAC-SEM-127) |
 | L3 | `fabric_a2a` | the reading side of an A2A Agent Card: `surfaces.a2a` as the schema reads it, and what a public card must not carry (DEC-0122) |
+| L3 | `fabric_page_links` | a service's pages as Fabric Dashboards' open_link: build and read it, a raw local address, FAC-SEM-143 on a link and on a URL-mode input request (DEC-0123); the Python twin reads URLs as WHATWG does by hand |
 | L3 | `fabric_lock` | the instance lock and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |

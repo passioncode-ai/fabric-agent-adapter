@@ -198,6 +198,18 @@
    "sha256": "ad4153fefbb14da4f69a8d230c6f1524f13da406d383f4fd7a128709cad3f49a"
   },
   {
+   "module": "fabric_page_links",
+   "file": "fabric_page_links.py",
+   "layer": "L3",
+   "imports": [
+    "fabric_base",
+    "fabric_connections",
+    "fabric_jsvalue",
+    "fabric_secrets"
+   ],
+   "sha256": "1b57ea573c550e2f90d1ec3edcc655917ceaa0db9dd1635fccf422ec3024d25e"
+  },
+  {
    "module": "fabric_lock",
    "file": "fabric_lock.py",
    "layer": "L3",
@@ -647,6 +659,17 @@
     "fabric-secrets"
    ],
    "sha256": "6bbb80925c3bc9570eb6c1e8ea0050cf733eaa0567e3b71b44c9a011945f75c5"
+  },
+  {
+   "module": "fabric-page-links",
+   "file": "fabric-page-links.mjs",
+   "layer": "L3",
+   "imports": [
+    "fabric-base",
+    "fabric-jsvalue",
+    "fabric-secrets"
+   ],
+   "sha256": "a8834926e9d4bbf7c4857f551451d2ebf6ac8873bbccaaf89c5e30cf45b17ee6"
   },
   {
    "module": "fabric-lock",

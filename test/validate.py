@@ -66,6 +66,7 @@ STDLIB_IMPORTS = {
     "ipaddress", "math", "struct",  # the delegation verifier: a loopback key-set URL, Ed25519 and claim checks (DEC-0039)
     "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
     "collections", "queue",  # native bridge mappings and isolated no-model host probes (FAA-48)
+    "unicodedata",  # the page-link port maps a host that is not ASCII as UTS 46 does (DEC-0123, FAA-132)
 }
 RECIPES = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes"
 KIT_MODULES = {e["module"] for e in json.loads(
