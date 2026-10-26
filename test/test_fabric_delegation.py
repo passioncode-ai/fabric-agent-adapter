@@ -2,6 +2,8 @@
 the contract's own verifier at the pin (test/fixtures/delegation/make_vectors.mjs)."""
 import hashlib
 import json
+import shutil
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -441,6 +443,25 @@ class RefusalCodeSetTests(unittest.TestCase):
             status, headers, _ = dl.refusal_http({"ok": False, "code": code, "detail": "x"})
             self.assertEqual(status, 403, code)
             self.assertNotIn("WWW-Authenticate", headers)
+
+    def test_the_decision_refusal_names_the_routes_without_meta(self):
+        # D13 of the 0.51.0 brief: DL-19 leaves the message free (at most 500 characters), so the kit's names the
+        # three routes the contract's owner confirmed for a client that cannot set _meta, in their order.
+        message = dl.REFUSAL_MESSAGES["operator-decision-required"]
+        self.assertLessEqual(len(message), 500)
+        routes = ["_meta.decision", "agent.call", "call.decision", "elicitation", "Fabric Dashboards", "open_link"]
+        places = [message.find(route) for route in routes]
+        self.assertNotIn(-1, places, message)
+        self.assertEqual(places, sorted(places))
+        self.assertNotIn("\u2014", message)
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not on PATH")
+        script = ("import('" + (SCRIPTS / "fabric-delegation.mjs").as_uri() + "').then((d) => process.stdout.write("
+                  "JSON.stringify(d.REFUSAL_MESSAGES['operator-decision-required'])))")
+        twin = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=60)
+        self.assertEqual(twin.returncode, 0, twin.stderr)
+        self.assertEqual(json.loads(twin.stdout), message)
 
     def test_an_action_refusal_is_a_dl19_body(self):
         refused = 0

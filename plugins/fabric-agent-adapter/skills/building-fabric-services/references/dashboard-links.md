@@ -140,5 +140,8 @@ or instructions alone do not prove all final answers from every agent are filter
 
 Syntax is owned by Fabric Dashboards and `@passioncode-ai/fabric-service-host`:
 [ADR-0005](https://github.com/passioncode-ai/fabric-dashboards/blob/51a7a80acf42781d7bec304cc87c655d48cc309b/docs/adr/0005-service-links.md).
-The gate accepts canonical links and the legacy `open?service=` form returned by
-older hosts; it does not generate either dialect or redefine the Fabric wire contract.
+The gate accepts only the service form, `fabric-dashboards://service/SERVICE_ID.INSTANCE`
+with at most one `path`; since 0.51.0 it refuses the legacy `open?service=` form, as contract
+DEC-0123 (PL-1, checker rule `FAC-SEM-143`) and its vectors do. A host that still returns the
+legacy form fails the gate: report it as an installed host that did not open the page. The gate
+does not generate links or redefine the Fabric wire contract.

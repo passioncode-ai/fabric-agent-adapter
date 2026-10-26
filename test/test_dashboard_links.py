@@ -66,6 +66,55 @@ class DashboardLinksTest(unittest.TestCase):
             with self.subTest(page=page):
                 self.assertEqual(self.handoff(page), (1, {'ok': False, 'reason': 'dashboard_handoff_refused'}))
 
+    def gate(self, service, link, page):
+        # The gate imported as a module, so its reason is visible; the CLI adds only the fixed refusal.
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('check_dashboard_link', SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        item = json.loads((ROOT / 'test/evals/dashboard-links/cases.json').read_text())['cases'][0]['input']
+        item['resolved'].update(service=service, open_link=link, http_url='http://127.0.0.1:47195' + (page or '/'))
+        item['action']['url'] = link
+        try:
+            return module.check(item)['ok'], None
+        except (ValueError, TypeError, KeyError, AttributeError) as error:
+            return False, str(error)
+
+    def test_contract_page_link_vectors_agree_with_the_gate(self):
+        # D10: every link FAC-SEM-143 refuses (DEC-0123 vectors at the pin) is refused as a native link with an
+        # available host, the legacy open?service= form included (D8); every link the host's link tool builds passes
+        # unless the gate's own login and credential rules, stricter than the grammar, refuse its page.
+        from urllib.parse import parse_qs
+        stricter = {'dot_segment', 'encoded_separator', 'login_link_is_not_dashboard', 'credential_query'}
+        fixtures = ROOT / 'test/fixtures/contract'
+        groups = [json.loads((fixtures / name).read_text()) for name in
+                  ['page-link-vectors.json', 'page-link-extra-vectors.json']]
+        refused = built = 0
+        for group in groups:
+            for vector in group['links']:
+                url = vector['input'].get('url')
+                if not vector['expected']:
+                    continue
+                page = None
+                if isinstance(url, str) and '?' in url:
+                    paths = parse_qs(url.split('?', 1)[1], keep_blank_values=True).get('path', [])
+                    page = paths[0] if len(paths) == 1 and paths[0].startswith('/') else None
+                with self.subTest(link=vector['name']):
+                    self.assertEqual(self.gate('example-agent.default', url, page)[0], False)
+                refused += 1
+            for vector in group['builds']:
+                if vector['expected'] is None:
+                    continue
+                spec = vector['input']
+                ok, reason = self.gate(spec['service'] + '.' + spec['instance'], vector['expected'], spec.get('path'))
+                with self.subTest(build=vector['name']):
+                    self.assertTrue(ok or reason in stricter, reason)
+                built += 1
+        self.assertGreater(refused, 40)
+        self.assertGreater(built, 40)
+        legacy = 'fabric-dashboards://open?service=example-agent.default'
+        self.assertIn(legacy, [v['input'].get('url') for v in groups[0]['links'] if v['expected']])
+
     def test_shared_payload_is_self_contained_and_identical(self):
         for relative in ['scripts/check_dashboard_link.py', 'references/dashboard-links.md']:
             contents = [(SKILLS / name / relative).read_bytes() for name in ['building-fabric-services', 'creating-fabric-agents', 'adapting-projects-to-fabric']]
