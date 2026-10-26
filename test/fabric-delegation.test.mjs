@@ -261,6 +261,15 @@ test('the code set is the contract\'s, and every code has its sentence and statu
   }
 });
 
+test('the decision refusal names the routes for a client that cannot set _meta (D13)', () => {
+  const message = d.REFUSAL_MESSAGES['operator-decision-required'];
+  assert.ok(message.length <= 500, message);
+  const places = ['_meta.decision', 'agent.call', 'call.decision', 'elicitation', 'Fabric Dashboards', 'open_link'].map((r) => message.indexOf(r));
+  assert.ok(!places.includes(-1), message);
+  assert.deepEqual(places, [...places].sort((a, b) => a - b));
+  assert.ok(!message.includes('—'));
+});
+
 test('an action refusal is a DL-19 body', () => {
   const details = { 'operator-decision-required': 'no-decision', 'decision-invalid': 'invalid-decision', 'human-step-required': 'human-step', 'approval-required': 'no-approval' };
   let refused = 0;
