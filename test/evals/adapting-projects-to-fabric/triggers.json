@@ -103,6 +103,10 @@
       "query": "Turn example-agent into an always-on local Fabric service with a dashboard and launchd.",
       "shouldTrigger": false,
       "note": "sibling: building-fabric-services"
+    },
+    {
+      "query": "Adapt this existing agent to Fabric; it has a local page that today opens in Safari.",
+      "shouldTrigger": true
     }
   ]
 }

@@ -191,6 +191,69 @@
         }
       },
       "expected_ok": true
+    },
+    {
+      "id": "open-never-native",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "never",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1"
+        }
+      },
+      "expected_ok": true
+    },
+    {
+      "id": "available-host-never-browser",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "never",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "human-step-path-native",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fconnections%2Fstore",
+          "http_url": "http://127.0.0.1:47195/dashboard#/connections/store"
+        },
+        "host": {
+          "state": "available"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "never",
+        "action": {
+          "kind": "native_link",
+          "url": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fconnections%2Fstore"
+        }
+      },
+      "expected_ok": true
     }
   ]
 }

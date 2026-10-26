@@ -183,6 +183,19 @@
       "query": "Подключись к Fabric и возьми задачу через fabric_work_claim.",
       "shouldTrigger": false,
       "note": "sibling: working-with-fabric"
+    },
+    {
+      "query": "Declare example-agent's dashboard buttons as actions in its well-known document so agents can press them too.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Сделай, чтобы `example-agent dashboard` открывал страницу только в Fabric Dashboards, а не в Safari.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "I told my coding agent to approve the reply; the service refused operator-decision-required. What should the agent send?",
+      "shouldTrigger": false,
+      "note": "sibling: working-with-fabric"
     }
   ]
 }

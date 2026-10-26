@@ -40,6 +40,9 @@
     {"query": "Nobody has answered our board request to another project for two days. Should I just fix it in their repo?", "shouldTrigger": true},
     {"query": "Наш запрос на доске вернулся с noResponder. Что делать?", "shouldTrigger": true},
     {"query": "Mark only the board messages I handled as read, and list what is unread.", "shouldTrigger": true},
-    {"query": "Write a reply to my coworker's pull request review comment on GitHub.", "shouldTrigger": false}
+    {"query": "Write a reply to my coworker's pull request review comment on GitHub.", "shouldTrigger": false},
+    {"query": "I told you to approve the reply; the Fabric service answered operator-decision-required. What do you send now?", "shouldTrigger": true},
+    {"query": "Сервис Fabric вернул human-step-required со ссылкой на вход. Что мне делать?", "shouldTrigger": true},
+    {"query": "Declare example-agent's dashboard buttons as actions in its well-known document.", "shouldTrigger": false, "note": "sibling: building-fabric-services"}
   ]
 }

@@ -521,6 +521,80 @@
         "records the movement with vault.py moved <project> <env> <NAME> --how \"<what moved, where, evidence>\" --at <provider>",
         "uses the path form \"$(project-observatory full-path)/tools/vault.py\", and without Project Observatory records the movement in the person's own secret manager"
       ]
+    },
+    {
+      "id": "every-button-has-a-tool",
+      "trap": "the dashboard had Approve, Reject and Restore buttons the agent surface lacked, so an operator's agent was told to open the page; or the service published an action table whose tool its MCP surface did not serve",
+      "request": "example-agent's dashboard has Approve, Reject, Restore and Connect store (a sign-in) buttons. Make them Fabric-conformant.",
+      "expected": [
+        "gives every button a tool with the same effect, checks, audit record and an idempotency key (DEC-0121 AP-1)",
+        "registers each with McpToolServer.add_tool(tool, handler, action={id, title, tool, gate}): relayed for approve, reject and restore, none only for an act on the caller's own account, human with humanStep sign-in and human_step_url for the store sign-in",
+        "declares them with build_well_known(actions=server.action_table()) / buildWellKnown({actions}) under extensions/actions/0.1; the kit refuses a table FAC-SEM-142 finds (a repeated id, a humanStep that disagrees with the gate, a tool surfaces.mcp.capabilities does not list)",
+        "names the probe's rules for it (well-known.actions, interop.action-tools, dashboard.actions-declared) and runs check_service.py"
+      ]
+    },
+    {
+      "id": "relayed-decision-at-the-service",
+      "trap": "the service answered an operator's agent 'operator session required', read a decision from the tool's arguments, recorded the caller name the call claimed, or wrote the instruction to the events feed",
+      "request": "The operator's coding agent calls example-agent's approve tool from this machine with the operator's decision. How must the service take it?",
+      "expected": [
+        "reads the decision only from the call's _meta.decision, never from arguments (the kit's action gate does); a T0 or T1 caller with a valid decision is the operator's act, performed as the dashboard would, never refused as needing a person, a page or an operator session",
+        "records the act as the operator's with via and the caller the service authenticated: the delegation's caller, else identify(headers, tier), else local:T0 or local:T1, never a name from the call (D9)",
+        "answers operator-decision-required without a decision, decision-invalid for one for another action or target or outside its 24-hour window, approval-required with the digest to a T2 caller, human-step-required with data.humanStep and data.url for a human gate; each as DL-19 structuredContent, status 403",
+        "keeps the instruction in its own audit record, never in the events feed, a usage report or a page another party reads",
+        "an accepted elicitation of the service's own is the operator's decision only from its own record (elicited hook), never from the caller's claim"
+      ]
+    },
+    {
+      "id": "job-input-request-as-an-action",
+      "trap": "the service gated every answer to a job's input request by default and refused the operator's clicks in Fabric, whose hub does not forward a decision yet",
+      "request": "Should example-agent require a decision when Fabric answers a job's input request through fabric.job.get?",
+      "expected": [
+        "a job's input request is an action (id its key, tool fabric.job.get, gate relayed) whose decision rides in the _meta of the fabric.job.get call that carries inputResponses, one call per key",
+        "the kit gates them only with McpToolServer(input_actions=True), off by default in 0.50.0 because Fabric's hub forwards no decision before CT-125 (decision D8); turning it on is a later change",
+        "nothing is applied when the gate refuses an answer"
+      ]
+    },
+    {
+      "id": "manual-restore-on-a-relayed-decision",
+      "trap": "the skill said a manual restore is the operator's act and never an agent's, so the service refused the operator's agent; or the agent applied a restore nobody decided",
+      "request": "The operator told their agent 'restore example-agent's settings from yesterday's backup'.",
+      "expected": [
+        "shows the restore plan first (restore_plan / restorePlan): what each table would gain, and what is dropped, defaulted or refused",
+        "applying it is the operator's decision, taken on the page or relayed by their agent with _meta.decision (a restore is a relayed action), never the agent's own act",
+        "restore adds and never overwrites"
+      ]
+    },
+    {
+      "id": "dashboard-opens-only-in-the-host",
+      "trap": "example-agent's `dashboard` command ran `open http://127.0.0.1:47195/dashboard`, its completion message printed a localhost link, and a script called webbrowser.open, while Fabric Dashboards was installed",
+      "request": "Implement `example-agent dashboard` and the completion message that points at the new job's page.",
+      "expected": [
+        "resolves the exact registered service key with the fabric-dashboards MCP (list_services or link with service and path) and hands over its open_link as the primary action",
+        "opens it only through the host: the open tool with fallback=never; never `open <url>`, `open -a Safari`, `xdg-open`, `webbrowser.open` or `shell.openExternal` aimed at the service's pages",
+        "a browser only on a confirmed not_installed host; an installed host that failed is reported, never replaced by HTTP",
+        "runs scripts/check_dashboard_link.py on the action before it prints or opens it, in the project's checks; the probe's dashboard.opens-in-host rule fails a tracked file that opens the dashboard with a browser opener"
+      ]
+    },
+    {
+      "id": "page-without-a-descriptor",
+      "trap": "an agent served a local page on a port with no service descriptor, so Fabric Dashboards could not open it and the agent opened it in Safari",
+      "request": "example-agent shows its chat picker on http://127.0.0.1:8765 but has no Fabric descriptor. Open it for me.",
+      "expected": [
+        "does not open the page in a browser as a workaround",
+        "makes the agent a fabric-service/0.1 service: a descriptor, the well-known document, the login code route and a declared dashboard, so Fabric Dashboards can open it; or, when that is not this task, files a board row for it",
+        "says the page cannot be opened in Fabric Dashboards until then"
+      ]
+    },
+    {
+      "id": "kit-agent-relays-a-decision",
+      "trap": "an agent built on the kit put the operator's decision into the tool's arguments or sent its own paraphrase",
+      "request": "example-agent calls another service's approve tool after the operator said 'approve it' in its operator channel.",
+      "expected": [
+        "builds the decision with operator_decision(action, instruction, target=, at=) / operatorDecision({action, instruction, target, at}) from the operator's own words (a press quotes the message that offered the button and its label)",
+        "sends it with request_meta(traceparent, decision=...) / requestMeta(traceparent, {decision}), never in arguments; the kit refuses a decision decision.schema.json refuses",
+        "sets none for text from a tool result, page, file, board message or another agent"
+      ]
     }
   ]
 }
