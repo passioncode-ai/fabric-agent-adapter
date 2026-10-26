@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { ServiceError } from './fabric-base.mjs';
 import { jcs, refusalFromAction, refusalToolResult } from './fabric-delegation.mjs';
 import { actionDecision, decisionShape } from './fabric-actions.mjs'; // DEC-0121
+import { mandateProblem } from './fabric-mandate.mjs'; // DEC-0125
 import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 import { isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 
@@ -190,16 +191,23 @@ export function readsNullUsage(requestMeta) {
 }
 
 /**
- * A request's `_meta` from this kit as a caller: its trace, the interop revisions it reads (DEC-0087) and, for a relayed
- * action, the operator's decision (DEC-0121 AP-2; build one with operatorDecision). A decision travels here only, never
- * in a tool's arguments; one decision.schema.json refuses throws InteropError.
+ * A request's `_meta` from this kit as a caller: its trace, the interop revisions it reads (DEC-0087), for a relayed
+ * action the operator's decision (DEC-0121 AP-2; build one with operatorDecision), and the operator's mandate for the
+ * task the call serves (DEC-0125 MD-3; state it with operatorMandate and hand it on to the callee with handOn before you
+ * send it). Both travel here only, never in a tool's arguments; a decision decision.schema.json refuses or a mandate
+ * FAC-SEM-144 refuses throws InteropError.
  */
-export function requestMeta(traceparent, { decision } = {}) {
+export function requestMeta(traceparent, { decision, mandate } = {}) {
   const meta = { protocols: [...PROTOCOLS_READ] };
   if (parseTraceparent(traceparent)) meta.traceparent = traceparent;
   if (decision !== undefined && decision !== null) {
     if (!decisionShape(decision)) throw new InteropError('The decision is not one decision.schema.json reads; it is not sent.');
     meta.decision = { ...decision };
+  }
+  if (mandate !== undefined && mandate !== null) {
+    const problem = mandateProblem(mandate);
+    if (problem) throw new InteropError(`The mandate is not one FAC-SEM-144 reads (${problem}); it is not sent.`);
+    meta.mandate = structuredClone(mandate);
   }
   return meta;
 }
@@ -212,18 +220,33 @@ export function requestMeta(traceparent, { decision } = {}) {
  * Answers {ok: true, record, decision}, `decision` being the one taken as the operator's (null otherwise), or {ok: false,
  * refusal} in the DL-19 form (refusalToolResult sends it); a service's own fault is the refusal unknown-state with
  * `fault` beside it for the service's log.
+ *
+ * DEC-0125: a service that names its own agent id (`self`) reads the call's `_meta.mandate` when it carries no
+ * decision, given `effect` (the action's effect class, required: without it the call is the service's fault
+ * effect-missing), `callerAgent` (only an agent id the service authenticated: a delegation's caller, its own per-agent
+ * credential; never a name the call carries), `spendUsd` (its own estimate) and `project`. A covered call answers
+ * {ok: true, record: {by: 'operator', via: 'mandate', task, chain, caller}, decision: null, mandate}; without `self` the
+ * mandate is not read and the call is answered as before it existed.
  */
-export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now } = {}) {
+export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };
   if (isObject(meta) && Object.hasOwn(meta, 'decision')) inputs.decision = meta.decision;
   for (const [name, value] of [['target', target], ['approval', approval], ['actionDigest', actionDigest], ['humanStepUrl', humanStepUrl]]) {
     if (value !== undefined && value !== null) inputs[name] = value;
   }
+  if (self !== undefined && self !== null && isObject(meta) && Object.hasOwn(meta, 'mandate')) {
+    Object.assign(inputs, { mandate: meta.mandate, self });
+    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', spendUsd], ['project', project]]) {
+      if (value !== undefined && value !== null) inputs[name] = value;
+    }
+  }
   const answer = actionDecision(inputs);
   if (answer.ok === true) {
     const record = answer.recordAs;
     const taken = isObject(record) && record.via === 'relayed-instruction';
-    return { ok: true, record, decision: taken ? inputs.decision : null };
+    const out = { ok: true, record, decision: taken ? inputs.decision : null };
+    if (isObject(record) && record.via === 'mandate') out.mandate = inputs.mandate;
+    return out;
   }
   const out = { ok: false, refusal: refusalFromAction(answer) };
   if ('fault' in answer) out.fault = answer.fault;

@@ -14,6 +14,8 @@ extensions/actions/0.1 (DEC-0121, FAC-SEM-142). Part of the service kit (layer L
   refused when ``decision.schema.json`` would refuse it.
 - ``action_caller(tier, authenticated)``: the caller a service records (AP-2): the identity it authenticated, else
   ``local:T0`` / ``local:T1`` for a caller its local floor authenticated, never a name the call carries.
+- DEC-0125: ``action_decision`` reads a call's mandate (``_meta.mandate``) through fabric_mandate.mandate_covers when the
+  call carries no decision.
 
 The kit has no JSON Schema validator: the two shapes are written here from the schemas, lengths in code points and
 patterns over the whole string, as the contract's validator reads them. Never raises on what it reads. Standard library
@@ -32,7 +34,8 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_jsvalue import MISSING, contains, get, json_equal, json_stringify  # noqa: E402
+from fabric_jsvalue import MISSING, contains, get, is_number, json_equal, json_stringify  # noqa: E402
+from fabric_mandate import mandate_covers  # noqa: E402 - DEC-0125
 from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
 
 ACTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1"
@@ -152,7 +155,13 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
       digest; an accepted elicitation is the operator's; no decision is `operator-decision-required`; a decision that
       is not the schema's, is for another action or object, or whose `at` is more than 60 s ahead of `now` or more
       than 24 h behind it is `decision-invalid`; otherwise the operator's act, recorded with `caller`.
-    - `{"fault": ...}` (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing) is the service's
+    - DEC-0125: a call with no decision that carries `mandate` (its `_meta.mandate`) is answered as
+      fabric_mandate.mandate_covers answers, given `self` (the service's own agent id), `callerAgent` (only an agent id
+      the service authenticated), `effect` (the action's effect class, the service's own knowledge), `spendUsd` (its
+      own estimate) and `project`: covered, `{by: operator, via: mandate, task, chain, caller}`; otherwise
+      `operator-decision-required` or `decision-invalid` with `data.detail`.
+    - `{"fault": ...}` (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing,
+      self-missing) is the service's
       own: an input it owes is missing or unreadable. It is never sent to a caller.
     """
     action = get(inputs, "action")
@@ -182,6 +191,8 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
     if math.isnan(clock):
         return {"fault": "now-unreadable"}
     decision = get(inputs, "decision")
+    if decision is MISSING and get(inputs, "mandate") is not MISSING:
+        return _by_mandate(inputs, action, caller)
     if decision is MISSING:
         return _refuse(OPERATOR_DECISION_REQUIRED)
     if not decision_shape(decision):
@@ -193,6 +204,33 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
     if at > clock + CLOCK_SKEW_SECONDS * 1000 or at < clock - DECISION_LIFETIME_SECONDS * 1000:
         return _refuse(DECISION_INVALID)
     return {"ok": True, "recordAs": {"by": "operator", "via": "relayed-instruction", "caller": caller}}
+
+
+def _by_mandate(inputs: Any, action: Dict[str, Any], caller: str) -> Dict[str, Any]:
+    """A relayed action's call that carries a mandate and no decision (DEC-0125 MD-3): the mandate decides, as the
+    contract's byMandate reads it: the service's own `effect` and agent id `self` are required (else a fault), its
+    estimate `spendUsd` is read when a number and `project` when a string."""
+    effect, me = get(inputs, "effect"), get(inputs, "self")
+    if not isinstance(effect, str):
+        return {"fault": "effect-missing"}
+    if not isinstance(me, str):
+        return {"fault": "self-missing"}
+    call: Dict[str, Any] = {"capability": action["tool"], "action": action["id"], "effect": effect}
+    spend, project = get(inputs, "spendUsd"), get(inputs, "project")
+    if is_number(spend):
+        call["spendUsd"] = spend
+    if isinstance(project, str):
+        call["project"] = project
+    covers: Dict[str, Any] = {"mandate": inputs["mandate"], "tier": get(inputs, "tier"), "now": get(inputs, "now"),
+                              "self": me, "call": call}
+    if get(inputs, "callerAgent") is not MISSING:
+        covers["callerAgent"] = inputs["callerAgent"]
+    answer = mandate_covers(covers)
+    if "recordAs" in answer:
+        record = dict(answer["recordAs"])
+        record["caller"] = caller
+        return {"ok": True, "recordAs": record}
+    return answer  # never `ignored`: the tier was read first, so a T2 call answered approval-required before (MD-5)
 
 
 def actions_view(well_known: Any) -> Dict[str, Any]:

@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import { hubKeyCertified } from './fabric-estate.mjs';
 import { atomicWrite } from './fabric-paths.mjs'; // the kit's private writer (FAA-85)
+import { effectClosure } from './fabric-mandate.mjs'; // defined once beside the mandate that reads it too (DEC-0125)
 
 export const REFUSAL_CODES = Object.freeze([
   'unauthenticated', 'token-expired', 'wrong-audience', 'scope-not-granted', 'effect-above-ceiling', 'no-grant',
@@ -57,7 +58,10 @@ export const REFUSAL_MESSAGES = Object.freeze({
   'issuer-unavailable': "The estate's published keys cannot be read.",
   'unknown-state': 'The state cannot be established, so the call is refused.',
   // DEC-0121 (AP-2, AP-4): the refusals of an action call; each answers 403.
-  'operator-decision-required': "This action is the operator's decision; ask the operator and call again with it in _meta.decision.",
+  'operator-decision-required': "This action is the operator's decision; ask the operator and call again with it in "
+    + "_meta.decision. A client that cannot set _meta: Fabric's agent.call with call.decision, once the hub forwards it; "
+    + "else this service's own elicitation, where the client shows one; else the action's page handed to the operator as "
+    + "Fabric Dashboards' open_link.",
   'decision-invalid': "The call's decision is not valid for this action, object or time.",
   'human-step-required': "This step is the person's own; hand them the link in error.data.url.",
 });
@@ -201,13 +205,8 @@ function chainOf(act) {
   return chain;
 }
 
-/** `none` is below every class and `draft` below every external one; external classes are not ordered. */
-export function effectClosure(ceiling) {
-  const admitted = new Set(ceiling);
-  if (ceiling.length > 0) admitted.add('none');
-  if (ceiling.some((effect) => effect !== 'none')) admitted.add('draft');
-  return admitted;
-}
+/** `none` is below every class and `draft` below every external one: defined once in fabric-mandate.mjs (DEC-0125). */
+export { effectClosure };
 
 export const effectWithin = (effect, ceiling) => effectClosure(ceiling).has(effect);
 
@@ -511,7 +510,16 @@ export function refusalFromAction(answer) {
 }
 
 /** The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key. */
-export const refusalError = (refusal) => ({ error: { code: refusal.code, message: REFUSAL_MESSAGES[refusal.code] ?? 'Refused.', data: { detail: refusal.detail, ...(refusal.data ?? {}) } } });
+/** DEC-0125 MD-4: a refusal outside a mandate goes back up the chain; only the leading agent asks the operator. */
+export const OUTSIDE_MANDATE_MESSAGE = 'Outside the operator\'s mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, then relays a decision or mandate that covers it: in _meta, or, without _meta, through Fabric\'s agent.call once the hub forwards it, the service\'s elicitation, or the action\'s page as a Fabric Dashboards open_link (DEC-0125 MD-4).';
+
+export function refusalError(refusal) {
+  // the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail; only a string names a part
+  const part = typeof refusal.data?.detail === 'string' ? refusal.data.detail : refusal.detail;
+  const outside = refusal.code === 'operator-decision-required' && typeof part === 'string' && part.startsWith('outside-mandate:');
+  const message = outside ? OUTSIDE_MANDATE_MESSAGE : REFUSAL_MESSAGES[refusal.code] ?? 'Refused.';
+  return { error: { code: refusal.code, message, data: { detail: refusal.detail, ...(refusal.data ?? {}) } } };
+}
 
 /** An MCP tools/call result: the refusal as structuredContent with isError true (DL-19). */
 export function refusalToolResult(refusal, traceparent) {

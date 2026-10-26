@@ -535,6 +535,12 @@ function placementGrantProblems(record, placement) {
   return problems;
 }
 
+/** FAC-SEM-111 for one placement of `record`, as findings (`instancePath` relative to the placement); never throws (FAA-125). */
+export function placementGrantFindings(record, placement) {
+  const object = (value) => (isObject(value) ? value : {});
+  return placementGrantProblems(object(record), object(placement)).map(([instancePath, message]) => ({ code: 'FAC-SEM-111', instancePath, message }));
+}
+
 function placementGrants(value, flag) {
   indexed(value.machines).forEach(([machine, m]) => {
     indexed(machine.packages).forEach(([placement, p]) => {

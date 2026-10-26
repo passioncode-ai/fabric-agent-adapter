@@ -55,7 +55,7 @@ class Vectors(unittest.TestCase):
                 self.assertTrue(all(f["code"] == "FAC-SEM-142" and f["message"] for f in findings))
 
     def test_the_action_call_fixtures(self):
-        self.assertEqual(len(V["actionCalls"]), 10)
+        self.assertEqual(len(V["actionCalls"]), 12)
         for case in V["actionCalls"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fa.action_decision(case["inputs"])), js(case["expected"]))

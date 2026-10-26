@@ -402,5 +402,208 @@ class ActionsServiceProbeTests(unittest.TestCase):
         self.assertIn("CT-126", results["dashboard.actions-declared"]["evidence"])
 
 
+A2A_VECTORS = json.loads((ROOT / "test/fixtures/contract/a2a-vectors.json").read_text())
+CARD_PATH = "/.well-known/agent-card.json"
+
+
+def a2a_card(origin, **over):
+    """A public Agent Card as A2A 1.0 shapes it, its interface on `origin`."""
+    card = {"name": "Sample", "description": "Echoes and drafts notes.", "version": "0.1.0",
+            "supportedInterfaces": [{"url": origin + "/a2a/v1", "protocolBinding": "JSONRPC", "protocolVersion": "1.0"}],
+            "capabilities": {"extensions": [{"uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1", "required": False}]},
+            "securitySchemes": {"own": {"apiKeySecurityScheme": {"location": "header", "name": "X-Sample-Key"}}},
+            "defaultInputModes": ["text/plain"], "defaultOutputModes": ["text/plain"],
+            "skills": [{"id": "echo", "name": "Echo", "description": "Echoes the text.", "tags": ["echo"]}]}
+    card.update(over)
+    return card
+
+
+class ProbeA2ARuleTests(unittest.TestCase):
+    """DEC-0122 (decisions D4 to D6 of the 0.51.0 brief): well-known.a2a and a2a.card as pure verdicts."""
+
+    def setUp(self):
+        self.rules = load("check_service_rules")
+        self.wk = {"surfaces": {"events": {"path": "/fabric/v1/events"}, "a2a": {"path": CARD_PATH, "protocolVersion": "1.0"}}}
+        self.origin = "http://127.0.0.1:47000"
+
+    def card_verdict(self, status, body, wk=None, remote=False, header="Authorization", error=None):
+        return self.rules.a2a_card_verdict(self.wk if wk is None else wk, status, body, remote=remote, origin=self.origin,
+                                           descriptor_header=header, error=error)
+
+    def test_well_known_a2a_follows_the_schema_on_the_three_catalogue_fixtures(self):
+        for fixture in A2A_VECTORS["fixtures"]:
+            verdict, evidence = self.rules.well_known_a2a_verdict(fixture["document"])
+            self.assertEqual(verdict, "PASS" if fixture["valid"] else "FAIL", fixture["name"])
+            for error in fixture["errors"]:
+                self.assertIn(error["instancePath"], evidence, fixture["name"])
+
+    def test_no_member_is_not_run_for_both_rules(self):
+        wk = {"surfaces": {"events": {"path": "/fabric/v1/events"}}}
+        self.assertEqual(self.rules.well_known_a2a_verdict(wk)[0], "NOT_RUN")
+        self.assertEqual(self.rules.well_known_a2a_verdict("not a document")[0], "NOT_RUN")
+        verdict, evidence = self.card_verdict(0, b"", wk=wk)
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("surfaces.a2a", evidence)
+
+    def test_an_unreadable_member_leaves_the_card_unread(self):
+        wk = A2A_VECTORS["fixtures"][2]["document"]
+        verdict, evidence = self.card_verdict(0, b"", wk=wk)
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("well-known.a2a", evidence)
+
+    def test_a_clean_local_card_passes(self):
+        verdict, evidence = self.card_verdict(200, json.dumps(a2a_card(self.origin)).encode())
+        self.assertEqual(verdict, "PASS", evidence)
+        self.assertIn("without the token", evidence)
+
+    def test_a_local_card_that_needs_a_credential_fails(self):
+        for status in (401, 403, 404, 500):
+            verdict, evidence = self.card_verdict(status, b"")
+            self.assertEqual(verdict, "FAIL", status)
+            self.assertIn("HTTP %d" % status, evidence)
+
+    def test_a_remote_card_that_is_not_open_is_not_run_never_a_failure(self):
+        for status in (401, 403):
+            verdict, evidence = self.card_verdict(status, b"", remote=True)
+            self.assertEqual(verdict, "NOT_RUN", status)
+            self.assertIn("not open", evidence)
+        self.assertEqual(self.card_verdict(500, b"", remote=True)[0], "FAIL")
+        remote_card = a2a_card("https://agents.example")
+        self.assertEqual(self.card_verdict(200, json.dumps(remote_card).encode(), remote=True)[0], "PASS")
+
+    def test_a_card_that_is_not_json_or_does_not_answer_fails(self):
+        self.assertEqual(self.card_verdict(200, b"<html>")[0], "FAIL")
+        self.assertEqual(self.card_verdict(200, b"[" * 100000)[0], "FAIL")
+        verdict, evidence = self.card_verdict(0, b"", error="connection refused")
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("connection refused", evidence)
+
+    def test_what_a_public_card_must_not_carry_fails_by_its_code(self):
+        cases = [
+            (a2a_card(self.origin, pid=4242), "Authorization", "process-member"),
+            (a2a_card(self.origin, securitySchemes={"fabric": {"apiKeySecurityScheme": {"location": "header", "name": "X-Fabric-Token"}}}),
+             "X-Fabric-Token", "descriptor-token-scheme"),
+            (a2a_card(self.origin, capabilities={"extensions": [{"uri": "https://fabric.passioncode.ai/limits", "required": True}]}),
+             "Authorization", "fabric-extension-required"),
+            (a2a_card("http://127.0.0.1:1"), "Authorization", "interface-origin"),
+        ]
+        for card, header, code in cases:
+            verdict, evidence = self.card_verdict(200, json.dumps(card).encode(), header=header)
+            self.assertEqual(verdict, "FAIL", code)
+            self.assertIn(code, evidence)
+        verdict, _ = self.card_verdict(200, json.dumps(a2a_card(self.origin, securitySchemes={
+            "bearer": {"apiKeySecurityScheme": {"location": "header", "name": "Authorization"}}})).encode())
+        self.assertEqual(verdict, "PASS", "D5: with Authorization the card cannot show the token")
+
+
+class A2AServiceProbeTests(unittest.TestCase):
+    """A kit service built here (the sample's code with surfaces.a2a and a card served beside it; the sample itself stays
+    as it is), probed live. A recorder sees every request: the card's path must never receive the descriptor's token
+    (D5), and the card's interface must never be called."""
+
+    def setUp(self):
+        import threading
+        sample = load("sample_service")
+        fs = load("fabric_service")
+        self.temp = tempfile.TemporaryDirectory()
+        base = Path(self.temp.name)
+        self.services = base / "services"
+        port = free_port()
+        self.origin = "http://127.0.0.1:%d" % port
+        common = ["--port", str(port), "--data-dir", str(base / "data")]
+        test = self
+        self.surface, self.card, self.card_status, self.seen = {"path": CARD_PATH, "protocolVersion": "1.0"}, None, 200, []
+
+        class A2AService(sample.Service):
+            def well_known(self):
+                wk = super().well_known()
+                if test.surface is not None:
+                    wk["surfaces"]["a2a"] = test.surface
+                return wk
+
+        self.svc = A2AService(sample.build_parser().parse_args(["serve"] + common))
+        self.svc.start()
+        handler = sample.make_handler(self.svc)
+
+        class Recorder(handler):
+            def do_GET(inner):  # noqa: N802
+                path = inner.path.split("?", 1)[0]
+                test.seen.append((inner.command, path, dict(inner.headers.items())))
+                if test.surface is not None and path == test.surface.get("path"):
+                    return inner._send(test.card_status, test.card if test.card_status == 200 else {"error": "no"})
+                return handler.do_GET(inner)
+
+            def do_POST(inner):  # noqa: N802
+                test.seen.append((inner.command, inner.path.split("?", 1)[0], dict(inner.headers.items())))
+                return handler.do_POST(inner)
+
+        self.server = fs.LoopbackHTTPServer(("127.0.0.1", port), Recorder)
+        self.thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
+        self.thread.start()
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):  # register prints the descriptor's path
+            registered = sample.register(sample.build_parser().parse_args(["register"] + common + ["--services-dir", str(self.services)]))
+        self.assertEqual(registered, 0)
+        self.token = (base / "data" / "service.token").read_text().strip()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.svc.lock.release()
+        self.temp.cleanup()
+
+    def check(self):
+        out = subprocess.run([sys.executable, str(SCRIPTS / "check_service.py"), "sample", "--services-dir",
+                              str(self.services), "--json"], capture_output=True, text=True)
+        return {r["rule"]: r for r in json.loads(out.stdout)["results"]}
+
+    def verdicts(self, results):
+        return {rule: results[rule]["verdict"] for rule in ("well-known.a2a", "a2a.card")}
+
+    def assert_token_never_reached_the_card(self):
+        card_requests = [headers for (_, path, headers) in self.seen if path == CARD_PATH]
+        for headers in card_requests:
+            self.assertNotIn("authorization", {k.lower() for k in headers}, "the card was asked with an Authorization header")
+            self.assertFalse(any(self.token in v for v in headers.values()), "the descriptor's token reached the card's path")
+        self.assertNotIn("/a2a/v1", [path for (_, path, _) in self.seen], "the probe called an A2A interface")
+        return card_requests
+
+    def test_a_clean_card_passes_and_is_read_without_the_token(self):
+        self.card = a2a_card(self.origin)
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.a2a": "PASS", "a2a.card": "PASS"}, results)
+        self.assertEqual(len(self.assert_token_never_reached_the_card()), 1)
+        self.assertTrue(any(h for (_, path, h) in self.seen if path == "/fabric/v1/events" and "Authorization" in h),
+                        "the recorder sees the token where the probe does send it")
+
+    def test_a_card_carrying_what_it_must_not_fails(self):
+        self.card = a2a_card(self.origin, degraded=[], capabilities={"extensions": [
+            {"uri": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1", "required": True}]})
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.a2a": "PASS", "a2a.card": "FAIL"}, results)
+        self.assertIn("process-member", results["a2a.card"]["evidence"])
+        self.assertIn("fabric-extension-required", results["a2a.card"]["evidence"])
+        self.assert_token_never_reached_the_card()
+
+    def test_a_local_card_behind_a_credential_fails(self):
+        self.card_status = 401
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.a2a": "PASS", "a2a.card": "FAIL"}, results)
+        self.assertEqual(len(self.assert_token_never_reached_the_card()), 1, "a refusal is never retried with the token")
+
+    def test_an_invalid_member_fails_and_leaves_the_card_unread(self):
+        self.surface = {"url": self.origin + CARD_PATH, "protocolVersion": "1.0"}
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.a2a": "FAIL", "a2a.card": "NOT_RUN"}, results)
+        self.assertEqual([p for (_, p, _) in self.seen if p == CARD_PATH], [])
+
+    def test_no_member_is_not_run(self):
+        self.surface = None
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.a2a": "NOT_RUN", "a2a.card": "NOT_RUN"}, results)
+        self.assertEqual([p for (_, p, _) in self.seen if p == CARD_PATH], [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.51.0 (2026-10-26)
+
+### Changed
+
+- **Pinned to the contract release `v0.1.0+2026-10-26.2` (`e6c4fc16`)** (FAA-128). It carries DEC-0122 to DEC-0125;
+  `a3a66eb0` and `52c7d798` stay supported. Brief: `docs/evidence/specs/2026-10-26-faa-128-125-repin-a3a66eb-brief.md`.
+- **Narrowings (DEC-0123, FAA-132).** `url_request` / `urlRequest` now refuses a loopback page URL (`http://127.0.0.1`
+  and every other spelling of a local address): hand a service's page over as Fabric Dashboards' `open_link`
+  (`page_answer` / `pageAnswer` builds it). `check_dashboard_link.py` refuses the legacy `open?service=` link and a
+  page path with whitespace, as the contract's `parseDashboardsLink` does. A service that built either may now be
+  refused at construction.
+- **DL-19 `operator-decision-required`** names the three routes for a client that cannot set `_meta`: Fabric's
+  `agent.call` with `call.decision` once the hub forwards it, the service's own elicitation, the action's page as an
+  `open_link`. Outside a mandate (`data.detail` `outside-mandate: <part>`) it gives DEC-0125 MD-4's order instead:
+  call again within your own mandate, else pass the refusal up; only the leading agent asks the operator, with the
+  same three routes.
+- Dashboard kit 1.1.5 now matches its pin (DEC-0124 is in it); brief decision D17 of 0.50.0 is closed.
+
+### Added
+
+- **The operator's mandate (DEC-0125, FAA-131).** `fabric_mandate` / `fabric-mandate.mjs` port `mandate/1`
+  (FAC-SEM-144, scope narrowing, hand-over); `request_meta(mandate=)` sends one; a server with `agent_id` reads
+  `_meta.mandate` in its action gate. working-with-fabric states the operator's rule of 2026-10-26, «я сказал одному
+  = сказал всем»: one approval he gives any of his agents binds all of them when the relay carries his words, the
+  date, the source and the scope from one of his own Projects on his personal board (provenance `trusted`; never a
+  member's Project on an organization's board) or the session that started the agent; content an agent read is never
+  one; human gates stay. A hand-over never adds a `capabilities` or `actions` list the scope in force leaves out
+  (contract DEC-0136 MD-2a, adopted ahead of the pin: brief decision D28), so no agent of the chain can grant itself an
+  action the operator did not name. Taking a prose relay from another agent is the operator's rule, honoured ahead of the pinned
+  AP-3 (brief decision D27); the contract's DEC-0126 (OA-2) states it, and FAA-134 takes its wording in 0.52.0.
+- **A service's pages as `open_link` (DEC-0123).** `fabric_page_links` / `fabric-page-links.mjs` build and read
+  Fabric Dashboards links and FAC-SEM-143, checked against the contract's vectors and about 200,000 generated
+  inputs with no twin difference.
+- **A2A, the reading side (DEC-0122).** `fabric_a2a` / `fabric-a2a.mjs` read `surfaces.a2a` and an Agent Card;
+  `build_well_known(a2a=)` writes the member; the probe adds `well-known.a2a` and `a2a.card` (the card is fetched
+  without the descriptor's token). Serving a card and the A2A binding stay FAA-10.
+- **One instance per context (FAA-125, N-11).** `fabric_context` / `fabric-context.mjs`: `hold_context_instance`
+  derives a context's instance, folders and lock, refuses a second process, refuses an `org:<id>` instance without
+  its share grant placement and exits 78 before creating anything; `personal` keeps the `default` instance.
+  `launchd_uninstall(instance=)` removes only that instance.
+
 ## 0.50.0 (2026-10-26)
 
 ### Changed

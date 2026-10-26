@@ -45,6 +45,7 @@ from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
     jcs,
 )
 from fabric_paths import atomic_write as _atomic_write  # noqa: E402 - the kit's private writer (FAA-85)
+from fabric_mandate import effect_closure  # noqa: E402,F401 - defined once beside the mandate that reads it too (DEC-0125)
 
 REFUSAL_CODES = (
     "unauthenticated", "token-expired", "wrong-audience", "scope-not-granted", "effect-above-ceiling", "no-grant",
@@ -93,7 +94,11 @@ REFUSAL_MESSAGES = {
     "issuer-unavailable": "The estate's published keys cannot be read.",
     "unknown-state": "The state cannot be established, so the call is refused.",
     # DEC-0121 (AP-2, AP-4): the refusals of an action call; each answers 403.
-    "operator-decision-required": "This action is the operator's decision; ask the operator and call again with it in _meta.decision.",
+    "operator-decision-required": ("This action is the operator's decision; ask the operator and call again with it in "
+                                   "_meta.decision. A client that cannot set _meta: Fabric's agent.call with "
+                                   "call.decision, once the hub forwards it; else this service's own elicitation, "
+                                   "where the client shows one; else the action's page handed to the operator as "
+                                   "Fabric Dashboards' open_link."),
     "decision-invalid": "The call's decision is not valid for this action, object or time.",
     "human-step-required": "This step is the person's own; hand them the link in error.data.url.",
 }
@@ -297,16 +302,6 @@ def _chain_of(act: Dict[str, Any]) -> List[str]:
         chain.append(node["partner"] if is_partner_actor(node) else node["sub"])
         node = node.get("act")
     return chain
-
-
-def effect_closure(ceiling: List[str]) -> set:
-    """`none` is below every class and `draft` below every external one; external classes are not ordered."""
-    admitted = set(ceiling)
-    if ceiling:
-        admitted.add("none")
-    if any(effect != "none" for effect in ceiling):
-        admitted.add("draft")
-    return admitted
 
 
 def effect_within(effect: str, ceiling: List[str]) -> bool:
@@ -822,11 +817,19 @@ def refusal_from_action(answer: Any) -> Optional[Dict[str, Any]]:
     return _refuse(code, _ACTION_DETAILS[code], dict(data) if isinstance(data, dict) and data else None)
 
 
+#: DEC-0125 MD-4: a refusal outside a mandate goes back up the chain; only the leading agent asks the operator.
+OUTSIDE_MANDATE_MESSAGE = ("Outside the operator's mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, then relays a decision or mandate that covers it: in _meta, or, without _meta, through Fabric's agent.call once the hub forwards it, the service's elicitation, or the action's page as a Fabric Dashboards open_link (DEC-0125 MD-4).")
+
+
 def refusal_error(refusal: Dict[str, Any]) -> Dict[str, Any]:
     """The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key."""
     data = {"detail": refusal["detail"]}
     data.update(refusal.get("data") or {})
-    return {"error": {"code": refusal["code"], "message": REFUSAL_MESSAGES.get(refusal["code"], "Refused."), "data": data}}
+    # the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail; only a string names a part
+    part = data.get("detail") if isinstance(data.get("detail"), str) else refusal["detail"]
+    outside = refusal["code"] == "operator-decision-required" and isinstance(part, str) and part.startswith("outside-mandate:")
+    message = OUTSIDE_MANDATE_MESSAGE if outside else REFUSAL_MESSAGES.get(refusal["code"], "Refused.")
+    return {"error": {"code": refusal["code"], "message": message, "data": data}}
 
 
 def refusal_tool_result(refusal: Dict[str, Any], traceparent: Optional[str] = None) -> Dict[str, Any]:

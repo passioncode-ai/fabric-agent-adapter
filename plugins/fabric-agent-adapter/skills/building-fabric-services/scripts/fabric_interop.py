@@ -20,6 +20,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import secrets
@@ -31,7 +32,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 from fabric_actions import action_caller, readable_action  # noqa: E402 - DEC-0121
+from fabric_mandate import EFFECT_CLASSES, is_agent_id  # noqa: E402 - DEC-0125
 from fabric_time import format_rfc3339  # noqa: E402 - the core's (FAA-65)
+from fabric_page_links import (  # noqa: E402 - DEC-0123
+    PageLinkError, dashboards_link, input_request_link_findings, page_link_findings, parse_dashboards_link)
 
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     _days_from_civil,
@@ -219,10 +223,30 @@ def choice_request(message: str, field: str, options: List[Any], title: Optional
 
 
 def url_request(message: str, url: str) -> Dict[str, Any]:
-    """URL mode: the person opens `url` out of band; for credentials and payments. Put nothing sensitive in the URL."""
-    if not url.startswith(("https://", "http://127.0.0.1", "http://localhost")):
-        raise InteropError("A URL-mode request needs an https URL (or this machine's loopback).")
+    """URL mode: the person opens `url` out of band; for credentials and payments. Put nothing sensitive in the URL.
+    A page of this service goes as its open_link (`page_answer`, DEC-0123 PL-4); a raw loopback address and a
+    `fabric-dashboards:` link outside the grammar are refused here, when the request is built (FAC-SEM-143)."""
+    if not isinstance(url, str):
+        raise InteropError("A URL-mode request needs an https URL or Fabric Dashboards' open_link (DEC-0123 PL-4).")
+    findings = page_link_findings(url, "/params/url", "the URL-mode request")
+    if findings:
+        raise InteropError(findings[0]["message"])
+    if not url.startswith("https://") and not parse_dashboards_link(url)["ok"]:
+        raise InteropError("A URL-mode request needs an https URL or Fabric Dashboards' open_link (DEC-0123 PL-4).")
     return {"method": "elicitation/create", "params": {"mode": "url", "message": message, "url": url}}
+
+
+def page_answer(service: str, instance: str, path: Optional[str] = None, http_url: Optional[str] = None) -> Dict[str, Any]:
+    """A tool answer that hands a person one of this service's pages (DEC-0123 PL-4): `{"open_link"}`, the page's
+    Fabric Dashboards link, and `http_url`, its raw address, only as a diagnostic beside it (never judged as the
+    action). Raises InteropError for an id, instance or path the open_link grammar refuses."""
+    try:
+        answer: Dict[str, Any] = {"open_link": dashboards_link(service, instance, path)}
+    except PageLinkError as refused:
+        raise InteropError("No open_link for %s.%s: %s (DEC-0123 PL-1)." % (service, instance, refused)) from None
+    if http_url is not None:
+        answer["http_url"] = http_url
+    return answer
 
 
 # --- C3.2 jobs ---------------------------------------------------------------------
@@ -366,6 +390,8 @@ class JobStore:
         for key, request in input_requests.items():
             if not _KEY.match(key) or request.get("method") != "elicitation/create":
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
+        for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
+            raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
         return self._transition(job_id, "input_required", inputRequests=input_requests, statusMessage=message)
 
     def answer(self, job_id: str, input_responses: Dict[str, Any]) -> Dict[str, Any]:
@@ -441,12 +467,13 @@ class CallContext:
     the request's `_meta`. For a tool registered with an action, `record` is action_decision's recordAs: "caller"
     (the caller's own act) or {by, via, caller}, the act to put in the service's audit record, and `decision` the
     operator's decision it took (its `instruction` stays in that record, never in events or a page another party
-    reads), else None. `input_records` maps each answered input request to its record when input_actions is on."""
+    reads), else None. `input_records` maps each answered input request to its record when input_actions is on.
+    DEC-0125: `mandate` is the operator's mandate the call was taken under (record `via: mandate`), else None."""
 
     def __init__(self, server: "McpToolServer", tool: str, arguments: Any, traceparent: str,
                  delegation: Optional[Dict[str, Any]] = None, *, tier: Optional[str] = None, caller: Optional[str] = None,
                  meta: Optional[Dict[str, Any]] = None, record: Any = None, decision: Optional[Dict[str, Any]] = None,
-                 input_records: Optional[Dict[str, Any]] = None):
+                 input_records: Optional[Dict[str, Any]] = None, mandate: Optional[Dict[str, Any]] = None):
         self.server = server
         self.tool = tool
         self.arguments = arguments
@@ -455,6 +482,7 @@ class CallContext:
         self.delegation = delegation
         self.tier, self.caller, self.meta = tier, caller, {} if meta is None else meta
         self.record, self.decision, self.input_records = record, decision, input_records
+        self.mandate = mandate
 
     def start_job(self, poll_interval_ms: Optional[int] = None) -> Dict[str, Any]:
         if self.server.jobs is None:
@@ -550,6 +578,10 @@ def mcp_request_headers(method: str, params: Dict[str, Any]) -> Dict[str, str]:
     return out
 
 
+_UNREADABLE = object()  # what a service's spend or project function answers when it raised
+_UNREADABLE_PROJECT = "\x00unreadable"  # never a member of a mandate's projects, so a scoped mandate refuses
+
+
 class McpToolServer:
     """tools/list and tools/call for an MCP 2026-07-28 server, with fabric.job.get/cancel built in.
 
@@ -567,7 +599,7 @@ class McpToolServer:
                  approve: Optional[Callable[[str, Dict[str, Any], Any, str], Optional[Dict[str, Any]]]] = None,
                  elicited: Optional[Callable[[str, Dict[str, Any], Optional[str]], bool]] = None,
                  input_actions: bool = False, clock: Callable[[], float] = time.time,
-                 on_fault: Optional[Callable[[str, str], None]] = None):
+                 on_fault: Optional[Callable[[str, str], None]] = None, agent_id: Optional[str] = None):
         # authorize(tool, headers, tier=) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
         # gated by the job's own capability, and answered only for the principal and caller that started it.
@@ -578,6 +610,12 @@ class McpToolServer:
         # record of an accepted elicitation. input_actions=True gates each answered input request as an action (D8).
         # on_fault(tool, fault) hears a service fault the caller only sees as unknown-state (e.g. caller-missing: an
         # action-gated server needs a tier, identify or authorize that names who calls).
+        # DEC-0125: agent_id is this service's own agent id; with it the server reads a call's _meta.mandate for a
+        # relayed action added with its effect (the chain must end in agent_id, and in the delegation's caller before
+        # it when authorize accepted a token); without it a mandate is not read, as before.
+        if agent_id is not None and not is_agent_id(agent_id):
+            raise InteropError("agent_id is this service's agent id (a lower-case id, optionally .instance; DEC-0125).")
+        self.agent_id = agent_id
         self._authorize = authorize
         self._identify, self._approve, self._elicited = identify, approve, elicited
         self.input_actions, self._clock, self._on_fault = input_actions is True, clock, on_fault
@@ -590,11 +628,17 @@ class McpToolServer:
         self._on_input = on_input
 
     def add_tool(self, tool: Dict[str, Any], handler: Handler, action: Optional[Dict[str, Any]] = None, *,
-                 target: Any = None, human_step_url: Optional[str] = None) -> None:
+                 target: Any = None, human_step_url: Optional[str] = None, effect: Optional[str] = None,
+                 spend: Any = None, project: Any = None) -> None:
         """Serve a tool. `action` (DEC-0121 AP-1) is the declared action this tool performs, {id, title, tool, gate,
         humanStep?}, its `tool` this tool's name: the server runs action_gate before the handler. `target` names the
         object a call acts on: an argument's name, or a function of the arguments; `human_step_url` is the link of a
-        `human` action's step (an https URL or a path on the service's origin, AP-4)."""
+        `human` action's step (an https URL or a path on the service's origin, AP-4).
+
+        DEC-0125, on a server with agent_id: `effect` is the action's effect class (governance's vocabulary), required
+        for a relayed action, since a mandate covers a call by its effect; `spend` the service's own estimate of what a
+        call spends, USD (a number, or a function of the arguments answering a number or None); `project` the project a
+        call acts in (a name, or a function of the arguments)."""
         if tool["name"] in self.handlers:
             raise InteropError("Tool %s is served twice." % tool["name"])
         if "outputSchema" in tool:
@@ -608,7 +652,16 @@ class McpToolServer:
                 raise InteropError("Tool %s: a human step needs its link, an https URL or a path (DEC-0121 AP-4)." % tool["name"])
             if not (target is None or isinstance(target, str) or callable(target)):
                 raise InteropError("Tool %s: target is an argument's name or a function of the arguments." % tool["name"])
-            self.actions[tool["name"]] = {"action": dict(action), "target": target, "url": human_step_url}
+            if self.agent_id is not None and action["gate"] == "relayed" and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+                raise InteropError("Tool %s: a relayed action on a server that reads mandates names its effect class (DEC-0125)." % tool["name"])
+            if effect is not None and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+                raise InteropError("Tool %s: effect is one of %s." % (tool["name"], ", ".join(EFFECT_CLASSES)))
+            if not (spend is None or callable(spend) or (isinstance(spend, (int, float)) and not isinstance(spend, bool))):
+                raise InteropError("Tool %s: spend is a number of USD or a function of the arguments." % tool["name"])
+            if not (project is None or isinstance(project, str) or callable(project)):
+                raise InteropError("Tool %s: project is a name or a function of the arguments." % tool["name"])
+            self.actions[tool["name"]] = {"action": dict(action), "target": target, "url": human_step_url,
+                                          "effect": effect, "spend": spend, "project": project}
         self.tools.append(tool)
         self.handlers[tool["name"]] = handler
 
@@ -624,8 +677,10 @@ class McpToolServer:
         return action_caller(tier, authenticated)
 
     def _gate_action(self, action: Dict[str, Any], name: str, arguments: Dict[str, Any], target: Any, url: Any,
-                     headers: Any, tier: str, meta: Dict[str, Any], caller: Optional[str]) -> Dict[str, Any]:
-        """action_gate for one call: the approval the call presented, the digest of {tool, arguments}, the clock."""
+                     headers: Any, tier: str, meta: Dict[str, Any], caller: Optional[str],
+                     mandate: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """action_gate for one call: the approval the call presented, the digest of {tool, arguments}, the clock, and
+        under DEC-0125 what a mandate is read with (`mandate`: self_id, effect, caller_agent, spend_usd, project)."""
         digest, approval = None, None
         if action["gate"] == "relayed":
             import fabric_delegation as _fd  # noqa: E402 - only an action-gated server needs it
@@ -646,7 +701,37 @@ class McpToolServer:
                         "fault": "approval-outcome-unreadable"}
         elicited = action["gate"] == "relayed" and self._elicited is not None and self._elicited(name, arguments, caller) is True
         return action_gate(action, tier=tier, caller=caller, meta=meta, target=target, elicited=elicited, approval=approval,
-                           action_digest=digest, human_step_url=url, now=format_rfc3339(self._clock() * 1000))
+                           action_digest=digest, human_step_url=url, now=format_rfc3339(self._clock() * 1000), **(mandate or {}))
+
+    def _mandate_inputs(self, entry: Dict[str, Any], arguments: Dict[str, Any], verdict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """DEC-0125: what action_gate reads a mandate with, empty on a server without agent_id. The caller's agent id is
+        the delegation's caller when authorize accepted a token, never a name the call carries."""
+        if self.agent_id is None:
+            return {}
+        spend, project = (self._read(entry.get(k), arguments) for k in ("spend", "project"))
+        caller_agent = (verdict or {}).get("caller")
+        # The estimate is read as a double, as the contract does: an int past the float range is infinite, and an
+        # estimate that is not a finite number reads as none, which a mandate's ceiling refuses (fail closed).
+        try:
+            double = float(spend) if isinstance(spend, (int, float)) and not isinstance(spend, bool) else math.nan
+        except OverflowError:
+            double = math.inf
+        finite = math.isfinite(double)  # the service's own number goes on when it is finite (25 stays 25)
+        if project is _UNREADABLE or not (project is None or isinstance(project, str)):
+            project = _UNREADABLE_PROJECT  # a function that raised or named no string: a scoped mandate refuses
+        return {"self_id": self.agent_id, "effect": entry.get("effect"),
+                "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
+                # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
+                "spend_usd": spend if finite else None,
+                "project": project if isinstance(project, str) else None}
+
+    @staticmethod
+    def _read(value: Any, arguments: Dict[str, Any]) -> Any:
+        """A spend or project the service gave, or what its function answers; a function that raises answers _UNREADABLE."""
+        try:
+            return value(arguments) if callable(value) else value
+        except Exception:  # noqa: BLE001 - the service's own code; the call is still answered
+            return _UNREADABLE
 
     def _gate_inputs(self, arguments: Dict[str, Any], headers: Any, tier: str, meta: Dict[str, Any],
                      caller: Optional[str]) -> Dict[str, Any]:
@@ -786,7 +871,7 @@ class McpToolServer:
         caller, gated, entry = self._caller(headers, tier, delegation), {"record": None, "decision": None}, self.actions.get(name)
         if entry is not None:  # DEC-0121: after the authorize gate, before the handler
             gated = self._gate_action(entry["action"], name, arguments, self._target(entry["target"], arguments), entry["url"],
-                                      headers, tier, meta, caller)
+                                      headers, tier, meta, caller, self._mandate_inputs(entry, arguments, delegation))
             if not gated["ok"] and "invalid" in gated:
                 return self._error(rid, -32602, gated["invalid"])
             if not gated["ok"]:
@@ -794,7 +879,7 @@ class McpToolServer:
                 import fabric_delegation as _fd  # noqa: E402 - DL-19
                 return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(gated["refusal"], traceparent=span)}
         context = CallContext(self, name, arguments, span, delegation, tier=tier, caller=caller, meta=meta,
-                              record=gated["record"], decision=gated["decision"])
+                              record=gated["record"], decision=gated["decision"], mandate=gated.get("mandate"))
         try:
             structured = handler(arguments, context)
         except InteropError as exc:

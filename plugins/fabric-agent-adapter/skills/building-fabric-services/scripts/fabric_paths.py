@@ -14,6 +14,8 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from fabric_base import (
     WINDOWS,
+    ServiceError,
+    _INSTANCE,
     _require_id,
 )
 from fabric_platform import (
@@ -53,6 +55,25 @@ def service_dirs(service_id: str) -> Dict[str, Path]:
     state = Path(os.environ.get("XDG_STATE_HOME") or home / ".local/state") / service_id
     cache = Path(os.environ.get("XDG_CACHE_HOME") or home / ".cache") / service_id
     return {"data": data, "logs": state / "logs", "cache": cache}
+
+
+def instance_dirs(service_id: str, instance: str = "default") -> Dict[str, Path]:
+    """One instance's folders (FAA-125, brief D16): the ``default`` instance keeps ``service_dirs`` (an existing install
+    keeps its data, logs and lock); any other is a sibling named as its descriptor, ``<id>.<instance>``, never inside
+    the default tree, so one instance's purge, prune or backup never reaches another's."""
+    _require_id(service_id)
+    if not isinstance(instance, str) or not _INSTANCE.match(instance):
+        raise ServiceError("Instance %r must match %s." % (instance, _INSTANCE.pattern))
+    if instance == "default":
+        return service_dirs(service_id)
+    folder, personal = "%s.%s" % (service_id, instance), service_dirs(service_id)
+    if sys.platform == "win32":
+        data = personal["data"].parent / folder
+        return {"data": data, "logs": data / "Logs", "cache": data / "Cache"}
+    if sys.platform == "darwin":
+        return {key: path.parent / folder for key, path in personal.items()}
+    return {"data": personal["data"].parent / folder, "logs": personal["logs"].parent.parent / folder / "logs",
+            "cache": personal["cache"].parent / folder}
 
 
 def _read_at(fd: int, n: int, offset: int) -> bytes:

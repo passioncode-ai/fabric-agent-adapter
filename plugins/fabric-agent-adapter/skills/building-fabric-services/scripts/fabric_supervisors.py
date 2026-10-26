@@ -30,7 +30,7 @@ from fabric_base import (
 )
 from fabric_paths import (
     atomic_write,
-    service_dirs,
+    instance_dirs,
 )
 from fabric_lock import (
     SUPERVISOR_ARG,
@@ -376,14 +376,16 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
 
 
 def launchd_uninstall(label: str, plist_path: Path, *, timeout: float = 30.0, purge: bool = False,
-                      service_id: Optional[str] = None) -> Dict[str, Any]:
+                      service_id: Optional[str] = None, instance: str = "default") -> Dict[str, Any]:
     """Symmetric with ``launchd_install`` (LC-14): bootout and WAIT until the job is gone, remove
     the plist, and reset the override to ``enabled`` — launchctl has no verb that deletes an
     override, and a leftover ``disabled`` would make a later fresh install stay off. Data stays
-    unless ``purge`` (then ``service_id`` names whose data, logs and cache go). A job still
+    unless ``purge`` (then ``service_id`` names whose data, logs and cache go, and ``instance`` which
+    instance's: ``instance_dirs``, so one context's purge never reaches another's, FAA-125). A job still
     loaded at ``timeout`` raises, leaving the plist and data in place."""
     if purge and not service_id:
         raise ServiceError("purge needs the service id whose data, logs and cache to remove.")
+    dirs = instance_dirs(str(service_id), instance) if purge else {}
     target = "%s/%s" % (_domain(), label)
     _launchctl("bootout", target)
     deadline = time.monotonic() + timeout
@@ -399,7 +401,7 @@ def launchd_uninstall(label: str, plist_path: Path, *, timeout: float = 30.0, pu
     _launchctl("enable", target)
     purged: List[str] = []
     if purge:
-        for directory in service_dirs(str(service_id)).values():
+        for directory in dirs.values():
             if directory.is_symlink():
                 directory.unlink()
             elif directory.exists():

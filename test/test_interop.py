@@ -147,6 +147,33 @@ class EnvelopeAndChoiceTests(unittest.TestCase):
             fi.form_request("Paste it.", {"value": {"type": "string", "title": "Your secret key"}})
         self.assertEqual(fi.url_request("Connect the account.", "https://publish.example/connect")["params"]["mode"], "url")
 
+    def test_url_mode_hands_over_an_open_link_never_a_raw_local_address(self):
+        """DEC-0123 PL-4, FAC-SEM-143 (D12 of the 0.51.0 brief): a URL-mode request on the service's own page carries
+        its open_link; a raw loopback address and a fabric-dashboards: link outside the grammar are refused when the
+        request is built."""
+        link = "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%2Fdrafts%2F7"
+        self.assertEqual(fi.url_request("Approve the draft.", link)["params"]["url"], link)
+        self.assertEqual(fi.url_request("Open it.", "fabric-dashboards://service/example-agent.default")["params"]["mode"], "url")
+        for url in ("http://127.0.0.1:4100/x", "http://localhost:4100/dashboard", "http://127.1/", "https://127.0.0.1/",
+                    "http://[::1]:4100/", "http://0/", "http://loc%61lhost/", "fabric-dashboards://open?service=example-agent.default",
+                    "fabric-dashboards://service/Bad", " fabric-dashboards://service/example-agent.default?path=x",
+                    "http://agents.example/", "ftp://files.example/", "/dashboard"):
+            with self.subTest(url), self.assertRaises(fi.InteropError):
+                fi.url_request("Open it.", url)
+        with self.assertRaises(fi.InteropError) as refused:
+            fi.url_request("Open it.", "http://127.0.0.1:4100/x")
+        self.assertIn("open_link", str(refused.exception))
+        self.assertIn("DEC-0123", str(refused.exception))
+
+    def test_page_answer_is_pl4s_shape(self):
+        self.assertEqual(fi.page_answer("example-agent", "default"), {"open_link": "fabric-dashboards://service/example-agent.default"})
+        self.assertEqual(fi.page_answer("example-agent", "default", "/jobs/7", http_url="http://127.0.0.1:4100/jobs/7"),
+                         {"open_link": "fabric-dashboards://service/example-agent.default?path=%2Fjobs%2F7",
+                          "http_url": "http://127.0.0.1:4100/jobs/7"})
+        for args in (("Example", "default"), ("example-agent", "default", "jobs"), ("example-agent", "default", "/x?token=abc")):
+            with self.subTest(args), self.assertRaises(fi.InteropError):
+                fi.page_answer(*args)
+
 
 class JobStoreTests(unittest.TestCase):
     def setUp(self):
@@ -201,6 +228,19 @@ class JobStoreTests(unittest.TestCase):
         with self.assertRaises(fi.InteropError):
             store.complete(other, envelope(traceparent=fi.child_traceparent(PARENT)))
         self.assertEqual(store.get(other)["status"], "working")
+
+    def test_a_url_mode_request_on_a_raw_local_address_is_refused_at_request_input(self):
+        """FAC-SEM-143 on kind interop-input-requests: a hand-built URL-mode request with a loopback url never reaches
+        the job; the job stays working."""
+        store = fi.JobStore(self.dir)
+        job_id = store.create("example.draft", {})["job"]["id"]
+        raw = {"method": "elicitation/create", "params": {"mode": "url", "message": "Approve.", "url": "http://127.0.0.1:4100/x"}}
+        with self.assertRaises(fi.InteropError) as refused:
+            store.request_input(job_id, {"approve": raw})
+        self.assertIn("/inputRequests/approve/params/url", str(refused.exception))
+        self.assertEqual(store.get(job_id)["status"], "working")
+        link = fi.url_request("Approve.", "fabric-dashboards://service/example-agent.default?path=%2Fdrafts%2F7")
+        self.assertEqual(store.request_input(job_id, {"approve": link})["status"], "input_required")
 
     def test_answers_for_unknown_keys_are_ignored(self):
         store = fi.JobStore(self.dir)
@@ -681,3 +721,190 @@ class RequestMetaDecisionTests(unittest.TestCase):
                 else:
                     with self.assertRaises(fi.InteropError):
                         fi.request_meta(PARENT, decision=case["document"])
+
+
+# --- DEC-0125: the operator's mandate in _meta.mandate (FAA-131, brief D25, D26) ------------------------------------
+
+fm = load("fabric_mandate")
+REPLY_SCOPE = {"actions": ["approve-reply"], "effects": ["reply"]}
+
+
+def lead_mandate(scope=None, at="2026-10-24T09:00:00Z"):
+    """The operator told the lead agent to answer the reviews; the lead hands the task to example-agent."""
+    stated = fm.operator_mandate("answer the reviews", "answer every review from this week", scope or REPLY_SCOPE,
+                                 "example-lead", at=at)
+    return fm.hand_on(stated, "example-agent", "2026-10-24T09:10:00Z")
+
+
+class RequestMetaMandateTests(unittest.TestCase):
+    def test_the_mandate_rides_in_meta_copied(self):
+        mandate = lead_mandate()
+        meta = fi.request_meta(PARENT, mandate=mandate)
+        self.assertEqual(meta["mandate"], mandate)
+        self.assertIsNot(meta["mandate"], mandate)
+        self.assertNotIn("mandate", fi.request_meta(PARENT))
+        both = fi.request_meta(PARENT, decision=DECISION, mandate=mandate)
+        self.assertEqual((both["decision"], both["mandate"]), (DECISION, mandate))
+
+    def test_a_mandate_fac_sem_144_refuses_is_never_sent(self):
+        vectors = json.loads((ROOT / "test/fixtures/contract/mandate-vectors.json").read_text(encoding="utf-8"))
+        for case in vectors["fixtures"]:
+            with self.subTest(case["name"]):
+                if case["valid"]:
+                    self.assertEqual(fi.request_meta(PARENT, mandate=case["document"])["mandate"], case["document"])
+                else:
+                    with self.assertRaises(fi.InteropError):
+                        fi.request_meta(PARENT, mandate=case["document"])
+        widened = lead_mandate()
+        widened["chain"][-1]["scope"] = {"actions": ["approve-reply"], "effects": ["publish"]}
+        for bad in ("yes", [], widened):
+            with self.subTest(bad=bad), self.assertRaises(fi.InteropError):
+                fi.request_meta(PARENT, mandate=bad)
+
+
+class ActionGateMandateTests(unittest.TestCase):
+    def gate(self, **extra):
+        options = {"action": RELAYED, "tier": "T0", "caller": "local:T0", "meta": {"mandate": lead_mandate()}, "target": "reply-7",
+                   "now": NOW, "self_id": "example-agent", "effect": "reply"}
+        options.update(extra)
+        return fi.action_gate(options.pop("action"), **options)
+
+    def test_a_covered_call_is_the_operators_act_recorded_via_the_mandate(self):
+        answer = self.gate()
+        self.assertEqual(answer, {"ok": True, "decision": None, "mandate": lead_mandate(),
+                                  "record": {"by": "operator", "via": "mandate", "task": "answer the reviews",
+                                             "chain": ["example-lead", "example-agent"], "caller": "local:T0"}})
+
+    def test_a_service_that_names_no_agent_id_does_not_read_a_mandate(self):
+        answer = self.gate(self_id=None)
+        self.assertEqual((answer["refusal"]["code"], answer["refusal"]["detail"]), ("operator-decision-required", "no-decision"))
+
+    def test_an_effect_the_service_did_not_name_is_its_own_fault(self):
+        answer = self.gate(effect=None)
+        self.assertEqual((answer["refusal"]["code"], answer["fault"]), ("unknown-state", "effect-missing"))
+
+    def test_what_the_mandate_does_not_cover_is_named(self):
+        error = fd.refusal_error(self.gate(effect="publish")["refusal"])["error"]
+        self.assertEqual((error["code"], error["data"]), ("operator-decision-required", {"detail": "outside-mandate: effect"}))
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        error = fd.refusal_error(self.gate(meta={"mandate": tight}, spend_usd=2)["refusal"])["error"]
+        self.assertEqual(error["data"], {"detail": "outside-mandate: spend", "estimateUsd": 2, "perCallMaxUsd": 1})
+        error = fd.refusal_error(self.gate(caller_agent="example-other")["refusal"])["error"]
+        self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": "mandate-not-for-this-call"}))
+        error = fd.refusal_error(self.gate(now="2026-10-25T09:00:00Z")["refusal"])["error"]
+        self.assertEqual(error["data"], {"detail": "mandate-expired"})
+        error = fd.refusal_error(self.gate(meta={"mandate": "yes"})["refusal"])["error"]
+        self.assertEqual(error["data"], {"detail": "mandate-malformed"})
+
+    def test_a_spend_or_project_function_that_fails_never_raises_and_fails_closed(self):
+        # Seam reading of 0.51.0: the server's spend and project functions are the service's code; a raise or a
+        # non-finite estimate reads as no estimate, so a mandate with a ceiling refuses the spend.
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        for spend in (lambda a: 1 / 0, lambda a: float("nan"), lambda a: float("inf")):
+            server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
+            server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
+                            target="reply", effect="reply", spend=spend, project=lambda a: 1 / 0)
+            params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": tight}}
+            answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
+            error = answer["result"]["structuredContent"]["error"]
+            self.assertEqual((error["code"], error["data"]["detail"]), ("operator-decision-required", "outside-mandate: spend"))
+
+    def test_a_huge_spend_and_a_raising_project_fail_closed(self):
+        # Second seam reading of 0.51.0: an int past the float range never raises; a project function that raises
+        # never reads as "no project", which a mandate limited to projects would cover.
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        cases = ((dict(spend=lambda a: 10 ** 400), tight, "outside-mandate: spend"), (dict(spend=10 ** 400), tight, "outside-mandate: spend"),
+                 (dict(spend=lambda a: 10 ** 5000), tight, "outside-mandate: spend"),
+                 (dict(spend=0.5, project=lambda a: 1 / 0), scoped, "outside-mandate: project"),
+                 (dict(spend=0.5, project=lambda a: 7), scoped, "outside-mandate: project"))
+        for options, mandate, detail in cases:
+            server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
+            server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
+                            target="reply", effect="reply", **options)
+            params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": mandate}}
+            answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
+            error = answer["result"]["structuredContent"]["error"]
+            json.dumps(answer)  # a past-the-float estimate never reaches the wire as a 5000-digit integer
+            self.assertNotIn("estimateUsd", error["data"]) if detail.endswith("spend") else None
+            self.assertEqual(error["data"]["detail"], detail, options)
+            # Third product reading: the MD-4 wording reaches the caller through the gate, not only a hand-built refusal.
+            self.assertIn("pass this refusal", error["message"])
+            plain = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": dict(params, _meta={"traceparent": PARENT})},
+                                  None, tier="T0")
+            self.assertEqual(plain["result"]["structuredContent"]["error"]["data"]["detail"], "no-decision", options)
+            self.assertNotIn("pass this refusal", plain["result"]["structuredContent"]["error"]["message"])
+
+    def test_a_decision_beside_a_mandate_decides(self):
+        answer = self.gate(meta={"mandate": lead_mandate(), "decision": DECISION})
+        self.assertEqual((answer["record"]["via"], answer["decision"]), ("relayed-instruction", DECISION))
+        self.assertNotIn("mandate", answer)
+
+
+class McpMandateTests(unittest.TestCase):
+    """McpToolServer(agent_id=...) reads _meta.mandate for a relayed action registered with its effect (DEC-0125)."""
+
+    def server(self, **options):
+        self.seen = []
+        options.setdefault("clock", lambda: NOW_SECONDS)
+        server = fi.McpToolServer("example-agent", "1.0.0", **options)
+        keep = lambda args, ctx: self.seen.append(ctx) or {"done": True}
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, keep, action=RELAYED, target="reply", effect="reply",
+                        spend=lambda arguments: arguments.get("cost"), project="example-site")
+        return server
+
+    def call(self, server, meta, arguments=None, tier="T0"):
+        params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"} if arguments is None else arguments,
+                  "_meta": dict({"traceparent": PARENT}, **meta)}
+        return server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier=tier)["result"]
+
+    def test_a_covered_call_runs_and_the_handler_gets_the_record_and_the_mandate(self):
+        mandate = lead_mandate()
+        result = self.call(self.server(agent_id="example-agent"), {"mandate": mandate})
+        self.assertFalse(result["isError"], result)
+        ctx = self.seen[-1]
+        self.assertEqual(ctx.record, {"by": "operator", "via": "mandate", "task": "answer the reviews",
+                                      "chain": ["example-lead", "example-agent"], "caller": "local:T0"})
+        self.assertEqual((ctx.mandate, ctx.decision), (mandate, None))
+
+    def test_the_services_estimate_and_project_are_read(self):
+        server = self.server(agent_id="example-agent")
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1, projects=["example-site"]))
+        error = self.call(server, {"mandate": tight}, {"reply": "reply-7", "cost": 2})["structuredContent"]["error"]
+        self.assertEqual(error["data"], {"detail": "outside-mandate: spend", "estimateUsd": 2, "perCallMaxUsd": 1})
+        self.assertFalse(self.call(server, {"mandate": tight}, {"reply": "reply-7", "cost": 0.5})["isError"])
+        elsewhere = lead_mandate(dict(REPLY_SCOPE, projects=["other-site"]))
+        self.assertEqual(self.call(server, {"mandate": elsewhere})["structuredContent"]["error"]["data"], {"detail": "outside-mandate: project"})
+
+    def test_an_authenticated_caller_must_be_the_agent_before_this_one(self):
+        verdict = lambda name: (lambda tool, headers, tier="T2": {"ok": True, "tier": tier, "principal": "person:p", "caller": name})
+        server = self.server(agent_id="example-agent", authorize=verdict("example-other"))
+        error = self.call(server, {"mandate": lead_mandate()})["structuredContent"]["error"]
+        self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": "mandate-not-for-this-call"}))
+        server = self.server(agent_id="example-agent", authorize=verdict("example-lead"))
+        self.assertFalse(self.call(server, {"mandate": lead_mandate()})["isError"])
+
+    def test_a_t2_callers_mandate_changes_nothing(self):
+        server = self.server(agent_id="example-agent", identify=lambda headers, tier: "agent:remote")
+        error = self.call(server, {"mandate": lead_mandate()}, tier="T2")["structuredContent"]["error"]
+        self.assertEqual(error["code"], "approval-required")
+        self.assertEqual(self.seen, [])
+
+    def test_without_an_agent_id_the_mandate_is_not_read(self):
+        error = self.call(self.server(), {"mandate": lead_mandate()})["structuredContent"]["error"]
+        self.assertEqual((error["code"], error["data"]), ("operator-decision-required", {"detail": "no-decision"}))
+
+    def test_a_mandate_in_the_arguments_is_ignored(self):
+        server = self.server(agent_id="example-agent")
+        error = self.call(server, {}, {"reply": "reply-7", "mandate": lead_mandate()})["structuredContent"]["error"]
+        self.assertEqual(error["code"], "operator-decision-required")
+
+    def test_construction_refuses_what_could_never_read_a_mandate(self):
+        with self.assertRaises(fi.InteropError):
+            fi.McpToolServer("x", "1", agent_id="Example Agent")
+        server = fi.McpToolServer("x", "1", agent_id="example-agent")
+        for extra in ({}, {"effect": "Reply"}, {"effect": "reply", "spend": "1"}, {"effect": "reply", "project": 7}):
+            with self.subTest(extra=extra), self.assertRaises(fi.InteropError):
+                server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda a, c: {}, action=RELAYED, **extra)
+        plain = fi.McpToolServer("x", "1")  # a server that reads no mandate needs no effect, as before
+        plain.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda a, c: {}, action=RELAYED)

@@ -1,0 +1,205 @@
+{
+  "about": "DEC-0122 at the pin: every service-well-known-a2a fixture as fixtures/catalogue.json lists it, its validity re-checked by the contract's validator against service-well-known.schema.json, with the instance path and keyword of each schema error. Written by vendor_vectors.mjs, never by hand.",
+  "source": "fixtures/catalogue.json, fixtures/*/service-well-known-a2a*.json, schemas/service-well-known.schema.json",
+  "fixtures": [
+    {
+      "name": "service-well-known-a2a",
+      "valid": true,
+      "errors": [],
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "service": {
+          "id": "example-agent",
+          "instance": "default",
+          "name": "Example Agent",
+          "version": "0.2.0",
+          "build": {
+            "commit": "8b80be9",
+            "dirty": false,
+            "builtAt": "2026-09-28T17:40:00Z"
+          }
+        },
+        "process": {
+          "pid": 51234,
+          "startedAt": "2026-09-28T17:41:02Z"
+        },
+        "status": "degraded",
+        "degraded": [
+          {
+            "source": "llm",
+            "reason": "No model key: drafting is paused."
+          }
+        ],
+        "summary": [
+          {
+            "label": "Jobs running",
+            "value": 2
+          },
+          {
+            "label": "Awaiting you",
+            "value": 1,
+            "attention": true
+          }
+        ],
+        "surfaces": {
+          "dashboard": {
+            "path": "/dashboard",
+            "login": true
+          },
+          "mcp": {
+            "path": "/mcp",
+            "transport": "streamable-http"
+          },
+          "events": {
+            "path": "/fabric/v1/events"
+          },
+          "a2a": {
+            "path": "/.well-known/agent-card.json",
+            "protocolVersion": "1.0"
+          }
+        },
+        "update": {
+          "available": null
+        }
+      }
+    },
+    {
+      "name": "service-well-known-a2a-old-version",
+      "valid": false,
+      "keyword": "const",
+      "errors": [
+        {
+          "instancePath": "/surfaces/a2a/protocolVersion",
+          "keyword": "const"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "service": {
+          "id": "example-agent",
+          "instance": "default",
+          "name": "Example Agent",
+          "version": "0.2.0",
+          "build": {
+            "commit": "8b80be9",
+            "dirty": false,
+            "builtAt": "2026-09-28T17:40:00Z"
+          }
+        },
+        "process": {
+          "pid": 51234,
+          "startedAt": "2026-09-28T17:41:02Z"
+        },
+        "status": "degraded",
+        "degraded": [
+          {
+            "source": "llm",
+            "reason": "No model key: drafting is paused."
+          }
+        ],
+        "summary": [
+          {
+            "label": "Jobs running",
+            "value": 2
+          },
+          {
+            "label": "Awaiting you",
+            "value": 1,
+            "attention": true
+          }
+        ],
+        "surfaces": {
+          "dashboard": {
+            "path": "/dashboard",
+            "login": true
+          },
+          "mcp": {
+            "path": "/mcp",
+            "transport": "streamable-http"
+          },
+          "events": {
+            "path": "/fabric/v1/events"
+          },
+          "a2a": {
+            "path": "/.well-known/agent-card.json",
+            "protocolVersion": "0.3"
+          }
+        },
+        "update": {
+          "available": null
+        }
+      }
+    },
+    {
+      "name": "service-well-known-a2a-url",
+      "valid": false,
+      "keyword": "required",
+      "errors": [
+        {
+          "instancePath": "/surfaces/a2a",
+          "keyword": "required"
+        },
+        {
+          "instancePath": "/surfaces/a2a",
+          "keyword": "additionalProperties"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-service/0.1",
+        "service": {
+          "id": "example-agent",
+          "instance": "default",
+          "name": "Example Agent",
+          "version": "0.2.0",
+          "build": {
+            "commit": "8b80be9",
+            "dirty": false,
+            "builtAt": "2026-09-28T17:40:00Z"
+          }
+        },
+        "process": {
+          "pid": 51234,
+          "startedAt": "2026-09-28T17:41:02Z"
+        },
+        "status": "degraded",
+        "degraded": [
+          {
+            "source": "llm",
+            "reason": "No model key: drafting is paused."
+          }
+        ],
+        "summary": [
+          {
+            "label": "Jobs running",
+            "value": 2
+          },
+          {
+            "label": "Awaiting you",
+            "value": 1,
+            "attention": true
+          }
+        ],
+        "surfaces": {
+          "dashboard": {
+            "path": "/dashboard",
+            "login": true
+          },
+          "mcp": {
+            "path": "/mcp",
+            "transport": "streamable-http"
+          },
+          "events": {
+            "path": "/fabric/v1/events"
+          },
+          "a2a": {
+            "url": "https://agents.example/.well-known/agent-card.json",
+            "protocolVersion": "1.0"
+          }
+        },
+        "update": {
+          "available": null
+        }
+      }
+    }
+  ]
+}

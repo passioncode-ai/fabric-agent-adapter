@@ -43,6 +43,8 @@
     {"query": "Write a reply to my coworker's pull request review comment on GitHub.", "shouldTrigger": false},
     {"query": "I told you to approve the reply; the Fabric service answered operator-decision-required. What do you send now?", "shouldTrigger": true},
     {"query": "Сервис Fabric вернул human-step-required со ссылкой на вход. Что мне делать?", "shouldTrigger": true},
-    {"query": "Declare example-agent's dashboard buttons as actions in its well-known document.", "shouldTrigger": false, "note": "sibling: building-fabric-services"}
+    {"query": "Declare example-agent's dashboard buttons as actions in its well-known document.", "shouldTrigger": false, "note": "sibling: building-fabric-services"},
+    {"query": "The operator already approved this in my lead agent's chat and it relayed his words with the date and scope. Do I need to ask him again?", "shouldTrigger": true},
+    {"query": "Оператор уже одобрил публикацию в чате другого моего агента, тот передал цитату, дату и объём. Спрашивать снова?", "shouldTrigger": true}
   ]
 }

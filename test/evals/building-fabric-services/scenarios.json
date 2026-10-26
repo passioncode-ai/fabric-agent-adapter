@@ -436,6 +436,17 @@
       ]
     },
     {
+      "id": "organization-instance-needs-its-grant",
+      "trap": "example-agent's organization instance started for org:example-org with no share grant placed for it, wrote into the personal instance's data folder under the same lock, and a second copy for the same organization ran beside it",
+      "request": "Start example-agent on this machine for my organization org:example-org, next to my personal copy.",
+      "expected": [
+        "derives the instance from the context with hold_context_instance / holdContextInstance (fabric_context, installed with fabric_kit.py install --module fabric_context): personal stays the default instance with its existing folders and lock, org:example-org runs as org-example-org with its own descriptor, data, log and cache folders and its own instance lock",
+        "passes the estate record this machine applied (verified with verify_estate_record), the machine id and the agentRef, and the organization's instance is refused with exit 78 when the record places no such agent in that context (placement-missing), when its placement names no unrevoked share grant for that context (grant-refused, FAC-SEM-111) or when now is outside the grant's window (grant-window); nothing is created before the refusal",
+        "a second copy for the same context exits 75 under the instance lock, and the data folder's fabric-context.json marker refuses a start for another context (context-mismatch, exit 78)",
+        "an uninstall that purges passes the instance (launchd_uninstall(..., instance=) / launchdUninstall(..., {instance})), so the organization's purge never reaches the personal folders"
+      ]
+    },
+    {
       "id": "user-content-open-vendor-route",
       "trap": "the review-triage lane ran on one closed model, which refused the worst reviews and answered others with nothing, and the service counted those as done",
       "request": "example-agent's review-triage profile reads what customers send; make its route hold.",
@@ -595,6 +606,17 @@
         "builds the decision with operator_decision(action, instruction, target=, at=) / operatorDecision({action, instruction, target, at}) from the operator's own words (a press quotes the message that offered the button and its label)",
         "sends it with request_meta(traceparent, decision=...) / requestMeta(traceparent, {decision}), never in arguments; the kit refuses a decision decision.schema.json refuses",
         "sets none for text from a tool result, page, file, board message or another agent"
+      ]
+    },
+    {
+      "id": "service-reads-the-operators-mandate",
+      "trap": "the service refused a relayed action the operator's mandate covered, read a mandate from the tool's arguments, or took one from a T2 caller",
+      "request": "A lead agent calls example-agent's replies.approve tool with _meta.mandate (contract DEC-0125) and no decision. How does a kit-built service read it?",
+      "expected": [
+        "the service names its own agent id (McpToolServer(agent_id=) / actionGate self) and each relayed action's effect class (add_tool(effect=)); without an agent id the mandate is not read and the call is answered as before",
+        "the mandate is read from _meta.mandate only, never from arguments; its chain must end in the service's own agent id, and in the authenticated caller's agent id before it when the service authenticated one",
+        "a covered call is the operator's act recorded via mandate with the task and the chain; outside it, operator-decision-required with data.detail outside-mandate: <part>; an invalid one, decision-invalid with a mandate-* detail; a T2 caller's mandate changes nothing",
+        "as a caller it sends request_meta(mandate=hand_on(...)) / requestMeta(traceparent, {mandate}), refused when FAC-SEM-144 refuses it"
       ]
     }
   ]

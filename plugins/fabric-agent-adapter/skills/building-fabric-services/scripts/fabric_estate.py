@@ -776,6 +776,13 @@ def _placement_grant_problems(record: Dict[str, Any], placement: Dict[str, Any])
     return problems
 
 
+def placement_grant_findings(record: Any, placement: Any) -> List[Dict[str, str]]:
+    """FAC-SEM-111 for one placement of ``record``, as findings (``instancePath`` relative to the placement). Answers,
+    never raises: a record or placement that is no object reads as an empty one (FAA-125)."""
+    record, placement = (v if isinstance(v, dict) else {} for v in (record, placement))
+    return [{"code": "FAC-SEM-111", "instancePath": at, "message": m} for at, m in _placement_grant_problems(record, placement)]
+
+
 def _placement_grants(value: Dict[str, Any], flag) -> None:
     for machine, m in _indexed(_get(value, "machines")):
         for placement, p in _indexed(_get(machine, "packages")):

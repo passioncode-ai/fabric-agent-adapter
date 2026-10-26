@@ -1956,6 +1956,161 @@
    "findings": []
   },
   {
+   "name": "action-call-mandate-ignored",
+   "description": "The same call answered as if no mandate covered it: FAC-SEM-142 reports an answer actionDecision would not give (DEC-0125 MD-3).",
+   "inputs": {
+    "action": {
+     "id": "approve-draft",
+     "title": "Approve the draft",
+     "tool": "page.update",
+     "gate": "relayed"
+    },
+    "tier": "T0",
+    "caller": "agent:claude-code",
+    "callerAgent": "example-developer",
+    "self": "example-researcher",
+    "now": "2026-10-26T12:00:00Z",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "research the eSIM market for the pricing page",
+     "instruction": "run the research on eSIM competitors' prices",
+     "at": "2026-10-26T10:00:00Z",
+     "expiresAt": "2026-10-27T10:00:00Z",
+     "scope": {
+      "capabilities": [
+       "research.run",
+       "research.ask",
+       "page.update"
+      ],
+      "effects": [
+       "charge",
+       "draft"
+      ],
+      "projects": [
+       "example-site"
+      ],
+      "actions": [
+       "approve-draft"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-26T10:01:00Z"
+      },
+      {
+       "agent": "example-researcher",
+       "at": "2026-10-26T10:05:00Z"
+      }
+     ]
+    },
+    "effect": "draft",
+    "project": "example-site"
+   },
+   "answer": {
+    "ok": false,
+    "code": "operator-decision-required"
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "research the eSIM market for the pricing page",
+     "chain": [
+      "example-developer",
+      "example-researcher"
+     ],
+     "caller": "agent:claude-code"
+    }
+   },
+   "findings": [
+    "/answer"
+   ]
+  },
+  {
+   "name": "action-call-mandate",
+   "description": "A relayed action whose call carries the operator's mandate and no decision, from the agent before the callee in the chain: the operator's act, recorded via the mandate (DEC-0125 MD-3).",
+   "inputs": {
+    "action": {
+     "id": "approve-draft",
+     "title": "Approve the draft",
+     "tool": "page.update",
+     "gate": "relayed"
+    },
+    "tier": "T0",
+    "caller": "agent:claude-code",
+    "callerAgent": "example-developer",
+    "self": "example-researcher",
+    "now": "2026-10-26T12:00:00Z",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "research the eSIM market for the pricing page",
+     "instruction": "run the research on eSIM competitors' prices",
+     "at": "2026-10-26T10:00:00Z",
+     "expiresAt": "2026-10-27T10:00:00Z",
+     "scope": {
+      "capabilities": [
+       "research.run",
+       "research.ask",
+       "page.update"
+      ],
+      "effects": [
+       "charge",
+       "draft"
+      ],
+      "projects": [
+       "example-site"
+      ],
+      "actions": [
+       "approve-draft"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-26T10:01:00Z"
+      },
+      {
+       "agent": "example-researcher",
+       "at": "2026-10-26T10:05:00Z"
+      }
+     ]
+    },
+    "effect": "draft",
+    "project": "example-site"
+   },
+   "answer": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "research the eSIM market for the pricing page",
+     "chain": [
+      "example-developer",
+      "example-researcher"
+     ],
+     "caller": "agent:claude-code"
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "research the eSIM market for the pricing page",
+     "chain": [
+      "example-developer",
+      "example-researcher"
+     ],
+     "caller": "agent:claude-code"
+    }
+   },
+   "findings": []
+  },
+  {
    "name": "action-call-none",
    "description": "The caller's own act is recorded as the caller's (DEC-0121 AP-1).",
    "inputs": {

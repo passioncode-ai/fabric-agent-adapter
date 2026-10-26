@@ -158,6 +158,41 @@ def grant_usage_context_findings(value: Any) -> List[Dict[str, str]]:
     return findings
 
 
+def instance_share_grant(record: Any, machine_id: Any, agent_ref: Any, context: Any, at_ms: float) -> Dict[str, Any]:
+    """Whether an organization's instance may run on ``machine_id`` now (FAA-125, N-11): the placement of ``agent_ref``
+    in ``context`` (as written; absent is personal) among that machine's packages, FAC-SEM-111 on it, and the grant's
+    window at ``at_ms`` (``startsAt`` <= at < ``expiresAt``; an unreadable instant or clock is outside it). Answers
+    ``{"ok": True, "grant": {"id", "startsAt"?, "expiresAt"?}}`` (``{"ok": True}`` for a personal placement) or ``{"ok": False, "code", "detail"}`` with code
+    ``placement-missing``, ``grant-refused`` or ``grant-window``; never raises. It reads the revision it is given, as
+    FAC-SEM-111 does: the caller verified it (``verify_estate_record``); a revocation delta is the hub's and the meter's."""
+    record = record if isinstance(record, dict) else {}
+    machine = next((m for m in _objects(record.get("machines")) if _jsv.same(m.get("id", _jsv.MISSING), machine_id)), {})
+    placement = next((p for p in _objects(machine.get("packages"))
+                      if _jsv.same(p.get("agentRef", _jsv.MISSING), agent_ref)
+                      and _jsv.same(p.get("context", _estate.PERSONAL_CONTEXT), context)), None)
+    if placement is None:
+        return {"ok": False, "code": "placement-missing", "detail": "this machine places no such agent in that context (FAC-SEM-074)"}
+    findings = _estate.placement_grant_findings(record, placement)
+    if findings:
+        return {"ok": False, "code": "grant-refused", "detail": "; ".join(f["message"] for f in findings)}
+    if not isinstance(placement.get("grant"), str):
+        return {"ok": True}  # a personal placement, which names no grant
+    ident = _ids.normal_identifier(placement["grant"])
+    grant = next((g for g in _objects(record.get("shareGrants")) if _jsv.same(g.get("context", _jsv.MISSING), context)
+                  and isinstance(g.get("meta"), dict) and isinstance(g["meta"].get("id"), str)
+                  and _ids.normal_identifier(g["meta"]["id"]) == ident), None)
+    if grant is None:  # defensive: FAC-SEM-111 has already matched one, so this answers rather than raises
+        return {"ok": False, "code": "grant-refused", "detail": "the record has no share grant for this placement"}
+    answer = {"id": grant["meta"]["id"]}
+    for name in ("startsAt", "expiresAt"):
+        if name in grant:
+            answer[name] = grant[name]
+    starts, expires = (_ftime.parse_rfc3339_ms(answer[n]) if n in answer else None for n in ("startsAt", "expiresAt"))
+    if (starts is not None and not starts <= at_ms) or (expires is not None and not at_ms < expires):
+        return {"ok": False, "code": "grant-window", "detail": "now is outside the share grant's window, or an instant cannot be read"}
+    return {"ok": True, "grant": answer}
+
+
 def share_rules(kind: str, value: Any) -> Optional[List[Dict[str, str]]]:
     """Kinds ``grant`` (FAC-SEM-110, 117), ``org-share-grants`` (117 with parent), ``share-registration`` (118) and
     ``device-attribution`` (045's grant.usage clause only); None for another kind."""

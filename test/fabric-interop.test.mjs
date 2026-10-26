@@ -7,6 +7,7 @@ import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-servi
 import { tempDir } from './temp-dir.mjs';
 import { assertPrivateFile } from './private-file.mjs';
 import { refusalError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs';
+import { handOn, operatorMandate } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-mandate.mjs';
 
 const PARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -80,6 +81,38 @@ test('form mode never asks for a secret; a choice is a titled single-select', ()
   const req = i.choiceRequest('Pick.', 'title', [['a', 'A'], ['b', 'B']]);
   assert.deepEqual(req.params.requestedSchema.properties.title.oneOf, [{ const: 'a', title: 'A' }, { const: 'b', title: 'B' }]);
   assert.throws(() => envelope({ usage: { inputTokens: -1, outputTokens: 0, wallMs: 0 } }), i.InteropError);
+});
+
+test('URL mode hands over an open_link, never a raw local address (DEC-0123 PL-4, FAC-SEM-143, D12)', () => {
+  const link = 'fabric-dashboards://service/example-agent.default?path=%2Fdashboard%2Fdrafts%2F7';
+  assert.equal(i.urlRequest('Approve the draft.', link).params.url, link);
+  assert.equal(i.urlRequest('Connect the account.', 'https://publish.example/connect').params.mode, 'url');
+  for (const url of ['http://127.0.0.1:4100/x', 'http://localhost:4100/dashboard', 'http://127.1/', 'https://127.0.0.1/',
+    'http://[::1]:4100/', 'http://0/', 'http://loc%61lhost/', 'fabric-dashboards://open?service=example-agent.default',
+    'fabric-dashboards://service/Bad', ' fabric-dashboards://service/example-agent.default?path=x', 'http://agents.example/',
+    'ftp://files.example/', '/dashboard', 7]) {
+    assert.throws(() => i.urlRequest('Open it.', url), i.InteropError, String(url));
+  }
+  assert.throws(() => i.urlRequest('Open it.', 'http://127.0.0.1:4100/x'), /open_link.*DEC-0123|DEC-0123.*open_link/);
+});
+
+test('pageAnswer is PL-4\'s shape', () => {
+  assert.deepEqual(i.pageAnswer('example-agent', 'default'), { open_link: 'fabric-dashboards://service/example-agent.default' });
+  assert.deepEqual(i.pageAnswer('example-agent', 'default', { path: '/jobs/7', httpUrl: 'http://127.0.0.1:4100/jobs/7' }),
+    { open_link: 'fabric-dashboards://service/example-agent.default?path=%2Fjobs%2F7', http_url: 'http://127.0.0.1:4100/jobs/7' });
+  for (const [service, instance, path] of [['Example', 'default'], ['example-agent', 'default', 'jobs'], ['example-agent', 'default', '/x?token=abc']]) {
+    assert.throws(() => i.pageAnswer(service, instance, { path }), i.InteropError);
+  }
+});
+
+test('a URL-mode request on a raw local address is refused at requestInput; the job stays working', () => {
+  const store = new i.JobStore(temp());
+  const id = store.create('example.draft', {}).job.id;
+  const raw = { method: 'elicitation/create', params: { mode: 'url', message: 'Approve.', url: 'http://127.0.0.1:4100/x' } };
+  assert.throws(() => store.requestInput(id, { approve: raw }), (error) => error instanceof i.InteropError && error.message.includes('/inputRequests/approve/params/url'));
+  assert.equal(store.get(id).status, 'working');
+  const link = i.urlRequest('Approve.', 'fabric-dashboards://service/example-agent.default?path=%2Fdrafts%2F7');
+  assert.equal(store.requestInput(id, { approve: link }).status, 'input_required');
 });
 
 // MCP 2026-07-28 standard headers: the Node twin agrees with fabric_interop.py.
@@ -166,4 +199,60 @@ test('actionRefusalToolResult answers DL-19 structuredContent, or null for a cal
   assert.equal(result.structuredContent.error.code, 'operator-decision-required');
   assert.equal(result._meta.traceparent, PARENT);
   assert.equal(i.actionRefusalToolResult({ fault: 'caller-missing' }).structuredContent.error.code, 'unknown-state');
+});
+
+// DEC-0125: the operator's mandate in _meta.mandate (FAA-131), the twin of test_interop's mandate tests.
+const REPLY_SCOPE = { actions: ['approve-reply'], effects: ['reply'] };
+const leadMandate = (scope = REPLY_SCOPE) => handOn(
+  operatorMandate({ task: 'answer the reviews', instruction: 'answer every review from this week', scope, lead: 'example-lead', at: '2026-10-24T09:00:00Z' }),
+  'example-agent', '2026-10-24T09:10:00Z');
+
+test('requestMeta carries the mandate in _meta, copied, and never one FAC-SEM-144 refuses', () => {
+  const mandate = leadMandate();
+  const meta = i.requestMeta(PARENT, { mandate });
+  assert.deepEqual(meta.mandate, mandate);
+  assert.notEqual(meta.mandate, mandate);
+  assert.equal('mandate' in i.requestMeta(PARENT), false);
+  const both = i.requestMeta(PARENT, { decision: DECISION, mandate });
+  assert.deepEqual([both.decision, both.mandate], [DECISION, mandate]);
+  const vectors = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/mandate-vectors.json', import.meta.url), 'utf8'));
+  for (const c of vectors.fixtures) {
+    if (c.valid) assert.deepEqual(i.requestMeta(PARENT, { mandate: c.document }).mandate, c.document, c.name);
+    else assert.throws(() => i.requestMeta(PARENT, { mandate: c.document }), i.InteropError, c.name);
+  }
+  const widened = structuredClone(mandate);
+  widened.chain[1].scope = { actions: ['approve-reply'], effects: ['publish'] };
+  for (const bad of ['yes', [], widened]) assert.throws(() => i.requestMeta(PARENT, { mandate: bad }), i.InteropError);
+});
+
+test('actionGate reads a mandate only for a service that names its agent id, and names what it does not cover', () => {
+  const gate = (extra) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta: { mandate: leadMandate() }, target: 'reply-7', now: NOW, self: 'example-agent', effect: 'reply', ...extra });
+  assert.deepEqual(gate(), {
+    ok: true, decision: null, mandate: leadMandate(),
+    record: { by: 'operator', via: 'mandate', task: 'answer the reviews', chain: ['example-lead', 'example-agent'], caller: 'local:T0' },
+  });
+  const unread = gate({ self: undefined });
+  assert.deepEqual([unread.refusal.code, unread.refusal.detail], ['operator-decision-required', 'no-decision']);
+  const fault = gate({ effect: undefined });
+  assert.deepEqual([fault.refusal.code, fault.fault], ['unknown-state', 'effect-missing']);
+  assert.deepEqual(refusalError(gate({ effect: 'publish' }).refusal).error.data, { detail: 'outside-mandate: effect' });
+  const tight = leadMandate({ ...REPLY_SCOPE, perCallMaxUsd: 1 });
+  assert.deepEqual(refusalError(gate({ meta: { mandate: tight }, spendUsd: 2 }).refusal).error.data, { detail: 'outside-mandate: spend', estimateUsd: 2, perCallMaxUsd: 1 });
+  const other = refusalError(gate({ callerAgent: 'example-other' }).refusal).error;
+  assert.deepEqual([other.code, other.data], ['decision-invalid', { detail: 'mandate-not-for-this-call' }]);
+  assert.deepEqual(refusalError(gate({ now: '2026-10-25T09:00:00Z' }).refusal).error.data, { detail: 'mandate-expired' });
+  assert.deepEqual(refusalError(gate({ meta: { mandate: 'yes' } }).refusal).error.data, { detail: 'mandate-malformed' });
+  assert.equal(gate({ meta: Object.create({ mandate: leadMandate() }) }).refusal.code, 'operator-decision-required'); // own members only
+  const decided = gate({ meta: { mandate: leadMandate(), decision: DECISION } });
+  assert.deepEqual([decided.record.via, decided.decision, 'mandate' in decided], ['relayed-instruction', DECISION, false]);
+  const t2 = gate({ tier: 'T2', caller: 'agent:remote', actionDigest: `sha256:${'a'.repeat(64)}` });
+  assert.equal(t2.refusal.code, 'approval-required');
+});
+
+test('an outside-mandate answer reaches the caller with the MD-4 wording (DEC-0125 MD-4)', async () => {
+  const k = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-interop.mjs');
+  const outside = k.actionRefusalToolResult({ ok: false, code: 'operator-decision-required', data: { detail: 'outside-mandate: spend', estimateUsd: 25, perCallMaxUsd: 1 } });
+  assert.match(outside.structuredContent.error.message, /pass this refusal/);
+  const plain = k.actionRefusalToolResult({ ok: false, code: 'operator-decision-required', data: { detail: 'no-decision' } });
+  assert.doesNotMatch(plain.structuredContent.error.message, /pass this refusal/);
 });
