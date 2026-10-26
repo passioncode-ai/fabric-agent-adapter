@@ -1,0 +1,1101 @@
+{
+ "about": "DEC-0123 (PL-1 to PL-4, FAC-SEM-143) at the pin: fixtures/vectors/page-links.json's builds, links and requests, each re-answered by the contract's dashboardsLink, pageLinkRules ('page-link') and inputRequestLinkFindings, with the findings' codes, instance paths and messages, and for each link parseDashboardsLink's and isLoopbackPageUrl's answers. Written by make_page_link_vectors.mjs, never by hand.",
+ "source": "fixtures/vectors/page-links.json, src/page-link-rules.ts",
+ "constants": {
+  "MAX_PAGE_PATH_LENGTH": 2048,
+  "MAX_PAGE_LINK_LENGTH": 20000,
+  "SERVICE_ID": "^[a-z][a-z0-9-]{1,62}$",
+  "INSTANCE": "^[a-z][a-z0-9-]{0,31}$",
+  "ORIGIN_PATH": "^\\/(?!\\/)\\S*$"
+ },
+ "builds": [
+  {
+   "name": "the dashboard itself, no path",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": null
+   },
+   "expected": "fabric-dashboards://service/example-agent.default"
+  },
+  {
+   "name": "the dashboard's root",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard"
+   },
+   "expected": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard"
+  },
+  {
+   "name": "a job page with a query",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard/job_1?tab=log"
+   },
+   "expected": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%2Fjob_1%3Ftab%3Dlog"
+  },
+  {
+   "name": "another instance",
+   "input": {
+    "service": "example-agent",
+    "instance": "work",
+    "path": "/"
+   },
+   "expected": "fabric-dashboards://service/example-agent.work?path=%2F"
+  },
+  {
+   "name": "a service id with an upper-case letter",
+   "input": {
+    "service": "Example-Agent",
+    "instance": "default",
+    "path": "/dashboard"
+   },
+   "expected": null
+  },
+  {
+   "name": "a missing instance",
+   "input": {
+    "service": "example-agent",
+    "instance": "",
+    "path": "/dashboard"
+   },
+   "expected": null
+  },
+  {
+   "name": "a full URL instead of a path",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "http://127.0.0.1:4100/dashboard"
+   },
+   "expected": null
+  },
+  {
+   "name": "a path that starts with two slashes",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "//evil.example/x"
+   },
+   "expected": null
+  },
+  {
+   "name": "the login-code route",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/fabric/v1/login?code=abcdefghijklmnop"
+   },
+   "expected": null
+  },
+  {
+   "name": "a token in the query",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard?token=sk-A1A1A1A1A1A1A1A1A1A1A1A1"
+   },
+   "expected": null
+  },
+  {
+   "name": "a backslash that a resolver reads as another host",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/\\evil.example/x"
+   },
+   "expected": null
+  },
+  {
+   "name": "the login-code route behind a dot segment",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/x/../fabric/v1/login"
+   },
+   "expected": null
+  },
+  {
+   "name": "the login-code route in other letter case",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/Fabric/v1/login"
+   },
+   "expected": null
+  },
+  {
+   "name": "a token in a hash route's own query",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard#/jobs?token=abc"
+   },
+   "expected": null
+  },
+  {
+   "name": "a backslash inside the path (the host's safePath refuses it anywhere)",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/a\\b"
+   },
+   "expected": null
+  },
+  {
+   "name": "a control character inside the path",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/a\u0001b"
+   },
+   "expected": null
+  },
+  {
+   "name": "a lone surrogate, which no encoding carries faithfully",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/\ud800"
+   },
+   "expected": null
+  },
+  {
+   "name": "a space in the path (the contract keeps originPath's no-whitespace, stricter than the host)",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/a b"
+   },
+   "expected": null
+  },
+  {
+   "name": "a hash route without a credential",
+   "input": {
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard#/jobs?tab=log"
+   },
+   "expected": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%3Ftab%3Dlog"
+  }
+ ],
+ "links": [
+  {
+   "name": "an open_link",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": true,
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard"
+   },
+   "loopback": false
+  },
+  {
+   "name": "the dashboard itself, no path (Fabric Dashboards' link tool)",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": true,
+    "service": "example-agent",
+    "instance": "default"
+   },
+   "loopback": false
+  },
+  {
+   "name": "one trailing slash is the same link",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default/"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": true,
+    "service": "example-agent",
+    "instance": "default"
+   },
+   "loopback": false
+  },
+  {
+   "name": "the host's verb in upper case",
+   "input": {
+    "url": "fabric-dashboards://SERVICE/example-agent.default?path=%2Fdashboard"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": true,
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard"
+   },
+   "loopback": false
+  },
+  {
+   "name": "an empty path",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path="
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the path is empty; a link to the dashboard itself names no path (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "the path is empty; a link to the dashboard itself names no path"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a second question mark, which the host reads as part of the name",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default??path=%2Fdashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: an open_link names its path (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "an open_link names its path"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a dot segment before the key (read as written, not as a URL parser normalises it)",
+   "input": {
+    "url": "fabric-dashboards://service/./example-agent.default"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: not fabric-dashboards://service/<id>.<instance>[?path=<path>] (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a control character before the scheme, which a URL parser drops",
+   "input": {
+    "url": "\u0001fabric-dashboards://service/example-agent.default?path=%2Ffabric%2Fv1%2Flogin%3Fcode%3D123456"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the path could carry a token or a login code; signing in is the host's (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a tab inside the scheme, which a URL parser drops",
+   "input": {
+    "url": "fabric-\tdashboards://service/example-agent.default?path=%2Fdashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: not fabric-dashboards://service/<id>.<instance>[?path=<path>] (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a newline after the scheme name",
+   "input": {
+    "url": "fabric-dashboards\n://service/example-agent.default?path=%2Fx%3Ftoken%3Dabc"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: not fabric-dashboards://service/<id>.<instance>[?path=<path>] (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a no-break space before the link (not stripped, as a URL parser does not)",
+   "input": {
+    "url": " fabric-dashboards://service/example-agent.default"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: not fabric-dashboards://service/<id>.<instance>[?path=<path>] (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a path parameter with no value",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the path is empty; a link to the dashboard itself names no path (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "the path is empty; a link to the dashboard itself names no path"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a backslash inside the path",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2Fa%5Cb"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the path is not a path on the service origin (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "the path is not a path on the service origin"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a control character inside the path",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2Fa%01b"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the path is not a path on the service origin (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "the path is not a path on the service origin"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a page after the key instead of in path",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default/dashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: not fabric-dashboards://service/<id>.<instance>[?path=<path>] (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "the scheme in upper case",
+   "input": {
+    "url": "FABRIC-DASHBOARDS://service/example-agent.default?path=%2Fdashboard"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": true,
+    "service": "example-agent",
+    "instance": "default",
+    "path": "/dashboard"
+   },
+   "loopback": false
+  },
+  {
+   "name": "a remote service's https page",
+   "input": {
+    "url": "https://agents.example/dashboard"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "another party's page (a payment step)",
+   "input": {
+    "url": "https://pay.example/checkout/123"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a raw loopback address",
+   "input": {
+    "url": "http://127.0.0.1:4100/dashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "localhost",
+   "input": {
+    "url": "http://localhost:4100/dashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "a name under localhost",
+   "input": {
+    "url": "http://example-agent.localhost:4100/"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "the IPv6 loopback",
+   "input": {
+    "url": "http://[::1]:4100/dashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "https on a loopback host",
+   "input": {
+    "url": "https://127.0.0.1:4443/dashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "another loopback address",
+   "input": {
+    "url": "http://127.1.2.3/"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "the IPv4-mapped loopback",
+   "input": {
+    "url": "http://[::ffff:127.0.0.1]:4100/"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "localhost with a trailing dot",
+   "input": {
+    "url": "http://localhost.:4100/dashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "the unspecified IPv4 address of a wildcard bind",
+   "input": {
+    "url": "http://0.0.0.0:4100/"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "the unspecified IPv6 address of a wildcard bind",
+   "input": {
+    "url": "http://[::]:4100/"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "a raw loopback address with leading space",
+   "input": {
+    "url": " http://127.0.0.1:4100/"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": true
+  },
+  {
+   "name": "an open_link without its instance",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent?path=%2Fdashboard"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the instance is not an instance name (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "the instance is not an instance name"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "an open_link without its path",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?tab=1"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: an open_link names its path (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "an open_link names its path"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "an open_link with two paths",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2Fa&path=%2Fb"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: path is given more than once (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "path is given more than once"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "an open_link to the login-code route",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2Ffabric%2Fv1%2Flogin%3Fcode%3Dabcdefghijklmnop"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the path could carry a token or a login code; signing in is the host's (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "the path could carry a token or a login code; signing in is the host's"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "an open_link of another form",
+   "input": {
+    "url": "fabric-dashboards://open?service=example-agent.default"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: not fabric-dashboards://service/<id>.<instance>[?path=<path>] (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "an open_link with a second parameter",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard&code=abcdefghijklmnop"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: an open_link carries its path and nothing else (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "an open_link carries its path and nothing else"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "an open_link with an unknown parameter",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2F&x=1"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: an open_link carries its path and nothing else (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "an open_link carries its path and nothing else"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "an open_link whose path leaves the origin by a backslash",
+   "input": {
+    "url": "fabric-dashboards://service/example-agent.default?path=%2F%5Cevil.example"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the path is not a path on the service origin (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "the path is not a path on the service origin"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "a malformed open_link with leading space",
+   "input": {
+    "url": " fabric-dashboards://service/Bad?path=x"
+   },
+   "expected": [
+    "/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/url",
+     "message": "the link is not an open_link: the service is not a service id; the instance is not an instance name; the path is not a path on the service origin (DEC-0123 PL-1)"
+    }
+   ],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  },
+  {
+   "name": "not a URL",
+   "input": {
+    "url": "dashboard"
+   },
+   "expected": [],
+   "findings": [],
+   "parsed": {
+    "ok": false,
+    "problems": [
+     "not fabric-dashboards://service/<id>.<instance>[?path=<path>]"
+    ]
+   },
+   "loopback": false
+  }
+ ],
+ "requests": [
+  {
+   "name": "URL mode on the service's own page, as its open_link",
+   "input": {
+    "inputRequests": {
+     "approve": {
+      "method": "elicitation/create",
+      "params": {
+       "mode": "url",
+       "message": "Approve the draft",
+       "url": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%2Fdrafts%2F7"
+      }
+     }
+    }
+   },
+   "expected": [],
+   "findings": []
+  },
+  {
+   "name": "URL mode on another party's sign-in page",
+   "input": {
+    "inputRequests": {
+     "connect": {
+      "method": "elicitation/create",
+      "params": {
+       "mode": "url",
+       "message": "Sign in to the store",
+       "url": "https://store.example/connect"
+      }
+     }
+    }
+   },
+   "expected": [],
+   "findings": []
+  },
+  {
+   "name": "URL mode on a raw loopback address",
+   "input": {
+    "inputRequests": {
+     "approve": {
+      "method": "elicitation/create",
+      "params": {
+       "mode": "url",
+       "message": "Approve the draft",
+       "url": "http://127.0.0.1:4100/dashboard/drafts/7"
+      }
+     }
+    }
+   },
+   "expected": [
+    "/inputRequests/approve/params/url"
+   ],
+   "findings": [
+    {
+     "code": "FAC-SEM-143",
+     "instancePath": "/inputRequests/approve/params/url",
+     "message": "input request approve hands a person a raw local address; give Fabric Dashboards' open_link (DEC-0123 PL-1)"
+    }
+   ]
+  },
+  {
+   "name": "form mode carries no link",
+   "input": {
+    "inputRequests": {
+     "pick": {
+      "method": "elicitation/create",
+      "params": {
+       "message": "Pick one",
+       "requestedSchema": {
+        "type": "object",
+        "properties": {
+         "choice": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "expected": [],
+   "findings": []
+  }
+ ]
+}
