@@ -227,5 +227,6 @@ The probe reads the declaration (`well-known.actions`), checks that `tools/list`
 | `interop.unknown-job` | `fabric.job.get` for a made-up id answers `isError` with `unknown-job` | `fabric.job.get` is not served |
 | `interop.trace-propagation` | the answer's `_meta.traceparent` has the probe's trace id and a new span | the answer carries no traceparent |
 | `interop.events-trace` | every event with a trace carries both `traceId` and `spanId`, well formed | no events page was read |
+| `interop.action-tools` | every action the well-known `extensions/actions/0.1` declares names a tool `tools/list` serves (DEC-0121 AP-1); one it does not serve is a `FAIL` | no declaration, an unreadable one (`well-known.actions` reports it), or no listing was read |
 
 `python3 scripts/check_service.py <id>` prints them with the rest; `--json` for a machine.
