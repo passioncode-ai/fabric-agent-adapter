@@ -88,10 +88,9 @@ def check(data):
     deep, plain = urlsplit(native), urlsplit(http)
     require(deep.scheme == 'fabric-dashboards' and not deep.username and not deep.password and not deep.port and not deep.fragment, 'invalid_deep_link')
     query = parse_qs(deep.query, keep_blank_values=True, strict_parsing=True)
-    if deep.netloc == 'service':
-        require(deep.path in ('/' + service, '/' + service + '/') and set(query) <= {'path'}, 'wrong_service_or_parameter')
-    else:
-        require(deep.netloc == 'open' and deep.path in ('', '/') and query.get('service') == [service] and set(query) <= {'service', 'path'}, 'invalid_legacy_link')
+    # DEC-0123 PL-1: only the service form; the legacy open?service= link is refused (FAC-SEM-143, since 0.51.0).
+    require(deep.netloc == 'service', 'not_service_link')
+    require(deep.path in ('/' + service, '/' + service + '/') and set(query) <= {'path'}, 'wrong_service_or_parameter')
     require('path' not in query or len(query['path']) == 1, 'duplicate_path')
     page = query.get('path', [None])[0]
     require(page is None or safe_path(page), 'unsafe_path')
