@@ -153,6 +153,17 @@
    "sha256": "28e693282cddff8e4396ae39ce6fa935e875e8ddac7375bea2c189dd6fb04970"
   },
   {
+   "module": "fabric_actions",
+   "file": "fabric_actions.py",
+   "layer": "L3",
+   "imports": [
+    "fabric_base",
+    "fabric_jsvalue",
+    "fabric_time"
+   ],
+   "sha256": "dd7c6b222dd233446758d9a27522822e146cb35bcb76c48ec97b6c576e23ea9e"
+  },
+  {
    "module": "fabric_connections",
    "file": "fabric_connections.py",
    "layer": "L3",
@@ -261,6 +272,7 @@
    "file": "fabric_service.py",
    "layer": "L3",
    "imports": [
+    "fabric_actions",
     "fabric_auth",
     "fabric_backups",
     "fabric_base",
@@ -547,6 +559,17 @@
    "sha256": "dc039ec3612d0090c9ba6a3a949b0b7df54712bead300dcb6cc8b9bc305cd183"
   },
   {
+   "module": "fabric-actions",
+   "file": "fabric-actions.mjs",
+   "layer": "L3",
+   "imports": [
+    "fabric-base",
+    "fabric-jsvalue",
+    "fabric-time"
+   ],
+   "sha256": "196e823bd9bc08273e54e06551c0e2d4826df74b8bd0adc919fd33c02bc22462"
+  },
+  {
    "module": "fabric-connections",
    "file": "fabric-connections.mjs",
    "layer": "L3",
@@ -657,6 +680,7 @@
    "file": "fabric-service.mjs",
    "layer": "L3",
    "imports": [
+    "fabric-actions",
     "fabric-auth",
     "fabric-backups",
     "fabric-base",

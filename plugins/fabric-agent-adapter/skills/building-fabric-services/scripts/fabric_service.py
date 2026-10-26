@@ -181,6 +181,15 @@ from fabric_backups import (  # noqa: F401
     newest_intact_backup,
     restore_plan,
 )
+from fabric_actions import (  # noqa: F401
+    ACTIONS_EXTENSION_KEY,
+    action_decision,
+    action_rules,
+    actions_extension,
+    actions_extension_rules,
+    actions_view,
+    decision_shape,
+)
 from fabric_connections import (  # noqa: F401
     CONNECTIONS_EXTENSION_KEY,
     connections_extension,
