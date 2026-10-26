@@ -101,6 +101,7 @@ once the kit reads it (FAA-135).
 - `evidence` is at most 8 references `{id: uri, contentHash: sha256:<hex>, label?}`; `artifact_ref(uri, content=…|path=…)`
   hashes the bytes itself. Two ids with one normal form (DEC-0076) name one artifact and are refused.
 - `reply: {text, format?, artifacts?}` is posted with `com.reply` before the completion. A reply is not a completion.
+  It is a fenced reply, so it carries no `deliverTo` and reaches the requester (DEC-0135 DR-3).
 - A handler that raises before any effect completes the request `failed_known` naming only the exception's class.
 - The handler checks `ctx.stopped` in long work: after a session loss its answer is not sent.
 

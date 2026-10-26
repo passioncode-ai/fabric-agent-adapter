@@ -129,6 +129,9 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
   finds no rule broken. A service that applies the estate record updates its copy first:
   `fabric_kit.py install <dir> --module fabric_estate` (or `--lang node --module fabric-estate`). Since 0.40.0 the
   estate reader imports the kit's core modules, so the one file alone no longer loads ([kit modules](kit-modules.md)).
+- **A tokenless call runs in the instance's context** (DEC-0137). A T0 or T1 caller presents no token (DL-26), so the
+  call is in the context of the instance it reached: the personal instance for the person, an organization's instance
+  for that organization ([delegation](delegation.md), the family).
 
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits

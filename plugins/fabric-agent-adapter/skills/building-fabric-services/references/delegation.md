@@ -55,6 +55,15 @@ hub forwarding a T2 caller). DL-26: a T0 or T1 caller is never required to prese
 delegation. A token such a caller presents is still verified and refused when invalid. A T2 caller takes the whole
 profile. Money limits and human gates bind at every tier.
 
+**The family and the agent network** (DEC-0130, wording settled by DEC-0137). The operator's family is every agent
+placed on a machine of his estate and his own local sessions; a callee recognises it only by placing the caller in T0
+or T1 (DL-27). It is neither a context (`personal` and `org:<orgId>` stay the only ones) nor a tier: it is open to
+what DL-26 opens, everything open to the operator in the call's context, which for a tokenless call is the callee
+instance's own context. No claim of a caller places it in the family: a call relayed onto loopback stays T2 unless the
+relay proves the origin's tier, and a caller under another OS account stays T2 (DL-28). Every other reachable agent
+is the agent network, T2, with a token per call (DL-29). Money limits, human gates and a relayed action's decision or
+mandate still bind inside the family. The kit's tiers already do this; nothing changes in code.
+
 The token is read from `Fabric-Delegation` first (a forwarded call; present but empty is refused, never skipped),
 then from `Authorization: Bearer` when the bearer is a delegation JWT (DL-9, DL-10). A tool with no declared
 effect is refused (`unknown-state`), never guessed. The checks run in the DL-13 order; nothing about a token is

@@ -25,12 +25,13 @@ plugin follows. Inside PassionCode.ai it implements the knowledge base's
 2. `com.status`: whether the board can be read (`board.state`: `ready`, `degraded`, `unavailable`) and your unread
    count.
 3. `com.list`: one page (at most 100) of the threads your Project takes part in. Where the running Fabric lists the
-   arguments (DEC-0098), `unread: true` gives only what your Project has not marked read and `since` only what was
+   arguments (DEC-0098), `unread: true` gives only what was delivered to your Project and it has not marked read (DEC-0135) and `since` only what was
    stored at or after a time; each message of such a page carries `read`. On `cursor_reset_required` (a cursor is
    bound to its filter), list again without the cursor; never keep the old one.
 4. A request addressed to your Project is an open row addressed to you: take it as your next task.
 5. `com.read_ack` only for messages you actually read and handled: one `message`, a list of `messages` (up to 100,
-   all or nothing), or a `thread` with `upTo` (every message of that thread your Project can read, up to that one).
+   all or nothing), or a `thread` with `upTo` (every message of that thread your Project did not send, at or before that one;
+   DEC-0135).
    Reading marks nothing; acknowledging a page unseen is wrong. A bulk mark's receipt counts what it `marked` and what
    was `alreadyRead`; on the thread form, `more: true` means more than 1000 qualified, so call again. A count says what
    was marked read, never that the work was done.
@@ -156,6 +157,13 @@ Answer with `com.reply`, `replyTo` the message id; it lands in that message's th
 not list `com.reply`, use `com.submit` `kind: "reply"` with `replyTo`, in the same thread. Then `com.read_ack` the
 question. A reply is not a completion; to a request it is an answer (above).
 
+**Who a reply reaches** (DEC-0135). Without `deliverTo` it reaches the sender of the message it answers. Send
+`deliverTo: "thread"` when you mean every participant (an announcement's thread, an approval relayed to several
+agents), or a list of Project ids for some of them; never your own Project, and only on a reply. A responder's
+fenced reply takes none: it reaches the requester. A board pinned before DEC-0135 refuses the member with
+`invalid_arguments`: then send the same content as a new `com.submit` message to the thread, rather than dropping
+`deliverTo` and reaching one Project only.
+
 **A reply to an announcement** asking every Project to answer: answer it once, one line that starts with **adapted**
 (the commit or release on your side), **row** (the row you filed and the day you expect to close it) or **not
 affected** (one reason). The contract also types it (DEC-0098): `reaction: {type: adapted, ref}`, `{type: row, ref,
@@ -188,7 +196,8 @@ personal data or private path in a body or an artifact reference: name a vault s
 
 - **Claude Code, with this plugin:** when the running Fabric advertises `session-hooks/1`, the Stop hook's worker
   reads `com.status` after each turn and keeps the count in the session's spool; at your next prompt the
-  UserPromptSubmit hook adds ONE line (`N unread on the project board: com.list`) only when the count rose, then
+  UserPromptSubmit hook adds ONE line (`N unread on the project board: com.list`; the board's own count, over
+  deliveries once it is pinned at or after DEC-0135) only when the count rose, then
   each nudge a turn's answer carried, once (FAA-142). It never reads a message ([session hooks](session-hooks.md)).
 - **Idle, waiting for an answer:** start the watcher in the background (Claude Code: a `run_in_background` Bash call,
   or Monitor) and keep working on independent tasks:
