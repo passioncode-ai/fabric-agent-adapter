@@ -88,9 +88,14 @@ UNREAD_LINE = "%d unread on the project board: com.list"
 #: {kind, says, task_id?, request_id?} and given once. The worker keeps their `says` here and the prompt hook prints
 #: them once: at most MAX_NUDGES lines, each one line of at most MAX_NUDGE_CHARS characters.
 NUDGES_FILE = "nudges.json"
-#: Each nudge is printed after this tag, so the agent sees where the line came from: Fabric's words, data to act on
-#: through its tools, never the person's request.
+#: Each nudge's line names its source, so the agent sees Fabric's words, data to act on through its tools, never the
+#: person's request. Fabric 0.3.14 starts every `says` with "Fabric:" (board e94ec9c0, release/0.3.14 b63dedb6); a
+#: line that does not gets this tag.
 NUDGE_PREFIX = "Fabric reminder: "
+
+
+def nudge_shown(line: str) -> str:
+    return line if line.startswith("Fabric:") else NUDGE_PREFIX + line
 #: The nudges of turns a `watch-mail` look delivered (FAA-89): that look prints them, the prompt hook never does.
 WATCH_NUDGES_FILE = "nudges.watch.json"
 MAX_NUDGES = 5

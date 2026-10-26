@@ -7,7 +7,7 @@
 - **Reminders Fabric gives on a turn reach the agent** (FAA-142, Fabric ask `dfb43ffb`). From Fabric 0.3.14, the
   answer to a turn's `fabric_session_observe` may carry `nudges`: lapsed claims, unread board answers, requests nobody
   moved. The Stop hook's worker keeps their text in the session's spool (`nudges.json`), and the UserPromptSubmit
-  hook prints each one once on the next prompt, after the unread line and the tag `Fabric reminder: `: one line each, at most five lines of at most
+  hook prints each one once on the next prompt, after the unread line, as Fabric writes it (each starts `Fabric:`; any other line gets the tag `Fabric reminder: `): one line each, at most five lines of at most
   400 characters. An empty or absent list prints nothing. A turn that `watch-mail` delivers has its nudges printed by
   `watch-mail`, once. Not carried across `/clear`: nudges of turns spooled before it stay in the old id's folder, and
   in a project that uses Fabric the new session's preamble sends the agent to `fabric_work_list`, where Fabric says

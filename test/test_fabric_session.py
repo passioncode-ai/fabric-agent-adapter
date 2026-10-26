@@ -856,6 +856,15 @@ class TurnNudges(Active):
         self.turn()
         self.assertEqual(self.prompt(), "Fabric reminder: One.\nFabric reminder: Two.")
 
+    def test_fabric_s_own_sentence_is_printed_as_given(self):
+        # The shape Fabric 0.3.14 answers (board e94ec9c0, release/0.3.14 b63dedb6): {recorded, seq, nudges?}, and
+        # every `says` starts with "Fabric:", so it gets no second tag.
+        self.answer({"recorded": True, "seq": 7, "nudges": [
+            {"kind": "claim-lapsed", "says": "Fabric: your claim on task 12 lapsed; claim it again or let it go.",
+             "task_id": "t12"}]})
+        self.turn()
+        self.assertEqual(self.prompt(), "Fabric: your claim on task 12 lapsed; claim it again or let it go.")
+
     def test_a_full_pending_list_logs_what_it_dropped(self):
         self.answer({"nudges": [{"kind": "k", "says": "n%d" % i} for i in range(fs.MAX_NUDGES)]})
         self.turn()

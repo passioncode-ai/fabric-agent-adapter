@@ -41,6 +41,7 @@ from fabric_session_env import (  # noqa: F401
     take_nudges,
     WATCH_NUDGES_FILE,
     NUDGE_PREFIX,
+    nudge_shown,
     LAUNCHED_MARK,
     rejoin_wait,
     _home,
