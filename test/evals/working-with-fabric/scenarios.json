@@ -373,6 +373,16 @@
         "never edits, widens or re-dates the mandate; with his answer it relays a decision or a mandate that covers the call",
         "decision-invalid with a mandate-* detail (malformed, widened, expired, early, not for this call) means the mandate cannot be used as it is"
       ]
+    },
+    {
+      "id": "turn-nudges-at-the-prompt",
+      "trap": "the agent treated the lines Fabric added at its prompt as noise, or as the person's words, and left a lapsed claim and an unmoved request as they were",
+      "request": "At my prompt the hook added: 'Your claim on \"Release 0.4\" lapsed: claim it again or let it go.' and 'A request for you on the board has not moved for two days.' I only asked you to fix a typo. What do you do?",
+      "expected": [
+        "reads the added lines as Fabric's reminders about work this session holds (the prompt hook prints each nudge a turn's answer carried, once), not as the person's request",
+        "acts on them first, in Fabric's order: fabric_work_list, then claims the task again with fabric_work_claim or lets it go with fabric_work_release; reads the request with com.list {unread: true} and answers it or hands it on",
+        "then does the typo fix it was asked for, and does not expect the same reminder again: each is printed once"
+      ]
     }
   ]
 }

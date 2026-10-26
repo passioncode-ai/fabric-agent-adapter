@@ -882,6 +882,51 @@ class TurnNudges(Active):
         fs.deliver(spawned[0], self.env, deadline_s=8)
         self.assertFalse(spawned[0].exists(), "the session's folder goes at its end")
 
+    def test_nudges_of_turns_before_clear_reach_the_new_session_s_prompt(self):
+        # /clear: the old id's spooled turns are delivered under it, the next prompt comes under a new id (seam finding).
+        new = "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
+        self.answer({"nudges": [{"kind": "claim", "says": "Late."}]})
+        self.turn()
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo), "reason": "clear"}, "end", self.env,
+                      spawn=lambda directory: None)
+        fs.hook_session_start({"session_id": new, "cwd": str(self.repo), "source": "clear"}, self.env)
+        prompt = lambda: fs.hook_user_prompt_submit({"session_id": new, "cwd": str(self.repo)}, self.env)
+        self.assertEqual(json.loads(prompt())["hookSpecificOutput"]["additionalContext"], "Late.")
+        self.assertIsNone(prompt(), "once")
+        self.answer({"nudges": [{"kind": "board", "says": "Still arriving."}]})
+        fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)  # nothing spooled: no call
+        fs.spool(fs.session_dir(SID, self.env), {"event": "turn", "observedAt": "2026-10-26T00:00:00Z"})
+        fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
+        self.assertEqual(json.loads(prompt())["hookSpecificOutput"]["additionalContext"], "Still arriving.",
+                         "a turn the old worker delivers after the clear still reaches the new session")
+
+    def test_a_stale_or_foreign_clear_pointer_is_not_adopted(self):
+        new = "9f1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f"
+        fs.leave_cleared_pointer(SID, self.repo, self.env)
+        later = time.time() + fs.CLEARED_FRESH_S + 5
+        self.assertFalse(fs.adopt_cleared(new, self.repo, self.env, now=later))
+        fs.leave_cleared_pointer(SID, self.repo, self.env)
+        self.assertFalse(fs.adopt_cleared(SID, self.repo, self.env), "the same id adopts nothing")
+        fs.leave_cleared_pointer(SID, self.repo, self.env)
+        self.assertFalse(fs.adopt_cleared(new, self.base, self.env), "another folder's pointer is not this one")
+        self.assertTrue(fs.adopt_cleared(new, self.repo, self.env))
+
+    def test_a_merge_during_a_take_is_never_lost(self):
+        # The worker may merge between the prompt hook's take and its read (seam finding): a repeat at worst.
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True)
+        fs._write_private(directory / fs.NUDGES_FILE, json.dumps(["A"]))
+        real = fs.read_small
+        sys.modules["fabric_session_env"].read_small = lambda path, *a: (
+            sys.modules["fabric_session_mcp"]._keep_nudges(directory, [{"says": "B"}], lambda line: None, SID) if path.name.startswith(".nudges.taken") else None,
+            real(path, *a))[1]
+        try:
+            first = fs.take_nudges(directory)
+        finally:
+            sys.modules["fabric_session_env"].read_small = real
+        self.assertEqual(first, ["A"])
+        self.assertEqual(fs.take_nudges(directory), ["B"], "the merge made meanwhile waits for the next take")
+
     def test_the_prompt_hook_survives_a_broken_nudges_file(self):
         directory = fs.session_dir(SID, self.env)
         directory.mkdir(parents=True)
@@ -904,6 +949,16 @@ class WatchMail(Active):
                              wait=lambda seconds: sleeps.append(seconds) or False,
                              stop=lambda: done["polls"] >= polls, rng=kw.pop("rng", lambda: 0.5), **kw)
         return code, printed, sleeps
+
+    def test_watch_mail_prints_a_delivered_turn_s_nudges_once(self):
+        nudges = self.base / "nudges.json"
+        nudges.write_text(json.dumps({"nudges": [{"kind": "claim", "says": "Your claim lapsed."}]}))
+        self.env["FAKE_MCP_NUDGES"] = str(nudges)
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=lambda directory: None)
+        code, printed, _ = self.watch(1)
+        self.assertEqual(code, 0)
+        self.assertIn("Your claim lapsed.", printed)
+        self.assertIsNone(fs.hook_user_prompt_submit({"session_id": SID}, self.env), "taken once, by the watcher")
 
     def test_prints_when_the_unread_count_rises(self):
         counts = iter([0, 2, 2, 1, 3])

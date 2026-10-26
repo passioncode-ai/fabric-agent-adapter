@@ -13,7 +13,6 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     HOSTS,
     LAUNCHED_MARK,
     NATIVE_PLUGIN_HOSTS,
-    NUDGES_FILE,
     REJOIN_MIN_INTERVAL_S,
     SESSION_ID,
     UNREAD_LINE,
@@ -31,7 +30,9 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     lock_held,
     log,
     no_session_held,
-    nudge_lines,
+    leave_cleared_pointer,
+    adopt_cleared,
+    pending_nudges,
     project_uses_fabric,
     prune_stale_sessions,
     read_small,
@@ -106,6 +107,10 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     and in a session Fabric launched. How to read the machine's Fabric services is the host instructions' to say."""
     if host not in HOSTS or payload.get("source") in QUIET_SOURCES or fabric_launched(env):
         return None
+    session_id = payload.get("session_id")
+    if host == "claude" and payload.get("source") == "clear" and isinstance(session_id, str) \
+            and SESSION_ID.fullmatch(session_id):
+        adopt_cleared(session_id, Path(payload.get("cwd") or os.getcwd()), env)  # FAA-142
     cwd = Path(payload.get("cwd") or os.getcwd())
     registration = claude_registration(cwd, env) if host == "claude" else None
     registered = registration is not None if host == "claude" else host_registered(host, cwd, env)
@@ -149,23 +154,6 @@ def _unread_line(directory: Path) -> Optional[str]:
     return UNREAD_LINE % unread if unread > shown else None
 
 
-def _take_nudges(directory: Path) -> List[str]:
-    """FAA-142: the nudges the Stop worker kept since the last prompt, taken once: the file goes before they are
-    printed, and a file that cannot be removed prints nothing rather than repeat them every prompt."""
-    path = directory / NUDGES_FILE
-    try:
-        value = json.loads(read_small(path) or "null")
-    except ValueError:
-        value = None
-    if value is None:
-        return []
-    try:
-        path.unlink()
-    except OSError:
-        return []
-    return nudge_lines([{"says": line} for line in value] if isinstance(value, list) else [])
-
-
 def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None) -> Optional[str]:
     """The unread line when the board's count rose since the last one, then each nudge a turn's answer carried
     (FAA-142), once; None when there is neither. Reads small files in the session's own folder; never calls Fabric."""
@@ -173,7 +161,7 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id) or fabric_launched(env):
         return None
     directory = session_dir(session_id, env)
-    lines = [line for line in [_unread_line(directory)] if line] + _take_nudges(directory)
+    lines = [line for line in [_unread_line(directory)] if line] + pending_nudges(session_id, env)
     if not lines:
         return None
     return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
@@ -212,6 +200,7 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
         # later hook comes for this id. The new worker waits for the lock and finds an empty spool at worst.
         if any(directory.glob("*-turn.json")):
             spawn(directory)
+        leave_cleared_pointer(session_id, cwd, env)  # FAA-142: those turns' nudges reach the new id's prompts
         return "skipped: /clear keeps the Fabric session"
     if no_session_held(directory):
         # A rejoin found no Fabric session for this id (02bf19c5, ask 4): recorded once, never retried every turn.

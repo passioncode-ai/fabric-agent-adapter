@@ -2,6 +2,7 @@
 project uses Fabric, whether Fabric launched this session, and the log and spool the hooks write. Standard library only."""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -555,7 +556,95 @@ def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[flo
                 removed += 1
         except OSError:
             continue
+    try:
+        for pointer in (state_root(env=env) / "cleared").iterdir():
+            try:
+                if now - pointer.stat().st_mtime > SESSION_STALE_S:
+                    pointer.unlink()
+            except OSError:
+                continue
+    except OSError:
+        pass
     return removed
+
+
+#: FAA-142: /clear gives the session a new id (Fabric renames its session to it), while the turns spooled before it
+#: are delivered under the old id. The end hook with reason clear leaves a pointer named by the folder; the next
+#: SessionStart with source clear adopts it, so the prompt hook also reads the old folder's nudges. A pointer older
+#: than CLEARED_FRESH_S is not adopted.
+CLEARED_FROM = "cleared-from"
+CLEARED_FRESH_S = 120
+
+
+def _cleared_pointer(cwd: Path, env: Optional[Dict[str, str]] = None) -> Path:
+    key = hashlib.sha256(str(cwd).encode("utf-8", "surrogatepass")).hexdigest()[:24]
+    return state_root(env=env) / "cleared" / key
+
+
+def leave_cleared_pointer(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None) -> None:
+    """At an end with reason clear: name the old session for the folder's next SessionStart. Never raises."""
+    try:
+        pointer = _cleared_pointer(cwd, env)
+        pointer.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        _write_private(pointer, json.dumps({"from": session_id, "at": time.time()}))
+    except OSError:
+        pass
+
+
+def adopt_cleared(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None,
+                  now: Optional[float] = None) -> bool:
+    """At SessionStart with source clear: keep the old session's id in the new session's folder, so its nudges reach
+    this session's prompts. True when adopted. Never raises."""
+    now = time.time() if now is None else now
+    try:
+        pointer = _cleared_pointer(cwd, env)
+        data = json.loads(read_small(pointer) or "null")
+        pointer.unlink()
+    except (OSError, ValueError):
+        return False
+    old = data.get("from") if isinstance(data, dict) else None
+    at = data.get("at") if isinstance(data, dict) else None
+    if (not isinstance(old, str) or not SESSION_ID.fullmatch(old) or old == session_id
+            or not isinstance(at, (int, float)) or isinstance(at, bool) or not 0 <= now - at <= CLEARED_FRESH_S):
+        return False
+    try:
+        directory = session_dir(session_id, env)
+        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        _write_private(directory / CLEARED_FROM, old)
+    except OSError:
+        return False
+    return True
+
+
+def take_nudges(directory: Path) -> List[str]:
+    """The nudges the worker kept in `directory`, taken once: the file is renamed away first, so a merge the worker
+    makes meanwhile lands in a new file for the next take (a repeat at worst, never a loss). [] on any trouble."""
+    path = directory / NUDGES_FILE
+    taken = directory / (".nudges.taken.%d" % os.getpid())
+    try:
+        os.replace(str(path), str(taken))
+    except OSError:
+        return []
+    try:
+        value = json.loads(read_small(taken) or "null")
+    except ValueError:
+        value = None
+    finally:
+        try:
+            taken.unlink()
+        except OSError:
+            pass
+    return nudge_lines([{"says": line} for line in value] if isinstance(value, list) else [])
+
+
+def pending_nudges(session_id: str, env: Optional[Dict[str, str]] = None) -> List[str]:
+    """This session's nudges, and those still arriving under the id it had before /clear, each once."""
+    directory = session_dir(session_id, env)
+    lines = take_nudges(directory)
+    old = (read_small(directory / CLEARED_FROM) or "").strip()
+    if SESSION_ID.fullmatch(old) and old != session_id:
+        lines = lines + take_nudges(session_dir(old, env))
+    return nudge_lines([{"says": line} for line in lines])
 
 
 def lock_held(directory: Path) -> bool:

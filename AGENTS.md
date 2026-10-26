@@ -131,7 +131,8 @@ this repository both obeys it and ships its service layer
   `fabric` is registered, Fabric runs and the project uses Fabric (a contract file up to the checkout root, a
   project-bound registration, or, read last, a service descriptor naming the checkout's origin, one `git config`
   call); in a folder with no such sign, one line pointing at `fabric_whoami` (FAA-60); when Fabric is down, one line,
-  and only in a project that uses Fabric. Stop and SessionEnd first remove
+  and only in a project that uses Fabric. On `/clear` it also adopts the pointer the cleared session's end left, one
+  small file in the new session's folder, so nudges of turns spooled before the clear reach the new id (FAA-142). Stop and SessionEnd first remove
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s) and
   write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**
