@@ -267,7 +267,7 @@ test('the decision refusal names the routes for a client that cannot set _meta (
   const places = ['_meta.decision', 'agent.call', 'call.decision', 'elicitation', 'Fabric Dashboards', 'open_link'].map((r) => message.indexOf(r));
   assert.ok(!places.includes(-1), message);
   assert.deepEqual(places, [...places].sort((a, b) => a - b));
-  assert.ok(!message.includes('—'));
+  assert.ok(!message.includes('\u2014'));
 });
 
 test('an action refusal is a DL-19 body', () => {

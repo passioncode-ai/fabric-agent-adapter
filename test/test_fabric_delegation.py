@@ -453,7 +453,7 @@ class RefusalCodeSetTests(unittest.TestCase):
         places = [message.find(route) for route in routes]
         self.assertNotIn(-1, places, message)
         self.assertEqual(places, sorted(places))
-        self.assertNotIn("—", message)
+        self.assertNotIn("\u2014", message)
         node = shutil.which("node")
         if node is None:
             self.skipTest("node is not on PATH")
