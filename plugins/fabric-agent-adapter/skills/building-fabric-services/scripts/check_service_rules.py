@@ -1,6 +1,7 @@
 """The probe's rules that read one thing and need no running service (FAA-65): a plist's marker and priority, the
-network guard's verdict, the board responder's fixture conversation, a session cookie's lifetime, a usage report, and
-whether two repository URLs name one repository. ``check_service.py`` runs them against a live service.
+network guard's verdict, the board responder's fixture conversation, a session cookie's lifetime, a usage report,
+whether two repository URLs name one repository, a service's actions declaration (DEC-0121) and whether its checkout
+opens its pages in a browser (FAA-118). ``check_service.py`` runs them against a live service.
 Standard library only, Python 3.9+."""
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
+import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 
 
 def plist_problems(plist: dict, label: object, token: object = None) -> list:
@@ -291,3 +293,67 @@ def same_repository(a: str, b: str) -> bool:
         u = re.sub(r"^[^@/]+@", "", u)
         return re.sub(r"\.git$", "", u).rstrip("/")
     return bool(a and b) and norm(a) == norm(b)
+
+
+# actions (fabric-actions/0.1, DEC-0121, FAC-SEM-142) ----------------------------------------
+_ACTIONS_KEY_PATH = "/extensions/" + fa.ACTIONS_EXTENSION_KEY.replace("~", "~0").replace("/", "~1")
+
+
+def _actions_place(instance_path: str) -> str:
+    """A finding's place inside the declaration (`/actions/1/id`), or the declaration itself."""
+    inner = instance_path[len(_ACTIONS_KEY_PATH):] if instance_path.startswith(_ACTIONS_KEY_PATH) else instance_path
+    return inner or "extensions/actions/0.1"
+
+
+def well_known_actions_verdict(wk: Any) -> Tuple[str, str]:
+    """`well-known.actions`: a declared extensions/actions/0.1 is FAC-SEM-142's (the kit's actions_extension_rules, the
+    contract's reader): its schema's, each id once, humanStep exactly when gate is human, every tool in a present
+    surfaces.mcp.capabilities. No declaration is NOT_RUN: dashboard.actions-declared says what that means."""
+    view = fa.actions_view(wk)
+    if not view["declared"]:
+        return "NOT_RUN", "no extensions/actions/0.1 declaration (DEC-0121 AP-1)"
+    findings = fa.actions_extension_rules(wk)
+    if findings:
+        return "FAIL", "; ".join("FAC-SEM-142 %s: %s" % (_actions_place(f["instancePath"]), f["message"]) for f in findings[:5])
+    gates: Dict[str, int] = {}
+    for action in view["actions"]:
+        gates[action["gate"]] = gates.get(action["gate"], 0) + 1
+    return "PASS", "%d action(s) (%s), FAC-SEM-142 holds" % (
+        len(view["actions"]), ", ".join("%d %s" % (n, g) for g, n in sorted(gates.items())))
+
+
+def action_tools_verdict(wk: Any, tools: Optional[Dict[str, Any]], why_not: str = "tools/list was not read") -> Tuple[str, str]:
+    """`interop.action-tools`: every declared action's tool is served by tools/list, the live surface (FAC-SEM-142
+    checks only the list the document names). `tools` None means no listing was read; `why_not` says why."""
+    view = fa.actions_view(wk)
+    if not view["declared"]:
+        return "NOT_RUN", "no extensions/actions/0.1 declaration"
+    if not view["valid"]:
+        return "NOT_RUN", "the actions declaration is not readable (well-known.actions): a reader treats it as not declared"
+    if tools is None:
+        return "NOT_RUN", why_not
+    missing = ["%s (%s)" % (a["tool"], a["id"]) for a in view["actions"] if a["tool"] not in tools]
+    if missing:
+        return "FAIL", ("tools/list does not serve %s: a button without an agent twin (DEC-0121 AP-1)" % ", ".join(missing))
+    return "PASS", "%d declared action(s), every tool served by tools/list" % len(view["actions"])
+
+
+def actions_declared_verdict(wk: Any) -> Tuple[str, str]:
+    """`dashboard.actions-declared` (decision D10): a dashboard whose declaration FAC-SEM-142 accepts passes, one it
+    finds (unreadable, a repeated id, a step that disagrees with the gate, a tool the surface does not list) fails,
+    and one with none is NOT_RUN, never FAIL: a read-only dashboard cannot declare an empty list
+    (minItems 1), so absence proves no page-only button. Fabric Dashboards reports it (CT-126)."""
+    surfaces = wk.get("surfaces") if isinstance(wk, dict) else None
+    if not (isinstance(surfaces, dict) and surfaces.get("dashboard")):
+        return "NOT_RUN", "no surfaces.dashboard"
+    view = fa.actions_view(wk)
+    if not view["declared"]:
+        return "NOT_RUN", ("a dashboard with no extensions/actions/0.1 declaration: a read-only dashboard declares none "
+                           "(the list needs minItems 1), so its absence proves no page-only button; a dashboard with a "
+                           "button declares it and its agent twin (DEC-0121 AP-1). Fabric Dashboards reports it (CT-126)")
+    if not view["valid"]:
+        return "FAIL", "the dashboard's actions declaration is not readable, so a host treats it as not declared (well-known.actions)"
+    findings = fa.actions_extension_rules(wk)
+    if findings:
+        return "FAIL", "the dashboard's actions declaration breaks FAC-SEM-142 in %d place(s) (well-known.actions)" % len(findings)
+    return "PASS", "the dashboard declares %d action(s) with their tools (DEC-0121 AP-1)" % len(view["actions"])

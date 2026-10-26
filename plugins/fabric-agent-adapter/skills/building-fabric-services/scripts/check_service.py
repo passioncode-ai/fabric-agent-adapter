@@ -26,6 +26,10 @@ well-known `protocols` declares that it answers board requests. The rule checks 
 runs the kit's fixture conversation (`fabric_board.self_check`, or `selfCheck` of a Node copy given with --board-kit):
 the whole conversation, a fenced accept and a board session without an epoch, with no Fabric. A live board is never
 touched; that smoke needs a disposable Fabric and is reported separately.
+
+Actions (fabric-actions/0.1, DEC-0121): `well-known.actions` holds a declared extensions/actions/0.1 to FAC-SEM-142,
+`interop.action-tools` fails a declared action whose tool tools/list does not serve, and `dashboard.actions-declared`
+is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboard cannot declare an empty list).
 """
 
 from __future__ import annotations
@@ -69,6 +73,7 @@ from check_service_rules import _semver  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import usage_problems  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
+from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict  # noqa: E402 - DEC-0121
 
 
 class _PinnedHTTPS(http.client.HTTPSConnection):
@@ -256,6 +261,8 @@ class Probe:
             self.add("well-known.connections", "FAIL" if view["reported"] else "PASS",
                      "; ".join(f["message"] for f in fcn.connections_rules(wk)[:5]) or
                      "%d connection(s), %d named in degraded[]" % (len(view["connections"]), failing))
+        # DEC-0121, FAC-SEM-142: every button's agent twin, declared; no declaration is NOT_RUN (D10).
+        self.add("well-known.actions", *well_known_actions_verdict(wk))
         self.configuration_rule()
         svc = wk.get("service") or {}
         answered = "%s.%s" % (svc.get("id"), svc.get("instance"))
@@ -405,6 +412,7 @@ class Probe:
 
     # dashboard (fabric-dashboard/0.1, DEC-0036) --------------------------------
     def dashboard_rules(self) -> None:
+        self.add("dashboard.actions-declared", *actions_declared_verdict(self.wk or {}))  # DEC-0121, D10: never a FAIL for absence
         wk = self.wk or {}
         if not (wk.get("surfaces") or {}).get("dashboard"):
             self.add("dashboard.declared", "NOT_RUN", "no surfaces.dashboard: nothing to declare")
@@ -544,11 +552,13 @@ class Probe:
                       else "no readable token")
             for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
                 self.add(rule, "NOT_RUN", reason)
+            self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason))
         else:
             try:
                 listing = self.mcp_call("tools/list", {})
             except (OSError, ValueError) as exc:
                 self.add("interop.tools-match", "FAIL", "tools/list failed: %s" % exc)
+                self.add("interop.action-tools", *action_tools_verdict(self.wk, None, "tools/list failed: %s" % exc))
                 listing = None
             if listing is not None:
                 sent = self.sent_traceparent
@@ -556,6 +566,7 @@ class Probe:
                 self.object_root_rule(tools)
                 self.tools_match_rule(capabilities, manifest_path, tools)
                 self.job_tools_rule(capabilities, tools)
+                self.add("interop.action-tools", *action_tools_verdict(self.wk, tools))  # DEC-0121 AP-1: the live twin
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
         self.events_trace_rule(self.events)
