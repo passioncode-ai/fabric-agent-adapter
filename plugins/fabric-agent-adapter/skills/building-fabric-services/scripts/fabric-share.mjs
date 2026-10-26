@@ -6,8 +6,8 @@
 // never throws on malformed input. Normative source: the contract's src/share-registration.ts.
 // #region share-kit-node, docs: plugins/fabric-agent-adapter/skills/building-fabric-services/references/estate-record.md#share-grants-into-an-organization
 
-import { estateTime, grantContextFindings } from './fabric-estate.mjs';
-import { sameIdentifier } from './fabric-identifiers.mjs';
+import { PERSONAL_CONTEXT, estateTime, grantContextFindings, placementGrantFindings } from './fabric-estate.mjs';
+import { normalIdentifier, sameIdentifier } from './fabric-identifiers.mjs';
 
 export const SHARE_REGISTRATION_TYPE = 'share-registration/1';
 export const SHARE_REGISTRATION_RECEIPT_TYPE = 'share-registration-receipt/1';
@@ -89,6 +89,34 @@ export function grantUsageContextFindings(value) {
     if (typeof org !== 'string' || context !== `org:${org}`) findings.push(finding('FAC-SEM-045', `/batch/events/${i}/data/context`, "a grant's usage carries its grant's own context, org: and the client certificate's org.id; another organization's is refused as attribution"));
   });
   return findings;
+}
+
+/**
+ * Whether an organization's instance may run on `machineId` now (FAA-125, N-11): the placement of `agentRef` in
+ * `context` (as written; absent is personal) among that machine's packages, FAC-SEM-111 on it, and the grant's window at
+ * `atMs` (startsAt <= at < expiresAt; an unreadable instant or clock is outside it). Answers {ok: true, grant: {id,
+ * startsAt?, expiresAt?}} ({ok: true} for a personal placement) or {ok: false, code, detail} with code
+ * placement-missing, grant-refused or grant-window; never throws. Reads the revision it is given (FAC-SEM-111).
+ */
+export function instanceShareGrant(record, machineId, agentRef, context, atMs) {
+  const rec = isObject(record) ? record : {};
+  const machine = list(rec.machines).find((entry) => entry.id === machineId) ?? {};
+  const placement = list(machine.packages).find((entry) => entry.agentRef === agentRef && (entry.context === undefined ? PERSONAL_CONTEXT : entry.context) === context);
+  if (!placement) return { ok: false, code: 'placement-missing', detail: 'this machine places no such agent in that context (FAC-SEM-074)' };
+  const findings = placementGrantFindings(rec, placement);
+  if (findings.length) return { ok: false, code: 'grant-refused', detail: findings.map((f) => f.message).join('; ') };
+  if (typeof placement.grant !== 'string') return { ok: true }; // a personal placement, which names no grant
+  const id = normalIdentifier(placement.grant);
+  const grant = list(rec.shareGrants).find((g) => g.context === context && isObject(g.meta) && typeof g.meta.id === 'string' && normalIdentifier(g.meta.id) === id);
+  if (!grant) return { ok: false, code: 'grant-refused', detail: 'the record has no share grant for this placement' }; // defensive, as in Python
+  const answer = { id: grant.meta.id };
+  for (const name of ['startsAt', 'expiresAt']) if (grant[name] !== undefined) answer[name] = grant[name];
+  const starts = answer.startsAt === undefined ? undefined : estateTime(answer.startsAt);
+  const expires = answer.expiresAt === undefined ? undefined : estateTime(answer.expiresAt);
+  if ((starts !== undefined && !(starts <= atMs)) || (expires !== undefined && !(atMs < expires))) {
+    return { ok: false, code: 'grant-window', detail: "now is outside the share grant's window, or an instant cannot be read" };
+  }
+  return { ok: true, grant: answer };
 }
 
 /** Kinds grant, org-share-grants, share-registration and device-attribution (045's grant.usage clause); undefined otherwise. */

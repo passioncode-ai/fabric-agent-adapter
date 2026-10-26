@@ -224,6 +224,21 @@
    "sha256": "361610f7c5bc94642a26a6dd7e4b6a5849efa0bd2aa814a8e2034eaed30368b6"
   },
   {
+   "module": "fabric_context",
+   "file": "fabric_context.py",
+   "layer": "L3",
+   "imports": [
+    "fabric_base",
+    "fabric_descriptor",
+    "fabric_estate",
+    "fabric_lock",
+    "fabric_paths",
+    "fabric_share",
+    "fabric_time"
+   ],
+   "sha256": "51016070a56d2dd0cedefe1d677ee54e9d42dfe0821b56767a983121995ed55a"
+  },
+  {
    "module": "fabric_auth",
    "file": "fabric_auth.py",
    "layer": "L3",
@@ -633,6 +648,21 @@
     "fabric-usage"
    ],
    "sha256": "c1ccaa9dff5edf90b82d6d77e2e5189a5d0f677fd48cc0aed3cccb83ad2a1f12"
+  },
+  {
+   "module": "fabric-context",
+   "file": "fabric-context.mjs",
+   "layer": "L3",
+   "imports": [
+    "fabric-base",
+    "fabric-descriptor",
+    "fabric-estate",
+    "fabric-lock",
+    "fabric-paths",
+    "fabric-share",
+    "fabric-time"
+   ],
+   "sha256": "3b12f21df19456b08728b9f1c734349d631db67019756c849a91dd533ee6bcbe"
   },
   {
    "module": "fabric-auth",
