@@ -818,14 +818,15 @@ def refusal_from_action(answer: Any) -> Optional[Dict[str, Any]]:
 
 
 #: DEC-0125 MD-4: a refusal outside a mandate goes back up the chain; only the leading agent asks the operator.
-OUTSIDE_MANDATE_MESSAGE = ("This action is outside the operator's mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, and calls again with a decision or a mandate that covers it (DEC-0125 MD-4).")
+OUTSIDE_MANDATE_MESSAGE = ("Outside the operator's mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, then relays a decision or mandate that covers it: in _meta, or, without _meta, through Fabric's agent.call once the hub forwards it, the service's elicitation, or the action's page as a Fabric Dashboards open_link (DEC-0125 MD-4).")
 
 
 def refusal_error(refusal: Dict[str, Any]) -> Dict[str, Any]:
     """The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key."""
     data = {"detail": refusal["detail"]}
     data.update(refusal.get("data") or {})
-    outside = refusal["code"] == "operator-decision-required" and str(refusal["detail"]).startswith("outside-mandate:")
+    # the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail, which wins in data
+    outside = refusal["code"] == "operator-decision-required" and str(data.get("detail")).startswith("outside-mandate:")
     message = OUTSIDE_MANDATE_MESSAGE if outside else REFUSAL_MESSAGES.get(refusal["code"], "Refused.")
     return {"error": {"code": refusal["code"], "message": message, "data": data}}
 

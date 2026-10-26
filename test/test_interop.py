@@ -822,10 +822,14 @@ class ActionGateMandateTests(unittest.TestCase):
                             target="reply", effect="reply", **options)
             params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": mandate}}
             answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
-            self.assertEqual(answer["result"]["structuredContent"]["error"]["data"]["detail"], detail, options)
+            error = answer["result"]["structuredContent"]["error"]
+            self.assertEqual(error["data"]["detail"], detail, options)
+            # Third product reading: the MD-4 wording reaches the caller through the gate, not only a hand-built refusal.
+            self.assertIn("pass this refusal", error["message"])
             plain = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": dict(params, _meta={"traceparent": PARENT})},
                                   None, tier="T0")
             self.assertEqual(plain["result"]["structuredContent"]["error"]["data"]["detail"], "no-decision", options)
+            self.assertNotIn("pass this refusal", plain["result"]["structuredContent"]["error"]["message"])
 
     def test_a_decision_beside_a_mandate_decides(self):
         answer = self.gate(meta={"mandate": lead_mandate(), "decision": DECISION})

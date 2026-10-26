@@ -200,8 +200,8 @@ so he told all: never ask him twice for what he already approved.
   tests, the limits) and asks once only about what he did not see: a part outside the scope, a fact the relay lacks.
 - Record the relay (his quote, the date, the source, the scope) as your reason in the change log, the thread reply or
   the handoff. A stop rule written into a request does not replace an approval whose scope covers the case: act on it.
-- Human gates stay: sign-in, a one-time code, consent, payment or top-up, a typed secret, spend above a limit, a
-  passkey. A policy change, a promotion or a grant of your own is never covered (AP-5).
+- Human gates stay: sign-in, a one-time code, consent, payment or top-up, a typed secret, spend above a limit (handed
+  to the person with its link and the amount, never asked in chat), a passkey. A policy change, a promotion or a grant of your own is never covered (AP-5).
 - Its machine form is the contract's `mandate/1` (DEC-0125). As the agent leading the task, state it from his words:
   `{kind: "mandate/1", by: "operator", task, instruction, at, expiresAt, scope, chain}`, `instruction` his words
   verbatim (at most 500 characters), `at` when he said them, `expiresAt` at most seven days on, `scope` no wider than

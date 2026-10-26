@@ -511,10 +511,11 @@ export function refusalFromAction(answer) {
 
 /** The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key. */
 /** DEC-0125 MD-4: a refusal outside a mandate goes back up the chain; only the leading agent asks the operator. */
-export const OUTSIDE_MANDATE_MESSAGE = 'This action is outside the operator\'s mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, and calls again with a decision or a mandate that covers it (DEC-0125 MD-4).';
+export const OUTSIDE_MANDATE_MESSAGE = 'Outside the operator\'s mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, then relays a decision or mandate that covers it: in _meta, or, without _meta, through Fabric\'s agent.call once the hub forwards it, the service\'s elicitation, or the action\'s page as a Fabric Dashboards open_link (DEC-0125 MD-4).';
 
 export function refusalError(refusal) {
-  const outside = refusal.code === 'operator-decision-required' && String(refusal.detail).startsWith('outside-mandate:');
+  // the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail, which wins in data
+  const outside = refusal.code === 'operator-decision-required' && String(refusal.data?.detail ?? refusal.detail).startsWith('outside-mandate:');
   const message = outside ? OUTSIDE_MANDATE_MESSAGE : REFUSAL_MESSAGES[refusal.code] ?? 'Refused.';
   return { error: { code: refusal.code, message, data: { detail: refusal.detail, ...(refusal.data ?? {}) } } };
 }

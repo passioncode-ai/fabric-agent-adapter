@@ -248,3 +248,11 @@ test('actionGate reads a mandate only for a service that names its agent id, and
   const t2 = gate({ tier: 'T2', caller: 'agent:remote', actionDigest: `sha256:${'a'.repeat(64)}` });
   assert.equal(t2.refusal.code, 'approval-required');
 });
+
+test('an outside-mandate answer reaches the caller with the MD-4 wording (DEC-0125 MD-4)', async () => {
+  const k = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-interop.mjs');
+  const outside = k.actionRefusalToolResult({ ok: false, code: 'operator-decision-required', data: { detail: 'outside-mandate: spend', estimateUsd: 25, perCallMaxUsd: 1 } });
+  assert.match(outside.structuredContent.error.message, /pass this refusal/);
+  const plain = k.actionRefusalToolResult({ ok: false, code: 'operator-decision-required', data: { detail: 'no-decision' } });
+  assert.doesNotMatch(plain.structuredContent.error.message, /pass this refusal/);
+});

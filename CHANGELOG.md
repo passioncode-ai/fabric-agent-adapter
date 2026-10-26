@@ -13,7 +13,9 @@
   refused at construction.
 - **DL-19 `operator-decision-required`** names the three routes for a client that cannot set `_meta`: Fabric's
   `agent.call` with `call.decision` once the hub forwards it, the service's own elicitation, the action's page as an
-  `open_link`.
+  `open_link`. Outside a mandate (`data.detail` `outside-mandate: <part>`) it gives DEC-0125 MD-4's order instead:
+  call again within your own mandate, else pass the refusal up; only the leading agent asks the operator, with the
+  same three routes.
 - Dashboard kit 1.1.5 now matches its pin (DEC-0124 is in it); brief decision D17 of 0.50.0 is closed.
 
 ### Added

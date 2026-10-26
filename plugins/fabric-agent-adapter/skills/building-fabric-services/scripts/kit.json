@@ -101,7 +101,7 @@
     "fabric_mandate",
     "fabric_paths"
    ],
-   "sha256": "991d4b44cd57997d87cf645cd38abc820addad123088abbb25d9e6ad3bc2ec24"
+   "sha256": "2bcd07f152f2cf85d856d27963d755bd2d5cc3bf50680de6fbc4f17252ff4abb"
   },
   {
    "module": "fabric_share",
@@ -568,7 +568,7 @@
     "fabric-mandate",
     "fabric-paths"
    ],
-   "sha256": "b3686017894b8d0680140fb04086824c7b99d944974e9a70eae0af0d2779accd"
+   "sha256": "757e9cfcd188a0c5f9c3a9ea4a42d36b67e046b879553ce499f55ee5fba7f75d"
   },
   {
    "module": "fabric-share",
@@ -3407,7 +3407,7 @@
    "fabric_paths.py": "8a1ee742f80f436e9f28c61b4f049a9545de2a9e0d66bfc61faa6ee5d1ba3734",
    "fabric_estate.py": "bcc2af6ddf3fee3def7a5c5a738a0397c0e27e815ac9cb462714acef47b0c8c5",
    "fabric_mandate.py": "b8557e703091474f039472e11292bf2caf1a809b23037a6c5578cbae40f69339",
-   "fabric_delegation.py": "991d4b44cd57997d87cf645cd38abc820addad123088abbb25d9e6ad3bc2ec24",
+   "fabric_delegation.py": "2bcd07f152f2cf85d856d27963d755bd2d5cc3bf50680de6fbc4f17252ff4abb",
    "fabric_share.py": "da36a466426fc29dd7dd40013167f3959a18375f8fedd228bf64f298cec1040c",
    "fabric_ceremonies.py": "a59e83cf4adb2669a9b98008e3d3a0cba991a35cbff97bc604fc82fe81cfd49f",
    "fabric_package_schema.py": "e623f0408d38e3343ed66222fb812907c6c52e1a286eb1c1176ab2e64640c9ad",
@@ -3448,7 +3448,7 @@
    "fabric-paths.mjs": "aa630d611e748a899e7043480f4a4e46b444f2e15ff945f30c2fbef21c1ceea5",
    "fabric-estate.mjs": "e2959b3986f1bd67b9594131d8a4057543f94d3193b57b6c65b19d05adf8d6e6",
    "fabric-mandate.mjs": "efd6d0d963ada7b5a1b3a6dc7d1dfb469d40c8632cb45c5a46686a55a1b2b11c",
-   "fabric-delegation.mjs": "b3686017894b8d0680140fb04086824c7b99d944974e9a70eae0af0d2779accd",
+   "fabric-delegation.mjs": "757e9cfcd188a0c5f9c3a9ea4a42d36b67e046b879553ce499f55ee5fba7f75d",
    "fabric-share.mjs": "bfb26581c21ad984c2a337da02429f9f3a165cc582f8ba48de4d3dfb7d163a59",
    "fabric-ceremonies.mjs": "117d4374c9e95c930a38de7adbd4323774798f4fe6ec6f24afcd6f2c7298ca44",
    "fabric-package-schema.mjs": "cd28092375db0fc21ffab1f0bb7794f7f8979ee08c64d3b9faf4b3845357caa6",
