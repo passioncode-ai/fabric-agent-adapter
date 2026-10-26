@@ -36,6 +36,7 @@ from fabric_protocols import (
     protocols_findings,
 )
 from fabric_connections import CONNECTIONS_EXTENSION_KEY, connections_view  # noqa: E402 - the kit (FAA-62)
+from fabric_actions import ACTIONS_EXTENSION_KEY, actions_extension, actions_extension_rules  # noqa: E402 - DEC-0121
 from fabric_usage import (
     ROUTES,
 )
@@ -577,11 +578,16 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
                      update_available: Optional[str] = None, pid: Optional[int] = None,
                      extensions: Optional[Dict[str, Any]] = None,
                      configuration: Optional[Dict[str, Any]] = None,
-                     protocols: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+                     protocols: Optional[Sequence[str]] = None,
+                     actions: Optional[Sequence[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """The unauthenticated identity answer. `degraded` is always present; ready means empty.
     `configuration` (DEC-0046) says what the operator can configure and what applies now; fabric_profiles builds it.
     `extensions` is kept as given (a reader ignores keys it does not know); a dashboard declaration
-    in it must be valid (dashboard_extension builds one)."""
+    in it must be valid (dashboard_extension builds one).
+    `actions` (DEC-0121 AP-1) is the service's action table, every button its dashboard, app or page offers with the
+    tool that performs it and its gate; it is written under extensions/actions/0.1 by fabric_actions.actions_extension.
+    A declaration FAC-SEM-142 finds, passed either way, is refused: one that is not its schema's, an id named twice, a
+    humanStep that disagrees with the gate, or a tool `surfaces.mcp.capabilities` does not list."""
     if status not in STATUSES:
         raise ServiceError("status must be one of %s." % ", ".join(STATUSES))
     degraded = list(degraded)
@@ -600,6 +606,12 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
     }
     if summary:
         doc["summary"] = list(summary)[:6]
+    if actions is not None:
+        if extensions and ACTIONS_EXTENSION_KEY in extensions:
+            raise ServiceError("Actions declaration: pass the action table or a ready declaration, not both.")
+        mcp = surfaces.get("mcp")
+        capabilities = mcp.get("capabilities") if isinstance(mcp, dict) else None
+        extensions = dict(extensions or {}, **actions_extension(actions, capabilities if isinstance(capabilities, list) else None))
     if extensions:
         if DASHBOARD_EXTENSION_KEY in extensions:
             problems = dashboard_extension_problems(extensions[DASHBOARD_EXTENSION_KEY])
@@ -610,6 +622,13 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
             view = connections_view({"extensions": {CONNECTIONS_EXTENSION_KEY: extensions[CONNECTIONS_EXTENSION_KEY]}})
             if view["reported"]:
                 raise ServiceError("Connections declaration: %s." % "; ".join(view["errors"]))
+        if ACTIONS_EXTENSION_KEY in extensions:
+            # DEC-0121 AP-1: a host reports an invalid declaration (FAC-SEM-142); a service never publishes one. The
+            # tools are compared with the capabilities this document's MCP surface lists.
+            findings = actions_extension_rules({"extensions": {ACTIONS_EXTENSION_KEY: extensions[ACTIONS_EXTENSION_KEY]},
+                                                "surfaces": surfaces})
+            if findings:
+                raise ServiceError("Actions declaration: %s." % "; ".join(f["message"] for f in findings))
         doc["extensions"] = dict(extensions)
     if configuration is not None:
         problems = configuration_problems(configuration)

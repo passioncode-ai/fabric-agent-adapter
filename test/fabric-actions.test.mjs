@@ -9,6 +9,7 @@ import {
   ACTIONS_EXTENSION_KEY as KEY, actionCallRules, actionDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
 } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-actions.mjs';
 import { ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
+import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
 const V = read('./fixtures/contract/actions-vectors.json');
@@ -210,4 +211,51 @@ test('a declaration a reader would report is refused', () => {
   for (const table of [undefined, null, 'x', { actions: [] }, RELAYED]) assert.throws(() => actionsExtension(table), ServiceError);
   assert.throws(() => actionsExtension([RELAYED], { capabilities: 'reviews.approve' }), ServiceError);
   assert.equal(humanStep, 'consent');
+});
+
+// REQ-5: buildWellKnown writes extensions/actions/0.1 from a service's action table and never publishes a declaration
+// FAC-SEM-142 finds, as it does for connections.
+const CAPABILITIES = ['jobs.retry', 'reviews.approve', 'accounts.connect'];
+const wellKnown = (extra = {}) => buildWellKnown({
+  id: 'example-agent', instance: 'default', name: 'Example', version: '1.0.0', build: { commit: '0'.repeat(40) },
+  startedAt: '2026-10-26T00:00:00Z', status: 'ready', degraded: [],
+  surfaces: { events: { path: '/fabric/v1/events' }, mcp: { path: '/mcp', transport: 'streamable-http', capabilities: [...CAPABILITIES] } },
+  ...extra,
+});
+
+test('the well-known document carries the table and a host reads it', () => {
+  const table = [NONE, RELAYED, HUMAN];
+  const doc = wellKnown({ actions: table });
+  assert.deepEqual(doc.extensions, { [KEY]: { actions: table } });
+  assert.deepEqual(actionsView(doc), { declared: true, valid: true, actions: table });
+  assert.deepEqual(actionsExtensionRules(doc), []);
+});
+
+test('the table is copied and sits beside other extensions; no table writes no key', () => {
+  const table = [{ ...RELAYED }];
+  const other = 'https://example.invalid/extensions/other/1';
+  const doc = wellKnown({ actions: table, extensions: { [other]: { x: 1 } } });
+  assert.deepEqual(Object.keys(doc.extensions).sort(), [KEY, other].sort());
+  doc.extensions[KEY].actions[0].title = 'changed';
+  assert.equal(table[0].title, 'Approve the reply');
+  assert.equal('extensions' in wellKnown(), false);
+});
+
+test('buildWellKnown refuses a tool the MCP surface does not list', () => {
+  assert.throws(() => wellKnown({ actions: [{ ...RELAYED, tool: 'reviews.reject' }] }), (e) => e instanceof ServiceError && e.message.includes('reviews.reject'));
+  assert.throws(() => wellKnown({ extensions: { [KEY]: { actions: [{ ...RELAYED, tool: 'reviews.reject' }] } } }), ServiceError);
+});
+
+test('buildWellKnown checks a ready declaration against the surfaces and refuses an invalid one', () => {
+  assert.deepEqual(actionsExtensionRules(wellKnown({ extensions: actionsExtension([RELAYED]) })), []);
+  const bad = [{ actions: [] }, { actions: [RELAYED, { ...NONE, id: 'approve-reply' }] }, { actions: [{ ...RELAYED, humanStep: 'consent' }] },
+    [RELAYED], { actions: [RELAYED], extra: true }];
+  for (const value of bad) assert.throws(() => wellKnown({ extensions: { [KEY]: value } }), ServiceError, JSON.stringify(value).slice(0, 60));
+  for (const table of ['x', [], { actions: [RELAYED] }, [{ ...HUMAN, humanStep: null }]]) assert.throws(() => wellKnown({ actions: table }), ServiceError);
+  assert.throws(() => wellKnown({ actions: [RELAYED], extensions: actionsExtension([RELAYED]) }), ServiceError);
+});
+
+test('without a capability list the tools are not compared', () => {
+  const doc = wellKnown({ actions: [{ ...RELAYED, tool: 'reviews.reject' }], surfaces: { events: { path: '/fabric/v1/events' } } });
+  assert.equal(doc.extensions[KEY].actions[0].tool, 'reviews.reject');
 });

@@ -8,7 +8,7 @@ import math
 import unittest
 from pathlib import Path
 
-from test_fabric_service import load
+from test_fabric_service import fs, load
 
 fa = load("fabric_actions")
 ServiceError = fa.ServiceError  # the class the kit raises (a second load would make another one)
@@ -225,6 +225,73 @@ class Extension(unittest.TestCase):
                 fa.actions_extension(table)
         with self.assertRaises(ServiceError):
             fa.actions_extension([RELAYED], capabilities="reviews.approve")
+
+
+CAPABILITIES = ["jobs.retry", "reviews.approve", "accounts.connect"]
+
+
+def well_known(**extra):
+    base = dict(service_id="example-agent", instance="default", name="Example", version="1.0.0",
+                build={"commit": "0" * 40}, started_at="2026-10-26T00:00:00Z", status="ready", degraded=[],
+                surfaces={"events": {"path": "/fabric/v1/events"},
+                          "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": list(CAPABILITIES)}})
+    base.update(extra)
+    return fs.build_well_known(**base)
+
+
+class WellKnown(unittest.TestCase):
+    """REQ-5: build_well_known writes extensions/actions/0.1 from a service's action table and never publishes a
+    declaration FAC-SEM-142 finds, as it does for connections."""
+
+    def test_the_table_is_written_and_a_host_reads_it(self):
+        table = [NONE, RELAYED, HUMAN]
+        doc = well_known(actions=table)
+        self.assertEqual(doc["extensions"], {KEY: {"actions": table}})
+        self.assertEqual(fa.actions_view(doc), {"declared": True, "valid": True, "actions": table})
+        self.assertEqual(fa.actions_extension_rules(doc), [])
+
+    def test_the_table_is_copied_and_sits_beside_other_extensions(self):
+        table = [dict(RELAYED)]
+        other = "https://example.invalid/extensions/other/1"
+        doc = well_known(actions=table, extensions={other: {"x": 1}})
+        self.assertEqual(sorted(doc["extensions"]), sorted([KEY, other]))
+        doc["extensions"][KEY]["actions"][0]["title"] = "changed"
+        self.assertEqual(table[0]["title"], "Approve the reply")
+
+    def test_no_table_writes_no_key(self):
+        self.assertNotIn("extensions", well_known())
+
+    def test_a_tool_the_mcp_surface_does_not_list_is_refused(self):
+        with self.assertRaises(ServiceError) as raised:
+            well_known(actions=[dict(RELAYED, tool="reviews.reject")])
+        self.assertIn("reviews.reject", str(raised.exception))
+        with self.assertRaises(ServiceError):  # the same declaration passed ready-made
+            well_known(extensions={KEY: {"actions": [dict(RELAYED, tool="reviews.reject")]}})
+
+    def test_a_declaration_extensions_carries_is_checked_against_the_surfaces(self):
+        doc = well_known(extensions=fa.actions_extension([RELAYED]))
+        self.assertEqual(fa.actions_extension_rules(doc), [])
+        bad = {
+            "an empty table": {"actions": []},
+            "an id declared twice": {"actions": [RELAYED, dict(NONE, id="approve-reply")]},
+            "a step on a relayed action": {"actions": [dict(RELAYED, humanStep="consent")]},
+            "not an object": [RELAYED],
+            "a member the schema does not know": {"actions": [RELAYED], "extra": True},
+        }
+        for name, value in bad.items():
+            with self.subTest(name), self.assertRaises(ServiceError):
+                well_known(extensions={KEY: value})
+        for table in ("x", [], {"actions": [RELAYED]}, [dict(HUMAN, humanStep=None)]):
+            with self.subTest(table=repr(table)[:40]), self.assertRaises(ServiceError):
+                well_known(actions=table)
+
+    def test_without_a_capability_list_the_tools_are_not_compared(self):
+        doc = well_known(actions=[dict(RELAYED, tool="reviews.reject")], surfaces={"events": {"path": "/fabric/v1/events"}})
+        self.assertEqual(doc["extensions"][KEY]["actions"][0]["tool"], "reviews.reject")
+
+    def test_a_table_and_a_ready_declaration_together_are_refused(self):
+        with self.assertRaises(ServiceError):
+            well_known(actions=[RELAYED], extensions=fa.actions_extension([RELAYED]))
 
 
 if __name__ == "__main__":

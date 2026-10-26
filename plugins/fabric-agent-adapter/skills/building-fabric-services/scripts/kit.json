@@ -213,6 +213,7 @@
    "file": "fabric_descriptor.py",
    "layer": "L3",
    "imports": [
+    "fabric_actions",
     "fabric_base",
     "fabric_connections",
     "fabric_paths",
@@ -620,6 +621,7 @@
    "file": "fabric-descriptor.mjs",
    "layer": "L3",
    "imports": [
+    "fabric-actions",
     "fabric-base",
     "fabric-connections",
     "fabric-paths",
