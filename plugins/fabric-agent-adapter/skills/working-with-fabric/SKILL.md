@@ -145,8 +145,9 @@ Fabric 0.4.0 (REQ-38):
    `fabric_task_create` while that task is claimed. Unless the answer says `chained: true` with `chained_to` your
    claimed task (Fabric to 0.3.14 links only a session it launched for a task, never one opened from its own
    terminal), link it yourself with `fabric_task_link {taskId: <the piece>, rel: "spawned", targetTaskId: <the
-   claimed task>}` (board `c42071bc`). An answer with `chained: false` names its `chain_reason`: tell the person
-   rather than retry; `proposed: true` means nothing was filed and the piece waits for the operator.
+   claimed task>}` (board `c42071bc`). An answer with `chained: false` names its `chain_reason`: link it yourself once,
+   and if that is refused too, tell the person its reason; never file the piece again. `proposed: true` means nothing
+   was filed, so there is nothing to link: report it and stop, the piece waits for the operator.
 3. A related-work warning (same backlog row, a linked task, an overlapping folder) names the other agent, its
    task and the overlap: tell the person, then coordinate (ask Fabric to hand it over, or link the tasks) or
    continue knowing it; say which, out loud.
