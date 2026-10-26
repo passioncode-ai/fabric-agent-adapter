@@ -423,7 +423,7 @@
       "request": "The person asked: \"Move the billing service to the new database and keep the old one read-only for a week.\" You will split it into a migration, a backfill and a cut-over, and you will need the person's choice of maintenance window. How do you make your goal and progress visible in Fabric?",
       "expected": [
         "reads the project's board at the start and answers requests addressed to its Project",
-        "claims the person's request as ONE task whose title is that request in one line, with origin kind person (fabric_work_claim), then files each piece it splits off (migration, backfill, cut-over) with fabric_task_create while that task is claimed, and links each one with fabric_task_link rel spawned to the claimed task when the answer carries no chained_to",
+        "claims the person's request as ONE task whose title is that request in one line, with origin {kind: person, ref: where they said it} (fabric_work_claim), then files each piece it splits off (migration, backfill, cut-over) with fabric_task_create while that task is claimed, and links each one with fabric_task_link rel spawned to the claimed task unless the answer says chained: true with chained_to that task",
         "reports its stage with step and ofSteps (fabric_stage_report, e.g. step 2 of 3) as it moves",
         "sends fabric_heartbeat with phase waiting before it waits on the person's choice of window, the wait in one line of note (waitingOn only for a question asked with fabric_question_ask)"
       ]

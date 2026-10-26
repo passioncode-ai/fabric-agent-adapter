@@ -58,9 +58,9 @@
 ### Added
 
 - **Being seen correctly in Fabric** (FAA-151, board `c42071bc`): working-with-fabric Steps 4 and 5 claim the
-  person's request as one task titled with it in one line (`origin: {kind: "person"}`), file each split with
-  `fabric_task_create` while it is claimed and link it with `fabric_task_link` (`rel: "spawned"`) when the answer
-  carries no `chained_to` (a session opened from its own terminal, on Fabric to 0.3.14), report the stage with `step`
+  person's request as one task titled with it in one line (`origin: {kind: "person", ref}`), file each split with
+  `fabric_task_create` while it is claimed and link it with `fabric_task_link` (`rel: "spawned"`) unless the answer
+  says `chained: true` with `chained_to` the claimed task (a session opened from its own terminal, on Fabric to 0.3.14), report the stage with `step`
   and `ofSteps`, and send a heartbeat with `phase: waiting` before a wait (the wait in `note`, or `waitingOn` for a
   question asked with `fabric_question_ask`).
   Scenario eval `seen-correctly-goal-and-step`.
