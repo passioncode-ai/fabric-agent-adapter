@@ -536,8 +536,8 @@ def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], sessi
                  name: str = NUDGES_FILE) -> None:
     """FAA-142: add a turn's nudges to the ones the prompt hook has not printed yet (NUDGES_FILE), without repeats and
     at most MAX_NUDGES. The log names how many, never what they say. A file that cannot be written loses this turn's
-    nudges: Fabric gives each once (a turn's answer takes it from the queue `fabric_work_list` reads), so a lost one is
-    gone. The pending file is taken by renaming it away, as a reader takes it, so a prompt in between prints nothing
+    nudges here; Fabric 0.3.14 only shows a nudge on a turn's answer, at most five, and keeps it for `fabric_work_list`
+    and `fabric_heartbeat` (board b605a636). The pending file is taken by renaming it away, as a reader takes it, so a prompt in between prints nothing
     twice; when the write fails, the kept ones are written back once more before the loss is logged."""
     offered = nudge_lines(value, limit=None)
     if not offered:

@@ -2,6 +2,12 @@
 
 ## 0.52.0 (2026-11-02)
 
+### Changed
+
+- The session hooks' notes on nudges follow Fabric 0.3.14's final behaviour (board `b605a636`): a turn's answer
+  shows a nudge, at most five, and keeps it for `fabric_work_list` and `fabric_heartbeat`, so the nudges of turns
+  spooled before a `/clear` are not lost, as 0.51.2's notes said; they reach the new session there.
+
 ### Added
 
 - **Fabric's rule `work.check-every-three-minutes`** (FAA-141, Fabric TO-2, ask `e2a7bec4`): working-with-fabric
