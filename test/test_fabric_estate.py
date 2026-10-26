@@ -67,7 +67,7 @@ class ContractVectors(unittest.TestCase):
             with self.subTest(case["name"]):
                 self.assertEqual(fe.estate_record_rules(case["kind"], case["value"]), case.get("expected"))
         codes = {f["code"] for c in V["rules"] for f in (c.get("expected") or [])}
-        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076", "FAC-SEM-110", "FAC-SEM-111", "FAC-SEM-114", "FAC-SEM-122", "FAC-SEM-134", "FAC-SEM-137"})
+        self.assertEqual(codes, {"FAC-SEM-072", "FAC-SEM-073", "FAC-SEM-074", "FAC-SEM-075", "FAC-SEM-076", "FAC-SEM-110", "FAC-SEM-111", "FAC-SEM-114", "FAC-SEM-122", "FAC-SEM-134", "FAC-SEM-137", "FAC-SEM-147"})
 
     def test_a_grants_context_answers_as_the_contract_does(self):
         """FAC-SEM-110 (DEC-0082) on a grant of its own, against the contract's grant-context fixtures and variants."""
@@ -371,6 +371,48 @@ class HubKeyVectors(unittest.TestCase):
             got = dl.verify_delegation(case["token"], audience="example-media", jwks=HUB["jwks"], now=case["now"], capability="media.render",
                                        effect="draft", issuer=HUB["issuer"], estate=record, estate_revocations=extra)
             self.assertEqual((got["code"], got["detail"]), ("unauthenticated", "kid-not-certified"))
+
+
+class ContextHubKeys(unittest.TestCase):
+    """DL-14a (DEC-0128): an organization's token verifies only under its context's hub key, while the record pins the
+    organization (hub-key-vectors.json's contextCases and contextVerifier, answered by the contract at the pin)."""
+
+    def test_every_context_case_answers_as_the_contract_does(self):
+        self.assertGreaterEqual(len(HUB["contextCases"]), 30)
+        answers = set()
+        for case in HUB["contextCases"]:
+            given = {k: case[k] for k in ("context",) if k in case}
+            if "extraRevocations" in case:
+                given["extra_revocations"] = case["extraRevocations"]
+            with self.subTest(case["name"]):
+                got = fe.hub_key_certified(case["record"], case["kid"], case.get("x"), case["at"], **given)
+                self.assertEqual(got, case["expected"])
+                answers.add(got.get("detail", "certified"))
+        self.assertEqual(answers, {"certified", "kid-not-certified"})
+
+    def test_every_context_verifier_answer_matches(self):
+        self.assertEqual(len(HUB["contextVerifier"]), 10)
+        for case in HUB["contextVerifier"]:
+            given = {"estate_context": case["estateContext"]} if "estateContext" in case else {}
+            with self.subTest(case["name"]):
+                got = dl.verify_delegation(case["token"], audience="example-media", jwks=HUB["contextJwks"], now=case["now"],
+                                           capability="media.render", effect="draft", issuer=case["issuer"], estate=case["estate"], **given)
+                self.assertEqual({"ok": True, "kid": got["kid"]} if got["ok"] else {"ok": False, "code": got["code"], "detail": got["detail"]},
+                                 case["expected"])
+
+    def test_the_gate_passes_the_context_through(self):
+        ok = HUB["contextVerifier"][0]
+        self.assertEqual(ok["estateContext"], "org:org_3fh9p1zc")
+        headers = {"Fabric-Delegation": ok["token"]}
+        for context, expected in ((ok["estateContext"], True), ("personal", False), (dl._MISSING, False)):
+            given = {} if context is dl._MISSING else {"estate_context": context}
+            gate = dl.delegation_gate(audience="example-media", jwks=HUB["contextJwks"], effects={"media.render": "draft"},
+                                      issuer=ok["issuer"], clock=lambda: ok["now"], estate=lambda: ok["estate"], **given)
+            got = gate("media.render", headers)
+            with self.subTest(context=context):
+                self.assertEqual(got["ok"], expected)
+                if not expected:
+                    self.assertEqual((got["code"], got["detail"]), ("unauthenticated", "kid-not-certified"))
 
 
 class SigningRp(unittest.TestCase):

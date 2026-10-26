@@ -86,8 +86,8 @@ from `leaseExpiresAt`.
 why not; a refusal accepts the request and completes it `failed_known` with that sentence, so the requester learns it
 and the request does not bounce. A redacted body is refused the same way. The kit never hands a body to a model, a
 shell or a tool; what the handler does with an admitted body (and the checks it needs before a model, a tool or a
-spend sees it) is the service's own responsibility. The kit's responder reads no approval or mandate from a message in
-0.51.0: a request from the operator's own Project may carry `mandate/1` (DEC-0125 MD-3), and a handler acts on it only
+spend sees it) is the service's own responsibility. The kit's responder reads no approval or mandate from a message yet
+(0.52.0): a request from the operator's own Project may carry `mandate/1` (DEC-0125 MD-3), and a handler acts on it only
 once the kit reads it (FAA-135).
 
 ## Effects, observation, evidence and the reply
@@ -101,6 +101,7 @@ once the kit reads it (FAA-135).
 - `evidence` is at most 8 references `{id: uri, contentHash: sha256:<hex>, label?}`; `artifact_ref(uri, content=…|path=…)`
   hashes the bytes itself. Two ids with one normal form (DEC-0076) name one artifact and are refused.
 - `reply: {text, format?, artifacts?}` is posted with `com.reply` before the completion. A reply is not a completion.
+  It is a fenced reply, so it carries no `deliverTo` and reaches the requester (DEC-0135 DR-3).
 - A handler that raises before any effect completes the request `failed_known` naming only the exception's class.
 - The handler checks `ctx.stopped` in long work: after a session loss its answer is not sent.
 

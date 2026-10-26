@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.52.0 (2026-10-26)
+
+### Changed
+
+- **Pinned to the contract release `v0.1.0+2026-10-26.12` (`1197a90d`)** (FAA-138). It carries DEC-0126 to DEC-0137;
+  `e6c4fc16`, `a3a66eb0` and `52c7d798` stay supported. Brief:
+  `docs/evidence/specs/2026-10-26-faa-138-134-repin-1197a90d-brief.md`.
+- **DEC-0126, where the operator said the words (`source`).** A mandate and a decision may carry `source`; both kits
+  read it as the contract's schema does, return it in the record (`recordAs`, `ctx.record`, `input_records`), keep it
+  on a hand-over, and build it with `operator_mandate(source=)` / `operator_decision(source=)` (Node: `source`).
+  `request_meta(..., target_protocols=)` / `requestMeta(traceparent, {targetProtocols})` send it only to a callee whose
+  well-known `protocols` list `operator-source/1`, and otherwise keep it in the caller's own record (OA-7; never through
+  Fabric's `agent.call` yet, FAA-146). `McpToolServer.well_known_protocols(protocols)` adds `operator-source/1` when
+  the server reads `source`. Nothing writes it to an event, a usage report, a log or a page (a test holds that).
+- **A job's approval step reads the operator's mandate** (contract interop C3.3, `conformance.md`; part of FAA-135):
+  `job_step` / `jobStep`, `CallContext.approval_step`, `request_input(steps=)` / `requestInput(..., {steps})`; with
+  `input_actions` on, an answer's `_meta.mandate` that covers a kept step is read too, under the job's own capability
+  as at the start (`action_gate(mandate_capability=)` / `actionGate({mandateCapability})`). Each question replaces the
+  kept steps and an answer clears them, so a step outlives neither its question nor its answer.
+- **DEC-0136 closes at the pin:** MD-2a is the pinned contract's rule, the by-name test override is gone, and both
+  twins run the contract's 30 `handOn` cases; FAC-SEM-144's message ends `(DEC-0125 MD-1, MD-2; DEC-0136 MD-2a)`.
+  Vectors at `.12`: mandate 40 cases and 5 fixtures, actions 67 cases and 16 action calls.
+- working-with-fabric, its board reference, `interop.md` and the shared operator-channel reference cite DEC-0126 OA-1
+  to OA-7 and drop the "ahead of the pin" wording; scenario eval `relay-source-goes-only-where-it-is-read`.
+- **DEC-0128 (DL-14a), a hub key per organization context.** `hub_key_certified` / `hubKeyCertified` take the
+  token's context (`context=` / `{context}`), and `verify_delegation` and `delegation_gate` (Node: `verifyDelegation`,
+  `delegationGate`) take `estate_context` / `estateContext`. An organization's token verifies only under its context's
+  hub key (`machines[].contextHubKeys`) while the record pins the organization; a context that is neither `personal`
+  nor `org:<orgId>` fails closed (`kid-not-certified`). `verify_approval` takes no context, as the contract declares.
+- Both estate readers check organization pins and context hub keys as the contract's `estate-record-rules.ts` does at
+  `.12`: `FAC-SEM-147` is new; `FAC-SEM-073`, `076`, `114` and `134` read context hub keys.
+- `fabric_estate` splits its record rules into the new kit module `fabric_estate_rules` (Node:
+  `fabric-estate-rules.mjs`), listed just before it in `kit.json`; `fabric_estate` re-exports every public name, so callers
+  keep their imports, and `fabric_kit.py install --module fabric_estate` copies both.
+- An organization instance whose context the record does not pin still starts (`fabric_context`); its tokens are
+  refused `kid-not-certified` (brief D5).
+- Vectors regenerated at `.12`: `estate-vectors.json` (the organizations positive, seven context and organization
+  semantic fixtures, 38 generated context and revision cases), `hub-key-vectors.json` (`contextCases` 33,
+  `contextVerifier` 10); the hostile estate inputs cover `contextHubKeys`, `organizations` and hub-key contexts.
+- **DEC-0135, who a reply reaches** (narrowing). A reply reaches the sender of the message it answers; send
+  `deliverTo: "thread"` for every participant, or a list, and on a board pinned before DEC-0135, which refuses the
+  member, a new message to the thread instead. The kit's responder posts only fenced replies, which carry none.
+  The narrowing: once Fabric adopts DEC-0135 (planned for its 0.3.15; DR-5, for a reader it takes as pinned at or
+  after DEC-0135; Fabric to 0.3.14 keeps the old count for every reader), `com.list {unread: true}` and the unread
+  count cover only what was delivered to your Project, so a reply sent only to another Project no longer shows.
+  `project-board.md` now also says a thread `com.read_ack` with `upTo` marks what your Project did not send, as the
+  board always did.
+- **DEC-0130 and DEC-0137, the family and the agent network** (wording, no code change): `delegation.md` names the
+  operator's family (T0 and T1) and the agent network, and `estate-record.md` says a tokenless call runs in the
+  instance's context.
+- The session hooks' notes on nudges follow Fabric 0.3.14's final behaviour (board `b605a636`, Fabric
+  `release/0.3.14` `b97ec351`): a turn's answer shows a nudge, at most five, and a repeated turn answers the same; it
+  stays for `fabric_work_list` and `fabric_heartbeat`, so it may come again there. The nudges of turns spooled before a
+  `/clear` are therefore not lost (0.51.2's notes said they were).
+
+### Added
+
+- **Being seen correctly in Fabric** (FAA-151, board `c42071bc`): working-with-fabric Steps 4 and 5 claim the
+  person's request as one task titled with it in one line (`origin: {kind: "person", ref}`), file each split with
+  `fabric_task_create` while it is claimed, and link it with `fabric_task_link` (`rel: "spawned"`) unless the answer
+  says `chained: true` with `chained_to` the claimed task: always in a session opened from its own terminal, which
+  Fabric to 0.3.14 never links itself. They report the stage with `step` and `ofSteps`, and send a heartbeat with
+  `phase: waiting` before a wait (the wait in `note`, or `waitingOn` for a question asked with `fabric_question_ask`).
+  Scenario eval `seen-correctly-goal-and-step`.
+- **Fabric's rule `work.check-every-three-minutes`** (FAA-141, Fabric TO-2, ask `e2a7bec4`): working-with-fabric
+  Step 5 and creating-fabric-agents' autonomy reference tell an agent to call `fabric_work_list` every three minutes
+  and before any wait, act first on its `nudges` and `waiting_for_you`, read and mark its unread board answers, and
+  never leave a held task still. Scenario eval `check-every-three-minutes`.
+- **Nine protocol register entries** (DEC-0126, DEC-0127, DEC-0129, DEC-0131, DEC-0132): `fabric-machine-report/1`,
+  `machine-report/1`, `operator-source/1`, `org-authority/1`, `org-authority-draft/1`, `org-key-set/1`,
+  `org-key-set-draft/1`, `org-membership/1` and `org-root-registration/1` in `fabric_protocols` and
+  `fabric-protocols.mjs`, so the kits' register equals the contract's at the pin.
+
 ## 0.51.2 (2026-10-26)
 
 ### Added

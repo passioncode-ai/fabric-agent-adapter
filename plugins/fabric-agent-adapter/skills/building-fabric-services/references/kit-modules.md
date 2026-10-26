@@ -58,8 +58,9 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L1 | `fabric_base` | the protocol name, `ServiceError`, small shared helpers |
 | L1 | `fabric_platform` | Windows: named pipes, owner-only files (DEC-0032) |
 | L1 | `fabric_paths` | the services directory, a service's folders and one instance's (`instance_dirs`, FAA-125), atomic and private writes (L1 since 0.44.2, so `fabric_delegation` writes its consumed approval ids with them, FAA-85) |
-| L2 | `fabric_estate` | `estate-record/1` revisions and their rules (DEC-0055) |
-| L2 | `fabric_mandate` | the operator's mandate `mandate/1`: what a callee takes under it (`mandate_covers`), FAC-SEM-144, stating and handing it on narrowed (DEC-0125); the effect closure, defined here once |
+| L2 | `fabric_estate_rules` | the record's own rules without a verifier: FAC-SEM-072…076 and the rest, FAC-SEM-147 and the context hub keys (DEC-0055, DEC-0128), contexts, the digest and challenge, a passkey's key; split from `fabric_estate` in 0.52.0 (D8) |
+| L2 | `fabric_estate` | `estate-record/1` revisions: the passkey assertion, the verifier, placement trust, `hub_key_certified` with its context (DL-14a, DEC-0128); re-exports `fabric_estate_rules` (DEC-0055) |
+| L2 | `fabric_mandate` | the operator's mandate `mandate/1`: what a callee takes under it (`mandate_covers`), FAC-SEM-144, stating and handing it on narrowed (DEC-0125); where the operator spoke, `source`, and its withholding from a target that does not list `operator-source/1` (DEC-0126); the effect closure, defined here once |
 | L2 | `fabric_delegation` | the callee's side of `fabric-delegation/0.1` (DEC-0039) |
 | L2 | `fabric_share` | share grants and registrations (DEC-0086); whether an organization's instance may run under its grant (`instance_share_grant`, FAA-125) |
 | L2 | `fabric_ceremonies` | the headless join token (DEC-0084) |
@@ -81,7 +82,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_supervisors` | launchd, systemd user units, Task Scheduler (DEC-0032, LC-14) |
 | L3 | `fabric_service` | the facade: every name 0.39.1 exported, re-exported from the modules above |
 | L3 | `fabric_profiles` | runner and model profiles ([profiles](profiles.md)) |
-| L3 | `fabric_interop_rules` | `fabric-interop/0.1` rules without a service: constants, `InteropError`, trace context, job limits (DEC-0087; FAA-92) |
+| L3 | `fabric_interop_rules` | `fabric-interop/0.1` rules without a service: constants, `InteropError`, trace context, job limits (DEC-0087; FAA-92), a job's approval step under the mandate (`job_step`, C3.3) |
 | L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools; re-exports the rule layer ([interop](interop.md)) |
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
@@ -103,7 +104,8 @@ public name 0.39.1 had, in both languages (the snapshot is `test/fixtures/kit-ap
 name fails `test_kit_api`), and the Python facade the private names other code reached through it (`_number`,
 `_DAY_MS`, `_utc_date_ms` from the core). `fabric_board` and `fabric-board.mjs` are
 facades the same way, and since 0.44.1 so are `fabric_interop` (over `fabric_interop_rules`) and `fabric_package` (over
-`fabric_package_schema`), with their Node twins: patch the rule or schema module, not the facade. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
+`fabric_package_schema`), and since 0.52.0 `fabric_estate` (over `fabric_estate_rules`, listed just before it, since it
+imports the rules), with their Node twins: patch the rule or schema module, not the facade. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
 install with `fabric_kit.py install` and `status` names what is missing. A test or service that replaced a function
 by assigning it on the facade (`fabric_service.X = ...`) no longer changes what the kit does: the code reads its own
 module's name, so patch the module that defines it (`fabric_lock.X`, `fabric_session_env.X`). A service that imported a module-private

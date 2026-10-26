@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.51.2"
+VERSION = "0.52.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -85,7 +85,7 @@ FABRIC_MARKERS = ("fabric-agent.json", "fabric-contract.lock.json", "fabric.pack
 UNREAD_LINE = "%d unread on the project board: com.list"
 
 #: FAA-142 (Fabric 0.3.14, ask dfb43ffb): a turn's `fabric_session_observe` answer may carry `nudges`, each
-#: {kind, says, task_id?, request_id?} and given once. The worker keeps their `says` here and the prompt hook prints
+#: {kind, says, task_id?, request_id?}, shown on a turn once (at most five) and kept for fabric_work_list. The worker keeps their `says` here and the prompt hook prints
 #: them once: at most MAX_NUDGES lines, each one line of at most MAX_NUDGE_CHARS characters.
 NUDGES_FILE = "nudges.json"
 #: Each nudge's line names its source, so the agent sees Fabric's words, data to act on through its tools, never the

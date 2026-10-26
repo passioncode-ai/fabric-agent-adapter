@@ -30,7 +30,10 @@ report, and do not ask again; an agent that serves `surfaces.operatorChannel` al
 stay the person's (a `secret` step, contract DEC-0121 AP-4): never create the bot, or ask for or
 store the token's value. Enabling the channel, and removing a webhook found on its token, are the
 operator's decision, taken by them on the agent's page or relayed to its agent in their own words
-with `_meta.decision` (OC-1, OC-2, DEC-0121 AP-2); never enable it on your own account. The default
+with `_meta.decision` (OC-1, OC-2, DEC-0121 AP-2), including a relay from another of their agents
+that carries their words verbatim, when and where they said them and the scope (DEC-0126 OA-2,
+OA-3; its `source` sent only to an agent whose well-known `protocols` list `operator-source/1`,
+OA-7); never enable it on your own account. The default
 pin carries DEC-0034 and DEC-0035: a served status document is
 checked against the pinned `schemas/operator-channel-status.schema.json`; the channel's runtime
 rules have no probe rule here yet, so report them `NOT_RUN`. An agent with neither stops nor notify

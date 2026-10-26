@@ -28,7 +28,7 @@ test('every verify case answers as the contract does', () => {
 test('every rule case answers as the contract does (FAC-SEM-072…076)', () => {
   for (const c of V.rules) assert.deepEqual(e.estateRecordRules(c.kind, c.value), c.expected, c.name);
   const codes = new Set(V.rules.flatMap((c) => (c.expected ?? []).map((f) => f.code)));
-  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114', 'FAC-SEM-122', 'FAC-SEM-134', 'FAC-SEM-137']);
+  assert.deepEqual([...codes].sort(), ['FAC-SEM-072', 'FAC-SEM-073', 'FAC-SEM-074', 'FAC-SEM-075', 'FAC-SEM-076', 'FAC-SEM-110', 'FAC-SEM-111', 'FAC-SEM-114', 'FAC-SEM-122', 'FAC-SEM-134', 'FAC-SEM-137', 'FAC-SEM-147']);
 });
 
 test('the digest, the challenge, placement trust, P-256 keys and passkey keys', () => {
@@ -178,6 +178,42 @@ test('an unreadable clock is refused first; the delta revocations pass through',
   for (const extra of [[{ kind: 'hub-key', ref: 'hub-m-4c1e-1', revokedAt: '2026-10-21T09:00:00Z' }], () => [{ kind: 'machine', ref: 'm-4c1e', revokedAt: '2026-10-21T09:00:00Z' }]]) {
     const got = dl.verifyDelegation(c.token, { audience: 'example-media', jwks: HUB.jwks, now: c.now, capability: 'media.render', effect: 'draft', issuer: HUB.issuer, estate: c.estate.record, estateRevocations: extra });
     assert.deepEqual([got.code, got.detail], ['unauthenticated', 'kid-not-certified']);
+  }
+});
+
+// ---- DL-14a (DEC-0128): a hub key per organization context, held to the contract's own answers ----
+
+test('every context hub-key case answers as the contract does', () => {
+  assert.ok(HUB.contextCases.length >= 30);
+  const answers = new Set();
+  for (const c of HUB.contextCases) {
+    const options = {
+      ...(Object.hasOwn(c, 'context') ? { context: c.context } : {}),
+      ...(c.extraRevocations === undefined ? {} : { extraRevocations: c.extraRevocations }),
+    };
+    const got = e.hubKeyCertified(c.record, c.kid, c.x, c.at, undefined, options);
+    assert.deepEqual(got, c.expected, c.name);
+    answers.add(got.detail ?? 'certified');
+  }
+  assert.deepEqual([...answers].sort(), ['certified', 'kid-not-certified']);
+});
+
+test('every context verifier answer matches', () => {
+  assert.equal(HUB.contextVerifier.length, 10);
+  for (const c of HUB.contextVerifier) {
+    const got = dl.verifyDelegation(c.token, { audience: 'example-media', jwks: HUB.contextJwks, now: c.now, capability: 'media.render', effect: 'draft', issuer: c.issuer, estate: c.estate, ...(Object.hasOwn(c, 'estateContext') ? { estateContext: c.estateContext } : {}) });
+    assert.deepEqual(got.ok ? { ok: true, kid: got.kid } : { ok: false, code: got.code, detail: got.detail }, c.expected, c.name);
+  }
+});
+
+test('the gate passes the context through', async () => {
+  const ok = HUB.contextVerifier[0];
+  assert.equal(ok.estateContext, 'org:org_3fh9p1zc');
+  for (const [context, expected] of [[ok.estateContext, true], ['personal', false], [undefined, false]]) {
+    const gate = dl.delegationGate({ audience: 'example-media', jwks: HUB.contextJwks, effects: { 'media.render': 'draft' }, issuer: ok.issuer, clock: () => ok.now, estate: () => ok.estate, ...(context === undefined ? {} : { estateContext: context }) });
+    const got = await gate('media.render', { 'Fabric-Delegation': ok.token });
+    assert.equal(got.ok, expected, String(context));
+    if (!expected) assert.deepEqual([got.code, got.detail], ['unauthenticated', 'kid-not-certified']);
   }
 });
 

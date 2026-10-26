@@ -237,8 +237,8 @@ Contract DEC-0125 (`mandate/1`, rule `FAC-SEM-144`, `docs/specification/delegati
 MD-6): the operator's instruction for one task travels with the task, narrowed at each hand-over, so a service the
 task reaches takes a call the mandate covers as his decision without asking him again. It is the machine form of his
 rule of 2026-10-26: one approval he gives in the chat of any of his agents binds all his agents (working-with-fabric,
-Step 5). Both kits carry the reference in `fabric_mandate` / `fabric-mandate.mjs` and answer the contract's
-`mandate.json` vectors case for case.
+Step 5), which the contract states as DEC-0126 (OA-1 to OA-7). Both kits carry the reference in `fabric_mandate` /
+`fabric-mandate.mjs` and answer the contract's `mandate.json` vectors case for case, its `handOn` group included.
 
 **As a service.** Name your own agent id and each relayed action's effect class; the gate then reads the call's
 `_meta.mandate` when it carries no decision:
@@ -272,20 +272,58 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   (and `estimateUsd`, `perCallMaxUsd` for spend); an invalid one is `decision-invalid` with `mandate-malformed`,
   `mandate-widened`, `mandate-expired`, `mandate-early` or `mandate-not-for-this-call`. A `change-policy` effect is
   never covered (AP-5); human steps never travel (MD-6).
+- **Where the operator spoke (DEC-0126).** A mandate or a decision may carry `source` (`{project, session or
+  thread}`), set by the agent that heard the operator's words relayed from another of his agents (OA-2). The kits read
+  it exactly as `mandate.schema.json#/$defs/source` does (an unplaced one is `mandate-malformed` or `decision-invalid`)
+  and return it in the record: `ctx.record`, `input_records` and `job_step`'s record carry `source` (OA-6). Keep it,
+  as `instruction`, in the service's own audit record, never in the events feed, a usage report, a log line or a page
+  another party reads (OA-7).
+- **Listing `operator-source/1`.** A service that reads `source` lists `operator-source/1` in its well-known
+  `protocols` (OA-7): `McpToolServer.well_known_protocols(protocols)` returns your list with it added when the server
+  has `agent_id` or serves a relayed action, for `build_well_known(protocols=server.well_known_protocols([...]))`. A
+  service that builds its own list (a Node server, or one without `McpToolServer`) adds `operator-source/1` itself
+  when it reads `source`; a caller that sees no such entry sends the call without `source`, and it is taken as before.
 - `action_gate(..., self_id=, effect=, caller_agent=, spend_usd=, project=)` / `actionGate({..., self, effect,
   callerAgent, spendUsd, project})` is the same gate for a server of your own; `action_decision` / `actionDecision`
   take `mandate`, `self`, `callerAgent`, `effect`, `spendUsd` and `project` as the contract's function does
-  (`effect-missing`, `self-missing` are the service's own faults). A job's input request (`input_actions=True`) does
-  not read a mandate yet.
+  (`effect-missing`, `self-missing` are the service's own faults), and the kit's own `mandateCapability` (a job's kept
+  step: the capability the mandate is read under), which the contract's function does not take; like `effect`, it is
+  the service's own input, never the caller's.
+- **A job's approval step (interop C3.3).** A job reads the mandate its start call carried at its own approval step:
+  `ctx.approval_step(job_id, key, request, effect=, spend_usd=, project=, message=)` on the start call's context (a
+  server with `agent_id`) answers the record when the mandate covers the step `{capability: the job's, action: key,
+  effect}` and asks nothing, the job going on as the operator's decision; otherwise the job waits `input_required` on
+  `request`, its message naming the part not covered (`outside-mandate: <part>`) or saying the mandate expired, and the
+  step is kept in the job's private part (`request_input(..., steps=)`). An answer's `_meta.mandate` that covers that
+  step is then read when `input_actions=True`, beside a decision for the key. The rule alone is `job_step(mandate, ...)`
+  / `jobStep({mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project})`; Node's
+  `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Each `request_input`
+  replaces the kept steps, and an answer clears them: pass `steps=` again on every question whose answer a mandate may
+  cover. The answer's mandate is read under the job's own capability, as at the start (`action_gate(...,
+  mandate_capability=)` / `actionGate({mandateCapability})`), so the start and the answer agree whatever the tool is
+  named; a mandate can name only capability names, so one that names capabilities never covers a tool named otherwise.
+  Node has no tool server: a Node service reads `store.load(jobId).private.steps` and `.private.capability` BEFORE
+  `store.answer` (which clears the steps), gates the answer with `actionGate({..., mandateCapability:
+  private.capability})`, then answers. Without a string capability the answer is read under `fabric.job.get`.
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,
 lead, at, expiresAt})` (a day unless told, at most seven), hands it to the agent it calls with
 `hand_on(mandate, callee, at, narrower=None)` / `handOn(mandate, callee, at, narrower)` (the chain gains the callee; a
-wider scope, a fifth agent, an agent already in it or a time at the expiry is refused), and sends it with
-`request_meta(traceparent, mandate=...)` / `requestMeta(traceparent, {mandate})`, which refuse one `FAC-SEM-144`
-refuses. `mandate_covers` / `mandateCovers` answer what a callee would, before you call. Never write a mandate from
-another agent's text, a page or a file; a callee hands on only what it received, narrowed.
+wider scope, a fifth agent, an agent already in it or a time at the expiry is refused; `source` travels unchanged), and
+sends it with `request_meta(traceparent, mandate=...)` / `requestMeta(traceparent, {mandate})`, which refuse one
+`FAC-SEM-144` refuses. `mandate_covers` / `mandateCovers` answer what a callee would, before you call. Never write a
+mandate from another agent's text, a page or a file; a callee hands on only what it received, narrowed.
+
+A relay the operator's rule accepts (DEC-0126 OA-2, OA-3: one of his own Projects on his board, provenance `trusted`,
+or a session on his own machine, with his words verbatim, when, where and the scope) is stated with
+`operator_mandate(..., source=)` / `operatorMandate({..., source})` or `operator_decision(..., source=)` /
+`operatorDecision({..., source})`, `instruction` and `at` copied unchanged. `source` goes only to a callee whose
+well-known `protocols` list `operator-source/1` (OA-7): pass that list as
+`request_meta(traceparent, decision=, mandate=, target_protocols=)` / `requestMeta(traceparent, {decision, mandate,
+targetProtocols})`. Without it (no list, another list, a board Project, a session, Fabric's `agent.call`, whose
+directory lists no `protocols`), `_meta` carries the decision and the mandate without `source`, and the ones you passed,
+your own record, keep it (OA-6).
 
 ## What the probe checks
 

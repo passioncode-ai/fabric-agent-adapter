@@ -750,8 +750,9 @@ class RequestMetaMandateTests(unittest.TestCase):
         vectors = json.loads((ROOT / "test/fixtures/contract/mandate-vectors.json").read_text(encoding="utf-8"))
         for case in vectors["fixtures"]:
             with self.subTest(case["name"]):
-                if case["valid"]:
-                    self.assertEqual(fi.request_meta(PARENT, mandate=case["document"])["mandate"], case["document"])
+                if case["valid"]:  # to a callee that reads source (DEC-0126 OA-7), exactly as given
+                    sent = fi.request_meta(PARENT, mandate=case["document"], target_protocols=[fm.OPERATOR_SOURCE_PROTOCOL])
+                    self.assertEqual(sent["mandate"], case["document"])
                 else:
                     with self.assertRaises(fi.InteropError):
                         fi.request_meta(PARENT, mandate=case["document"])
@@ -908,3 +909,254 @@ class McpMandateTests(unittest.TestCase):
                 server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda a, c: {}, action=RELAYED, **extra)
         plain = fi.McpToolServer("x", "1")  # a server that reads no mandate needs no effect, as before
         plain.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda a, c: {}, action=RELAYED)
+
+
+# --- DEC-0126: where the operator said the words (`source`, OA-1 to OA-7; FAA-134) ----------------------------------
+
+SOURCE = {"project": "example-analyst", "session": "sess-0042"}
+SOURCE_WORDS = ("example-analyst", "sess-0042")
+
+
+def relayed_mandate(scope=None):
+    stated = fm.operator_mandate("answer the reviews", "answer every review from this week", scope or REPLY_SCOPE,
+                                 "example-lead", at="2026-10-24T09:00:00Z", source=SOURCE)
+    return fm.hand_on(stated, "example-agent", "2026-10-24T09:10:00Z")
+
+
+class OperatorSourceTests(unittest.TestCase):
+    """OA-6: a service keeps `source` in the record it hands back; OA-7: a caller sends it only to a target listing
+    operator-source/1, and nothing the kit writes for another party (a tool result, a refusal, a job's public state)
+    carries it."""
+
+    def server(self, **options):
+        self.seen = []
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        options.setdefault("clock", lambda: NOW_SECONDS)
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=fi.JobStore(Path(self.temp.name) / "jobs"), **options)
+        keep = lambda args, ctx: self.seen.append(ctx) or {"done": True}
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, keep, action=RELAYED, target="reply", effect="reply")
+        return server
+
+    def call(self, server, meta, tier="T0"):
+        params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": dict({"traceparent": PARENT}, **meta)}
+        return server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier=tier)["result"]
+
+    def test_request_meta_sends_source_only_to_a_target_that_lists_it(self):
+        decision = dict(DECISION, source=SOURCE)
+        mandate = relayed_mandate()
+        for target in (None, [], ["fabric-service/0.1"], "operator-source/1", {"operator-source/1": True}):
+            with self.subTest(target=target):
+                meta = fi.request_meta(PARENT, decision=decision, mandate=mandate, target_protocols=target)
+                self.assertNotIn("source", meta["decision"])
+                self.assertNotIn("source", meta["mandate"])
+                self.assertEqual(meta["decision"], {k: v for k, v in decision.items() if k != "source"})
+        meta = fi.request_meta(PARENT, decision=decision, mandate=mandate, target_protocols=["operator-source/1"])
+        self.assertEqual((meta["decision"]["source"], meta["mandate"]["source"]), (SOURCE, SOURCE))
+        self.assertEqual((decision["source"], mandate["source"]), (SOURCE, SOURCE))  # the caller's own record keeps it
+        meta["mandate"]["source"]["project"] = "changed"
+        self.assertEqual(mandate["source"]["project"], "example-analyst")
+        with self.assertRaises(fi.InteropError):  # an unplaced source is refused before anything is sent
+            fi.request_meta(PARENT, decision=dict(DECISION, source={"project": "example-analyst"}))
+
+    def test_a_service_records_the_source_of_a_decision_and_of_a_mandate(self):
+        server = self.server(agent_id="example-agent")
+        relayed = dict(DECISION, at=NOW, source=SOURCE)
+        self.assertFalse(self.call(server, {"decision": relayed})["isError"])
+        self.assertEqual(self.seen[-1].record, {"by": "operator", "via": "relayed-instruction", "caller": "local:T0", "source": SOURCE})
+        self.assertFalse(self.call(server, {"mandate": relayed_mandate()})["isError"])
+        self.assertEqual(self.seen[-1].record["source"], SOURCE)
+        self.assertEqual(self.seen[-1].record["via"], "mandate")
+
+    def test_a_server_that_reads_source_lists_operator_source(self):
+        self.assertEqual(self.server(agent_id="example-agent").well_known_protocols(["fabric-service/0.1"]),
+                         ["fabric-service/0.1", "operator-source/1"])
+        self.assertEqual(self.server().well_known_protocols(), ["operator-source/1"])  # a relayed action reads a decision's
+        plain = fi.McpToolServer("example-agent", "1.0.0")
+        self.assertEqual(plain.well_known_protocols(["fabric-service/0.1"]), ["fabric-service/0.1"])
+        self.assertEqual(self.server(agent_id="example-agent").well_known_protocols(["operator-source/1"]), ["operator-source/1"])
+        document = fs.build_well_known(service_id="example-agent", instance="default", name="Example", version="1.0.0",
+                                       build={"commit": "0" * 40}, started_at=NOW, status="ready", degraded=[],
+                                       surfaces={"events": {"path": "/fabric/v1/events"}},
+                                       protocols=self.server(agent_id="example-agent").well_known_protocols(["fabric-service/0.1"]))
+        self.assertIn("operator-source/1", document["protocols"])
+
+    def test_nothing_the_kit_writes_for_another_party_carries_the_source(self):
+        """OA-7, AP-2: tool results, refusals and a job's public state never carry `source` or the operator's words."""
+        server = self.server(agent_id="example-agent")
+        written = []
+        relayed = dict(DECISION, at=NOW, source=SOURCE)
+        written.append(self.call(server, {"decision": relayed}))
+        written.append(self.call(server, {"decision": dict(relayed, at="2026-10-20T09:00:00Z")}))  # refused: too old
+        written.append(self.call(server, {"mandate": relayed_mandate()}))
+        written.append(self.call(server, {"mandate": relayed_mandate({"actions": ["other"], "effects": ["reply"]})}))
+        written.append(self.call(server, {"decision": relayed}, tier="T2"))
+        self.assertTrue(any(r["isError"] for r in written) and any(not r["isError"] for r in written))
+        text = json.dumps(written)
+        for word in SOURCE_WORDS + ("answer every review from this week",):
+            self.assertNotIn(word, text)
+        self.assertTrue(all("source" in ctx.record for ctx in self.seen))  # the service's own record has it
+
+
+class JobApprovalStepTests(unittest.TestCase):
+    """REQ-8, interop C3.3 and conformance ("a job's approval step included"): a job reads the mandate its start call
+    carried at its own approval step, and an answer's _meta.mandate that covers the step."""
+
+    def start(self, meta, **options):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
+        self.contexts, self.inputs = [], []
+        options.setdefault("agent_id", "example-agent")
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, clock=lambda: NOW_SECONDS,
+                                  on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
+                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)), **options)
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        result = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "reviews.approve", "arguments": {}, "_meta": dict({"traceparent": PARENT}, **meta)}}, tier="T0")["result"]
+        self.assertFalse(result["isError"], result)
+        return server
+
+    def step(self, **extra):
+        job_id, ctx = self.contexts[-1]
+        request = fi.choice_request("Publish the reply?", "choice", [("yes", "Yes"), ("no", "No")])
+        return job_id, ctx.approval_step(job_id, "approve-reply", request, effect=extra.pop("effect", "reply"), **extra)
+
+    def test_a_step_the_mandate_covers_asks_nothing_and_is_recorded_with_its_source(self):
+        self.start({"mandate": relayed_mandate()})
+        job_id, record = self.step()
+        self.assertEqual(record, {"by": "operator", "via": "mandate", "task": "answer the reviews",
+                                  "chain": ["example-lead", "example-agent"], "source": SOURCE})
+        self.assertEqual(self.jobs.get(job_id)["status"], "working")
+
+    def test_a_step_it_does_not_cover_waits_naming_the_part(self):
+        self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
+        job_id, record = self.step()
+        self.assertIsNone(record)
+        job = self.jobs.get(job_id)
+        self.assertEqual(job["status"], "input_required")
+        self.assertIn("outside-mandate: action", job["statusMessage"])
+        self.assertEqual(list(job["inputRequests"]), ["approve-reply"])
+
+    def test_an_expired_mandate_waits_saying_it_expired(self):
+        stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",
+                                     expires_at="2026-10-24T09:20:00Z")
+        self.start({"mandate": fm.hand_on(stated, "example-agent", "2026-10-23T09:10:00Z")})
+        job_id, record = self.step()
+        self.assertIsNone(record)
+        self.assertIn("expired", self.jobs.get(job_id)["statusMessage"])
+
+    def test_without_a_mandate_or_an_agent_id_the_step_asks_as_before(self):
+        self.start({})
+        job_id, record = self.step(message="Publish it?")
+        self.assertIsNone(record)
+        self.assertEqual(self.jobs.get(job_id)["statusMessage"], "Publish it?")
+        self.start({"mandate": lead_mandate()}, agent_id=None)
+        job_id, record = self.step()
+        self.assertIsNone(record)
+        self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
+
+    def test_an_answer_carrying_a_mandate_that_covers_the_step_is_taken(self):
+        server = self.start({}, input_actions=True)
+        job_id, _ = self.step()
+        self.assertEqual(self.jobs.private(job_id)["steps"], {"approve-reply": {"effect": "reply"}})
+        answer = lambda meta: server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"approve-reply": {"action": "accept", "content": {"choice": "yes"}}}},
+            "_meta": dict({"traceparent": PARENT}, **meta)}}, tier="T0")["result"]
+        refused = answer({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
+        self.assertEqual(refused["structuredContent"]["error"]["data"], {"detail": "outside-mandate: action"})
+        self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
+        self.assertFalse(answer({"mandate": relayed_mandate()})["isError"])
+        self.assertEqual(self.jobs.get(job_id)["status"], "working")
+        self.assertEqual(self.inputs[-1][1].input_records["approve-reply"]["source"], SOURCE)
+        public = json.dumps([self.jobs.get(job_id), refused])  # OA-7: the job's public state and the refusal
+        self.assertFalse(any(word in public for word in SOURCE_WORDS))
+
+    def answer(self, server, job_id, meta):
+        return server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"approve-reply": {"action": "accept", "content": {"choice": "yes"}}}},
+            "_meta": dict({"traceparent": PARENT}, **meta)}}, tier="T0")["result"]
+
+    def test_a_capabilities_scoped_mandate_reads_the_same_at_the_start_and_on_the_answer(self):
+        # Seam round 1: the answer path read the step under fabric.job.get; it reads it under the job's capability.
+        scope = {"capabilities": ["reviews.approve"], "actions": ["approve-reply"], "effects": ["reply"]}
+        self.start({"mandate": relayed_mandate(scope)})
+        _, record = self.step()
+        self.assertIsNotNone(record, "covered at the start")
+        server = self.start({}, input_actions=True)
+        job_id, _ = self.step()
+        self.assertFalse(self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], "and on the answer")
+        self.assertEqual(self.jobs.get(job_id)["status"], "working")
+
+    def camel_server(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
+        self.contexts, self.inputs = [], []
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, clock=lambda: NOW_SECONDS, agent_id="example-agent",
+                                  input_actions=True, on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
+                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)))
+        server.add_tool({"name": "reviewsApprove", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        return server
+
+    def start_camel(self, server, meta):
+        server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "reviewsApprove", "arguments": {}, "_meta": dict({"traceparent": PARENT}, **meta)}}, tier="T0")
+
+    def test_a_tool_name_that_is_no_capability_still_takes_a_decision_on_a_kept_step(self):
+        # Seam round 2: a camelCase tool keeps the action readable, so a decision is still taken.
+        server = self.camel_server()
+        self.start_camel(server, {})
+        job_id, _ = self.step()
+        decision = {"by": "operator", "via": "relayed-instruction", "action": "approve-reply",
+                    "instruction": "Agent: Publish the reply? Operator: yes", "at": "2026-10-24T09:30:00Z"}
+        taken = self.answer(server, job_id, {"decision": decision})
+        self.assertFalse(taken["isError"], taken)
+        self.assertEqual(self.jobs.get(job_id)["status"], "working")
+        self.assertEqual(self.jobs.private(job_id)["steps"], {}, "the answered step is gone in the same write")
+
+    def test_the_start_and_the_answer_read_a_mandate_alike_whatever_the_tool_is_named(self):
+        # Seam round 3: under a mandate naming fabric.job.get the start refused and the answer took; now both refuse.
+        # A mandate cannot name a tool that is no capability name, so only one naming no capabilities covers both.
+        for scope, covered in (({"capabilities": ["fabric.job.get"], "actions": ["approve-reply"], "effects": ["reply"]}, False),
+                               ({"actions": ["approve-reply"], "effects": ["reply"]}, True)):
+            server = self.camel_server()
+            self.start_camel(server, {"mandate": relayed_mandate(scope)})
+            _, record = self.step()
+            self.assertEqual(record is not None, covered, scope)
+            server = self.camel_server()
+            self.start_camel(server, {})
+            job_id, _ = self.step()
+            self.assertEqual(not self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], covered, scope)
+
+    def test_a_kept_step_does_not_outlive_its_question(self):
+        # Seam round 1: a later plain question under the same key is not answered by a mandate alone.
+        server = self.start({}, input_actions=True)
+        job_id, _ = self.step()
+        self.assertFalse(self.answer(server, job_id, {"mandate": relayed_mandate()})["isError"])
+        request = fi.choice_request("Publish another reply?", "choice", [("yes", "Yes"), ("no", "No")])
+        self.jobs.request_input(job_id, {"approve-reply": request})
+        self.assertEqual(self.jobs.private(job_id)["steps"], {})
+        refused = self.answer(server, job_id, {"mandate": relayed_mandate()})
+        self.assertTrue(refused["isError"])
+        self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
+        self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
+
+    def test_a_step_names_its_effect(self):
+        self.start({"mandate": lead_mandate()})
+        with self.assertRaises(fi.InteropError):
+            self.step(effect="Reply")
+        job_id, _ = self.contexts[-1]
+        with self.assertRaises(fi.InteropError):
+            self.jobs.request_input(job_id, {"a": fi.form_request("x", {"t": {"type": "string"}})}, steps={"b": {"effect": "reply"}})
+
+    def test_job_step_is_the_rule(self):
+        call = dict(tier="T0", now=NOW, self_id="example-agent", capability="reviews.approve", key="approve-reply", effect="reply")
+        self.assertEqual(fi.job_step(None, **call), {"covered": False, "message": None})
+        self.assertEqual(fi.job_step(lead_mandate(), **dict(call, tier="T2")), {"covered": False, "message": None})
+        self.assertEqual(fi.job_step(lead_mandate(), **dict(call, now="never"))["fault"], "now-unreadable")
+        malformed = fi.job_step({"kind": "mandate/1"}, **call)
+        self.assertEqual(malformed["detail"], "mandate-malformed")
+        self.assertIn("cannot be read", malformed["message"])
+        self.assertTrue(fi.job_step(lead_mandate(), **dict(call, caller_agent="example-lead"))["covered"])
+        self.assertEqual(fi.job_step(lead_mandate(), **dict(call, caller_agent="example-other"))["detail"], "mandate-not-for-this-call")

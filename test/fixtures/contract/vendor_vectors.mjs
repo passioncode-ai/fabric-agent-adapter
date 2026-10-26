@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Vendors the contract's own vectors the kits are held to, re-answered here by the contract's functions so a stale copy
-// is caught: fixtures/vectors/hub-key.json (DEC-0060, hubKeyCertified), fixtures/vectors/service-supervisor.json
+// is caught: fixtures/vectors/hub-key.json (DEC-0060, hubKeyCertified; DEC-0128's context cases generated on
+// fixtures/positive/estate-record-organizations.json, for hubKeyCertified and verifyDelegation), fixtures/vectors/service-supervisor.json
 // (DEC-0057, supervisorMarker and lockWaitBudgetMs) and the fixtures/semantic/service-lock-*.json records (FAC-SEM-078,
 // lockOutcomeRules), fixtures/vectors/windows-token.json (DEC-0057, windowsTokenAclProblem, FAC-SEM-079), and
 // DEC-0061/0069: fixtures/vectors/service-peer.json (peerRefusal), fixtures/vectors/app-descriptor.json
@@ -13,6 +14,7 @@
 //
 // Needs Node 24 or later (type stripping). The hub keys' private seeds are dropped: the kits verify and never sign.
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,6 +28,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const write = (name, value) => fs.writeFileSync(path.join(out, name), `${JSON.stringify(value, null, 2)}\n`);
 
 const hubKeyRules = await src('hub-key-rules.ts');
+const delegation = await src('delegation.ts');
 const supervisor = await src('service-supervisor.ts');
 const windowsToken = await src('windows-token.ts');
 const appDescriptor = await src('app-descriptor.ts');
@@ -47,7 +50,84 @@ for (const c of hub.cases) {
 }
 const hubKeys = Object.fromEntries(Object.entries(hub.hubKeys).map(([kid, key]) => [kid, Object.fromEntries(Object.entries(key).filter(([name]) => name !== 'seed'))]));
 const revisions = Object.fromEntries(Object.entries(hub.revisions).map(([n, r]) => [n, typeof r === 'string' ? read(r) : r]));
-write('hub-key-vectors.json', { ...hub, hubKeys, revisions, source: 'fixtures/vectors/hub-key.json' });
+// DEC-0128 (DL-14a): a hub key per organization context. hubKeyCertified with options.context, on the contract's positive
+// record with two organizations pinned and one context key, varied as test/context-keys.test.ts varies it; and
+// verifyDelegation with estateContext over tokens signed here under that record's keys: the context key is RFC 8032's
+// first test key (its seed is the RFC's), the personal one hub-key.json's own. Seeds stay here; only tokens are written.
+const orgRecord = read('fixtures/positive/estate-record-organizations.json');
+const ORG = 'org:org_3fh9p1zc';
+const hubMachine = orgRecord.machines.find((machine) => machine.hubKey);
+const contextKey = hubMachine.contextHubKeys[0].key;
+const personalKey = hubMachine.hubKey;
+const at = Date.parse('2026-10-20T00:00:00Z') / 1000;
+const contextCases = [];
+const contextCase = (name, record, kid, x, options = {}) => {
+  const answer = hubKeyRules.hubKeyCertified(record, kid, x, at, undefined, options);
+  contextCases.push({ name, record, kid, x, at, ...options, expected: answer });
+};
+const unpinned = { ...orgRecord, organizations: orgRecord.organizations.filter((pin) => pin.org !== ORG) };
+const { organizations: _pins, ...noPins } = orgRecord;
+const onHub = (change) => ({ ...orgRecord, machines: orgRecord.machines.map((machine) => (machine.id === hubMachine.id ? change(machine) : machine)) });
+contextCase('a context key in its own context', orgRecord, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('a context key with no context', orgRecord, contextKey.kid, contextKey.x);
+contextCase('a context key in the personal context', orgRecord, contextKey.kid, contextKey.x, { context: 'personal' });
+contextCase('a context key in the other pinned organization', orgRecord, contextKey.kid, contextKey.x, { context: 'org:org_7kq2m4xw' });
+contextCase('the personal key with no context', orgRecord, personalKey.kid, personalKey.x);
+contextCase('the personal key in the personal context', orgRecord, personalKey.kid, personalKey.x, { context: 'personal' });
+contextCase('the personal key in an organization context', orgRecord, personalKey.kid, personalKey.x, { context: ORG });
+for (const context of ['org:', 'Org:org_3fh9p1zc', 'team:x', 'personal ', `org:${'x'.repeat(129)}`, null]) {
+  contextCase(`a context of ${JSON.stringify(context)}`, orgRecord, personalKey.kid, personalKey.x, { context });
+  contextCase(`the context key under a context of ${JSON.stringify(context)}`, orgRecord, contextKey.kid, contextKey.x, { context });
+}
+contextCase('the organization unpinned', unpinned, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('organizations that is not an array', { ...orgRecord, organizations: 'none' }, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('no organizations at all', noPins, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('a pin among non-objects', { ...orgRecord, organizations: [7, null, ...orgRecord.organizations] }, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('the context kid revoked by the delta', orgRecord, contextKey.kid, contextKey.x, { context: ORG, extraRevocations: [{ kind: 'hub-key', ref: contextKey.kid }] });
+contextCase('the context kid revoked by the record', { ...orgRecord, revocations: [{ kind: 'hub-key', ref: contextKey.kid, revokedAt: orgRecord.issuedAt }] }, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('the hub machine revoked', { ...orgRecord, revocations: [{ kind: 'machine', ref: hubMachine.id, revokedAt: orgRecord.issuedAt }] }, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('the context kid under the personal public key', orgRecord, contextKey.kid, personalKey.x, { context: ORG });
+contextCase('no x', orgRecord, contextKey.kid, undefined, { context: ORG });
+contextCase('contextHubKeys that is not an array', onHub((machine) => ({ ...machine, contextHubKeys: 'none' })), contextKey.kid, contextKey.x, { context: ORG });
+contextCase('a context key entry that is not an object, then the key', onHub((machine) => ({ ...machine, contextHubKeys: [3, { context: ORG, key: 'k' }, ...machine.contextHubKeys] })), contextKey.kid, contextKey.x, { context: ORG });
+contextCase('the context key listed for another context only', onHub((machine) => ({ ...machine, contextHubKeys: [{ context: 'org:org_7kq2m4xw', key: contextKey }] })), contextKey.kid, contextKey.x, { context: ORG });
+contextCase('two machines list the context kid', { ...orgRecord, machines: orgRecord.machines.map((machine) => ({ ...machine, contextHubKeys: [{ context: ORG, key: contextKey }] })) }, contextKey.kid, contextKey.x, { context: ORG });
+contextCase('the context key on a machine without the personal key', onHub((machine) => { const { hubKey: _drop, ...rest } = machine; return rest; }), contextKey.kid, contextKey.x, { context: ORG });
+
+const pkcs8 = (seed) => crypto.createPrivateKey({ key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(seed, 'hex')]), format: 'der', type: 'pkcs8' });
+const publicX = (key) => crypto.createPublicKey(key).export({ format: 'jwk' }).x;
+const contextSigner = pkcs8('9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60'); // RFC 8032 §7.1, test 1
+const personalSigner = pkcs8(hub.hubKeys[personalKey.kid].seed);
+if (publicX(contextSigner) !== contextKey.x || publicX(personalSigner) !== personalKey.x) throw new Error('the signing seeds no longer match the record\'s keys');
+const tokenOf = (kid, signer, claims) => {
+  const head = Buffer.from(JSON.stringify({ alg: 'EdDSA', typ: 'fabric-delegation+jwt', kid })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return `${head}.${body}.${crypto.sign(null, Buffer.from(`${head}.${body}`), signer).toString('base64url')}`;
+};
+const baseClaims = JSON.parse(Buffer.from(hub.verifier[0].token.split('.')[1], 'base64url').toString('utf8'));
+const contextIss = orgRecord.organizations.find((pin) => pin.org === ORG).iss;
+const contextToken = tokenOf(contextKey.kid, contextSigner, { ...baseClaims, iss: contextIss, sub: 'urn:person:context-subject', jti: 'context-vector-token-0001' });
+const personalToken = tokenOf(personalKey.kid, personalSigner, { ...baseClaims, jti: 'context-vector-token-0002' });
+const contextJwks = { keys: [{ ...contextKey }, { ...personalKey }] };
+const now = hub.verifier[0].now;
+const contextVerifier = [];
+const verifierCase = (name, token, issuer, estate, estateContext) => {
+  const options = { audience: 'example-media', jwks: contextJwks, now, capability: 'media.render', effect: 'draft', issuer, estate, ...(estateContext === undefined ? {} : { estateContext }) };
+  const answer = delegation.verifyDelegation(token, options);
+  contextVerifier.push({ name, token, issuer, now, estate, ...(estateContext === undefined ? {} : { estateContext }), expected: answer.ok ? { ok: true, kid: answer.kid } : { ok: false, code: answer.code, detail: answer.detail } });
+};
+verifierCase('an organization token in its own context', contextToken, contextIss, orgRecord, ORG);
+verifierCase('an organization token with no context', contextToken, contextIss, orgRecord);
+verifierCase('an organization token in the personal context', contextToken, contextIss, orgRecord, 'personal');
+verifierCase('an organization token in the other pinned organization', contextToken, contextIss, orgRecord, 'org:org_7kq2m4xw');
+verifierCase('an organization token once the organization is unpinned', contextToken, contextIss, unpinned, ORG);
+verifierCase('an organization token under a malformed context', contextToken, contextIss, orgRecord, 'Org:org_3fh9p1zc');
+verifierCase('an organization token checked against the estate issuer', contextToken, hub.issuer, orgRecord, ORG);
+verifierCase('a personal token in an organization context', personalToken, hub.issuer, orgRecord, ORG);
+verifierCase('a personal token in the personal context', personalToken, hub.issuer, orgRecord, 'personal');
+verifierCase('a personal token with no context', personalToken, hub.issuer, orgRecord);
+if (!contextVerifier[0].expected.ok || contextVerifier[1].expected.ok || !contextVerifier[8].expected.ok) throw new Error('the context verifier cases no longer answer as DL-14a says');
+write('hub-key-vectors.json', { ...hub, hubKeys, revisions, contextCases, contextJwks, contextVerifier, source: 'fixtures/vectors/hub-key.json; contextCases and contextVerifier generated on fixtures/positive/estate-record-organizations.json (DEC-0128)' });
 
 // service-supervisor.json: every case re-answered by supervisorMarker and lockWaitBudgetMs.
 const sup = read('fixtures/vectors/service-supervisor.json');

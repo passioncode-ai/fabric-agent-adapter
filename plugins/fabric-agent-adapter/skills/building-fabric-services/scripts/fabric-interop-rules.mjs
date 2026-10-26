@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { ServiceError } from './fabric-base.mjs';
 import { jcs, refusalFromAction, refusalToolResult } from './fabric-delegation.mjs';
 import { actionDecision, decisionShape } from './fabric-actions.mjs'; // DEC-0121
-import { mandateProblem } from './fabric-mandate.mjs'; // DEC-0125
+import { EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, mandateCovers, mandateProblem, withoutSource } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
 import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 import { isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 
@@ -196,20 +196,54 @@ export function readsNullUsage(requestMeta) {
  * task the call serves (DEC-0125 MD-3; state it with operatorMandate and hand it on to the callee with handOn before you
  * send it). Both travel here only, never in a tool's arguments; a decision decision.schema.json refuses or a mandate
  * FAC-SEM-144 refuses throws InteropError.
+ *
+ * DEC-0126 OA-7: `targetProtocols` is the callee's well-known `protocols`. A decision's or a mandate's `source` is sent
+ * only when that list names operator-source/1; otherwise (no list, another list, a board Project, a session, Fabric's
+ * agent.call, whose directory lists no `protocols`) it is left out of `_meta` and stays in the caller's own record, the
+ * decision and the mandate given here, which this never changes.
  */
-export function requestMeta(traceparent, { decision, mandate } = {}) {
+export function requestMeta(traceparent, { decision, mandate, targetProtocols } = {}) {
   const meta = { protocols: [...PROTOCOLS_READ] };
+  const readsSource = Array.isArray(targetProtocols) && targetProtocols.includes(OPERATOR_SOURCE_PROTOCOL);
   if (parseTraceparent(traceparent)) meta.traceparent = traceparent;
   if (decision !== undefined && decision !== null) {
     if (!decisionShape(decision)) throw new InteropError('The decision is not one decision.schema.json reads; it is not sent.');
-    meta.decision = { ...decision };
+    meta.decision = structuredClone(readsSource ? decision : withoutSource(decision));
   }
   if (mandate !== undefined && mandate !== null) {
     const problem = mandateProblem(mandate);
     if (problem) throw new InteropError(`The mandate is not one FAC-SEM-144 reads (${problem}); it is not sent.`);
-    meta.mandate = structuredClone(mandate);
+    meta.mandate = structuredClone(readsSource ? mandate : withoutSource(mandate));
   }
   return meta;
+}
+
+/**
+ * A job's own approval step under the mandate its start call carried (interop C3.3, DEC-0125 MD-3, MD-4; conformance:
+ * "a job's approval step included"): the step is the call {capability: the job's, action: the input request's `key`,
+ * effect, spendUsd?, project?} that mandateCovers reads, with `self` the service's agent id and `callerAgent` only an
+ * agent id it authenticated for the start call. Answers {covered: true, record} (the step goes on as the operator's
+ * decision, no input request; `record` is mandateCovers' recordAs, `source` included when the mandate carries one);
+ * {covered: false, message, detail} (the step waits input_required, `message` its statusMessage naming the part not
+ * covered, or saying the mandate expired or cannot be read; never the operator's words or `source`); or {covered: false,
+ * message: null} with no mandate or a T2 caller's (MD-5), with `fault` when the service's own clock does not read.
+ */
+export function jobStep({ mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project } = {}) {
+  if (mandate === undefined || mandate === null) return { covered: false, message: null };
+  if (!EFFECT_CLASSES.includes(effect)) throw new InteropError(`A job's approval step names its effect class (one of ${EFFECT_CLASSES.join(', ')}; DEC-0125).`);
+  const call = { capability, action: key, effect };
+  if (typeof spendUsd === 'number') call.spendUsd = spendUsd;
+  if (typeof project === 'string') call.project = project;
+  const covers = { mandate, tier, now, self, call };
+  if (typeof callerAgent === 'string' && callerAgent.length > 0) covers.callerAgent = callerAgent;
+  const answer = mandateCovers(covers);
+  if (answer.ok === true) return { covered: true, record: answer.recordAs };
+  if ('ignored' in answer || 'fault' in answer) return { covered: false, message: null, ...('fault' in answer ? { fault: answer.fault } : {}) };
+  const { detail } = answer.data;
+  const said = detail === 'mandate-expired' ? "The operator's mandate for this task expired before this step"
+    : detail.startsWith('outside-mandate') ? `The operator's mandate does not cover this step (${detail})`
+      : `The operator's mandate cannot be read for this step (${detail})`;
+  return { covered: false, detail, message: `${said}: answer it, or call fabric.job.get with a mandate that covers it in _meta.mandate.` };
 }
 
 /**
@@ -227,8 +261,11 @@ export function requestMeta(traceparent, { decision, mandate } = {}) {
  * credential; never a name the call carries), `spendUsd` (its own estimate) and `project`. A covered call answers
  * {ok: true, record: {by: 'operator', via: 'mandate', task, chain, caller}, decision: null, mandate}; without `self` the
  * mandate is not read and the call is answered as before it existed.
+ *
+ * mandateCapability: a job's kept step's capability the mandate is read under, not the action's tool (the kit's
+ * input; the service's own, never a caller's).
  */
-export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project } = {}) {
+export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };
   if (isObject(meta) && Object.hasOwn(meta, 'decision')) inputs.decision = meta.decision;
   for (const [name, value] of [['target', target], ['approval', approval], ['actionDigest', actionDigest], ['humanStepUrl', humanStepUrl]]) {
@@ -236,7 +273,7 @@ export function actionGate({ action, tier, caller, meta, target, elicited = fals
   }
   if (self !== undefined && self !== null && isObject(meta) && Object.hasOwn(meta, 'mandate')) {
     Object.assign(inputs, { mandate: meta.mandate, self });
-    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', spendUsd], ['project', project]]) {
+    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', spendUsd], ['project', project], ['mandateCapability', mandateCapability]]) {
       if (value !== undefined && value !== null) inputs[name] = value;
     }
   }

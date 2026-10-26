@@ -3,6 +3,11 @@
 // Part of the Node service kit (layer L3, after fabric-descriptor); the twin of fabric_context.py, answer for answer
 // (test/fixtures/kit-context-cases.json). Node built-ins only. The facade fabric-service.mjs does not re-export it.
 // A refusal exits 78 (EX_CONFIG) with nothing created; a second copy for the same context exits 75 as holdSingleInstance does.
+// An organization's instance whose context the record does not pin (`organizations`, DEC-0127) still starts: the helper
+// checks the placement and its share grant, not the pin (decision D5 of 0.52.0). Its tokens are refused instead:
+// hubKeyCertified reads a context's hub keys only while the record pins that organization (DL-14a, DEC-0128), so the
+// service passes `estateContext: context` to its delegation gate. A refusal at start would stop every organization
+// instance on today's records, which pin none until every reader is pinned at or after DEC-0127.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';

@@ -55,6 +55,18 @@ hub forwarding a T2 caller). DL-26: a T0 or T1 caller is never required to prese
 delegation. A token such a caller presents is still verified and refused when invalid. A T2 caller takes the whole
 profile. Money limits and human gates bind at every tier.
 
+**The family and the agent network** (DEC-0130, wording settled by DEC-0137). The operator's family is every agent
+placed on a machine of his estate and his own local sessions; a callee recognises it only by placing the caller in T0
+or T1 (DL-27). It is neither a context (`personal` and `org:<orgId>` stay the only ones) nor a tier: it is open to
+what DL-26 opens, everything open to the operator in the call's context, which for a tokenless call is the callee
+instance's own context. No claim of a caller places it in the family: a call relayed onto loopback stays T2 unless the
+relay proves the origin's tier, and a caller under another OS account stays T2 (DL-28). The agent network is every
+agent a caller can reach, the family included; outside the family a caller is T2, with a token per call (DL-29). Money
+limits, human gates, the contexts, the credential source (never another agent's key or vault slot), the machine
+profiles on calls over the relay, and a relayed action's decision or mandate still bind inside the family (DEC-0137).
+Every T0 process of the owner's account counts as the family, one he did not install included, so a product that must
+hold against a hostile local process adds its own approval (FAA-148). The kit's tiers already do this; nothing changes in code.
+
 The token is read from `Fabric-Delegation` first (a forwarded call; present but empty is refused, never skipped),
 then from `Authorization: Bearer` when the bearer is a delegation JWT (DL-9, DL-10). A tool with no declared
 effect is refused (`unknown-state`), never guessed. The checks run in the DL-13 order; nothing about a token is
@@ -131,6 +143,16 @@ current verified revision as `estate=` / `{ estate }`, as a value or as a functi
   applied mark or its revocations is an unreadable source, `estate-unreadable`, in both kits (FAA-78).
 - Every verifier refuses a clock that is not a number of seconds `unknown-state` `no-clock` before row 1: a NaN clock
   would make every time row false and pass an expired token.
+- **Which hub key a token is checked against** (DL-14a, DEC-0128). An organization's tokens are signed by that
+  organization context's own hub key (`machines[].contextHubKeys`), under the context issuer its pin names
+  (`organizations[].iss`, `urn:fabric:context:<opaque>`, never the estate id). An instance that serves an organization
+  passes its context as `estate_context=` / `{ estateContext }` to `delegation_gate` or `verify_delegation`, once the
+  record pins its organization (until then its tokens are refused `kid-not-certified`, brief D5), and that pin's `iss`
+  as `issuer`: the `kid` is then trusted only when one machine lists it for that context with that key and
+  the record pins the organization. Without it, or with `personal`, the personal `hubKey` is read, so a context key
+  never verifies a personal token and the personal key never an organization's; any other value (`Org:x`, a trailing
+  space, a number) certifies nothing. `verify_approval` takes no context (the contract's `VerifyApprovalOptions`
+  declares none at the pin), so it reads the personal keys. Held to `contextCases` and `contextVerifier` in `test/fixtures/contract/hub-key-vectors.json`.
 
 ## What the kit does not do
 

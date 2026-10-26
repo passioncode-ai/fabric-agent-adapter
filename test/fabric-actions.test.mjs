@@ -25,7 +25,7 @@ const viewOf = (view) => Object.fromEntries(['declared', 'valid', 'actions'].fil
 const call = (extra = {}) => actionDecision({ action: RELAYED, tier: 'T0', caller: 'agent:claude-code', now: NOW, decision: DECISION, ...extra });
 
 test('every case answers as the contract does', () => {
-  assert.equal(V.cases.length, 65);
+  assert.equal(V.cases.length, 67);
   for (const c of V.cases) assert.deepEqual(actionDecision(c.input), c.expected, c.name);
 });
 
@@ -39,7 +39,7 @@ test('every declaration is found where the contract finds it', () => {
 });
 
 test('the action-call fixtures', () => {
-  assert.equal(V.actionCalls.length, 12);
+  assert.equal(V.actionCalls.length, 16);
   for (const c of V.actionCalls) {
     assert.deepEqual(actionDecision(c.inputs), c.expected, c.name);
     const value = { ...c.inputs, answer: c.answer };
@@ -277,6 +277,21 @@ test('operatorDecision refuses what the schema refuses', () => {
     ['approve-reply', 'approve it', { target: '' }], ['approve-reply', 'approve it', { target: 't'.repeat(201) }], ['approve-reply', 5, {}]];
   for (const [action, instruction, extra] of bad) assert.throws(() => operatorDecision({ action, instruction, at: NOW, ...extra }), ServiceError, `${action} ${String(instruction).slice(0, 20)}`);
   assert.throws(() => operatorDecision(), ServiceError);
+});
+
+test('DEC-0126: a relayed decision names where the operator spoke (OA-2, OA-6)', () => {
+  const source = { project: 'example-site', session: 'sess-42' };
+  const made = operatorDecision({ action: 'approve-reply', instruction: 'approve the reply to the review from Anna', at: NOW, source });
+  assert.deepEqual(made.source, source);
+  assert.equal(decisionShape(made), true);
+  const answer = actionDecision({ action: RELAYED, tier: 'T1', caller: 'local:T1', now: NOW, decision: made });
+  assert.deepEqual(answer, { ok: true, recordAs: { by: 'operator', via: 'relayed-instruction', caller: 'local:T1', source } });
+  answer.recordAs.source.project = 'changed'; // the record is a copy
+  assert.equal(made.source.project, 'example-site');
+  for (const bad of [{ project: 'example-site' }, { project: 'x', session: 's', extra: 1 }, { project: 'x', thread: 'a b' }]) {
+    assert.equal(decisionShape({ ...made, source: bad }), false, JSON.stringify(bad));
+    assert.throws(() => operatorDecision({ action: 'approve-reply', instruction: 'approve it', at: NOW, source: bad }), ServiceError);
+  }
 });
 
 test('the caller recorded is the authenticated one or the local floor', () => {

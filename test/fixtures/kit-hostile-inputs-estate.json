@@ -1,5 +1,5 @@
 {
-  "comment": "Hostile inputs the estate and ceremony twins answer alike (FAA-78, finding 44; decision D3): fabric_estate.py, fabric_ceremonies.py and their Node twins each run every case (test_kit_hostile_estate.py, kit-hostile-estate.test.mjs). hubKey: the contract's first hub-key vector with applied set as written (absent when the member is missing); an explicit null fails closed. deviceKeys: a deviceKeys list replacing machine 0's in the contract's estate-contexts-ok.json, and the finding paths expected (the index is the position in the list as written, non-objects included). placementTrust: a record that is no object places nothing. enrollTokenClock: every ceremony verify vector answered the same with the clock as epoch seconds.",
+  "comment": "Hostile inputs the estate and ceremony twins answer alike (FAA-78, finding 44; decision D3): fabric_estate.py, fabric_ceremonies.py and their Node twins each run every case (test_kit_hostile_estate.py, kit-hostile-estate.test.mjs). hubKey: the contract's first hub-key vector with applied set as written (absent when the member is missing); an explicit null fails closed. deviceKeys: a deviceKeys list replacing machine 0's in the contract's estate-contexts-ok.json, and the finding paths expected (the index is the position in the list as written, non-objects included). placementTrust: a record that is no object places nothing. enrollTokenClock: every ceremony verify vector answered the same with the clock as epoch seconds. DEC-0128 (0.52.0): contextHubKeys replaces the hub machine's list, organizations the pins (and estate the estate id, when given), in the contract's fixtures/positive/estate-record-organizations.json, with the findings other than FAC-SEM-072 as [code, instancePath]; hubKeyContext runs that record's context key under each context at 2026-10-20. Every expected answer was given by the contract's estateRecordRules and hubKeyCertified at the pin.",
   "hubKey": [
     {
       "name": "applied-absent",
@@ -94,6 +94,416 @@
     {
       "name": "string record",
       "record": "estate"
+    }
+  ],
+  "contextHubKeys": [
+    {
+      "name": "non-objects before a context key",
+      "contextHubKeys": [
+        null,
+        7,
+        "x",
+        [],
+        {
+          "context": "org:org_3fh9p1zc",
+          "key": {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+            "kid": "hub-ctx-a-1",
+            "use": "sig",
+            "alg": "EdDSA"
+          }
+        }
+      ],
+      "expected": []
+    },
+    {
+      "name": "an object for the list",
+      "contextHubKeys": {
+        "context": "org:org_3fh9p1zc",
+        "key": {
+          "kty": "OKP",
+          "crv": "Ed25519",
+          "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+          "kid": "hub-ctx-a-1",
+          "use": "sig",
+          "alg": "EdDSA"
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "keys that are not objects, twice in one context",
+      "contextHubKeys": [
+        {
+          "context": "org:org_3fh9p1zc",
+          "key": null
+        },
+        {
+          "context": "org:org_3fh9p1zc",
+          "key": []
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/1/context"
+        ]
+      ]
+    },
+    {
+      "name": "a context, kid and x that are numbers",
+      "contextHubKeys": [
+        {
+          "context": 7,
+          "key": {
+            "kid": 7,
+            "x": 7
+          }
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/0/context"
+        ],
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/0/key/x"
+        ]
+      ]
+    },
+    {
+      "name": "a kid and x with their own toString, twice",
+      "contextHubKeys": [
+        {
+          "context": "org:org_3fh9p1zc",
+          "key": {
+            "kid": {
+              "toString": 1
+            },
+            "x": {
+              "toString": 1
+            }
+          }
+        },
+        {
+          "context": "org:org_3fh9p1zc",
+          "key": {
+            "kid": {
+              "toString": 1
+            },
+            "x": {
+              "toString": 1
+            }
+          }
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/0/key/x"
+        ],
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/1/context"
+        ],
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/1/key/x"
+        ]
+      ]
+    },
+    {
+      "name": "a context that is an array",
+      "contextHubKeys": [
+        {
+          "context": [
+            "org:org_3fh9p1zc"
+          ],
+          "key": {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+            "kid": "hub-ctx-a-1",
+            "use": "sig",
+            "alg": "EdDSA"
+          }
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/0/context"
+        ]
+      ]
+    },
+    {
+      "name": "a key with no kid and no x",
+      "contextHubKeys": [
+        {
+          "context": "org:org_3fh9p1zc",
+          "key": {}
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/0/key/x"
+        ]
+      ]
+    }
+  ],
+  "organizations": [
+    {
+      "name": "non-objects before a pin",
+      "organizations": [
+        null,
+        "x",
+        3,
+        {
+          "org": "org:org_3fh9p1zc",
+          "issuer": "https://orgs.example",
+          "iss": "urn:fabric:context:c7d2a91f0b3e4c58",
+          "root": {
+            "kid": "root-org-a-1",
+            "x": "bfkD5KBvkcHA-_BwPJxUzu7jiwq2SmtVRyLuNpSQRmQ"
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "name": "a string for the list",
+      "organizations": "none",
+      "expected": [
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/0/context"
+        ]
+      ]
+    },
+    {
+      "name": "two pins whose org is null",
+      "organizations": [
+        {
+          "org": null,
+          "issuer": "https://orgs.example",
+          "iss": "urn:fabric:context:c7d2a91f0b3e4c58",
+          "root": {
+            "kid": "root-org-a-1",
+            "x": "bfkD5KBvkcHA-_BwPJxUzu7jiwq2SmtVRyLuNpSQRmQ"
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        },
+        {
+          "org": null,
+          "issuer": "https://orgs.example",
+          "iss": "urn:fabric:context:another0000000000",
+          "root": {
+            "kid": "root-org-a-1",
+            "x": "bfkD5KBvkcHA-_BwPJxUzu7jiwq2SmtVRyLuNpSQRmQ"
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-073",
+          "/machines/0/contextHubKeys/0/context"
+        ],
+        [
+          "FAC-SEM-147",
+          "/organizations/1/org"
+        ]
+      ]
+    },
+    {
+      "name": "an iss that is an array and one with its own toString",
+      "organizations": [
+        {
+          "org": "org:org_3fh9p1zc",
+          "issuer": "https://orgs.example",
+          "iss": [
+            "a"
+          ],
+          "root": {
+            "kid": "root-org-a-1",
+            "x": "bfkD5KBvkcHA-_BwPJxUzu7jiwq2SmtVRyLuNpSQRmQ"
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        },
+        {
+          "org": "org:b",
+          "issuer": "https://orgs.example",
+          "iss": {
+            "toString": 1
+          },
+          "root": null,
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "name": "an issuer that holds the estate id in upper case, a root x that is a number",
+      "organizations": [
+        {
+          "org": "org:org_3fh9p1zc",
+          "issuer": "https://orgs.example",
+          "iss": "urn:fabric:context:ESTATE-5D0F1A-0000000",
+          "root": {
+            "x": 5
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-147",
+          "/organizations/0/iss"
+        ]
+      ]
+    },
+    {
+      "name": "an estate id of eight UTF-16 units in four astral characters",
+      "organizations": [
+        {
+          "org": "org:org_3fh9p1zc",
+          "issuer": "https://orgs.example",
+          "iss": "urn:fabric:context:x😀😀😀😀y",
+          "root": {
+            "kid": "root-org-a-1",
+            "x": "bfkD5KBvkcHA-_BwPJxUzu7jiwq2SmtVRyLuNpSQRmQ"
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        }
+      ],
+      "estate": "😀😀😀😀",
+      "expected": [
+        [
+          "FAC-SEM-147",
+          "/organizations/0/iss"
+        ]
+      ]
+    },
+    {
+      "name": "an estate id of seven characters inside the issuer",
+      "organizations": [
+        {
+          "org": "org:org_3fh9p1zc",
+          "issuer": "https://orgs.example",
+          "iss": "urn:fabric:context:abcdefg00000000000",
+          "root": {
+            "kid": "root-org-a-1",
+            "x": "bfkD5KBvkcHA-_BwPJxUzu7jiwq2SmtVRyLuNpSQRmQ"
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        }
+      ],
+      "estate": "abcdefg",
+      "expected": []
+    },
+    {
+      "name": "the prefix twice",
+      "organizations": [
+        {
+          "org": "org:org_3fh9p1zc",
+          "issuer": "https://orgs.example",
+          "iss": "urn:fabric:context:urn:fabric:context:estate-5d0f1a",
+          "root": {
+            "kid": "root-org-a-1",
+            "x": "bfkD5KBvkcHA-_BwPJxUzu7jiwq2SmtVRyLuNpSQRmQ"
+          },
+          "pinnedAt": "2026-10-12T09:00:00Z"
+        }
+      ],
+      "expected": [
+        [
+          "FAC-SEM-147",
+          "/organizations/0/iss"
+        ]
+      ]
+    }
+  ],
+  "hubKeyContext": [
+    {
+      "name": "context null",
+      "context": null,
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
+    },
+    {
+      "name": "context 7",
+      "context": 7,
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
+    },
+    {
+      "name": "context \"org:org_3fh9p1zc\\n\"",
+      "context": "org:org_3fh9p1zc\n",
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
+    },
+    {
+      "name": "context [\"org:org_3fh9p1zc\"]",
+      "context": [
+        "org:org_3fh9p1zc"
+      ],
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
+    },
+    {
+      "name": "context {\"toString\":1}",
+      "context": {
+        "toString": 1
+      },
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
+    },
+    {
+      "name": "context \"\"",
+      "context": "",
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
+    },
+    {
+      "name": "context \"org:org_3fh9p1zc \"",
+      "context": "org:org_3fh9p1zc ",
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
+    },
+    {
+      "name": "context \"ORG:org_3fh9p1zc\"",
+      "context": "ORG:org_3fh9p1zc",
+      "expected": {
+        "certified": false,
+        "fault": "token",
+        "detail": "kid-not-certified"
+      }
     }
   ]
 }

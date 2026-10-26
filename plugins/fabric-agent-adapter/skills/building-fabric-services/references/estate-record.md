@@ -14,7 +14,10 @@ One revision of one person's estate lists:
 
 A revision names its parent's digest and is signed by a passkey assertion (WebAuthn Level 3) over a challenge
 derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fabric_estate.py). Node:
-[`scripts/fabric-estate.mjs`](../scripts/fabric-estate.mjs). Both answer the contract's own vectors.
+[`scripts/fabric-estate.mjs`](../scripts/fabric-estate.mjs). Both answer the contract's own vectors. Since 0.52.0 the
+record's rules live in [`fabric_estate_rules.py`](../scripts/fabric_estate_rules.py) and
+[`fabric-estate-rules.mjs`](../scripts/fabric-estate-rules.mjs); the estate modules re-export them, and
+`fabric_kit.py install` copies both.
 
 ## Contents
 
@@ -85,6 +88,21 @@ gate = fd.delegation_gate(audience=..., jwks=keys, issuer=..., effects=..., esta
                           estate_revocations=lambda: delta_entries)
 ```
 
+**Which key: the instance's context** (DL-14a, contract DEC-0128). The personal context's tokens are signed by a
+machine's `hubKey`; an organization's by that context's own key in the same machine's `contextHubKeys`
+(`{context: "org:<orgId>", key}`), under the context issuer its pin in `organizations` names (`iss`,
+`urn:fabric:context:<opaque>`). An instance that serves an organization passes its context and that issuer:
+
+```python
+gate = fd.delegation_gate(audience=..., jwks=keys, issuer=pin["iss"], effects=..., estate=lambda: current,
+                          estate_context="org:acme-rehearsal")     # the context fabric_context started it for
+```
+
+The `kid` is then certified only when exactly one machine lists it for that context with the published key and the
+revision pins the organization; omitted or `personal`, the personal `hubKey` is read. A context key never verifies a
+personal token, the personal key never an organization's, and a context that is neither (`Org:x`, a trailing space, a
+number, `null`) certifies nothing: a misconfigured callee fails closed with `kid-not-certified`.
+
 - **The token's fault** (no such certification, another key under that `kid`, a `kid` on two machines, a revoked hub
   key or machine) is `unauthenticated` (for an approval, `approval-invalid`) with detail `kid-not-certified`.
 - **The trust source's fault** is `issuer-unavailable`: `estate-unreadable` (a source that throws or answers nothing
@@ -97,10 +115,12 @@ gate = fd.delegation_gate(audience=..., jwks=keys, issuer=..., effects=..., esta
   source in both kits, and so is `applied: null`; an omitted `applied` means no revision applied yet (FAA-78).
 - **What you pass in.** Pass only a revision that `verify_estate_record` accepted and whose number is not lower than
   the highest the machine applied; a higher one only when you verified its chain from the applied revision.
-- `hub_key_certified(record, kid, x, at, applied, extra_revocations)` /
-  `hubKeyCertified(record, kid, x, at, applied, {extraRevocations})` answers the question on its own:
+- `hub_key_certified(record, kid, x, at, applied, extra_revocations, context)` /
+  `hubKeyCertified(record, kid, x, at, applied, {extraRevocations, context})` answers the question on its own:
   `{certified: true, machine, revision}` or `{certified: false, fault, detail}`. Both kits are held to the contract's
-  `fixtures/vectors/hub-key.json` (`test/fixtures/contract/hub-key-vectors.json`).
+  `fixtures/vectors/hub-key.json` (`test/fixtures/contract/hub-key-vectors.json`), and to its `contextCases` and
+  `contextVerifier`, generated with the contract's `hubKeyCertified` and `verifyDelegation` over its
+  `estate-record-organizations.json`.
 
 ## Contexts: one agent for you and for an organization
 
@@ -129,6 +149,24 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
   finds no rule broken. A service that applies the estate record updates its copy first:
   `fabric_kit.py install <dir> --module fabric_estate` (or `--lang node --module fabric-estate`). Since 0.40.0 the
   estate reader imports the kit's core modules, so the one file alone no longer loads ([kit modules](kit-modules.md)).
+- **The organizations the person admitted** (DEC-0127, DEC-0128). `organizations[]` pins each organization once by
+  its context (`org`), with its server (`issuer`), its context issuer (`iss`) and the root that signs its key sets
+  (`root`). FAC-SEM-147: an organization pinned twice, one `iss` used by two pins, an `iss` whose opaque part contains
+  the estate id (eight characters or more, any case), and a root of small order are findings.
+- **A hub key per organization context** (DEC-0128). `machines[].contextHubKeys[]` (`{context, key}`) certifies the
+  key that signs that context's tokens. FAC-SEM-073: each context once on a machine, a context the record pins, every
+  `kid` and public key unique across all the record's hub keys (personal and per context), no key of small order, and
+  only on the machine that holds the personal `hubKey`; FAC-SEM-134: only a `full` machine; FAC-SEM-076: revoking
+  `hub-key <kid>` while listing it; FAC-SEM-114: a context key dropped, replaced, moved to another context or left on a
+  removed machine is revoked in the same revision.
+- **An organization instance whose context the record does not pin** (decision D5 of 0.52.0). `fabric_context` starts
+  it as before: it checks the placement and its share grant, not the pin. Every token presented to it in that context
+  is then refused `kid-not-certified`, since `hub_key_certified` reads a context's keys only while the record pins it.
+  The start is not refused because the contract lets Fabric write `organizations` only once every reader of the record
+  is pinned at or after DEC-0128, so today's records pin none; a refusal now would stop every organization instance.
+- **A tokenless call runs in the instance's context** (DEC-0137). A T0 or T1 caller presents no token (DL-26), so the
+  call is in the context of the instance it reached: the personal instance for the person, an organization's instance
+  for that organization ([delegation](delegation.md), the family).
 
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
@@ -289,8 +327,8 @@ sharer's node's and the organization server's, not this kit's.
 ## Checking a record you produce
 
 `estate_record_rules(kind, value)` / `estateRecordRules(kind, value)` are the contract's rules, finding for finding:
-- `estate-record` (FAC-SEM-072…076, 110, 111, 122);
-- `estate-record-revision` `{parent, next}` (072);
+- `estate-record` (FAC-SEM-072…076, 092, 110, 111, 122, 134, 147);
+- `estate-record-revision` `{parent, next}` (072, 114, 137);
 - `estate-placement` `{record, machine, package, context?}` (074, 075, 111, 122): the package placed on that machine in that
   context, `personal` when `context` is absent.
 

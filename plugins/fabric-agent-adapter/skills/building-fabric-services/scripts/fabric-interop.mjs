@@ -11,6 +11,7 @@ import path from 'node:path';
 import { ServiceError, atomicWrite, ensurePrivateDir, nowIso } from './fabric-service.mjs';
 import { jcs } from './fabric-delegation.mjs';
 import { PageLinkError, dashboardsLink, inputRequestLinkFindings, pageLinkFindings, parseDashboardsLink } from './fabric-page-links.mjs';
+import { EFFECT_CLASSES } from './fabric-mandate.mjs'; // DEC-0125
 
 export {
   PROTOCOL,
@@ -37,6 +38,7 @@ export {
   intentIdempotencyKey,
   readsNullUsage,
   requestMeta,
+  jobStep,
   actionGate,
   actionRefusalToolResult,
   usageFindings,
@@ -247,8 +249,10 @@ export class JobStore {
   get(jobId) { return { ...this.load(jobId).job }; }
   traceparent(jobId) { return this.load(jobId).private.traceparent ?? null; }
 
-  transition(jobId, status, fields = {}) {
+  transition(jobId, status, fields = {}, privatePart) {
     const record = this.load(jobId);
+    // One write; each question replaces the kept steps, so a step outlives neither its question nor its answer.
+    if (privatePart && Object.hasOwn(privatePart, 'steps')) record.private.steps = { ...privatePart.steps };
     if (TERMINAL.includes(record.job.status)) throw new InteropError(`Job ${jobId} is already ${record.job.status}; a terminal job does not change.`);
     for (const key of ['inputRequests', 'result', 'error', 'statusMessage']) delete record.job[key];
     record.job.status = status;
@@ -258,13 +262,18 @@ export class JobStore {
 
   working(jobId, statusMessage) { return this.transition(jobId, 'working', { statusMessage }); }
 
-  requestInput(jobId, inputRequests, statusMessage) {
+  // `steps` (DEC-0125) maps a request key to the approval step it asks for, {effect, spendUsd?, project?}, kept in the
+  // job's private part (the format fabric_interop.py writes) so a service reads an answer's _meta.mandate for that step.
+  requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
+    for (const [key, step] of Object.entries(steps ?? {})) {
+      if (!Object.hasOwn(inputRequests ?? {}, key) || !EFFECT_CLASSES.includes(step?.effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
+    }
     const entries = Object.entries(inputRequests ?? {});
     if (!entries.length) throw new InteropError('input_required needs at least one input request.');
     for (const [key, request] of entries) if (!KEY.test(key) || request?.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
     const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
     if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);
-    return this.transition(jobId, 'input_required', { inputRequests, statusMessage });
+    return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, { steps: { ...(steps ?? {}) } });
   }
 
   answer(jobId, inputResponses) {
@@ -272,7 +281,8 @@ export class JobStore {
     if (job.status !== 'input_required') return {};
     const matched = Object.fromEntries(Object.entries(inputResponses ?? {}).filter(([key, value]) =>
       key in (job.inputRequests ?? {}) && ['accept', 'decline', 'cancel'].includes(value?.action)));
-    if (Object.keys(matched).length) this.working(jobId);
+    // The answered question's kept steps go in the same write: none outlives its answer.
+    if (Object.keys(matched).length) this.transition(jobId, 'working', {}, { steps: {} });
     return matched;
   }
 
