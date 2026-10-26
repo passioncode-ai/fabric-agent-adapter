@@ -20,6 +20,7 @@ export const REFUSAL_CODES = Object.freeze([
   'unauthenticated', 'token-expired', 'wrong-audience', 'scope-not-granted', 'effect-above-ceiling', 'no-grant',
   'grant-expired', 'grant-revoked', 'limit-reached', 'approval-required', 'approval-invalid', 'approval-reused',
   'principal-unproven', 'credential-source-refused', 'chain-too-deep', 'profile-forbids', 'issuer-unavailable', 'unknown-state',
+  'operator-decision-required', 'decision-invalid', 'human-step-required',
 ]);
 export const EFFECT_CLASSES = Object.freeze(['none', 'draft', 'publish', 'send', 'reply', 'charge', 'delete', 'merge', 'deploy', 'change-policy']);
 export const DELEGATION_HEADER = 'Fabric-Delegation';
@@ -55,7 +56,13 @@ export const REFUSAL_MESSAGES = Object.freeze({
   'profile-forbids': "The caller's or the target's machine profile does not allow this call.",
   'issuer-unavailable': "The estate's published keys cannot be read.",
   'unknown-state': 'The state cannot be established, so the call is refused.',
+  // DEC-0121 (AP-2, AP-4): the refusals of an action call; each answers 403.
+  'operator-decision-required': "This action is the operator's decision; ask the operator and call again with it in _meta.decision.",
+  'decision-invalid': "The call's decision is not valid for this action, object or time.",
+  'human-step-required': "This step is the person's own; hand them the link in error.data.url.",
 });
+/** The detail each action-call refusal carries in error.data (the schema requires one, 1..80 characters). */
+const ACTION_DETAILS = new Map([['operator-decision-required', 'no-decision'], ['decision-invalid', 'invalid-decision'], ['human-step-required', 'human-step'], ['approval-required', 'no-approval']]);
 
 const refuse = (code, detail, data) => (data ? { ok: false, code, detail, data } : { ok: false, code, detail });
 const B64URL = /^[A-Za-z0-9_-]+$/;
@@ -486,6 +493,21 @@ export function refusalFromDenial(denial) {
   };
   const message = `the meter denied the spend: ${denial.reason ?? ''}`.slice(0, 500);
   return { error: { code: denial.code, message, ...(Object.keys(data).length > 0 ? { data } : {}) } };
+}
+
+/**
+ * DL-19 (DEC-0121): the refusal a service answers for an action call that fabric-actions.mjs's actionDecision refused,
+ * or undefined when it took the call. operator-decision-required, decision-invalid and approval-required carry their
+ * detail; human-step-required carries humanStep and url (AP-4). A `fault` is the service's own and is never sent: the
+ * caller reads unknown-state with the detail service-fault, as for anything else that is not an answer.
+ */
+export function refusalFromAction(answer) {
+  const isRecord = answer !== null && typeof answer === 'object' && !Array.isArray(answer);
+  if (isRecord && answer.ok === true) return undefined;
+  const code = isRecord && answer.ok === false && typeof answer.code === 'string' ? answer.code : undefined;
+  if (code === undefined || !ACTION_DETAILS.has(code)) return refuse('unknown-state', 'service-fault');
+  const data = answer.data !== null && typeof answer.data === 'object' && !Array.isArray(answer.data) && Object.keys(answer.data).length ? { ...answer.data } : undefined;
+  return refuse(code, ACTION_DETAILS.get(code), data);
 }
 
 /** The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key. */

@@ -4665,6 +4665,195 @@
       }
     },
     {
+      "name": "a slashed secret after a URL and a space",
+      "input": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+            "connections": [
+              {
+                "id": "telegram",
+                "kind": "connector",
+                "target": "telegram",
+                "purpose": "reads https://h.example/docs wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "state": "degraded",
+                "reason": "flood wait 30 s"
+              }
+            ]
+          }
+        },
+        "degraded": []
+      },
+      "expected": {
+        "declared": false,
+        "reported": true
+      }
+    },
+    {
+      "name": "a slashed secret after a URL and a tab",
+      "input": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+            "connections": [
+              {
+                "id": "telegram",
+                "kind": "connector",
+                "target": "telegram",
+                "purpose": "reads https://h.example/docs\twJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "state": "degraded",
+                "reason": "flood wait 30 s"
+              }
+            ]
+          }
+        },
+        "degraded": []
+      },
+      "expected": {
+        "declared": false,
+        "reported": true
+      }
+    },
+    {
+      "name": "a slashed secret after a URL and a no-break space",
+      "input": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+            "connections": [
+              {
+                "id": "telegram",
+                "kind": "connector",
+                "target": "telegram",
+                "purpose": "reads https://h.example/docs wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                "state": "degraded",
+                "reason": "flood wait 30 s"
+              }
+            ]
+          }
+        },
+        "degraded": []
+      },
+      "expected": {
+        "declared": false,
+        "reported": true
+      }
+    },
+    {
+      "name": "a config line NAME=value of 40 or more mixed characters is one long run",
+      "input": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+            "connections": [
+              {
+                "id": "writer",
+                "kind": "model",
+                "target": "openrouter/xiaomi/mimo-v2.6-pro",
+                "state": "unknown",
+                "label": "FABRIC_LOG_LEVEL=verbose-output-for-release-2"
+              }
+            ]
+          }
+        },
+        "degraded": []
+      },
+      "expected": {
+        "declared": false,
+        "reported": true
+      }
+    },
+    {
+      "name": "a config line NAME=value under 40 characters is declared",
+      "input": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+            "connections": [
+              {
+                "id": "writer",
+                "kind": "model",
+                "target": "openrouter/xiaomi/mimo-v2.6-pro",
+                "state": "unknown",
+                "label": "FABRIC_LOG_LEVEL=verbose-for-release-2"
+              }
+            ]
+          }
+        },
+        "degraded": []
+      },
+      "expected": {
+        "declared": true,
+        "reported": false,
+        "connections": [
+          {
+            "id": "writer",
+            "kind": "model",
+            "target": "openrouter/xiaomi/mimo-v2.6-pro",
+            "state": "unknown",
+            "label": "FABRIC_LOG_LEVEL=verbose-for-release-2",
+            "failing": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "a bare Notion id (32 lower-case hex) is declared",
+      "input": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+            "connections": [
+              {
+                "id": "telegram",
+                "kind": "connector",
+                "target": "telegram",
+                "purpose": "reads Notion page 1a2b3c4d5e6f708192a3b4c5d6e7f809",
+                "state": "degraded",
+                "reason": "flood wait 30 s",
+                "label": "1a2b3c4d5e6f708192a3b4c5d6e7f809"
+              }
+            ]
+          }
+        },
+        "degraded": []
+      },
+      "expected": {
+        "declared": true,
+        "reported": false,
+        "connections": [
+          {
+            "id": "telegram",
+            "kind": "connector",
+            "target": "telegram",
+            "purpose": "reads Notion page 1a2b3c4d5e6f708192a3b4c5d6e7f809",
+            "state": "degraded",
+            "reason": "flood wait 30 s",
+            "label": "1a2b3c4d5e6f708192a3b4c5d6e7f809",
+            "failing": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "a Notion link whose segment joins the page title and its id",
+      "input": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1": {
+            "connections": [
+              {
+                "id": "telegram",
+                "kind": "connector",
+                "target": "telegram",
+                "purpose": "reads https://www.notion.so/Weekly-Report-1a2b3c4d5e6f708192a3b4c5d6e7f809",
+                "state": "degraded",
+                "reason": "flood wait 30 s"
+              }
+            ]
+          }
+        },
+        "degraded": []
+      },
+      "expected": {
+        "declared": false,
+        "reported": true
+      }
+    },
+    {
       "name": "not an object",
       "input": {
         "extensions": {

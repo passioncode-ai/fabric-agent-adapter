@@ -30,9 +30,11 @@
 ## CLI for people and scripts
 
 `<tool> service status|start|stop|restart` (launchctl on the label, then the
-well-known document), `<tool> dashboard` (resolve the exact service and use the Fabric Dashboards host
-opener first; installed-but-failed never falls back to a browser; only confirmed
-absence permits explicit browser fallback and its one-time login flow), `<tool> doctor --json`
+well-known document), `<tool> dashboard` (resolve the exact registered service with the `fabric-dashboards`
+MCP, run `check_dashboard_link.py` on the action, then open its `open_link` with the host's `open` and
+`fallback=never`; never `open <url>`, `open -a Safari`, `xdg-open` or `webbrowser.open`; an installed host that
+failed is reported, never replaced by a browser; only a confirmed `not_installed` host permits an explicit browser
+fallback and its one-time login flow; [dashboard links](dashboard-links.md)), `<tool> doctor --json`
 (the same checks the probe runs, plus provider keys), `--json` on every command. Print
 a sign-in link only when stdout is a terminal.
 

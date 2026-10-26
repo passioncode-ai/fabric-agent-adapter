@@ -362,7 +362,8 @@ def restore_plan(doc: Dict[str, Any], current: Dict[str, Dict[str, Any]]) -> Dic
     columns both sides have), how many are already present, the snapshot columns dropped, the current columns left
     to their defaults, the required columns the snapshot lacks, and every row refused with its key and reason.
     ``unknownTables`` names snapshot tables the service no longer has. The service applies ``insert`` and adds any
-    row its database refuses to ``refused``; a manual restore shows this plan first and applying it is the operator's act."""
+    row its database refuses to ``refused``; a manual restore shows this plan first and applying it is the operator's
+    decision, taken on the page or relayed by their agent with ``_meta.decision`` (DEC-0121), never the agent's own act."""
     problems = settings_backup_problems(doc)
     if problems:
         raise ServiceError("a damaged snapshot is never restored: " + "; ".join(problems))

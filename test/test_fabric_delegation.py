@@ -394,6 +394,98 @@ class GateTests(unittest.TestCase):
         self.assertEqual(plain.handle(call)["result"]["structuredContent"], {"d": None})
 
 
+ACTIONS = json.loads((Path(__file__).resolve().parent / "fixtures/contract/actions-vectors.json").read_text())
+HUMAN_STEPS = ("sign-in", "consent", "payment", "secret", "spend-above-limit", "passkey")
+
+
+def dl19_problems(body):
+    """delegation-refusal.schema.json's rules, by hand: what makes `body` not a DL-19 refusal (empty when it is one)."""
+    problems = []
+    error = body.get("error") if isinstance(body, dict) and list(body) == ["error"] else None
+    if not isinstance(error, dict) or set(error) - {"code", "message", "data"}:
+        return ["shape"]
+    if error.get("code") not in VECTORS["constants"]["refusalCodes"]:
+        problems.append("code")
+    if not (isinstance(error.get("message"), str) and 1 <= len(error["message"]) <= 500):
+        problems.append("message")
+    data = error.get("data", {})
+    if not isinstance(data, dict) or not (isinstance(data.get("detail"), str) and 1 <= len(data["detail"]) <= 80):
+        problems.append("detail")
+    if error.get("code") == "approval-required" and not str(data.get("actionDigest", "")).startswith("sha256:"):
+        problems.append("actionDigest")
+    if error.get("code") == "human-step-required":
+        url = data.get("url")
+        if data.get("humanStep") not in HUMAN_STEPS:
+            problems.append("humanStep")
+        if not (isinstance(url, str) and 1 <= len(url) <= 2048 and (url.startswith("https://") or url.startswith("/"))):
+            problems.append("url")
+    return problems
+
+
+class RefusalCodeSetTests(unittest.TestCase):
+    """DL-19 (DEC-0039, DEC-0121): the kit's one code set is the contract's, each code answers with its own sentence,
+    and the refusals of an action call (fabric_actions) are DL-19 bodies."""
+
+    def test_the_code_set_is_the_contracts(self):
+        self.assertEqual(list(dl.REFUSAL_CODES), VECTORS["constants"]["refusalCodes"])
+        self.assertEqual(len(dl.REFUSAL_CODES), 21)
+
+    def test_every_code_has_its_sentence_and_status(self):
+        for code in dl.REFUSAL_CODES:
+            with self.subTest(code):
+                self.assertIn(code, dl.REFUSAL_MESSAGES)
+                self.assertNotEqual(dl.REFUSAL_MESSAGES[code], "Refused.")
+                data = {"actionDigest": "sha256:" + "0" * 64, "humanStep": "consent", "url": "/x"}
+                self.assertEqual(dl19_problems(dl.refusal_error({"ok": False, "code": code, "detail": "x", "data": data})), [])
+        for code in ("operator-decision-required", "decision-invalid", "human-step-required"):
+            status, headers, _ = dl.refusal_http({"ok": False, "code": code, "detail": "x"})
+            self.assertEqual(status, 403, code)
+            self.assertNotIn("WWW-Authenticate", headers)
+
+    def test_an_action_refusal_is_a_dl19_body(self):
+        refused = 0
+        for case in ACTIONS["cases"]:
+            with self.subTest(case["name"]):
+                answer = case["expected"]
+                refusal = dl.refusal_from_action(answer)
+                if answer.get("ok") is True:
+                    self.assertIsNone(refusal)
+                    continue
+                refused += 1
+                result = dl.refusal_tool_result(refusal, "00-" + "a" * 32 + "-" + "b" * 16 + "-01")
+                self.assertTrue(result["isError"])
+                body = result["structuredContent"]
+                self.assertEqual(json.loads(result["content"][0]["text"]), body)
+                self.assertEqual(dl19_problems(body), [])
+                if "fault" in answer:  # the service's own fault is never sent: the caller reads an unknown state
+                    self.assertEqual(body["error"]["code"], "unknown-state")
+                    self.assertEqual(body["error"]["data"], {"detail": "service-fault"})
+                    self.assertNotIn(answer["fault"], json.dumps(body))
+                    continue
+                self.assertEqual(body["error"]["code"], answer["code"])
+                detail = {"operator-decision-required": "no-decision", "decision-invalid": "invalid-decision",
+                          "human-step-required": "human-step", "approval-required": "no-approval"}[answer["code"]]
+                self.assertEqual(body["error"]["data"], dict(answer.get("data", {}), detail=detail))
+                self.assertEqual(dl.refusal_http(refusal)[0], 403)
+        self.assertGreater(refused, 30)
+
+    def test_a_human_step_carries_its_step_and_link(self):
+        refusal = dl.refusal_from_action({"ok": False, "code": "human-step-required",
+                                          "data": {"humanStep": "payment", "url": "https://store.example/pay"}})
+        self.assertEqual(refusal, {"ok": False, "code": "human-step-required", "detail": "human-step",
+                                   "data": {"humanStep": "payment", "url": "https://store.example/pay"}})
+        error = dl.refusal_error(refusal)["error"]
+        self.assertEqual(error["data"], {"detail": "human-step", "humanStep": "payment", "url": "https://store.example/pay"})
+        self.assertEqual(error["message"], dl.REFUSAL_MESSAGES["human-step-required"])
+
+    def test_what_is_not_an_answer_is_an_unknown_state(self):
+        for value in (None, [], "x", {}, {"ok": False}, {"ok": False, "code": "no-such-code"}, {"ok": "true"},
+                      {"ok": False, "code": "toString"}):
+            with self.subTest(value=repr(value)):
+                refusal = dl.refusal_from_action(value)
+                self.assertEqual((refusal["code"], refusal["detail"]), ("unknown-state", "service-fault"))
+
+
 class ReviewRegressionTests(unittest.TestCase):
     """Findings of the independent review of the port, each a test that failed first."""
 

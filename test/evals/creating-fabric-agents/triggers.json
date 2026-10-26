@@ -27,6 +27,7 @@
     {"query": "Which OpenRouter model is cheapest for classifying support tickets in my existing script?", "shouldTrigger": false},
     {"query": "Turn example-agent into an always-on local Fabric service with a dashboard and launchd.", "shouldTrigger": false, "note": "sibling: building-fabric-services"},
     {"query": "Подключись к Fabric и проверь доску проекта перед работой.", "shouldTrigger": false, "note": "sibling: working-with-fabric"},
-    {"query": "Подключи существующий проект к Fabric: подготовь fabric-agent.json для его CLI.", "shouldTrigger": false, "note": "sibling: adapting-projects-to-fabric"}
+    {"query": "Подключи существующий проект к Fabric: подготовь fabric-agent.json для его CLI.", "shouldTrigger": false, "note": "sibling: adapting-projects-to-fabric"},
+    {"query": "Create a new Fabric agent with a dashboard whose AGENTS.md says pages open only in Fabric Dashboards.", "shouldTrigger": true}
   ]
 }

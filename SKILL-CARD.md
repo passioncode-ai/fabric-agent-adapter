@@ -2,9 +2,9 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.49.3` |
+| Version | `0.50.0` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `2f020a696453ae299b123517f14957f6a1354379` |
+| Contract | Fabric Agent Contract `0.1.0` at `52c7d798b9f4eb784eb4e29e717038a8912c759d` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
 | Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base |
 | Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`) |
@@ -25,9 +25,9 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.49.3` |
+| Version | `0.50.0` |
 | Plugin | `fabric-agent-adapter` |
-| Contract | Fabric Agent Contract `0.1.0` at `2f020a696453ae299b123517f14957f6a1354379` |
+| Contract | Fabric Agent Contract `0.1.0` at `52c7d798b9f4eb784eb4e29e717038a8912c759d` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
 | Inputs | capability, named consumer, workflow-or-agent decision, profile, effect declarations, where it runs and in which contexts, models per lane, who pays, how it learns, knowledge sources |
 | Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton, provider bundle via the sibling scaffolder, conformance report with the canary expectation |
@@ -48,12 +48,12 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.49.3` |
+| Version | `0.50.0` |
 | Plugin | `fabric-agent-adapter` |
-| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `2f020a696453ae299b123517f14957f6a1354379`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036) |
+| Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `52c7d798b9f4eb784eb4e29e717038a8912c759d`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036); dashboard action parity `fabric-actions/0.1` (DEC-0121) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
 | Inputs | service id, port, callers and surfaces, store, notification-worthy events |
-| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration, a signed `fabric-package/1` folder (`fabric_package`, `fabric-package.mjs`), probe and layout-probe reports |
+| Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration and its action table (`extensions/actions/0.1`), a signed `fabric-package/1` folder (`fabric_package`, `fabric-package.mjs`), probe and layout-probe reports |
 | Mutations | the target service's files; its supervisor file when its installer runs (a launchd plist in `~/Library/LaunchAgents`, a systemd user unit, or a per-user Scheduled Task); one descriptor in the services directory |
 | Network | the probe talks to `127.0.0.1:<port>` for a local service and to the service's own `https` origin for a remote placement, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; a board responder talks only to Fabric's hub at the `http://127.0.0.1:<port>` its `hub.json` names, after checking that file's pid; the layout probe opens the dashboard in a local headless browser with a one-time login code; the kit's connectors (`fabric_http`, `fabric_openrouter`) reach the external APIs the service's author configures |
 | Secrets | the service token is created 0600 and read, never printed; a board responder's binding credential lives in a 0600 file, read for each join and never logged |
@@ -69,10 +69,10 @@ using Fabric (working-with-fabric) or the Fabric Dashboards app.
 
 | Field | Value |
 |---|---|
-| Version | `0.49.3` |
+| Version | `0.50.0` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | the desktop app 0.4.0 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
-| Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, coordinate, report, link backlog rows, release |
+| Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, relay the operator's own decision on a service's action, coordinate, report, link backlog rows, release |
 | Inputs | the agent's folder; Fabric's `hub.json`; the agent's MCP configuration (read, not written, by the status script) |
 | Outputs | `fabric_session.py status`: Fabric's state, the registrations and one next action; `watch-mail`: one line each time the board's unread count rises |
 | Mutations | none by `status`; `watch-mail` renews the session's `rejoined` mark in the hooks' spool when that folder exists; the hooks write only their own log and spool in the user's cache folder (and prune their own stale spool folders even while inert); `install-host-hooks --apply` edits Codex's `hooks.json` or Kimi Code's `config.toml` after a backup, only on the person's go-ahead |

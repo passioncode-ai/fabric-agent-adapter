@@ -68,12 +68,17 @@ test('labels: English by default, Russian for a page in Russian, and a page over
   assert.deepEqual(en, { chat: 'Chat with Fabric about {name}', session: 'Open a coding session in {name}', open: 'Open Fabric', absent: 'Fabric is not installed. Get it at' });
   for (const lang of ['', 'en', 'en-GB', 'fr', 'rus', 'ruby', null, undefined]) assert.deepEqual(plain(fb.labelsFor(lang)), en, String(lang));
   for (const lang of ['ru', 'RU', 'ru-RU', 'ru-ua']) assert.deepEqual(plain(fb.labelsFor(lang)), RU, lang);
-  assert.deepEqual(plain(fb.labelsFor('ru', { chat: 'Спросить про {name}', open: '  ', session: 42, absent: ' Нет Fabric. Возьмите на ' })),
-    { ...RU, chat: 'Спросить про {name}', absent: 'Нет Fabric. Возьмите на' }, 'blank and non-string overrides keep the built-in label');
+  assert.deepEqual(plain(fb.labelsFor('ru', { chat: 'Спросить Fabric про {name}', open: '  ', session: 42, absent: ' Нет Fabric. Возьмите на ' })),
+    { ...RU, chat: 'Спросить Fabric про {name}', absent: 'Нет Fabric. Возьмите на' }, 'blank and non-string overrides keep the built-in label');
+  // DEC-0124 (FB-3, WCAG 2.2 SC 2.5.3): a page's own words keep the word Fabric, in the name and in each item.
+  assert.deepEqual(plain(fb.labelsFor('en', { chat: 'Ask about {name}', session: 'Code in {name}', open: 'Menu', absent: 'Not installed. See' })),
+    plain(fb.labelsFor('en')), 'an override without Fabric keeps the built-in label');
+  assert.deepEqual(plain(fb.labelsFor('en', { open: 'open fabric', session: 'Fabric session in {name}' })),
+    { ...plain(fb.labelsFor('en')), session: 'Fabric session in {name}' }, 'Fabric is matched as written, with its capital');
   const options = { service: 'example-agent.default', serviceName: 'Example Agent', project: 'project-a', projectName: 'Project A' };
   assert.deepEqual(plain(fb.menuItems(options, fb.labelsFor('ru'))).map((i) => i.label), ['Чат с Fabric о сервисе Example Agent', 'Открыть сессию в проекте Project A']);
-  assert.deepEqual(plain(fb.menuItems(options, fb.labelsFor('en', { session: '{name}: {name}' }))).map((i) => i.label),
-    ['Chat with Fabric about Example Agent', 'Project A: Project A'], '{name} is replaced everywhere, as text');
+  assert.deepEqual(plain(fb.menuItems(options, fb.labelsFor('en', { session: 'Fabric {name}: {name}' }))).map((i) => i.label),
+    ['Chat with Fabric about Example Agent', 'Fabric Project A: Project A'], '{name} is replaced everywhere, as text');
   assert.deepEqual(plain(fb.menuItems({ ...options, serviceName: '$& $1' }, fb.labelsFor('en'))).map((i) => i.label)[0], 'Chat with Fabric about $& $1',
     'a name is never read as a replacement pattern');
 });

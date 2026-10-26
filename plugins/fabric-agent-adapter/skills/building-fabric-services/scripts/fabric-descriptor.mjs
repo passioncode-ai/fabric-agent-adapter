@@ -7,13 +7,14 @@ import { ID, INSTANCE, LOCAL_PATH, PROTOCOL, ServiceError, TASK, UNIT, expand } 
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
+import { ACTIONS_EXTENSION_KEY, actionsExtension, actionsExtensionRules } from './fabric-actions.mjs';
 import { ROUTES } from './fabric-usage.mjs';
 
 // The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
 // document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 
-export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.4';
+export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.5';
 
 export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 
@@ -377,7 +378,11 @@ export function configurationProblems(doc) {
   return problems;
 }
 
-export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions, configuration, protocols }) {
+// `actions` (DEC-0121 AP-1) is the service's action table, every button its dashboard, app or page offers with the tool
+// that performs it and its gate, written under extensions/actions/0.1 by actionsExtension. A declaration FAC-SEM-142
+// finds, passed either way, is refused: not its schema's, an id named twice, a humanStep that disagrees with the gate,
+// or a tool surfaces.mcp.capabilities does not list.
+export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions, configuration, protocols, actions }) {
   if (!STATUSES.includes(status)) throw new ServiceError(`status must be one of ${STATUSES.join(', ')}.`);
   if (!surfaces?.events) throw new ServiceError('surfaces.events is required.');
   if (!(build?.commit || build?.digest)) throw new ServiceError('build needs a commit or a digest.');
@@ -391,6 +396,11 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
     update: { available: updateAvailable },
   };
   if (summary?.length) doc.summary = summary.slice(0, 6);
+  if (actions !== undefined && actions !== null) {
+    if (extensions && Object.hasOwn(extensions, ACTIONS_EXTENSION_KEY)) throw new ServiceError('Actions declaration: pass the action table or a ready declaration, not both.');
+    const capabilities = Array.isArray(surfaces.mcp?.capabilities) ? surfaces.mcp.capabilities : undefined;
+    extensions = { ...(extensions ?? {}), ...actionsExtension(actions, { capabilities }) };
+  }
   if (extensions && Object.keys(extensions).length) {
     if (DASHBOARD_EXTENSION_KEY in extensions) {
       const problems = dashboardExtensionProblems(extensions[DASHBOARD_EXTENSION_KEY]);
@@ -400,6 +410,12 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
       // DEC-0096: a host hides an invalid declaration (FAC-SEM-127); a service never publishes one.
       const view = connectionsView({ extensions: { [CONNECTIONS_EXTENSION_KEY]: extensions[CONNECTIONS_EXTENSION_KEY] } });
       if (view.reported) throw new ServiceError(`Connections declaration: ${view.errors.join('; ')}.`);
+    }
+    if (Object.hasOwn(extensions, ACTIONS_EXTENSION_KEY)) {
+      // DEC-0121 AP-1: a host reports an invalid declaration (FAC-SEM-142); a service never publishes one. The tools are
+      // compared with the capabilities this document's MCP surface lists.
+      const findings = actionsExtensionRules({ extensions: { [ACTIONS_EXTENSION_KEY]: extensions[ACTIONS_EXTENSION_KEY] }, surfaces });
+      if (findings.length) throw new ServiceError(`Actions declaration: ${findings.map((f) => f.message).join('; ')}.`);
     }
     doc.extensions = { ...extensions };
   }

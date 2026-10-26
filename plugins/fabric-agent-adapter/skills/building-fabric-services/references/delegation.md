@@ -95,6 +95,14 @@ profile does not allow). A published key the service cannot use (of small order,
 issuer's fault, `issuer-unavailable` (DEC-0045); a gate without a trusted issuer refuses everything as
 `no-trusted-issuer`. `detail` is a short machine word; the token, the approval and the keys never appear in a result or a log.
 
+DEC-0121 adds three codes to the one set, each 403: `operator-decision-required` (a `relayed` action called without the
+operator's decision), `decision-invalid` (a decision for another action or object, outside its 24 hours, or malformed)
+and `human-step-required`, which carries `data.humanStep` (`sign-in`, `consent`, `payment`, `secret`,
+`spend-above-limit`, `passkey`) and `data.url` (an https URL or a path on the service's origin) beside `detail`.
+`refusal_from_action` / `refusalFromAction` turn an action decision into that refusal; a service's own fault never
+reaches the caller and reads as `unknown-state`. The gate that answers them is in
+[the interop reference](interop.md#actions).
+
 ## Keys and the cache
 
 `JwksCache` holds the estate's key set at most 10 minutes and, on a `kid` it does not hold, re-reads at most once
@@ -124,4 +132,5 @@ current verified revision as `estate=` / `{ estate }`, as a value or as a functi
 ## What the kit does not do
 
 It does not mint tokens, check attenuation against a parent (the issuer's rule, DL-5), check a grant or a spend
-window (the meter's, DL-21), or decide which actions need an approval; the service decides that.
+window (the meter's, DL-21), or decide which actions need an approval or the operator's decision: the service
+declares that in its action table (each action's gate, [interop](interop.md#actions)).

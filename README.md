@@ -85,6 +85,7 @@ a service (a descriptor names it as `source.repository`) whose dashboard has no 
 anywhere else; the [kit reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-kit.md)
 has the upgrade steps, which the agent may take itself.
 
+Agent pages open only in Fabric Dashboards (the operator's rule, carried in the builder skills since 0.50.0).
 Dashboard handoffs use the host-generated `open_link` as the primary action. The
 three builder skills carry the same [consumer procedure](plugins/fabric-agent-adapter/skills/building-fabric-services/references/dashboard-links.md)
 and a portable `scripts/check_dashboard_link.py` gate for generated renderers.
@@ -98,7 +99,11 @@ is the MCP tool of its name, long work is a job with a stable id (`fabric.job.ge
 `fabric.job.cancel`), a question for a person is an elicitation, and every call carries
 one W3C trace. The kits ship the helpers (`scripts/fabric_interop.py`,
 `scripts/fabric-interop.mjs`), the sample service serves a job end to end, and the probe
-checks the interop rules. A job a provider limit paused or stopped, and an effect nobody saw, carry their own codes
+checks the interop rules. Every dashboard button has a tool (`fabric-actions/0.1`, contract DEC-0121): the
+operator's agent relays their decision in `_meta.decision` (a service adopts the gate once Fabric's hub forwards
+decisions, CT-125; Claude Code and Codex, which cannot set `_meta`, relay through Fabric's `agent.call`, the service's
+own elicitation or the action's page), and the refusals `operator-decision-required`,
+`decision-invalid` and `human-step-required` say what is missing. A job a provider limit paused or stopped, and an effect nobody saw, carry their own codes
 (`quota-exhausted`, `outcome-unknown`) and keys per caller (contract DEC-0087). The estate kits check share grants into
 an organization (`scripts/fabric_share.py`, DEC-0086) and the estate ceremonies: a revision's record rules, a headless
 machine's enroll token, the nearby pairing by a comparison code and the hub's single use of a token
@@ -275,7 +280,7 @@ Scaffolding is non-destructive by default. It writes only the paths declared in 
 The default pin for new bundles is [`fabric-contract.lock.json`](fabric-contract.lock.json):
 
 - version: `0.1.0`
-- commit: `2f020a696453ae299b123517f14957f6a1354379`
+- commit: `52c7d798b9f4eb784eb4e29e717038a8912c759d`
 
 Every other mention of the default contract revision (this section, the skills' metadata, the
 skill card, `adapt_project.py`) must equal it; `python3 test/validate.py` fails a tree

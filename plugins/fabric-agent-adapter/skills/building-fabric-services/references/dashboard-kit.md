@@ -96,7 +96,8 @@ service. Load it after the stylesheet, with ids only:
 - **Words (since 1.1.4):** English by default, Russian when the page says `<html lang="ru">` (any `ru-*`). The page
   sets its own with `data-label-chat` and `data-label-session` (`{name}` is the service or the project),
   `data-label-open` (the button's accessible name) and `data-label-absent` (the sentence before the link to
-  passioncode.ai/fabric). A blank attribute keeps the built-in words; `FabricButton.labelsFor(lang, overrides)` returns
+  passioncode.ai/fabric). Each keeps the word *Fabric* (since 1.1.5, contract DEC-0124, WCAG 2.2 SC 2.5.3 Label in
+  Name): an attribute without it, or a blank one, keeps the built-in words; `FabricButton.labelsFor(lang, overrides)` returns
   what a page gets. Product names stay in English in every language.
 - **Placement and look (FB-2, FB-3):** bottom-right (bottom-left right-to-left), 16 px off and clear of the safe
   area, above the sticky chrome and below dialogs; the page keeps its height plus 16 px free at the end of the
@@ -136,7 +137,7 @@ and promises nothing else.
 ```bash
 node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>[.<instance>]   # signs in with a login code
 node <skill-dir>/scripts/check_dashboard_layout.mjs http://127.0.0.1:<port>/dashboard
-python3 <skill-dir>/scripts/check_service.py <id>                                   # dashboard.declared (ED-9)
+python3 <skill-dir>/scripts/check_service.py <id>                                   # dashboard.declared (ED-9), dashboard.actions-declared, dashboard.opens-in-host
 ```
 
 The layout probe renders the page in WebKit (Safari's engine; `--browser chromium` on request) at

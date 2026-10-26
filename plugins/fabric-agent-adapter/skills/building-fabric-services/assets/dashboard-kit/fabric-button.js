@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.4 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+/* fabric-dashboard-kit@1.1.5 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
    Load it same-origin, after fabric-dashboard.css, with the service it opens Fabric on:
      <script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
              data-project="project-a" data-project-name="Project A"></script>
@@ -11,7 +11,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '1.1.4';
+  var VERSION = '1.1.5';
   var COOKIE = 'fabric_button';
   var GET_FABRIC = 'https://passioncode.ai/fabric';
   var ABSENT_AFTER_MS = 1500;
@@ -165,13 +165,14 @@
       absent: 'Fabric \u043d\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d. \u0421\u043a\u0430\u0447\u0430\u0439\u0442\u0435 \u0435\u0433\u043e \u043d\u0430' }
   };
 
-  /** The labels for a page language, each one replaced by a non-blank string the page gives (data-label-*). */
+  /** The labels for a page language, each one replaced by a non-blank string the page gives (data-label-*) that keeps
+      the word Fabric: the visible label stays inside the name and each item (DEC-0124, WCAG 2.2 SC 2.5.3). */
   function labelsFor(lang, overrides) {
     var base = LABELS[/^ru(-|$)/i.test(String(lang || '')) ? 'ru' : 'en'];
     var out = {};
     Object.keys(base).forEach(function (k) {
       var own = overrides ? overrides[k] : undefined;
-      out[k] = typeof own === 'string' && own.trim() ? own.trim() : base[k];
+      out[k] = typeof own === 'string' && own.trim() && own.indexOf('Fabric') >= 0 ? own.trim() : base[k];
     });
     return out;
   }

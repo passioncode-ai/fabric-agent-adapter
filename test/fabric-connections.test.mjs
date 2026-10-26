@@ -13,7 +13,7 @@ const INPUTS = JSON.parse(fs.readFileSync(new URL('./fixtures/kit-connections-in
 const EXTRA = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/connections-extra-vectors.json', import.meta.url), 'utf8'));
 
 test('every case answers as the contract does', () => {
-  assert.equal(V.cases.length, 127);
+  assert.equal(V.cases.length, 134);
   for (const c of V.cases) {
     const view = connectionsView(c.input);
     assert.deepEqual(Object.fromEntries(Object.keys(c.expected).map((k) => [k, view[k]])), c.expected, c.name);

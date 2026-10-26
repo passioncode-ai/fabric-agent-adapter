@@ -5,6 +5,19 @@ an existing Fabric service dashboard to a person. This also applies to generated
 agent instructions and completion messages. Headless agents need no dashboard;
 API origins, external docs and OAuth links are not dashboard actions.
 
+The rule (the operator's, 2026-10-24): every page of an agent or a local Fabric
+service opens only in Fabric Dashboards, never in Safari, Dia, Chrome or any
+other browser, unless Fabric Dashboards is confirmed not installed.
+
+## Contents
+
+- Resolve, then hand over
+- The block a generated AGENTS.md carries
+- An agent with a page and no service descriptor
+- Device and channel
+- Portable output gate
+- Degradation
+
 ## Resolve, then hand over
 
 1. Discover the target computer and exact registered `service.id.instance`.
@@ -20,9 +33,12 @@ API origins, external docs and OAuth links are not dashboard actions.
    compatible host resolver or report the limitation, not presumed absence.
 4. A request for a link opens nothing. A request to open uses the host `open`
    tool/approved opener, which starts or focuses the existing Fabric Dashboards
-   and reuses the service view. `fallback=never` forbids a browser; `if_absent`
-   permits one only for confirmed absence. Discover schema support first: older
-   `open` implementations may silently fall back on failure and are not strict.
+   and reuses the service view, with `fallback=never`: it forbids a browser.
+   `if_absent` permits one only for confirmed absence. Discover schema support
+   first: older `open` implementations may silently fall back on failure and are
+   not strict. Never
+   `open <url>`, `open -a Safari`, `xdg-open`, `start <url>`, `webbrowser.open`
+   or `shell.openExternal` aimed at the service's pages.
 5. An installed host that failed to open is **not absent**. Report the failure;
    do not silently launch HTTP in a browser, a second server, `npm run dev`, or
    another standalone dashboard. A stopped backend stays on its host status/Start
@@ -30,6 +46,40 @@ API origins, external docs and OAuth links are not dashboard actions.
 6. Preserve an unavailable/error result. `accepted_by_os` proves dispatch only,
    not page readiness, a successful login, or a completed job. Links carry no
    bearer tokens or login codes. The host handles dashboard authentication.
+
+## The block a generated AGENTS.md carries
+
+An agent with a page carries this block in its `AGENTS.md` (its `CLAUDE.md` reads
+it through `@AGENTS.md`), beside its browser rule, and its completion and
+notification renderers follow it:
+
+```markdown
+## Pages open only in Fabric Dashboards
+
+Every page of this agent (its dashboard, a job, an approval, a report) opens in
+Fabric Dashboards, never in a browser. Resolve the registered service key with
+the fabric-dashboards MCP (`list_services`, never guessed) and hand over the
+`open_link` its `link` tool returns for the page's path; to open it, call the
+host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`,
+`xdg-open`, `start <url>`, `webbrowser.open` or `shell.openExternal` on this
+agent's pages. A browser only when `host_status` confirms `not_installed`; an
+installed host that failed to open is reported, not replaced by HTTP. Links
+carry no token or login code. Every completion and notification action passes
+the Fabric Agent Adapter's link gate before delivery: `check_dashboard_link.py`
+in its `building-fabric-services/scripts`, run from that skill's directory;
+where it cannot run, the action is compared by hand and the check is NOT_RUN.
+```
+
+The project's checks run the gate below on each renderer's action, and a test
+holds a raw-HTTP primary action beside an available host refused.
+
+## An agent with a page and no service descriptor
+
+Fabric Dashboards opens only a page a service descriptor names. An agent that
+serves a local page without one cannot be opened there, and a browser is not the
+workaround. Make it a `fabric-service/0.1` service (`building-fabric-services`:
+the descriptor, the well-known document, the login-code routes and a declared
+dashboard); until that lands, file a board row for it and say the page waits on it.
 
 ## Device and channel
 

@@ -232,5 +232,175 @@ class ProbeRuleUnitTests(unittest.TestCase):
         self.assertEqual(probe.results[-1]["verdict"], "PASS")
 
 
+
+ACTIONS_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1"
+ACTIONS_VECTORS = json.loads((ROOT / "test/fixtures/contract/actions-vectors.json").read_text())
+
+
+def with_actions(actions, dashboard=True, capabilities=("sample.echo", "sample.draft")):
+    """A well-known document's surfaces and the actions declaration, as the probe reads them."""
+    wk = {"surfaces": {"mcp": {"path": "/mcp", "capabilities": list(capabilities)}, "events": {"path": "/e"}}}
+    if dashboard:
+        wk["surfaces"]["dashboard"] = {"path": "/", "login": True}
+    if actions is not None:
+        wk["extensions"] = {ACTIONS_KEY: {"actions": actions}}
+    return wk
+
+
+class ProbeActionsRuleTests(unittest.TestCase):
+    """DEC-0121 (FAC-SEM-142, D10): the probe's pure verdicts on a declaration and the tools a service lists."""
+
+    def setUp(self):
+        self.rules = load("check_service_rules")
+
+    def test_well_known_actions_follows_fac_sem_142_on_every_contract_fixture(self):
+        for case in ACTIONS_VECTORS["wellKnowns"]:
+            verdict, evidence = self.rules.well_known_actions_verdict(case["document"])
+            self.assertEqual(verdict, "FAIL" if case["findings"] else "PASS", "%s: %s" % (case["name"], evidence))
+            if case["findings"]:
+                self.assertIn("FAC-SEM-142", evidence, case["name"])
+                # Each finding is named at its place inside the declaration (the whole key for an invalid one).
+                self.assertIn(case["findings"][0].split("~10.1", 1)[1] or "extensions/actions/0.1", evidence, case["name"])
+
+    def test_well_known_actions_is_not_run_without_a_declaration(self):
+        verdict, evidence = self.rules.well_known_actions_verdict(with_actions(None))
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("extensions/actions/0.1", evidence)
+        self.assertEqual(self.rules.well_known_actions_verdict("not a document")[0], "NOT_RUN")
+
+    def test_action_tools_fails_on_a_declared_tool_tools_list_does_not_serve(self):
+        actions = [{"id": "approve-draft", "title": "Approve", "tool": "sample.publish", "gate": "relayed"},
+                   {"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}]
+        verdict, evidence = self.rules.action_tools_verdict(with_actions(actions, capabilities=["sample.echo", "sample.publish"]),
+                                                            {"sample.echo": {}, "sample.draft": {}})
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("approve-draft", evidence)
+        self.assertIn("sample.publish", evidence)
+        self.assertNotIn("sample.echo is not", evidence)
+
+    def test_action_tools_passes_when_every_declared_tool_is_served(self):
+        actions = [{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"},
+                   {"id": "draft", "title": "Draft", "tool": "sample.draft", "gate": "relayed"}]
+        verdict, evidence = self.rules.action_tools_verdict(with_actions(actions), {"sample.echo": {}, "sample.draft": {}})
+        self.assertEqual(verdict, "PASS", evidence)
+        self.assertIn("2", evidence)
+
+    def test_action_tools_is_not_run_without_a_readable_declaration_or_a_listing(self):
+        self.assertEqual(self.rules.action_tools_verdict(with_actions(None), {"sample.echo": {}})[0], "NOT_RUN")
+        invalid = with_actions([{"id": "x", "title": "X", "tool": "sample.echo", "gate": "sometimes"}])
+        verdict, evidence = self.rules.action_tools_verdict(invalid, {"sample.echo": {}})
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("well-known.actions", evidence)
+        ok = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}])
+        verdict, evidence = self.rules.action_tools_verdict(ok, None, "no readable token")
+        self.assertEqual((verdict, evidence), ("NOT_RUN", "no readable token"))
+
+    def test_declared_actions_with_no_mcp_surface_fail(self):
+        # Seam reading of 0.50.0: AP-1, every action has a tool on the MCP surface; a declaration with none is a page-only button.
+        ok = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}])
+        verdict, evidence = self.rules.action_tools_verdict(ok, None, "no MCP surface", no_surface=True)
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("AP-1", evidence)
+        self.assertEqual(self.rules.action_tools_verdict(with_actions(None), None, "no MCP surface", no_surface=True)[0], "NOT_RUN")
+        # A remote agent's surface may be A2A or MCP behind a gateway (the contract's surfaces table): not judged here.
+        verdict, evidence = self.rules.action_tools_verdict(ok, None, "no MCP surface", no_surface=True, remote=True)
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("remote", evidence)
+
+    def test_a_dashboard_without_a_declaration_is_not_run_never_a_failure(self):
+        verdict, evidence = self.rules.actions_declared_verdict(with_actions(None))
+        self.assertEqual(verdict, "NOT_RUN")
+        for words in ("minItems", "read-only", "CT-126", "DEC-0121"):
+            self.assertIn(words, evidence)
+
+    def test_a_dashboard_with_a_valid_declaration_passes_and_an_invalid_one_fails(self):
+        ok = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}])
+        self.assertEqual(self.rules.actions_declared_verdict(ok)[0], "PASS")
+        bad = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none", "humanStep": "sign-in"}])
+        verdict, evidence = self.rules.actions_declared_verdict(bad)
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("well-known.actions", evidence)
+        self.assertEqual(self.rules.actions_declared_verdict(with_actions(None, dashboard=False))[0], "NOT_RUN")
+        self.assertEqual(self.rules.actions_declared_verdict(with_actions([], dashboard=True))[0], "FAIL")  # minItems 1
+
+
+class ActionsServiceProbeTests(unittest.TestCase):
+    """A kit service built here (the sample's code, its well-known document given a declaration; D15: the sample
+    itself stays as it is), probed live: PASS, FAIL and NOT_RUN for well-known.actions, interop.action-tools and
+    dashboard.actions-declared."""
+
+    def setUp(self):
+        import threading
+        sample = load("sample_service")
+        self.temp = tempfile.TemporaryDirectory()
+        base = Path(self.temp.name)
+        self.services = base / "services"
+        port = free_port()
+        common = ["--port", str(port), "--data-dir", str(base / "data")]
+        test = self
+
+        class ActionsService(sample.Service):
+            def well_known(self):
+                wk = super().well_known()
+                wk["surfaces"]["mcp"]["capabilities"] += test.extra_capabilities
+                if test.actions is not None:
+                    wk.setdefault("extensions", {})[ACTIONS_KEY] = {"actions": test.actions}
+                return wk
+
+        self.actions, self.extra_capabilities = None, []
+        self.svc = ActionsService(sample.build_parser().parse_args(["serve"] + common))
+        self.svc.start()
+        self.server = sample.make_server(self.svc)
+        self.thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
+        self.thread.start()
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):  # register prints the descriptor's path
+            registered = sample.register(sample.build_parser().parse_args(["register"] + common + ["--services-dir", str(self.services)]))
+        self.assertEqual(registered, 0)
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.svc.lock.release()
+        self.temp.cleanup()
+
+    def check(self):
+        out = subprocess.run([sys.executable, str(SCRIPTS / "check_service.py"), "sample", "--services-dir",
+                              str(self.services), "--json"], capture_output=True, text=True)
+        return {r["rule"]: r for r in json.loads(out.stdout)["results"]}
+
+    def verdicts(self, results):
+        return {rule: results[rule]["verdict"] for rule in ("well-known.actions", "interop.action-tools", "dashboard.actions-declared")}
+
+    def test_a_declaration_whose_tools_are_served_passes(self):
+        self.actions = [{"id": "echo", "title": "Echo the text", "tool": "sample.echo", "gate": "none"},
+                        {"id": "draft-note", "title": "Draft a note", "tool": "sample.draft", "gate": "relayed"}]
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.actions": "PASS", "interop.action-tools": "PASS",
+                                                  "dashboard.actions-declared": "PASS"}, results)
+
+    def test_a_declared_tool_tools_list_does_not_serve_fails(self):
+        self.actions = [{"id": "publish-note", "title": "Publish", "tool": "sample.publish", "gate": "relayed"}]
+        self.extra_capabilities = ["sample.publish"]  # listed on the surface, so FAC-SEM-142 holds; tools/list lacks it
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.actions": "PASS", "interop.action-tools": "FAIL",
+                                                  "dashboard.actions-declared": "PASS"}, results)
+        self.assertIn("publish-note", results["interop.action-tools"]["evidence"])
+
+    def test_a_declaration_fac_sem_142_finds_fails(self):
+        self.actions = [{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"},
+                        {"id": "echo", "title": "Echo again", "tool": "sample.echo", "gate": "none"}]
+        results = self.check()
+        self.assertEqual(results["well-known.actions"]["verdict"], "FAIL")
+        self.assertIn("declared twice", results["well-known.actions"]["evidence"])
+
+    def test_a_dashboard_with_no_declaration_is_not_run(self):
+        results = self.check()
+        self.assertEqual(self.verdicts(results), {"well-known.actions": "NOT_RUN", "interop.action-tools": "NOT_RUN",
+                                                  "dashboard.actions-declared": "NOT_RUN"}, results)
+        self.assertIn("CT-126", results["dashboard.actions-declared"]["evidence"])
+
+
 if __name__ == "__main__":
     unittest.main()

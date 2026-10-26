@@ -64,4 +64,5 @@ plan = fs.restore_plan(doc, {"projects": {"columns": [...], "key": ["id"], "requ
 - **Automatic restore** only on a *fresh* database (no domain records **and** the service has never started),
   so a restart never undoes a deletion. Insert `plan[...]["insert"]` and add every row the database refuses to
   `refused` with its key and reason.
-- **Manual restore** shows the plan first; applying it is the operator's act, never an agent's.
+- **Manual restore** shows the plan first; applying it is the operator's decision, taken on the page or relayed by
+  their agent with `_meta.decision` (a restore is a `relayed` action, contract DEC-0121), never the agent's own act.

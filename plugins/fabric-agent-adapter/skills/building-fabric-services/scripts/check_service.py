@@ -6,6 +6,7 @@
   options: --services-dir DIR  --json  --skip-login
            --ca-file PEM  --connect HOST:PORT     (remote placement: trust a test CA; dial another address)
            --board-kit PATH                       (board.responder: the service's own fabric_board.py or fabric-board.mjs)
+           --repo PATH                            (dashboard.opens-in-host: the service's checkout)
 
 A remote placement (DEC-0019 — an online agent or dashboard at an https origin) is probed over
 TLS with the certificate verified: the well-known document must refuse a request without the
@@ -26,6 +27,16 @@ well-known `protocols` declares that it answers board requests. The rule checks 
 runs the kit's fixture conversation (`fabric_board.self_check`, or `selfCheck` of a Node copy given with --board-kit):
 the whole conversation, a fenced accept and a board session without an epoch, with no Fabric. A live board is never
 touched; that smoke needs a disposable Fabric and is reported separately.
+
+Actions (fabric-actions/0.1, DEC-0121): `well-known.actions` holds a declared extensions/actions/0.1 to FAC-SEM-142,
+`interop.action-tools` fails a declared action whose tool tools/list does not serve (and a local service that declares
+actions with no MCP surface; a remote one there is NOT_RUN, its twin may be on A2A), and `dashboard.actions-declared`
+is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboard cannot declare an empty list).
+
+dashboard.opens-in-host (FAA-118, the operator rule of 2026-10-24): the service's checkout (--repo, else the one of
+the descriptor's source.repository that holds its commands, manifest or launchd job) opens the service's pages only
+through Fabric Dashboards. Tracked text files only, within a time budget; a browser opener aimed at its pages outside
+the confirmed not_installed fallback is a FAIL (the matcher: check_service_rules.py, "dashboard.opens-in-host").
 """
 
 from __future__ import annotations
@@ -69,6 +80,8 @@ from check_service_rules import _semver  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import usage_problems  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
+from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict  # noqa: E402 - DEC-0121
+from check_service_rules import opens_in_host_verdict, service_checkout  # noqa: E402 - FAA-118
 
 
 class _PinnedHTTPS(http.client.HTTPSConnection):
@@ -85,9 +98,13 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
 
 
 class Probe:
+    remote = False  # a probe built without __init__ (the tests' Probe.__new__) reads as local
+
     def __init__(self, descriptor_path: Path, descriptor: Dict[str, Any], services_dir: Path, skip_login: bool,
-                 ca_file: Optional[str] = None, connect: Optional[str] = None, board_kit: Optional[str] = None):
+                 ca_file: Optional[str] = None, connect: Optional[str] = None, board_kit: Optional[str] = None,
+                 repo: Optional[str] = None):
         self.board_kit = board_kit
+        self.repo = repo
         self.remote = fs.placement_of(descriptor) == "remote"
         self.ca_file = ca_file
         self.connect = connect
@@ -256,6 +273,8 @@ class Probe:
             self.add("well-known.connections", "FAIL" if view["reported"] else "PASS",
                      "; ".join(f["message"] for f in fcn.connections_rules(wk)[:5]) or
                      "%d connection(s), %d named in degraded[]" % (len(view["connections"]), failing))
+        # DEC-0121, FAC-SEM-142: every button's agent twin, declared; no declaration is NOT_RUN (D10).
+        self.add("well-known.actions", *well_known_actions_verdict(wk))
         self.configuration_rule()
         svc = wk.get("service") or {}
         answered = "%s.%s" % (svc.get("id"), svc.get("instance"))
@@ -428,6 +447,24 @@ class Probe:
                 note += " (kit %s is current: dashboard_kit.py status)" % current
         self.add("dashboard.declared", "PASS", note + "; the page itself: check_dashboard_layout.mjs")
 
+    def dashboard_page_rules(self) -> None:
+        """DEC-0121 and FAA-118: what a person can do on the dashboard, and where its pages open."""
+        self.add("dashboard.actions-declared", *actions_declared_verdict(self.wk or {}))  # D10: never a FAIL for absence
+        self.opens_in_host_rule()
+
+    def opens_in_host_rule(self) -> None:
+        """FAA-118: the checkout opens the service's pages only through Fabric Dashboards (decision D13)."""
+        dashboard = ((self.wk or {}).get("surfaces") or {}).get("dashboard")
+        if not isinstance(dashboard, dict):
+            self.add("dashboard.opens-in-host", "NOT_RUN", "no surfaces.dashboard: no page to open")
+            return
+        checkout, why = service_checkout(self.d, self.repo)
+        if checkout is None:
+            self.add("dashboard.opens-in-host", "NOT_RUN", why)
+            return
+        self.add("dashboard.opens-in-host", *opens_in_host_verdict(checkout, 0 if self.remote else self.port,
+                                                                   str(self.d.get("origin") or ""), str(dashboard.get("path") or "/")))
+
     def login_rules(self) -> None:
         dashboard = ((self.wk or {}).get("surfaces") or {}).get("dashboard")
         if not dashboard or not dashboard.get("login"):
@@ -544,11 +581,14 @@ class Probe:
                       else "no readable token")
             for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
                 self.add(rule, "NOT_RUN", reason)
+            self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason, no_surface=not mcp_surface,
+                                                                    remote=self.remote))
         else:
             try:
                 listing = self.mcp_call("tools/list", {})
             except (OSError, ValueError) as exc:
                 self.add("interop.tools-match", "FAIL", "tools/list failed: %s" % exc)
+                self.add("interop.action-tools", *action_tools_verdict(self.wk, None, "tools/list failed: %s" % exc))
                 listing = None
             if listing is not None:
                 sent = self.sent_traceparent
@@ -556,6 +596,7 @@ class Probe:
                 self.object_root_rule(tools)
                 self.tools_match_rule(capabilities, manifest_path, tools)
                 self.job_tools_rule(capabilities, tools)
+                self.add("interop.action-tools", *action_tools_verdict(self.wk, tools))  # DEC-0121 AP-1: the live twin
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
         self.events_trace_rule(self.events)
@@ -811,6 +852,7 @@ class Probe:
             self.auth_rules()
             self.usage_rules()
             self.dashboard_rules()
+            self.dashboard_page_rules()
             self.login_rules()
             self.interop_rules()
             verdict, evidence = board_responder_verdict(self.wk, self.board_kit)
@@ -838,6 +880,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--ca-file", help="remote placement: trust this CA bundle instead of the system store (tests)")
     parser.add_argument("--connect", help="remote placement: dial HOST:PORT while speaking TLS to the origin's name (tests)")
     parser.add_argument("--board-kit", help="board.responder: the service's own fabric_board.py or fabric-board.mjs")
+    parser.add_argument("--repo", help="dashboard.opens-in-host: the service's checkout (default: found by source.repository)")
     args = parser.parse_args(argv)
     if not args.target and not args.descriptor:
         parser.print_usage(sys.stderr)
@@ -849,7 +892,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     except (OSError, ValueError) as exc:
         print("No readable descriptor at %s: %s" % (path, exc), file=sys.stderr)
         return 1
-    results = Probe(path, descriptor, services_dir, args.skip_login, args.ca_file, args.connect, args.board_kit).run()
+    results = Probe(path, descriptor, services_dir, args.skip_login, args.ca_file, args.connect, args.board_kit, args.repo).run()
     failed = sum(r["verdict"] == "FAIL" for r in results)
     if args.json:
         print(json.dumps({"descriptor": str(path), "results": results, "failed": failed}, indent=2))

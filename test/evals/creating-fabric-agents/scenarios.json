@@ -103,7 +103,7 @@
         "cites fabric-operator-channel/0.1 OC-11 (contract DEC-0034, docs/specification/operator-channel.md) from the default contract pin, which carries it",
         "if the operator will bind the channel in a group shared with other bots, says it follows OC-14…OC-17 (contract DEC-0035): silent unless addressed, and a bare /command in a group is not addressed",
         "records the answer as accepted, declined or later (in the channel status document's proposal field when the agent serves surfaces.operatorChannel) and does not ask again",
-        "does not create a bot, ask for or store a token value, or enable the channel itself"
+        "does not create the bot or ask for or store the token's value (a secret step stays the person's); enables the channel only on the operator's decision, on its page or relayed by their agent with the operator's own words (DEC-0121), never on its own"
       ]
     },
     {
@@ -166,6 +166,25 @@
         "names the key the agent reads, never its value",
         "with Project Observatory installed, runs it through \"$(project-observatory full-path)/tools/use_secret.py\"",
         "without it, injects the key at runtime from the OS keychain or the person's secret manager, never in argv or a committed file"
+      ]
+    },
+    {
+      "id": "generated-instructions-open-pages-in-the-host",
+      "trap": "the new agent's AGENTS.md said nothing about its pages, so its own sessions opened the dashboard with `open -a Safari http://127.0.0.1:...` and its completion message printed a localhost link",
+      "request": "Write example-agent's AGENTS.md and its completion message; it has a dashboard.",
+      "expected": [
+        "AGENTS.md (and CLAUDE.md through @AGENTS.md) carries the rule block: an agent page opens only in Fabric Dashboards, as the open_link from the fabric-dashboards link tool, opened with open and fallback=never",
+        "names what never opens a page: `open <url>`, `open -a Safari`, `xdg-open`, `webbrowser.open`, `shell.openExternal`; a browser only on a confirmed not_installed host; an installed host that failed is reported",
+        "has the project's checks run the adapter's scripts/check_dashboard_link.py from the skill's own directory (not a copy in the project), run on every completion and notification action before delivery"
+      ]
+    },
+    {
+      "id": "page-without-a-descriptor",
+      "trap": "the agent serves a local page on a port with no service descriptor, so Fabric Dashboards cannot open it, and the skill let it open in a browser",
+      "request": "example-agent shows a settings page on http://127.0.0.1:8765 and has no Fabric service descriptor.",
+      "expected": [
+        "does not open or link the page in a browser",
+        "makes the agent a fabric-service/0.1 service through building-fabric-services (descriptor, well-known document, login code, declared dashboard), or files a board row for that when it is not this task"
       ]
     }
   ]

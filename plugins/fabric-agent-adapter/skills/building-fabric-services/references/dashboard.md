@@ -23,11 +23,20 @@ service are not.
    when it returns.
 7. **Approvals show the diff and its hash.** Any write the operator approves shows
    before → after and the hash the service will verify at apply time.
-8. **Theme and width.** Build the page from the dashboard kit: its seven AA themes, light and
+8. **Every button has an agent twin** (contract DEC-0121 AP-1). Each action the page lets a
+   person take (approve, reject, choose, edit, pause, resume, cancel, retry, send, publish,
+   restore, set a policy) is a tool with the same effect, checks, audit record and an
+   idempotency key, declared in the well-known document's action table; a `relayed` action
+   takes the operator's decision from their agent as from a click. Never answer an agent
+   "open the dashboard" for an action the page offers, except a step only a person can take, which answers
+   `human-step-required` with its link (AP-4; [interop](interop.md#actions)).
+9. **Theme and width.** Build the page from the dashboard kit: its seven AA themes, light and
    dark, follow `prefers-color-scheme` and the host's `fabric_appearance` cookie, and its layout
    holds from 360 CSS px inside a host pane (`fabric-dashboard/0.1`, DEC-0036;
    [the dashboard kit reference](dashboard-kit.md)). Never encode meaning by colour alone.
-9. **Links into the page are stable.** Event `link`s point at hash routes that survive
+10. **Links into the page are stable.** Event `link`s point at hash routes that survive
    a reload (`/dashboard#/approvals/77`) so a notification opens the exact item.
-10. **No second browser tab required.** With Fabric Dashboards installed, the page is
-    shown inside it; do not open windows or tabs on your own; use in-page dialogs.
+11. **No second browser tab required.** With Fabric Dashboards installed, the page is
+    shown inside it and opens only there: its `open_link`, opened with `fallback=never`
+    ([dashboard links](dashboard-links.md)); do not open windows or tabs on your own; use
+    in-page dialogs.

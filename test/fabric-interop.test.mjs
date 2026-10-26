@@ -6,6 +6,7 @@ import * as i from '../plugins/fabric-agent-adapter/skills/building-fabric-servi
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { tempDir } from './temp-dir.mjs';
 import { assertPrivateFile } from './private-file.mjs';
+import { refusalError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs';
 
 const PARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -107,4 +108,62 @@ test('Mcp-Name values use the Base64 sentinel exactly as the spec shows, and a s
   assert.match(i.mcpHeaderProblem(call, { ...headers, 'Mcp-Name': i.encodeHeaderValue('другое') }), /disagrees/);
   assert.match(i.mcpHeaderProblem(call, { ...headers, 'Mcp-Name': '=?base64?***?=' }), /malformed/);
   assert.match(i.mcpHeaderProblem(call, { ...headers, 'Mcp-Name': 'погода' }), /malformed/);
+});
+
+// DEC-0121: the caller relays the operator's decision in _meta.decision (REQ-8); a Node service's own server gates a tool
+// registered with an action with actionGate and answers its refusal with actionRefusalToolResult (REQ-7, D9, D11).
+const AV = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/actions-vectors.json', import.meta.url), 'utf8'));
+const NOW = '2026-10-24T09:30:00Z';
+const RELAYED = { id: 'approve-reply', title: 'Approve the reply', tool: 'reviews.approve', gate: 'relayed' };
+const HUMAN = { id: 'connect-store', title: 'Connect the store', tool: 'accounts.connect', gate: 'human', humanStep: 'consent' };
+const DECISION = { by: 'operator', via: 'relayed-instruction', action: 'approve-reply', target: 'reply-7', instruction: 'Agent: Approve the reply to Anna? Operator: yes', at: '2026-10-24T09:29:00Z' };
+
+test('requestMeta carries the decision in _meta, copied, and never one the schema refuses', () => {
+  const meta = i.requestMeta(PARENT, { decision: DECISION });
+  assert.deepEqual(meta.decision, DECISION);
+  assert.equal(meta.traceparent, PARENT);
+  assert.equal('decision' in i.requestMeta(PARENT), false);
+  meta.decision.instruction = 'changed';
+  assert.equal(DECISION.instruction, 'Agent: Approve the reply to Anna? Operator: yes');
+  const decisions = AV.fixtures.filter((c) => c.schema === 'decision.schema.json');
+  assert.ok(decisions.some((c) => c.valid) && decisions.some((c) => !c.valid));
+  for (const c of decisions) {
+    if (c.valid) assert.deepEqual(i.requestMeta(PARENT, { decision: c.document }).decision, c.document, c.name);
+    else assert.throws(() => i.requestMeta(PARENT, { decision: c.document }), i.InteropError, c.name);
+  }
+});
+
+test('actionGate: no decision, a valid one, one in the arguments, a T2 caller, a human step', () => {
+  const gate = (extra) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta: {}, target: 'reply-7', now: NOW, ...extra });
+  const none = gate();
+  assert.equal(none.ok, false);
+  assert.deepEqual(refusalError(none.refusal).error.data, { detail: 'no-decision' });
+  assert.equal(none.refusal.code, 'operator-decision-required');
+  const ok = gate({ meta: { decision: DECISION } });
+  assert.deepEqual(ok, { ok: true, record: { by: 'operator', via: 'relayed-instruction', caller: 'local:T0' }, decision: DECISION });
+  // A decision is read from _meta only: an inherited member is not one, and arguments are never read (D11).
+  assert.equal(gate({ meta: Object.create({ decision: DECISION }) }).refusal.code, 'operator-decision-required');
+  assert.equal(gate({ meta: { decision: null } }).refusal.code, 'decision-invalid');
+  assert.equal(gate({ meta: { decision: { ...DECISION, target: 'reply-8' } } }).refusal.code, 'decision-invalid');
+  const t2 = gate({ tier: 'T2', caller: 'agent:remote', meta: { decision: DECISION }, actionDigest: `sha256:${'a'.repeat(64)}` });
+  assert.deepEqual([t2.refusal.code, t2.refusal.data], ['approval-required', { actionDigest: `sha256:${'a'.repeat(64)}` }]);
+  const fault = gate({ tier: 'T2', caller: null, meta: { decision: DECISION } });
+  assert.deepEqual([fault.refusal.code, fault.refusal.detail], ['unknown-state', 'service-fault']);
+  const step = i.actionGate({ action: HUMAN, tier: 'T0', caller: 'local:T0', meta: { decision: { ...DECISION, action: 'connect-store' } }, humanStepUrl: '/connect/store', now: NOW });
+  assert.deepEqual(refusalError(step.refusal).error.data, { detail: 'human-step', humanStep: 'consent', url: '/connect/store' });
+  const own = i.actionGate({ action: { ...RELAYED, gate: 'none' }, tier: 'T2', caller: null, meta: { decision: DECISION }, now: NOW });
+  assert.deepEqual(own, { ok: true, record: 'caller', decision: null });
+  const elicited = gate({ elicited: true });
+  assert.deepEqual(elicited.record, { by: 'operator', via: 'elicitation', caller: 'local:T0' });
+  assert.equal(elicited.decision, null);
+});
+
+test('actionRefusalToolResult answers DL-19 structuredContent, or null for a call the action takes', () => {
+  assert.equal(i.actionRefusalToolResult({ ok: true, recordAs: 'caller' }), null);
+  const result = i.actionRefusalToolResult({ ok: false, code: 'operator-decision-required' }, PARENT);
+  assert.equal(result.isError, true);
+  assert.deepEqual(result.structuredContent.error.data, { detail: 'no-decision' });
+  assert.equal(result.structuredContent.error.code, 'operator-decision-required');
+  assert.equal(result._meta.traceparent, PARENT);
+  assert.equal(i.actionRefusalToolResult({ fault: 'caller-missing' }).structuredContent.error.code, 'unknown-state');
 });

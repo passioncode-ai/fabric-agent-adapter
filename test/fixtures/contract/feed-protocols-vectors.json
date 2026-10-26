@@ -44,6 +44,9 @@
     "execution-packet": [
       "1"
     ],
+    "fabric-actions": [
+      "0.1"
+    ],
     "fabric-activity": [
       "0.1"
     ],

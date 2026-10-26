@@ -359,3 +359,325 @@ class McpStandardHeaderTests(unittest.TestCase):
         self.assertEqual(answer["error"]["code"], fi.HEADER_MISMATCH)
         listed = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}}, fi.mcp_request_headers("tools/list", {}))
         self.assertIn("tools", listed["result"])
+
+
+# --- DEC-0121: a tool registered with an action runs action_decision (REQ-7, REQ-8, D8, D9, D11) -----------------
+
+fa = load("fabric_actions")
+fd = load("fabric_delegation")
+NOW = "2026-10-24T09:30:00Z"
+NOW_SECONDS = 1_792_834_200  # NOW as epoch seconds
+RELAYED = {"id": "approve-reply", "title": "Approve the reply", "tool": "reviews.approve", "gate": "relayed"}
+NONE = {"id": "retry-job", "title": "Retry", "tool": "jobs.retry", "gate": "none"}
+HUMAN = {"id": "connect-store", "title": "Connect the store", "tool": "accounts.connect", "gate": "human", "humanStep": "consent"}
+DECISION = {"by": "operator", "via": "relayed-instruction", "action": "approve-reply", "target": "reply-7",
+            "instruction": "Agent: Approve the reply to Anna? Operator: yes", "at": "2026-10-24T09:29:00Z"}
+OBJECT = {"type": "object"}
+
+
+class ActionGateTests(unittest.TestCase):
+    """McpToolServer runs fabric_actions.action_decision for a tool registered with an action, after the authorize
+    gate and before the handler; a refusal is DL-19's structuredContent; the handler gets the record."""
+
+    def server(self, **options):
+        self.seen = []
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
+        options.setdefault("clock", lambda: NOW_SECONDS)
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, **options)
+        keep = lambda args, ctx: self.seen.append(ctx) or {"done": True}
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, keep, action=RELAYED, target="reply")
+        server.add_tool({"name": "jobs.retry", "inputSchema": OBJECT}, keep, action=NONE)
+        server.add_tool({"name": "accounts.connect", "inputSchema": OBJECT}, keep, action=HUMAN, human_step_url="/connect/store")
+        server.add_tool({"name": "example.echo", "inputSchema": OBJECT}, keep)
+        server.add_tool({"name": "example.ask", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        return server
+
+    def call(self, server, name, arguments=None, meta=None, tier="T0", headers=None):
+        params = {"name": name, "arguments": {"reply": "reply-7"} if arguments is None else arguments,
+                  "_meta": dict({"traceparent": PARENT}, **(meta or {}))}
+        return server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, headers, tier=tier)["result"]
+
+    def refusal(self, result):
+        self.assertTrue(result["isError"])
+        error = result["structuredContent"]["error"]
+        self.assertEqual(json.loads(result["content"][0]["text"]), result["structuredContent"])
+        self.assertTrue(1 <= len(error["data"]["detail"]) <= 80)
+        self.assertEqual(error["message"], fd.REFUSAL_MESSAGES[error["code"]])
+        return error
+
+    def test_arguments_with_no_canonical_form_are_answered_never_raised(self):
+        # Seam reading of 0.50.0: a lone surrogate or a non-finite number has no JCS form, so no digest; the call is
+        # answered -32602 at every tier, and a tool with no action still takes it as before.
+        for tier in ("T0", "T1", "T2"):
+            deep = json.loads('[' * 900 + '1' + ']' * 900)  # past the JCS recursion, still valid JSON
+            for bad in ("\ud800", float("nan"), float("inf"), deep):
+                with self.subTest(tier=tier, bad=repr(bad)):
+                    server = self.server()
+                    params = {"name": "reviews.approve", "arguments": {"reply": "reply-7", "x": bad}, "_meta": {"traceparent": PARENT}}
+                    answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier=tier)
+                    self.assertEqual(answer["error"]["code"], -32602, answer)
+                    self.assertEqual(self.seen, [])
+                    plain = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                                           "params": {"name": "example.echo", "arguments": {"x": bad}, "_meta": {"traceparent": PARENT}}}, None, tier=tier)
+                    self.assertFalse(plain["result"]["isError"])
+
+    def test_a_service_fault_reaches_on_fault_and_never_the_caller(self):
+        faults = []
+        server = self.server(on_fault=lambda tool, fault: faults.append((tool, fault)))
+        error = self.refusal(self.call(server, "reviews.approve", meta={"decision": DECISION}, tier="T2"))
+        self.assertEqual((error["code"], error["data"]["detail"]), ("unknown-state", "service-fault"))
+        self.assertEqual(faults, [("reviews.approve", "caller-missing")])
+        faults.clear()
+        server = self.server(on_fault=lambda tool, fault: faults.append((tool, fault)), approve=lambda *a: {"ok": False, "code": "weird"},
+                             identify=lambda headers, tier: "agent:example")
+        error = self.refusal(self.call(server, "reviews.approve", meta={"decision": DECISION}, tier="T2"))
+        self.assertEqual((error["code"], error["data"]["detail"]), ("unknown-state", "service-fault"))
+        self.assertEqual(faults, [("reviews.approve", "approval-outcome-unreadable")])
+
+    def test_a_relayed_action_from_t0_without_a_decision_is_operator_decision_required(self):
+        server = self.server()
+        error = self.refusal(self.call(server, "reviews.approve"))
+        self.assertEqual((error["code"], error["data"]), ("operator-decision-required", {"detail": "no-decision"}))
+        self.assertEqual(self.seen, [])
+
+    def test_a_valid_decision_runs_the_tool_and_records_the_operator_with_the_authenticated_caller(self):
+        for tier in ("T0", "T1"):
+            with self.subTest(tier):
+                server = self.server()
+                result = self.call(server, "reviews.approve", {"reply": "reply-7", "caller": "agent:claimed"},
+                                   {"decision": DECISION, "caller": "agent:claimed"}, tier=tier)
+                self.assertFalse(result["isError"])
+                ctx = self.seen[-1]
+                self.assertEqual(ctx.record, {"by": "operator", "via": "relayed-instruction", "caller": "local:" + tier})
+                self.assertEqual((ctx.tier, ctx.caller, ctx.decision), (tier, "local:" + tier, DECISION))
+        server = self.server(identify=lambda headers, tier: "agent:" + headers["X-Agent"])
+        self.call(server, "reviews.approve", meta={"decision": DECISION}, headers={"X-Agent": "claude-code"})
+        self.assertEqual(self.seen[-1].record["caller"], "agent:claude-code")
+
+    def test_a_caller_the_authorize_gate_accepted_is_the_one_recorded(self):
+        gate = lambda tool, headers, tier="T2": {"ok": True, "tier": tier, "principal": "person:p", "caller": "agent:token-caller"}
+        server = self.server(authorize=gate, identify=lambda headers, tier: "agent:not-this")
+        self.call(server, "reviews.approve", meta={"decision": DECISION})
+        self.assertEqual(self.seen[-1].record["caller"], "agent:token-caller")
+        self.assertEqual(self.seen[-1].delegation["caller"], "agent:token-caller")
+        refusing = self.server(authorize=lambda tool, headers, tier="T2": {"ok": False, "code": "unauthenticated", "detail": "no-token"})
+        self.assertEqual(self.refusal(self.call(refusing, "reviews.approve", tier="T2"))["code"], "unauthenticated")
+
+    def test_a_t2_caller_is_asked_for_an_approval_with_the_digest_and_its_decision_changes_nothing(self):
+        server = self.server(identify=lambda headers, tier: "agent:remote")
+        error = self.refusal(self.call(server, "reviews.approve", meta={"decision": DECISION}, tier="T2"))
+        digest = fd.action_digest({"tool": "reviews.approve", "arguments": {"reply": "reply-7"}})
+        self.assertEqual((error["code"], error["data"]), ("approval-required", {"detail": "no-approval", "actionDigest": digest}))
+        self.assertEqual(self.seen, [])
+
+    def test_an_accepted_approval_is_the_approvers_and_a_bad_one_is_refused_as_verified(self):
+        asked = []
+        def approve(tool, arguments, headers, digest):
+            asked.append((tool, digest))
+            return headers.get("approval")
+        server = self.server(identify=lambda headers, tier: "agent:remote", approve=approve)
+        ok = {"ok": True, "approver": "person:operator", "method": "passkey", "claims": {}, "kid": "k"}
+        self.call(server, "reviews.approve", tier="T2", headers={"approval": ok})
+        self.assertEqual(self.seen[-1].record, {"by": "person:operator", "via": "approval", "caller": "agent:remote"})
+        bad = {"ok": False, "code": "approval-reused", "detail": "jti-consumed"}
+        self.assertEqual(self.refusal(self.call(server, "reviews.approve", tier="T2", headers={"approval": bad}))["code"], "approval-reused")
+        missing = {"ok": False, "code": "approval-required", "detail": "no-approval", "data": {"actionDigest": "sha256:" + "0" * 64}}
+        self.assertEqual(self.refusal(self.call(server, "reviews.approve", tier="T2", headers={"approval": missing}))["data"]["actionDigest"],
+                         fd.action_digest({"tool": "reviews.approve", "arguments": {"reply": "reply-7"}}))
+        for malformed in ({"ok": False, "code": "approval-invalid"}, {"ok": False, "code": "not-a-code", "detail": "x"}):
+            with self.subTest(malformed=malformed):  # an outcome that is not verify_approval's is the service's fault
+                error = self.refusal(self.call(server, "reviews.approve", tier="T2", headers={"approval": malformed}))
+                self.assertEqual((error["code"], error["data"]["detail"]), ("unknown-state", "service-fault"))
+        self.call(server, "jobs.retry", tier="T2", headers={"approval": ok})  # an action that needs no decision spends no approval
+        self.assertEqual([tool for tool, _ in asked], ["reviews.approve"] * 5)
+
+    def test_a_t2_call_with_no_identity_is_the_services_fault(self):
+        error = self.refusal(self.call(self.server(), "reviews.approve", meta={"decision": DECISION}, tier="T2"))
+        self.assertEqual((error["code"], error["data"]["detail"]), ("unknown-state", "service-fault"))
+
+    def test_a_human_step_is_refused_with_its_step_and_link_at_every_tier(self):
+        for tier in ("T0", "T1", "T2"):
+            with self.subTest(tier):
+                server = self.server()
+                error = self.refusal(self.call(server, "accounts.connect", {}, {"decision": dict(DECISION, action="connect-store")}, tier=tier))
+                self.assertEqual((error["code"], error["data"]),
+                                 ("human-step-required", {"detail": "human-step", "humanStep": "consent", "url": "/connect/store"}))
+                self.assertEqual(self.seen, [])
+
+    def test_an_action_of_the_callers_own_runs_without_a_decision(self):
+        server = self.server()
+        self.assertFalse(self.call(server, "jobs.retry", {})["isError"])
+        self.assertEqual((self.seen[-1].record, self.seen[-1].decision), ("caller", None))
+
+    def test_a_decision_in_the_arguments_is_ignored(self):
+        server = self.server()
+        error = self.refusal(self.call(server, "reviews.approve", {"reply": "reply-7", "decision": DECISION, "_meta": {"decision": DECISION}}))
+        self.assertEqual(error["code"], "operator-decision-required")
+
+    def test_a_decision_that_is_not_valid_for_this_call_is_decision_invalid(self):
+        bad = {
+            "another action": dict(DECISION, action="reject-reply"),
+            "another object": dict(DECISION, target="reply-8"),
+            "an hour ahead": dict(DECISION, at="2026-10-24T10:30:00Z"),
+            "two days old": dict(DECISION, at="2026-10-22T09:30:00Z"),
+            "a decision named an elicitation": dict(DECISION, via="elicitation"),
+            "not the operator": dict(DECISION, by="agent"),
+            "null": None,
+            "a string": "yes",
+        }
+        for name, decision in bad.items():
+            with self.subTest(name):
+                server = self.server()
+                error = self.refusal(self.call(server, "reviews.approve", meta={"decision": decision}))
+                self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": "invalid-decision"}))
+                self.assertEqual(self.seen, [])
+
+    def test_the_services_own_elicitation_record_is_the_operators_decision(self):
+        records = []
+        server = self.server(elicited=lambda tool, arguments, caller: records.append((tool, caller)) or True)
+        self.call(server, "reviews.approve")
+        self.assertEqual(self.seen[-1].record, {"by": "operator", "via": "elicitation", "caller": "local:T0"})
+        self.assertEqual(records, [("reviews.approve", "local:T0")])
+        server = self.server(elicited=lambda tool, arguments, caller: "yes")  # only True is a record
+        self.assertEqual(self.refusal(self.call(server, "reviews.approve"))["code"], "operator-decision-required")
+
+    def test_a_tool_without_an_action_is_unchanged(self):
+        server = self.server()
+        self.assertFalse(self.call(server, "example.echo", {}, {"decision": "not even a decision"}, tier="T2")["isError"])
+        self.assertEqual((self.seen[-1].record, self.seen[-1].decision), (None, None))
+
+    def test_the_action_table_is_what_was_registered_and_a_bad_one_is_refused(self):
+        server = self.server()
+        self.assertEqual(server.action_table(), [RELAYED, NONE, HUMAN])
+        doc = fs.build_well_known(service_id="example-agent", instance="default", name="Example", version="1.0.0",
+                                  build={"commit": "0" * 40}, started_at=NOW, status="ready", degraded=[],
+                                  surfaces={"events": {"path": "/fabric/v1/events"},
+                                            "mcp": {"path": "/mcp", "transport": "streamable-http",
+                                                    "capabilities": [t["name"] for t in server.tools]}},
+                                  actions=server.action_table())
+        self.assertEqual(fa.actions_view(doc)["actions"], [RELAYED, NONE, HUMAN])
+        bad = {
+            "another tool": ({"name": "reviews.reject"}, RELAYED, {}),
+            "an unknown gate": ({"name": "reviews.approve"}, dict(RELAYED, gate="page"), {}),
+            "a human step without its link": ({"name": "accounts.connect"}, HUMAN, {}),
+            "a link that is neither https nor a path": ({"name": "accounts.connect"}, HUMAN, {"human_step_url": "http://x"}),
+            "a target that is neither a name nor a function": ({"name": "reviews.approve"}, RELAYED, {"target": 7}),
+        }
+        for name, (tool, action, extra) in bad.items():
+            with self.subTest(name), self.assertRaises(fi.InteropError):
+                fi.McpToolServer("x", "1").add_tool(dict(tool, inputSchema=OBJECT), lambda a, c: {}, action=action, **extra)
+
+    def test_a_target_function_names_the_object(self):
+        server = fi.McpToolServer("x", "1", clock=lambda: NOW_SECONDS)
+        seen = []
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda a, c: seen.append(c.record) or {},
+                        action=RELAYED, target=lambda arguments: arguments["review"]["reply"])
+        self.assertFalse(self.call(server, "reviews.approve", {"review": {"reply": "reply-7"}}, {"decision": DECISION})["isError"])
+        self.assertTrue(self.call(server, "reviews.approve", {"review": {"reply": "reply-8"}}, {"decision": DECISION})["isError"])
+        self.assertEqual(len(seen), 1)
+
+
+class InputActionTests(unittest.TestCase):
+    """D8: a job's input request is an action (id its key, tool fabric.job.get, gate relayed), gated per key only when
+    the service opts in with input_actions=True; off by default."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+
+    def start(self, **options):
+        self.inputs = []
+        jobs = fi.JobStore(Path(self.temp.name) / ("jobs-%d" % len(os.listdir(self.temp.name))))
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, clock=lambda: NOW_SECONDS,
+                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)), **options)
+        server.add_tool({"name": "example.ask", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        handle = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                "params": {"name": "example.ask", "arguments": {}}})["result"]["structuredContent"]
+        job_id = handle["job"]["id"]
+        jobs.request_input(job_id, {"pick": fi.choice_request("Which?", "choice", [("a", "A"), ("b", "B")]),
+                                    "note": fi.form_request("A note?", {"text": {"type": "string"}})})
+        return server, jobs, job_id
+
+    def answer(self, server, job_id, responses, decision=None, tier="T0"):
+        meta = {"traceparent": PARENT}
+        if decision is not None:
+            meta["decision"] = decision
+        return server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                              "params": {"name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": responses},
+                                         "_meta": meta}}, tier=tier)["result"]
+
+    def key_decision(self, key):
+        return {"by": "operator", "via": "relayed-instruction", "action": key, "instruction": "Agent: Which? Operator: a", "at": NOW}
+
+    def test_off_by_default_the_answer_is_taken_as_before(self):
+        server, jobs, job_id = self.start()
+        result = self.answer(server, job_id, {"pick": {"action": "accept", "content": {"choice": "a"}}})
+        self.assertFalse(result["isError"])
+        self.assertEqual(jobs.get(job_id)["status"], "working")
+        self.assertEqual(list(self.inputs[0][0]), ["pick"])
+        self.assertIsNone(self.inputs[0][1].input_records)
+
+    def test_on_an_answer_without_a_decision_is_refused_and_nothing_is_applied(self):
+        server, jobs, job_id = self.start(input_actions=True)
+        error = self.answer(server, job_id, {"pick": {"action": "accept", "content": {"choice": "a"}}})["structuredContent"]["error"]
+        self.assertEqual(error["code"], "operator-decision-required")
+        self.assertEqual(jobs.get(job_id)["status"], "input_required")
+        self.assertEqual(self.inputs, [])
+
+    def test_on_a_decision_for_the_key_answers_it_and_hands_on_input_the_record(self):
+        server, jobs, job_id = self.start(input_actions=True)
+        result = self.answer(server, job_id, {"pick": {"action": "accept", "content": {"choice": "a"}}}, self.key_decision("pick"))
+        self.assertFalse(result["isError"])
+        self.assertEqual(jobs.get(job_id)["status"], "working")
+        matched, ctx = self.inputs[0]
+        self.assertEqual(list(matched), ["pick"])
+        self.assertEqual(ctx.input_records, {"pick": {"by": "operator", "via": "relayed-instruction", "caller": "local:T0"}})
+
+    def test_on_one_decision_covers_one_key(self):
+        server, jobs, job_id = self.start(input_actions=True)
+        both = {"pick": {"action": "accept", "content": {"choice": "a"}}, "note": {"action": "decline"}}
+        self.assertEqual(self.answer(server, job_id, both, self.key_decision("pick"))["structuredContent"]["error"]["code"], "decision-invalid")
+        self.assertEqual(self.answer(server, job_id, {"note": {"action": "decline"}}, self.key_decision("pick"))["structuredContent"]["error"]["code"],
+                         "decision-invalid")
+        self.assertEqual(jobs.get(job_id)["status"], "input_required")
+        self.assertEqual(self.inputs, [])
+
+    def test_on_a_key_the_job_does_not_ask_and_a_plain_read_are_not_gated(self):
+        server, jobs, job_id = self.start(input_actions=True)
+        self.assertFalse(self.answer(server, job_id, {"other": {"action": "accept"}})["isError"])
+        read = server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                              "params": {"name": "fabric.job.get", "arguments": {"id": job_id}}}, tier="T0")["result"]
+        self.assertFalse(read["isError"])
+        self.assertEqual(jobs.get(job_id)["status"], "input_required")
+
+    def test_on_a_t2_answer_needs_an_approval(self):
+        server, jobs, job_id = self.start(input_actions=True, identify=lambda headers, tier: "agent:remote")
+        error = self.answer(server, job_id, {"pick": {"action": "accept", "content": {"choice": "a"}}}, self.key_decision("pick"), tier="T2")["structuredContent"]["error"]
+        self.assertEqual(error["code"], "approval-required")
+        self.assertTrue(error["data"]["actionDigest"].startswith("sha256:"))
+
+
+class RequestMetaDecisionTests(unittest.TestCase):
+    """REQ-8: a caller built on the kit relays the operator's decision in _meta.decision, never in arguments."""
+
+    def test_the_decision_rides_in_meta(self):
+        meta = fi.request_meta(PARENT, decision=DECISION)
+        self.assertEqual(meta["decision"], DECISION)
+        self.assertEqual(meta["traceparent"], PARENT)
+        self.assertNotIn("decision", fi.request_meta(PARENT))
+        meta["decision"]["instruction"] = "changed"
+        self.assertEqual(DECISION["instruction"], "Agent: Approve the reply to Anna? Operator: yes")
+
+    def test_a_decision_the_schema_refuses_is_never_sent(self):
+        vectors = json.loads((ROOT / "test/fixtures/contract/actions-vectors.json").read_text(encoding="utf-8"))
+        decisions = [case for case in vectors["fixtures"] if case["schema"] == "decision.schema.json"]
+        self.assertTrue(any(case["valid"] for case in decisions) and any(not case["valid"] for case in decisions))
+        for case in decisions:
+            with self.subTest(case["name"]):
+                if case["valid"]:
+                    self.assertEqual(fi.request_meta(PARENT, decision=case["document"])["decision"], case["document"])
+                else:
+                    with self.assertRaises(fi.InteropError):
+                        fi.request_meta(PARENT, decision=case["document"])

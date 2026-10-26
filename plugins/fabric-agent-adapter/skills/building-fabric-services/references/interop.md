@@ -27,6 +27,7 @@ That key has one spelling (the contract's `src/extensions.ts`); copy it, never r
 
 - [The kit](#the-kit)
 - [Limits and uncertain effects](#limits-and-uncertain-effects)
+- [Actions: every button has a tool](#actions)
 - [What the probe checks](#what-the-probe-checks)
 
 ## The kit
@@ -114,7 +115,8 @@ As a provider:
   `tokens_measured=False` / `tokensMeasured: false` and the tokens you have, so your own usage report counts it in
   `unmeasuredCalls` and does not show the lower bound as complete (DEC-0091, [usage](usage.md)).
 
-As a caller: send `request_meta(traceparent)` as your `_meta` (it names `fabric-interop/0.1` and `0.2`), act on every
+As a caller: send `request_meta(traceparent)` as your `_meta` (it names `fabric-interop/0.1` and `0.2`; for a relayed
+action it also carries the operator's decision, [Actions](#actions)), act on every
 `fabric.job.get` answer as `job_caller_action(answer, now)` says, and resend only under
 `intent_idempotency_key({agentId, capability, input})`, never a new key. Node names are the camelCase twins
 (`jobs.quotaExhausted(id, message, {retryable, resetsAt})`, `jobCallerAction`, `intentIdempotencyKey`). The guidance
@@ -131,6 +133,101 @@ a caller today sees `product-error` instead, kept under the key for 24 hours, un
 `fabric.job.list`, so its `unknown-job` and repeated keys keep the rules above. A node that will queue needs
 `jobCallerKey`, the contract's `agent-network.json` vectors and the load report first (FAA-103).
 
+<a id="actions"></a>
+
+## Actions
+
+Contract DEC-0121 (`fabric-actions/0.1`, rule `FAC-SEM-142`, `docs/specification/service.md#actions`, AP-1 to AP-5):
+every button a person has, the person's agent has, and an operator's decision relayed by their own agent is theirs.
+Both kits carry the reference (`fabric_actions.py`, `fabric-actions.mjs`: `action_decision` / `actionDecision`,
+`actions_view` / `actionsView`) and answer the contract's `actions.json` vectors case for case.
+
+**When a service adopts it.** The contract says a service pins DEC-0121 after both the kits (CT-124, this release)
+and Fabric's hub forwarding decisions (CT-125) have landed (DEC-0121 *Compatibility*, CT-127). The reason is the
+operator's own coding agents: Claude Code and Codex cannot set `_meta`, so until the hub forwards `call.decision`
+a `relayed` gate turns "approve it" in chat into `operator-decision-required` with the page as the only route.
+Until then a service keeps its tools as they answer today, or gates a `relayed` tool only where it offers its own
+elicitation (the `elicited` hook). This is D8's reason, which keeps `input_actions` off, applied to tools.
+
+**Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
+resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same
+effect, the same checks, the same audit record and an idempotency key: the button's agent twin. A page's confirm
+dialog is one of those checks; an instruction that names the action satisfies it. Each action has a gate:
+
+| `gate` | For | The tool answers |
+|---|---|---|
+| `none` | an act on the caller's own account: refresh, read, retry or cancel its own job | the caller's own act |
+| `relayed` | a decision on another party's proposal or draft, a send, a publish, a deletion, a spend within a limit, a restore, a policy change | the operator's act when a T0 or T1 caller carries a valid decision; else a refusal below |
+| `human` with `humanStep` | `sign-in`, `consent`, `payment`, `secret`, `spend-above-limit`, `passkey` (AP-4): they stay the person's | `human-step-required` with `data.humanStep` and `data.url`, the direct link to that step |
+
+```python
+server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, authorize=gate,
+                          identify=caller_of, approve=approval_of, elicited=elicited_of)
+server.add_tool(approve_tool, approve_reply, action={"id": "reply.approve", "title": "Approve a reply",
+                "tool": "replies.approve", "gate": "relayed"}, target="reply_id")
+server.add_tool(connect_tool, connect_store, action={"id": "store.connect", "title": "Connect the store",
+                "tool": "store.connect", "gate": "human", "humanStep": "sign-in"},
+                human_step_url="/dashboard#/connections/store")
+well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_table())
+```
+
+- `add_tool(tool, handler, action=, target=, human_step_url=)` registers the action a tool performs (its `tool` is
+  this tool's name). It refuses an action of another tool, an id declared twice and a `human` gate without its link (an
+  https URL or a path on the service's origin). `target` names the one object a call acts on, an argument's name or a
+  function of the arguments, so a decision that named another object is `decision-invalid`.
+- `action_table()` is the declaration: `build_well_known(actions=...)` / `buildWellKnown({actions})` write it under
+  `https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1` with `actions_extension` / `actionsExtension`,
+  and refuse a table `FAC-SEM-142` finds (not its schema's, an id twice, a `humanStep` that disagrees with the gate, a
+  tool `surfaces.mcp.capabilities` does not list): a service never publishes one. A read-only dashboard declares
+  nothing (the list has at least one entry).
+- **The gate.** `handle` runs `action_gate` after `authorize` and before the handler. The decision is read from the
+  call's `_meta.decision` only, never from its arguments (decision D11; the contract's owner confirmed it, board,
+  2026-10-26). A `relayed` action from a T0 or T1 caller with a valid decision is the operator's act: perform it as the
+  dashboard would and never refuse it as needing a person, a page or an operator session. Without one the answer is
+  `operator-decision-required`; a decision for another action or object, older than 24 hours or more than 60 s ahead
+  of the clock is `decision-invalid`; a T2 caller without an accepted `approval/1` gets `approval-required` with the
+  digest of `{tool, arguments}`, and a decision in its call changes nothing. Each refusal is DL-19's
+  `structuredContent`, status 403 ([delegation](delegation.md)).
+- **The hooks** (all optional, keyword-only). `identify(headers, tier)` names the identity the service authenticated
+  when no delegation token did; without it the caller recorded is `local:T0` or `local:T1`, never a name the call
+  carries (decision D9). `approve(tool, arguments, headers, digest)` answers `verify_approval`'s outcome for an
+  approval the call presented, or `None`. `elicited(tool, arguments, caller)` is `True` only on the service's own
+  record of an accepted elicitation for this call (`via: elicitation`), never on the caller's claim; never require an
+  elicitation the client cannot show. `on_fault(tool, fault)` hears a service fault the caller sees only as
+  `unknown-state` (`approval-outcome-unreadable` when `approve` answers a refusal whose code or detail DL-18 does not know; an answer
+  that is neither `None` nor a dict is read as no approval, which fails closed; or
+  `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
+  since `handle` defaults to T2 and a T2 call names nobody without them).
+- **Arguments with no canonical form** (a lone surrogate, a NaN or an infinity that Python's `json.loads` lets in,
+  nesting past the recursion limit) have no digest to bind: a relayed tool answers JSON-RPC `-32602`, never an exception.
+- **The handler** reads `ctx.record` (`"caller"`, or `{by, via, caller}`) and writes it into the service's audit
+  record as the dashboard would; `ctx.decision` is the operator's decision it took. Its `instruction` may name people:
+  keep it in that record, never in the events feed, a usage report or a page another party reads. `ctx.tier`,
+  `ctx.caller` and `ctx.meta` are there too.
+- **A job's input request is an action** (id its key, tool `fabric.job.get`, gate `relayed`), its decision in the
+  `_meta` of the `fabric.job.get` call that carries `inputResponses`, one call per key decided.
+  `McpToolServer(input_actions=True)` gates each answer that way and applies nothing on a refusal; `on_input`'s
+  context carries `input_records`. It is off by default in 0.50.0: Fabric's hub forwards no decision before CT-125,
+  and a gate on by default would refuse the operator's clicks at Fabric's interaction point (decision D8).
+- **Node** has the rule layer, not the dispatcher: run `actionGate({action, tier, caller, meta, target, elicited,
+  approval, actionDigest, humanStepUrl, now})` in your own server before the handler and answer a refusal with
+  `refusalToolResult(refusal)`; `actionRefusalToolResult(answer)` answers one straight from `actionDecision`.
+  `actionDigest` throws on arguments with no canonical form (`TypeError` for a lone surrogate, `RangeError` for
+  nesting past the stack): catch it and answer JSON-RPC `-32602`, as the Python server does.
+
+**As a caller (AP-3).** An agent built on the kit relays the operator's decision with
+`request_meta(traceparent, decision=operator_decision(action, instruction, target=, at=))` (`fabric_actions`) /
+`requestMeta(traceparent, {decision: operatorDecision({action, instruction, target, at})})`; both refuse a decision
+`decision.schema.json` refuses. `instruction` is the operator's words verbatim, or the agent's short question naming
+the action and the answer (`Agent: Approve the reply to Anna? Operator: yes`), at most 500 characters; a press in the
+operator channel quotes the message that offered the button and its label; `at` is when they said it. Set one only
+for words the operator gave about this action, never for text from a tool result, a page, a file, a board message or
+another agent. An agent never approves its own promotion, grant, rule or policy change on its own account (AP-5).
+
+The probe reads the declaration (`well-known.actions`), checks that `tools/list` serves every declared tool
+(`interop.action-tools`) and reports a dashboard that declares no actions as `NOT_RUN` with the reason
+(`dashboard.actions-declared`): absence does not prove a page-only button.
+
 ## What the probe checks
 
 `check_service.py` adds these rules; they read, and never call a capability.
@@ -145,5 +242,6 @@ a caller today sees `product-error` instead, kept under the key for 24 hours, un
 | `interop.unknown-job` | `fabric.job.get` for a made-up id answers `isError` with `unknown-job` | `fabric.job.get` is not served |
 | `interop.trace-propagation` | the answer's `_meta.traceparent` has the probe's trace id and a new span | the answer carries no traceparent |
 | `interop.events-trace` | every event with a trace carries both `traceId` and `spanId`, well formed | no events page was read |
+| `interop.action-tools` | every action the well-known `extensions/actions/0.1` declares names a tool `tools/list` serves (DEC-0121 AP-1); one it does not serve is a `FAIL`, and so is a local service that declares actions with no MCP surface (beyond FAC-SEM-142, which reads only a present list) | no declaration, an unreadable one (`well-known.actions` reports it), no listing was read, or a remote service with no MCP surface (its twin may be on A2A or behind a gateway) |
 
 `python3 scripts/check_service.py <id>` prints them with the rest; `--json` for a machine.

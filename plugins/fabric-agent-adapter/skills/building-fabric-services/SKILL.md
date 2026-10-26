@@ -14,10 +14,10 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.49.3"
+  version: "0.50.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "2f020a696453ae299b123517f14957f6a1354379"
+  extension-commit: "52c7d798b9f4eb784eb4e29e717038a8912c759d"
 ---
 
 # Building Fabric services
@@ -70,9 +70,9 @@ Answer before writing code, and record the answers in the project README:
 | Caller | Surface | Why |
 |---|---|---|
 | Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session; stdio-per-session once left twenty stray servers on this machine |
-| The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard`, `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
+| The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard` (opens only in Fabric Dashboards, below), `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
 | A remote agent | A2A `1.0` over HTTPS, or MCP behind an authenticated gateway | loopback reachability is not authorization |
-| The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header | the CSRF defence all four existing dashboards use |
+| The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header; every button on it also a tool on the MCP surface (Step 5) | the CSRF defence all four existing dashboards use |
 
 Read [the surfaces and auth reference](references/surfaces-and-auth.md) when wiring
 MCP registration into a client config, the login flow or the CSRF header.
@@ -248,6 +248,16 @@ and declare it with `extensions=fs.dashboard_extension()`. Read
 declaration and how to upgrade a dashboard built before the kit: an upgrade you may make yourself,
 which the plugin's session-start notice offers in a repository that owns the service.
 
+**Every button has a tool** (`fabric-actions/0.1`, contract DEC-0121 AP-1). Each action the page lets a
+person take is a tool on the MCP surface with the same effect, checks, audit record and an idempotency key,
+registered with `server.add_tool(tool, handler, action={id, title, tool, gate})` (`gate` is `none`, `relayed`
+or `human` with its `humanStep`) and declared with `build_well_known(actions=server.action_table())` under
+`extensions/actions/0.1`. A `relayed` action called by the operator's own agent with their decision in
+`_meta.decision` is the operator's act: never answer it "operator session required" or send them to the page.
+A service adopts the relayed gate once Fabric's hub forwards decisions (CT-125), as the contract says; until then its tools
+answer as today. Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
+refusals.
+
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
 agents, models, connectors, stores and channels, each with its state, from
 `connections_extension()` / `connectionsExtension()` in `fabric_connections`. Never a credential in it, never a call
@@ -283,10 +293,13 @@ python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,
-launchd pid equals answering pid, `dashboard.declared` (ED-9), and the `interop.*` rules:
+launchd pid equals answering pid, `dashboard.declared` (ED-9), `well-known.actions` (DEC-0121),
+`dashboard.actions-declared` (`NOT_RUN` when a dashboard declares no actions), `dashboard.opens-in-host` (no browser
+opener aimed at the service's pages in its checkout; `--repo PATH` names the checkout, and a service installed
+from a release folder needs it), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
-propagation, event trace pairs, and `board.responder` for a service that declares the project board) and exits 1 on
-any `FAIL`. A `NOT_RUN` is not a pass;
+propagation, event trace pairs, `interop.action-tools` (every declared action's tool is served), and
+`board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
 and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured).
@@ -328,7 +341,8 @@ first commit:
 - an `AGENTS.md` that opens with the template's *Read first* block and closes with *After work*,
   and a `CLAUDE.md` whose first line is `@AGENTS.md`.
 
-org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
+Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
+(below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
 choice, nothing about it is published or listed by the organization, and none of these files is
 required of it, though the verified MCP quick start is still how anyone learns to drive it.
@@ -418,8 +432,29 @@ the probe table verbatim with every `NOT_RUN` explained; the lock and kill-9 res
 with pids; and the one next command. Never call a service conformant while the probe
 reports a `FAIL`.
 
-## Dashboard handoff: also for consumers
+## Agent pages open only in Fabric Dashboards
 
-When handing a registered service dashboard to a person, or writing the generated agent's
-completion or notification instructions, read and apply [dashboard links](references/dashboard-links.md)
-and run its output gate before delivery, in any host. Headless agents need no dashboard.
+The operator's rule (2026-10-24) for every page of an agent or a local Fabric service, in any host: a link in an
+answer or a notification, `<tool> dashboard`, a completion message, a page the agent opens itself.
+
+1. Resolve the exact registered service key (`id.instance`) with the `fabric-dashboards` MCP (`list_services`);
+   never guess it from a project name or a port.
+2. Hand over the `open_link` its `link` tool returns for the service and the page's path, as the primary action.
+3. To open it, use the host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
+   `start <url>`, `webbrowser.open` or `shell.openExternal` aimed at the service's pages.
+4. A browser only on a confirmed `not_installed` host (`host_status`); an installed host that failed to open is
+   reported, never replaced by HTTP.
+5. Links carry no token or login code: the host signs in.
+
+Run `scripts/check_dashboard_link.py` (from this skill's own directory; it is not copied into the project) on an
+action before it is printed or opened, and have the project's checks run it for every completion and notification
+renderer. The generated `AGENTS.md` carries the rule as its dashboard
+rule block; [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case. The
+probe's `dashboard.opens-in-host` fails a tracked file that opens the dashboard with a browser opener. Headless agents
+need no dashboard.
+
+## An agent with a page and no service descriptor
+
+A local page no service descriptor names cannot open in Fabric Dashboards. Never open it in a browser instead:
+make the agent a `fabric-service/0.1` service (this skill: the descriptor, the well-known document, the login-code
+routes and a declared dashboard), and until that lands file a board row for it and say the page waits on it.

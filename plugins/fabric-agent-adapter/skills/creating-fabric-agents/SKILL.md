@@ -5,9 +5,9 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.49.3"
+  version: "0.50.0"
   contract-version: "0.1.0"
-  contract-commit: "2f020a696453ae299b123517f14957f6a1354379"
+  contract-commit: "52c7d798b9f4eb784eb4e29e717038a8912c759d"
 ---
 
 # Creating Fabric-compatible agents
@@ -136,7 +136,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
 The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
 does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
 
-Pin exactly contract `0.1.0` at commit `2f020a696453ae299b123517f14957f6a1354379` and
+Pin exactly contract `0.1.0` at commit `52c7d798b9f4eb784eb4e29e717038a8912c759d` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check
@@ -190,9 +190,9 @@ purpose. Then record one expectation the report must carry:
 If the agent has a human stop (a choice, an approval, a confirmation) or emits `notify: true`
 events, propose its operator channel (`fabric-operator-channel/0.1`, OC-11) to the operator once,
 now, as the shared reference linked at step 2 describes: the
-operator's four steps, the answer recorded and never asked again, and the bot, the token and
-enabling the channel left to the operator. An agent with neither stops nor notify events skips
-this step.
+operator's four steps, the answer recorded and never asked again, the bot and the token left to the
+person, and enabling the channel to the operator's decision (on the page or relayed, DEC-0121). An
+agent with neither stops nor notify events skips this step.
 
 ## Resilience and autonomy
 
@@ -212,8 +212,26 @@ table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`; remaining placeholders;
 operator channel answer (step 6); and the exact next command. Never summarize the outcome as
 "Fabric-compatible" unless every required admission gate passed against the real provider.
 
-## Dashboard handoff: also for consumers
+## Agent pages open only in Fabric Dashboards
 
-When handing a registered service dashboard to a person, or writing the generated agent's
-completion or notification instructions, read and apply [dashboard links](references/dashboard-links.md)
-and run its output gate before delivery, in any host. Headless agents need no dashboard.
+The operator's rule (2026-10-24) for every page of an agent or a local Fabric service, in any host: a
+link in an answer or a notification, `<tool> dashboard`, a completion message, a page the agent opens
+itself. Hand over the `open_link` the `fabric-dashboards` MCP's `link` tool returns for the exact
+registered service key (`list_services`, never guessed) and the page's path; open it only with the
+host's `open` and `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
+`webbrowser.open` or `shell.openExternal` aimed at the agent's pages. A browser only on a confirmed
+`not_installed` host; an installed host that failed to open is reported, never replaced by HTTP.
+Links carry no token or login code.
+
+The agent's `AGENTS.md` carries this as its dashboard rule block, and its checks run the adapter's link gate
+(`scripts/check_dashboard_link.py` from this skill's own directory; it is not copied into the project) on every
+completion and notification action before delivery:
+[dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case.
+Headless agents need no dashboard.
+
+## An agent with a page and no service descriptor
+
+A local page no service descriptor names cannot open in Fabric Dashboards. Never open it in a browser
+instead: make the agent a `fabric-service/0.1` service with `building-fabric-services` (the descriptor,
+the well-known document, the login-code routes and a declared dashboard), and until that lands file a
+board row for it and say the page waits on it.

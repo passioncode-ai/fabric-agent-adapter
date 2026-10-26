@@ -291,7 +291,9 @@ export function newestIntactBackup(dir) {
 
 /**
  * What restoring `doc` would do — it adds and never overwrites (DEC-0025). `current[table]` is `{columns, key,
- * required, existing}` (existing primary keys as arrays). The twin of fabric_service.restore_plan.
+ * required, existing}` (existing primary keys as arrays). The twin of fabric_service.restore_plan. A manual restore
+ * shows this plan first; applying it is the operator's decision, taken on the page or relayed by their agent with
+ * `_meta.decision` (DEC-0121), never the agent's own act.
  */
 export function restorePlan(doc, current) {
   const problems = settingsBackupProblems(doc);
