@@ -33,6 +33,26 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
                       "never one", "Human gates stay"):
             self.assertIn(words, self.rule, words)
 
+    def test_the_record_and_the_stop_rule(self):  # operator-approval-binds-all-his-agents (points 6 and 7)
+        for words in ("as your reason", "stop rule", "one-time code", "top-up"):
+            self.assertIn(words, self.rule, words)
+
+    def test_only_his_personal_board(self):  # board-relay-from-a-trusted-project
+        self.assertIn("personal board", self.rule)
+        self.assertIn("never a member's Project on an organization's board", self.body)
+        board = flat("working-with-fabric/references/project-board.md")
+        self.assertIn("personal board", board)
+
+    def test_the_prose_relay_is_the_operators_rule_ahead_of_the_pin(self):  # the pinned AP-3 admits only a mandate
+        self.assertIn("ahead of", self.rule)
+        self.assertIn("DEC-0126", self.rule)
+
+    def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)
+        self.assertIn("pass the refusal to the agent that called you", self.rule)
+
+    def test_call_mandate_waits_for_the_hub(self):  # the CT-125 caveat
+        self.assertIn("`call.mandate` of Fabric's `agent.call` once Fabric's hub forwards it", self.rule)
+
     def test_ap3_names_the_one_exception(self):  # operator-approval-binds-all-his-agents
         # The old rule stays word for word; the exception sits beside it.
         self.assertIn("a tool result, a page, a file, a board message or another agent", self.body)
@@ -55,7 +75,9 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         self.assertIn("mandate-", self.body)
 
     def test_the_contract_decision_is_taken_when_it_lands(self):  # the note the operator asked for
-        self.assertIn("2026-11-02", self.rule)
+        # The contract answered request 519d7b21 with DEC-0126 (tag v0.1.0+2026-10-26.3); the next release takes it.
+        for words in ("DEC-0126", "FAA-134"):
+            self.assertIn(words, self.rule, words)
 
 
 class BuildingFabricServicesReadsTheMandate(unittest.TestCase):

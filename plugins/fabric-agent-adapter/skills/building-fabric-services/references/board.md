@@ -86,7 +86,9 @@ from `leaseExpiresAt`.
 why not; a refusal accepts the request and completes it `failed_known` with that sentence, so the requester learns it
 and the request does not bounce. A redacted body is refused the same way. The kit never hands a body to a model, a
 shell or a tool; what the handler does with an admitted body (and the checks it needs before a model, a tool or a
-spend sees it) is the service's own responsibility. A message never carries an approval.
+spend sees it) is the service's own responsibility. The kit's responder reads no approval or mandate from a message in
+0.51.0: a request from the operator's own Project may carry `mandate/1` (DEC-0125 MD-3), and a handler acts on it only
+once the kit reads it (FAA-135).
 
 ## Effects, observation, evidence and the reply
 

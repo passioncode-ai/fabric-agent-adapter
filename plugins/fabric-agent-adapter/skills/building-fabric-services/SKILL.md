@@ -72,6 +72,7 @@ Answer before writing code, and record the answers in the project README:
 | Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session; stdio-per-session once left twenty stray servers on this machine |
 | The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard` (opens only in Fabric Dashboards, below), `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
 | A remote agent | A2A `1.0` over HTTPS, or MCP behind an authenticated gateway | loopback reachability is not authorization |
+| An A2A peer on this computer | `surfaces.a2a` names a public Agent Card, served without the token; its interface URLs are loopback (DEC-0122) | the card carries no credential, process member or required Fabric extension |
 | The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header; every button on it also a tool on the MCP surface (Step 5) | the CSRF defence all four existing dashboards use |
 
 Read [the surfaces and auth reference](references/surfaces-and-auth.md) when wiring
@@ -298,7 +299,9 @@ launchd pid equals answering pid, `dashboard.declared` (ED-9), `well-known.actio
 opener aimed at the service's pages in its checkout; `--repo PATH` names the checkout, and a service installed
 from a release folder needs it), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
-propagation, event trace pairs, `interop.action-tools` (every declared action's tool is served), and
+propagation, event trace pairs, `interop.action-tools` (every declared action's tool is served), `well-known.a2a` and
+`a2a.card` (DEC-0122: the card is fetched without the token and its interfaces are never called; the surfaces
+reference's *A2A for remote agents* section), and
 `board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
