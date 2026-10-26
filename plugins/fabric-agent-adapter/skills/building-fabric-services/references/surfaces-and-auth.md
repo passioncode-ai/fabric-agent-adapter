@@ -65,7 +65,8 @@ A service that answers A2A peers names its public Agent Card in the well-known d
   one of them.
 - The public card carries no secret and none of the well-known document's process members (`build`, `process`,
   `pid`, `status`, `summary`, `degraded`). An extension it declares for a Fabric fact (`uri` under
-  `https://fabric.passioncode.ai/`) carries `required: false`.
+  `https://fabric.passioncode.ai/`) carries `required: false`; the probe also accepts it absent, which A2A reads as
+  false (a protobuf-written card drops a false default), and flags `required: true` or a non-boolean.
 
 `agent_card_findings(card, origin=, remote=, descriptor_header=)` / `agentCardFindings(card, {origin, remote,
 descriptorHeader})` report each of these by `code` and place, never the value. The probe runs two rules:

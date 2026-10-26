@@ -112,7 +112,8 @@ function descriptorSchemes(root, header) {
   return found;
 }
 
-// D6: an extension under the contract's namespace carries required: false (A2A 1.0 section 4.4.4).
+// D6: an extension under the contract's namespace is not required (A2A 1.0 section 4.4.4): `required` false or absent,
+// which A2A reads as false (a protobuf-written card drops a false default); true or a non-boolean is a finding.
 function fabricExtensions(root) {
   const extensions = isObject(root.capabilities) ? root.capabilities.extensions : undefined;
   if (!Array.isArray(extensions)) return [];
@@ -120,8 +121,8 @@ function fabricExtensions(root) {
   extensions.forEach((extension, i) => {
     const uri = isObject(extension) ? extension.uri : undefined;
     if (typeof uri !== 'string' || asciiLower(uri.slice(0, FABRIC_EXTENSION_PREFIX.length)) !== FABRIC_EXTENSION_PREFIX) return;
-    if (extension.required !== false) {
-      found.push(card('fabric-extension-required', pointer('capabilities', 'extensions', i), `the Fabric extension at capabilities.extensions[${i}] does not carry required: false, so a peer that does not know it cannot call (DEC-0122 item 4)`));
+    if (Object.hasOwn(extension, 'required') && extension.required !== false) {
+      found.push(card('fabric-extension-required', pointer('capabilities', 'extensions', i), `the Fabric extension at capabilities.extensions[${i}] is required, so a peer that does not know it cannot call; it carries required: false (DEC-0122 item 4)`));
     }
   });
   return found;

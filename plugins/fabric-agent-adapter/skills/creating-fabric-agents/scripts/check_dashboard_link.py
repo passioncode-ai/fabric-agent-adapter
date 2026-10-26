@@ -89,7 +89,8 @@ def check(data):
     require(not re.search(r'[\\\x00-\x20\x7f]', native + http), 'unsafe_url')
     deep, plain = urlsplit(native), urlsplit(http)
     require(deep.scheme == 'fabric-dashboards' and not deep.username and not deep.password and not deep.port and not deep.fragment, 'invalid_deep_link')
-    query = parse_qs(deep.query, keep_blank_values=True, strict_parsing=True)
+    # An empty query is no fields: Python 3.9's strict parse_qs raises on '' where 3.11 and later answer {}.
+    query = parse_qs(deep.query, keep_blank_values=True, strict_parsing=True) if deep.query else {}
     # DEC-0123 PL-1: only the service form; the legacy open?service= link is refused (FAC-SEM-143, since 0.51.0).
     require(deep.netloc == 'service', 'not_service_link')
     require(deep.path in ('/' + service, '/' + service + '/') and set(query) <= {'path'}, 'wrong_service_or_parameter')

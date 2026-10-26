@@ -20,6 +20,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import secrets
@@ -703,14 +704,22 @@ class McpToolServer:
         the delegation's caller when authorize accepted a token, never a name the call carries."""
         if self.agent_id is None:
             return {}
-        spend, project = entry.get("spend"), entry.get("project")
-        spend = spend(arguments) if callable(spend) else spend
-        project = project(arguments) if callable(project) else project
+        spend, project = (self._read(entry.get(k), arguments) for k in ("spend", "project"))
         caller_agent = (verdict or {}).get("caller")
+        finite = isinstance(spend, (int, float)) and not isinstance(spend, bool) and math.isfinite(spend)
         return {"self_id": self.agent_id, "effect": entry.get("effect"),
                 "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
-                "spend_usd": spend if isinstance(spend, (int, float)) and not isinstance(spend, bool) else None,
+                # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
+                "spend_usd": spend if finite else None,
                 "project": project if isinstance(project, str) else None}
+
+    @staticmethod
+    def _read(value: Any, arguments: Dict[str, Any]) -> Any:
+        """A spend or project the service gave, or what its function answers; a function that raises answers None."""
+        try:
+            return value(arguments) if callable(value) else value
+        except Exception:  # noqa: BLE001 - the service's own code; the call is still answered
+            return None
 
     def _gate_inputs(self, arguments: Dict[str, Any], headers: Any, tier: str, meta: Dict[str, Any],
                      caller: Optional[str]) -> Dict[str, Any]:

@@ -146,7 +146,8 @@ def _descriptor_schemes(card: Dict[str, Any], header: str) -> List[Dict[str, str
 
 
 def _fabric_extensions(card: Dict[str, Any]) -> List[Dict[str, str]]:
-    """D6: an extension under the contract's namespace carries required: false (A2A 1.0 section 4.4.4)."""
+    """D6: an extension under the contract's namespace is not required (A2A 1.0 section 4.4.4): `required` false or
+    absent, which A2A reads as false (a protobuf-written card drops a false default); true or a non-boolean is a finding."""
     capabilities = card.get("capabilities")
     extensions = capabilities.get("extensions") if isinstance(capabilities, dict) else None
     if not isinstance(extensions, list):
@@ -156,10 +157,10 @@ def _fabric_extensions(card: Dict[str, Any]) -> List[Dict[str, str]]:
         uri = extension.get("uri") if isinstance(extension, dict) else None
         if not isinstance(uri, str) or _ascii_lower(uri[:len(FABRIC_EXTENSION_PREFIX)]) != FABRIC_EXTENSION_PREFIX:
             continue
-        if extension.get("required") is not False:
+        if "required" in extension and extension["required"] is not False:
             found.append(_card("fabric-extension-required", _pointer("capabilities", "extensions", i),
-                               "the Fabric extension at capabilities.extensions[%d] does not carry required: false, so a "
-                               "peer that does not know it cannot call (DEC-0122 item 4)" % i))
+                               "the Fabric extension at capabilities.extensions[%d] is required, so a peer that does not "
+                               "know it cannot call; it carries required: false (DEC-0122 item 4)" % i))
     return found
 
 

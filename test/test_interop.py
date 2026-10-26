@@ -796,6 +796,19 @@ class ActionGateMandateTests(unittest.TestCase):
         error = fd.refusal_error(self.gate(meta={"mandate": "yes"})["refusal"])["error"]
         self.assertEqual(error["data"], {"detail": "mandate-malformed"})
 
+    def test_a_spend_or_project_function_that_fails_never_raises_and_fails_closed(self):
+        # Seam reading of 0.51.0: the server's spend and project functions are the service's code; a raise or a
+        # non-finite estimate reads as no estimate, so a mandate with a ceiling refuses the spend.
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        for spend in (lambda a: 1 / 0, lambda a: float("nan"), lambda a: float("inf")):
+            server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
+            server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
+                            target="reply", effect="reply", spend=spend, project=lambda a: 1 / 0)
+            params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": tight}}
+            answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
+            error = answer["result"]["structuredContent"]["error"]
+            self.assertEqual((error["code"], error["data"]["detail"]), ("operator-decision-required", "outside-mandate: spend"))
+
     def test_a_decision_beside_a_mandate_decides(self):
         answer = self.gate(meta={"mandate": lead_mandate(), "decision": DECISION})
         self.assertEqual((answer["record"]["via"], answer["decision"]), ("relayed-instruction", DECISION))
