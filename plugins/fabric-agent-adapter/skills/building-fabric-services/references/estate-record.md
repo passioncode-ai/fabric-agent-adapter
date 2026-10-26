@@ -21,6 +21,7 @@ derived from its own digest. Python: [`scripts/fabric_estate.py`](../scripts/fab
 - Applying a revision
 - Trusting a delegation key
 - Contexts: one agent for you and for an organization
+- One instance per context: the helper
 - Machine profiles: full, member, view
 - The delta anchor
 - The estate ceremonies
@@ -132,6 +133,65 @@ of `[A-Za-z0-9][A-Za-z0-9_-]{0,127}`. Absent is `personal`; `null` is not absent
 Every rule is total on hostile JSON, as the contract's are: an `instancePath` names an item by its index as written (a
 non-object before it does not shift it), and a value whose own `toString` member is data is shown as its JSON. Both kits
 answer the contract's contexts fixtures and variants of them (`test/fixtures/contract/estate-vectors.json`).
+
+## One instance per context: the helper
+
+A service that runs for the person and for an organization runs once per context on a machine (contract
+`contexts.md`, *One instance per context on a machine*; FAA-125). `fabric_context` / `fabric-context.mjs` turns the
+context it is started for into that context's one instance. It is not in the facade: install it with
+`fabric_kit.py install <dir> --module fabric_context` (Node: `--lang node --module fabric-context`), so a service that
+does not run per context keeps the estate reader out of its closure.
+
+```python
+import fabric_context as fc
+info, lock = fc.hold_context_instance("example-agent", "org:acme-rehearsal", record=applied_revision,
+                                      machine_id="machine-a", agent_ref="urn:agent:example-agent")
+serve(data=info["dirs"]["data"], instance=info["instance"])        # org-acme-rehearsal; lock held until exit
+```
+
+```js
+import { holdContextInstance } from './fabric-context.mjs';
+const { dirs, instance, lock } = await holdContextInstance('example-agent', 'org:acme-rehearsal', { record, machineId, agentRef });
+```
+
+- **The instance name.** `personal` is `default` (`personal_instance` / `personalInstance`), so an existing install
+  keeps its descriptor `<id>.default.json`, its folders and its lock. `org:<orgId>` is `org-<orgId>` when the id is
+  lower-case words joined by single hyphens, at most 28 characters, and does not end in a hyphen and 10 hex digits
+  (`org:acme-rehearsal` is `org-acme-rehearsal`); any other id is `org-<slug>-<first 10 hex digits of sha256(orgId)>`
+  (`org:Acme` is `org-acme-37036cd8f9`). `context_instance_name` / `contextInstanceName` answer it alone.
+- **Its folders.** `instance_dirs(id, instance)` / `instanceDirs(id, instance, platform)`: `default` is
+  `service_dirs`; any other is a sibling named as its descriptor, `<id>.<instance>` (on macOS
+  `~/Library/Application Support/<id>.<instance>`, `~/Library/Logs/<id>.<instance>`, `~/Library/Caches/<id>.<instance>`),
+  never inside the personal tree. `launchd_uninstall(..., purge=True, service_id=..., instance=...)` /
+  `launchdUninstall(..., {purge, serviceId, instance})` purge only that instance's folders.
+- **What it checks, before anything is created.** `context_instance` / `contextInstance` is pure and answers
+  `{context, kind, org?, instance, key, dirs, descriptorPath, grant?}`, never the record. An organization's instance
+  needs the estate record revision this machine applied (verified with `verify_estate_record`; the helper verifies no
+  signature), the machine id and the agentRef, all passed by whoever installed the instance. It finds this machine's
+  placement of that agent in that context, as written (FAC-SEM-074), runs FAC-SEM-111 on it
+  (`placement_grant_findings` / `placementGrantFindings`), and refuses outside the grant's window (`startsAt` <= now <
+  `expiresAt`); `instance_share_grant` / `instanceShareGrant` answers the three alone. A personal instance needs no
+  record; given one, a personal placement that names a grant is refused.
+- **What it holds.** `hold_context_instance` / `holdContextInstance` then takes the instance lock on the instance's
+  data folder (`hold_single_instance`: a second copy for the same context exits 75, a supervised one waits first),
+  then the marker `<data>/fabric-context.json` (`{service, instance, context}`, 0600): absent, it is written; equal,
+  kept; another context or instance, or unreadable, releases the lock and refuses. The folder never changes context.
+
+A refusal is one sentence on stderr naming the code and the context, never a record or grant value, and exit 78
+(`EXIT_CONTEXT_REFUSED`, EX_CONFIG; 75 stays "already running"). `ContextRefused` carries the code:
+
+| Code | When |
+|---|---|
+| `context-invalid` | the context is neither `personal` nor `org:<orgId>` as written (`Personal`, `ORG:x`) |
+| `record-required` | an organization's context with no record, machine id or agentRef (fail closed) |
+| `placement-missing` | the record places no such agent on this machine in that context |
+| `grant-refused` | the placement names no share grant of the record for that context, or a revoked one (FAC-SEM-111); a personal placement names one |
+| `grant-window` | now is before the grant's `startsAt`, at or after its `expiresAt`, or an instant cannot be read |
+| `context-mismatch` | the data folder's `fabric-context.json` names another context or instance, or cannot be read |
+
+Under launchd's `KeepAlive` a refused instance is started again every 10 s until the node's next revision removes it;
+a revoked grant stops calls at once at the hub and the meter (DL-24), not here: the helper reads revisions only.
+Tests: `test/test_fabric_context.py`, `test/fabric-context.test.mjs` over `test/fixtures/kit-context-cases.json`.
 
 ## Machine profiles: full, member, view
 

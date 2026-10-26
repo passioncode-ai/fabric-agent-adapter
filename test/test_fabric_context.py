@@ -7,6 +7,7 @@ folder never changes context. Brief: docs/evidence/specs/2026-10-26-faa-128-125-
 D14 to D20). The cases are shared with test/fabric-context.test.mjs (test/fixtures/kit-context-cases.json)."""
 
 import contextlib
+import importlib
 import io
 import json
 import os
@@ -21,14 +22,9 @@ SKILL = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services"
 SCRIPTS = SKILL / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-import fabric_base  # noqa: E402
-import fabric_context as fc  # noqa: E402
-import fabric_descriptor  # noqa: E402
-import fabric_estate  # noqa: E402
-import fabric_lock  # noqa: E402
-import fabric_paths  # noqa: E402
-import fabric_share  # noqa: E402
-import fabric_time  # noqa: E402
+fabric_base, fc, fabric_descriptor, fabric_estate, fabric_lock, fabric_paths, fabric_share, fabric_time = (
+    importlib.import_module(name) for name in ("fabric_base", "fabric_context", "fabric_descriptor", "fabric_estate",
+                                               "fabric_lock", "fabric_paths", "fabric_share", "fabric_time"))
 
 CASES = json.loads((ROOT / "test/fixtures/kit-context-cases.json").read_text(encoding="utf-8"))
 SERVICE = CASES["service"]
@@ -273,6 +269,25 @@ class ShareAndEstate(unittest.TestCase):
         self.assertEqual(findings[0]["instancePath"], "/grant")
         self.assertEqual(fabric_estate.placement_grant_findings(RECORD, {"agentRef": A}), [])
         self.assertEqual(fabric_estate.placement_grant_findings(None, None), [], "answers, never raises")
+
+
+class Prose(unittest.TestCase):
+    """REQ-11: the scenario first, then the words that carry the rule."""
+
+    def test_the_scenario_exists(self):
+        scenarios = json.loads((ROOT / "test/evals/building-fabric-services/scenarios.json").read_text(encoding="utf-8"))
+        self.assertIn("organization-instance-needs-its-grant", {s["id"] for s in scenarios["scenarios"]})
+
+    def test_the_docs_name_the_helper(self):
+        flat = lambda rel: " ".join((SKILL / rel).read_text(encoding="utf-8").split())
+        recipe = flat("recipes/support-agent/README.md")
+        self.assertIn("hold_context_instance", recipe)
+        estate = flat("references/estate-record.md")
+        for words in ("hold_context_instance", "holdContextInstance", "fabric-context.json", "exit 78", "org-acme-rehearsal",
+                      "record-required", "placement-missing", "grant-refused", "grant-window", "context-mismatch",
+                      "context-invalid"):
+            self.assertIn(words, estate)
+        self.assertIn("| L3 | `fabric_context` |", (SKILL / "references/kit-modules.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
