@@ -98,6 +98,8 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
 
 
 class Probe:
+    remote = False  # a probe built without __init__ (the tests' Probe.__new__) reads as local
+
     def __init__(self, descriptor_path: Path, descriptor: Dict[str, Any], services_dir: Path, skip_login: bool,
                  ca_file: Optional[str] = None, connect: Optional[str] = None, board_kit: Optional[str] = None,
                  repo: Optional[str] = None):
