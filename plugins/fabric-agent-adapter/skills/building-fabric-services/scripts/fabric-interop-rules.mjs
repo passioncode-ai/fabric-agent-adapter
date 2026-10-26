@@ -261,6 +261,9 @@ export function jobStep({ mandate, tier, now, self, capability, key, effect, cal
  * credential; never a name the call carries), `spendUsd` (its own estimate) and `project`. A covered call answers
  * {ok: true, record: {by: 'operator', via: 'mandate', task, chain, caller}, decision: null, mandate}; without `self` the
  * mandate is not read and the call is answered as before it existed.
+ *
+ * mandateCapability: a job's kept step's capability the mandate is read under, not the action's tool (the kit's
+ * input; the service's own, never a caller's).
  */
 export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };

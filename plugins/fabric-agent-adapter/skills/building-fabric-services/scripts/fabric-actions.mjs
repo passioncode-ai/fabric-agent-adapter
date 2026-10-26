@@ -128,6 +128,9 @@ const refuse = (code) => ({ ok: false, code });
  * knowledge), `spendUsd` and `project`: covered, {by: 'operator', via: 'mandate', task, chain, source?, caller}. `{fault}`
  * (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing, self-missing) is the
  * service's own and is never sent to a caller.
+ *
+ * Kit input beside the contract's: mandateCapability, a job's kept step's capability, read by the mandate in place of
+ * the action's tool (the contract's actionDecision does not take it; the service's own input, never a caller's).
  */
 export function actionDecision(inputs) {
   const field = (key) => member(inputs, key);

@@ -286,7 +286,9 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
 - `action_gate(..., self_id=, effect=, caller_agent=, spend_usd=, project=)` / `actionGate({..., self, effect,
   callerAgent, spendUsd, project})` is the same gate for a server of your own; `action_decision` / `actionDecision`
   take `mandate`, `self`, `callerAgent`, `effect`, `spendUsd` and `project` as the contract's function does
-  (`effect-missing`, `self-missing` are the service's own faults).
+  (`effect-missing`, `self-missing` are the service's own faults), and the kit's own `mandateCapability` (a job's kept
+  step: the capability the mandate is read under), which the contract's function does not take; like `effect`, it is
+  the service's own input, never the caller's.
 - **A job's approval step (interop C3.3).** A job reads the mandate its start call carried at its own approval step:
   `ctx.approval_step(job_id, key, request, effect=, spend_usd=, project=, message=)` on the start call's context (a
   server with `agent_id`) answers the record when the mandate covers the step `{capability: the job's, action: key,
@@ -300,8 +302,9 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   cover. The answer's mandate is read under the job's own capability, as at the start (`action_gate(...,
   mandate_capability=)` / `actionGate({mandateCapability})`), so the start and the answer agree whatever the tool is
   named; a mandate can name only capability names, so one that names capabilities never covers a tool named otherwise.
-  Node has no tool server: a Node service reads the kept step with `store.load(jobId).private.steps` and gates the
-  answer with `actionGate({..., mandateCapability: <the job's tool>})`.
+  Node has no tool server: a Node service reads `store.load(jobId).private.steps` and `.private.capability` BEFORE
+  `store.answer` (which clears the steps), gates the answer with `actionGate({..., mandateCapability:
+  private.capability})`, then answers. Without a string capability the answer is read under `fabric.job.get`.
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,

@@ -139,7 +139,10 @@ Fabric 0.4.0 (REQ-38):
    will touch, since, last sign of life), open tasks nobody holds, agent-sync leases read-only. If it cannot be
    read, the answer says so: never tell the person "nobody is working here".
 2. `fabric_work_claim` with your task (a board id, a backlog row as `source: {repository, path, id}`, or a new
-   row's title with its evidence) and what you will touch (folders, files or patterns).
+   row's title with its evidence) and what you will touch (folders, files or patterns). Claim the person's request
+   as ONE task whose title is that request in one line: Fabric shows it as your goal. File each piece you split off
+   with `fabric_task_create` while that task is claimed, so Fabric links it as spawned (Fabric's announcement of
+   2026-10-26, board `c42071bc`).
 3. A related-work warning (same backlog row, a linked task, an overlapping folder) names the other agent, its
    task and the overlap: tell the person, then coordinate (ask Fabric to hand it over, or link the tasks) or
    continue knowing it; say which, out loud.
@@ -154,9 +157,11 @@ A Fabric older than 0.4.0 has no `fabric_work_*` tools: use `fabric_tasks_list` 
   `waiting_for_you` (each is given once, there or in `fabric_heartbeat`); then read your unread board answers with
   `com.list {unread: true}` and mark what you handled with `com.read_ack`. Never leave a task you hold still: move
   it, hand it over or let it go. Fabric sweeps abandoned work on the same cadence.
-- `fabric_stage_report`: where you are in the work, as a claim beside what Fabric observes.
+- `fabric_stage_report`: where you are in the work, as a claim beside what Fabric observes; give `step` and
+  `ofSteps` (step 2 of 3), which Fabric shows to the operator as your current step.
 - `fabric_task_note`: working notes on the task, append-only.
-- `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim.
+- `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim. Before
+  you wait on the person or a question, send it with `phase: "waiting"` and what you wait on.
 - `fabric_memory_search` before re-deriving what the project knows; `fabric_memory_remember` for a fact worth
   keeping, with where you learned it.
 - `fabric_question_ask` for a decision you are not entitled to make; `fabric_effect_request` before spending,

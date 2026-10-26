@@ -42,10 +42,11 @@
 - **DEC-0135, who a reply reaches** (narrowing). A reply reaches the sender of the message it answers; send
   `deliverTo: "thread"` for every participant, or a list, and on a board pinned before DEC-0135, which refuses the
   member, a new message to the thread instead. The kit's responder posts only fenced replies, which carry none.
-  Narrowed once Fabric adopts DEC-0135 (planned for its 0.3.15), for a reader it takes as pinned at or after
-  DEC-0135 (DR-5); Fabric to 0.3.14 keeps the old count for every reader: `com.list {unread: true}` and the unread count
-  cover only what was delivered to your Project, so a reply sent only to another Project no longer shows; a thread
-  `com.read_ack` with `upTo` marks only what your Project did not send.
+  The narrowing: once Fabric adopts DEC-0135 (planned for its 0.3.15; DR-5, for a reader it takes as pinned at or
+  after DEC-0135; Fabric to 0.3.14 keeps the old count for every reader), `com.list {unread: true}` and the unread
+  count cover only what was delivered to your Project, so a reply sent only to another Project no longer shows.
+  `project-board.md` now also says a thread `com.read_ack` with `upTo` marks what your Project did not send, as the
+  board always did.
 - **DEC-0130 and DEC-0137, the family and the agent network** (wording, no code change): `delegation.md` names the
   operator's family (T0 and T1) and the agent network, and `estate-record.md` says a tokenless call runs in the
   instance's context.
@@ -56,6 +57,10 @@
 
 ### Added
 
+- **Being seen correctly in Fabric** (FAA-151, board `c42071bc`): working-with-fabric Steps 4 and 5 claim the
+  person's request as one task titled with it in one line, file each split with `fabric_task_create` while it is
+  claimed, report the stage with `step` and `ofSteps`, and send a heartbeat with `phase: waiting` before a wait.
+  Scenario eval `seen-correctly-goal-and-step`.
 - **Fabric's rule `work.check-every-three-minutes`** (FAA-141, Fabric TO-2, ask `e2a7bec4`): working-with-fabric
   Step 5 and creating-fabric-agents' autonomy reference tell an agent to call `fabric_work_list` every three minutes
   and before any wait, act first on its `nudges` and `waiting_for_you`, read and mark its unread board answers, and

@@ -416,6 +416,17 @@
         "for the answer the two peers must see, sends deliverTo as a list naming their Projects (and the announcer's if it needs it), and deliverTo \"thread\" only when every participant needs the answer; never its own Project, and only on a reply",
         "if the board refuses the member with invalid_arguments (a board pinned before DEC-0135), sends the same content as a new com.submit message to the thread rather than dropping deliverTo"
       ]
+    },
+    {
+      "id": "seen-correctly-goal-and-step",
+      "trap": "the agent claimed a vague task title, split work into untracked pieces, reported a stage with no step count, and went quiet while waiting on the person, so Fabric showed no goal, no progress and a stalled agent",
+      "request": "The person asked: \"Move the billing service to the new database and keep the old one read-only for a week.\" You will split it into a migration, a backfill and a cut-over, and you will need the person's choice of maintenance window. How do you make your goal and progress visible in Fabric?",
+      "expected": [
+        "reads the project's board at the start and answers requests addressed to its Project",
+        "claims the person's request as ONE task whose title is that request in one line (fabric_work_claim), then files each piece it splits off (migration, backfill, cut-over) with fabric_task_create while that task is claimed, so Fabric links them as spawned",
+        "reports its stage with step and ofSteps (fabric_stage_report, e.g. step 2 of 3) as it moves",
+        "sends fabric_heartbeat with phase waiting, naming the question, before it waits on the person's choice of window"
+      ]
     }
   ]
 }
