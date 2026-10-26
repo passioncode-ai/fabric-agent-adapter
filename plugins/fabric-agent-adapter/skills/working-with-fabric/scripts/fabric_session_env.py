@@ -103,9 +103,9 @@ MAX_NUDGE_CHARS = 400
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
 
 
-def nudge_lines(value: Any) -> List[str]:
+def nudge_lines(value: Any, limit: Optional[int] = MAX_NUDGES) -> List[str]:
     """The `says` of a nudges list as clean lines: one line each (controls and line breaks become a space), cut to
-    MAX_NUDGE_CHARS, blanks and repeats dropped, at most MAX_NUDGES. Anything that is not such a list gives []."""
+    MAX_NUDGE_CHARS, blanks and repeats dropped, at most `limit` (None: all). Anything that is not such a list gives []."""
     lines: List[str] = []
     if not isinstance(value, list):
         return lines
@@ -116,7 +116,7 @@ def nudge_lines(value: Any) -> List[str]:
         line = " ".join(_CONTROL.sub(" ", says).split())[:MAX_NUDGE_CHARS].rstrip()
         if line and line not in lines:
             lines.append(line)
-        if len(lines) == MAX_NUDGES:
+        if limit is not None and len(lines) == limit:
             break
     return lines
 
@@ -570,7 +570,8 @@ def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[flo
 
 def take_nudges(directory: Path, name: str = NUDGES_FILE) -> List[str]:
     """The nudges the worker kept in `directory`, taken once: the file is renamed away first, so a merge the worker
-    makes meanwhile lands in a new file for the next take (a repeat at worst, never a loss). [] on any trouble."""
+    makes meanwhile lands in a new file for the next take: the worker's merge takes the same way, so one of the two holds
+    each line at a time. [] on any trouble."""
     path = directory / name
     taken = directory / (".%s.taken.%d" % (name, os.getpid()))
     try:

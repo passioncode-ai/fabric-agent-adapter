@@ -9,10 +9,8 @@
   moved. The Stop hook's worker keeps their text in the session's spool (`nudges.json`), and the UserPromptSubmit
   hook prints each one once on the next prompt, after the unread line, as Fabric writes it (each starts `Fabric:`; any other line gets the tag `Fabric reminder: `): one line each, at most five lines of at most
   400 characters. An empty or absent list prints nothing. A turn that `watch-mail` delivers has its nudges printed by
-  `watch-mail`, once. Not carried across `/clear`: nudges of turns spooled before it stay in the old id's folder, and
-  in a project that uses Fabric the new session's preamble sends the agent to `fabric_work_list`, where Fabric says
-  nudges also ride (carrying them
-  would make the new id's folder before the launched-session check of FAA-68). Claude Code only: the Codex and Kimi
+  `watch-mail`, once. Not carried across `/clear`: nudges of turns spooled before it stay in the old id's folder and are
+  lost, since Fabric gives each nudge once and the turn's answer took it (carrying them would make the new id's folder before the launched-session check of FAA-68). Claude Code only: the Codex and Kimi
   Code hooks run at session start and send no turns.
 
 ### Fixed

@@ -872,6 +872,32 @@ class TurnNudges(Active):
         self.turn()
         self.assertIn("nudges=3 dropped=3", self.log_text())
 
+    def test_one_answer_over_the_cap_logs_its_drop(self):
+        self.answer({"nudges": [{"kind": "k", "says": "n%d" % i} for i in range(fs.MAX_NUDGES + 2)]})
+        self.turn()
+        self.assertIn("nudges=%d dropped=2" % (fs.MAX_NUDGES + 2), self.log_text())
+
+    def test_a_failed_write_puts_the_pending_ones_back(self):
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True)
+        fs._write_private(directory / fs.NUDGES_FILE, json.dumps(["A"]))
+        mcp = sys.modules["fabric_session_mcp"]
+        real, calls = mcp._write_private, []
+
+        def flaky(path, text):
+            calls.append(text)
+            if len(calls) == 1:
+                raise PermissionError("denied")
+            real(path, text)
+        mcp._write_private = flaky
+        said = []
+        try:
+            mcp._keep_nudges(directory, [{"says": "B"}], said.append, SID)
+        finally:
+            mcp._write_private = real
+        self.assertEqual(fs.take_nudges(directory), ["A"], "the pending one is back; only this turn's B is lost")
+        self.assertIn("outcome=lost lost=1", said[0])
+
     def test_an_empty_absent_or_odd_list_prints_nothing(self):
         for value in ({"nudges": []}, {"recorded": True}, {"nudges": "go"}, {"nudges": [1, None, "x", {"kind": "a"},
                       {"kind": "a", "says": 7}, {"kind": "a", "says": "   "}]}, "not json", [1, 2]):
