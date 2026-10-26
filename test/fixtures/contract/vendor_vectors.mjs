@@ -4,7 +4,8 @@
 // (DEC-0057, supervisorMarker and lockWaitBudgetMs) and the fixtures/semantic/service-lock-*.json records (FAC-SEM-078,
 // lockOutcomeRules), fixtures/vectors/windows-token.json (DEC-0057, windowsTokenAclProblem, FAC-SEM-079), and
 // DEC-0061/0069: fixtures/vectors/service-peer.json (peerRefusal), fixtures/vectors/app-descriptor.json
-// (appDescriptorAction, appDescriptorStale), every service descriptor fixture and the FAC-SEM-085/086 semantic ones.
+// (appDescriptorAction, appDescriptorStale), every service descriptor fixture and the FAC-SEM-085/086 semantic ones;
+// DEC-0122: every service-well-known-a2a* fixture with its validity re-checked by the contract's validator.
 // Never written by hand.
 //
 //   node test/fixtures/contract/vendor_vectors.mjs --contract <a clean checkout of the contract at the pin>
@@ -292,3 +293,22 @@ write('comms-hold-vectors.json', { about: "DEC-0079 at the pin: the hold matrix'
   source: 'fixtures/vectors/comms-hold.json, src/comms-hold.ts',
   tools: holdModule.COMMS_TOOLS, scopes: Object.fromEntries(holdModule.HOLD_SCOPES), neverHeld: holdModule.NEVER_HELD, cases: holdVectors.cases });
 console.log(`${holdVectors.cases.length} hold cases`);
+
+// DEC-0122 (FAA-128, CT-145): every service-well-known-a2a* fixture as fixtures/catalogue.json lists it, its validity
+// re-checked by the contract's validator, with the instance path and keyword of each schema error the validator reports
+// (the wording is not part of a vector). The kits' surfaces.a2a check is held to these documents.
+const { createValidatorSync } = await src('validator.ts');
+const { SCHEMA_PREFIX } = await src('contract.ts');
+const validate = createValidatorSync().getSchema(`${SCHEMA_PREFIX}schemas/service-well-known.schema.json`);
+const a2aFixtures = catalogue.filter((e) => /(^|\/)service-well-known-a2a[^/]*\.json$/.test(e.path)).map((e) => {
+  const document = read(`fixtures/${e.path}`);
+  const ok = validate(document) === true;
+  if (ok !== e.valid) throw new Error(`${e.path} is not ${e.valid ? 'valid' : 'invalid'} as the catalogue says`);
+  const errors = ok ? [] : (validate.errors ?? []).map((x) => ({ instancePath: x.instancePath, keyword: x.keyword }));
+  if (!ok && !errors.some((x) => x.keyword === e.keyword)) throw new Error(`${e.path} does not fail on the catalogue's keyword ${e.keyword}`);
+  return { name: e.name, valid: e.valid, ...(e.keyword === undefined ? {} : { keyword: e.keyword }), errors, document };
+});
+if (a2aFixtures.length !== 3 || a2aFixtures.filter((f) => f.valid).length !== 1) throw new Error(`expected one positive and two negative a2a fixtures, found ${a2aFixtures.length}`);
+write('a2a-vectors.json', { about: "DEC-0122 at the pin: every service-well-known-a2a fixture as fixtures/catalogue.json lists it, its validity re-checked by the contract's validator against service-well-known.schema.json, with the instance path and keyword of each schema error. Written by vendor_vectors.mjs, never by hand.",
+  source: 'fixtures/catalogue.json, fixtures/*/service-well-known-a2a*.json, schemas/service-well-known.schema.json', fixtures: a2aFixtures });
+console.log(`${a2aFixtures.length} a2a well-known fixtures`);
