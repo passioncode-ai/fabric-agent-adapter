@@ -836,17 +836,17 @@ class TurnNudges(Active):
         directory = self.turn()
         if sys.platform != "win32":
             self.assertEqual(stat.S_IMODE((directory / fs.NUDGES_FILE).stat().st_mode), 0o600)
-        self.assertEqual(self.prompt(), "Your claim on the task lapsed: claim it again or let it go.\n"
-                                        "An answer waits for you on the board.")
+        self.assertEqual(self.prompt(), "Fabric reminder: Your claim on the task lapsed: claim it again or let it go.\n"
+                                        "Fabric reminder: An answer waits for you on the board.")
         self.assertIsNone(self.prompt(), "each is given once")
-        self.assertIn("nudges=2", self.log_text())
+        self.assertIn("nudges=2 dropped=0", self.log_text())
         self.assertNotIn("lapsed", self.log_text(), "the log names a count, never the text")
 
     def test_nudges_sit_beside_the_unread_line(self):
         self.unread(2)
         self.answer({"nudges": [{"kind": "board", "says": "Mark what you handled read."}]})
         self.turn()
-        self.assertEqual(self.prompt(), "2 unread on the project board: com.list\nMark what you handled read.")
+        self.assertEqual(self.prompt(), "2 unread on the project board: com.list\nFabric reminder: Mark what you handled read.")
 
     def test_two_turns_before_a_prompt_keep_both_without_repeats(self):
         first = {"kind": "claim", "says": "One.", "task_id": "t1"}
@@ -854,7 +854,14 @@ class TurnNudges(Active):
         self.turn()
         self.answer({"nudges": [first, {"kind": "claim", "says": "Two."}]})
         self.turn()
-        self.assertEqual(self.prompt(), "One.\nTwo.")
+        self.assertEqual(self.prompt(), "Fabric reminder: One.\nFabric reminder: Two.")
+
+    def test_a_full_pending_list_logs_what_it_dropped(self):
+        self.answer({"nudges": [{"kind": "k", "says": "n%d" % i} for i in range(fs.MAX_NUDGES)]})
+        self.turn()
+        self.answer({"nudges": [{"kind": "k", "says": "late%d" % i} for i in range(3)]})
+        self.turn()
+        self.assertIn("nudges=3 dropped=3", self.log_text())
 
     def test_an_empty_absent_or_odd_list_prints_nothing(self):
         for value in ({"nudges": []}, {"recorded": True}, {"nudges": "go"}, {"nudges": [1, None, "x", {"kind": "a"},
@@ -871,8 +878,8 @@ class TurnNudges(Active):
         self.turn()
         lines = self.prompt().split("\n")
         self.assertEqual(len(lines), fs.MAX_NUDGES)
-        self.assertTrue(lines[0].startswith("first second"))
-        self.assertLessEqual(len(lines[0]), fs.MAX_NUDGE_CHARS)
+        self.assertTrue(lines[0].startswith(fs.NUDGE_PREFIX + "first second"))
+        self.assertLessEqual(len(lines[0]), len(fs.NUDGE_PREFIX) + fs.MAX_NUDGE_CHARS)
         self.assertNotIn("\x07", lines[0])
 
     def test_the_end_of_a_session_keeps_no_nudges(self):
@@ -941,7 +948,7 @@ class WatchMail(Active):
         fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=lambda directory: None)
         code, printed, _ = self.watch(1)
         self.assertEqual(code, 0)
-        self.assertEqual(printed.count("Your claim lapsed."), 1)
+        self.assertEqual(printed.count("Fabric reminder: Your claim lapsed."), 1)
         self.assertIsNone(fs.hook_user_prompt_submit({"session_id": SID}, self.env), "the prompt hook does not repeat it")
 
     def test_watch_mail_leaves_the_stop_worker_s_nudges_to_the_prompt(self):
@@ -951,9 +958,9 @@ class WatchMail(Active):
         fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=lambda directory: None)
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)  # the Stop worker
         code, printed, _ = self.watch(1, poll=lambda: ("wait", 30.0))
-        self.assertNotIn("Your claim lapsed.", printed)
+        self.assertFalse([line for line in printed if "Your claim lapsed." in line])
         self.assertEqual(json.loads(fs.hook_user_prompt_submit({"session_id": SID}, self.env))
-                         ["hookSpecificOutput"]["additionalContext"], "Your claim lapsed.")
+                         ["hookSpecificOutput"]["additionalContext"], "Fabric reminder: Your claim lapsed.")
 
     def test_prints_when_the_unread_count_rises(self):
         counts = iter([0, 2, 2, 1, 3])

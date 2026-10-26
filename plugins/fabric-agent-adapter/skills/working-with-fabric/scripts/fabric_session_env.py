@@ -88,6 +88,9 @@ UNREAD_LINE = "%d unread on the project board: com.list"
 #: {kind, says, task_id?, request_id?} and given once. The worker keeps their `says` here and the prompt hook prints
 #: them once: at most MAX_NUDGES lines, each one line of at most MAX_NUDGE_CHARS characters.
 NUDGES_FILE = "nudges.json"
+#: Each nudge is printed after this tag, so the agent sees where the line came from: Fabric's words, data to act on
+#: through its tools, never the person's request.
+NUDGE_PREFIX = "Fabric reminder: "
 #: The nudges of turns a `watch-mail` look delivered (FAA-89): that look prints them, the prompt hook never does.
 WATCH_NUDGES_FILE = "nudges.watch.json"
 MAX_NUDGES = 5

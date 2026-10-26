@@ -139,8 +139,8 @@ this repository both obeys it and ships its service layer
   (the whole group is ended at the deadline; a refused or unreadable entry is logged by its code and dropped; an end
   whose release got no answer stays for the next worker), reads the board's unread
   count (`com.status`) after a turn, and exits. A session rejoins at most once a minute: a turn within 60 s of its
-  last successful rejoin stays in the spool for the next worker; the end of a session always starts one (FAA-53). UserPromptSubmit reads small files in that spool (the count, and the nudges a
-  turn's answer carried, FAA-142) and calls nothing. Every one is silent in a session Fabric launched; a launched session is remembered by a marker so the process walk
+  last successful rejoin stays in the spool for the next worker; the end of a session always starts one (FAA-53). UserPromptSubmit reads small files in that spool (the count) and takes the nudges a
+  turn's answer carried by renaming their file away (FAA-142); it calls nothing. Every one is silent in a session Fabric launched; a launched session is remembered by a marker so the process walk
   runs once, and a walk that cannot read the processes spools nothing (FAA-68). Measured 2026-10-11 under a load average of about 220,
   with the feature absent: medians 282 / 271 / 329 ms for start / stop / end, of which 65 ms is Python's own start
   ([raw](docs/reports/2026-10-11-working-with-fabric/raw/hook-timing.log)); the prompt hook is measured in

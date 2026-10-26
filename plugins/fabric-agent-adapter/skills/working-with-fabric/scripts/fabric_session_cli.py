@@ -31,6 +31,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     log,
     no_session_held,
     take_nudges,
+    NUDGE_PREFIX,
     project_uses_fabric,
     prune_stale_sessions,
     read_small,
@@ -155,7 +156,7 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id) or fabric_launched(env):
         return None
     directory = session_dir(session_id, env)
-    lines = [line for line in [_unread_line(directory)] if line] + take_nudges(directory)
+    lines = [line for line in [_unread_line(directory)] if line] + [NUDGE_PREFIX + line for line in take_nudges(directory)]
     if not lines:
         return None
     return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",

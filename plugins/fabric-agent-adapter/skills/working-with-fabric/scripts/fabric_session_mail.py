@@ -21,6 +21,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     fabric_launched,
     fabric_root,
     locate_hub,
+    NUDGE_PREFIX,
     WATCH_NUDGES_FILE,
     take_nudges,
     rejoin_wait,
@@ -136,7 +137,7 @@ def watch_mail(session_id: str, cwd: Path, env: Optional[Dict[str, str]] = None,
     while not stop():
         kind, value = poll()
         for line in take_nudges(session_dir(session_id, env), WATCH_NUDGES_FILE):  # FAA-142: its own look's turns
-            out(line)
+            out(NUDGE_PREFIX + line)
         if kind == "wait":
             delay = float(value)
         elif kind == "ok":

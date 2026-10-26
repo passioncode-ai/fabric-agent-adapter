@@ -33,6 +33,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     locate_hub,
     log,
     nudge_lines,
+    take_nudges,
     read_small,
 )
 
@@ -535,22 +536,19 @@ def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], sessi
                  name: str = NUDGES_FILE) -> None:
     """FAA-142: add a turn's nudges to the ones the prompt hook has not printed yet (NUDGES_FILE), without repeats and
     at most MAX_NUDGES. The log names how many, never what they say. A file that cannot be written loses this turn's
-    nudges: Fabric gives each once, and a lost one stays in its `fabric_work_list` answer."""
+    nudges: Fabric gives each once, and its nudges also ride on `fabric_work_list` (board ask e2a7bec4). The pending
+    file is taken by renaming it away, as a reader takes it, so a prompt in between prints nothing twice."""
     lines = nudge_lines(value)
     if not lines:
         return
-    path = directory / name
-    try:
-        kept = json.loads(read_small(path) or "null")
-    except ValueError:
-        kept = None
-    kept = nudge_lines([{"says": line} for line in kept] if isinstance(kept, list) else [])
+    kept = take_nudges(directory, name)
     merged = nudge_lines([{"says": line} for line in kept + lines])
+    dropped = len(kept) + len([line for line in lines if line not in kept]) - len(merged)
     try:
-        _write_private(path, json.dumps(merged))
-        note("session=%s event=turn nudges=%d" % (session_id[:8], len(lines)))
+        _write_private(directory / name, json.dumps(merged))
+        note("session=%s event=turn nudges=%d dropped=%d" % (session_id[:8], len(lines), dropped))
     except OSError as exc:
-        note("session=%s event=turn nudges=%d outcome=lost reason=%r" % (session_id[:8], len(lines), type(exc).__name__))
+        note("session=%s event=turn nudges=%d outcome=lost reason=%r" % (session_id[:8], len(merged), type(exc).__name__))
 
 
 def _drop_stale_ends(entries: List[Path], note: Callable[[str], None], session_id: str) -> List[Path]:
