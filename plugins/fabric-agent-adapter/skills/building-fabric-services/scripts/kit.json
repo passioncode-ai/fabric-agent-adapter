@@ -322,10 +322,12 @@
    "file": "fabric_interop.py",
    "layer": "L3",
    "imports": [
+    "fabric_actions",
     "fabric_base",
     "fabric_delegation",
     "fabric_interop_rules",
-    "fabric_service"
+    "fabric_service",
+    "fabric_time"
    ],
    "sha256": "f92fa111328fe3811438f733d8f0eb5295e6941c774123a78e26318bdcb35fc3"
   },

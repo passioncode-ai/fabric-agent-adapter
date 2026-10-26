@@ -24,11 +24,14 @@ from pathlib import Path
 import re
 import secrets
 import sys
+import time
 from typing import Any, Callable, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
+from fabric_actions import action_caller, readable_action  # noqa: E402 - DEC-0121
+from fabric_time import format_rfc3339  # noqa: E402 - the core's (FAA-65)
 
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     _days_from_civil,
@@ -77,6 +80,8 @@ from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     intent_idempotency_key,
     reads_null_usage,
     request_meta,
+    action_gate,
+    action_refusal_tool_result,
     usage_findings,
     usage_toward,
     _job_findings,
@@ -430,16 +435,26 @@ class JobStore:
 # --- a minimal MCP tool server (streamable HTTP, JSON responses) ------------------------
 
 class CallContext:
-    """What a tool handler gets: the child span it runs in, and a way to start a job."""
+    """What a tool handler gets: the child span it runs in, and a way to start a job.
+
+    DEC-0121: `tier` is the caller's (DL-25), `caller` the identity the service authenticated (decision D9), `meta`
+    the request's `_meta`. For a tool registered with an action, `record` is action_decision's recordAs: "caller"
+    (the caller's own act) or {by, via, caller}, the act to put in the service's audit record, and `decision` the
+    operator's decision it took (its `instruction` stays in that record, never in events or a page another party
+    reads), else None. `input_records` maps each answered input request to its record when input_actions is on."""
 
     def __init__(self, server: "McpToolServer", tool: str, arguments: Any, traceparent: str,
-                 delegation: Optional[Dict[str, Any]] = None):
+                 delegation: Optional[Dict[str, Any]] = None, *, tier: Optional[str] = None, caller: Optional[str] = None,
+                 meta: Optional[Dict[str, Any]] = None, record: Any = None, decision: Optional[Dict[str, Any]] = None,
+                 input_records: Optional[Dict[str, Any]] = None):
         self.server = server
         self.tool = tool
         self.arguments = arguments
         self.traceparent = traceparent
         # DEC-0039: the accepted delegation (principal, caller, chain, claims) when the server has a gate.
         self.delegation = delegation
+        self.tier, self.caller, self.meta = tier, caller, {} if meta is None else meta
+        self.record, self.decision, self.input_records = record, decision, input_records
 
     def start_job(self, poll_interval_ms: Optional[int] = None) -> Dict[str, Any]:
         if self.server.jobs is None:
@@ -547,11 +562,23 @@ class McpToolServer:
     def __init__(self, name: str, version: str, jobs: Optional[JobStore] = None,
                  on_job_started: Optional[Callable[[str, CallContext], None]] = None,
                  on_input: Optional[OnInput] = None,
-                 authorize: Optional[Callable[[str, Any], Dict[str, Any]]] = None):
+                 authorize: Optional[Callable[[str, Any], Dict[str, Any]]] = None, *,
+                 identify: Optional[Callable[[Any, str], Optional[str]]] = None,
+                 approve: Optional[Callable[[str, Dict[str, Any], Any, str], Optional[Dict[str, Any]]]] = None,
+                 elicited: Optional[Callable[[str, Dict[str, Any], Optional[str]], bool]] = None,
+                 input_actions: bool = False, clock: Callable[[], float] = time.time):
         # authorize(tool, headers, tier=) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
         # gated by the job's own capability, and answered only for the principal and caller that started it.
+        # DEC-0121: a tool added with an action runs action_gate after authorize and before its handler.
+        # identify(headers, tier) names the caller the service authenticated when no delegation did (D9; else
+        # local:T0 / local:T1); approve(tool, arguments, headers, digest) answers verify_approval's outcome for an
+        # approval the call presented, or None; elicited(tool, arguments, caller) is True only on the service's own
+        # record of an accepted elicitation. input_actions=True gates each answered input request as an action (D8).
         self._authorize = authorize
+        self._identify, self._approve, self._elicited = identify, approve, elicited
+        self.input_actions, self._clock = input_actions is True, clock
+        self.actions: Dict[str, Dict[str, Any]] = {}
         self.info = {"name": name, "version": version}
         self.jobs = jobs
         self.tools: List[Dict[str, Any]] = []
@@ -559,13 +586,85 @@ class McpToolServer:
         self._on_job_started = on_job_started
         self._on_input = on_input
 
-    def add_tool(self, tool: Dict[str, Any], handler: Handler) -> None:
+    def add_tool(self, tool: Dict[str, Any], handler: Handler, action: Optional[Dict[str, Any]] = None, *,
+                 target: Any = None, human_step_url: Optional[str] = None) -> None:
+        """Serve a tool. `action` (DEC-0121 AP-1) is the declared action this tool performs, {id, title, tool, gate,
+        humanStep?}, its `tool` this tool's name: the server runs action_gate before the handler. `target` names the
+        object a call acts on: an argument's name, or a function of the arguments; `human_step_url` is the link of a
+        `human` action's step (an https URL or a path on the service's origin, AP-4)."""
         if tool["name"] in self.handlers:
             raise InteropError("Tool %s is served twice." % tool["name"])
         if "outputSchema" in tool:
             require_object_root(tool["name"], tool["outputSchema"])
+        if action is not None:
+            if not readable_action(action) or action["tool"] != tool["name"]:
+                raise InteropError("Tool %s: its action is not a declared action of this tool (DEC-0121)." % tool["name"])
+            if action["id"] in {a["action"]["id"] for a in self.actions.values()}:
+                raise InteropError("Action %s is declared twice." % action["id"])
+            if action["gate"] == "human" and not (isinstance(human_step_url, str) and re.match(r"https://|/", human_step_url)):
+                raise InteropError("Tool %s: a human step needs its link, an https URL or a path (DEC-0121 AP-4)." % tool["name"])
+            if not (target is None or isinstance(target, str) or callable(target)):
+                raise InteropError("Tool %s: target is an argument's name or a function of the arguments." % tool["name"])
+            self.actions[tool["name"]] = {"action": dict(action), "target": target, "url": human_step_url}
         self.tools.append(tool)
         self.handlers[tool["name"]] = handler
+
+    def action_table(self) -> List[Dict[str, Any]]:
+        """The declared actions in the order they were added: build_well_known(actions=) writes them (DEC-0121 AP-1)."""
+        return [dict(entry["action"]) for entry in self.actions.values()]
+
+    def _caller(self, headers: Any, tier: str, verdict: Optional[Dict[str, Any]]) -> Optional[str]:
+        """D9: the delegation's caller when a gate accepted a token, else identify(headers, tier), else the local floor."""
+        authenticated = (verdict or {}).get("caller")
+        if not authenticated and self._identify is not None:
+            authenticated = self._identify(headers, tier)
+        return action_caller(tier, authenticated)
+
+    def _gate_action(self, action: Dict[str, Any], name: str, arguments: Dict[str, Any], target: Any, url: Any,
+                     headers: Any, tier: str, meta: Dict[str, Any], caller: Optional[str]) -> Dict[str, Any]:
+        """action_gate for one call: the approval the call presented, the digest of {tool, arguments}, the clock."""
+        digest, approval = None, None
+        if action["gate"] == "relayed":
+            import fabric_delegation as _fd  # noqa: E402 - only an action-gated server needs it
+            digest = _fd.action_digest({"tool": name, "arguments": arguments})
+            outcome = self._approve(name, arguments, headers, digest) if self._approve is not None else None
+            if isinstance(outcome, dict) and outcome.get("ok") is True:
+                approval = outcome
+            elif isinstance(outcome, dict) and outcome.get("code") not in (None, "approval-required"):
+                # DL-18: the presented approval's own refusal; an outcome that is not verify_approval's is the service's.
+                readable = outcome.get("code") in _fd.REFUSAL_CODES and isinstance(outcome.get("detail"), str) and outcome["detail"]
+                return {"ok": False, "refusal": outcome if readable else {"ok": False, "code": "unknown-state", "detail": "service-fault"}}
+        elicited = action["gate"] == "relayed" and self._elicited is not None and self._elicited(name, arguments, caller) is True
+        return action_gate(action, tier=tier, caller=caller, meta=meta, target=target, elicited=elicited, approval=approval,
+                           action_digest=digest, human_step_url=url, now=format_rfc3339(self._clock() * 1000))
+
+    def _gate_inputs(self, arguments: Dict[str, Any], headers: Any, tier: str, meta: Dict[str, Any],
+                     caller: Optional[str]) -> Dict[str, Any]:
+        """D8: each input request an answer would take is an action (id its key, tool fabric.job.get, gate relayed),
+        one decision per call; the first refusal refuses the call and nothing is applied."""
+        job_id = str(arguments.get("id", ""))
+        job = self.jobs.get(job_id)
+        asked = job.get("inputRequests", {}) if job["status"] == "input_required" else {}
+        records: Dict[str, Any] = {}
+        for key, value in arguments["inputResponses"].items():
+            if key not in asked or not isinstance(value, dict) or value.get("action") not in ("accept", "decline", "cancel"):
+                continue
+            action = {"id": key, "title": "Answer %s" % key, "tool": "fabric.job.get", "gate": "relayed"}
+            gated = self._gate_action(action, "fabric.job.get", {"id": job_id, "inputResponses": {key: value}}, None, None,
+                                      headers, tier, meta, caller)
+            if not gated["ok"]:
+                return gated
+            records[key] = gated["record"]
+        return {"ok": True, "records": records}
+
+    @staticmethod
+    def _target(target: Any, arguments: Dict[str, Any]) -> Optional[str]:
+        """The object a call acts on: the named argument, or what the service's function answers; a string or None."""
+        try:
+            value = target(arguments) if callable(target) else arguments.get(target) if isinstance(target, str) else None
+        except Exception:  # noqa: BLE001 - a function that cannot read this call names no object
+            return None
+        return value if isinstance(value, str) else None
 
     def job_started(self, job_id: str, ctx: CallContext) -> None:
         if self._on_job_started:
@@ -641,7 +740,18 @@ class McpToolServer:
                 if not verdict.get("ok"):
                     import fabric_delegation as _fd  # noqa: E402 - only a gated server needs it
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
-            return {"jsonrpc": "2.0", "id": rid, "result": self._job_call(name, arguments, span, verdict)}
+            caller, inputs = self._caller(headers, tier, verdict), None
+            responses = arguments.get("inputResponses")
+            if name == "fabric.job.get" and self.input_actions and isinstance(responses, dict) and responses:
+                try:
+                    inputs = self._gate_inputs(arguments, headers, tier, meta, caller)
+                except UnknownJob:
+                    return {"jsonrpc": "2.0", "id": rid, "result": unknown_job_result(str(arguments.get("id", "")), traceparent=span)}
+                if not inputs["ok"]:
+                    import fabric_delegation as _fd  # noqa: E402 - DL-19
+                    return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(inputs["refusal"], traceparent=span)}
+            context = {"tier": tier, "caller": caller, "meta": meta, "input_records": inputs["records"] if inputs else None}
+            return {"jsonrpc": "2.0", "id": rid, "result": self._job_call(name, arguments, span, verdict, context)}
         handler = self.handlers.get(name)
         if handler is None:
             return self._error(rid, -32602, "Unknown tool: %s." % name)
@@ -652,14 +762,23 @@ class McpToolServer:
                 import fabric_delegation as _fd  # noqa: E402 - only a gated server needs it
                 return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
             delegation = verdict
+        caller, gated, entry = self._caller(headers, tier, delegation), {"record": None, "decision": None}, self.actions.get(name)
+        if entry is not None:  # DEC-0121: after the authorize gate, before the handler
+            gated = self._gate_action(entry["action"], name, arguments, self._target(entry["target"], arguments), entry["url"],
+                                      headers, tier, meta, caller)
+            if not gated["ok"]:
+                import fabric_delegation as _fd  # noqa: E402 - DL-19
+                return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(gated["refusal"], traceparent=span)}
+        context = CallContext(self, name, arguments, span, delegation, tier=tier, caller=caller, meta=meta,
+                              record=gated["record"], decision=gated["decision"])
         try:
-            structured = handler(arguments, CallContext(self, name, arguments, span, delegation))
+            structured = handler(arguments, context)
         except InteropError as exc:
             return {"jsonrpc": "2.0", "id": rid, "result": tool_result({"error": {"code": "tool-error", "message": str(exc)}}, is_error=True, traceparent=span)}
         return {"jsonrpc": "2.0", "id": rid, "result": tool_result(structured, traceparent=span)}
 
     def _job_call(self, name: str, arguments: Dict[str, Any], span: str,
-                  delegation: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                  delegation: Optional[Dict[str, Any]] = None, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         job_id = str(arguments.get("id", ""))
         try:
             job_span = self.jobs.traceparent(job_id) or span
@@ -674,11 +793,14 @@ class McpToolServer:
                         state = self.jobs.get(job_id)
                 return tool_result({"job": state}, traceparent=job_span)
             responses = arguments.get("inputResponses")
+            context = context or {}
+            if responses and context.get("input_records") is not None:  # D8: only the keys the action gate took
+                responses = {key: responses[key] for key in context["input_records"]}
             if responses:
                 matched = self.jobs.answer(job_id, responses)
                 if matched and self._on_input:
                     private = self.jobs.private(job_id)
-                    self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span, delegation))
+                    self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span, delegation, **context))
             return tool_result({"job": self.jobs.get(job_id)}, traceparent=job_span)
         except UnknownJob:
             return unknown_job_result(job_id, traceparent=span)
