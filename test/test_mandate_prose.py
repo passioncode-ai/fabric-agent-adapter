@@ -61,7 +61,7 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
 class BuildingFabricServicesReadsTheMandate(unittest.TestCase):
     def test_the_interop_reference(self):  # service-reads-the-operators-mandate
         interop = flat("building-fabric-services/references/interop.md")
-        self.assertIn("## The operator's mandate", text("building-fabric-services/references/interop.md"))
+        self.assertTrue("\n## The operator's mandate" in text("building-fabric-services/references/interop.md"), "no section")
         for words in ("_meta.mandate", "agent_id=", "add_tool(tool, handler, action=, effect=", "self_id", "ctx.mandate",
                       "request_meta(traceparent, mandate=", "requestMeta(traceparent, {mandate})", "hand_on(", "handOn(",
                       "operator_mandate(", "outside-mandate:", "mandate-not-for-this-call", "never from its arguments",

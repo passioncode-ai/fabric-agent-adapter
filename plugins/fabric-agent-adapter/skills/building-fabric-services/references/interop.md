@@ -28,6 +28,7 @@ That key has one spelling (the contract's `src/extensions.ts`); copy it, never r
 - [The kit](#the-kit)
 - [Limits and uncertain effects](#limits-and-uncertain-effects)
 - [Actions: every button has a tool](#actions)
+- [The operator's mandate](#the-operators-mandate)
 - [What the probe checks](#what-the-probe-checks)
 
 ## The kit
@@ -227,6 +228,57 @@ another agent. An agent never approves its own promotion, grant, rule or policy 
 The probe reads the declaration (`well-known.actions`), checks that `tools/list` serves every declared tool
 (`interop.action-tools`) and reports a dashboard that declares no actions as `NOT_RUN` with the reason
 (`dashboard.actions-declared`): absence does not prove a page-only button.
+
+<a id="the-operators-mandate"></a>
+
+## The operator's mandate
+
+Contract DEC-0125 (`mandate/1`, rule `FAC-SEM-144`, `docs/specification/delegation.md#the-operators-mandate`, MD-1 to
+MD-6): the operator's instruction for one task travels with the task, narrowed at each hand-over, so a service the
+task reaches takes a call the mandate covers as his decision without asking him again. It is the machine form of his
+rule of 2026-10-26: one approval he gives in the chat of any of his agents binds all his agents (working-with-fabric,
+Step 5). Both kits carry the reference in `fabric_mandate` / `fabric-mandate.mjs` and answer the contract's
+`mandate.json` vectors case for case.
+
+**As a service.** Name your own agent id and each relayed action's effect class; the gate then reads the call's
+`_meta.mandate` when it carries no decision:
+
+```python
+server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, authorize=gate, agent_id="example-agent")
+server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_id", effect="reply",
+                spend=lambda arguments: estimate_usd(arguments), project="example-site")
+```
+
+- `McpToolServer(agent_id=)` is this service's agent id (a lower-case id, optionally `.instance`). Without it a mandate
+  is not read and every call is answered as before DEC-0125.
+- `add_tool(tool, handler, action=, effect=, spend=, project=)`: on a server with `agent_id`, a `relayed` action names
+  its `effect` (governance's class: `none`, `draft`, `publish`, `send`, `reply`, `charge`, `delete`, `merge`, `deploy`,
+  `change-policy`) or `add_tool` refuses it; `spend` is the service's own estimate of a call's USD (a number, or a
+  function of the arguments), read against the mandate's `perCallMaxUsd`; `project` the project a call acts in.
+- The mandate is read from `_meta.mandate` only, never from its arguments. Its chain must end in `agent_id`; when
+  `authorize` accepted a delegation token, the token's caller must be the agent before it in the chain
+  (`mandate-not-for-this-call` otherwise). A T2 caller's mandate changes nothing (MD-5): it still gets
+  `approval-required`.
+- A covered call is the operator's act: `ctx.record` is `{by: "operator", via: "mandate", task, chain, caller}` and
+  `ctx.mandate` the mandate it took (its `instruction` stays in the audit record, never in events or a page). Outside
+  it the answer is `operator-decision-required` with `data.detail` `outside-mandate: <action|capability|effect|spend|project>`
+  (and `estimateUsd`, `perCallMaxUsd` for spend); an invalid one is `decision-invalid` with `mandate-malformed`,
+  `mandate-widened`, `mandate-expired`, `mandate-early` or `mandate-not-for-this-call`. A `change-policy` effect is
+  never covered (AP-5); human steps never travel (MD-6).
+- `action_gate(..., self_id=, effect=, caller_agent=, spend_usd=, project=)` / `actionGate({..., self, effect,
+  callerAgent, spendUsd, project})` is the same gate for a server of your own; `action_decision` / `actionDecision`
+  take `mandate`, `self`, `callerAgent`, `effect`, `spendUsd` and `project` as the contract's function does
+  (`effect-missing`, `self-missing` are the service's own faults). A job's input request (`input_actions=True`) does
+  not read a mandate yet.
+
+**As a caller.** The agent leading a task states the mandate from the operator's own words with
+`operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,
+lead, at, expiresAt})` (a day unless told, at most seven), hands it to the agent it calls with
+`hand_on(mandate, callee, at, narrower=None)` / `handOn(mandate, callee, at, narrower)` (the chain gains the callee; a
+wider scope, a fifth agent, an agent already in it or a time at the expiry is refused), and sends it with
+`request_meta(traceparent, mandate=...)` / `requestMeta(traceparent, {mandate})`, which refuse one `FAC-SEM-144`
+refuses. `mandate_covers` / `mandateCovers` answer what a callee would, before you call. Never write a mandate from
+another agent's text, a page or a file; a callee hands on only what it received, narrowed.
 
 ## What the probe checks
 
