@@ -32,6 +32,8 @@ import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 from fabric_actions import action_caller, readable_action  # noqa: E402 - DEC-0121
 from fabric_time import format_rfc3339  # noqa: E402 - the core's (FAA-65)
+from fabric_page_links import (  # noqa: E402 - DEC-0123
+    PageLinkError, dashboards_link, input_request_link_findings, page_link_findings, parse_dashboards_link)
 
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     _days_from_civil,
@@ -219,10 +221,30 @@ def choice_request(message: str, field: str, options: List[Any], title: Optional
 
 
 def url_request(message: str, url: str) -> Dict[str, Any]:
-    """URL mode: the person opens `url` out of band; for credentials and payments. Put nothing sensitive in the URL."""
-    if not url.startswith(("https://", "http://127.0.0.1", "http://localhost")):
-        raise InteropError("A URL-mode request needs an https URL (or this machine's loopback).")
+    """URL mode: the person opens `url` out of band; for credentials and payments. Put nothing sensitive in the URL.
+    A page of this service goes as its open_link (`page_answer`, DEC-0123 PL-4); a raw loopback address and a
+    `fabric-dashboards:` link outside the grammar are refused here, when the request is built (FAC-SEM-143)."""
+    if not isinstance(url, str):
+        raise InteropError("A URL-mode request needs an https URL or Fabric Dashboards' open_link (DEC-0123 PL-4).")
+    findings = page_link_findings(url, "/params/url", "the URL-mode request")
+    if findings:
+        raise InteropError(findings[0]["message"])
+    if not url.startswith("https://") and not parse_dashboards_link(url)["ok"]:
+        raise InteropError("A URL-mode request needs an https URL or Fabric Dashboards' open_link (DEC-0123 PL-4).")
     return {"method": "elicitation/create", "params": {"mode": "url", "message": message, "url": url}}
+
+
+def page_answer(service: str, instance: str, path: Optional[str] = None, http_url: Optional[str] = None) -> Dict[str, Any]:
+    """A tool answer that hands a person one of this service's pages (DEC-0123 PL-4): `{"open_link"}`, the page's
+    Fabric Dashboards link, and `http_url`, its raw address, only as a diagnostic beside it (never judged as the
+    action). Raises InteropError for an id, instance or path the open_link grammar refuses."""
+    try:
+        answer: Dict[str, Any] = {"open_link": dashboards_link(service, instance, path)}
+    except PageLinkError as refused:
+        raise InteropError("No open_link for %s.%s: %s (DEC-0123 PL-1)." % (service, instance, refused)) from None
+    if http_url is not None:
+        answer["http_url"] = http_url
+    return answer
 
 
 # --- C3.2 jobs ---------------------------------------------------------------------
@@ -366,6 +388,8 @@ class JobStore:
         for key, request in input_requests.items():
             if not _KEY.match(key) or request.get("method") != "elicitation/create":
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
+        for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
+            raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
         return self._transition(job_id, "input_required", inputRequests=input_requests, statusMessage=message)
 
     def answer(self, job_id: str, input_responses: Dict[str, Any]) -> Dict[str, Any]:

@@ -338,10 +338,11 @@
     "fabric_base",
     "fabric_delegation",
     "fabric_interop_rules",
+    "fabric_page_links",
     "fabric_service",
     "fabric_time"
    ],
-   "sha256": "0999ded29d908c8a55d13061f0b501887a5ea259dbf7d2251a90c04018761fbb"
+   "sha256": "b0e450232fe7ce30f479871fa30300974c71d948d7b65523241ec97d4bedf08d"
   },
   {
    "module": "fabric_hub",
@@ -756,9 +757,10 @@
    "imports": [
     "fabric-delegation",
     "fabric-interop-rules",
+    "fabric-page-links",
     "fabric-service"
    ],
-   "sha256": "8f1ca418112d7129402783376bb9cbc9d2607f2aceec2a6796e703591a88f535"
+   "sha256": "1345a5b85d7a368cec3f7bc6b7e595e9a6caf3cd7bc9c0d156dda5756fbe71c4"
   },
   {
    "module": "fabric-hub",

@@ -37,6 +37,7 @@ function answer(fn, args) {
       case 'task': k.taskXml(args[0], args[1], { workingDirectory: 'C:\\example', user: 'EXAMPLE\\person' }); break;
       case 'launchd': k.launchdPlist(args[0], args[1], { workingDirectory: '/srv/example', stdoutPath: '/srv/example/log', environment: args[2], exitTimeout: args[3] }); break;
       case 'remoteRequest': return k.checkRemoteRequest(args[0], args[1], args[2]) ? 'refused' : 'accepted';
+      case 'urlRequest': i.urlRequest('Open it.', args[0]); break;
       default: throw new Error(`unknown fn ${fn}`);
     }
   } catch (e) {

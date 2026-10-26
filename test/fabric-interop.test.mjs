@@ -82,6 +82,38 @@ test('form mode never asks for a secret; a choice is a titled single-select', ()
   assert.throws(() => envelope({ usage: { inputTokens: -1, outputTokens: 0, wallMs: 0 } }), i.InteropError);
 });
 
+test('URL mode hands over an open_link, never a raw local address (DEC-0123 PL-4, FAC-SEM-143, D12)', () => {
+  const link = 'fabric-dashboards://service/example-agent.default?path=%2Fdashboard%2Fdrafts%2F7';
+  assert.equal(i.urlRequest('Approve the draft.', link).params.url, link);
+  assert.equal(i.urlRequest('Connect the account.', 'https://publish.example/connect').params.mode, 'url');
+  for (const url of ['http://127.0.0.1:4100/x', 'http://localhost:4100/dashboard', 'http://127.1/', 'https://127.0.0.1/',
+    'http://[::1]:4100/', 'http://0/', 'http://loc%61lhost/', 'fabric-dashboards://open?service=example-agent.default',
+    'fabric-dashboards://service/Bad', ' fabric-dashboards://service/example-agent.default?path=x', 'http://agents.example/',
+    'ftp://files.example/', '/dashboard', 7]) {
+    assert.throws(() => i.urlRequest('Open it.', url), i.InteropError, String(url));
+  }
+  assert.throws(() => i.urlRequest('Open it.', 'http://127.0.0.1:4100/x'), /open_link.*DEC-0123|DEC-0123.*open_link/);
+});
+
+test('pageAnswer is PL-4\'s shape', () => {
+  assert.deepEqual(i.pageAnswer('example-agent', 'default'), { open_link: 'fabric-dashboards://service/example-agent.default' });
+  assert.deepEqual(i.pageAnswer('example-agent', 'default', { path: '/jobs/7', httpUrl: 'http://127.0.0.1:4100/jobs/7' }),
+    { open_link: 'fabric-dashboards://service/example-agent.default?path=%2Fjobs%2F7', http_url: 'http://127.0.0.1:4100/jobs/7' });
+  for (const [service, instance, path] of [['Example', 'default'], ['example-agent', 'default', 'jobs'], ['example-agent', 'default', '/x?token=abc']]) {
+    assert.throws(() => i.pageAnswer(service, instance, { path }), i.InteropError);
+  }
+});
+
+test('a URL-mode request on a raw local address is refused at requestInput; the job stays working', () => {
+  const store = new i.JobStore(temp());
+  const id = store.create('example.draft', {}).job.id;
+  const raw = { method: 'elicitation/create', params: { mode: 'url', message: 'Approve.', url: 'http://127.0.0.1:4100/x' } };
+  assert.throws(() => store.requestInput(id, { approve: raw }), (error) => error instanceof i.InteropError && error.message.includes('/inputRequests/approve/params/url'));
+  assert.equal(store.get(id).status, 'working');
+  const link = i.urlRequest('Approve.', 'fabric-dashboards://service/example-agent.default?path=%2Fdrafts%2F7');
+  assert.equal(store.requestInput(id, { approve: link }).status, 'input_required');
+});
+
 // MCP 2026-07-28 standard headers: the Node twin agrees with fabric_interop.py.
 test('mcpHeaderProblem refuses a declared request without Mcp-Method/Mcp-Name and any mismatch; matching headers pass', () => {
   const call = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'sample.echo', arguments: {} } };

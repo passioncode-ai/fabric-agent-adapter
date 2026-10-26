@@ -147,6 +147,33 @@ class EnvelopeAndChoiceTests(unittest.TestCase):
             fi.form_request("Paste it.", {"value": {"type": "string", "title": "Your secret key"}})
         self.assertEqual(fi.url_request("Connect the account.", "https://publish.example/connect")["params"]["mode"], "url")
 
+    def test_url_mode_hands_over_an_open_link_never_a_raw_local_address(self):
+        """DEC-0123 PL-4, FAC-SEM-143 (D12 of the 0.51.0 brief): a URL-mode request on the service's own page carries
+        its open_link; a raw loopback address and a fabric-dashboards: link outside the grammar are refused when the
+        request is built."""
+        link = "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%2Fdrafts%2F7"
+        self.assertEqual(fi.url_request("Approve the draft.", link)["params"]["url"], link)
+        self.assertEqual(fi.url_request("Open it.", "fabric-dashboards://service/example-agent.default")["params"]["mode"], "url")
+        for url in ("http://127.0.0.1:4100/x", "http://localhost:4100/dashboard", "http://127.1/", "https://127.0.0.1/",
+                    "http://[::1]:4100/", "http://0/", "http://loc%61lhost/", "fabric-dashboards://open?service=example-agent.default",
+                    "fabric-dashboards://service/Bad", " fabric-dashboards://service/example-agent.default?path=x",
+                    "http://agents.example/", "ftp://files.example/", "/dashboard"):
+            with self.subTest(url), self.assertRaises(fi.InteropError):
+                fi.url_request("Open it.", url)
+        with self.assertRaises(fi.InteropError) as refused:
+            fi.url_request("Open it.", "http://127.0.0.1:4100/x")
+        self.assertIn("open_link", str(refused.exception))
+        self.assertIn("DEC-0123", str(refused.exception))
+
+    def test_page_answer_is_pl4s_shape(self):
+        self.assertEqual(fi.page_answer("example-agent", "default"), {"open_link": "fabric-dashboards://service/example-agent.default"})
+        self.assertEqual(fi.page_answer("example-agent", "default", "/jobs/7", http_url="http://127.0.0.1:4100/jobs/7"),
+                         {"open_link": "fabric-dashboards://service/example-agent.default?path=%2Fjobs%2F7",
+                          "http_url": "http://127.0.0.1:4100/jobs/7"})
+        for args in (("Example", "default"), ("example-agent", "default", "jobs"), ("example-agent", "default", "/x?token=abc")):
+            with self.subTest(args), self.assertRaises(fi.InteropError):
+                fi.page_answer(*args)
+
 
 class JobStoreTests(unittest.TestCase):
     def setUp(self):
@@ -201,6 +228,19 @@ class JobStoreTests(unittest.TestCase):
         with self.assertRaises(fi.InteropError):
             store.complete(other, envelope(traceparent=fi.child_traceparent(PARENT)))
         self.assertEqual(store.get(other)["status"], "working")
+
+    def test_a_url_mode_request_on_a_raw_local_address_is_refused_at_request_input(self):
+        """FAC-SEM-143 on kind interop-input-requests: a hand-built URL-mode request with a loopback url never reaches
+        the job; the job stays working."""
+        store = fi.JobStore(self.dir)
+        job_id = store.create("example.draft", {})["job"]["id"]
+        raw = {"method": "elicitation/create", "params": {"mode": "url", "message": "Approve.", "url": "http://127.0.0.1:4100/x"}}
+        with self.assertRaises(fi.InteropError) as refused:
+            store.request_input(job_id, {"approve": raw})
+        self.assertIn("/inputRequests/approve/params/url", str(refused.exception))
+        self.assertEqual(store.get(job_id)["status"], "working")
+        link = fi.url_request("Approve.", "fabric-dashboards://service/example-agent.default?path=%2Fdrafts%2F7")
+        self.assertEqual(store.request_input(job_id, {"approve": link})["status"], "input_required")
 
     def test_answers_for_unknown_keys_are_ignored(self):
         store = fi.JobStore(self.dir)

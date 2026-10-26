@@ -51,6 +51,8 @@ def answer(fn, args):
                              environment=args[2], exit_timeout=args[3])
         elif fn == "remoteRequest":
             return "refused" if fs.check_remote_request(args[0], args[1], args[2]) else "accepted"
+        elif fn == "urlRequest":
+            fi.url_request("Open it.", args[0])
         else:
             raise AssertionError("unknown fn %s" % fn)
     except fs.ServiceError:

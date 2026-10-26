@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ServiceError, atomicWrite, ensurePrivateDir, nowIso } from './fabric-service.mjs';
 import { jcs } from './fabric-delegation.mjs';
+import { PageLinkError, dashboardsLink, inputRequestLinkFindings, pageLinkFindings, parseDashboardsLink } from './fabric-page-links.mjs';
 
 export {
   PROTOCOL,
@@ -121,9 +122,34 @@ export function choiceRequest(message, field, options, title) {
   return formRequest(message, { [field]: schema }, [field]);
 }
 
+/**
+ * URL mode: the person opens `url` out of band; for credentials and payments. A page of this service goes as its
+ * open_link (`pageAnswer`, DEC-0123 PL-4); a raw loopback address and a `fabric-dashboards:` link outside the grammar
+ * are refused here, when the request is built (FAC-SEM-143).
+ */
 export function urlRequest(message, url) {
-  if (!/^(https:\/\/|http:\/\/127\.0\.0\.1|http:\/\/localhost)/.test(url)) throw new InteropError('A URL-mode request needs an https URL (or this machine\'s loopback).');
+  const needs = "A URL-mode request needs an https URL or Fabric Dashboards' open_link (DEC-0123 PL-4).";
+  if (typeof url !== 'string') throw new InteropError(needs);
+  const [finding] = pageLinkFindings(url, '/params/url', 'the URL-mode request');
+  if (finding) throw new InteropError(finding.message);
+  if (!url.startsWith('https://') && !parseDashboardsLink(url).ok) throw new InteropError(needs);
   return { method: 'elicitation/create', params: { mode: 'url', message, url } };
+}
+
+/**
+ * A tool answer that hands a person one of this service's pages (DEC-0123 PL-4): `{open_link}`, the page's Fabric
+ * Dashboards link, and `http_url`, its raw address, only as a diagnostic beside it (never judged as the action).
+ */
+export function pageAnswer(service, instance, { path, httpUrl } = {}) {
+  let answer;
+  try {
+    answer = { open_link: dashboardsLink(service, instance, path) };
+  } catch (error) {
+    if (!(error instanceof PageLinkError)) throw error;
+    throw new InteropError(`No open_link for ${service}.${instance}: ${error.message} (DEC-0123 PL-1).`);
+  }
+  if (httpUrl !== undefined && httpUrl !== null) answer.http_url = httpUrl;
+  return answer;
 }
 
 // --- C3.2 jobs: the same file format as fabric_interop.JobStore ------------------------------
@@ -236,6 +262,8 @@ export class JobStore {
     const entries = Object.entries(inputRequests ?? {});
     if (!entries.length) throw new InteropError('input_required needs at least one input request.');
     for (const [key, request] of entries) if (!KEY.test(key) || request?.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
+    const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
+    if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);
     return this.transition(jobId, 'input_required', { inputRequests, statusMessage });
   }
 
