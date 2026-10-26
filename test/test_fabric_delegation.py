@@ -463,6 +463,23 @@ class RefusalCodeSetTests(unittest.TestCase):
         self.assertEqual(twin.returncode, 0, twin.stderr)
         self.assertEqual(json.loads(twin.stdout), message)
 
+    def test_an_outside_mandate_refusal_names_the_md4_order(self):
+        # Second product reading of 0.51.0: under a mandate only the leading agent asks the operator (DEC-0125 MD-4).
+        message = dl.refusal_error({"ok": False, "code": "operator-decision-required", "detail": "outside-mandate: spend"})["error"]["message"]
+        for words in ("within your own mandate", "pass this refusal", "leading agent", "once"):
+            self.assertIn(words, message)
+        self.assertLessEqual(len(message), 500)
+        self.assertNotIn("\u2014", message)
+        plain = dl.refusal_error({"ok": False, "code": "operator-decision-required", "detail": "no-decision"})["error"]["message"]
+        self.assertEqual(plain, dl.REFUSAL_MESSAGES["operator-decision-required"])
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not on PATH")
+        script = ("import('" + (SCRIPTS / "fabric-delegation.mjs").as_uri() + "').then((d) => process.stdout.write(JSON.stringify("
+                  "d.refusalError({ok: false, code: 'operator-decision-required', detail: 'outside-mandate: spend'}).error.message)))")
+        twin = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=60)
+        self.assertEqual(json.loads(twin.stdout), message)
+
     def test_an_action_refusal_is_a_dl19_body(self):
         refused = 0
         for case in ACTIONS["cases"]:

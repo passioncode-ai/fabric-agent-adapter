@@ -510,7 +510,14 @@ export function refusalFromAction(answer) {
 }
 
 /** The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key. */
-export const refusalError = (refusal) => ({ error: { code: refusal.code, message: REFUSAL_MESSAGES[refusal.code] ?? 'Refused.', data: { detail: refusal.detail, ...(refusal.data ?? {}) } } });
+/** DEC-0125 MD-4: a refusal outside a mandate goes back up the chain; only the leading agent asks the operator. */
+export const OUTSIDE_MANDATE_MESSAGE = 'This action is outside the operator\'s mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, and calls again with a decision or a mandate that covers it (DEC-0125 MD-4).';
+
+export function refusalError(refusal) {
+  const outside = refusal.code === 'operator-decision-required' && String(refusal.detail).startsWith('outside-mandate:');
+  const message = outside ? OUTSIDE_MANDATE_MESSAGE : REFUSAL_MESSAGES[refusal.code] ?? 'Refused.';
+  return { error: { code: refusal.code, message, data: { detail: refusal.detail, ...(refusal.data ?? {}) } } };
+}
 
 /** An MCP tools/call result: the refusal as structuredContent with isError true (DL-19). */
 export function refusalToolResult(refusal, traceparent) {

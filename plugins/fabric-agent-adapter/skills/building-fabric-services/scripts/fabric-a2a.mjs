@@ -1,7 +1,7 @@
 // The reading side of an A2A Agent Card (DEC-0122): the well-known document's surfaces.a2a member, read as the contract's
 // schema reads it (a2aSurfaceFindings, a2aView; a2aSurface builds one), and what a public card must not carry
 // (agentCardFindings): no member about the running process, no secret, no securitySchemes entry naming the descriptor's
-// token header, every Fabric extension required: false, and interface URLs where the placement puts them. Serving a
+// token header, every Fabric extension required: false (or absent, which A2A reads as false), and interface URLs where the placement puts them. Serving a
 // card, the A2A binding and a client are not here (FAA-10).
 // Part of the Node service kit (layer L3); the twin of fabric_a2a.py. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';

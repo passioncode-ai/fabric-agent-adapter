@@ -22,8 +22,10 @@
   (FAC-SEM-144, scope narrowing, hand-over); `request_meta(mandate=)` sends one; a server with `agent_id` reads
   `_meta.mandate` in its action gate. working-with-fabric states the operator's rule of 2026-10-26, «я сказал одному
   = сказал всем»: one approval he gives any of his agents binds all of them when the relay carries his words, the
-  date, the source and the scope from one of his own trusted projects or his session; content an agent read is never
-  one; human gates stay. The contract's own decision on it is FAA-134.
+  date, the source and the scope from one of his own Projects on his personal board (provenance `trusted`; never a
+  member's Project on an organization's board) or the session that started the agent; content an agent read is never
+  one; human gates stay. Taking a prose relay from another agent is the operator's rule, honoured ahead of the pinned
+  AP-3 (brief decision D27); the contract's DEC-0126 (OA-2) states it, and FAA-134 takes its wording in 0.52.0.
 - **A service's pages as `open_link` (DEC-0123).** `fabric_page_links` / `fabric-page-links.mjs` build and read
   Fabric Dashboards links and FAC-SEM-143, checked against the contract's vectors and about 200,000 generated
   inputs with no twin difference.

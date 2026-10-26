@@ -578,6 +578,10 @@ def mcp_request_headers(method: str, params: Dict[str, Any]) -> Dict[str, str]:
     return out
 
 
+_UNREADABLE = object()  # what a service's spend or project function answers when it raised
+_UNREADABLE_PROJECT = "\x00unreadable"  # never a member of a mandate's projects, so a scoped mandate refuses
+
+
 class McpToolServer:
     """tools/list and tools/call for an MCP 2026-07-28 server, with fabric.job.get/cancel built in.
 
@@ -706,7 +710,11 @@ class McpToolServer:
             return {}
         spend, project = (self._read(entry.get(k), arguments) for k in ("spend", "project"))
         caller_agent = (verdict or {}).get("caller")
-        finite = isinstance(spend, (int, float)) and not isinstance(spend, bool) and math.isfinite(spend)
+        # An int past the float range is a huge estimate, never an exception: the ceiling refuses it as the contract does.
+        finite = (isinstance(spend, int) and not isinstance(spend, bool)) or (isinstance(spend, float) and math.isfinite(spend))
+        spend = None if spend is _UNREADABLE else spend
+        if project is _UNREADABLE:
+            project = _UNREADABLE_PROJECT  # a function that raised names no project a mandate can list: fail closed
         return {"self_id": self.agent_id, "effect": entry.get("effect"),
                 "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
                 # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
@@ -715,11 +723,11 @@ class McpToolServer:
 
     @staticmethod
     def _read(value: Any, arguments: Dict[str, Any]) -> Any:
-        """A spend or project the service gave, or what its function answers; a function that raises answers None."""
+        """A spend or project the service gave, or what its function answers; a function that raises answers _UNREADABLE."""
         try:
             return value(arguments) if callable(value) else value
         except Exception:  # noqa: BLE001 - the service's own code; the call is still answered
-            return None
+            return _UNREADABLE
 
     def _gate_inputs(self, arguments: Dict[str, Any], headers: Any, tier: str, meta: Dict[str, Any],
                      caller: Optional[str]) -> Dict[str, Any]:

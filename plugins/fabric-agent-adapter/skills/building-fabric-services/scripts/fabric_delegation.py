@@ -817,11 +817,17 @@ def refusal_from_action(answer: Any) -> Optional[Dict[str, Any]]:
     return _refuse(code, _ACTION_DETAILS[code], dict(data) if isinstance(data, dict) and data else None)
 
 
+#: DEC-0125 MD-4: a refusal outside a mandate goes back up the chain; only the leading agent asks the operator.
+OUTSIDE_MANDATE_MESSAGE = ("This action is outside the operator's mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, and calls again with a decision or a mandate that covers it (DEC-0125 MD-4).")
+
+
 def refusal_error(refusal: Dict[str, Any]) -> Dict[str, Any]:
     """The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key."""
     data = {"detail": refusal["detail"]}
     data.update(refusal.get("data") or {})
-    return {"error": {"code": refusal["code"], "message": REFUSAL_MESSAGES.get(refusal["code"], "Refused."), "data": data}}
+    outside = refusal["code"] == "operator-decision-required" and str(refusal["detail"]).startswith("outside-mandate:")
+    message = OUTSIDE_MANDATE_MESSAGE if outside else REFUSAL_MESSAGES.get(refusal["code"], "Refused.")
+    return {"error": {"code": refusal["code"], "message": message, "data": data}}
 
 
 def refusal_tool_result(refusal: Dict[str, Any], traceparent: Optional[str] = None) -> Dict[str, Any]:

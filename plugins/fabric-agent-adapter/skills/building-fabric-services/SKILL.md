@@ -72,7 +72,7 @@ Answer before writing code, and record the answers in the project README:
 | Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session; stdio-per-session once left twenty stray servers on this machine |
 | The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard` (opens only in Fabric Dashboards, below), `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
 | A remote agent | A2A `1.0` over HTTPS, or MCP behind an authenticated gateway | loopback reachability is not authorization |
-| An A2A peer on this computer | `surfaces.a2a` names a public Agent Card, served without the token; its interface URLs are loopback (DEC-0122) | the card carries no credential, process member or required Fabric extension |
+| An A2A peer on this computer | `surfaces.a2a` names a public Agent Card, served without the token; its interface URLs are loopback (DEC-0122); the kits read it, serving one is FAA-10 | the card carries no credential, process member or required Fabric extension |
 | The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header; every button on it also a tool on the MCP surface (Step 5) | the CSRF defence all four existing dashboards use |
 
 Read [the surfaces and auth reference](references/surfaces-and-auth.md) when wiring

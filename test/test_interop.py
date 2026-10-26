@@ -809,6 +809,24 @@ class ActionGateMandateTests(unittest.TestCase):
             error = answer["result"]["structuredContent"]["error"]
             self.assertEqual((error["code"], error["data"]["detail"]), ("operator-decision-required", "outside-mandate: spend"))
 
+    def test_a_huge_spend_and_a_raising_project_fail_closed(self):
+        # Second seam reading of 0.51.0: an int past the float range never raises; a project function that raises
+        # never reads as "no project", which a mandate limited to projects would cover.
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        cases = ((dict(spend=lambda a: 10 ** 400), tight, "outside-mandate: spend"), (dict(spend=10 ** 400), tight, "outside-mandate: spend"),
+                 (dict(spend=0.5, project=lambda a: 1 / 0), scoped, "outside-mandate: project"))
+        for options, mandate, detail in cases:
+            server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
+            server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
+                            target="reply", effect="reply", **options)
+            params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": mandate}}
+            answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
+            self.assertEqual(answer["result"]["structuredContent"]["error"]["data"]["detail"], detail, options)
+            plain = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": dict(params, _meta={"traceparent": PARENT})},
+                                  None, tier="T0")
+            self.assertEqual(plain["result"]["structuredContent"]["error"]["data"]["detail"], "no-decision", options)
+
     def test_a_decision_beside_a_mandate_decides(self):
         answer = self.gate(meta={"mandate": lead_mandate(), "decision": DECISION})
         self.assertEqual((answer["record"]["via"], answer["decision"]), ("relayed-instruction", DECISION))

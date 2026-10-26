@@ -251,6 +251,11 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
 
 - `McpToolServer(agent_id=)` is this service's agent id (a lower-case id, optionally `.instance`). Without it a mandate
   is not read and every call is answered as before DEC-0125.
+- A `spend` or `project` function that raises, or a spend that is not a finite number, fails closed: the call is
+  answered, and a mandate with a `perCallMaxUsd` ceiling or a `projects` list refuses it (`outside-mandate: spend` or
+  `outside-mandate: project`); an integer past the float range is read as a huge estimate. A refusal outside a mandate
+  tells the caller the MD-4 order: call again within its own mandate, else pass the refusal up; only the leading agent
+  asks the operator.
 - `add_tool(tool, handler, action=, effect=, spend=, project=)`: on a server with `agent_id`, a `relayed` action names
   its `effect` (governance's class: `none`, `draft`, `publish`, `send`, `reply`, `charge`, `delete`, `merge`, `deploy`,
   `change-policy`) or `add_tool` refuses it; `spend` is the service's own estimate of a call's USD (a number, or a
