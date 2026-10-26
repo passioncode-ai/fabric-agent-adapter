@@ -10,11 +10,15 @@ import { INSTANCE, ServiceError } from '../plugins/fabric-agent-adapter/skills/b
 import * as fc from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-context.mjs';
 import { descriptorPath } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 import { placementGrantFindings } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-estate.mjs';
-import { EXIT_ALREADY_RUNNING, InstanceLock } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+import { abstractNames, EXIT_ALREADY_RUNNING, InstanceLock } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
 import { instanceDirs, serviceDirs } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-paths.mjs';
 import { instanceShareGrant } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-share.mjs';
 import { parseRfc3339Ms } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-time.mjs';
 import { tempDir } from './temp-dir.mjs';
+
+// FAA-72: on Linux the lock needs a Node that binds an abstract socket name exactly (22 and later); Node 18 and 20
+// refuse to hold it (fabric-lock.mjs), and lock-old-node-refuses.test.mjs holds that refusal.
+const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 'exact' && `Node ${process.version} cannot hold the Linux lock`;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CASES = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/kit-context-cases.json'), 'utf8'));
@@ -124,7 +128,7 @@ test('the personal instance keeps the service folders; an organization gets sibl
   assert.throws(() => instanceDirs('Bad Id', 'default'), ServiceError);
 });
 
-test('the personal instance holds the service lock and marks its folder', async (t) => {
+test('the personal instance holds the service lock and marks its folder', { skip: noLinuxLock }, async (t) => {
   tempHome(t);
   const { held, code } = await hold('personal');
   assert.equal(code, undefined);
@@ -137,7 +141,7 @@ test('the personal instance holds the service lock and marks its folder', async 
   assert.equal(held.instance, 'default');
 });
 
-test('a second copy for the same context exits 75', async (t) => {
+test('a second copy for the same context exits 75', { skip: noLinuxLock }, async (t) => {
   tempHome(t);
   const first = await hold('personal');
   t.after(() => first.held.lock.release());
@@ -146,7 +150,7 @@ test('a second copy for the same context exits 75', async (t) => {
   assert.match(second.err, /already running/);
 });
 
-test('two contexts run side by side', async (t) => {
+test('two contexts run side by side', { skip: noLinuxLock }, async (t) => {
   tempHome(t);
   const personal = await hold('personal');
   t.after(() => personal.held.lock.release());
@@ -176,7 +180,7 @@ test('a refusal exits 78 with one sentence and creates nothing', async (t) => {
   assert.deepEqual(created(), ['home'], 'nothing created before a refusal');
 });
 
-test('a folder never changes context; the lock is released before the exit', async (t) => {
+test('a folder never changes context; the lock is released before the exit', { skip: noLinuxLock }, async (t) => {
   tempHome(t);
   const data = serviceDirs(SERVICE).data;
   fs.mkdirSync(data, { recursive: true });
@@ -191,7 +195,7 @@ test('a folder never changes context; the lock is released before the exit', asy
   assert.match(unreadable.err, /context-mismatch/);
 });
 
-test('an equal marker is kept', async (t) => {
+test('an equal marker is kept', { skip: noLinuxLock }, async (t) => {
   tempHome(t);
   const first = await hold('personal');
   const marker = path.join(path.dirname(first.held.lock.path), 'fabric-context.json');
