@@ -643,6 +643,71 @@
    }
   },
   {
+   "name": "relayed words with where the operator said them",
+   "input": {
+    "action": {
+     "id": "approve-reply",
+     "title": "Approve the reply",
+     "tool": "reviews.approve",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "decision": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "action": "approve-reply",
+     "instruction": "approve the reply to the review from Anna",
+     "at": "2026-10-24T09:30:00Z",
+     "source": {
+      "project": "example-analyst",
+      "session": "example-session-7"
+     }
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "caller": "agent:claude-code",
+     "source": {
+      "project": "example-analyst",
+      "session": "example-session-7"
+     }
+    }
+   }
+  },
+  {
+   "name": "a source naming neither the session nor the thread",
+   "input": {
+    "action": {
+     "id": "approve-reply",
+     "title": "Approve the reply",
+     "tool": "reviews.approve",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "decision": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "action": "approve-reply",
+     "instruction": "approve the reply to the review from Anna",
+     "at": "2026-10-24T09:30:00Z",
+     "source": {
+      "project": "example-analyst"
+     }
+    }
+   },
+   "expected": {
+    "ok": false,
+    "code": "decision-invalid"
+   }
+  },
+  {
    "name": "a decision 60 s ahead of the service's clock",
    "input": {
     "action": {
@@ -2030,6 +2095,190 @@
    ]
   },
   {
+   "name": "action-call-mandate-source-dropped",
+   "description": "A service that drops source from a mandate's record (FAC-SEM-142, DEC-0126 OA-6).",
+   "inputs": {
+    "action": {
+     "id": "approve-draft",
+     "title": "Approve the draft",
+     "tool": "page.update",
+     "gate": "relayed"
+    },
+    "tier": "T0",
+    "caller": "agent:claude-code",
+    "callerAgent": "example-developer",
+    "self": "example-researcher",
+    "now": "2026-10-26T12:00:00Z",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "research the eSIM market for the pricing page",
+     "instruction": "run the research on eSIM competitors' prices",
+     "at": "2026-10-26T10:00:00Z",
+     "expiresAt": "2026-10-27T10:00:00Z",
+     "scope": {
+      "capabilities": [
+       "research.run",
+       "research.ask",
+       "page.update"
+      ],
+      "effects": [
+       "charge",
+       "draft"
+      ],
+      "projects": [
+       "example-site"
+      ],
+      "actions": [
+       "approve-draft"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-26T10:01:00Z"
+      },
+      {
+       "agent": "example-researcher",
+       "at": "2026-10-26T10:05:00Z"
+      }
+     ],
+     "source": {
+      "project": "example-analyst",
+      "thread": "example-thread-3"
+     }
+    },
+    "effect": "draft",
+    "project": "example-site"
+   },
+   "answer": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "research the eSIM market for the pricing page",
+     "chain": [
+      "example-developer",
+      "example-researcher"
+     ],
+     "caller": "agent:claude-code"
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "research the eSIM market for the pricing page",
+     "chain": [
+      "example-developer",
+      "example-researcher"
+     ],
+     "source": {
+      "project": "example-analyst",
+      "thread": "example-thread-3"
+     },
+     "caller": "agent:claude-code"
+    }
+   },
+   "findings": [
+    "/answer"
+   ]
+  },
+  {
+   "name": "action-call-mandate-source",
+   "description": "A relayed action under a mandate that carries where the operator said the words: the record keeps source (DEC-0126 OA-6).",
+   "inputs": {
+    "action": {
+     "id": "approve-draft",
+     "title": "Approve the draft",
+     "tool": "page.update",
+     "gate": "relayed"
+    },
+    "tier": "T0",
+    "caller": "agent:claude-code",
+    "callerAgent": "example-developer",
+    "self": "example-researcher",
+    "now": "2026-10-26T12:00:00Z",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "research the eSIM market for the pricing page",
+     "instruction": "run the research on eSIM competitors' prices",
+     "at": "2026-10-26T10:00:00Z",
+     "expiresAt": "2026-10-27T10:00:00Z",
+     "scope": {
+      "capabilities": [
+       "research.run",
+       "research.ask",
+       "page.update"
+      ],
+      "effects": [
+       "charge",
+       "draft"
+      ],
+      "projects": [
+       "example-site"
+      ],
+      "actions": [
+       "approve-draft"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-26T10:01:00Z"
+      },
+      {
+       "agent": "example-researcher",
+       "at": "2026-10-26T10:05:00Z"
+      }
+     ],
+     "source": {
+      "project": "example-analyst",
+      "thread": "example-thread-3"
+     }
+    },
+    "effect": "draft",
+    "project": "example-site"
+   },
+   "answer": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "research the eSIM market for the pricing page",
+     "chain": [
+      "example-developer",
+      "example-researcher"
+     ],
+     "caller": "agent:claude-code",
+     "source": {
+      "project": "example-analyst",
+      "thread": "example-thread-3"
+     }
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "research the eSIM market for the pricing page",
+     "chain": [
+      "example-developer",
+      "example-researcher"
+     ],
+     "source": {
+      "project": "example-analyst",
+      "thread": "example-thread-3"
+     },
+     "caller": "agent:claude-code"
+    }
+   },
+   "findings": []
+  },
+  {
    "name": "action-call-mandate",
    "description": "A relayed action whose call carries the operator's mandate and no decision, from the agent before the callee in the chain: the operator's act, recorded via the mandate (DEC-0125 MD-3).",
    "inputs": {
@@ -2258,6 +2507,106 @@
      "by": "operator",
      "via": "relayed-instruction",
      "caller": "agent:claude-code"
+    }
+   },
+   "findings": []
+  },
+  {
+   "name": "action-call-relayed-source-dropped",
+   "description": "A service that drops where the operator said the words from its record (FAC-SEM-142, DEC-0126 OA-6).",
+   "inputs": {
+    "action": {
+     "id": "approve-reply",
+     "title": "Approve the reply",
+     "tool": "reviews.approve",
+     "gate": "relayed"
+    },
+    "tier": "T1",
+    "caller": "agent:example-config-agent",
+    "decision": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "action": "approve-reply",
+     "instruction": "approve the reply to the review from Anna",
+     "at": "2026-10-24T09:30:00Z",
+     "source": {
+      "project": "example-analyst",
+      "session": "example-session-7"
+     }
+    },
+    "now": "2026-10-24T09:30:30Z"
+   },
+   "answer": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "caller": "agent:example-config-agent"
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "caller": "agent:example-config-agent",
+     "source": {
+      "project": "example-analyst",
+      "session": "example-session-7"
+     }
+    }
+   },
+   "findings": [
+    "/answer"
+   ]
+  },
+  {
+   "name": "action-call-relayed-source",
+   "description": "A decision relayed from another of the operator's agents carries where they said it; the service records source with the caller it authenticated, never one source names (DEC-0126 OA-6, OA-7).",
+   "inputs": {
+    "action": {
+     "id": "approve-reply",
+     "title": "Approve the reply",
+     "tool": "reviews.approve",
+     "gate": "relayed"
+    },
+    "tier": "T1",
+    "caller": "agent:example-config-agent",
+    "decision": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "action": "approve-reply",
+     "instruction": "approve the reply to the review from Anna",
+     "at": "2026-10-24T09:30:00Z",
+     "source": {
+      "project": "example-analyst",
+      "session": "example-session-7"
+     }
+    },
+    "now": "2026-10-24T09:30:30Z"
+   },
+   "answer": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "caller": "agent:example-config-agent",
+     "source": {
+      "project": "example-analyst",
+      "session": "example-session-7"
+     }
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "caller": "agent:example-config-agent",
+     "source": {
+      "project": "example-analyst",
+      "session": "example-session-7"
+     }
     }
    },
    "findings": []

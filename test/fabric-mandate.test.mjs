@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 import {
   MANDATE_INVALID, MANDATE_LIFETIME_SECONDS, OUTSIDE_MANDATE, effectClosure, effectiveScope, handOn, mandateCovers, mandateProblem, mandateRules,
-  mandateShape, operatorMandate, scopeWithin,
+  mandateShape, operatorMandate, scopeWithin, sourceShape, withoutSource, OPERATOR_SOURCE_PROTOCOL,
 } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-mandate.mjs';
 import { actionDecision } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-actions.mjs';
 import { ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
@@ -23,16 +23,31 @@ const SCOPE = { capabilities: ['research.run'], effects: ['charge', 'draft'], pr
 const STRICT_TIME_APART = new Set(['at with an offset without a colon', 'at with a space for T']);
 
 test('every contract case', () => {
-  assert.equal(V.cases.length, 37);
+  assert.equal(V.cases.length, 40);
   for (const c of V.cases) assert.deepEqual(mandateCovers(c.input), c.expected, c.name);
 });
 
 test('every catalogue fixture', () => {
-  assert.equal(V.fixtures.length, 3);
+  assert.equal(V.fixtures.length, 5);
   for (const f of V.fixtures) {
     assert.equal(mandateShape(f.document), f.valid, f.name);
     assert.equal(mandateProblem(f.document) ?? null, f.problem, f.name);
     assert.deepEqual(mandateRules('mandate', f.document), f.findings, f.name);
+  }
+});
+
+test('every contract hand-over (DEC-0136): {mandate} or {refused: <problem>}', () => {
+  assert.equal(V.handOn.length, 30);
+  for (const c of V.handOn) {
+    const { mandate, callee, at, narrower } = c.input;
+    let answer;
+    try {
+      answer = { mandate: handOn(mandate, callee, at, narrower) };
+    } catch (error) {
+      assert.ok(error instanceof ServiceError, c.name);
+      answer = { refused: error.message.split(': ').at(-1) };
+    }
+    assert.deepEqual(answer, c.expected, c.name);
   }
 });
 
@@ -57,9 +72,8 @@ test('every kit document', () => {
 });
 
 test('every scope pair and the scope in force', () => {
-  // Answered by the contract at the pin; DEC-0136 MD-2a (brief D28) narrows the pairs that add a naming list.
-  const md2a = { 'a capability list under no list': false };
-  for (const c of EXTRA.scopes) assert.equal(scopeWithin(c.child, c.parent), Object.hasOwn(md2a, c.name) ? md2a[c.name] : c.within, c.name);
+  // Answered by the contract at the pin, which applies DEC-0136 MD-2a itself: no pair is overridden by name.
+  for (const c of EXTRA.scopes) assert.equal(scopeWithin(c.child, c.parent), c.within, c.name);
   assert.ok(EXTRA.effective.length > 50);
   for (const c of EXTRA.effective) assert.deepEqual(effectiveScope(c.mandate), c.scope, c.name);
 });
@@ -114,6 +128,28 @@ test('a lead hands on narrowed and the callee takes it', () => {
   const handed = handOn(mandate, 'example-researcher', '2026-10-26T10:05:00Z', { capabilities: ['research.run'], effects: ['charge'], projects: ['example-site'], perCallMaxUsd: 20 });
   const answer = mandateCovers({ mandate: handed, tier: 'T0', now: '2026-10-26T12:00:00Z', self: 'example-researcher', callerAgent: 'example-developer', call: { capability: 'research.run', effect: 'charge', spendUsd: 21 } });
   assert.deepEqual(answer.data, { detail: 'outside-mandate: spend', estimateUsd: 21, perCallMaxUsd: 20 });
+});
+
+test('DEC-0126: a relayed mandate names where the operator spoke', () => {
+  const source = { project: 'example-site', thread: 'thr_0001' };
+  const mandate = operatorMandate({ task: 't', instruction: 'run the research', scope: SCOPE, lead: 'example-developer', at: '2026-10-26T10:00:00Z', source });
+  assert.deepEqual(mandate.source, source);
+  const handed = handOn(mandate, 'example-researcher', '2026-10-26T10:05:00Z');
+  assert.deepEqual(handed.source, source);
+  const answer = mandateCovers({ mandate: handed, tier: 'T1', now: '2026-10-26T12:00:00Z', self: 'example-researcher', call: { capability: 'research.run', effect: 'draft' } });
+  assert.deepEqual(answer.recordAs.source, source);
+  answer.recordAs.source.project = 'changed'; // the record is a copy
+  assert.equal(handed.source.project, 'example-site');
+  for (const bad of [{ project: 'example-site' }, { session: 's1' }, { project: 'x', session: 's', extra: 'y' }, { project: '-x', session: 's' },
+    { project: 'x'.repeat(129), session: 's' }, { project: 'x', thread: '' }, { project: 'x', session: 7 }, [], 'example-site']) {
+    assert.equal(sourceShape(bad), false, JSON.stringify(bad));
+    assert.throws(() => operatorMandate({ task: 't', instruction: 'do it', scope: SCOPE, lead: 'example-developer', at: '2026-10-26T10:00:00Z', source: bad }), ServiceError);
+  }
+  assert.equal(sourceShape({ project: 'example-site', session: 's1', thread: 't1' }), true);
+  const { source: _s, ...rest } = handed;
+  assert.deepEqual(withoutSource(handed), rest);
+  assert.ok(Object.hasOwn(handed, 'source')); // withoutSource copies
+  assert.equal(OPERATOR_SOURCE_PROTOCOL, 'operator-source/1');
 });
 
 test('effectClosure is defined once', () => {

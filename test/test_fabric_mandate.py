@@ -32,18 +32,31 @@ def js(value):
 
 class Vectors(unittest.TestCase):
     def test_every_contract_case(self):
-        self.assertEqual(len(V["cases"]), 37)
+        self.assertEqual(len(V["cases"]), 40)
         for case in V["cases"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fm.mandate_covers(case["input"])), js(case["expected"]))
 
     def test_every_catalogue_fixture(self):
-        self.assertEqual(len(V["fixtures"]), 3)
+        self.assertEqual(len(V["fixtures"]), 5)
         for fixture in V["fixtures"]:
             with self.subTest(fixture["name"]):
                 self.assertIs(fm.mandate_shape(fixture["document"]), fixture["valid"])
                 self.assertEqual(fm.mandate_problem(fixture["document"]), fixture["problem"])
                 self.assertEqual(fm.mandate_rules("mandate", fixture["document"]), fixture["findings"])
+
+    def test_every_contract_hand_over(self):
+        """DEC-0136: the contract's handOn group, {mandate} or {refused: <problem>}; the kit raises ServiceError where the
+        reference throws, its message ending in the problem."""
+        self.assertEqual(len(V["handOn"]), 30)
+        for case in V["handOn"]:
+            with self.subTest(case["name"]):
+                given = case["input"]
+                try:
+                    answer = {"mandate": fm.hand_on(given["mandate"], given["callee"], given["at"], given.get("narrower"))}
+                except ServiceError as refused:
+                    answer = {"refused": str(refused).rsplit(": ", 1)[-1]}
+                self.assertEqual(js(answer), js(case["expected"]))
 
     def test_the_lifetime_and_the_codes(self):
         self.assertEqual(fm.MANDATE_LIFETIME_SECONDS, V["lifetimeSeconds"])
@@ -67,11 +80,10 @@ class KitInputs(unittest.TestCase):
                 self.assertEqual(fm.mandate_rules("mandate", case["mandate"]), case["findings"])
 
     def test_every_scope_pair(self):
-        # Answered by the contract at the pin; DEC-0136 MD-2a (brief D28) narrows the pairs that add a naming list.
-        md2a = {"a capability list under no list": False}
+        # Answered by the contract at the pin, which applies DEC-0136 MD-2a itself: no pair is overridden by name.
         for case in EXTRA["scopes"]:
             with self.subTest(case["name"]):
-                self.assertIs(fm.scope_within(case["child"], case["parent"]), md2a.get(case["name"], case["within"]))
+                self.assertIs(fm.scope_within(case["child"], case["parent"]), case["within"])
 
     def test_the_scope_in_force(self):
         self.assertGreater(len(EXTRA["effective"]), 50)
@@ -155,6 +167,31 @@ class Building(unittest.TestCase):
                                     "call": {"capability": "research.run", "effect": "charge", "spendUsd": 21}})
         self.assertEqual(answer["data"], {"detail": "outside-mandate: spend", "estimateUsd": 21, "perCallMaxUsd": 20})
 
+    def test_a_relayed_mandate_names_where_the_operator_spoke(self):
+        """DEC-0126: `source` is read as the schema reads it, kept on a hand-over and returned in recordAs (OA-6)."""
+        source = {"project": "example-site", "thread": "thr_0001"}
+        mandate = fm.operator_mandate("t", "run the research", SCOPE, "example-developer", at="2026-10-26T10:00:00Z",
+                                      source=source)
+        self.assertEqual(mandate["source"], source)
+        handed = fm.hand_on(mandate, "example-researcher", "2026-10-26T10:05:00Z")
+        self.assertEqual(handed["source"], source)
+        answer = fm.mandate_covers({"mandate": handed, "tier": "T1", "now": "2026-10-26T12:00:00Z", "self": "example-researcher",
+                                    "call": {"capability": "research.run", "effect": "draft"}})
+        self.assertEqual(answer["recordAs"]["source"], source)
+        answer["recordAs"]["source"]["project"] = "changed"  # the record is a copy
+        self.assertEqual(handed["source"]["project"], "example-site")
+        for bad in ({"project": "example-site"}, {"session": "s1"}, {"project": "x", "session": "s", "extra": "y"},
+                    {"project": "-x", "session": "s"}, {"project": "x" * 129, "session": "s"}, {"project": "x", "thread": ""},
+                    {"project": "x", "session": 7}, [], "example-site"):
+            with self.subTest(source=bad):
+                self.assertFalse(fm.source_shape(bad))
+                with self.assertRaises(ServiceError):
+                    fm.operator_mandate("t", "do it", SCOPE, "example-developer", at="2026-10-26T10:00:00Z", source=bad)
+        self.assertTrue(fm.source_shape({"project": "example-site", "session": "s1", "thread": "t1"}))
+        self.assertEqual(fm.without_source(handed), {k: v for k, v in handed.items() if k != "source"})
+        self.assertIn("source", handed)  # without_source copies
+        self.assertEqual(fm.OPERATOR_SOURCE_PROTOCOL, "operator-source/1")
+
     def test_effect_closure_is_defined_once(self):
         self.assertEqual(fm.effect_closure(["charge"]), {"charge", "none", "draft"})
         self.assertEqual(fm.effect_closure(["none"]), {"none"})
@@ -167,7 +204,7 @@ if __name__ == "__main__":
 
 
 class NamingListsMd2a(unittest.TestCase):
-    """DEC-0136 MD-2a (adopted ahead of the pin, brief D28): a hand-over never adds a naming list the scope in force
+    """DEC-0136 MD-2a: a hand-over never adds a naming list the scope in force
     leaves out, which would let a callee cover a relayed action the operator never named."""
 
     def test_scope_within(self):
