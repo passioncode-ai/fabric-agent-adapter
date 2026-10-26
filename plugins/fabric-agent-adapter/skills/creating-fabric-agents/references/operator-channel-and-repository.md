@@ -26,9 +26,12 @@ bare `/command` in a group is not addressed), and a channel nobody receives on i
 
 Record the answer (`accepted`, `declined` or `later`) in the agent's state and in its conformance
 report, and do not ask again; an agent that serves `surfaces.operatorChannel` also shows it as
-`proposal` in its status document. Creating the bot, storing the token and enabling the channel
-are the operator's action: never create the bot, ask for or store the token's value, or enable the
-channel yourself. The default pin carries DEC-0034 and DEC-0035: a served status document is
+`proposal` in its status document. Creating the bot and putting its token into the secret store
+stay the person's (a `secret` step, contract DEC-0121 AP-4): never create the bot, or ask for or
+store the token's value. Enabling the channel, and removing a webhook found on its token, are the
+operator's decision, taken by them on the agent's page or relayed to its agent in their own words
+with `_meta.decision` (OC-1, OC-2, DEC-0121 AP-2); never enable it on your own account. The default
+pin carries DEC-0034 and DEC-0035: a served status document is
 checked against the pinned `schemas/operator-channel-status.schema.json`; the channel's runtime
 rules have no probe rule here yet, so report them `NOT_RUN`. An agent with neither stops nor notify
 events skips this.

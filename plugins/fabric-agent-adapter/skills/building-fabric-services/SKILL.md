@@ -70,9 +70,9 @@ Answer before writing code, and record the answers in the project README:
 | Caller | Surface | Why |
 |---|---|---|
 | Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session; stdio-per-session once left twenty stray servers on this machine |
-| The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard`, `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
+| The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard` (opens only in Fabric Dashboards, below), `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
 | A remote agent | A2A `1.0` over HTTPS, or MCP behind an authenticated gateway | loopback reachability is not authorization |
-| The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header | the CSRF defence all four existing dashboards use |
+| The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header; every button on it also a tool on the MCP surface (Step 5) | the CSRF defence all four existing dashboards use |
 
 Read [the surfaces and auth reference](references/surfaces-and-auth.md) when wiring
 MCP registration into a client config, the login flow or the CSRF header.
@@ -247,6 +247,14 @@ and declare it with `extensions=fs.dashboard_extension()`. Read
 [the dashboard kit reference](references/dashboard-kit.md) for the markup, the themes, the
 declaration and how to upgrade a dashboard built before the kit: an upgrade you may make yourself,
 which the plugin's session-start notice offers in a repository that owns the service.
+
+**Every button has a tool** (`fabric-actions/0.1`, contract DEC-0121 AP-1). Each action the page lets a
+person take is a tool on the MCP surface with the same effect, checks, audit record and an idempotency key,
+registered with `server.add_tool(tool, handler, action={id, title, tool, gate})` (`gate` is `none`, `relayed`
+or `human` with its `humanStep`) and declared with `build_well_known(actions=server.action_table())` under
+`extensions/actions/0.1`. A `relayed` action called by the operator's own agent with their decision in
+`_meta.decision` is the operator's act: never answer it "operator session required" or send them to the page.
+Read the interop reference's *Actions* section for the gate, its hooks and its refusals.
 
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
 agents, models, connectors, stores and channels, each with its state, from

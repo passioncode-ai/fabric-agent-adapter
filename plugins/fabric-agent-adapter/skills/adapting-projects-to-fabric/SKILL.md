@@ -218,9 +218,9 @@ not a connected provider.
 If the agent has a human stop (a choice, an approval, a confirmation) or emits `notify: true`
 events, propose its operator channel (`fabric-operator-channel/0.1`, OC-11) to the operator once,
 now, as [the operator channel and the repository standard](references/operator-channel-and-repository.md)
-describes: the operator's four steps, the answer recorded and never asked again, and the bot, the
-token and enabling the channel left to the operator. An agent with neither stops nor notify events
-skips this step.
+describes: the operator's four steps, the answer recorded and never asked again, the bot and the
+token left to the person, and enabling the channel to the operator's decision (on the page or
+relayed, DEC-0121). An agent with neither stops nor notify events skips this step.
 
 ## The repository around the provider
 
