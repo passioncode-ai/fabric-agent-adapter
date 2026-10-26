@@ -566,7 +566,8 @@ class McpToolServer:
                  identify: Optional[Callable[[Any, str], Optional[str]]] = None,
                  approve: Optional[Callable[[str, Dict[str, Any], Any, str], Optional[Dict[str, Any]]]] = None,
                  elicited: Optional[Callable[[str, Dict[str, Any], Optional[str]], bool]] = None,
-                 input_actions: bool = False, clock: Callable[[], float] = time.time):
+                 input_actions: bool = False, clock: Callable[[], float] = time.time,
+                 on_fault: Optional[Callable[[str, str], None]] = None):
         # authorize(tool, headers, tier=) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
         # gated by the job's own capability, and answered only for the principal and caller that started it.
@@ -575,9 +576,11 @@ class McpToolServer:
         # local:T0 / local:T1); approve(tool, arguments, headers, digest) answers verify_approval's outcome for an
         # approval the call presented, or None; elicited(tool, arguments, caller) is True only on the service's own
         # record of an accepted elicitation. input_actions=True gates each answered input request as an action (D8).
+        # on_fault(tool, fault) hears a service fault the caller only sees as unknown-state (e.g. caller-missing: an
+        # action-gated server needs a tier, identify or authorize that names who calls).
         self._authorize = authorize
         self._identify, self._approve, self._elicited = identify, approve, elicited
-        self.input_actions, self._clock = input_actions is True, clock
+        self.input_actions, self._clock, self._on_fault = input_actions is True, clock, on_fault
         self.actions: Dict[str, Dict[str, Any]] = {}
         self.info = {"name": name, "version": version}
         self.jobs = jobs
@@ -626,7 +629,10 @@ class McpToolServer:
         digest, approval = None, None
         if action["gate"] == "relayed":
             import fabric_delegation as _fd  # noqa: E402 - only an action-gated server needs it
-            digest = _fd.action_digest({"tool": name, "arguments": arguments})
+            try:
+                digest = _fd.action_digest({"tool": name, "arguments": arguments})
+            except TypeError:  # a lone surrogate or a non-finite number: no canonical form, so no digest to bind
+                return {"ok": False, "invalid": "Invalid params: the arguments have no canonical form."}
             outcome = self._approve(name, arguments, headers, digest) if self._approve is not None else None
             if isinstance(outcome, dict) and outcome.get("ok") is True:
                 approval = outcome
@@ -656,6 +662,14 @@ class McpToolServer:
                 return gated
             records[key] = gated["record"]
         return {"ok": True, "records": records}
+
+    def _fault(self, tool: str, gated: Dict[str, Any]) -> None:
+        """Hand a service fault to on_fault; the caller saw only unknown-state. A hook that raises is the service's."""
+        if gated.get("fault") and self._on_fault is not None:
+            try:
+                self._on_fault(tool, str(gated["fault"]))
+            except Exception:  # noqa: BLE001 - logging must not change the answer
+                pass
 
     @staticmethod
     def _target(target: Any, arguments: Dict[str, Any]) -> Optional[str]:
@@ -747,7 +761,10 @@ class McpToolServer:
                     inputs = self._gate_inputs(arguments, headers, tier, meta, caller)
                 except UnknownJob:
                     return {"jsonrpc": "2.0", "id": rid, "result": unknown_job_result(str(arguments.get("id", "")), traceparent=span)}
+                if not inputs["ok"] and "invalid" in inputs:
+                    return self._error(rid, -32602, inputs["invalid"])
                 if not inputs["ok"]:
+                    self._fault(name, inputs)
                     import fabric_delegation as _fd  # noqa: E402 - DL-19
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(inputs["refusal"], traceparent=span)}
             context = {"tier": tier, "caller": caller, "meta": meta, "input_records": inputs["records"] if inputs else None}
@@ -766,7 +783,10 @@ class McpToolServer:
         if entry is not None:  # DEC-0121: after the authorize gate, before the handler
             gated = self._gate_action(entry["action"], name, arguments, self._target(entry["target"], arguments), entry["url"],
                                       headers, tier, meta, caller)
+            if not gated["ok"] and "invalid" in gated:
+                return self._error(rid, -32602, gated["invalid"])
             if not gated["ok"]:
+                self._fault(name, gated)
                 import fabric_delegation as _fd  # noqa: E402 - DL-19
                 return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(gated["refusal"], traceparent=span)}
         context = CallContext(self, name, arguments, span, delegation, tier=tier, caller=caller, meta=meta,

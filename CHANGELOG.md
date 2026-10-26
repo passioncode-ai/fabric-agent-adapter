@@ -23,6 +23,9 @@
     take `human-step-required` with `data.humanStep` and `data.url`, and T2 still needs `approval-required`. The
     decision records the authenticated caller (`identify`, the delegation's caller, or `local:T0` / `local:T1`).
     Gating a job's input responses is opt-in (`input_actions=True`) until Fabric's hub forwards decisions (CT-125).
+    The kits are ready now; a service adopts the gate once CT-125 lands, as the contract says (DEC-0121
+    *Compatibility*, CT-127), because Claude Code and Codex cannot set `_meta` and would otherwise meet
+    `operator-decision-required` with the page as their only route.
   - A caller relays with `request_meta(decision=...)` / `requestMeta(traceparent, {decision})`.
   - The three codes join DL-19 in both delegation twins.
 - **The probe** reports `well-known.actions`, `interop.action-tools` (a declared action's tool must be served),
@@ -38,7 +41,10 @@
   thread `4801da8d`, contract PR #189, after this release's pin). The accessible name and the menu follow the page's
   language, which the contract now states, so 0.49.3's note that the kit departs from FB-3 no longer holds. A page's
   own words (`data-label-*`) are taken only when they keep the word *Fabric* (WCAG 2.2 SC 2.5.3, Label in Name);
-  otherwise the built-in words stay.
+  otherwise the built-in words stay. A page that set words without *Fabric* under 0.49.3 shows the built-in words
+  after it updates its kit. The kit follows this amendment ahead of the pin (brief decision D17).
+- **The probe's new `dashboard.opens-in-host` can fail a service that passed before**: one that opens its own pages
+  in a browser. Open them through Fabric Dashboards instead (see the building-fabric-services skill).
 
 ### Changed (guidance)
 

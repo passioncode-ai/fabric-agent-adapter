@@ -223,8 +223,9 @@ host's `open` and `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-o
 `not_installed` host; an installed host that failed to open is reported, never replaced by HTTP.
 Links carry no token or login code.
 
-The agent's `AGENTS.md` carries this as its dashboard rule block, and its checks run
-`scripts/check_dashboard_link.py` on every completion and notification action before delivery:
+The agent's `AGENTS.md` carries this as its dashboard rule block, and its checks run the adapter's link gate
+(`scripts/check_dashboard_link.py` from this skill's own directory; it is not copied into the project) on every
+completion and notification action before delivery:
 [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case.
 Headless agents need no dashboard.
 

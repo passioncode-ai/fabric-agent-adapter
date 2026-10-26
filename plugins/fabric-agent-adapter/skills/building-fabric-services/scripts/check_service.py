@@ -578,7 +578,7 @@ class Probe:
                       else "no readable token")
             for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
                 self.add(rule, "NOT_RUN", reason)
-            self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason))
+            self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason, no_surface=not mcp_surface))
         else:
             try:
                 listing = self.mcp_call("tools/list", {})

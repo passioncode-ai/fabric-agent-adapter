@@ -142,6 +142,13 @@ every button a person has, the person's agent has, and an operator's decision re
 Both kits carry the reference (`fabric_actions.py`, `fabric-actions.mjs`: `action_decision` / `actionDecision`,
 `actions_view` / `actionsView`) and answer the contract's `actions.json` vectors case for case.
 
+**When a service adopts it.** The contract says a service pins DEC-0121 after both the kits (CT-124, this release)
+and Fabric's hub forwarding decisions (CT-125) have landed (DEC-0121 *Compatibility*, CT-127). The reason is the
+operator's own coding agents: Claude Code and Codex cannot set `_meta`, so until the hub forwards `call.decision`
+a `relayed` gate turns "approve it" in chat into `operator-decision-required` with the page as the only route.
+Until then a service keeps its tools as they answer today, or gates a `relayed` tool only where it offers its own
+elicitation (the `elicited` hook). This is D8's reason, which keeps `input_actions` off, applied to tools.
+
 **Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
 resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same
 effect, the same checks, the same audit record and an idempotency key: the button's agent twin. A page's confirm
@@ -186,7 +193,11 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
   carries (decision D9). `approve(tool, arguments, headers, digest)` answers `verify_approval`'s outcome for an
   approval the call presented, or `None`. `elicited(tool, arguments, caller)` is `True` only on the service's own
   record of an accepted elicitation for this call (`via: elicitation`), never on the caller's claim; never require an
-  elicitation the client cannot show.
+  elicitation the client cannot show. `on_fault(tool, fault)` hears a service fault the caller sees only as
+  `unknown-state` (for example `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
+  since `handle` defaults to T2 and a T2 call names nobody without them).
+- **Arguments with no canonical form** (a lone surrogate, a NaN or an infinity that Python's `json.loads` lets in)
+  have no digest to bind: a relayed tool answers JSON-RPC `-32602`, never an exception.
 - **The handler** reads `ctx.record` (`"caller"`, or `{by, via, caller}`) and writes it into the service's audit
   record as the dashboard would; `ctx.decision` is the operator's decision it took. Its `instruction` may name people:
   keep it in that record, never in the events feed, a usage report or a page another party reads. `ctx.tier`,

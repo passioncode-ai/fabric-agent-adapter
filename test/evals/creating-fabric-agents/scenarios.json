@@ -175,7 +175,7 @@
       "expected": [
         "AGENTS.md (and CLAUDE.md through @AGENTS.md) carries the rule block: an agent page opens only in Fabric Dashboards, as the open_link from the fabric-dashboards link tool, opened with open and fallback=never",
         "names what never opens a page: `open <url>`, `open -a Safari`, `xdg-open`, `webbrowser.open`, `shell.openExternal`; a browser only on a confirmed not_installed host; an installed host that failed is reported",
-        "puts scripts/check_dashboard_link.py into the project's checks, run on every completion and notification action before delivery"
+        "has the project's checks run the adapter's scripts/check_dashboard_link.py from the skill's own directory (not a copy in the project), run on every completion and notification action before delivery"
       ]
     },
     {

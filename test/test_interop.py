@@ -407,6 +407,28 @@ class ActionGateTests(unittest.TestCase):
         self.assertEqual(error["message"], fd.REFUSAL_MESSAGES[error["code"]])
         return error
 
+    def test_arguments_with_no_canonical_form_are_answered_never_raised(self):
+        # Seam reading of 0.50.0: a lone surrogate or a non-finite number has no JCS form, so no digest; the call is
+        # answered -32602 at every tier, and a tool with no action still takes it as before.
+        for tier in ("T0", "T1", "T2"):
+            for bad in ("\ud800", float("nan"), float("inf")):
+                with self.subTest(tier=tier, bad=repr(bad)):
+                    server = self.server()
+                    params = {"name": "reviews.approve", "arguments": {"reply": "reply-7", "x": bad}, "_meta": {"traceparent": PARENT}}
+                    answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier=tier)
+                    self.assertEqual(answer["error"]["code"], -32602, answer)
+                    self.assertEqual(self.seen, [])
+                    plain = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                                           "params": {"name": "example.echo", "arguments": {"x": bad}, "_meta": {"traceparent": PARENT}}}, None, tier=tier)
+                    self.assertFalse(plain["result"]["isError"])
+
+    def test_a_service_fault_reaches_on_fault_and_never_the_caller(self):
+        faults = []
+        server = self.server(on_fault=lambda tool, fault: faults.append((tool, fault)))
+        error = self.refusal(self.call(server, "reviews.approve", meta={"decision": DECISION}, tier="T2"))
+        self.assertEqual((error["code"], error["data"]["detail"]), ("unknown-state", "service-fault"))
+        self.assertEqual(faults, [("reviews.approve", "caller-missing")])
+
     def test_a_relayed_action_from_t0_without_a_decision_is_operator_decision_required(self):
         server = self.server()
         error = self.refusal(self.call(server, "reviews.approve"))

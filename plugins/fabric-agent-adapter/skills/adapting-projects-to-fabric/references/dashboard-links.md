@@ -64,8 +64,10 @@ host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`,
 `xdg-open`, `start <url>`, `webbrowser.open` or `shell.openExternal` on this
 agent's pages. A browser only when `host_status` confirms `not_installed`; an
 installed host that failed to open is reported, not replaced by HTTP. Links
-carry no token or login code. `scripts/check_dashboard_link.py` checks every
-completion and notification action before delivery.
+carry no token or login code. Every completion and notification action passes
+the Fabric Agent Adapter's link gate before delivery: `check_dashboard_link.py`
+in its `building-fabric-services/scripts`, run from that skill's directory;
+where it cannot run, the action is compared by hand and the check is NOT_RUN.
 ```
 
 The project's checks run the gate below on each renderer's action, and a test

@@ -295,6 +295,14 @@ class ProbeActionsRuleTests(unittest.TestCase):
         verdict, evidence = self.rules.action_tools_verdict(ok, None, "no readable token")
         self.assertEqual((verdict, evidence), ("NOT_RUN", "no readable token"))
 
+    def test_declared_actions_with_no_mcp_surface_fail(self):
+        # Seam reading of 0.50.0: AP-1, every action has a tool on the MCP surface; a declaration with none is a page-only button.
+        ok = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}])
+        verdict, evidence = self.rules.action_tools_verdict(ok, None, "no MCP surface", no_surface=True)
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("AP-1", evidence)
+        self.assertEqual(self.rules.action_tools_verdict(with_actions(None), None, "no MCP surface", no_surface=True)[0], "NOT_RUN")
+
     def test_a_dashboard_without_a_declaration_is_not_run_never_a_failure(self):
         verdict, evidence = self.rules.actions_declared_verdict(with_actions(None))
         self.assertEqual(verdict, "NOT_RUN")

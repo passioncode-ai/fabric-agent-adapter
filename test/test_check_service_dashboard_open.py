@@ -109,6 +109,13 @@ class MatcherTests(unittest.TestCase):
         text = 'url = "http://127.0.0.1:47190/"\n' + "pass\n" * 10 + "webbrowser.open(url)\n"
         self.assertEqual(found("agent/far.py", text), [])
 
+    def test_a_loopback_url_of_another_port_is_another_tool(self):
+        # Seam reading of 0.50.0: a local Storybook or docs server is not this service's page.
+        self.assertEqual(found("scripts/storybook.sh", "open http://localhost:6006\n"), [])
+        self.assertEqual(found("Makefile", "\t@open http://127.0.0.1:4000/docs\n"), [])
+        self.assertEqual(len(found("bin/x", "open http://localhost:%d/\n" % PORT)), 1)
+        self.assertEqual(len(found("bin/x", "open http://localhost/dashboard\n")), 1, "no port: may be the service")
+
     def test_the_root_dashboard_path_alone_is_no_aim(self):
         self.assertEqual(found("bin/x", "open https://example.org/\n", dashboard_path="/"), [])
 

@@ -322,14 +322,19 @@ def well_known_actions_verdict(wk: Any) -> Tuple[str, str]:
         len(view["actions"]), ", ".join("%d %s" % (n, g) for g, n in sorted(gates.items())))
 
 
-def action_tools_verdict(wk: Any, tools: Optional[Dict[str, Any]], why_not: str = "tools/list was not read") -> Tuple[str, str]:
+def action_tools_verdict(wk: Any, tools: Optional[Dict[str, Any]], why_not: str = "tools/list was not read",
+                         no_surface: bool = False) -> Tuple[str, str]:
     """`interop.action-tools`: every declared action's tool is served by tools/list, the live surface (FAC-SEM-142
-    checks only the list the document names). `tools` None means no listing was read; `why_not` says why."""
+    checks only the list the document names). `tools` None means no listing was read; `why_not` says why. Declared
+    actions with no MCP surface at all fail: every action has a tool on that surface (DEC-0121 AP-1)."""
     view = fa.actions_view(wk)
     if not view["declared"]:
         return "NOT_RUN", "no extensions/actions/0.1 declaration"
     if not view["valid"]:
         return "NOT_RUN", "the actions declaration is not readable (well-known.actions): a reader treats it as not declared"
+    if no_surface:
+        return "FAIL", ("%d action(s) declared but the service has no MCP surface: buttons without an agent twin "
+                        "(DEC-0121 AP-1)" % len(view["actions"]))
     if tools is None:
         return "NOT_RUN", why_not
     missing = ["%s (%s)" % (a["tool"], a["id"]) for a in view["actions"] if a["tool"] not in tools]
@@ -410,7 +415,7 @@ _OPENERS = re.compile("|".join((
 _OPEN_PACKAGE = re.compile(r"""import\s+(\w+)\s+from\s+["']open["']|(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*["']open["']\s*\)""")
 _JS_FILES = (".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx")
 _PROSE_FILES = (".md", ".markdown", ".mdx", ".rst", ".txt", ".adoc", ".org")
-_LOOPBACK = re.compile(r"(?:127\.0\.0\.1|\blocalhost\b|\[::1\]|0\.0\.0\.0)")
+_LOOPBACK = re.compile(r"(?:127\.0\.0\.1|\blocalhost\b|\[::1\]|0\.0\.0\.0)(?::(\d{1,5}))?")
 _HOST_ROUTE = re.compile(r"fabric-dashboards://|Fabric Dashboards|\b(?:open_link|openLink|native_link|nativeLink)\b")
 _FALLBACK = re.compile(r"\bnot[_-]installed\b|\bnotInstalled\b|\bNOT_INSTALLED\b")
 _GATE_LINK = re.compile(r"\b(?:browser_link|browserLink)\b")
@@ -430,7 +435,10 @@ _COARSE = (r"open[[:space:]]+-[ab][[:space:]]|open[[:space:]]+[\"'`]?(https?://|
 
 def _aims(lines: List[str], port: int, host: str, dashboard_path: str) -> bool:
     text = "\n".join(lines)
-    if _LOOPBACK.search(text) or "/fabric/v1/login" in text:
+    if "/fabric/v1/login" in text:
+        return True
+    # A loopback address is this service's only with its port or with none: another port is another local tool.
+    if any(m.group(1) is None or not port or int(m.group(1)) == port for m in _LOOPBACK.finditer(text)):
         return True
     if port and re.search(r"(?<!\d)%d(?!\d)" % port, text):
         return True

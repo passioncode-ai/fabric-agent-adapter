@@ -254,7 +254,9 @@ registered with `server.add_tool(tool, handler, action={id, title, tool, gate})`
 or `human` with its `humanStep`) and declared with `build_well_known(actions=server.action_table())` under
 `extensions/actions/0.1`. A `relayed` action called by the operator's own agent with their decision in
 `_meta.decision` is the operator's act: never answer it "operator session required" or send them to the page.
-Read the interop reference's *Actions* section for the gate, its hooks and its refusals.
+A service adopts it once Fabric's hub forwards decisions (CT-125), as the contract says; until then its tools
+answer as today. Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
+refusals.
 
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
 agents, models, connectors, stores and channels, each with its state, from
@@ -293,7 +295,8 @@ shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token fi
 events auth and shape, single-use login, state outside code, instance lock, plist,
 launchd pid equals answering pid, `dashboard.declared` (ED-9), `well-known.actions` (DEC-0121),
 `dashboard.actions-declared` (`NOT_RUN` when a dashboard declares no actions), `dashboard.opens-in-host` (no browser
-opener aimed at the service's pages in its checkout; `--repo PATH` names the checkout), and the `interop.*` rules:
+opener aimed at the service's pages in its checkout; `--repo PATH` names the checkout, and a service installed
+from a release folder needs it), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
 propagation, event trace pairs, `interop.action-tools` (every declared action's tool is served), and
 `board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
@@ -443,8 +446,9 @@ answer or a notification, `<tool> dashboard`, a completion message, a page the a
    reported, never replaced by HTTP.
 5. Links carry no token or login code: the host signs in.
 
-Run `scripts/check_dashboard_link.py` on an action before it is printed or opened, and put it into the project's
-checks for every completion and notification renderer. The generated `AGENTS.md` carries the rule as its dashboard
+Run `scripts/check_dashboard_link.py` (from this skill's own directory; it is not copied into the project) on an
+action before it is printed or opened, and have the project's checks run it for every completion and notification
+renderer. The generated `AGENTS.md` carries the rule as its dashboard
 rule block; [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case. The
 probe's `dashboard.opens-in-host` fails a tracked file that opens the dashboard with a browser opener. Headless agents
 need no dashboard.

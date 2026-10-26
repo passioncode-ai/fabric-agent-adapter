@@ -28,7 +28,8 @@ service are not.
    restore, set a policy) is a tool with the same effect, checks, audit record and an
    idempotency key, declared in the well-known document's action table; a `relayed` action
    takes the operator's decision from their agent as from a click. Never answer an agent
-   "open the dashboard" for an action the page offers ([interop](interop.md#actions)).
+   "open the dashboard" for an action the page offers, except a step only a person can take, which answers
+   `human-step-required` with its link (AP-4; [interop](interop.md#actions)).
 9. **Theme and width.** Build the page from the dashboard kit: its seven AA themes, light and
    dark, follow `prefers-color-scheme` and the host's `fabric_appearance` cookie, and its layout
    holds from 360 CSS px inside a host pane (`fabric-dashboard/0.1`, DEC-0036;
