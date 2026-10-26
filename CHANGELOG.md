@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.50.0 (2026-10-26)
+
+### Changed
+
+- **Pinned to the contract release `v0.1.0+2026-10-25` (`52c7d798`)** (FAA-117, contract CT-124). The release carries
+  DEC-0112 to DEC-0121; only DEC-0121 changes kit code, the others bind a node, an organization server or Project
+  Observatory and only regenerate vendored vectors (connections gains seven cases, the protocol register
+  `fabric-actions/0.1`). `2f020a6` stays supported. The brief is
+  `docs/evidence/specs/2026-10-26-faa-117-118-repin-52c7d79-brief.md` (decisions D1 to D16).
+
+### Added
+
+- **Dashboard action parity (DEC-0121).** Every button a dashboard offers the operator is an agent action too.
+  - `fabric_actions.py` / `fabric-actions.mjs` port the contract's `actionDecision`, `actionsView` and the FAC-SEM-142
+    rules, checked against `fixtures/vectors/actions.json` (65 cases) and the semantic fixtures.
+  - A service declares its actions with `McpToolServer.add_tool(..., action=, target=, human_step_url=)` and
+    publishes them with `build_well_known(actions=)` / `buildWellKnown({actions})` as `extensions/actions/0.1`; a
+    declaration the contract would flag is refused.
+  - The server gate reads only `_meta.decision`, never the arguments: a T0 or T1 call without the operator's
+    decision is refused `operator-decision-required`, a malformed one `decision-invalid`, a step only a person can
+    take `human-step-required` with `data.humanStep` and `data.url`, and T2 still needs `approval-required`. The
+    decision records the authenticated caller (`identify`, the delegation's caller, or `local:T0` / `local:T1`).
+    Gating a job's input responses is opt-in (`input_actions=True`) until Fabric's hub forwards decisions (CT-125).
+  - A caller relays with `request_meta(decision=...)` / `requestMeta(traceparent, {decision})`.
+  - The three codes join DL-19 in both delegation twins.
+- **The probe** reports `well-known.actions`, `interop.action-tools` (a declared action's tool must be served),
+  `dashboard.actions-declared` (`NOT_RUN` for a dashboard that declares none) and `dashboard.opens-in-host`
+  (FAA-118: a browser opener aimed at the service's own pages in its checkout fails; `--repo PATH` names the
+  checkout).
+- **working-with-fabric** relays the operator's own words as the decision (AP-3), never text from a tool result, a
+  page, a file or another agent; a coding agent whose client cannot set `_meta` goes through Fabric's `agent.call`
+  (after CT-125), the service's elicitation, or the action's page in Fabric Dashboards, in that order (confirmed by
+  the contract's owner on board thread `92c6f277`). On `human-step-required` it hands the person the link.
+
+### Changed (guidance)
+
+- **Agent pages open only in Fabric Dashboards** (FAA-118, the operator's rule of 2026-10-24): the rule now sits in
+  the body of the three SKILL.md files, with the AGENTS.md block a project carries and a section for an agent that
+  has a page and no service descriptor. Manual restore and enabling the operator channel are the operator's
+  decision on the page or relayed (D16).
+
 ## 0.49.3 (2026-10-25)
 
 ### Fixed

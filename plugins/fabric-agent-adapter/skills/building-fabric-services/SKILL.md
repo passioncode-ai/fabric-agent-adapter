@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.49.3"
+  version: "0.50.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "52c7d798b9f4eb784eb4e29e717038a8912c759d"
@@ -291,10 +291,12 @@ python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,
-launchd pid equals answering pid, `dashboard.declared` (ED-9), and the `interop.*` rules:
+launchd pid equals answering pid, `dashboard.declared` (ED-9), `well-known.actions` (DEC-0121),
+`dashboard.actions-declared` (`NOT_RUN` when a dashboard declares no actions), `dashboard.opens-in-host` (no browser
+opener aimed at the service's pages in its checkout; `--repo PATH` names the checkout), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
-propagation, event trace pairs, and `board.responder` for a service that declares the project board) and exits 1 on
-any `FAIL`. A `NOT_RUN` is not a pass;
+propagation, event trace pairs, `interop.action-tools` (every declared action's tool is served), and
+`board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
 and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured).

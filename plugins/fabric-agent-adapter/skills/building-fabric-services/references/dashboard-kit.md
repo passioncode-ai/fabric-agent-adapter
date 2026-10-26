@@ -136,7 +136,7 @@ and promises nothing else.
 ```bash
 node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>[.<instance>]   # signs in with a login code
 node <skill-dir>/scripts/check_dashboard_layout.mjs http://127.0.0.1:<port>/dashboard
-python3 <skill-dir>/scripts/check_service.py <id>                                   # dashboard.declared (ED-9)
+python3 <skill-dir>/scripts/check_service.py <id>                                   # dashboard.declared (ED-9), dashboard.actions-declared, dashboard.opens-in-host
 ```
 
 The layout probe renders the page in WebKit (Safari's engine; `--browser chromium` on request) at
