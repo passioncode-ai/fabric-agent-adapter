@@ -225,3 +225,77 @@ test('R1: a token with a trailing newline is malformed', () => {
   const got = d.verifyDelegation(`${c.token}\n`, c.options);
   assert.deepEqual([got.ok, got.code, got.detail], [false, 'unauthenticated', 'malformed']);
 });
+
+// DL-19 (DEC-0039, DEC-0121): the kit's one code set is the contract's, each code answers with its own sentence, and
+// the refusals of an action call (fabric-actions.mjs) are DL-19 bodies. The twin of RefusalCodeSetTests.
+const ACTIONS = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/actions-vectors.json'), 'utf8'));
+const HUMAN_STEPS = ['sign-in', 'consent', 'payment', 'secret', 'spend-above-limit', 'passkey'];
+function dl19Problems(body) {
+  const error = body !== null && typeof body === 'object' && Object.keys(body).join() === 'error' ? body.error : undefined;
+  if (error === null || typeof error !== 'object' || Object.keys(error).some((k) => !['code', 'message', 'data'].includes(k))) return ['shape'];
+  const problems = [];
+  if (!V.constants.refusalCodes.includes(error.code)) problems.push('code');
+  if (!(typeof error.message === 'string' && error.message.length >= 1 && error.message.length <= 500)) problems.push('message');
+  const data = error.data ?? {};
+  if (!(typeof data.detail === 'string' && data.detail.length >= 1 && data.detail.length <= 80)) problems.push('detail');
+  if (error.code === 'approval-required' && !String(data.actionDigest ?? '').startsWith('sha256:')) problems.push('actionDigest');
+  if (error.code === 'human-step-required') {
+    if (!HUMAN_STEPS.includes(data.humanStep)) problems.push('humanStep');
+    if (!(typeof data.url === 'string' && data.url.length >= 1 && data.url.length <= 2048 && /^(https:\/\/|\/)/.test(data.url))) problems.push('url');
+  }
+  return problems;
+}
+
+test('the code set is the contract\'s, and every code has its sentence and status', () => {
+  assert.deepEqual([...d.REFUSAL_CODES], V.constants.refusalCodes);
+  assert.equal(d.REFUSAL_CODES.length, 21);
+  const data = { actionDigest: `sha256:${'0'.repeat(64)}`, humanStep: 'consent', url: '/x' };
+  for (const code of d.REFUSAL_CODES) {
+    assert.ok(Object.hasOwn(d.REFUSAL_MESSAGES, code), code);
+    assert.deepEqual(dl19Problems(d.refusalError({ ok: false, code, detail: 'x', data })), [], code);
+  }
+  for (const code of ['operator-decision-required', 'decision-invalid', 'human-step-required']) {
+    const http = d.refusalHttp({ ok: false, code, detail: 'x' });
+    assert.equal(http.status, 403, code);
+    assert.equal(http.headers['WWW-Authenticate'], undefined, code);
+  }
+});
+
+test('an action refusal is a DL-19 body', () => {
+  const details = { 'operator-decision-required': 'no-decision', 'decision-invalid': 'invalid-decision', 'human-step-required': 'human-step', 'approval-required': 'no-approval' };
+  let refused = 0;
+  for (const c of ACTIONS.cases) {
+    const answer = c.expected;
+    const refusal = d.refusalFromAction(answer);
+    if (answer.ok === true) {
+      assert.equal(refusal, undefined, c.name);
+      continue;
+    }
+    refused += 1;
+    const result = d.refusalToolResult(refusal, `00-${'a'.repeat(32)}-${'b'.repeat(16)}-01`);
+    assert.equal(result.isError, true, c.name);
+    const body = result.structuredContent;
+    assert.deepEqual(JSON.parse(result.content[0].text), body, c.name);
+    assert.deepEqual(dl19Problems(body), [], c.name);
+    if ('fault' in answer) {
+      assert.equal(body.error.code, 'unknown-state', c.name);
+      assert.deepEqual(body.error.data, { detail: 'service-fault' }, c.name);
+      assert.ok(!JSON.stringify(body).includes(answer.fault), c.name);
+      continue;
+    }
+    assert.equal(body.error.code, answer.code, c.name);
+    assert.deepEqual(body.error.data, { detail: details[answer.code], ...(answer.data ?? {}) }, c.name);
+    assert.equal(d.refusalHttp(refusal).status, 403, c.name);
+  }
+  assert.ok(refused > 30);
+});
+
+test('a human step carries its step and link; what is not an answer is an unknown state', () => {
+  const refusal = d.refusalFromAction({ ok: false, code: 'human-step-required', data: { humanStep: 'payment', url: 'https://store.example/pay' } });
+  assert.deepEqual(refusal, { ok: false, code: 'human-step-required', detail: 'human-step', data: { humanStep: 'payment', url: 'https://store.example/pay' } });
+  assert.deepEqual(d.refusalError(refusal).error.data, { detail: 'human-step', humanStep: 'payment', url: 'https://store.example/pay' });
+  for (const value of [undefined, null, [], 'x', {}, { ok: false }, { ok: false, code: 'no-such-code' }, { ok: 'true' }, { ok: false, code: 'toString' }]) {
+    const r = d.refusalFromAction(value);
+    assert.deepEqual([r.code, r.detail], ['unknown-state', 'service-fault'], JSON.stringify(value));
+  }
+});

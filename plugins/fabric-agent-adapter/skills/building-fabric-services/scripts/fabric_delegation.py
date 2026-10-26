@@ -50,7 +50,7 @@ REFUSAL_CODES = (
     "unauthenticated", "token-expired", "wrong-audience", "scope-not-granted", "effect-above-ceiling", "no-grant",
     "grant-expired", "grant-revoked", "limit-reached", "approval-required", "approval-invalid", "approval-reused",
     "principal-unproven", "credential-source-refused", "chain-too-deep", "profile-forbids", "issuer-unavailable",
-    "unknown-state",
+    "unknown-state", "operator-decision-required", "decision-invalid", "human-step-required",
 )
 EFFECT_CLASSES = ("none", "draft", "publish", "send", "reply", "charge", "delete", "merge", "deploy", "change-policy")
 DELEGATION_HEADER = "Fabric-Delegation"
@@ -92,7 +92,14 @@ REFUSAL_MESSAGES = {
     "profile-forbids": "The caller's or the target's machine profile does not allow this call.",
     "issuer-unavailable": "The estate's published keys cannot be read.",
     "unknown-state": "The state cannot be established, so the call is refused.",
+    # DEC-0121 (AP-2, AP-4): the refusals of an action call; each answers 403.
+    "operator-decision-required": "This action is the operator's decision; ask the operator and call again with it in _meta.decision.",
+    "decision-invalid": "The call's decision is not valid for this action, object or time.",
+    "human-step-required": "This step is the person's own; hand them the link in error.data.url.",
 }
+# The detail each action-call refusal carries in error.data (the schema requires one, 1..80 characters).
+_ACTION_DETAILS = {"operator-decision-required": "no-decision", "decision-invalid": "invalid-decision",
+                   "human-step-required": "human-step", "approval-required": "no-approval"}
 
 _B64URL = re.compile(r"^[A-Za-z0-9_-]+\Z")
 # DL-2's grammar, as the contract's verifier types the claims (DEC-0045): an agent id, an opaque session or task id,
@@ -799,6 +806,20 @@ def refusal_from_denial(denial: Dict[str, Any]) -> Dict[str, Any]:
     if data:
         error["data"] = data
     return {"error": error}
+
+
+def refusal_from_action(answer: Any) -> Optional[Dict[str, Any]]:
+    """DL-19 (DEC-0121): the refusal a service answers for an action call that fabric_actions.action_decision refused,
+    or None when it took the call. operator-decision-required, decision-invalid and approval-required carry their
+    detail; human-step-required carries `humanStep` and `url` (AP-4). A `fault` is the service's own and is never
+    sent: the caller reads unknown-state with the detail `service-fault`, as for anything else that is not an answer."""
+    if isinstance(answer, dict) and answer.get("ok") is True:
+        return None
+    code = answer.get("code") if isinstance(answer, dict) and answer.get("ok") is False else None
+    if not isinstance(code, str) or code not in _ACTION_DETAILS:
+        return _refuse("unknown-state", "service-fault")
+    data = answer.get("data")
+    return _refuse(code, _ACTION_DETAILS[code], dict(data) if isinstance(data, dict) and data else None)
 
 
 def refusal_error(refusal: Dict[str, Any]) -> Dict[str, Any]:
