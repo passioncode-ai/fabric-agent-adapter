@@ -5576,6 +5576,305 @@
       }
     },
     {
+      "name": "comms-reply-deliver-sender",
+      "schema": "comms-reply.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0009"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "deliverTo": "sender",
+        "body": {
+          "text": "To you, who asked."
+        }
+      }
+    },
+    {
+      "name": "comms-reply-deliver-thread",
+      "schema": "comms-reply.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0001"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "deliverTo": "thread",
+        "body": {
+          "text": "Released for everyone on this thread: v1.4.2."
+        }
+      }
+    },
+    {
+      "name": "comms-reply-deliver-list",
+      "schema": "comms-reply.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0002"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "deliverTo": [
+          "proj-growth",
+          "proj-analytics"
+        ],
+        "body": {
+          "text": "The two of you asked for the same number: 41.2 %."
+        }
+      }
+    },
+    {
+      "name": "comms-reply-deliver-list-max",
+      "schema": "comms-reply.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0016"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "deliverTo": [
+          "proj-p01",
+          "proj-p02",
+          "proj-p03",
+          "proj-p04",
+          "proj-p05",
+          "proj-p06",
+          "proj-p07",
+          "proj-p08",
+          "proj-p09",
+          "proj-p10",
+          "proj-p11",
+          "proj-p12",
+          "proj-p13",
+          "proj-p14",
+          "proj-p15",
+          "proj-p16"
+        ],
+        "body": {
+          "text": "Sixteen Projects, the most a reply names."
+        }
+      }
+    },
+    {
+      "name": "comms-reply-deliver-empty-list",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0003"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "deliverTo": [],
+        "body": {
+          "text": "To nobody."
+        }
+      }
+    },
+    {
+      "name": "comms-reply-deliver-too-many",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0006"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "Too many."
+        },
+        "deliverTo": [
+          "proj-a0x",
+          "proj-b1x",
+          "proj-c2x",
+          "proj-d3x",
+          "proj-e4x",
+          "proj-f5x",
+          "proj-g6x",
+          "proj-h7x",
+          "proj-i8x",
+          "proj-j9x",
+          "proj-k10x",
+          "proj-l11x",
+          "proj-m12x",
+          "proj-n13x",
+          "proj-o14x",
+          "proj-p15x",
+          "proj-q16x"
+        ]
+      }
+    },
+    {
+      "name": "comms-reply-deliver-duplicate",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0007"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "A repeated Project."
+        },
+        "deliverTo": [
+          "proj-growth",
+          "proj-growth"
+        ]
+      }
+    },
+    {
+      "name": "comms-reply-deliver-empty-id",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0008"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "body": {
+          "text": "An empty Project id."
+        },
+        "deliverTo": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "comms-reply-deliver-unknown",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0004"
+        },
+        "replyTo": "msg_K9j8H7g6F5",
+        "deliverTo": "everyone",
+        "body": {
+          "text": "An audience the contract does not name."
+        }
+      }
+    },
+    {
+      "name": "comms-reply-responder-deliver",
+      "schema": "comms-reply.schema.json",
+      "valid": false,
+      "document": {
+        "fence": {
+          "request": "req_A1b2C3d4E5",
+          "generation": 2,
+          "attempt": "att_Zx9Cv8Bn7M",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "expectedRevision": 3,
+          "idempotency": {
+            "epoch": 3,
+            "key": "reply-req_A1b2C3d4E5-1"
+          }
+        },
+        "deliverTo": "thread",
+        "body": {
+          "text": "A responder's reply goes to the requester."
+        }
+      }
+    },
+    {
+      "name": "comms-submit-reply-deliver-thread",
+      "schema": "comms-submit.schema.json",
+      "valid": true,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "reply-2026-10-26-0005"
+        },
+        "thread": {
+          "id": "thr_8Hc2kQ9xA1"
+        },
+        "kind": "reply",
+        "replyTo": "msg_Q2w3e4r5t6",
+        "deliverTo": "thread",
+        "body": {
+          "text": "Done, for everyone here."
+        }
+      }
+    },
+    {
+      "name": "comms-submit-deliver-on-message",
+      "schema": "comms-submit.schema.json",
+      "valid": false,
+      "document": {
+        "idempotency": {
+          "epoch": 3,
+          "key": "message-2026-10-26-0001"
+        },
+        "thread": {
+          "id": "thr_8Hc2kQ9xA1"
+        },
+        "kind": "message",
+        "deliverTo": "thread",
+        "body": {
+          "text": "Only a reply chooses its delivery."
+        }
+      }
+    },
+    {
+      "name": "comms-message-reply-deliver-thread",
+      "schema": "comms-message.schema.json",
+      "valid": true,
+      "document": {
+        "id": "msg_R7t8Y9u0I1",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "reply",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Done, for everyone here."
+        },
+        "replyTo": "msg_Q2w3e4r5t6",
+        "deliverTo": "thread"
+      }
+    },
+    {
+      "name": "comms-message-deliver-on-message",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_R7t8Y9u0I2",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "message",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Done, for everyone here."
+        },
+        "deliverTo": "thread"
+      }
+    },
+    {
       "name": "comms-submit-reply-reaction",
       "schema": "comms-submit.schema.json",
       "valid": true,

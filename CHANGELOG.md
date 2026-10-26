@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.52.0 (2026-11-02)
 
 ### Added
 
@@ -8,6 +8,16 @@
   Step 5 and creating-fabric-agents' autonomy reference tell an agent to call `fabric_work_list` every three minutes
   and before any wait, act first on its `nudges` and `waiting_for_you`, read and mark its unread board answers, and
   never leave a held task still. Scenario eval `check-every-three-minutes`.
+- **Nine protocol register entries** (DEC-0126, DEC-0127, DEC-0129, DEC-0131, DEC-0132): `fabric-machine-report/1`,
+  `machine-report/1`, `operator-source/1`, `org-authority/1`, `org-authority-draft/1`, `org-key-set/1`,
+  `org-key-set-draft/1`, `org-membership/1` and `org-root-registration/1` in `fabric_protocols` and
+  `fabric-protocols.mjs`, so the kits' register equals the contract's at the pin.
+
+### Changed
+
+- **Pinned to the contract release `v0.1.0+2026-10-26.12` (`1197a90d`)** (FAA-138). It carries DEC-0126 to DEC-0137;
+  `e6c4fc16`, `a3a66eb0` and `52c7d798` stay supported. Brief:
+  `docs/evidence/specs/2026-10-26-faa-138-134-repin-1197a90d-brief.md`.
 
 ## 0.51.2 (2026-10-26)
 
