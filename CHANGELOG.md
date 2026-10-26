@@ -8,6 +8,21 @@
   shows a nudge, at most five, and keeps it for `fabric_work_list` and `fabric_heartbeat`, so the nudges of turns
   spooled before a `/clear` are not lost, as 0.51.2's notes said; they reach the new session there.
 
+- **DEC-0126, where the operator said the words (`source`).** A mandate and a decision may carry `source`; both kits
+  read it as the contract's schema does, return it in the record (`recordAs`, `ctx.record`, `input_records`), keep it
+  on a hand-over, and build it with `operator_mandate(source=)` / `operator_decision(source=)` (Node: `source`).
+  `request_meta(..., target_protocols=)` / `requestMeta(traceparent, {targetProtocols})` send it only to a callee whose
+  well-known `protocols` list `operator-source/1`, and otherwise keep it in the caller's own record (OA-7; never through
+  Fabric's `agent.call` yet, FAA-146). `McpToolServer.well_known_protocols(protocols)` adds `operator-source/1` when
+  the server reads `source`. Nothing writes it to an event, a usage report, a log or a page (a test holds that).
+- **A job's approval step reads the operator's mandate** (contract interop C3.3, `conformance.md`; part of FAA-135):
+  `job_step` / `jobStep`, `CallContext.approval_step`, `request_input(steps=)` / `requestInput(..., {steps})`; with
+  `input_actions` on, an answer's `_meta.mandate` that covers a kept step is read too.
+- **DEC-0136 closes at the pin:** MD-2a is the pinned contract's rule, the by-name test override is gone, and both
+  twins run the contract's 30 `handOn` cases; FAC-SEM-144's message ends `(DEC-0125 MD-1, MD-2; DEC-0136 MD-2a)`.
+  Vectors at `.12`: mandate 40 cases and 5 fixtures, actions 67 cases and 16 action calls.
+- working-with-fabric, its board reference, `interop.md` and the shared operator-channel reference cite DEC-0126 OA-1
+  to OA-7 and drop the "ahead of the pin" wording; scenario eval `relay-source-goes-only-where-it-is-read`.
 - **DEC-0128 (DL-14a), a hub key per organization context.** `hub_key_certified` / `hubKeyCertified` take the
   token's context (`context=` / `{context}`), and `verify_delegation` and `delegation_gate` (Node: `verifyDelegation`,
   `delegationGate`) take `estate_context` / `estateContext`. An organization's token verifies only under its context's
