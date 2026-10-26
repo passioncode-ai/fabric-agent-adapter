@@ -217,7 +217,8 @@ test('requestMeta carries the mandate in _meta, copied, and never one FAC-SEM-14
   assert.deepEqual([both.decision, both.mandate], [DECISION, mandate]);
   const vectors = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/mandate-vectors.json', import.meta.url), 'utf8'));
   for (const c of vectors.fixtures) {
-    if (c.valid) assert.deepEqual(i.requestMeta(PARENT, { mandate: c.document }).mandate, c.document, c.name);
+    // to a callee that reads source (DEC-0126 OA-7), exactly as given
+    if (c.valid) assert.deepEqual(i.requestMeta(PARENT, { mandate: c.document, targetProtocols: ['operator-source/1'] }).mandate, c.document, c.name);
     else assert.throws(() => i.requestMeta(PARENT, { mandate: c.document }), i.InteropError, c.name);
   }
   const widened = structuredClone(mandate);
@@ -255,4 +256,74 @@ test('an outside-mandate answer reaches the caller with the MD-4 wording (DEC-01
   assert.match(outside.structuredContent.error.message, /pass this refusal/);
   const plain = k.actionRefusalToolResult({ ok: false, code: 'operator-decision-required', data: { detail: 'no-decision' } });
   assert.doesNotMatch(plain.structuredContent.error.message, /pass this refusal/);
+});
+
+// DEC-0126: where the operator said the words (`source`, OA-1 to OA-7; FAA-134), the twin of test_interop's source tests.
+const SOURCE = { project: 'example-analyst', session: 'sess-0042' };
+const relayedMandate = (scope = REPLY_SCOPE) => handOn(
+  operatorMandate({ task: 'answer the reviews', instruction: 'answer every review from this week', scope, lead: 'example-lead', at: '2026-10-24T09:00:00Z', source: SOURCE }),
+  'example-agent', '2026-10-24T09:10:00Z');
+
+test('requestMeta sends source only to a target that lists operator-source/1 (DEC-0126 OA-7)', () => {
+  const decision = { ...DECISION, source: SOURCE };
+  const mandate = relayedMandate();
+  for (const targetProtocols of [undefined, null, [], ['fabric-service/0.1'], 'operator-source/1', { 'operator-source/1': true }]) {
+    const meta = i.requestMeta(PARENT, { decision, mandate, targetProtocols });
+    assert.equal(Object.hasOwn(meta.decision, 'source') || Object.hasOwn(meta.mandate, 'source'), false, JSON.stringify(targetProtocols));
+    assert.deepEqual(meta.decision, DECISION);
+  }
+  const meta = i.requestMeta(PARENT, { decision, mandate, targetProtocols: ['operator-source/1'] });
+  assert.deepEqual([meta.decision.source, meta.mandate.source], [SOURCE, SOURCE]);
+  assert.deepEqual([decision.source, mandate.source], [SOURCE, SOURCE]); // the caller's own record keeps it
+  meta.mandate.source.project = 'changed';
+  assert.equal(mandate.source.project, 'example-analyst');
+  assert.throws(() => i.requestMeta(PARENT, { decision: { ...DECISION, source: { project: 'example-analyst' } } }), i.InteropError);
+});
+
+test('actionGate records the source of a decision and of a mandate, and its refusals never carry it (OA-6, OA-7)', () => {
+  const gate = (meta, extra = {}) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta, target: 'reply-7', now: NOW, self: 'example-agent', effect: 'reply', ...extra });
+  const relayed = { ...DECISION, at: NOW, source: SOURCE };
+  assert.deepEqual(gate({ decision: relayed }).record, { by: 'operator', via: 'relayed-instruction', caller: 'local:T0', source: SOURCE });
+  assert.deepEqual(gate({ mandate: relayedMandate() }).record.source, SOURCE);
+  const refusals = [gate({ decision: { ...relayed, at: '2026-10-20T09:00:00Z' } }), gate({ mandate: relayedMandate({ actions: ['other'], effects: ['reply'] }) }),
+    gate({ decision: relayed }, { tier: 'T2', actionDigest: `sha256:${'a'.repeat(64)}` })];
+  assert.ok(refusals.every((r) => r.ok === false));
+  const text = JSON.stringify(refusals.map((r) => i.actionRefusalToolResult({ ok: false, code: r.refusal.code, data: r.refusal.data })));
+  for (const word of ['example-analyst', 'sess-0042', 'answer every review from this week']) assert.equal(text.includes(word), false, word);
+});
+
+test('jobStep: a job reads the mandate its start call carried at its own approval step (C3.3, REQ-8)', () => {
+  const call = { tier: 'T0', now: NOW, self: 'example-agent', capability: 'reviews.approve', key: 'approve-reply', effect: 'reply' };
+  assert.deepEqual(i.jobStep({ ...call, mandate: relayedMandate() }), {
+    covered: true, record: { by: 'operator', via: 'mandate', task: 'answer the reviews', chain: ['example-lead', 'example-agent'], source: SOURCE },
+  });
+  const outside = i.jobStep({ ...call, mandate: leadMandate({ actions: ['other-action'], effects: ['reply'] }) });
+  assert.equal(outside.covered, false);
+  assert.equal(outside.detail, 'outside-mandate: action');
+  assert.ok(outside.message.includes('outside-mandate: action') && outside.message.includes('_meta.mandate'));
+  const expired = i.jobStep({ ...call, now: '2026-10-26T09:30:00Z', mandate: leadMandate() });
+  assert.equal(expired.detail, 'mandate-expired');
+  assert.ok(expired.message.includes('expired'));
+  assert.ok(i.jobStep({ ...call, mandate: { kind: 'mandate/1' } }).message.includes('cannot be read'));
+  assert.deepEqual(i.jobStep({ ...call }), { covered: false, message: null });
+  assert.deepEqual(i.jobStep({ ...call, tier: 'T2', mandate: leadMandate() }), { covered: false, message: null });
+  assert.equal(i.jobStep({ ...call, now: 'never', mandate: leadMandate() }).fault, 'now-unreadable');
+  assert.equal(i.jobStep({ ...call, callerAgent: 'example-lead', mandate: leadMandate() }).covered, true);
+  assert.equal(i.jobStep({ ...call, callerAgent: 'example-other', mandate: leadMandate() }).detail, 'mandate-not-for-this-call');
+  assert.throws(() => i.jobStep({ ...call, effect: 'Reply', mandate: leadMandate() }), i.InteropError);
+});
+
+test('requestInput keeps an approval step in the job\'s private part, the Python file format (DEC-0125)', () => {
+  const dir = temp();
+  const store = new i.JobStore(dir);
+  const { job } = store.create('reviews.approve', {}, { traceparent: PARENT });
+  const request = i.choiceRequest('Publish the reply?', 'choice', [['yes', 'Yes'], ['no', 'No']]);
+  assert.throws(() => store.requestInput(job.id, { 'approve-reply': request }, 'x', { steps: { other: { effect: 'reply' } } }), i.InteropError);
+  assert.throws(() => store.requestInput(job.id, { 'approve-reply': request }, 'x', { steps: { 'approve-reply': { effect: 'Reply' } } }), i.InteropError);
+  assert.equal(store.get(job.id).status, 'working');
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': { effect: 'reply', spendUsd: 0 } } });
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8'));
+  assert.deepEqual(onDisk.private.steps, { 'approve-reply': { effect: 'reply', spendUsd: 0 } });
+  assert.equal(onDisk.job.status, 'input_required');
+  assert.equal(JSON.stringify(onDisk.job).includes('steps'), false);
 });

@@ -2,9 +2,10 @@
 
 The scenario evals in test/evals/<skill>/scenarios.json are judged by a model, so hosted CI cannot run them. These
 tests hold the prose those scenarios grade to the words that carry the rule: each check names the scenario it serves.
-Contract DEC-0125 (`mandate/1`, docs/specification/delegation.md#the-operators-mandate, MD-1 to MD-6) at the pin
-e6c4fc16; the operator's rule of 2026-10-26 that one approval binds all his agents (board thread 3e8f706c, request
-519d7b21; fabric-workspace knowledge/agents-first.md), whose own contract DEC is due 2026-11-02."""
+Contract DEC-0125 (`mandate/1`, docs/specification/delegation.md#the-operators-mandate, MD-1 to MD-6) and DEC-0126
+(one approval binds all the operator's agents, OA-1 to OA-7, `source` and `operator-source/1`) at the pin 1197a90d
+(`v0.1.0+2026-10-26.12`, 0.52.0, FAA-134); the operator's rule of 2026-10-26 (board thread 3e8f706c, request 519d7b21;
+fabric-workspace knowledge/agents-first.md) that DEC-0126 answers."""
 
 import unittest
 
@@ -15,7 +16,8 @@ class EvalsComeFirst(unittest.TestCase):
     def test_the_scenarios_exist(self):
         wanted = {
             "working-with-fabric": {"operator-approval-binds-all-his-agents", "board-relay-from-a-trusted-project",
-                                    "lead-hands-on-a-narrowed-mandate", "outside-mandate-asks-once-for-that-part"},
+                                    "lead-hands-on-a-narrowed-mandate", "outside-mandate-asks-once-for-that-part",
+                                    "relay-source-goes-only-where-it-is-read"},
             "building-fabric-services": {"service-reads-the-operators-mandate"},
         }
         for skill, ids in wanted.items():
@@ -43,9 +45,22 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         board = flat("working-with-fabric/references/project-board.md")
         self.assertIn("personal board", board)
 
-    def test_the_prose_relay_is_the_operators_rule_ahead_of_the_pin(self):  # the pinned AP-3 admits only a mandate
-        self.assertIn("ahead of", self.rule)
-        self.assertIn("DEC-0126", self.rule)
+    def test_the_prose_relay_is_the_pinned_contracts(self):  # operator-approval-binds-all-his-agents
+        # At 0.52.0 the pin carries DEC-0126: the relay is the contract's (OA-2, OA-3), no longer ahead of it.
+        self.assertNotIn("ahead of this skill's pinned contract", self.rule)
+        self.assertNotIn("ahead of the pin", self.rule)
+        for words in ("DEC-0126", "OA-1", "OA-2", "OA-3", "OA-4", "OA-5", "OA-6", "OA-7", "copied unchanged",
+                      "the runner's own delivery", "L0", "L1"):
+            self.assertIn(words, self.rule, words)
+
+    def test_source_goes_only_where_it_is_read(self):  # relay-source-goes-only-where-it-is-read
+        for words in ("`source`", "`operator-source/1`", "request_meta(target_protocols=", "your own record",
+                      "without `source`", "never to an events feed"):
+            self.assertIn(words, self.rule, words)
+        board = flat("working-with-fabric/references/project-board.md")
+        self.assertNotIn("ahead of the pinned contract", board)
+        for words in ("OA-2", "OA-7", "without `source`"):
+            self.assertIn(words, board, words)
 
     def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)
         self.assertIn("pass the refusal to the agent that called you", self.rule)
@@ -74,10 +89,10 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         self.assertIn("outside-mandate:", self.body)
         self.assertIn("mandate-", self.body)
 
-    def test_the_contract_decision_is_taken_when_it_lands(self):  # the note the operator asked for
-        # The contract answered request 519d7b21 with DEC-0126 (tag v0.1.0+2026-10-26.3); the next release takes it.
-        for words in ("DEC-0126", "FAA-134"):
-            self.assertIn(words, self.rule, words)
+    def test_the_contract_decision_is_taken(self):  # the note the operator asked for
+        # The contract answered request 519d7b21 with DEC-0126; 0.52.0 pins it (FAA-134), so no "next release" remains.
+        self.assertIn("DEC-0126", self.rule)
+        self.assertNotIn("next release", self.rule)
 
 
 class BuildingFabricServicesReadsTheMandate(unittest.TestCase):
@@ -89,6 +104,20 @@ class BuildingFabricServicesReadsTheMandate(unittest.TestCase):
                       "operator_mandate(", "outside-mandate:", "mandate-not-for-this-call", "never from its arguments",
                       "T2", "fabric_mandate"):
             self.assertIn(words, interop, words)
+
+    def test_the_interop_reference_carries_the_source(self):  # service-reads-the-operators-mandate (DEC-0126)
+        interop = flat("building-fabric-services/references/interop.md")
+        self.assertNotIn("ahead of the pin", interop)
+        for words in ("DEC-0126", "OA-6", "OA-7", "`operator-source/1`", "well_known_protocols(", "request_meta(traceparent, decision=, mandate=, target_protocols=",
+                      "targetProtocols", "operator_mandate(..., source=", "operator_decision(..., source=", "approval_step(",
+                      "jobStep(", "C3.3", "builds its own list"):
+            self.assertIn(words, interop, words)
+
+    def test_the_shared_operator_channel_reference_cites_the_relay(self):  # operator-approval-binds-all-his-agents
+        for skill in ("creating-fabric-agents", "adapting-projects-to-fabric"):
+            shared = flat("%s/references/operator-channel-and-repository.md" % skill)
+            for words in ("DEC-0126", "OA-2", "OA-7", "`operator-source/1`"):
+                self.assertIn(words, shared, words)
 
 
 if __name__ == "__main__":

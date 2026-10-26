@@ -41,7 +41,7 @@ def view_of(view):
 
 class Vectors(unittest.TestCase):
     def test_every_case_answers_as_the_contract_does(self):
-        self.assertEqual(len(V["cases"]), 65)
+        self.assertEqual(len(V["cases"]), 67)
         for case in V["cases"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fa.action_decision(case["input"])), js(case["expected"]))
@@ -55,7 +55,7 @@ class Vectors(unittest.TestCase):
                 self.assertTrue(all(f["code"] == "FAC-SEM-142" and f["message"] for f in findings))
 
     def test_the_action_call_fixtures(self):
-        self.assertEqual(len(V["actionCalls"]), 12)
+        self.assertEqual(len(V["actionCalls"]), 16)
         for case in V["actionCalls"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fa.action_decision(case["inputs"])), js(case["expected"]))
@@ -315,6 +315,23 @@ class CallerSide(unittest.TestCase):
         for name, (action, instruction, extra) in bad.items():
             with self.subTest(name), self.assertRaises(ServiceError):
                 fa.operator_decision(action, instruction, **dict({"at": NOW}, **extra))
+
+    def test_a_relayed_decision_names_where_the_operator_spoke(self):
+        """DEC-0126 OA-2, OA-6: operator_decision(source=) builds it, the service records it with the decision."""
+        source = {"project": "example-site", "session": "sess-42"}
+        made = fa.operator_decision("approve-reply", "approve the reply to the review from Anna", at=NOW, source=source)
+        self.assertEqual(made["source"], source)
+        self.assertTrue(fa.decision_shape(made))
+        answer = fa.action_decision({"action": RELAYED, "tier": "T1", "caller": "local:T1", "now": NOW, "decision": made})
+        self.assertEqual(answer, {"ok": True, "recordAs": {"by": "operator", "via": "relayed-instruction", "caller": "local:T1",
+                                                           "source": source}})
+        answer["recordAs"]["source"]["project"] = "changed"  # the record is a copy
+        self.assertEqual(made["source"]["project"], "example-site")
+        for bad in ({"project": "example-site"}, {"project": "x", "session": "s", "extra": 1}, {"project": "x", "thread": "a b"}):
+            with self.subTest(source=bad):
+                self.assertFalse(fa.decision_shape(dict(made, source=bad)))
+                with self.assertRaises(ServiceError):
+                    fa.operator_decision("approve-reply", "approve it", at=NOW, source=bad)
 
     def test_the_caller_recorded_is_the_authenticated_one_or_the_local_floor(self):
         self.assertEqual(fa.action_caller("T0", "agent:claude-code"), "agent:claude-code")

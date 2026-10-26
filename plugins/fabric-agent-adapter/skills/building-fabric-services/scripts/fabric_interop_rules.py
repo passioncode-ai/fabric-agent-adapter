@@ -18,7 +18,8 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_actions import action_decision, decision_shape  # noqa: E402 - DEC-0121
-from fabric_mandate import mandate_problem  # noqa: E402 - DEC-0125
+from fabric_mandate import (  # noqa: E402 - DEC-0125, DEC-0126
+    EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, mandate_covers, mandate_problem, without_source)
 
 PROTOCOL = "fabric-interop/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
@@ -290,25 +291,73 @@ def reads_null_usage(request_meta: Any) -> bool:
     return isinstance(protocols, list) and INTEROP_NULL_USAGE in protocols
 
 
-def request_meta(traceparent: Optional[str] = None, decision: Any = None, mandate: Any = None) -> Dict[str, Any]:
+def request_meta(traceparent: Optional[str] = None, decision: Any = None, mandate: Any = None,
+                 target_protocols: Any = None) -> Dict[str, Any]:
     """A request's `_meta` from this kit as a caller: its trace, the interop revisions it reads (DEC-0087), for a
     relayed action the operator's decision (DEC-0121 AP-2; build one with fabric_actions.operator_decision), and the
     operator's mandate for the task the call serves (DEC-0125 MD-3; state it with fabric_mandate.operator_mandate and
     hand it on to the callee with fabric_mandate.hand_on before you send it). Both travel here only, never in a tool's
-    arguments; a decision decision.schema.json refuses or a mandate FAC-SEM-144 refuses raises InteropError."""
+    arguments; a decision decision.schema.json refuses or a mandate FAC-SEM-144 refuses raises InteropError.
+
+    DEC-0126 OA-7: `target_protocols` is the callee's well-known `protocols`. A decision's or a mandate's `source` is
+    sent only when that list names `operator-source/1`; otherwise (no list, another list, a board Project, a session,
+    Fabric's `agent.call`, whose directory lists no `protocols`) it is left out of `_meta` and stays in the caller's
+    own record, the decision and the mandate given here, which this never changes."""
     meta: Dict[str, Any] = {"protocols": list(PROTOCOLS_READ)}
+    reads_source = isinstance(target_protocols, (list, tuple)) and OPERATOR_SOURCE_PROTOCOL in target_protocols
     if parse_traceparent(traceparent):
         meta["traceparent"] = traceparent
     if decision is not None:
         if not decision_shape(decision):
             raise InteropError("The decision is not one decision.schema.json reads; it is not sent.")
-        meta["decision"] = dict(decision)
+        meta["decision"] = json.loads(json.dumps(decision if reads_source else without_source(decision)))
     if mandate is not None:
         problem = mandate_problem(mandate)
         if problem:
             raise InteropError("The mandate is not one FAC-SEM-144 reads (%s); it is not sent." % problem)
-        meta["mandate"] = json.loads(json.dumps(mandate))
+        meta["mandate"] = json.loads(json.dumps(mandate if reads_source else without_source(mandate)))
     return meta
+
+
+def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any, key: Any, effect: Any,
+             caller_agent: Any = None, spend_usd: Any = None, project: Any = None) -> Dict[str, Any]:
+    """A job's own approval step under the mandate its start call carried (interop C3.3, DEC-0125 MD-3, MD-4;
+    conformance: "a job's approval step included"): the step is the call {capability: the job's, action: the input
+    request's `key`, effect, spendUsd?, project?} that mandate_covers reads, with `self_id` the service's agent id and
+    `caller_agent` only an agent id it authenticated for the start call.
+
+    - {"covered": True, "record"}: the step goes on as the operator's decision, no input request; `record` is
+      mandate_covers' recordAs (`via: mandate`, the task, the chain and `source` when the mandate carries one).
+    - {"covered": False, "message", "detail"}: the step waits input_required, `message` its statusMessage naming the
+      part not covered, or saying the mandate expired or cannot be read; never the operator's words or `source`.
+    - {"covered": False, "message": None}: no mandate, or a T2 caller's (MD-5): ask as before; with `fault` when the
+      service's own clock does not read."""
+    if mandate is None:
+        return {"covered": False, "message": None}
+    if not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+        raise InteropError("A job's approval step names its effect class (one of %s; DEC-0125)." % ", ".join(EFFECT_CLASSES))
+    call: Dict[str, Any] = {"capability": capability, "action": key, "effect": effect}
+    if isinstance(spend_usd, (int, float)) and not isinstance(spend_usd, bool):
+        call["spendUsd"] = spend_usd
+    if isinstance(project, str):
+        call["project"] = project
+    covers: Dict[str, Any] = {"mandate": mandate, "tier": tier, "now": now, "self": self_id, "call": call}
+    if isinstance(caller_agent, str) and caller_agent:
+        covers["callerAgent"] = caller_agent
+    answer = mandate_covers(covers)
+    if answer.get("ok") is True:
+        return {"covered": True, "record": answer["recordAs"]}
+    if "ignored" in answer or "fault" in answer:
+        return dict({"covered": False, "message": None}, **({"fault": answer["fault"]} if "fault" in answer else {}))
+    detail = answer["data"]["detail"]
+    if detail == "mandate-expired":
+        said = "The operator's mandate for this task expired before this step"
+    elif detail.startswith("outside-mandate"):
+        said = "The operator's mandate does not cover this step (%s)" % detail
+    else:
+        said = "The operator's mandate cannot be read for this step (%s)" % detail
+    return {"covered": False, "detail": detail,
+            "message": said + ": answer it, or call fabric.job.get with a mandate that covers it in _meta.mandate."}
 
 
 def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target: Optional[str] = None,

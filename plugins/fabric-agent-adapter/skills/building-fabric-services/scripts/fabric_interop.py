@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 from fabric_actions import action_caller, readable_action  # noqa: E402 - DEC-0121
-from fabric_mandate import EFFECT_CLASSES, is_agent_id  # noqa: E402 - DEC-0125
+from fabric_mandate import EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, is_agent_id  # noqa: E402 - DEC-0125, DEC-0126
 from fabric_time import format_rfc3339  # noqa: E402 - the core's (FAA-65)
 from fabric_page_links import (  # noqa: E402 - DEC-0123
     PageLinkError, dashboards_link, input_request_link_findings, page_link_findings, parse_dashboards_link)
@@ -84,6 +84,7 @@ from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     intent_idempotency_key,
     reads_null_usage,
     request_meta,
+    job_step,
     action_gate,
     action_refusal_tool_result,
     usage_findings,
@@ -368,9 +369,11 @@ class JobStore:
     def traceparent(self, job_id: str) -> Optional[str]:
         return self._load(job_id)["private"].get("traceparent")
 
-    def _transition(self, job_id: str, status: str, **fields: Any) -> Dict[str, Any]:
+    def _transition(self, job_id: str, status: str, private: Optional[Dict[str, Any]] = None, **fields: Any) -> Dict[str, Any]:
         with self._lock:
             record = self._load(job_id)
+            if private:  # written in the same file write as the transition
+                record["private"].setdefault("steps", {}).update(private.get("steps", {}))
             job = record["job"]
             if job["status"] in TERMINAL:
                 raise InteropError("Job %s is already %s; a terminal job does not change." % (job_id, job["status"]))
@@ -383,8 +386,14 @@ class JobStore:
     def working(self, job_id: str, message: Optional[str] = None) -> Dict[str, Any]:
         return self._transition(job_id, "working", statusMessage=message)
 
-    def request_input(self, job_id: str, input_requests: Dict[str, Dict[str, Any]], message: Optional[str] = None) -> Dict[str, Any]:
-        """input_required with MCP elicitation requests, keyed; build them with choice_request / form_request / url_request."""
+    def request_input(self, job_id: str, input_requests: Dict[str, Dict[str, Any]], message: Optional[str] = None,
+                      steps: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """input_required with MCP elicitation requests, keyed; build them with choice_request / form_request / url_request.
+        `steps` (DEC-0125) maps a request key to the approval step it asks for, {effect, spendUsd?, project?}, kept in the
+        job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it)."""
+        for key, step in (steps or {}).items():
+            if key not in (input_requests or {}) or not isinstance(step, dict) or step.get("effect") not in EFFECT_CLASSES:
+                raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
         if not input_requests:
             raise InteropError("input_required needs at least one input request.")
         for key, request in input_requests.items():
@@ -392,7 +401,8 @@ class JobStore:
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
-        return self._transition(job_id, "input_required", inputRequests=input_requests, statusMessage=message)
+        return self._transition(job_id, "input_required", {"steps": dict(steps)} if steps else None,
+                                inputRequests=input_requests, statusMessage=message)
 
     def answer(self, job_id: str, input_responses: Dict[str, Any]) -> Dict[str, Any]:
         """Apply inputResponses to an input_required job; unknown keys are ignored (MCP Tasks rule).
@@ -468,7 +478,9 @@ class CallContext:
     (the caller's own act) or {by, via, caller}, the act to put in the service's audit record, and `decision` the
     operator's decision it took (its `instruction` stays in that record, never in events or a page another party
     reads), else None. `input_records` maps each answered input request to its record when input_actions is on.
-    DEC-0125: `mandate` is the operator's mandate the call was taken under (record `via: mandate`), else None."""
+    DEC-0125: `mandate` is the operator's mandate the call was taken under (record `via: mandate`), else None.
+    DEC-0126: `record` carries `source` when the decision or the mandate does (OA-6); like `instruction` it stays in the
+    service's own audit record, never an event, a usage report, a log line or a page another party reads (OA-7)."""
 
     def __init__(self, server: "McpToolServer", tool: str, arguments: Any, traceparent: str,
                  delegation: Optional[Dict[str, Any]] = None, *, tier: Optional[str] = None, caller: Optional[str] = None,
@@ -490,6 +502,28 @@ class CallContext:
         handle = self.server.jobs.create(self.tool, self.arguments, self.traceparent, poll_interval_ms, self.delegation)
         self.server.job_started(handle["job"]["id"], self)
         return handle
+
+    def approval_step(self, job_id: str, key: str, request: Dict[str, Any], *, effect: str, spend_usd: Any = None,
+                      project: Optional[str] = None, message: Optional[str] = None) -> Any:
+        """The job's own approval step `key` (interop C3.3, DEC-0125): on a server with agent_id, the mandate this call
+        carried (`_meta.mandate`) is read for it (job_step). Covered: answers the record (`via: mandate`, `source` when
+        the mandate carries one) and asks nothing; the job goes on as the operator's decision. Otherwise the job waits
+        input_required on `request`, its message naming the part not covered (or `message`), and answers None; the step
+        is kept so an answer's `_meta.mandate` that covers it is read when input_actions is on."""
+        if self.server.jobs is None:
+            raise InteropError("This server has no job store.")
+        step: Dict[str, Any] = {"message": None}
+        if self.server.agent_id is not None:
+            caller = (self.delegation or {}).get("caller")
+            step = job_step(self.meta.get("mandate"), tier=self.tier, now=format_rfc3339(self.server._clock() * 1000),
+                            self_id=self.server.agent_id, capability=self.tool, key=key, effect=effect, caller_agent=caller,
+                            spend_usd=spend_usd, project=project)
+            if step["covered"]:
+                return step["record"]
+        kept = {"effect": effect, **({"spendUsd": spend_usd} if spend_usd is not None else {}),
+                **({"project": project} if project is not None else {})}
+        self.server.jobs.request_input(job_id, {key: request}, step["message"] or message, steps={key: kept})
+        return None
 
 
 Handler = Callable[[Any, CallContext], Any]
@@ -626,6 +660,18 @@ class McpToolServer:
         self.handlers: Dict[str, Handler] = {}
         self._on_job_started = on_job_started
         self._on_input = on_input
+        # DEC-0126 OA-7: a server that reads `source` (a decision's on a relayed action, a mandate's with agent_id) lists
+        # operator-source/1 in its well-known protocols; well_known_protocols() hands the list to build_well_known.
+        self.reads_source = agent_id is not None
+
+    def well_known_protocols(self, protocols: Any = ()) -> List[str]:
+        """The well-known `protocols` (DEC-0067) a service on this server lists: `protocols` and, when it reads `source`
+        (agent_id given, or a relayed action served), operator-source/1 (DEC-0126 OA-7), each once."""
+        listed = list(protocols)
+        if (self.reads_source or any(e["action"]["gate"] == "relayed" for e in self.actions.values())) \
+                and OPERATOR_SOURCE_PROTOCOL not in listed:
+            listed.append(OPERATOR_SOURCE_PROTOCOL)
+        return listed
 
     def add_tool(self, tool: Dict[str, Any], handler: Handler, action: Optional[Dict[str, Any]] = None, *,
                  target: Any = None, human_step_url: Optional[str] = None, effect: Optional[str] = None,
@@ -734,19 +780,26 @@ class McpToolServer:
             return _UNREADABLE
 
     def _gate_inputs(self, arguments: Dict[str, Any], headers: Any, tier: str, meta: Dict[str, Any],
-                     caller: Optional[str]) -> Dict[str, Any]:
+                     caller: Optional[str], verdict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """D8: each input request an answer would take is an action (id its key, tool fabric.job.get, gate relayed),
-        one decision per call; the first refusal refuses the call and nothing is applied."""
+        one decision per call; the first refusal refuses the call and nothing is applied. DEC-0125: on a server with
+        agent_id, a step approval_step kept is read under the call's `_meta.mandate` too (C3.3)."""
         job_id = str(arguments.get("id", ""))
         job = self.jobs.get(job_id)
+        steps = self.jobs.private(job_id).get("steps") or {}
         asked = job.get("inputRequests", {}) if job["status"] == "input_required" else {}
         records: Dict[str, Any] = {}
         for key, value in arguments["inputResponses"].items():
             if key not in asked or not isinstance(value, dict) or value.get("action") not in ("accept", "decline", "cancel"):
                 continue
             action = {"id": key, "title": "Answer %s" % key, "tool": "fabric.job.get", "gate": "relayed"}
+            step, mandate = steps.get(key), {}
+            if self.agent_id is not None and isinstance(step, dict):
+                agent = (verdict or {}).get("caller")
+                mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),
+                           "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None}
             gated = self._gate_action(action, "fabric.job.get", {"id": job_id, "inputResponses": {key: value}}, None, None,
-                                      headers, tier, meta, caller)
+                                      headers, tier, meta, caller, mandate)
             if not gated["ok"]:
                 return gated
             records[key] = gated["record"]
@@ -847,7 +900,7 @@ class McpToolServer:
             responses = arguments.get("inputResponses")
             if name == "fabric.job.get" and self.input_actions and isinstance(responses, dict) and responses:
                 try:
-                    inputs = self._gate_inputs(arguments, headers, tier, meta, caller)
+                    inputs = self._gate_inputs(arguments, headers, tier, meta, caller, verdict)
                 except UnknownJob:
                     return {"jsonrpc": "2.0", "id": rid, "result": unknown_job_result(str(arguments.get("id", "")), traceparent=span)}
                 if not inputs["ok"] and "invalid" in inputs:

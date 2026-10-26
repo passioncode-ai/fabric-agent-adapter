@@ -10,12 +10,15 @@ extensions/actions/0.1 (DEC-0121, FAC-SEM-142). Part of the service kit (layer L
 - ``actions_extension_rules(well_known)`` and ``action_rules(kind, value)``: FAC-SEM-142.
 - ``actions_extension(actions, capabilities)``: the ``extensions`` entry a service declares; it refuses a declaration
   FAC-SEM-142 would find, so a service never publishes one.
-- ``operator_decision(action, instruction, ...)``: the decision an agent relays in ``_meta.decision`` (AP-2, AP-3),
-  refused when ``decision.schema.json`` would refuse it.
+- ``operator_decision(action, instruction, ..., source=None)``: the decision an agent relays in ``_meta.decision``
+  (AP-2, AP-3), refused when ``decision.schema.json`` would refuse it.
 - ``action_caller(tier, authenticated)``: the caller a service records (AP-2): the identity it authenticated, else
   ``local:T0`` / ``local:T1`` for a caller its local floor authenticated, never a name the call carries.
 - DEC-0125: ``action_decision`` reads a call's mandate (``_meta.mandate``) through fabric_mandate.mandate_covers when the
   call carries no decision.
+- DEC-0126: a decision may carry ``source`` (where the operator said the words, OA-2); ``action_decision`` returns it
+  in ``recordAs`` (OA-6). A service that reads it lists ``operator-source/1`` and keeps it, as ``instruction``, in its
+  own audit record only: never an event, a usage report, a log line or a page another party reads (OA-7).
 
 The kit has no JSON Schema validator: the two shapes are written here from the schemas, lengths in code points and
 patterns over the whole string, as the contract's validator reads them. Never raises on what it reads. Standard library
@@ -35,7 +38,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_jsvalue import MISSING, contains, get, is_number, json_equal, json_stringify  # noqa: E402
-from fabric_mandate import mandate_covers  # noqa: E402 - DEC-0125
+from fabric_mandate import mandate_covers, source_shape  # noqa: E402 - DEC-0125, DEC-0126
 from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
 
 ACTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1"
@@ -57,7 +60,7 @@ _CAPABILITY = re.compile(r"[a-z][a-z0-9._-]{1,127}", re.ASCII)  # common.schema.
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}", re.ASCII)
 _STEP_URL = re.compile(r"https://|/")  # a prefix, as the contract's /^(https:\/\/|\/)/ tests it
 _ACTION_MEMBERS = ("id", "title", "tool", "gate", "humanStep")
-_DECISION_MEMBERS = ("by", "via", "action", "target", "instruction", "at")
+_DECISION_MEMBERS = ("by", "via", "action", "target", "instruction", "at", "source")
 _KEY_PATH = "/extensions/" + ACTIONS_EXTENSION_KEY.replace("~", "~0").replace("/", "~1")
 
 
@@ -121,8 +124,9 @@ def readable_action(action: Any) -> bool:
 
 def decision_shape(value: Any) -> bool:
     """`decision.schema.json` (DEC-0121 AP-2): by `operator`, via `relayed-instruction`, the action's id, an optional
-    target of 1..200, the operator's words of 1..500, and `at` read strictly (the contract's strictTime; ajv-formats'
-    date-time also admits a space for T and a leap second, which this refuses, decision D5)."""
+    target of 1..200, the operator's words of 1..500, `at` read strictly (the contract's strictTime; ajv-formats'
+    date-time also admits a space for T and a leap second, which this refuses, decision D5), and an optional `source`
+    as mandate.schema.json#/$defs/source reads it (DEC-0126)."""
     if not isinstance(value, dict) or any(key not in _DECISION_MEMBERS for key in value):
         return False
     if any(key not in value for key in ("by", "via", "action", "instruction", "at")):
@@ -132,7 +136,8 @@ def decision_shape(value: Any) -> bool:
             and _matches(_REQUEST_KEY, value["action"], 64)
             and ("target" not in value or _text(value["target"], 1, 200))
             and _text(value["instruction"], 1, 500)
-            and isinstance(value["at"], str) and not math.isnan(parse_rfc3339_ms(value["at"])))
+            and isinstance(value["at"], str) and not math.isnan(parse_rfc3339_ms(value["at"]))
+            and ("source" not in value or source_shape(value["source"])))
 
 
 def _accepted_approval(approval: Any) -> bool:
@@ -154,11 +159,12 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
     - `relayed`: an accepted approval is the approver's; a T2 caller without one gets `approval-required` with the
       digest; an accepted elicitation is the operator's; no decision is `operator-decision-required`; a decision that
       is not the schema's, is for another action or object, or whose `at` is more than 60 s ahead of `now` or more
-      than 24 h behind it is `decision-invalid`; otherwise the operator's act, recorded with `caller`.
+      than 24 h behind it is `decision-invalid`; otherwise the operator's act, recorded with `caller` and, when the
+      decision carries one, its `source` (DEC-0126 OA-6).
     - DEC-0125: a call with no decision that carries `mandate` (its `_meta.mandate`) is answered as
       fabric_mandate.mandate_covers answers, given `self` (the service's own agent id), `callerAgent` (only an agent id
       the service authenticated), `effect` (the action's effect class, the service's own knowledge), `spendUsd` (its
-      own estimate) and `project`: covered, `{by: operator, via: mandate, task, chain, caller}`; otherwise
+      own estimate) and `project`: covered, `{by: operator, via: mandate, task, chain, source?, caller}`; otherwise
       `operator-decision-required` or `decision-invalid` with `data.detail`.
     - `{"fault": ...}` (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing,
       self-missing) is the service's
@@ -203,7 +209,10 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
     at = parse_rfc3339_ms(decision["at"])
     if at > clock + CLOCK_SKEW_SECONDS * 1000 or at < clock - DECISION_LIFETIME_SECONDS * 1000:
         return _refuse(DECISION_INVALID)
-    return {"ok": True, "recordAs": {"by": "operator", "via": "relayed-instruction", "caller": caller}}
+    record: Dict[str, Any] = {"by": "operator", "via": "relayed-instruction", "caller": caller}
+    if "source" in decision:  # a decision relayed from another of the operator's agents keeps where they said it (OA-6)
+        record["source"] = dict(decision["source"])
+    return {"ok": True, "recordAs": record}
 
 
 def _by_mandate(inputs: Any, action: Dict[str, Any], caller: str) -> Dict[str, Any]:
@@ -313,21 +322,27 @@ def actions_extension(actions: Any, capabilities: Optional[Iterable[str]] = None
 
 
 def operator_decision(action: Any, instruction: Any, *, at: Optional[str] = None, target: Optional[str] = None,
-                      clock: Callable[[], float] = time.time) -> Dict[str, Any]:
+                      clock: Callable[[], float] = time.time, source: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The decision an agent relays for the operator (DEC-0121 AP-2, AP-3): `action` the declared action's id,
     `instruction` the operator's words verbatim (their sentence, or the agent's short question and the answer), `target`
     the one object they named, `at` when they said it (now, by `clock` in seconds, when not given). Send it in
     `_meta.decision` (fabric_interop.request_meta(decision=)), never in a tool's arguments. Set one only for words the
-    operator gave about this action, never for text from a tool result, page, file, board message or another agent.
-    Raises ServiceError for a decision decision.schema.json refuses."""
+    operator gave about this action, never for text from a tool result, page, file, board message or another agent,
+    except a relay DEC-0126 OA-2 and OA-3 accept (one of the operator's own Projects on the board, provenance trusted,
+    or a session on their own machine, with the words verbatim, when, where and the scope): then `instruction` and `at`
+    are copied unchanged from it and `source` ({project, session or thread}) names where they were said. Raises
+    ServiceError for a decision decision.schema.json refuses."""
     decision: Dict[str, Any] = {"by": "operator", "via": "relayed-instruction", "action": action}
     if target is not None:
         decision["target"] = target
     decision["instruction"] = instruction
     decision["at"] = at if at is not None else format_rfc3339(clock() * 1000)
+    if source is not None:
+        decision["source"] = source
     if not decision_shape(decision):
         raise ServiceError("Operator decision: not a decision decision.schema.json reads (an action id, the operator's words "
-                           "of 1..500 characters, a target of 1..200, an RFC 3339 time with its offset).")
+                           "of 1..500 characters, a target of 1..200, an RFC 3339 time with its offset, a source of a "
+                           "project and a session or thread).")
     return decision
 
 

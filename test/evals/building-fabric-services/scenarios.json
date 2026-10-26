@@ -616,7 +616,9 @@
         "the service names its own agent id (McpToolServer(agent_id=) / actionGate self) and each relayed action's effect class (add_tool(effect=)); without an agent id the mandate is not read and the call is answered as before",
         "the mandate is read from _meta.mandate only, never from arguments; its chain must end in the service's own agent id, and in the authenticated caller's agent id before it when the service authenticated one",
         "a covered call is the operator's act recorded via mandate with the task and the chain; outside it, operator-decision-required with data.detail outside-mandate: <part>; an invalid one, decision-invalid with a mandate-* detail; a T2 caller's mandate changes nothing",
-        "as a caller it sends request_meta(mandate=hand_on(...)) / requestMeta(traceparent, {mandate}), refused when FAC-SEM-144 refuses it"
+        "as a caller it sends request_meta(mandate=hand_on(...)) / requestMeta(traceparent, {mandate}), refused when FAC-SEM-144 refuses it",
+        "a mandate or a decision may carry source (DEC-0126): the record carries it (ctx.record, input_records) and the service keeps it, as instruction, off events, usage reports, logs and pages; a server that reads it lists operator-source/1 in its well-known protocols (McpToolServer.well_known_protocols()), and as a caller the kit sends source only with target_protocols naming it",
+        "a job reads the mandate its start call carried at its own approval step (ctx.approval_step(job_id, key, request, effect=) / jobStep): a covered step asks nothing and is recorded via mandate; otherwise the job waits input_required naming the part, and an answer's _meta.mandate that covers the step is read when input_actions is on"
       ]
     }
   ]

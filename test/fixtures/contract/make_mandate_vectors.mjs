@@ -3,7 +3,8 @@
 // mandate-vectors.json, every answer re-computed here by the contract's own functions so a stale copy is caught. Never
 // written by hand.
 //
-// - fixtures/vectors/mandate.json: its `cases` (mandateCovers), each re-answered.
+// - fixtures/vectors/mandate.json: its `cases` (mandateCovers) and its `handOn` group (handOn: {mandate} or
+//   {refused: <problem>}, DEC-0136 MD-2a), each re-answered.
 // - every catalogue fixture of mandate.schema.json (positive/mandate.json, negative/mandate-*.json) with its validity
 //   re-checked by the contract's validator and FAC-SEM-144's findings over it (mandateRules, kind `mandate`, checked
 //   equal to what evaluateSemanticRules dispatches).
@@ -45,6 +46,18 @@ const vectors = read('fixtures/vectors/mandate.json');
 for (const c of vectors.cases) {
   if (!same(mandateCovers(c.input), c.expected)) throw new Error(`the contract's mandate case "${c.name}" no longer answers as written`);
 }
+const handOnAnswer = ({ mandate, callee, at, narrower }) => {
+  try {
+    return { mandate: handOn(mandate, callee, at, narrower) };
+  } catch (error) {
+    const problem = /: (mandate-[a-z-]+)$/.exec(error.message)?.[1];
+    if (!problem) throw error;
+    return { refused: problem };
+  }
+};
+for (const c of vectors.handOn) {
+  if (!same(handOnAnswer(c.input), c.expected)) throw new Error(`the contract's handOn case "${c.name}" no longer answers as written`);
+}
 const fixtures = read('fixtures/catalogue.json').filter((e) => e.schema === 'mandate.schema.json').map((e) => {
   const document = read(`fixtures/${e.path}`);
   if (valid(document) !== e.valid) throw new Error(`${e.path} is not ${e.valid ? 'valid' : 'invalid'} as the catalogue says`);
@@ -53,12 +66,12 @@ const fixtures = read('fixtures/catalogue.json').filter((e) => e.schema === 'man
 });
 
 fs.writeFileSync(out, `${JSON.stringify({
-  about: "mandate/1 (DEC-0125) at the pin: mandateCovers' cases (fixtures/vectors/mandate.json) and every mandate.schema.json fixture as fixtures/catalogue.json lists it, with its validity, mandateProblem's answer and FAC-SEM-144's findings, each answered by the contract's functions and validator. Written by make_mandate_vectors.mjs, never by hand.",
+  about: "mandate/1 (DEC-0125, DEC-0126, DEC-0136) at the pin: mandateCovers' cases and handOn's cases (fixtures/vectors/mandate.json) and every mandate.schema.json fixture as fixtures/catalogue.json lists it, with its validity, mandateProblem's answer and FAC-SEM-144's findings, each answered by the contract's functions and validator. Written by make_mandate_vectors.mjs, never by hand.",
   source: 'fixtures/vectors/mandate.json, fixtures/catalogue.json, fixtures/positive/mandate.json, fixtures/negative/mandate-*.json, src/mandate.ts, src/semantic-rules.ts',
   lifetimeSeconds: MANDATE_LIFETIME_SECONDS,
-  cases: vectors.cases, fixtures,
+  cases: vectors.cases, handOn: vectors.handOn, fixtures,
 }, null, 1)}\n`);
-console.log(`${vectors.cases.length} cases, ${fixtures.length} fixtures`);
+console.log(`${vectors.cases.length} cases, ${vectors.handOn.length} handOn, ${fixtures.length} fixtures`);
 
 if (args.extra) {
   const extra = JSON.parse(fs.readFileSync(args.extra, 'utf8'));

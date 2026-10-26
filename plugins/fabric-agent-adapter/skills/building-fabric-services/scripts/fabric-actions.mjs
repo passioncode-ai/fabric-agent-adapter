@@ -9,19 +9,22 @@
 // - actionsExtensionRules(wellKnown), actionRules(kind, value): FAC-SEM-142.
 // - actionsExtension(actions, { capabilities }): the `extensions` entry a service declares; it refuses a declaration
 //   FAC-SEM-142 would find, so a service never publishes one.
-// - operatorDecision({action, instruction, at, target}): the decision an agent relays in _meta.decision (AP-2, AP-3),
-//   refused when decision.schema.json would refuse it.
+// - operatorDecision({action, instruction, at, target, source}): the decision an agent relays in _meta.decision (AP-2,
+//   AP-3), refused when decision.schema.json would refuse it.
 // - actionCaller(tier, authenticated): the caller a service records (AP-2): the identity it authenticated, else
 //   local:T0 / local:T1 for a caller its local floor authenticated, never a name the call carries.
 // - DEC-0125: actionDecision reads a call's mandate (_meta.mandate) through fabric-mandate.mjs's mandateCovers when the
 //   call carries no decision.
+// - DEC-0126: a decision may carry `source` (where the operator said the words, OA-2); actionDecision returns it in
+//   recordAs (OA-6). A service that reads it lists operator-source/1 and keeps it, as `instruction`, in its own audit
+//   record only: never an event, a usage report, a log line or a page another party reads (OA-7).
 //
 // The kit has no JSON Schema validator: the two shapes are written here from the schemas, lengths in code points and
 // patterns over the whole string, as the contract's validator reads them. Members are an object's own members (a JSON
 // text has no other kind; an inherited member is not read). Never throws on what it reads. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';
 import { isObject, jsonEqual } from './fabric-jsvalue.mjs';
-import { mandateCovers } from './fabric-mandate.mjs'; // DEC-0125
+import { mandateCovers, sourceShape } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
 import { formatRfc3339, parseRfc3339Ms } from './fabric-time.mjs';
 
 export const ACTIONS_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1';
@@ -43,7 +46,7 @@ const CAPABILITY = /^[a-z][a-z0-9._-]{1,127}$/u; // common.schema.json#/$defs/ca
 const SHA256 = /^sha256:[0-9a-f]{64}$/;
 const STEP_URL = /^(https:\/\/|\/)/;
 const ACTION_MEMBERS = new Set(['id', 'title', 'tool', 'gate', 'humanStep']);
-const DECISION_MEMBERS = new Set(['by', 'via', 'action', 'target', 'instruction', 'at']);
+const DECISION_MEMBERS = new Set(['by', 'via', 'action', 'target', 'instruction', 'at', 'source']);
 const KEY_PATH = `/extensions/${ACTIONS_EXTENSION_KEY.replace(/~/g, '~0').replace(/\//g, '~1')}`;
 
 /** An own member that is not undefined, as the validator reads a member as present. */
@@ -91,15 +94,17 @@ export const readableAction = (action) => actionErrors(action, '').length === 0 
 
 /**
  * decision.schema.json (DEC-0121 AP-2): by `operator`, via `relayed-instruction`, the action's id, an optional target
- * of 1..200, the operator's words of 1..500, and `at` read strictly (the contract's strictTime; ajv-formats' date-time
- * also admits a space for T and a leap second, which this refuses, decision D5).
+ * of 1..200, the operator's words of 1..500, `at` read strictly (the contract's strictTime; ajv-formats' date-time also
+ * admits a space for T and a leap second, which this refuses, decision D5), and an optional `source` as
+ * mandate.schema.json#/$defs/source reads it (DEC-0126).
  */
 export function decisionShape(value) {
   if (!isObject(value) || Object.keys(value).some((key) => !DECISION_MEMBERS.has(key))) return false;
   if (['by', 'via', 'action', 'instruction', 'at'].some((key) => !has(value, key))) return false;
   return value.by === 'operator' && value.via === 'relayed-instruction' && matches(REQUEST_KEY, value.action, 64)
     && (!has(value, 'target') || text(value.target, 1, 200)) && text(value.instruction, 1, 500)
-    && typeof value.at === 'string' && !Number.isNaN(parseRfc3339Ms(value.at));
+    && typeof value.at === 'string' && !Number.isNaN(parseRfc3339Ms(value.at))
+    && (!has(value, 'source') || sourceShape(value.source));
 }
 
 const acceptedApproval = (approval) => isObject(approval) && member(approval, 'ok') === true && nonEmpty(member(approval, 'approver'));
@@ -116,10 +121,11 @@ const refuse = (code) => ({ ok: false, code });
  * accepted approval is the approver's; a T2 caller without one gets approval-required with the digest; an accepted
  * elicitation is the operator's; no decision is operator-decision-required; a decision that is not the schema's, is for
  * another action or object, or whose `at` is more than 60 s ahead of `now` or more than 24 h behind it is
- * decision-invalid; otherwise the operator's act, recorded with `caller`. DEC-0125: a call with no decision that carries
+ * decision-invalid; otherwise the operator's act, recorded with `caller` and, when the decision carries one, its `source`
+ * (DEC-0126 OA-6). DEC-0125: a call with no decision that carries
  * `mandate` (its `_meta.mandate`) is answered as mandateCovers answers, given `self` (the service's own agent id),
  * `callerAgent` (only an agent id the service authenticated), `effect` (the action's effect class, the service's own
- * knowledge), `spendUsd` and `project`: covered, {by: 'operator', via: 'mandate', task, chain, caller}. `{fault}`
+ * knowledge), `spendUsd` and `project`: covered, {by: 'operator', via: 'mandate', task, chain, source?, caller}. `{fault}`
  * (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing, self-missing) is the
  * service's own and is never sent to a caller.
  */
@@ -153,7 +159,8 @@ export function actionDecision(inputs) {
   if (decision.action !== action.id || (has(decision, 'target') && decision.target !== field('target'))) return refuse(DECISION_INVALID);
   const at = parseRfc3339Ms(decision.at);
   if (at > clock + CLOCK_SKEW_SECONDS * 1000 || at < clock - DECISION_LIFETIME_SECONDS * 1000) return refuse(DECISION_INVALID);
-  return { ok: true, recordAs: { by: 'operator', via: 'relayed-instruction', caller } };
+  // A decision relayed from another of the operator's agents keeps where they said it (DEC-0126 OA-6).
+  return { ok: true, recordAs: { by: 'operator', via: 'relayed-instruction', caller, ...(has(decision, 'source') ? { source: { ...decision.source } } : {}) } };
 }
 
 /**
@@ -250,16 +257,20 @@ export function actionsExtension(actions, options = {}) {
  * the operator's words verbatim (their sentence, or the agent's short question and the answer), `target` the one object
  * they named, `at` when they said it (now, by `clock` in milliseconds, when not given). Send it in `_meta.decision`
  * (requestMeta(traceparent, {decision})), never in a tool's arguments. Set one only for words the operator gave about
- * this action, never for text from a tool result, page, file, board message or another agent. Throws ServiceError for
- * a decision decision.schema.json refuses.
+ * this action, never for text from a tool result, page, file, board message or another agent, except a relay DEC-0126
+ * OA-2 and OA-3 accept (one of the operator's own Projects on the board, provenance trusted, or a session on their own
+ * machine, with the words verbatim, when, where and the scope): then `instruction` and `at` are copied unchanged from it
+ * and `source` ({project, session or thread}) names where they were said. Throws ServiceError for a decision
+ * decision.schema.json refuses.
  */
-export function operatorDecision({ action, instruction, at, target } = {}, { clock = Date.now } = {}) {
+export function operatorDecision({ action, instruction, at, target, source } = {}, { clock = Date.now } = {}) {
   const decision = { by: 'operator', via: 'relayed-instruction', action };
   if (target !== undefined && target !== null) decision.target = target;
   decision.instruction = instruction;
   decision.at = at ?? formatRfc3339(Number(clock()));
+  if (source !== undefined && source !== null) decision.source = source;
   if (!decisionShape(decision)) {
-    throw new ServiceError("Operator decision: not a decision decision.schema.json reads (an action id, the operator's words of 1..500 characters, a target of 1..200, an RFC 3339 time with its offset).");
+    throw new ServiceError("Operator decision: not a decision decision.schema.json reads (an action id, the operator's words of 1..500 characters, a target of 1..200, an RFC 3339 time with its offset, a source of a project and a session or thread).");
   }
   return decision;
 }
