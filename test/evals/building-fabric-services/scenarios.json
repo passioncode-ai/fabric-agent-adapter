@@ -530,7 +530,8 @@
         "gives every button a tool with the same effect, checks, audit record and an idempotency key (DEC-0121 AP-1)",
         "registers each with McpToolServer.add_tool(tool, handler, action={id, title, tool, gate}): relayed for approve, reject and restore, none only for an act on the caller's own account, human with humanStep sign-in and human_step_url for the store sign-in",
         "declares them with build_well_known(actions=server.action_table()) / buildWellKnown({actions}) under extensions/actions/0.1; the kit refuses a table FAC-SEM-142 finds (a repeated id, a humanStep that disagrees with the gate, a tool surfaces.mcp.capabilities does not list)",
-        "names the probe's rules for it (well-known.actions, interop.action-tools, dashboard.actions-declared) and runs check_service.py"
+        "names the probe's rules for it (well-known.actions, interop.action-tools, dashboard.actions-declared) and runs check_service.py",
+        "says the relayed gate is adopted once Fabric's hub forwards decisions (CT-125; DEC-0121 Compatibility, CT-127); until then the tools answer as today, or gate only where the service offers its own elicitation"
       ]
     },
     {

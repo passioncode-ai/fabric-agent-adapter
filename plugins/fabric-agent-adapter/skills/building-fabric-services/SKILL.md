@@ -254,7 +254,7 @@ registered with `server.add_tool(tool, handler, action={id, title, tool, gate})`
 or `human` with its `humanStep`) and declared with `build_well_known(actions=server.action_table())` under
 `extensions/actions/0.1`. A `relayed` action called by the operator's own agent with their decision in
 `_meta.decision` is the operator's act: never answer it "operator session required" or send them to the page.
-A service adopts it once Fabric's hub forwards decisions (CT-125), as the contract says; until then its tools
+A service adopts the relayed gate once Fabric's hub forwards decisions (CT-125), as the contract says; until then its tools
 answer as today. Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
 refusals.
 

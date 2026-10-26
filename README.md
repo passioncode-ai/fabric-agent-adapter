@@ -100,7 +100,9 @@ is the MCP tool of its name, long work is a job with a stable id (`fabric.job.ge
 one W3C trace. The kits ship the helpers (`scripts/fabric_interop.py`,
 `scripts/fabric-interop.mjs`), the sample service serves a job end to end, and the probe
 checks the interop rules. Every dashboard button has a tool (`fabric-actions/0.1`, contract DEC-0121): the
-operator's agent relays their decision in `_meta.decision`, and the refusals `operator-decision-required`,
+operator's agent relays their decision in `_meta.decision` (a service adopts the gate once Fabric's hub forwards
+decisions, CT-125; Claude Code and Codex, which cannot set `_meta`, relay through Fabric's `agent.call`, the service's
+own elicitation or the action's page), and the refusals `operator-decision-required`,
 `decision-invalid` and `human-step-required` say what is missing. A job a provider limit paused or stopped, and an effect nobody saw, carry their own codes
 (`quota-exhausted`, `outcome-unknown`) and keys per caller (contract DEC-0087). The estate kits check share grants into
 an organization (`scripts/fabric_share.py`, DEC-0086) and the estate ceremonies: a revision's record rules, a headless

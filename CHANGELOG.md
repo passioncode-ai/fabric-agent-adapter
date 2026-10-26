@@ -8,7 +8,7 @@
   DEC-0112 to DEC-0121; only DEC-0121 changes kit code, the others bind a node, an organization server or Project
   Observatory and only regenerate vendored vectors (connections gains seven cases, the protocol register
   `fabric-actions/0.1`). `2f020a6` stays supported. The brief is
-  `docs/evidence/specs/2026-10-26-faa-117-118-repin-52c7d79-brief.md` (decisions D1 to D16).
+  `docs/evidence/specs/2026-10-26-faa-117-118-repin-52c7d79-brief.md` (decisions D1 to D17).
 
 ### Added
 
