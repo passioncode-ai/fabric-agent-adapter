@@ -36,6 +36,8 @@ export {
   intentIdempotencyKey,
   readsNullUsage,
   requestMeta,
+  actionGate,
+  actionRefusalToolResult,
   usageFindings,
   usageToward,
   jobLimitRules,

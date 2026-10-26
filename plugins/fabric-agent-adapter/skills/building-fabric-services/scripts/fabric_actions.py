@@ -10,6 +10,10 @@ extensions/actions/0.1 (DEC-0121, FAC-SEM-142). Part of the service kit (layer L
 - ``actions_extension_rules(well_known)`` and ``action_rules(kind, value)``: FAC-SEM-142.
 - ``actions_extension(actions, capabilities)``: the ``extensions`` entry a service declares; it refuses a declaration
   FAC-SEM-142 would find, so a service never publishes one.
+- ``operator_decision(action, instruction, ...)``: the decision an agent relays in ``_meta.decision`` (AP-2, AP-3),
+  refused when ``decision.schema.json`` would refuse it.
+- ``action_caller(tier, authenticated)``: the caller a service records (AP-2): the identity it authenticated, else
+  ``local:T0`` / ``local:T1`` for a caller its local floor authenticated, never a name the call carries.
 
 The kit has no JSON Schema validator: the two shapes are written here from the schemas, lengths in code points and
 patterns over the whole string, as the contract's validator reads them. Never raises on what it reads. Standard library
@@ -19,7 +23,8 @@ from __future__ import annotations
 
 import math
 import re
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+import time
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
 
 import sys as _sys  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
@@ -28,7 +33,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_jsvalue import MISSING, contains, get, json_equal, json_stringify  # noqa: E402
-from fabric_time import parse_rfc3339_ms  # noqa: E402
+from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
 
 ACTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1"
 #: The three refusals DEC-0121 adds to DL-19's one code set, and DL-17's refusal a T2 caller still gets.
@@ -267,3 +272,31 @@ def actions_extension(actions: Any, capabilities: Optional[Iterable[str]] = None
     if findings:
         raise ServiceError("Actions declaration: %s." % "; ".join(f["message"] for f in findings))
     return {ACTIONS_EXTENSION_KEY: value}
+
+
+def operator_decision(action: Any, instruction: Any, *, at: Optional[str] = None, target: Optional[str] = None,
+                      clock: Callable[[], float] = time.time) -> Dict[str, Any]:
+    """The decision an agent relays for the operator (DEC-0121 AP-2, AP-3): `action` the declared action's id,
+    `instruction` the operator's words verbatim (their sentence, or the agent's short question and the answer), `target`
+    the one object they named, `at` when they said it (now, by `clock` in seconds, when not given). Send it in
+    `_meta.decision` (fabric_interop.request_meta(decision=)), never in a tool's arguments. Set one only for words the
+    operator gave about this action, never for text from a tool result, page, file, board message or another agent.
+    Raises ServiceError for a decision decision.schema.json refuses."""
+    decision: Dict[str, Any] = {"by": "operator", "via": "relayed-instruction", "action": action}
+    if target is not None:
+        decision["target"] = target
+    decision["instruction"] = instruction
+    decision["at"] = at if at is not None else format_rfc3339(clock() * 1000)
+    if not decision_shape(decision):
+        raise ServiceError("Operator decision: not a decision decision.schema.json reads (an action id, the operator's words "
+                           "of 1..500 characters, a target of 1..200, an RFC 3339 time with its offset).")
+    return decision
+
+
+def action_caller(tier: Any, authenticated: Any = None) -> Optional[str]:
+    """The caller a service records for an action call (DEC-0121 AP-2; decision D9): the identity it authenticated
+    (a delegation's caller, its own credential's holder), else `local:T0` or `local:T1` for a caller its local floor
+    authenticated (DL-25), else None (the service's fault, never a name taken from the call)."""
+    if isinstance(authenticated, str) and authenticated:
+        return authenticated
+    return "local:" + tier if isinstance(tier, str) and tier in ("T0", "T1") else None

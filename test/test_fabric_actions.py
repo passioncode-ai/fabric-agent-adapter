@@ -294,5 +294,38 @@ class WellKnown(unittest.TestCase):
             well_known(actions=[RELAYED], extensions=fa.actions_extension([RELAYED]))
 
 
+class CallerSide(unittest.TestCase):
+    """REQ-8 and D9: the decision an agent built on the kit sends, and the caller a service records."""
+
+    def test_operator_decision_builds_the_schemas_decision(self):
+        made = fa.operator_decision("approve-reply", "Agent: Approve the reply to Anna? Operator: yes", at=NOW, target="reply-7")
+        self.assertEqual(made, {"by": "operator", "via": "relayed-instruction", "action": "approve-reply", "target": "reply-7",
+                                "instruction": "Agent: Approve the reply to Anna? Operator: yes", "at": NOW})
+        self.assertTrue(fa.decision_shape(made))
+        self.assertNotIn("target", fa.operator_decision("approve-reply", "approve it", at=NOW))
+        now = fa.operator_decision("approve-reply", "approve it", clock=lambda: 1_792_834_200)
+        self.assertEqual(now["at"], "2026-10-24T09:30:00.000Z")
+        self.assertTrue(fa.decision_shape(now))
+
+    def test_operator_decision_refuses_what_the_schema_refuses(self):
+        bad = {"no words": ("approve-reply", "", {}), "501 characters": ("approve-reply", "x" * 501, {}),
+               "an id with a space": ("approve reply", "approve it", {}), "a date without a zone": ("approve-reply", "approve it", {"at": "2026-10-24T09:30:00"}),
+               "a leap second": ("approve-reply", "approve it", {"at": "2026-12-31T23:59:60Z"}), "an empty target": ("approve-reply", "approve it", {"target": ""}),
+               "a target of 201": ("approve-reply", "approve it", {"target": "t" * 201}), "words that are not text": ("approve-reply", 5, {})}
+        for name, (action, instruction, extra) in bad.items():
+            with self.subTest(name), self.assertRaises(ServiceError):
+                fa.operator_decision(action, instruction, **dict({"at": NOW}, **extra))
+
+    def test_the_caller_recorded_is_the_authenticated_one_or_the_local_floor(self):
+        self.assertEqual(fa.action_caller("T0", "agent:claude-code"), "agent:claude-code")
+        self.assertEqual(fa.action_caller("T2", "agent:remote"), "agent:remote")
+        self.assertEqual(fa.action_caller("T0"), "local:T0")
+        self.assertEqual(fa.action_caller("T1", ""), "local:T1")
+        for tier in ("T2", "T3", None, 0):
+            with self.subTest(tier=tier):
+                self.assertIsNone(fa.action_caller(tier))
+        self.assertEqual(fa.action_caller("T0", 7), "local:T0")  # an identity is a non-empty string
+
+
 if __name__ == "__main__":
     unittest.main()

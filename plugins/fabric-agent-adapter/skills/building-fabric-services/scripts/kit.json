@@ -310,6 +310,7 @@
    "file": "fabric_interop_rules.py",
    "layer": "L3",
    "imports": [
+    "fabric_actions",
     "fabric_base",
     "fabric_delegation",
     "fabric_time"
@@ -716,6 +717,7 @@
    "file": "fabric-interop-rules.mjs",
    "layer": "L3",
    "imports": [
+    "fabric-actions",
     "fabric-base",
     "fabric-delegation",
     "fabric-jsvalue"

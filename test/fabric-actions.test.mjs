@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import {
-  ACTIONS_EXTENSION_KEY as KEY, actionCallRules, actionDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
+  ACTIONS_EXTENSION_KEY as KEY, actionCaller, actionCallRules, actionDecision, operatorDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
 } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-actions.mjs';
 import { ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
 import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
@@ -258,4 +258,32 @@ test('buildWellKnown checks a ready declaration against the surfaces and refuses
 test('without a capability list the tools are not compared', () => {
   const doc = wellKnown({ actions: [{ ...RELAYED, tool: 'reviews.reject' }], surfaces: { events: { path: '/fabric/v1/events' } } });
   assert.equal(doc.extensions[KEY].actions[0].tool, 'reviews.reject');
+});
+
+// REQ-8 and D9: the decision an agent built on the kit sends, and the caller a service records.
+test('operatorDecision builds the schema\'s decision', () => {
+  const made = operatorDecision({ action: 'approve-reply', instruction: 'Agent: Approve the reply to Anna? Operator: yes', at: NOW, target: 'reply-7' });
+  assert.deepEqual(made, { by: 'operator', via: 'relayed-instruction', action: 'approve-reply', target: 'reply-7', instruction: 'Agent: Approve the reply to Anna? Operator: yes', at: NOW });
+  assert.equal(decisionShape(made), true);
+  assert.equal('target' in operatorDecision({ action: 'approve-reply', instruction: 'approve it', at: NOW }), false);
+  const now = operatorDecision({ action: 'approve-reply', instruction: 'approve it' }, { clock: () => 1_792_834_200_000 });
+  assert.equal(now.at, '2026-10-24T09:30:00.000Z');
+  assert.equal(decisionShape(now), true);
+});
+
+test('operatorDecision refuses what the schema refuses', () => {
+  const bad = [['approve-reply', '', {}], ['approve-reply', 'x'.repeat(501), {}], ['approve reply', 'approve it', {}],
+    ['approve-reply', 'approve it', { at: '2026-10-24T09:30:00' }], ['approve-reply', 'approve it', { at: '2026-12-31T23:59:60Z' }],
+    ['approve-reply', 'approve it', { target: '' }], ['approve-reply', 'approve it', { target: 't'.repeat(201) }], ['approve-reply', 5, {}]];
+  for (const [action, instruction, extra] of bad) assert.throws(() => operatorDecision({ action, instruction, at: NOW, ...extra }), ServiceError, `${action} ${String(instruction).slice(0, 20)}`);
+  assert.throws(() => operatorDecision(), ServiceError);
+});
+
+test('the caller recorded is the authenticated one or the local floor', () => {
+  assert.equal(actionCaller('T0', 'agent:claude-code'), 'agent:claude-code');
+  assert.equal(actionCaller('T2', 'agent:remote'), 'agent:remote');
+  assert.equal(actionCaller('T0'), 'local:T0');
+  assert.equal(actionCaller('T1', ''), 'local:T1');
+  for (const tier of ['T2', 'T3', null, undefined, 0]) assert.equal(actionCaller(tier), null);
+  assert.equal(actionCaller('T0', 7), 'local:T0');
 });

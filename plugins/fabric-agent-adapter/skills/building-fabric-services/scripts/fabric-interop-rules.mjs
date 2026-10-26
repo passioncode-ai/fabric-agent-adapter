@@ -5,7 +5,8 @@
 // fabric_interop_rules.py. Node 20+, no dependency.
 import crypto from 'node:crypto';
 import { ServiceError } from './fabric-base.mjs';
-import { jcs } from './fabric-delegation.mjs';
+import { jcs, refusalFromAction, refusalToolResult } from './fabric-delegation.mjs';
+import { actionDecision, decisionShape } from './fabric-actions.mjs'; // DEC-0121
 import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 import { isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 
@@ -188,11 +189,52 @@ export function readsNullUsage(requestMeta) {
   return Array.isArray(protocols) && protocols.includes(INTEROP_NULL_USAGE);
 }
 
-/** A request's `_meta` from this kit as a caller: its trace, and the interop revisions it reads (DEC-0087). */
-export function requestMeta(traceparent) {
+/**
+ * A request's `_meta` from this kit as a caller: its trace, the interop revisions it reads (DEC-0087) and, for a relayed
+ * action, the operator's decision (DEC-0121 AP-2; build one with operatorDecision). A decision travels here only, never
+ * in a tool's arguments; one decision.schema.json refuses throws InteropError.
+ */
+export function requestMeta(traceparent, { decision } = {}) {
   const meta = { protocols: [...PROTOCOLS_READ] };
   if (parseTraceparent(traceparent)) meta.traceparent = traceparent;
+  if (decision !== undefined && decision !== null) {
+    if (!decisionShape(decision)) throw new InteropError('The decision is not one decision.schema.json reads; it is not sent.');
+    meta.decision = { ...decision };
+  }
   return meta;
+}
+
+/**
+ * One call of a declared action, before its handler runs (DEC-0121 AP-2, AP-4), for a Node service's own MCP server:
+ * actionDecision over the call's `_meta.decision` (an own member of `meta` only, never arguments, decision D11), the
+ * service's authenticated `caller` (actionCaller), `target`, `elicited` (the service's own record of an accepted
+ * elicitation), `approval` (verifyApproval's accepted outcome), `actionDigest`, `humanStepUrl` and `now` (RFC 3339).
+ * Answers {ok: true, record, decision}, `decision` being the one taken as the operator's (null otherwise), or {ok: false,
+ * refusal} in the DL-19 form (refusalToolResult sends it); a service's own fault is the refusal unknown-state with
+ * `fault` beside it for the service's log.
+ */
+export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now } = {}) {
+  const inputs = { action, tier, caller, elicited: elicited === true, now };
+  if (isObject(meta) && Object.hasOwn(meta, 'decision')) inputs.decision = meta.decision;
+  for (const [name, value] of [['target', target], ['approval', approval], ['actionDigest', actionDigest], ['humanStepUrl', humanStepUrl]]) {
+    if (value !== undefined && value !== null) inputs[name] = value;
+  }
+  const answer = actionDecision(inputs);
+  if (answer.ok === true) {
+    const record = answer.recordAs;
+    const taken = isObject(record) && record.via === 'relayed-instruction';
+    return { ok: true, record, decision: taken ? inputs.decision : null };
+  }
+  const out = { ok: false, refusal: refusalFromAction(answer) };
+  if ('fault' in answer) out.fault = answer.fault;
+  return out;
+}
+
+/** The tools/call result a service's own MCP server answers for an actionDecision answer: null when the action takes
+ * the call, else DL-19's refusal as structuredContent with isError true (DEC-0121). */
+export function actionRefusalToolResult(answer, traceparent) {
+  const refusal = refusalFromAction(answer);
+  return refusal === undefined ? null : refusalToolResult(refusal, traceparent);
 }
 
 /** FAC-SEM-119 on a usage: partial false asserts every number known, so it stands beside no null. */

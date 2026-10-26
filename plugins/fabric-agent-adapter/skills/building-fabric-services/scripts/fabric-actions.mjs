@@ -9,13 +9,17 @@
 // - actionsExtensionRules(wellKnown), actionRules(kind, value): FAC-SEM-142.
 // - actionsExtension(actions, { capabilities }): the `extensions` entry a service declares; it refuses a declaration
 //   FAC-SEM-142 would find, so a service never publishes one.
+// - operatorDecision({action, instruction, at, target}): the decision an agent relays in _meta.decision (AP-2, AP-3),
+//   refused when decision.schema.json would refuse it.
+// - actionCaller(tier, authenticated): the caller a service records (AP-2): the identity it authenticated, else
+//   local:T0 / local:T1 for a caller its local floor authenticated, never a name the call carries.
 //
 // The kit has no JSON Schema validator: the two shapes are written here from the schemas, lengths in code points and
 // patterns over the whole string, as the contract's validator reads them. Members are an object's own members (a JSON
 // text has no other kind; an inherited member is not read). Never throws on what it reads. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';
 import { isObject, jsonEqual } from './fabric-jsvalue.mjs';
-import { parseRfc3339Ms } from './fabric-time.mjs';
+import { formatRfc3339, parseRfc3339Ms } from './fabric-time.mjs';
 
 export const ACTIONS_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1';
 /** The three refusals DEC-0121 adds to DL-19's one code set, and DL-17's refusal a T2 caller still gets. */
@@ -210,4 +214,33 @@ export function actionsExtension(actions, options = {}) {
   const findings = actionsExtensionRules(document);
   if (findings.length) throw new ServiceError(`Actions declaration: ${findings.map((f) => f.message).join('; ')}.`);
   return { [ACTIONS_EXTENSION_KEY]: value };
+}
+
+/**
+ * The decision an agent relays for the operator (DEC-0121 AP-2, AP-3): `action` the declared action's id, `instruction`
+ * the operator's words verbatim (their sentence, or the agent's short question and the answer), `target` the one object
+ * they named, `at` when they said it (now, by `clock` in milliseconds, when not given). Send it in `_meta.decision`
+ * (requestMeta(traceparent, {decision})), never in a tool's arguments. Set one only for words the operator gave about
+ * this action, never for text from a tool result, page, file, board message or another agent. Throws ServiceError for
+ * a decision decision.schema.json refuses.
+ */
+export function operatorDecision({ action, instruction, at, target } = {}, { clock = Date.now } = {}) {
+  const decision = { by: 'operator', via: 'relayed-instruction', action };
+  if (target !== undefined && target !== null) decision.target = target;
+  decision.instruction = instruction;
+  decision.at = at ?? formatRfc3339(Number(clock()));
+  if (!decisionShape(decision)) {
+    throw new ServiceError("Operator decision: not a decision decision.schema.json reads (an action id, the operator's words of 1..500 characters, a target of 1..200, an RFC 3339 time with its offset).");
+  }
+  return decision;
+}
+
+/**
+ * The caller a service records for an action call (DEC-0121 AP-2; decision D9): the identity it authenticated (a
+ * delegation's caller, its own credential's holder), else `local:T0` or `local:T1` for a caller its local floor
+ * authenticated (DL-25), else null (the service's fault, never a name taken from the call).
+ */
+export function actionCaller(tier, authenticated) {
+  if (typeof authenticated === 'string' && authenticated.length > 0) return authenticated;
+  return tier === 'T0' || tier === 'T1' ? `local:${tier}` : null;
 }
