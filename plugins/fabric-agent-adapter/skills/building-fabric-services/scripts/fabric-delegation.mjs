@@ -514,8 +514,9 @@ export function refusalFromAction(answer) {
 export const OUTSIDE_MANDATE_MESSAGE = 'Outside the operator\'s mandate for this call. Call again within your own mandate if it covers this part; else pass this refusal to the agent that called you. Only the leading agent asks the operator, once, about this part alone, then relays a decision or mandate that covers it: in _meta, or, without _meta, through Fabric\'s agent.call once the hub forwards it, the service\'s elicitation, or the action\'s page as a Fabric Dashboards open_link (DEC-0125 MD-4).';
 
 export function refusalError(refusal) {
-  // the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail, which wins in data
-  const outside = refusal.code === 'operator-decision-required' && String(refusal.data?.detail ?? refusal.detail).startsWith('outside-mandate:');
+  // the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail; only a string names a part
+  const part = typeof refusal.data?.detail === 'string' ? refusal.data.detail : refusal.detail;
+  const outside = refusal.code === 'operator-decision-required' && typeof part === 'string' && part.startsWith('outside-mandate:');
   const message = outside ? OUTSIDE_MANDATE_MESSAGE : REFUSAL_MESSAGES[refusal.code] ?? 'Refused.';
   return { error: { code: refusal.code, message, data: { detail: refusal.detail, ...(refusal.data ?? {}) } } };
 }

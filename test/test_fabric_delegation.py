@@ -480,6 +480,21 @@ class RefusalCodeSetTests(unittest.TestCase):
         twin = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=60)
         self.assertEqual(json.loads(twin.stdout), message)
 
+    def test_the_outside_mandate_choice_reads_only_a_string_detail(self):
+        # Third seam reading: the twins agree on a detail that is not a string (only a string can name a part).
+        cases = [{"detail": "outside-mandate: spend"}, {"detail": "no-decision", "data": {"detail": "outside-mandate: x"}},
+                 {"detail": "outside-mandate: x", "data": {"detail": None}}, {"detail": ["outside-mandate:"]},
+                 {"detail": 7}, {"detail": "no-decision", "data": {"detail": ["outside-mandate:"]}}]
+        mine = [dl.refusal_error(dict(c, ok=False, code="operator-decision-required"))["error"]["message"] for c in cases]
+        self.assertEqual([m == dl.OUTSIDE_MANDATE_MESSAGE for m in mine], [True, True, True, False, False, False])
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node is not on PATH")
+        script = ("import('" + (SCRIPTS / "fabric-delegation.mjs").as_uri() + "').then((d) => process.stdout.write(JSON.stringify("
+                  + json.dumps(cases) + ".map((c) => d.refusalError({...c, ok: false, code: 'operator-decision-required'}).error.message))))")
+        twin = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, timeout=60)
+        self.assertEqual(json.loads(twin.stdout), mine)
+
     def test_an_action_refusal_is_a_dl19_body(self):
         refused = 0
         for case in ACTIONS["cases"]:

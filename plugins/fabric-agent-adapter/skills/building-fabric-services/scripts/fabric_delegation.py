@@ -825,8 +825,9 @@ def refusal_error(refusal: Dict[str, Any]) -> Dict[str, Any]:
     """The DL-19 body: {error: {code, message, data: {detail, ...}}}; never a token or a key."""
     data = {"detail": refusal["detail"]}
     data.update(refusal.get("data") or {})
-    # the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail, which wins in data
-    outside = refusal["code"] == "operator-decision-required" and str(data.get("detail")).startswith("outside-mandate:")
+    # the gate's answer keeps no-decision at the top and its outside-mandate part in data.detail; only a string names a part
+    part = data.get("detail") if isinstance(data.get("detail"), str) else refusal["detail"]
+    outside = refusal["code"] == "operator-decision-required" and isinstance(part, str) and part.startswith("outside-mandate:")
     message = OUTSIDE_MANDATE_MESSAGE if outside else REFUSAL_MESSAGES.get(refusal["code"], "Refused.")
     return {"error": {"code": refusal["code"], "message": message, "data": data}}
 

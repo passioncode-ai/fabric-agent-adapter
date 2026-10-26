@@ -253,7 +253,9 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   is not read and every call is answered as before DEC-0125.
 - A `spend` or `project` function that raises, or a spend that is not a finite number, fails closed: the call is
   answered, and a mandate with a `perCallMaxUsd` ceiling or a `projects` list refuses it (`outside-mandate: spend` or
-  `outside-mandate: project`); an integer past the float range is read as a huge estimate. A refusal outside a mandate
+  `outside-mandate: project`); the estimate is read as a double, so an integer past the float range is infinite and
+  refused under a ceiling, and a project function that answers anything but a string or `None` names no project a
+  mandate can list. A refusal outside a mandate
   tells the caller the MD-4 order: call again within its own mandate, else pass the refusal up; only the leading agent
   asks the operator.
 - `add_tool(tool, handler, action=, effect=, spend=, project=)`: on a server with `agent_id`, a `relayed` action names

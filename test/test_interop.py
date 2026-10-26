@@ -815,7 +815,9 @@ class ActionGateMandateTests(unittest.TestCase):
         tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
         scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
         cases = ((dict(spend=lambda a: 10 ** 400), tight, "outside-mandate: spend"), (dict(spend=10 ** 400), tight, "outside-mandate: spend"),
-                 (dict(spend=0.5, project=lambda a: 1 / 0), scoped, "outside-mandate: project"))
+                 (dict(spend=lambda a: 10 ** 5000), tight, "outside-mandate: spend"),
+                 (dict(spend=0.5, project=lambda a: 1 / 0), scoped, "outside-mandate: project"),
+                 (dict(spend=0.5, project=lambda a: 7), scoped, "outside-mandate: project"))
         for options, mandate, detail in cases:
             server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
             server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
@@ -823,6 +825,8 @@ class ActionGateMandateTests(unittest.TestCase):
             params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": mandate}}
             answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
             error = answer["result"]["structuredContent"]["error"]
+            json.dumps(answer)  # a past-the-float estimate never reaches the wire as a 5000-digit integer
+            self.assertNotIn("estimateUsd", error["data"]) if detail.endswith("spend") else None
             self.assertEqual(error["data"]["detail"], detail, options)
             # Third product reading: the MD-4 wording reaches the caller through the gate, not only a hand-built refusal.
             self.assertIn("pass this refusal", error["message"])

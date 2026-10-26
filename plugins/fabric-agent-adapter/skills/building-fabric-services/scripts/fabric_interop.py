@@ -710,11 +710,15 @@ class McpToolServer:
             return {}
         spend, project = (self._read(entry.get(k), arguments) for k in ("spend", "project"))
         caller_agent = (verdict or {}).get("caller")
-        # An int past the float range is a huge estimate, never an exception: the ceiling refuses it as the contract does.
-        finite = (isinstance(spend, int) and not isinstance(spend, bool)) or (isinstance(spend, float) and math.isfinite(spend))
-        spend = None if spend is _UNREADABLE else spend
-        if project is _UNREADABLE:
-            project = _UNREADABLE_PROJECT  # a function that raised names no project a mandate can list: fail closed
+        # The estimate is read as a double, as the contract does: an int past the float range is infinite, and an
+        # estimate that is not a finite number reads as none, which a mandate's ceiling refuses (fail closed).
+        try:
+            double = float(spend) if isinstance(spend, (int, float)) and not isinstance(spend, bool) else math.nan
+        except OverflowError:
+            double = math.inf
+        finite = math.isfinite(double)  # the service's own number goes on when it is finite (25 stays 25)
+        if project is _UNREADABLE or not (project is None or isinstance(project, str)):
+            project = _UNREADABLE_PROJECT  # a function that raised or named no string: a scoped mandate refuses
         return {"self_id": self.agent_id, "effect": entry.get("effect"),
                 "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
                 # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
