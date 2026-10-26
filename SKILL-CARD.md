@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.51.1` |
+| Version | `0.51.2` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `e6c4fc16b415eec3190dd34d924d269405359dc9` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -25,7 +25,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.51.1` |
+| Version | `0.51.2` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `e6c4fc16b415eec3190dd34d924d269405359dc9` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
@@ -48,7 +48,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.51.1` |
+| Version | `0.51.2` |
 | Plugin | `fabric-agent-adapter` |
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `e6c4fc16b415eec3190dd34d924d269405359dc9`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036); dashboard action parity `fabric-actions/0.1` (DEC-0121); the operator's mandate `mandate/1` (DEC-0125) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
@@ -69,14 +69,14 @@ using Fabric (working-with-fabric) or the Fabric Dashboards app.
 
 | Field | Value |
 |---|---|
-| Version | `0.51.1` |
+| Version | `0.51.2` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | the desktop app 0.4.0 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
 | Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, relay the operator's own decision on a service's action, or the mandate he gave another of his agents (DEC-0125), coordinate, report, link backlog rows, release |
 | Inputs | the agent's folder; Fabric's `hub.json`; the agent's MCP configuration (read, not written, by the status script) |
 | Outputs | `fabric_session.py status`: Fabric's state, the registrations and one next action; `watch-mail`: one line each time the board's unread count rises |
 | Mutations | none by `status`; `watch-mail` renews the session's `rejoined` mark in the hooks' spool when that folder exists; the hooks write only their own log and spool in the user's cache folder (and prune their own stale spool folders even while inert); `install-host-hooks --apply` edits Codex's `hooks.json` or Kimi Code's `config.toml` after a backup, only on the person's go-ahead |
-| Hooks | Claude Code: SessionStart at startup and `/clear` (preamble when `fabric` is registered and Fabric runs; one line when it is down, only in a project that uses Fabric), Stop (turn facts and the unread count), UserPromptSubmit (one line when the count rose), SessionEnd (release), the last three spooling and calling Fabric only when it advertises `session-hooks/1` (Stop and SessionEnd always prune their own stale spool); Codex and Kimi Code: the SessionStart preamble only. Silent in a session Fabric launched; never block, always exit 0 |
+| Hooks | Claude Code: SessionStart at startup and `/clear` (preamble when `fabric` is registered and Fabric runs; one line when it is down, only in a project that uses Fabric), Stop (turn facts and the unread count), UserPromptSubmit (one line when the count rose, and each reminder a turn's answer carried, once), SessionEnd (release), the last three spooling and calling Fabric only when it advertises `session-hooks/1` (Stop and SessionEnd always prune their own stale spool); Codex and Kimi Code: the SessionStart preamble only. Silent in a session Fabric launched; never block, always exit 0 |
 | Network | none of its own; Fabric is reached only through `fabric-mcp` |
 | Secrets | never read: the door token and credentials stay with `fabric-mcp`; nothing secret in argv or logs |
 

@@ -94,6 +94,11 @@ FAKE_MCP = textwrap.dedent('''\
                         "board": {{"state": "ready"}}, "project": "p1", "responders": [], "transport": {{"telegram": "off"}},
                         "unread": int(said)}})}}]}}
                 send({{"jsonrpc": "2.0", "id": m["id"], "result": answer}})
+            elif m["params"]["name"] == "fabric_session_observe" and os.environ.get("FAKE_MCP_NUDGES") \
+                    and os.path.exists(os.environ["FAKE_MCP_NUDGES"]):
+                # Fabric 0.3.14 (FAA-142): a turn's answer may carry nudges; the file holds the answer's JSON.
+                text = open(os.environ["FAKE_MCP_NUDGES"]).read()
+                send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"content": [{{"type": "text", "text": text}}]}}}})
             elif mode == "refuse":
                 send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"isError": True,
                       "content": [{{"type": "text", "text": "not enrolled /private/path"}}],
@@ -810,6 +815,79 @@ class BoardUnread(Active):
         for stdin in ("not json", "", json.dumps({"session_id": "../x"})):
             done, _ = self.run_hook("user-prompt-submit", stdin)
             self.assertEqual((done.returncode, done.stdout), (0, ""))
+
+
+class TurnNudges(Active):
+    """FAA-142 (Fabric ask dfb43ffb): a turn's answer may carry `nudges`; the worker keeps them in the session's spool
+    and the prompt hook prints each `says` once, on the next prompt."""
+
+    def setUp(self):
+        super().setUp()
+        self.nudges = self.base / "nudges.json"
+        self.env["FAKE_MCP_NUDGES"] = str(self.nudges)
+
+    def answer(self, value):
+        self.nudges.write_text(value if isinstance(value, str) else json.dumps(value))
+
+    def test_a_turn_s_nudges_reach_the_next_prompt_once(self):
+        self.answer({"recorded": True, "nudges": [
+            {"kind": "claim", "says": "Your claim on the task lapsed: claim it again or let it go.", "task_id": "t1"},
+            {"kind": "board", "says": "An answer waits for you on the board.", "request_id": "r1"}]})
+        directory = self.turn()
+        if sys.platform != "win32":
+            self.assertEqual(stat.S_IMODE((directory / fs.NUDGES_FILE).stat().st_mode), 0o600)
+        self.assertEqual(self.prompt(), "Your claim on the task lapsed: claim it again or let it go.\n"
+                                        "An answer waits for you on the board.")
+        self.assertIsNone(self.prompt(), "each is given once")
+        self.assertIn("nudges=2", self.log_text())
+        self.assertNotIn("lapsed", self.log_text(), "the log names a count, never the text")
+
+    def test_nudges_sit_beside_the_unread_line(self):
+        self.unread(2)
+        self.answer({"nudges": [{"kind": "board", "says": "Mark what you handled read."}]})
+        self.turn()
+        self.assertEqual(self.prompt(), "2 unread on the project board: com.list\nMark what you handled read.")
+
+    def test_two_turns_before_a_prompt_keep_both_without_repeats(self):
+        first = {"kind": "claim", "says": "One.", "task_id": "t1"}
+        self.answer({"nudges": [first]})
+        self.turn()
+        self.answer({"nudges": [first, {"kind": "claim", "says": "Two."}]})
+        self.turn()
+        self.assertEqual(self.prompt(), "One.\nTwo.")
+
+    def test_an_empty_absent_or_odd_list_prints_nothing(self):
+        for value in ({"nudges": []}, {"recorded": True}, {"nudges": "go"}, {"nudges": [1, None, "x", {"kind": "a"},
+                      {"kind": "a", "says": 7}, {"kind": "a", "says": "   "}]}, "not json", [1, 2]):
+            self.answer(value)
+            directory = self.turn()
+            self.assertFalse((directory / fs.NUDGES_FILE).exists(), value)
+            self.assertIsNone(self.prompt(), value)
+
+    def test_nudges_are_bounded_and_one_line_each(self):
+        many = [{"kind": "k", "says": "n%d" % i} for i in range(fs.MAX_NUDGES + 4)]
+        many[0] = {"kind": "k", "says": "first\nsecond\x07" + "x" * (fs.MAX_NUDGE_CHARS + 50)}
+        self.answer({"nudges": many})
+        self.turn()
+        lines = self.prompt().split("\n")
+        self.assertEqual(len(lines), fs.MAX_NUDGES)
+        self.assertTrue(lines[0].startswith("first second"))
+        self.assertLessEqual(len(lines[0]), fs.MAX_NUDGE_CHARS)
+        self.assertNotIn("\x07", lines[0])
+
+    def test_the_end_of_a_session_keeps_no_nudges(self):
+        self.answer({"nudges": [{"kind": "claim", "says": "Late."}]})
+        spawned = []
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "end", self.env, spawn=spawned.append)
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertFalse(spawned[0].exists(), "the session's folder goes at its end")
+
+    def test_the_prompt_hook_survives_a_broken_nudges_file(self):
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True)
+        for text in ("{broken", json.dumps({"nudges": [1]}), json.dumps("x"), json.dumps([{"says": 5}])):
+            (directory / fs.NUDGES_FILE).write_text(text)
+            self.assertIsNone(self.prompt(), text)
 
 
 class WatchMail(Active):

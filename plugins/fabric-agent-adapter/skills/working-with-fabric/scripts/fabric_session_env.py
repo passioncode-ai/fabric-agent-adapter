@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 from typing import Dict
+from typing import List
 
 
 HUB_PROTOCOL = "fabric-hub/0.1"
@@ -57,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.51.0"
+VERSION = "0.51.2"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -82,6 +83,32 @@ FABRIC_MARKERS = ("fabric-agent.json", "fabric-contract.lock.json", "fabric.pack
 
 
 UNREAD_LINE = "%d unread on the project board: com.list"
+
+#: FAA-142 (Fabric 0.3.14, ask dfb43ffb): a turn's `fabric_session_observe` answer may carry `nudges`, each
+#: {kind, says, task_id?, request_id?} and given once. The worker keeps their `says` here and the prompt hook prints
+#: them once: at most MAX_NUDGES lines, each one line of at most MAX_NUDGE_CHARS characters.
+NUDGES_FILE = "nudges.json"
+MAX_NUDGES = 5
+MAX_NUDGE_CHARS = 400
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
+
+
+def nudge_lines(value: Any) -> List[str]:
+    """The `says` of a nudges list as clean lines: one line each (controls and line breaks become a space), cut to
+    MAX_NUDGE_CHARS, blanks and repeats dropped, at most MAX_NUDGES. Anything that is not such a list gives []."""
+    lines: List[str] = []
+    if not isinstance(value, list):
+        return lines
+    for item in value:
+        says = item.get("says") if isinstance(item, dict) else None
+        if not isinstance(says, str):
+            continue
+        line = " ".join(_CONTROL.sub(" ", says).split())[:MAX_NUDGE_CHARS].rstrip()
+        if line and line not in lines:
+            lines.append(line)
+        if len(lines) == MAX_NUDGES:
+            break
+    return lines
 
 
 def _home(env: Optional[Dict[str, str]] = None) -> Path:
