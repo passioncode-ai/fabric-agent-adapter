@@ -45,6 +45,7 @@ from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
     jcs,
 )
 from fabric_paths import atomic_write as _atomic_write  # noqa: E402 - the kit's private writer (FAA-85)
+from fabric_mandate import effect_closure  # noqa: E402,F401 - defined once beside the mandate that reads it too (DEC-0125)
 
 REFUSAL_CODES = (
     "unauthenticated", "token-expired", "wrong-audience", "scope-not-granted", "effect-above-ceiling", "no-grant",
@@ -297,16 +298,6 @@ def _chain_of(act: Dict[str, Any]) -> List[str]:
         chain.append(node["partner"] if is_partner_actor(node) else node["sub"])
         node = node.get("act")
     return chain
-
-
-def effect_closure(ceiling: List[str]) -> set:
-    """`none` is below every class and `draft` below every external one; external classes are not ordered."""
-    admitted = set(ceiling)
-    if ceiling:
-        admitted.add("none")
-    if any(effect != "none" for effect in ceiling):
-        admitted.add("draft")
-    return admitted
 
 
 def effect_within(effect: str, ceiling: List[str]) -> bool:

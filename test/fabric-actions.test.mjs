@@ -39,7 +39,7 @@ test('every declaration is found where the contract finds it', () => {
 });
 
 test('the action-call fixtures', () => {
-  assert.equal(V.actionCalls.length, 10);
+  assert.equal(V.actionCalls.length, 12);
   for (const c of V.actionCalls) {
     assert.deepEqual(actionDecision(c.inputs), c.expected, c.name);
     const value = { ...c.inputs, answer: c.answer };

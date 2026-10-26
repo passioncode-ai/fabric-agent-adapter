@@ -7,6 +7,7 @@ import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-servi
 import { tempDir } from './temp-dir.mjs';
 import { assertPrivateFile } from './private-file.mjs';
 import { refusalError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs';
+import { handOn, operatorMandate } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-mandate.mjs';
 
 const PARENT = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -166,4 +167,52 @@ test('actionRefusalToolResult answers DL-19 structuredContent, or null for a cal
   assert.equal(result.structuredContent.error.code, 'operator-decision-required');
   assert.equal(result._meta.traceparent, PARENT);
   assert.equal(i.actionRefusalToolResult({ fault: 'caller-missing' }).structuredContent.error.code, 'unknown-state');
+});
+
+// DEC-0125: the operator's mandate in _meta.mandate (FAA-131), the twin of test_interop's mandate tests.
+const REPLY_SCOPE = { actions: ['approve-reply'], effects: ['reply'] };
+const leadMandate = (scope = REPLY_SCOPE) => handOn(
+  operatorMandate({ task: 'answer the reviews', instruction: 'answer every review from this week', scope, lead: 'example-lead', at: '2026-10-24T09:00:00Z' }),
+  'example-agent', '2026-10-24T09:10:00Z');
+
+test('requestMeta carries the mandate in _meta, copied, and never one FAC-SEM-144 refuses', () => {
+  const mandate = leadMandate();
+  const meta = i.requestMeta(PARENT, { mandate });
+  assert.deepEqual(meta.mandate, mandate);
+  assert.notEqual(meta.mandate, mandate);
+  assert.equal('mandate' in i.requestMeta(PARENT), false);
+  const both = i.requestMeta(PARENT, { decision: DECISION, mandate });
+  assert.deepEqual([both.decision, both.mandate], [DECISION, mandate]);
+  const vectors = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/mandate-vectors.json', import.meta.url), 'utf8'));
+  for (const c of vectors.fixtures) {
+    if (c.valid) assert.deepEqual(i.requestMeta(PARENT, { mandate: c.document }).mandate, c.document, c.name);
+    else assert.throws(() => i.requestMeta(PARENT, { mandate: c.document }), i.InteropError, c.name);
+  }
+  const widened = structuredClone(mandate);
+  widened.chain[1].scope = { actions: ['approve-reply'], effects: ['publish'] };
+  for (const bad of ['yes', [], widened]) assert.throws(() => i.requestMeta(PARENT, { mandate: bad }), i.InteropError);
+});
+
+test('actionGate reads a mandate only for a service that names its agent id, and names what it does not cover', () => {
+  const gate = (extra) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta: { mandate: leadMandate() }, target: 'reply-7', now: NOW, self: 'example-agent', effect: 'reply', ...extra });
+  assert.deepEqual(gate(), {
+    ok: true, decision: null, mandate: leadMandate(),
+    record: { by: 'operator', via: 'mandate', task: 'answer the reviews', chain: ['example-lead', 'example-agent'], caller: 'local:T0' },
+  });
+  const unread = gate({ self: undefined });
+  assert.deepEqual([unread.refusal.code, unread.refusal.detail], ['operator-decision-required', 'no-decision']);
+  const fault = gate({ effect: undefined });
+  assert.deepEqual([fault.refusal.code, fault.fault], ['unknown-state', 'effect-missing']);
+  assert.deepEqual(refusalError(gate({ effect: 'publish' }).refusal).error.data, { detail: 'outside-mandate: effect' });
+  const tight = leadMandate({ ...REPLY_SCOPE, perCallMaxUsd: 1 });
+  assert.deepEqual(refusalError(gate({ meta: { mandate: tight }, spendUsd: 2 }).refusal).error.data, { detail: 'outside-mandate: spend', estimateUsd: 2, perCallMaxUsd: 1 });
+  const other = refusalError(gate({ callerAgent: 'example-other' }).refusal).error;
+  assert.deepEqual([other.code, other.data], ['decision-invalid', { detail: 'mandate-not-for-this-call' }]);
+  assert.deepEqual(refusalError(gate({ now: '2026-10-25T09:00:00Z' }).refusal).error.data, { detail: 'mandate-expired' });
+  assert.deepEqual(refusalError(gate({ meta: { mandate: 'yes' } }).refusal).error.data, { detail: 'mandate-malformed' });
+  assert.equal(gate({ meta: Object.create({ mandate: leadMandate() }) }).refusal.code, 'operator-decision-required'); // own members only
+  const decided = gate({ meta: { mandate: leadMandate(), decision: DECISION } });
+  assert.deepEqual([decided.record.via, decided.decision, 'mandate' in decided], ['relayed-instruction', DECISION, false]);
+  const t2 = gate({ tier: 'T2', caller: 'agent:remote', actionDigest: `sha256:${'a'.repeat(64)}` });
+  assert.equal(t2.refusal.code, 'approval-required');
 });

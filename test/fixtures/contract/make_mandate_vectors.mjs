@@ -5,7 +5,8 @@
 //
 // - fixtures/vectors/mandate.json: its `cases` (mandateCovers), each re-answered.
 // - every catalogue fixture of mandate.schema.json (positive/mandate.json, negative/mandate-*.json) with its validity
-//   re-checked by the contract's validator and FAC-SEM-144's findings over it (evaluateSemanticRules, kind `mandate`).
+//   re-checked by the contract's validator and FAC-SEM-144's findings over it (mandateRules, kind `mandate`, checked
+//   equal to what evaluateSemanticRules dispatches).
 // - the action-call-mandate*.json semantic fixtures are actionDecision's and are vendored by make_actions_vectors.mjs.
 //
 //   tsx test/fixtures/contract/make_mandate_vectors.mjs --contract <a clean checkout of the contract at the pin>
@@ -29,14 +30,16 @@ const src = (file) => import(pathToFileURL(path.join(args['contract-src'], file)
 const read = (file) => JSON.parse(fs.readFileSync(path.join(args.contract, file), 'utf8'));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-const { mandateCovers, mandateProblem, scopeWithin, effectiveScope, handOn, MANDATE_LIFETIME_SECONDS } = await src('mandate.ts');
+const { mandateCovers, mandateProblem, mandateRules, scopeWithin, effectiveScope, handOn, MANDATE_LIFETIME_SECONDS } = await src('mandate.ts');
 const { actionDecision } = await src('actions.ts');
 const { evaluateSemanticRules } = await src('semantic-rules.ts');
 const { createValidatorSync } = await src('validator.ts');
 const { SCHEMA_PREFIX } = await src('contract.ts');
 const validator = createValidatorSync();
 const valid = (document) => validator.getSchema(`${SCHEMA_PREFIX}schemas/mandate.schema.json`)(document) === true;
-const findings = (document) => evaluateSemanticRules('mandate', document).map((f) => ({ code: f.code, instancePath: f.instancePath, message: f.message }));
+const findings = (document) => mandateRules('mandate', document).map((f) => ({ code: f.code, instancePath: f.instancePath, message: f.message }));
+// The dispatcher answers a document that is not an object with FAC-SEM-000 before the rule; for an object it is the rule.
+const dispatched = (document) => evaluateSemanticRules('mandate', document).map((f) => ({ code: f.code, instancePath: f.instancePath, message: f.message }));
 
 const vectors = read('fixtures/vectors/mandate.json');
 for (const c of vectors.cases) {
@@ -45,6 +48,7 @@ for (const c of vectors.cases) {
 const fixtures = read('fixtures/catalogue.json').filter((e) => e.schema === 'mandate.schema.json').map((e) => {
   const document = read(`fixtures/${e.path}`);
   if (valid(document) !== e.valid) throw new Error(`${e.path} is not ${e.valid ? 'valid' : 'invalid'} as the catalogue says`);
+  if (!same(dispatched(document), findings(document))) throw new Error(`${e.path}: the dispatcher and mandateRules disagree`);
   return { name: e.name, valid: e.valid, document, problem: mandateProblem(document) ?? null, findings: findings(document) };
 });
 

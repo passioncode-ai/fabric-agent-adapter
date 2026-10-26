@@ -58,6 +58,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L1 | `fabric_platform` | Windows: named pipes, owner-only files (DEC-0032) |
 | L1 | `fabric_paths` | the services directory, a service's folders, atomic and private writes (L1 since 0.44.2, so `fabric_delegation` writes its consumed approval ids with them, FAA-85) |
 | L2 | `fabric_estate` | `estate-record/1` revisions and their rules (DEC-0055) |
+| L2 | `fabric_mandate` | the operator's mandate `mandate/1`: what a callee takes under it (`mandate_covers`), FAC-SEM-144, stating and handing it on narrowed (DEC-0125); the effect closure, defined here once |
 | L2 | `fabric_delegation` | the callee's side of `fabric-delegation/0.1` (DEC-0039) |
 | L2 | `fabric_share` | share grants and registrations (DEC-0086) |
 | L2 | `fabric_ceremonies` | the headless join token (DEC-0084) |

@@ -18,6 +18,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_actions import action_decision, decision_shape  # noqa: E402 - DEC-0121
+from fabric_mandate import mandate_problem  # noqa: E402 - DEC-0125
 
 PROTOCOL = "fabric-interop/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
@@ -289,10 +290,12 @@ def reads_null_usage(request_meta: Any) -> bool:
     return isinstance(protocols, list) and INTEROP_NULL_USAGE in protocols
 
 
-def request_meta(traceparent: Optional[str] = None, decision: Any = None) -> Dict[str, Any]:
-    """A request's `_meta` from this kit as a caller: its trace, the interop revisions it reads (DEC-0087) and, for a
-    relayed action, the operator's decision (DEC-0121 AP-2; build one with fabric_actions.operator_decision). A
-    decision travels here only, never in a tool's arguments; one decision.schema.json refuses raises InteropError."""
+def request_meta(traceparent: Optional[str] = None, decision: Any = None, mandate: Any = None) -> Dict[str, Any]:
+    """A request's `_meta` from this kit as a caller: its trace, the interop revisions it reads (DEC-0087), for a
+    relayed action the operator's decision (DEC-0121 AP-2; build one with fabric_actions.operator_decision), and the
+    operator's mandate for the task the call serves (DEC-0125 MD-3; state it with fabric_mandate.operator_mandate and
+    hand it on to the callee with fabric_mandate.hand_on before you send it). Both travel here only, never in a tool's
+    arguments; a decision decision.schema.json refuses or a mandate FAC-SEM-144 refuses raises InteropError."""
     meta: Dict[str, Any] = {"protocols": list(PROTOCOLS_READ)}
     if parse_traceparent(traceparent):
         meta["traceparent"] = traceparent
@@ -300,19 +303,33 @@ def request_meta(traceparent: Optional[str] = None, decision: Any = None) -> Dic
         if not decision_shape(decision):
             raise InteropError("The decision is not one decision.schema.json reads; it is not sent.")
         meta["decision"] = dict(decision)
+    if mandate is not None:
+        problem = mandate_problem(mandate)
+        if problem:
+            raise InteropError("The mandate is not one FAC-SEM-144 reads (%s); it is not sent." % problem)
+        meta["mandate"] = json.loads(json.dumps(mandate))
     return meta
 
 
 def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target: Optional[str] = None,
                 elicited: bool = False, approval: Any = None, action_digest: Optional[str] = None,
-                human_step_url: Optional[str] = None, now: Any = None) -> Dict[str, Any]:
+                human_step_url: Optional[str] = None, now: Any = None, self_id: Optional[str] = None,
+                effect: Optional[str] = None, caller_agent: Optional[str] = None, spend_usd: Any = None,
+                project: Optional[str] = None) -> Dict[str, Any]:
     """One call of a declared action, before its handler runs (DEC-0121 AP-2, AP-4): fabric_actions.action_decision over
     the call's `_meta.decision` (read from `meta` only, never from arguments, decision D11), the service's authenticated
     `caller` (fabric_actions.action_caller), `target` (the object the call acts on), `elicited` (the service's own
     record of an accepted elicitation), `approval` (verify_approval's accepted outcome), `action_digest`,
     `human_step_url` and `now` (RFC 3339). Answers {ok: True, record, decision}, `decision` being the one taken as the
     operator's (None otherwise), or {ok: False, refusal} in the DL-19 form (fabric_delegation.refusal_tool_result
-    sends it); a service's own fault is the refusal unknown-state with `fault` beside it for the service's log."""
+    sends it); a service's own fault is the refusal unknown-state with `fault` beside it for the service's log.
+
+    DEC-0125: a service that names its own agent id (`self_id`) reads the call's `_meta.mandate` when it carries no
+    decision, given `effect` (the action's effect class, required: without it the call is the service's fault
+    effect-missing), `caller_agent` (only an agent id the service authenticated: a delegation's caller, its own
+    per-agent credential; never a name the call carries), `spend_usd` (its own estimate) and `project`. A covered call
+    answers {ok: True, record: {by: operator, via: mandate, task, chain, caller}, decision: None, mandate}; without
+    `self_id` the mandate is not read and the call is answered as before it existed."""
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19
     inputs: Dict[str, Any] = {"action": action, "tier": tier, "caller": caller, "elicited": elicited is True, "now": now}
     if isinstance(meta, dict) and "decision" in meta:
@@ -320,11 +337,19 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     for name, value in (("target", target), ("approval", approval), ("actionDigest", action_digest), ("humanStepUrl", human_step_url)):
         if value is not None:
             inputs[name] = value
+    if self_id is not None and isinstance(meta, dict) and "mandate" in meta:
+        inputs.update({"mandate": meta["mandate"], "self": self_id})
+        for name, value in (("effect", effect), ("callerAgent", caller_agent), ("spendUsd", spend_usd), ("project", project)):
+            if value is not None:
+                inputs[name] = value
     answer = action_decision(inputs)
     if answer.get("ok") is True:
         record = answer["recordAs"]
         taken = isinstance(record, dict) and record.get("via") == "relayed-instruction"
-        return {"ok": True, "record": record, "decision": inputs["decision"] if taken else None}
+        out = {"ok": True, "record": record, "decision": inputs["decision"] if taken else None}
+        if isinstance(record, dict) and record.get("via") == "mandate":
+            out["mandate"] = inputs["mandate"]
+        return out
     out: Dict[str, Any] = {"ok": False, "refusal": _fd.refusal_from_action(answer)}
     if "fault" in answer:
         out["fault"] = answer["fault"]

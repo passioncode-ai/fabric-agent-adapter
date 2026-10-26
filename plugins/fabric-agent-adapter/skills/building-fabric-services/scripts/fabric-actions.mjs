@@ -13,12 +13,15 @@
 //   refused when decision.schema.json would refuse it.
 // - actionCaller(tier, authenticated): the caller a service records (AP-2): the identity it authenticated, else
 //   local:T0 / local:T1 for a caller its local floor authenticated, never a name the call carries.
+// - DEC-0125: actionDecision reads a call's mandate (_meta.mandate) through fabric-mandate.mjs's mandateCovers when the
+//   call carries no decision.
 //
 // The kit has no JSON Schema validator: the two shapes are written here from the schemas, lengths in code points and
 // patterns over the whole string, as the contract's validator reads them. Members are an object's own members (a JSON
 // text has no other kind; an inherited member is not read). Never throws on what it reads. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';
 import { isObject, jsonEqual } from './fabric-jsvalue.mjs';
+import { mandateCovers } from './fabric-mandate.mjs'; // DEC-0125
 import { formatRfc3339, parseRfc3339Ms } from './fabric-time.mjs';
 
 export const ACTIONS_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1';
@@ -113,8 +116,12 @@ const refuse = (code) => ({ ok: false, code });
  * accepted approval is the approver's; a T2 caller without one gets approval-required with the digest; an accepted
  * elicitation is the operator's; no decision is operator-decision-required; a decision that is not the schema's, is for
  * another action or object, or whose `at` is more than 60 s ahead of `now` or more than 24 h behind it is
- * decision-invalid; otherwise the operator's act, recorded with `caller`. `{fault}` (action-invalid, caller-missing,
- * now-unreadable, digest-missing, url-missing) is the service's own and is never sent to a caller.
+ * decision-invalid; otherwise the operator's act, recorded with `caller`. DEC-0125: a call with no decision that carries
+ * `mandate` (its `_meta.mandate`) is answered as mandateCovers answers, given `self` (the service's own agent id),
+ * `callerAgent` (only an agent id the service authenticated), `effect` (the action's effect class, the service's own
+ * knowledge), `spendUsd` and `project`: covered, {by: 'operator', via: 'mandate', task, chain, caller}. `{fault}`
+ * (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing, self-missing) is the
+ * service's own and is never sent to a caller.
  */
 export function actionDecision(inputs) {
   const field = (key) => member(inputs, key);
@@ -140,12 +147,34 @@ export function actionDecision(inputs) {
   const clock = parseRfc3339Ms(field('now'));
   if (Number.isNaN(clock)) return { fault: 'now-unreadable' };
   const decision = field('decision');
+  if (decision === undefined && field('mandate') !== undefined) return byMandate(field, action, caller);
   if (decision === undefined) return refuse(OPERATOR_DECISION_REQUIRED);
   if (!decisionShape(decision)) return refuse(DECISION_INVALID);
   if (decision.action !== action.id || (has(decision, 'target') && decision.target !== field('target'))) return refuse(DECISION_INVALID);
   const at = parseRfc3339Ms(decision.at);
   if (at > clock + CLOCK_SKEW_SECONDS * 1000 || at < clock - DECISION_LIFETIME_SECONDS * 1000) return refuse(DECISION_INVALID);
   return { ok: true, recordAs: { by: 'operator', via: 'relayed-instruction', caller } };
+}
+
+/**
+ * A relayed action's call that carries a mandate and no decision (DEC-0125 MD-3): the mandate decides, as the contract's
+ * byMandate reads it: the service's own `effect` and agent id `self` are required (else a fault), its estimate
+ * `spendUsd` is read when a number and `project` when a string.
+ */
+function byMandate(field, action, caller) {
+  const effect = field('effect');
+  const self = field('self');
+  if (typeof effect !== 'string') return { fault: 'effect-missing' };
+  if (typeof self !== 'string') return { fault: 'self-missing' };
+  const spendUsd = field('spendUsd');
+  const project = field('project');
+  const answer = mandateCovers({
+    mandate: field('mandate'), tier: field('tier'), now: field('now'), self,
+    ...(field('callerAgent') === undefined ? {} : { callerAgent: field('callerAgent') }),
+    call: { capability: action.tool, action: action.id, effect, ...(typeof spendUsd === 'number' ? { spendUsd } : {}), ...(typeof project === 'string' ? { project } : {}) },
+  });
+  if ('recordAs' in answer) return { ok: true, recordAs: { ...answer.recordAs, caller } };
+  return answer; // never `ignored`: the tier was read first, so a T2 call answered approval-required before (MD-5)
 }
 
 /**

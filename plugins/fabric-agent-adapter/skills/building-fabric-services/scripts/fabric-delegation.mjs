@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import { hubKeyCertified } from './fabric-estate.mjs';
 import { atomicWrite } from './fabric-paths.mjs'; // the kit's private writer (FAA-85)
+import { effectClosure } from './fabric-mandate.mjs'; // defined once beside the mandate that reads it too (DEC-0125)
 
 export const REFUSAL_CODES = Object.freeze([
   'unauthenticated', 'token-expired', 'wrong-audience', 'scope-not-granted', 'effect-above-ceiling', 'no-grant',
@@ -201,13 +202,8 @@ function chainOf(act) {
   return chain;
 }
 
-/** `none` is below every class and `draft` below every external one; external classes are not ordered. */
-export function effectClosure(ceiling) {
-  const admitted = new Set(ceiling);
-  if (ceiling.length > 0) admitted.add('none');
-  if (ceiling.some((effect) => effect !== 'none')) admitted.add('draft');
-  return admitted;
-}
+/** `none` is below every class and `draft` below every external one: defined once in fabric-mandate.mjs (DEC-0125). */
+export { effectClosure };
 
 export const effectWithin = (effect, ceiling) => effectClosure(ceiling).has(effect);
 

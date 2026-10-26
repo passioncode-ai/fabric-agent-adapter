@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 from fabric_actions import action_caller, readable_action  # noqa: E402 - DEC-0121
+from fabric_mandate import EFFECT_CLASSES, is_agent_id  # noqa: E402 - DEC-0125
 from fabric_time import format_rfc3339  # noqa: E402 - the core's (FAA-65)
 
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
@@ -441,12 +442,13 @@ class CallContext:
     the request's `_meta`. For a tool registered with an action, `record` is action_decision's recordAs: "caller"
     (the caller's own act) or {by, via, caller}, the act to put in the service's audit record, and `decision` the
     operator's decision it took (its `instruction` stays in that record, never in events or a page another party
-    reads), else None. `input_records` maps each answered input request to its record when input_actions is on."""
+    reads), else None. `input_records` maps each answered input request to its record when input_actions is on.
+    DEC-0125: `mandate` is the operator's mandate the call was taken under (record `via: mandate`), else None."""
 
     def __init__(self, server: "McpToolServer", tool: str, arguments: Any, traceparent: str,
                  delegation: Optional[Dict[str, Any]] = None, *, tier: Optional[str] = None, caller: Optional[str] = None,
                  meta: Optional[Dict[str, Any]] = None, record: Any = None, decision: Optional[Dict[str, Any]] = None,
-                 input_records: Optional[Dict[str, Any]] = None):
+                 input_records: Optional[Dict[str, Any]] = None, mandate: Optional[Dict[str, Any]] = None):
         self.server = server
         self.tool = tool
         self.arguments = arguments
@@ -455,6 +457,7 @@ class CallContext:
         self.delegation = delegation
         self.tier, self.caller, self.meta = tier, caller, {} if meta is None else meta
         self.record, self.decision, self.input_records = record, decision, input_records
+        self.mandate = mandate
 
     def start_job(self, poll_interval_ms: Optional[int] = None) -> Dict[str, Any]:
         if self.server.jobs is None:
@@ -567,7 +570,7 @@ class McpToolServer:
                  approve: Optional[Callable[[str, Dict[str, Any], Any, str], Optional[Dict[str, Any]]]] = None,
                  elicited: Optional[Callable[[str, Dict[str, Any], Optional[str]], bool]] = None,
                  input_actions: bool = False, clock: Callable[[], float] = time.time,
-                 on_fault: Optional[Callable[[str, str], None]] = None):
+                 on_fault: Optional[Callable[[str, str], None]] = None, agent_id: Optional[str] = None):
         # authorize(tool, headers, tier=) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
         # gated by the job's own capability, and answered only for the principal and caller that started it.
@@ -578,6 +581,12 @@ class McpToolServer:
         # record of an accepted elicitation. input_actions=True gates each answered input request as an action (D8).
         # on_fault(tool, fault) hears a service fault the caller only sees as unknown-state (e.g. caller-missing: an
         # action-gated server needs a tier, identify or authorize that names who calls).
+        # DEC-0125: agent_id is this service's own agent id; with it the server reads a call's _meta.mandate for a
+        # relayed action added with its effect (the chain must end in agent_id, and in the delegation's caller before
+        # it when authorize accepted a token); without it a mandate is not read, as before.
+        if agent_id is not None and not is_agent_id(agent_id):
+            raise InteropError("agent_id is this service's agent id (a lower-case id, optionally .instance; DEC-0125).")
+        self.agent_id = agent_id
         self._authorize = authorize
         self._identify, self._approve, self._elicited = identify, approve, elicited
         self.input_actions, self._clock, self._on_fault = input_actions is True, clock, on_fault
@@ -590,11 +599,17 @@ class McpToolServer:
         self._on_input = on_input
 
     def add_tool(self, tool: Dict[str, Any], handler: Handler, action: Optional[Dict[str, Any]] = None, *,
-                 target: Any = None, human_step_url: Optional[str] = None) -> None:
+                 target: Any = None, human_step_url: Optional[str] = None, effect: Optional[str] = None,
+                 spend: Any = None, project: Any = None) -> None:
         """Serve a tool. `action` (DEC-0121 AP-1) is the declared action this tool performs, {id, title, tool, gate,
         humanStep?}, its `tool` this tool's name: the server runs action_gate before the handler. `target` names the
         object a call acts on: an argument's name, or a function of the arguments; `human_step_url` is the link of a
-        `human` action's step (an https URL or a path on the service's origin, AP-4)."""
+        `human` action's step (an https URL or a path on the service's origin, AP-4).
+
+        DEC-0125, on a server with agent_id: `effect` is the action's effect class (governance's vocabulary), required
+        for a relayed action, since a mandate covers a call by its effect; `spend` the service's own estimate of what a
+        call spends, USD (a number, or a function of the arguments answering a number or None); `project` the project a
+        call acts in (a name, or a function of the arguments)."""
         if tool["name"] in self.handlers:
             raise InteropError("Tool %s is served twice." % tool["name"])
         if "outputSchema" in tool:
@@ -608,7 +623,16 @@ class McpToolServer:
                 raise InteropError("Tool %s: a human step needs its link, an https URL or a path (DEC-0121 AP-4)." % tool["name"])
             if not (target is None or isinstance(target, str) or callable(target)):
                 raise InteropError("Tool %s: target is an argument's name or a function of the arguments." % tool["name"])
-            self.actions[tool["name"]] = {"action": dict(action), "target": target, "url": human_step_url}
+            if self.agent_id is not None and action["gate"] == "relayed" and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+                raise InteropError("Tool %s: a relayed action on a server that reads mandates names its effect class (DEC-0125)." % tool["name"])
+            if effect is not None and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+                raise InteropError("Tool %s: effect is one of %s." % (tool["name"], ", ".join(EFFECT_CLASSES)))
+            if not (spend is None or callable(spend) or (isinstance(spend, (int, float)) and not isinstance(spend, bool))):
+                raise InteropError("Tool %s: spend is a number of USD or a function of the arguments." % tool["name"])
+            if not (project is None or isinstance(project, str) or callable(project)):
+                raise InteropError("Tool %s: project is a name or a function of the arguments." % tool["name"])
+            self.actions[tool["name"]] = {"action": dict(action), "target": target, "url": human_step_url,
+                                          "effect": effect, "spend": spend, "project": project}
         self.tools.append(tool)
         self.handlers[tool["name"]] = handler
 
@@ -624,8 +648,10 @@ class McpToolServer:
         return action_caller(tier, authenticated)
 
     def _gate_action(self, action: Dict[str, Any], name: str, arguments: Dict[str, Any], target: Any, url: Any,
-                     headers: Any, tier: str, meta: Dict[str, Any], caller: Optional[str]) -> Dict[str, Any]:
-        """action_gate for one call: the approval the call presented, the digest of {tool, arguments}, the clock."""
+                     headers: Any, tier: str, meta: Dict[str, Any], caller: Optional[str],
+                     mandate: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """action_gate for one call: the approval the call presented, the digest of {tool, arguments}, the clock, and
+        under DEC-0125 what a mandate is read with (`mandate`: self_id, effect, caller_agent, spend_usd, project)."""
         digest, approval = None, None
         if action["gate"] == "relayed":
             import fabric_delegation as _fd  # noqa: E402 - only an action-gated server needs it
@@ -646,7 +672,21 @@ class McpToolServer:
                         "fault": "approval-outcome-unreadable"}
         elicited = action["gate"] == "relayed" and self._elicited is not None and self._elicited(name, arguments, caller) is True
         return action_gate(action, tier=tier, caller=caller, meta=meta, target=target, elicited=elicited, approval=approval,
-                           action_digest=digest, human_step_url=url, now=format_rfc3339(self._clock() * 1000))
+                           action_digest=digest, human_step_url=url, now=format_rfc3339(self._clock() * 1000), **(mandate or {}))
+
+    def _mandate_inputs(self, entry: Dict[str, Any], arguments: Dict[str, Any], verdict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """DEC-0125: what action_gate reads a mandate with, empty on a server without agent_id. The caller's agent id is
+        the delegation's caller when authorize accepted a token, never a name the call carries."""
+        if self.agent_id is None:
+            return {}
+        spend, project = entry.get("spend"), entry.get("project")
+        spend = spend(arguments) if callable(spend) else spend
+        project = project(arguments) if callable(project) else project
+        caller_agent = (verdict or {}).get("caller")
+        return {"self_id": self.agent_id, "effect": entry.get("effect"),
+                "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
+                "spend_usd": spend if isinstance(spend, (int, float)) and not isinstance(spend, bool) else None,
+                "project": project if isinstance(project, str) else None}
 
     def _gate_inputs(self, arguments: Dict[str, Any], headers: Any, tier: str, meta: Dict[str, Any],
                      caller: Optional[str]) -> Dict[str, Any]:
@@ -786,7 +826,7 @@ class McpToolServer:
         caller, gated, entry = self._caller(headers, tier, delegation), {"record": None, "decision": None}, self.actions.get(name)
         if entry is not None:  # DEC-0121: after the authorize gate, before the handler
             gated = self._gate_action(entry["action"], name, arguments, self._target(entry["target"], arguments), entry["url"],
-                                      headers, tier, meta, caller)
+                                      headers, tier, meta, caller, self._mandate_inputs(entry, arguments, delegation))
             if not gated["ok"] and "invalid" in gated:
                 return self._error(rid, -32602, gated["invalid"])
             if not gated["ok"]:
@@ -794,7 +834,7 @@ class McpToolServer:
                 import fabric_delegation as _fd  # noqa: E402 - DL-19
                 return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(gated["refusal"], traceparent=span)}
         context = CallContext(self, name, arguments, span, delegation, tier=tier, caller=caller, meta=meta,
-                              record=gated["record"], decision=gated["decision"])
+                              record=gated["record"], decision=gated["decision"], mandate=gated.get("mandate"))
         try:
             structured = handler(arguments, context)
         except InteropError as exc:

@@ -80,6 +80,17 @@
    "sha256": "a0ddc49d748c1efb1830de176998d6c8eac30f77d387c71eae12549c52aaab27"
   },
   {
+   "module": "fabric_mandate",
+   "file": "fabric_mandate.py",
+   "layer": "L2",
+   "imports": [
+    "fabric_base",
+    "fabric_jsvalue",
+    "fabric_time"
+   ],
+   "sha256": "b8557e703091474f039472e11292bf2caf1a809b23037a6c5578cbae40f69339"
+  },
+  {
    "module": "fabric_delegation",
    "file": "fabric_delegation.py",
    "layer": "L2",
@@ -87,6 +98,7 @@
     "fabric_crypto",
     "fabric_estate",
     "fabric_jsvalue",
+    "fabric_mandate",
     "fabric_paths"
    ],
    "sha256": "f6c135126d2b9f6ff0c93f2947be1aa03d99460cb759495f51fe86f3edf481b3"
@@ -159,6 +171,7 @@
    "imports": [
     "fabric_base",
     "fabric_jsvalue",
+    "fabric_mandate",
     "fabric_time"
    ],
    "sha256": "44feb5e70bd9894c5ed1fa23bf8df55989ec99acb934b24bf97ddd7295891251"
@@ -492,6 +505,17 @@
    "sha256": "b6610aaad9d00d8a7f42955627fb81725950841455bcedfc050abb0e079f0f93"
   },
   {
+   "module": "fabric-mandate",
+   "file": "fabric-mandate.mjs",
+   "layer": "L2",
+   "imports": [
+    "fabric-base",
+    "fabric-jsvalue",
+    "fabric-time"
+   ],
+   "sha256": "efd6d0d963ada7b5a1b3a6dc7d1dfb469d40c8632cb45c5a46686a55a1b2b11c"
+  },
+  {
    "module": "fabric-delegation",
    "file": "fabric-delegation.mjs",
    "layer": "L2",
@@ -499,6 +523,7 @@
     "fabric-crypto",
     "fabric-estate",
     "fabric-jsvalue",
+    "fabric-mandate",
     "fabric-paths"
    ],
    "sha256": "fab1efdc1a9a0a9a00768905dded538fe185ca1b63c115dc4273717efc8e81f6"
@@ -569,6 +594,7 @@
    "imports": [
     "fabric-base",
     "fabric-jsvalue",
+    "fabric-mandate",
     "fabric-time"
    ],
    "sha256": "66f9ca7d1da31c89eeedffe7b78ff2230361d375d44c3aa90d9c60b66dfe5cbe"

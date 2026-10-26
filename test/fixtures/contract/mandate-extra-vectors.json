@@ -5872,9 +5872,9 @@
    "problem": "mandate-malformed",
    "findings": [
     {
-     "code": "FAC-SEM-000",
+     "code": "FAC-SEM-144",
      "instancePath": "",
-     "message": "value must be an object"
+     "message": "the mandate is not valid: mandate-malformed (DEC-0125 MD-1, MD-2)"
     }
    ]
   },
@@ -5918,9 +5918,9 @@
    "problem": "mandate-malformed",
    "findings": [
     {
-     "code": "FAC-SEM-000",
+     "code": "FAC-SEM-144",
      "instancePath": "",
-     "message": "value must be an object"
+     "message": "the mandate is not valid: mandate-malformed (DEC-0125 MD-1, MD-2)"
     }
    ]
   },
@@ -5931,9 +5931,9 @@
    "problem": "mandate-malformed",
    "findings": [
     {
-     "code": "FAC-SEM-000",
+     "code": "FAC-SEM-144",
      "instancePath": "",
-     "message": "value must be an object"
+     "message": "the mandate is not valid: mandate-malformed (DEC-0125 MD-1, MD-2)"
     }
    ]
   },
@@ -9073,9 +9073,9 @@
    "problem": "mandate-malformed",
    "findings": [
     {
-     "code": "FAC-SEM-000",
+     "code": "FAC-SEM-144",
      "instancePath": "",
-     "message": "value must be an object"
+     "message": "the mandate is not valid: mandate-malformed (DEC-0125 MD-1, MD-2)"
     }
    ]
   },
