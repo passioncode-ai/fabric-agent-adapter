@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Fabric's rule `work.check-every-three-minutes`** (FAA-141, Fabric TO-2, ask `e2a7bec4`): working-with-fabric
+  Step 5 and creating-fabric-agents' autonomy reference tell an agent to call `fabric_work_list` every three minutes
+  and before any wait, act first on its `nudges` and `waiting_for_you`, read and mark its unread board answers, and
+  never leave a held task still. Scenario eval `check-every-three-minutes`.
+
 ## 0.51.2 (2026-10-26)
 
 ### Added

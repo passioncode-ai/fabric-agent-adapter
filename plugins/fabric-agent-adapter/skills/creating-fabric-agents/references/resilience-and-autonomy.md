@@ -141,6 +141,13 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 8. **Hand work over only while it is alive**, and claim each hand-over exactly once by an exclusive
    create; a forgotten workflow was handed over twice.
 
+### In a Fabric project
+
+An agent that works in a project through Fabric follows Fabric's rule `work.check-every-three-minutes`: every three
+minutes while it works, and before any wait, it calls `fabric_work_list`, acts first on `nudges` and
+`waiting_for_you`, then reads its unread board answers (`com.list {unread: true}`, then `com.read_ack`), and never
+leaves a held task still. The working-with-fabric skill's Step 5 carries it; Fabric serves it through `fabric_whoami`.
+
 ## Verification you can believe
 
 1. **A test counts once it was watched failing against a planted defect** (clear bytecode caches

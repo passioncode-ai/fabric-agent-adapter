@@ -147,6 +147,11 @@ A Fabric older than 0.4.0 has no `fabric_work_*` tools: use `fabric_tasks_list` 
 
 ## Step 5: while you work
 
+- **Every three minutes, and before any wait** (Fabric's rule `work.check-every-three-minutes`, which
+  `fabric_whoami` serves from Fabric 0.3.13): call `fabric_work_list` and act first on its `nudges` and
+  `waiting_for_you` (each is given once, there or in `fabric_heartbeat`); then read your unread board answers with
+  `com.list {unread: true}` and mark what you handled with `com.read_ack`. Never leave a task you hold still: move
+  it, hand it over or let it go. Fabric sweeps abandoned work on the same cadence.
 - `fabric_stage_report`: where you are in the work, as a claim beside what Fabric observes.
 - `fabric_task_note`: working notes on the task, append-only.
 - `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim.

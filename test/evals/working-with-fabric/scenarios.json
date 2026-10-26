@@ -383,6 +383,16 @@
         "acts on them first, in Fabric's order: fabric_work_list, then claims the task again with fabric_work_claim or lets it go with fabric_work_release; reads the request with com.list {unread: true} and answers it or hands it on",
         "then does the typo fix it was asked for, and does not expect the same reminder again: each is printed once"
       ]
+    },
+    {
+      "id": "check-every-three-minutes",
+      "trap": "the agent worked for half an hour on a claimed task without looking at Fabric again, and waited on a reply without checking its nudges or its unread board answers; the claim went silent and Fabric's sweep took it as abandoned",
+      "request": "You claimed the migration task and it will take about forty minutes; partway through you will wait for a peer's reply on the board. How do you stay in touch with Fabric while you work?",
+      "expected": [
+        "every three minutes while it works, and before any wait, calls fabric_work_list and acts first on its nudges and waiting_for_you (Fabric's rule work.check-every-three-minutes, served by fabric_whoami)",
+        "then reads its unread board answers with com.list {unread: true} and marks what it handled read with com.read_ack",
+        "never leaves a held task still: it moves it, hands it over or lets it go, since Fabric sweeps abandoned work on the same cadence"
+      ]
     }
   ]
 }
