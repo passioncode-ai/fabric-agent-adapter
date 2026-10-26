@@ -8,6 +8,22 @@
   shows a nudge, at most five, and keeps it for `fabric_work_list` and `fabric_heartbeat`, so the nudges of turns
   spooled before a `/clear` are not lost, as 0.51.2's notes said; they reach the new session there.
 
+- **DEC-0128 (DL-14a), a hub key per organization context.** `hub_key_certified` / `hubKeyCertified` take the
+  token's context (`context=` / `{context}`), and `verify_delegation` and `delegation_gate` (Node: `verifyDelegation`,
+  `delegationGate`) take `estate_context` / `estateContext`. An organization's token verifies only under its context's
+  hub key (`machines[].contextHubKeys`) while the record pins the organization; a context that is neither `personal`
+  nor `org:<orgId>` fails closed (`kid-not-certified`). `verify_approval` takes no context, as the contract declares.
+- Both estate readers check organization pins and context hub keys as the contract's `estate-record-rules.ts` does at
+  `.12`: `FAC-SEM-147` is new; `FAC-SEM-073`, `076`, `114` and `134` read context hub keys.
+- `fabric_estate` splits its record rules into the new kit module `fabric_estate_rules` (Node:
+  `fabric-estate-rules.mjs`), listed just before it in `kit.json`; `fabric_estate` re-exports every name, so callers
+  keep their imports, and `fabric_kit.py install --module fabric_estate` copies both.
+- An organization instance whose context the record does not pin still starts (`fabric_context`); its tokens are
+  refused `kid-not-certified` (brief D5).
+- Vectors regenerated at `.12`: `estate-vectors.json` (the organizations positive, seven context and organization
+  semantic fixtures, 39 generated context and revision cases), `hub-key-vectors.json` (`contextCases` 33,
+  `contextVerifier` 10); the hostile estate inputs cover `contextHubKeys`, `organizations` and hub-key contexts.
+
 ### Added
 
 - **Fabric's rule `work.check-every-three-minutes`** (FAA-141, Fabric TO-2, ask `e2a7bec4`): working-with-fabric
