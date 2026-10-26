@@ -9,10 +9,11 @@ import { credentialName, secretArgument, secretUrl, secretValue } from './fabric
 export const PROTOCOL_REVISIONS = new Map(Object.entries({
   'access-log': ['1'], approval: ['1'], 'activity-summary': ['1'], 'agent-directory': ['1'], 'call-record': ['1'], 'coding-agents': ['1'], 'credential-decision': ['1'], 'credential-request': ['1'], 'credential-revocation': ['1'], 'enroll-token': ['1'], entitlement: ['1'], 'entitlement-key-set': ['1'], 'estate-record': ['1'], 'execution-packet': ['1'],
   'fabric-actions': ['0.1'], 'fabric-activity': ['0.1'], 'fabric-agent-call': ['1'], 'fabric-connections': ['0.1'], 'fabric-credential-envelope': ['1'], 'fabric-load': ['0.1'], 'fabric-dashboard': ['0.1'], 'fabric-delegation': ['0.1'], 'fabric-device': ['0.1'],
-  'fabric-interop': ['0.1', '0.2'], 'fabric-local-channel': ['0.1'], 'fabric-local-runner': ['0.1'], 'fabric-operator-channel': ['0.1'],
+  'fabric-interop': ['0.1', '0.2'], 'fabric-local-channel': ['0.1'], 'fabric-local-runner': ['0.1'], 'fabric-machine-report': ['1'], 'fabric-operator-channel': ['0.1'],
   'fabric-package': ['1'], 'fabric-project-comms': ['0.1'], 'fabric-proposal': ['1'], 'fabric-provider': ['0.1'], 'fabric-relay': ['0.1'],
-  'fabric-secret-envelope': ['1'], 'fabric-service': ['0.1'], 'fabric-settings-backup': ['1'], heartbeat: ['1'], 'learning-note': ['1'], mandate: ['1'],
-  memory: ['0.1'], 'node-summary': ['1'], 'pairing-message': ['1'], pipeline: ['0.1'], 'repair-request': ['1'], 'repair-result': ['1'],
+  'fabric-secret-envelope': ['1'], 'fabric-service': ['0.1'], 'fabric-settings-backup': ['1'], heartbeat: ['1'], 'learning-note': ['1'], 'machine-report': ['1'], mandate: ['1'],
+  memory: ['0.1'], 'node-summary': ['1'], 'operator-source': ['1'], 'org-authority': ['1'], 'org-authority-draft': ['1'],
+  'org-key-set': ['1'], 'org-key-set-draft': ['1'], 'org-membership': ['1'], 'org-root-registration': ['1'], 'pairing-message': ['1'], pipeline: ['0.1'], 'repair-request': ['1'], 'repair-result': ['1'],
   'revocation-delta': ['1'], 'session-handoff': ['1'], 'service-load': ['1'],
   'share-registration': ['1'], 'share-registration-receipt': ['1'], 'support-quality-daily': ['1'], 'window-lease': ['1'],
 }));

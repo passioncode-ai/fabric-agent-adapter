@@ -81,6 +81,9 @@
     "fabric-local-runner": [
       "0.1"
     ],
+    "fabric-machine-report": [
+      "1"
+    ],
     "fabric-operator-channel": [
       "0.1"
     ],
@@ -114,6 +117,9 @@
     "learning-note": [
       "1"
     ],
+    "machine-report": [
+      "1"
+    ],
     "mandate": [
       "1"
     ],
@@ -121,6 +127,27 @@
       "0.1"
     ],
     "node-summary": [
+      "1"
+    ],
+    "operator-source": [
+      "1"
+    ],
+    "org-authority": [
+      "1"
+    ],
+    "org-authority-draft": [
+      "1"
+    ],
+    "org-key-set": [
+      "1"
+    ],
+    "org-key-set-draft": [
+      "1"
+    ],
+    "org-membership": [
+      "1"
+    ],
+    "org-root-registration": [
       "1"
     ],
     "pairing-message": [
