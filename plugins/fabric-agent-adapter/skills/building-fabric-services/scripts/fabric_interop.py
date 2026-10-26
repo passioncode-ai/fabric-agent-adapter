@@ -796,8 +796,12 @@ class McpToolServer:
             action = {"id": key, "title": "Answer %s" % key, "tool": "fabric.job.get", "gate": "relayed"}
             step, mandate = steps.get(key), {}
             if self.agent_id is not None and isinstance(step, dict):
-                # A kept step is read as approval_step read it: under the job's own capability, not fabric.job.get.
-                action["tool"] = self.jobs.private(job_id).get("capability") or "fabric.job.get"
+                # A kept step is read as approval_step read it: under the job's own capability, not fabric.job.get. A
+                # tool name that is no capability name keeps fabric.job.get, so the action stays readable: a decision
+                # is still taken, and a mandate naming capabilities does not cover it (fails closed).
+                capability = self.jobs.private(job_id).get("capability")
+                if readable_action(dict(action, tool=capability)):
+                    action["tool"] = capability
                 agent = (verdict or {}).get("caller")
                 mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),
                            "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None}

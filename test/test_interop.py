@@ -1088,6 +1088,25 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertFalse(self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], "and on the answer")
         self.assertEqual(self.jobs.get(job_id)["status"], "working")
 
+    def test_a_tool_name_that_is_no_capability_still_takes_a_decision_on_a_kept_step(self):
+        # Seam round 2: a camelCase tool keeps fabric.job.get for the action, so a decision is still taken.
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
+        self.contexts, self.inputs = [], []
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, clock=lambda: NOW_SECONDS, agent_id="example-agent",
+                                  input_actions=True, on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
+                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)))
+        server.add_tool({"name": "reviewsApprove", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "reviewsApprove", "arguments": {}, "_meta": {"traceparent": PARENT}}}, tier="T0")
+        job_id, _ = self.step()
+        decision = {"by": "operator", "via": "relayed-instruction", "action": "approve-reply",
+                    "instruction": "Agent: Publish the reply? Operator: yes", "at": "2026-10-24T09:30:00Z"}
+        taken = self.answer(server, job_id, {"decision": decision})
+        self.assertFalse(taken["isError"], taken)
+        self.assertEqual(self.jobs.get(job_id)["status"], "working")
+
     def test_a_kept_step_does_not_outlive_its_question(self):
         # Seam round 1: a later plain question under the same key is not answered by a mandate alone.
         server = self.start({}, input_actions=True)

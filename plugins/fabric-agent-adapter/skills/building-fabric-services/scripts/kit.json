@@ -396,7 +396,7 @@
     "fabric_service",
     "fabric_time"
    ],
-   "sha256": "64caea63bd5d9ab471acdfeb85932748f0f1c5aa2ce7b3a5b448b77d19fc6617"
+   "sha256": "b01ecc657d9b13f88a9fa71c757efd78e611e42ed27dcb7d056b62a62d3b6c5a"
   },
   {
    "module": "fabric_hub",
@@ -868,7 +868,7 @@
     "fabric-page-links",
     "fabric-service"
    ],
-   "sha256": "17e140f0085ccbdb3b2211cbc4999772d30a0f71e368df942c5274b8409026cd"
+   "sha256": "5aabe2907b79c08a34b0a57839148566f34ad6e19e562b4f58c5517ece65c281"
   },
   {
    "module": "fabric-hub",
@@ -3713,7 +3713,7 @@
    "fabric_service.py": "a2e813469a47d4d3eea996628635c8903007498bdb6a1ae032a7a5ce6f49fe2f",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "b612d84ce0ededda663fc4f73a10e2bb43b76e57234bf147ed153c7e184808e5",
-   "fabric_interop.py": "64caea63bd5d9ab471acdfeb85932748f0f1c5aa2ce7b3a5b448b77d19fc6617",
+   "fabric_interop.py": "b01ecc657d9b13f88a9fa71c757efd78e611e42ed27dcb7d056b62a62d3b6c5a",
    "fabric_hub.py": "b9ac852e601b1d54cf61351677a628afc69faeed7d1fc74ebe541c1cf38e0c2a",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "b5bff994cb615c6a4bb0d88d020e3a59504166180e1fa1aea3be93224f2aeccb",
@@ -3755,7 +3755,7 @@
    "fabric-service.mjs": "6aa673657427211b491a9b63f94b9847a7e6aa3ee1b7353e1af11f46469803a3",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "002de7c6c90d49bbad80014abf41e488ee573697c601b456082ae59a5d9e90fd",
-   "fabric-interop.mjs": "17e140f0085ccbdb3b2211cbc4999772d30a0f71e368df942c5274b8409026cd",
+   "fabric-interop.mjs": "5aabe2907b79c08a34b0a57839148566f34ad6e19e562b4f58c5517ece65c281",
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
    "fabric-board-link.mjs": "4cd6d4e21713a38c8e56f7d59db3148638b8c27c08e774d96a0f6283c6049e0a",
