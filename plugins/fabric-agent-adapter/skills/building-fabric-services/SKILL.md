@@ -17,7 +17,7 @@ metadata:
   version: "0.50.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "52c7d798b9f4eb784eb4e29e717038a8912c759d"
+  extension-commit: "a3a66eb0052043847f6556348e37d34ca873a629"
 ---
 
 # Building Fabric services

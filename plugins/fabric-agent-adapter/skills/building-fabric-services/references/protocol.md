@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `52c7d798b9f4eb784eb4e29e717038a8912c759d`
+Pinned to `fabric-agent-contract` commit `a3a66eb0052043847f6556348e37d34ca873a629`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -17,7 +17,9 @@ no-token `401` DEC-0109; money apart from a subscription's estimate DEC-0110; th
 protocols of DEC-0111 in the register; a check-in's credential members DEC-0112, a revocation that names its request
 DEC-0113, a node summary against the certificate DEC-0114, key windows read strictly DEC-0115 and DEC-0119, which list
 gates each credential member DEC-0116 to DEC-0118, a pin of four members and `profile` DEC-0120; every action a person
-has as an agent tool, `fabric-actions/0.1` and the operator's relayed decision DEC-0121). The contract's schemas are normative;
+has as an agent tool, `fabric-actions/0.1` and the operator's relayed decision DEC-0121; `surfaces.a2a` and the public A2A
+Agent Card DEC-0122, a service's pages as Fabric Dashboards' `open_link` DEC-0123, Fabric's button in the page's language
+DEC-0124). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
