@@ -82,6 +82,8 @@ from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-
 from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
 from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict  # noqa: E402 - DEC-0121
 from check_service_rules import opens_in_host_verdict, service_checkout  # noqa: E402 - FAA-118
+from check_service_rules import well_known_a2a_verdict, a2a_card_verdict  # noqa: E402 - DEC-0122
+import fabric_a2a as fa2  # noqa: E402 - DEC-0122
 
 
 class _PinnedHTTPS(http.client.HTTPSConnection):
@@ -275,6 +277,8 @@ class Probe:
                      "%d connection(s), %d named in degraded[]" % (len(view["connections"]), failing))
         # DEC-0121, FAC-SEM-142: every button's agent twin, declared; no declaration is NOT_RUN (D10).
         self.add("well-known.actions", *well_known_actions_verdict(wk))
+        # DEC-0122: where the public Agent Card is; no member is NOT_RUN.
+        self.add("well-known.a2a", *well_known_a2a_verdict(wk))
         self.configuration_rule()
         svc = wk.get("service") or {}
         answered = "%s.%s" % (svc.get("id"), svc.get("instance"))
@@ -421,6 +425,23 @@ class Probe:
         days = report.get("days") if isinstance(report, dict) else None
         self.add("usage.report", "FAIL" if problems else "PASS",
                  "; ".join(problems[:5]) if problems else "%d day(s), unknown cost kept null" % len(days or []))
+
+    # A2A (DEC-0122) ---------------------------------------------------------------
+    def a2a_rules(self) -> None:
+        """`a2a.card`: the public card read with no Authorization header and never the descriptor's token (D5); its
+        interfaces are never called. The verdict is check_service_rules.a2a_card_verdict."""
+        view = fa2.a2a_view(self.wk)
+        status, body, error = 0, b"", None
+        if view["valid"]:
+            # Non-ASCII and control characters the schema's path admits are sent percent-encoded.
+            target = urllib.parse.quote(view["path"], safe="".join(chr(c) for c in range(0x21, 0x7F)))
+            try:
+                status, _, body = self.request("GET", target)  # Host only: no token header is added here
+            except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
+                error = str(exc) or type(exc).__name__
+        header, _ = fs.token_header(self.d.get("auth"), "")
+        self.add("a2a.card", *a2a_card_verdict(self.wk, status, body, remote=self.remote, origin=str(self.d.get("origin") or ""),
+                                               descriptor_header=header, error=error))
 
     # dashboard (fabric-dashboard/0.1, DEC-0036) --------------------------------
     def dashboard_rules(self) -> None:
@@ -851,6 +872,7 @@ class Probe:
             self.network_rules()
             self.auth_rules()
             self.usage_rules()
+            self.a2a_rules()
             self.dashboard_rules()
             self.dashboard_page_rules()
             self.login_rules()
