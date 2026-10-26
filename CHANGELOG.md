@@ -58,8 +58,11 @@
 ### Added
 
 - **Being seen correctly in Fabric** (FAA-151, board `c42071bc`): working-with-fabric Steps 4 and 5 claim the
-  person's request as one task titled with it in one line, file each split with `fabric_task_create` while it is
-  claimed, report the stage with `step` and `ofSteps`, and send a heartbeat with `phase: waiting` before a wait.
+  person's request as one task titled with it in one line (`origin: {kind: "person"}`), file each split with
+  `fabric_task_create` while it is claimed and link it with `fabric_task_link` (`rel: "spawned"`) when the answer
+  carries no `chained_to` (a session opened from its own terminal, on Fabric to 0.3.14), report the stage with `step`
+  and `ofSteps`, and send a heartbeat with `phase: waiting` before a wait (the wait in `note`, or `waitingOn` for a
+  question asked with `fabric_question_ask`).
   Scenario eval `seen-correctly-goal-and-step`.
 - **Fabric's rule `work.check-every-three-minutes`** (FAA-141, Fabric TO-2, ask `e2a7bec4`): working-with-fabric
   Step 5 and creating-fabric-agents' autonomy reference tell an agent to call `fabric_work_list` every three minutes

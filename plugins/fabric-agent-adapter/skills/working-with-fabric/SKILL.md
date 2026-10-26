@@ -140,9 +140,11 @@ Fabric 0.4.0 (REQ-38):
    read, the answer says so: never tell the person "nobody is working here".
 2. `fabric_work_claim` with your task (a board id, a backlog row as `source: {repository, path, id}`, or a new
    row's title with its evidence) and what you will touch (folders, files or patterns). Claim the person's request
-   as ONE task whose title is that request in one line: Fabric shows it as your goal. File each piece you split off
-   with `fabric_task_create` while that task is claimed, so Fabric links it as spawned (Fabric's announcement of
-   2026-10-26, board `c42071bc`).
+   as ONE task whose title is that request in one line, with `origin: {kind: "person"}` naming where they said it:
+   from the Fabric release that shows agents' goals, it is shown as yours. File each piece you split off with
+   `fabric_task_create` while that task is claimed; when the answer carries no `chained_to` (a session opened from
+   its own terminal: Fabric to 0.3.14 links only a session it launched for a task), link it yourself with
+   `fabric_task_link {taskId: <the piece>, rel: "spawned", targetTaskId: <the claimed task>}` (board `c42071bc`).
 3. A related-work warning (same backlog row, a linked task, an overlapping folder) names the other agent, its
    task and the overlap: tell the person, then coordinate (ask Fabric to hand it over, or link the tasks) or
    continue knowing it; say which, out loud.
@@ -161,7 +163,8 @@ A Fabric older than 0.4.0 has no `fabric_work_*` tools: use `fabric_tasks_list` 
   `ofSteps` (step 2 of 3), which Fabric shows to the operator as your current step.
 - `fabric_task_note`: working notes on the task, append-only.
 - `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim. Before
-  you wait on the person or a question, send it with `phase: "waiting"` and what you wait on.
+  you wait on the person or a question, send it with `phase: "waiting"`: `waitingOn: {kind: "question", id}` for a
+  question you asked with `fabric_question_ask`, otherwise what you wait on in one line of `note`.
 - `fabric_memory_search` before re-deriving what the project knows; `fabric_memory_remember` for a fact worth
   keeping, with where you learned it.
 - `fabric_question_ask` for a decision you are not entitled to make; `fabric_effect_request` before spending,
