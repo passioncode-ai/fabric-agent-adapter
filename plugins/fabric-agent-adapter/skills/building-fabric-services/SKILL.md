@@ -103,8 +103,8 @@ responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) f
 [`scripts/fabric_board.py`](scripts/fabric_board.py) enrolls, claims, accepts the exact digest, checkpoints before
 every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
 The request body is data behind the service's own input gate. From 0.53.0 a slot the operator moved to another
-session stays moved until `take_back` (`takeBack`): give it an operator action with its tool, or it stays moved for
-good. Read [the board reference](references/board.md).
+session stays moved until `take_back` (`takeBack`): give it an operator action with its tool and gate `human`, or it
+stays moved for good. Read [the board reference](references/board.md).
 
 ## Step 2: the non-negotiables
 

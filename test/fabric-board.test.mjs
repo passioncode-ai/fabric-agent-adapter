@@ -1111,12 +1111,11 @@ test('FAA-155 seam 2: a lost ask that never landed does not take a moved slot ba
   const h = harness(hub);
   const r = h.responder();
   await r.step(); // holds generation 1
-  await hub.control({ op: 'set', values: { down: true } });
-  await h.advance(20);
-  await r.step(); // the renew's enroll is recorded, then never reaches the board
-  assert.ok('asking' in record(hub)['video.render']);
-  await hub.control({ op: 'set', values: { down: false } });
-  await hub.control({ op: 'end-sessions' });
+  await hub.control({ op: 'end-sessions' }); // it dies with an enroll recorded that never reached the board
+  const file = path.join(hub.data, 'board-checkpoint.json');
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  doc.slots['video.render'].asking = { op: 'com.enroll', args: { idempotency: { epoch: 1, key: 'example-agent.enroll.never-sent' }, capability: 'video.render' } };
+  fs.writeFileSync(file, JSON.stringify(doc), { mode: 0o600 });
   await hub.control({ op: 'move', capability: 'video.render' });
   await h.advance(61);
   const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
@@ -1157,6 +1156,36 @@ test('FAA-155 seam 2: a lost ask that never landed does not take a moved slot ba
   assert.ok(s.calls.includes('com.responder_replace'));
   assert.equal(s.requests[done].state, 'completed');
   assert.ok(!c.kinds().includes('board.slot.moved'));
+});
+
+test('FAA-155 seam 3: an idle renew writes nothing; a clean leave forgets the record, so a rollback never reads as a move', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  const file = path.join(hub.data, 'board-checkpoint.json');
+  const before = fs.statSync(file).mtimeMs;
+  const plain = r.checkpoint.slot.bind(r.checkpoint);
+  let writes = 0;
+  r.checkpoint.slot = (c, rec) => { const was = JSON.stringify(r.checkpoint.slots); plain(c, rec); if (JSON.stringify(r.checkpoint.slots) !== was) writes += 1; };
+  for (let i = 0; i < 5; i += 1) {
+    await h.advance(20);
+    await r.step();
+  }
+  assert.equal(writes, 0);
+  assert.equal(fs.statSync(file).mtimeMs, before);
+  await r.shutdown(0);
+  assert.ok(!('video.render' in record(hub)));
+  await hub.control({ op: 'move', capability: 'video.render' }); // an older kit enrolls the free slot, then stops
+  await h.advance(61);
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const second = h.responder();
+  for (let i = 0; i < 3; i += 1) {
+    await second.step();
+    await h.advance(1);
+  }
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  assert.ok(!h.kinds().includes('board.slot.moved'));
 });
 
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {

@@ -72,8 +72,15 @@ FAKE_MCP = textwrap.dedent('''\
                     return {{"type": "object", "properties": {{"claims": {{"type": "string"}}, "observedAt": {{"type": "string"}}}}}}
                 shape = os.environ.get("FAKE_MCP_OBSERVE_REPOSITORIES")
                 if n == "fabric_session_observe" and shape:
-                    items = {{"type": "string"}} if shape == "strings" else {{"type": "object", "properties": {{k: {{"type": "string"}} for k in ("host", "owner", "name")}}}}
-                    return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": {{"type": "array", "items": items}}}}}}
+                    items = {{"type": "string"}} if shape == "strings" else {{"type": "object", "properties": {{k: {{"type": "string"}} for k in ("host", "owner", "name", "path")}}}}
+                    if shape == "required-path":
+                        items["required"] = ["host", "owner", "name", "path"]
+                    field = {{"type": "array", "items": items}}
+                    if shape == "max1":
+                        field["maxItems"] = 1
+                    if shape == "untyped":
+                        field.pop("type")
+                    return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": field}}}}
                 return {{"type": "object"}}
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": schema(n)}} for n in names]}}}})
         elif method == "tools/call":
@@ -1397,11 +1404,28 @@ class TurnRepositories(Base):
         self.assertIn("the repositories mark: FileNotFoundError", self.log_text())
 
     def test_a_field_of_another_shape_is_not_sent(self):
-        self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "strings"
-        turns = self.deliver_two_turns()
-        for turn in turns:
-            self.assertNotIn("repositories", turn)
-        self.assertEqual(self.log_text().count("does not take repositories"), 1)
+        """Seam reading 3: items of another type, an item that requires more than host, owner and name, or a field
+        that is not declared an array: nothing is sent, the turn's facts still are."""
+        for shape in ("strings", "required-path", "untyped"):
+            with self.subTest(shape=shape):
+                self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = shape
+                turns = self.deliver_two_turns()
+                self.assertEqual(len(turns), 2)
+                for turn in turns:
+                    self.assertNotIn("repositories", turn)
+                    self.assertIn("filesChanged", turn)
+                self.assertEqual(self.log_text().count("does not take repositories"), 1)
+                self.tearDown()
+                self.setUp()
+
+    def test_at_most_the_schemas_max_items_are_sent(self):
+        self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "max1"
+        one, two = self.git_repo("one", "https://github.com/acme/one.git"), self.git_repo("two", "https://github.com/acme/two.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x")), tool_entry("Edit", file_path=str(two / "y"))])
+        self.spool_turn()
+        fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
+        (turn,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
+        self.assertEqual(turn["repositories"], [{"host": "github.com", "owner": "acme", "name": "one"}])
 
     def test_the_worker_drops_repositories_where_the_schema_does_not_list_them(self):
         turns = self.deliver_two_turns()

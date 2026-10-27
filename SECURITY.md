@@ -36,11 +36,15 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   in the session's folder (counts only, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
   session Fabric launched, and, only once the running Fabric's `fabric_session_observe` takes
   `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark), read the
-  tail of the session's transcript (at most 512 KB, back to the last prompt the person typed)
+  last 512 KB of the session's transcript (earlier turns included; only the entries after the
+  last prompt the person typed are used)
   and run `git rev-parse --show-toplevel` and `git config --get remote.origin.url` in the
   other repositories the turn's tool calls name, within the same 1.5 s. Of the transcript they
   use only tool names and path arguments; what leaves the machine is each repository's
-  host, owner and name, never a path, a command or message text. They write their spool and log under the user's cache folder (0600),
+  host, owner and name, never a local path, a command or message text (on a self-hosted ssh
+  remote, `owner` is the folder path on that server before the repository's name). The mark is
+  removed only by a worker that sees a schema without the field, so after Fabric is downgraded
+  each session may read one more turn before it goes. They write their spool and log under the user's cache folder (0600),
   and the delivery worker starts `fabric-mcp` in its own process group and ends that group
   (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no token.
 - `adapting-projects-to-fabric/scripts/adapt_project.py` reads the target project without

@@ -134,6 +134,22 @@ export class Checkpoint {
     this.#write(this.entries, slots);
     this.slots = slots;
   }
+  /**
+   * At a clean leave (the session's DELETE released the slots): forget the record of each slot this service held for
+   * `project` with no request left and not moved away, so a later generation is another session taking a free slot, and
+   * a kit rolled back to before 0.53.0 leaves nothing that reads as a move. A record that cannot be written stays.
+   */
+  leave(project) {
+    const busy = new Set(Object.values(this.entries).map((e) => e.capability));
+    for (const [capability, record] of Object.entries(this.slots)) {
+      if (!isObj(record) || record.project !== project || 'moved' in record || busy.has(capability)) continue;
+      try {
+        this.slot(capability, null);
+      } catch {
+        // stays for the next start
+      }
+    }
+  }
 }
 
 const sortDeep = (v) => (isObj(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])])) : v);

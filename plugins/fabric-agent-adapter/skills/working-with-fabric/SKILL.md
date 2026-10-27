@@ -143,7 +143,8 @@ Fabric 0.4.0 (REQ-38):
    as ONE task whose title is that request in one line, with `origin: {kind: "person", ref: <where they said it: the session or thread>}`:
    from Fabric 0.3.14, which shows agents' goals, it is shown as yours. File each piece you split off with
    `fabric_task_create` while that task is claimed, and read the answer's `spawned_from` (Fabric 0.3.14 links the piece
-   from your single live claim). Your claimed task's id there: it is linked, link nothing. `spawned_from: null` comes
+   from your single live claim). Your claimed task's id there: it is linked, link nothing. Another task's id: link
+   nothing either (Fabric chose that parent, FAA-153) and tell the person which. `spawned_from: null` comes
    with `spawned_from_why`: link it yourself once with `fabric_task_link {taskId: <the piece>, rel: "spawned",
    targetTaskId: <the claimed task>}`, and if that is refused too, tell the person that reason; never file the piece
    again. No `spawned_from` at all is a Fabric before 0.3.14: link it yourself the same way unless the answer says

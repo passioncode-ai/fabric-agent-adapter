@@ -1319,12 +1319,12 @@ class MovedSlotTests(Conversation):
         had moved past the record meanwhile, so it is read as moved, never taken back to work on."""
         r = self.responder()
         r.step()  # holds generation 1
-        self.hub.control({"op": "set", "values": {"down": True}})
-        self.board.advance(20)
-        r.step()  # the renew's enroll is recorded, then never reaches the board
-        self.assertIn("asking", self.record()["video.render"])
-        self.hub.control({"op": "set", "values": {"down": False}})
-        self.hub.control({"op": "end-sessions"})
+        self.hub.control({"op": "end-sessions"})  # it dies with an enroll recorded that never reached the board
+        path = self.data / "board-checkpoint.json"
+        doc = json.loads(path.read_text())
+        doc["slots"]["video.render"]["asking"] = {"op": "com.enroll", "args": {
+            "idempotency": {"epoch": 1, "key": "example-agent.enroll.never-sent"}, "capability": "video.render"}}
+        path.write_text(json.dumps(doc))
         self.board.move("video.render")  # generation 2
         self.board.advance(61)  # and that holder lapses
         rid = self.board.queue("video.render")
@@ -1338,6 +1338,39 @@ class MovedSlotTests(Conversation):
         self.assertNotIn("com.claim", self.tools())
         self.assertEqual(self.board.requests[rid]["state"], "queued")
         self.assertEqual(self.record()["video.render"]["generation"], 1)
+
+    def test_an_idle_renew_writes_nothing(self):
+        """Seam and product readings 3: a live holder's renew cannot change its generation, so it records nothing."""
+        r = self.responder()
+        r.step()
+        with mock.patch.object(fb.Checkpoint, "_write", autospec=True, side_effect=AssertionError("written")):
+            for _ in range(5):
+                self.board.advance(20)
+                r.step()
+        self.assertGreaterEqual(self.tools().count("com.enroll"), 6)
+        self.assertEqual(self.record()["video.render"], {"project": r.project, "generation": 1})
+
+    def test_a_clean_leave_forgets_the_record_so_a_rollback_never_reads_as_a_move(self):
+        """Seam reading 3: a service stopped cleanly released its slot; a kit before 0.53.0 (or anyone) that enrolls it
+        meanwhile is another session taking a free slot. With work left in the checkpoint the record stays."""
+        r = self.responder()
+        r.step()
+        r.shutdown(0)
+        self.assertNotIn("video.render", self.record())
+        self.board.move("video.render")  # an older kit of this service enrolls the free slot: generation 2
+        self.board.advance(61)  # and stops
+        rid = self.board.queue("video.render")
+        second = self.responder()
+        for _ in range(3):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+
+    def test_a_clean_leave_with_work_left_keeps_the_record(self):
+        _, first = self._crash_after(effect=False)
+        first.shutdown(0)
+        self.assertEqual(self.record()["video.render"]["generation"], 1)  # accepted work left: kept for the next start
 
     def test_an_unwritable_record_never_stops_a_renew(self):
         """Seam reading 2: the record is best effort, as `_held_at` is; a full disk does not take a live holder down."""

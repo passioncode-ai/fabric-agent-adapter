@@ -125,7 +125,8 @@ On restart the checkpoint is read back: settled, queued, claimed or `answered` r
 the target Project's participant reply answered it, DEC-0098 and DEC-0102; not settled, the requester may still cancel
 it, but no longer this responder's); `in_progress` and `outcome_unknown` are
 reconciled from what `observe(entry)` answers (observed only; with no observation they stay unknown and notify);
-accepted ones go back to this responder with `com.responder_replace {expectedGeneration, transfer}`, whose receipt's
+accepted ones go back to this responder with `com.responder_replace {expectedGeneration, transfer}` (unless the slot
+moved to another session meanwhile: they stay `lapsed` until take-back, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)), whose receipt's
 `transferred` (DEC-0078: `{request, revision, attempt}`) carries the new fence. **A Fabric that does not answer
 `transferred` yet leaves the request held** (`board.request.held`, notify): the kit never claims it back, because the
 contract has no `com.claim` read-back and `com.claim` never moves an accepted request. A known outcome is sent after the
@@ -169,13 +170,19 @@ it for the receiving session (generation up, `claimed` back to `queued`, `in_pro
 held and not transferred). The responder keeps that move instead of undoing it:
 
 - It records the generation it holds each slot at, in the checkpoint file beside the requests (`slots: {<capability>:
-  {project, generation, moved?}}`), rewritten only when a receipt's generation changes. A file without the record reads
-  as before; a kit before 0.53.0 reads the file, ignores the record and drops it when it writes, so a service taken back
-  to 0.52 and then up again no longer knows a slot moved and takes it when the new holder lapses.
+  {project, generation, moved?, asking?}}`). The record is written when a receipt's generation changes and before an
+  enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
+  clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
+  in the checkpoint is forgotten: the slot is free, and whoever takes it next is no move. A file without the record
+  reads as before; a kit before 0.53.0 reads the file and ignores the record. So a service stopped cleanly, rolled back
+  to 0.52 and up again starts as on a first start. After a crash the record stays: if 0.52 then ran and enrolled the
+  slot, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
 - An enroll or a replace is written into that record with its key before it is sent (`asking`). When its answer is
   lost, the next connect (or the next enroll) sends the same call again under the same key; the board answers the
   stored receipt, whose generation is this service's own, and the slot is then asked for once more for the new board
-  session. A refusal is an answer and drops the `asking` record, so a move that happened meanwhile is still seen.
+  session. A refusal is an answer and drops the `asking` record, so a move that happened meanwhile is still seen. An
+  `asking` record that cannot be written (a full disk) is skipped, as the generation record is: the call goes out
+  unrecorded, and a lost answer to it, or a restart before the next receipt is recorded, may then read as a move.
 - It reads the slot's generation from `com.status` at every connect (a restart), and after any call refused `fenced`:
   at once for a claim or an enroll, at the next tick for a fenced call on running work. Only a responder with a record
   asks, so a first start sends no extra call. A generation past the recorded one, with no own call of
@@ -188,8 +195,9 @@ held and not transferred). The responder keeps that move instead of undoing it:
   returned it to the queue); accepted work stays as `lapsed` and work whose effect began as `unknown` (only the slot's
   holder, or the estate owner, reconciles it now). No `com.claim`, `com.renew`, `com.complete`, `com.enroll` or
   `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
-  holder's lease lapses. One `board.slot.moved` event (warn, notify) says so, once, also across restarts (the record
-  keeps `moved`).
+  holder's lease lapses. Accepted requests stay held on the board, unanswered, until the slot is taken back (CT-175
+  will hand them to the new holder). One `board.slot.moved` event (warn, notify) says so, once, also across restarts
+  (the record keeps `moved`).
 - A responder that never held the slot (a first start: no record, or a record of another Project), or whose record
   equals the current generation, behaves as before: it enrolls, recovers and replaces its own lapsed work. A recorded or
   reported generation that is not an integer of at least 1, or one not past the record (lower: the record is not this
@@ -197,14 +205,13 @@ held and not transferred). The responder keeps that move instead of undoing it:
   between a receipt and its record's write leaves the `asking` record: the next start asks again under the same key and
   records its own generation. Only a replay the board refuses, or one that ran for the first time (`repeated: false`)
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
-  unused. A generation written
-  `2.0` is `2`.
-- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record. The kit gives it no
-  route of its own (the reference service has none yet, FAA-157): a service built on the kit declares it as an operator
-  action, a button with its tool ([Every button has a tool](../SKILL.md), `fabric-actions/0.1`), and names it in its
-  docs, or a moved slot stays moved. An `asking` record that cannot be written (a full disk) is skipped, as
-  the generation record is: the call goes out unrecorded and a lost answer to it may then read as a move. The next tick enrolls once the slot is free (a live holder is waited for, as on a first
-  start) and takes the work left `lapsed` back with a transfer. A move back to this service's own session is not
+  unused. A generation written `2.0` is `2`.
+- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and the next tick
+  enrolls once the other session lets the slot go (a live holder is waited for, as on a first start) and takes the work
+  left `lapsed` back with a transfer. The kit gives it no route of its own (the reference service has none yet,
+  FAA-157): a service built on the kit declares it as an operator action, a button with its tool ([Every button has a
+  tool](../SKILL.md), `fabric-actions/0.1`) with gate `human` (or `relayed`), never `none`, so no other agent can call
+  it, and names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
   detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
   surface.
 

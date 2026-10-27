@@ -228,6 +228,11 @@ export class Responder {
   async ask(capability, op, args) {
     let held = this.checkpoint.slots[capability] ?? {};
     if (held.project !== this.project) return this.call(op, args); // no record: nothing a lost answer could be mistaken for
+    const slot = this.slots[capability] ?? {};
+    if (op === 'com.enroll' && slot.state === 'held' && slot.generation === held.generation
+      && this.now() - (slot.renewedAt ?? 0) < LEASE_SECONDS / 2 && !('asking' in held)) {
+      return this.call(op, args); // a live holder's renew cannot change its generation: nothing to record
+    }
     if (isObj(held.asking)) {
       // An earlier lost ask is settled first; it may show the slot moved.
       if (await this.gone(capability)) throw new BoardError('fenced', `The ${capability} slot moved to another session.`, false, op);
@@ -294,7 +299,7 @@ export class Responder {
     this.toResume = this.toResume.filter((r) => this.checkpoint.entries[r]?.capability !== capability);
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets it go; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       try {
         this.checkpoint.slot(capability, { ...held, moved: now });
       } catch {
@@ -975,6 +980,7 @@ export class Responder {
     if (this.session) {
       await this.session.close();
       this.session = null;
+      this.checkpoint.leave(this.project); // the slots were released: no record of them can read as a move
     }
     this.state = 'stopped';
   }

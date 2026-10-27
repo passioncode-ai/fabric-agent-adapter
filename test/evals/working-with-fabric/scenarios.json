@@ -431,11 +431,13 @@
     {
       "id": "spawned-from-decides-the-link",
       "trap": "the agent links every piece it filed by hand even when Fabric already linked it, or trusts an old Fabric to link a piece it never linked",
-      "request": "You claimed the person's request and filed three pieces with fabric_task_create. The first answer says spawned_from: <your claimed task>. The second says spawned_from: null with spawned_from_why: \"two live claims; the parent is not certain\". The third, on another machine's older Fabric, has neither spawned_from nor chained. What do you do for each?",
+      "request": "You claimed the person's request and filed three pieces with fabric_task_create. The first answer says spawned_from: <your claimed task>. The second says spawned_from: null with spawned_from_why: \"two live claims; the parent is not certain\". The third, on another machine's older Fabric, has neither spawned_from nor chained. A fourth answer says proposed: true. A fifth names another task than yours in spawned_from. What do you do for each?",
       "expected": [
         "first piece: links nothing (Fabric 0.3.14 already linked it to the claimed task through spawned_from)",
         "second piece: links it once with fabric_task_link {taskId: the piece, rel: spawned, targetTaskId: the claimed task}; if that is refused too, tells the person spawned_from_why and never files the piece again",
-        "third piece: links it itself with fabric_task_link rel spawned to the claimed task (no spawned_from and no chained: true with chained_to that task means this Fabric did not link it)"
+        "third piece: links it itself with fabric_task_link rel spawned to the claimed task (no spawned_from and no chained: true with chained_to that task means this Fabric did not link it)",
+        "fourth piece: files and links nothing for it, tells the person it waits for the operator, and goes on with the rest",
+        "fifth piece: links nothing (Fabric chose that parent) and tells the person which parent Fabric chose (FAA-153)"
       ]
     },
     {
@@ -444,8 +446,8 @@
       "request": "The person asks: \"Does the Fabric plugin read my Claude Code transcript, and what does it send about other repositories I worked in?\"",
       "expected": [
         "says the Stop hook reads no transcript until a worker has seen the running Fabric's fabric_session_observe take repositories as items with host, owner and name (a mark in the hooks' folder); with today's Fabric it reads none",
-        "says that once it does, it reads at most the last 512 KB of the transcript, message text included, and uses only the current turn's tool names and path arguments (Edit, Write, MultiEdit, NotebookEdit paths; cd and git -C in Bash)",
-        "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a path, a command or message text, and that a cd or a read-only git -C counts as touching a repository"
+        "says that once it does, it reads the last 512 KB of the transcript, earlier turns and message text included, and uses only the current turn's tool names and path arguments (Edit, Write, MultiEdit, NotebookEdit paths; cd and git -C in Bash)",
+        "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a local path, a command or message text (on a self-hosted ssh remote owner is that server's folder path), and that a cd or a read-only git -C counts as touching a repository"
       ]
     }
   ]

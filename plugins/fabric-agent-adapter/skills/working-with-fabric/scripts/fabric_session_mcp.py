@@ -774,7 +774,7 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                         arguments["reason"] = reason
                     repositories = stored_repositories(entry) if event == "turn" else []
                     if repositories and takes:
-                        arguments["repositories"] = repositories  # FAA-140 (REQ-2): only where the tool takes it
+                        arguments["repositories"] = repositories[:takes]  # FAA-140 (REQ-2): only where the tool takes it
                     elif repositories and not (directory / "repositories.degraded").exists():
                         note("session=%s event=turn outcome=degraded reason=%r"
                              % (session_id[:8], "%s does not take repositories" % OBSERVE_TOOL))
@@ -881,17 +881,23 @@ def _input_fields(client: McpStdio, tool: str) -> List[str]:
     return []
 
 
-def _takes_repositories(client: McpStdio) -> bool:
-    """Whether fabric_session_observe declares `repositories` as a list of objects with host, owner and name (FAA-140,
-    REQ-2): a field of another shape would fail Fabric's check and lose the turn's other facts with it."""
+def _takes_repositories(client: McpStdio) -> int:
+    """How many repositories fabric_session_observe takes a turn: 0 unless it declares `repositories` as an array of
+    objects with host, owner and name that requires nothing else, then at most its maxItems (FAA-140, REQ-2). A field
+    of another shape would fail Fabric's check and lose the turn's other facts with it."""
     for listed in client.tools:
         if listed.get("name") == OBSERVE_TOOL:
             schema = listed.get("inputSchema")
             field = (schema.get("properties") or {}).get("repositories") if isinstance(schema, dict) else None
-            items = field.get("items") if isinstance(field, dict) else None
+            items = field.get("items") if isinstance(field, dict) and field.get("type") == "array" else None
             props = items.get("properties") if isinstance(items, dict) else None
-            return isinstance(props, dict) and {"host", "owner", "name"} <= set(props)
-    return False
+            required = items.get("required", []) if isinstance(items, dict) else None
+            if not (isinstance(props, dict) and {"host", "owner", "name"} <= set(props) and isinstance(required, list)
+                    and set(required) <= {"host", "owner", "name"}):
+                return 0
+            most = field.get("maxItems")
+            return max(0, min(MAX_REPOSITORIES, most)) if isinstance(most, int) and not isinstance(most, bool) else MAX_REPOSITORIES
+    return 0
 
 
 def _wait_for_session_tools(client: McpStdio, deadline: float) -> List[str]:

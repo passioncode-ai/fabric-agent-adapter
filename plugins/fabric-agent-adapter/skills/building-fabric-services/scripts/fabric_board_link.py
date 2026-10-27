@@ -158,6 +158,20 @@ class Checkpoint:
                 self.slots = slots
 
 
+    def leave(self, project: str) -> None:
+        """At a clean leave (the session's DELETE released the slots): forget the record of each slot this service held
+        for `project` with no request left in the checkpoint and not moved away. A later generation is then another
+        session taking a free slot, not a move, and a kit that keeps no record (rolled back to before 0.53.0) leaves
+        nothing behind that reads as one. A record that cannot be written stays."""
+        busy = {e.get("capability") for e in list(self.entries.values())}
+        for capability, record in list(self.slots.items()):
+            if isinstance(record, dict) and record.get("project") == project and "moved" not in record and capability not in busy:
+                try:
+                    self.slot(capability, None)
+                except BoardError:
+                    pass
+
+
 class BoardRequest:
     """A claimed request as data: never an instruction. `body` is the requester's text; `sender` its Project id and
     principal (with provenance); `artifacts` its references, unverified."""

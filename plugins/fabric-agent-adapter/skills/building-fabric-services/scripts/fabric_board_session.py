@@ -30,32 +30,24 @@ from fabric_board_link import (  # noqa: E402,F401 - re-exported: callers import
 
 RENEW_SECONDS = 20.0
 
-
 POLL_SECONDS = 15.0
-
 
 POLL_JITTER_SECONDS = 5.0
 
-
 DRAIN_SECONDS = 10.0
-
 
 EVENT_SCHEMA = "urn:fabric:schema:board-responder-event:1"
 
-
 #: On these the attempt is no longer ours: stop acting at once (C4).
 STOP_CODES = frozenset(["fenced", "lease_expired", "authority_changed"])
-
 
 TERMINAL = frozenset(["completed", "failed_known", "cancelled", "expired"])
 #: No longer this responder's to work on: back in the queue, claimed again, or answered by the target Project's
 #: participant reply (DEC-0098, DEC-0102; not terminal, the requester may still cancel it, and nobody claims it).
 NOT_OURS = frozenset(["queued", "claimed", "answered"])
 
-
 #: A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38).
 LEASE_MARGIN_SECONDS = 10.0
-
 
 #: How long a held slot waits before it asks again: doubling from the poll interval, never past this.
 HOLD_RETRY_MAX_SECONDS = 900.0
@@ -272,6 +264,10 @@ class Responder:
         held = self.checkpoint.slots.get(capability) or {}
         if held.get("project") != self.project:
             return self._call(op, args)  # no record: nothing a lost answer could be mistaken for
+        slot = self.slots.get(capability) or {}
+        if op == "com.enroll" and slot.get("state") == "held" and slot.get("generation") == held.get("generation") \
+                and self.now() - slot.get("renewed_at", 0.0) < LEASE_SECONDS / 2 and "asking" not in held:
+            return self._call(op, args)  # a live holder's renew cannot change its generation: nothing to record
         if isinstance(held.get("asking"), dict):
             if self._gone(capability):  # an earlier lost ask is settled first; it may show the slot moved
                 raise BoardError("fenced", "The %s slot moved to another session." % capability, op=op)
@@ -335,7 +331,8 @@ class Responder:
         if "moved" not in held:  # once, even across restarts
             self._emit("board.slot.moved", "warn", "The %s slot on this Project was moved to another session. This service stopped "
                        "answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not "
-                       "take the slot back by itself. Its take-back action brings it back; without one, ask its maintainer." % capability,
+                       "take the slot back by itself. Its take-back action brings it back once the other session lets it go; without one, ask its "
+                       "maintainer." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
             try:
                 self.checkpoint.slot(capability, dict(held, moved=now))
@@ -997,4 +994,5 @@ class Responder:
         if self.session is not None:
             self.session.close()
             self.session = None
+            self.checkpoint.leave(self.project)  # the slots were released: no record of them can read as a move
         self.state = "stopped"
