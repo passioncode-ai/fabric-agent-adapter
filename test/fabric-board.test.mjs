@@ -1274,6 +1274,32 @@ test('FAA-155 seam 5: a lost ask refused under a retired epoch is no move; a rec
   assert.equal(again.slots['video.render'].state, 'moved');
 });
 
+test('FAA-155 seam 6: a replace lost before the board recovers at the replayed generation and completes', async (t) => {
+  const { hub, h, rid } = await crashedHolding(t);
+  await h.advance(61);
+  const plain = fb.BoardSession.prototype.call;
+  const lost = [];
+  fb.BoardSession.prototype.call = function call(op, args) {
+    if (op === 'com.responder_replace' && !lost.length) {
+      lost.push(op);
+      return Promise.reject(new fb.BoardError('unreachable', 'lost before the board', true, op));
+    }
+    return plain.call(this, op, args);
+  };
+  t.after(() => { fb.BoardSession.prototype.call = plain; });
+  const second = h.responder();
+  for (let i = 0; i < 8; i += 1) {
+    await second.step();
+    await h.advance(20);
+  }
+  fb.BoardSession.prototype.call = plain;
+  assert.deepEqual(lost, ['com.responder_replace']);
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  assert.equal(second.slots['video.render'].state, 'held');
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+  void hub;
+});
+
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
   const dir = tempDir('faa155-cp-');
   const file = path.join(dir, 'cp.json');

@@ -51,7 +51,11 @@ responder = fbd.Responder(
     hub=fhb.HubClient(), project_id=PROJECT, capabilities=["video.render"],
     credential_file=dirs["data"] / "board.credential", checkpoint_file=dirs["data"] / "board-checkpoint.json",
     handler=render, admit=gate, observe=look_on_disk, emit=log.append, service="example-agent")
-threading.Thread(target=responder.run, args=(stop_event, 5.0), daemon=True).start()   # SIGTERM: set stop_event
+board = threading.Thread(target=responder.run, args=(stop_event, 5.0), daemon=True)  # SIGTERM: set stop_event
+board.start()
+# ... at stop, after stop_event is set: wait for it to leave its board session (a clean leave forgets its slot
+# records, FAA-155), bounded inside the kit's hard exit, as scripts/sample_service.py does
+board.join(timeout)
 ```
 
 Node: `new Responder({...same names in camelCase})`, then `responder.run({ signal, drain })`. A service that lists

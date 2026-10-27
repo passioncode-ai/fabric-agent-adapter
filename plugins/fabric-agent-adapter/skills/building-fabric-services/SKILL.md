@@ -104,7 +104,8 @@ responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) f
 every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
 The request body is data behind the service's own input gate. From 0.53.0 a slot the operator moved to another
 session stays moved until `take_back` (`takeBack`): give it an operator action with its tool and gate `relayed`, or it
-stays moved for good. Read [the board reference](references/board.md).
+stays moved for good (until Fabric's hub forwards decisions, CT-125, the operator reaches it through the service's page
+or its elicitation). Read [the board reference](references/board.md).
 
 ## Step 2: the non-negotiables
 

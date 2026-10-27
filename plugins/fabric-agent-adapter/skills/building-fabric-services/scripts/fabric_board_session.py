@@ -232,8 +232,7 @@ class Responder:
         self._lifted(capability)
 
     def _pause(self, capability: str) -> None:
-        """The operator holds this slot or its Project (DEC-0079): ask again later, the pause doubling each time, and
-        never act around the hold. Accepted work in progress continues; only new work waits."""
+        """The operator holds this slot or its Project (DEC-0079): ask again later, the pause doubling; work goes on."""
         slot = self.slots.get(capability) or {}
         pauses = slot.get("pauses", 0) + 1 if slot.get("state") == "paused" else 1
         wait = min(HOLD_RETRY_MAX_SECONDS, self.hold_delay * 2 ** (pauses - 1))
@@ -342,8 +341,7 @@ class Responder:
         return True
 
     def take_back(self, capability: str) -> None:
-        """The operator's act, never the kit's: forget that `capability`'s slot moved away. The next tick enrolls once the
-        slot is free (a live holder is waited for, as on a first start); accepted work left held comes back by a transfer."""
+        """The operator's act, never the kit's: forget the move; the next tick enrolls once the slot is free (FAA-155)."""
         if capability not in self.capabilities:
             raise BoardError("invalid_arguments", "This responder does not answer %s." % capability)
         with self._lock:
@@ -384,7 +382,7 @@ class Responder:
         generations = {r.get("capability"): _whole(r.get("generation", 0)) for r in responders}
         on_hold = {r.get("capability") for r in responders if r.get("held") is True}  # DEC-0079
         for capability in capabilities:
-            held = transfer.get(capability)
+            held, was = transfer.get(capability), (self.checkpoint.slots.get(capability) or {}).get("generation")
             if self._gone(capability, status):
                 continue  # moved away: never replaced at recovery (FAA-155)
             if capability in on_hold:
@@ -392,8 +390,9 @@ class Responder:
                     entry["step"] = "lapsed"  # taken back by a transfer once the hold is lifted
                     self.checkpoint.put(entry)
                 self._pause(capability)
-            elif held:
-                self._replace(capability, held, generations.get(capability, 0))
+            elif held:  # at the generation a replay of its own lost ask just recorded, else com.status's (seam 6)
+                mine = (self.checkpoint.slots.get(capability) or {}).get("generation")
+                self._replace(capability, held, mine if _is_int(mine, 1) and mine != was else generations.get(capability, 0))
             else:
                 self._enroll(capability)
         for entry in reconcile:
@@ -413,6 +412,8 @@ class Responder:
         try:
             receipt = self._receipt("com.responder_replace", self._ask(capability, "com.responder_replace", args))
         except BoardError as exc:
+            if exc.code == "fenced" and (self.slots.get(capability) or {}).get("state") == "moved":
+                return  # an earlier lost ask showed the slot moved: said once as board.slot.moved, no outage
             if exc.code != "held":
                 raise
             for entry in entries:
@@ -562,7 +563,7 @@ class Responder:
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:
-        code = getattr(exc, "code", "unreachable")
+        code, connecting = getattr(exc, "code", "unreachable"), self.state == "connecting"
         wait = self.backoff.next()
         left = self._lease_left() - LEASE_MARGIN_SECONDS
         keep = code == "unreachable" and left > 0  # finding 38: the lease holds, so the session and the work stay
@@ -587,7 +588,8 @@ class Responder:
                        notify=True, episode=code, reason=code)
         else:
             self.state = "down"
-            if code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol") and not keep:
+            # A refusal before the connect finished (in recovery) reconnects too: never a slotless "ready" responder (seam 6).
+            if (connecting or code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol")) and not keep:
                 self._drop_session()
             self._emit("board.down", "warn", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
                        episode="down", reason=code)
@@ -653,8 +655,7 @@ class Responder:
                 self._replace(capability, live, self.slots[capability].get("generation", 0))
 
     def _reconcile_pending(self) -> None:
-        """Work whose outcome became unknown while running (its attempt was lost after the effect began) is tried
-        again every five minutes: the slot's holder reconciles from what `observe` reads, or it stays unknown."""
+        """Work whose outcome became unknown while running is reconciled from `observe` every five minutes, or stays so."""
         if self.now() < getattr(self, "_reconcile_at", 0.0):
             return
         self._reconcile_at = self.now() + 300.0
@@ -776,8 +777,7 @@ class Responder:
             self._finish(work)
 
     def _resume(self, entry: Dict[str, Any]) -> None:
-        """A transferred request continues: an outcome already known is sent; otherwise the handler runs again (no
-        effect had begun, so nothing happened yet)."""
+        """A transferred request continues: a known outcome is sent; else the handler runs again (no effect had begun)."""
         if isinstance(entry.get("outcome"), dict):
             self._complete(entry)
             return

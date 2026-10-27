@@ -1448,6 +1448,28 @@ class MovedSlotTests(Conversation):
         self.assertNotIn("com.enroll", self.tools())
         self.assertEqual(second.slots["video.render"]["state"], "moved")
 
+    def test_a_replace_lost_before_the_board_recovers_at_the_replayed_generation(self):
+        """Seam reading 6: the replay at the next connect runs the replace for the first time and moves the generation;
+        the replace that follows uses the record's generation, never the stale one, and the work completes."""
+        rid, _ = self._crash_after(effect=False)
+        self.board.advance(61)
+        plain, lost = fb.BoardSession.call, []
+
+        def call(session, op, args):
+            if op == "com.responder_replace" and not lost:
+                lost.append(op)
+                raise fb.BoardError("unreachable", "lost before the board", True, op=op)
+            return plain(session, op, args)
+        second = self.responder()
+        with mock.patch.object(fb.BoardSession, "call", call):
+            for _ in range(8):
+                second.step()
+                self.board.advance(20)
+        self.assertEqual(lost, ["com.responder_replace"])
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(second.slots["video.render"]["state"], "held")
+        self.assertEqual(self.moved(), [])
+
     def test_an_unwritable_record_never_stops_a_renew(self):
         """Seam reading 2: the record is best effort, as `_held_at` is; a full disk does not take a live holder down."""
         r = self.responder()

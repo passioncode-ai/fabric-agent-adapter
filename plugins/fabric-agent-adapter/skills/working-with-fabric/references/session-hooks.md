@@ -154,8 +154,8 @@ only variable names are looked at, never a value (two of them carry the session'
 One line per event that did something, never content: `~/Library/Caches/ai.passioncode.fabric-agent-adapter/hooks.log`
 (macOS), `$XDG_CACHE_HOME/fabric-agent-adapter/hooks.log` (Linux, default `~/.cache`),
 `%LOCALAPPDATA%\fabric-agent-adapter\hooks.log` (Windows). Mode 0600, rotated at 1 MB to `hooks.log.1`. The
-per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, each holding the folder the
-session started in and, when the turn touched another repository (only once Fabric takes them), `repositories` as `{host, owner, name}`; `board.json`, `board.shown`, `repositories.degraded` (the once-a-session note that repositories were left out: the schema no longer takes them, or refused every item), and the nudges not yet printed: `nudges.json` for the prompt
+per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, each holding the session's folder when
+the turn ended (the Stop payload's `cwd`) and, when the turn touched another repository (only once Fabric takes them), `repositories` as `{host, owner, name}`; `board.json`, `board.shown`, `repositories.degraded` (the once-a-session note that repositories were left out: the schema no longer takes them, or refused every item), and the nudges not yet printed: `nudges.json` for the prompt
 hook, `nudges.watch.json` for `watch-mail`, each taken by renaming it away; a
 folder untouched for 7 days, whose worker failed or whose session ended without SessionEnd, is removed by the next
 Stop or SessionEnd hook, even while the hooks are inert; an end entry whose release or observation got no answer stays

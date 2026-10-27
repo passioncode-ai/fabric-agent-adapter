@@ -272,9 +272,7 @@ export class Responder {
         if (isInt(generation, 1) && (answer.repeated === true || !moved)) record = { project: this.project, generation };
       } catch (e) {
         if (LOST.includes(e.code)) throw e;
-        // A retired epoch refuses even a repeat: landed or not is unknown, so the record goes and the slot reads as on a
-        // first start, never as a move.
-        if (e.code === 'idempotency_window_expired') record = {};
+        if (e.code === 'idempotency_window_expired') record = {}; // a retired epoch: unknown, so a first start, no move
       }
     }
     this.note(capability, Object.keys(record).length ? record : null);
@@ -290,8 +288,7 @@ export class Responder {
     if (held.project !== this.project || (!isInt(held.generation, 1) && !('asking' in held))) return false;
     let now = ((status ?? await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if ('asking' in held) held = await this.replay(capability, held, now); // its own lost ask first
-    // A recorded move stays until takeBack, whatever com.status says of the slot now.
-    if (isInt(held.moved, 1) && !(isInt(now, 1) && now > (held.generation ?? now))) now = held.moved;
+    if (isInt(held.moved, 1) /* a recorded move stays until takeBack */ && !(isInt(now, 1) && now > (held.generation ?? now))) now = held.moved;
     if (!isInt(now, 1) || !isInt(held.generation, 1) || now <= held.generation) return false;
     if (this.current?.entry.capability === capability) {
       this.current.ctx.stopped = true;
@@ -358,6 +355,7 @@ export class Responder {
     const generations = Object.fromEntries(responders.map((r) => [r.capability, r.generation ?? 0]));
     const onHold = new Set(responders.filter((r) => r.held === true).map((r) => r.capability)); // DEC-0079
     for (const capability of capabilities) {
+      const was = this.checkpoint.slots[capability]?.generation;
       if (await this.gone(capability, status)) continue; // moved away: never replaced at recovery (FAA-155)
       if (onHold.has(capability)) {
         for (const entry of transfer[capability] ?? []) {
@@ -365,7 +363,10 @@ export class Responder {
           this.checkpoint.put(entry);
         }
         this.pause(capability);
-      } else if (transfer[capability]?.length) await this.replace(capability, transfer[capability], generations[capability] ?? 0);
+      } else if (transfer[capability]?.length) { // at the generation a replay just recorded, else com.status's
+        const mine = this.checkpoint.slots[capability]?.generation;
+        await this.replace(capability, transfer[capability], isInt(mine, 1) && mine !== was ? mine : generations[capability] ?? 0);
+      }
       else await this.enroll(capability);
     }
     for (const entry of reconcile) {
@@ -384,6 +385,8 @@ export class Responder {
     try {
       receipt = this.receipt('com.responder_replace', await this.ask(capability, 'com.responder_replace', args));
     } catch (e) {
+      // An earlier lost ask showed the slot moved: said once as board.slot.moved, no outage.
+      if (e.code === 'fenced' && this.slots[capability]?.state === 'moved') return;
       if (e.code !== 'held') throw e;
       for (const entry of entries) {
         entry.step = 'lapsed'; // nothing moved: taken back by a transfer once the hold is lifted
@@ -541,6 +544,7 @@ export class Responder {
 
   async fault(e) {
     const code = e.code ?? 'unreachable';
+    const connecting = this.state === 'connecting';
     let wait = this.backoff.next();
     const left = this.leaseLeft() - LEASE_MARGIN_SECONDS;
     const keep = code === 'unreachable' && left > 0; // finding 38: the lease holds, so the session and the work stay
@@ -560,7 +564,8 @@ export class Responder {
       this.emit('board.blocked', 'error', `The responder stopped answering requests: ${e.message}`, { notify: true, episode: code, reason: code });
     } else {
       this.state = 'down';
-      if (['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code) && !keep) await this.dropSession();
+      // A refusal before the connect finished (in recovery) reconnects too: never a slotless "ready" responder (seam 6).
+      if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code)) && !keep) await this.dropSession();
       this.emit('board.down', 'warn', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
     }
     return wait;

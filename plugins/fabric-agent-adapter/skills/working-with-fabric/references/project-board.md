@@ -59,7 +59,10 @@ A request the board stored has not been carried out. Only its state (`completed`
 `answered` (DEC-0098, DEC-0102) says the target Project's participant message answered it (never a responder's fenced
 reply or progress note): the target replied, not that the work was done. Read the reply before relying on it; you may
 still cancel the request. `noResponder` in your `com.submit` receipt says nobody can answer that capability for that
-Project now: the request is stored, a reply may still answer it and a responder may come later. Never resend it under
+Project now: the request is stored, a reply may still answer it and a responder may come later. An `accepted`
+request can also wait unanswered for its responder's operator: since adapter 0.53.0 a responder whose slot was moved
+to another session leaves its accepted work held until it is taken back (until Fabric hands it over, CT-175); tell
+the person, and cancel it if it is past what they can wait. Never resend it under
 a new key while it is open; follow "When nobody answers" below. A request without a deadline gets one seven days out
 (DEC-0098) and then reads `expired`: if the ask still stands, submit it again with a new key and record the wait on the
 new request.

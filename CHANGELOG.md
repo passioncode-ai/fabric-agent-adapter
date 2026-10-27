@@ -16,7 +16,7 @@
   or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
   read. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside the existing
   1.5 s facts budget, and named `{host, owner, name}` from its `origin` (credentials, port and `.git` dropped). The
-  start folder's repository (any checkout of it), a repository without a parsable origin and duplicates are left out;
+  repository of the session's folder when the turn ends (the Stop payload's `cwd`; any checkout of it), a repository without a parsable origin and duplicates are left out;
   at most 10 (or the schema's `maxItems`), and an item whose host, owner or name the schema refuses (type, length,
   pattern, enum) is left out, never the turn; no local path leaves the hook (on a self-hosted ssh remote `owner` is the
   server's folder path). The worker sends them as `repositories` on `fabric_session_observe`. With a Fabric that never
@@ -64,7 +64,8 @@
   forgot the record); after a crash, a 0.52 run that enrolled the slot and wrote nothing to the checkpoint reads as a move at the next 0.53 start, which
   the take-back action undoes. A `fenced` refusal on accepted work while the slot did not move now keeps the entry `lapsed`
   and the next tick transfers it back and finishes it (0.52 dropped the entry and left the request accepted on the
-  board). A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
+  board). A refusal raised while the responder recovers at connect now reconnects instead of leaving it `ready` with no
+  slot. A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
 
 ## 0.52.0 (2026-10-26)
 

@@ -362,8 +362,8 @@ def serve(args: argparse.Namespace) -> int:
         if board_thread is not None:
             # The responder drains (5 s at most) and leaves its board session, which releases its slots and forgets their
             # records (FAA-155): joined, so the process does not end before that.
-            # Bounded by the kit's hard exit, 8 + 2 s after the stop was asked: leave at least half a second for the rest.
-            board_thread.join(max(0.5, 9.5 - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
+            # Bounded by the kit's hard exit, 8 + 2 s after the stop was asked: 1.5 s are left for the rest of the stop.
+            board_thread.join(max(0.5, 8.5 - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
         server.server_close()
         svc.lock.release()
     return 0
