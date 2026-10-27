@@ -32,6 +32,18 @@
   [
    "HTTPS:/u@x:hunter2@h.example/y?t=1",
    "https://h.example/y"
+  ],
+  [
+   "htps:u:hunter2@api.example/x",
+   "htps:<redacted>"
+  ],
+  [
+   "mailto:u:hunter2@h.example",
+   "mailto:<redacted>"
+  ],
+  [
+   "ws://u:hunter2@h.example/x",
+   "ws:<redacted>"
   ]
  ],
  "checkUrl": [

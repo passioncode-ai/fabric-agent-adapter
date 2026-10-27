@@ -128,6 +128,10 @@ def redact_url(url: str) -> str:
         parts = urllib.parse.urlsplit(url)
     except ValueError:
         return "<unparseable url>"
+    if parts.scheme and parts.scheme.lower() not in ("http", "https"):
+        # Only http and https are sent; any other scheme (a misspelled `htps:` included) keeps no more than its name,
+        # since its user information may sit anywhere in the rest (0.56.0 product r10).
+        return parts.scheme.lower() + ":<redacted>"
     host = parts.hostname or ""
     if ":" in host:
         host = "[%s]" % host

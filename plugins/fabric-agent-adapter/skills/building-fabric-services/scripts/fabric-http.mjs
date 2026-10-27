@@ -54,6 +54,8 @@ export class Response {
 export function redactUrl(url) {
   let parts;
   try { parts = new URL(String(url)); } catch { return '<unparseable url>'; }
+  // Only http and https are sent; any other scheme keeps no more than its name (0.56.0 product r10).
+  if (parts.protocol !== 'http:' && parts.protocol !== 'https:') return `${parts.protocol}<redacted>`;
   return `${parts.protocol}//${parts.host}${parts.pathname}`;
 }
 

@@ -52,7 +52,8 @@ gate behave.
   (`https:bot:pw@host`), up to the user information's last `@` (`https://me@corp.example:pw@host`), and says so
   before it judges the host. The query and the fragment are read percent-encoded, as `new URL` hands them over.
   `fabric_http.redact_url` reads a special scheme the same way, so the URL an `HttpError` carries for
-  `https:u:pw@host` has no password, as in Node.
+  `https:u:pw@host` has no password, as in Node; a URL of any other scheme (a misspelled `htps:` included) keeps only
+  its scheme in both twins (`htps:<redacted>`), since its user information may sit anywhere in the rest.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
   capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer

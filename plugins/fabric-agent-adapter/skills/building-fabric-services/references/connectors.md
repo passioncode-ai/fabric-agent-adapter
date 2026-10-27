@@ -45,7 +45,7 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 
 Every answer comes back as a `Response`, whatever its status; `HttpError` means no usable answer came, with `kind`
 `connection`, `timeout`, `too-large` or `refused`, the status when there was one, and the URL redacted to scheme,
-host, port and path (`redact_url`). An error never carries a request header or body.
+host, port and path (`redact_url`); a URL of any other scheme keeps only its scheme (`htps:<redacted>`). An error never carries a request header or body.
 
 ## fabric_openrouter
 
