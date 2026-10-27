@@ -34,7 +34,7 @@
   `host`, `owner` and `name` that require nothing else (it then leaves a mark in the hooks' folder, and removes it when
   the schema stops saying so; after a Fabric downgrade, the turns that end before a worker next runs, about a minute, are still read; none of their
   names is sent). With the mark, the
-  hook reads the last 512 KB of the session's transcript (earlier turns and message text included) and uses only the
+  hook reads the last 512 KB of the session's transcript (earlier turns, message text and tool output included; a secret the session displayed can be there, read in memory only) and uses only the
   current turn's tool names and path arguments: Edit, Write, MultiEdit and NotebookEdit paths, and `cd
   <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
   or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
@@ -51,7 +51,7 @@
 - **A board slot the operator moves to another session stays moved** (FAA-155; contract DEC-0140, proposed; CT-174,
   CT-175). The kit's board responder records the generation it holds each slot at, beside its checkpoint: when a
   receipt's generation changes and before an enroll or replace that can change it; a live holder's renew writes
-  nothing, and a clean leave (the session's DELETE released the slots) forgets the record of a slot with no request
+  nothing, and a clean leave (the session's DELETE released the slots) forgets the record of a slot not moved and with no request
   left. When `com.status` (at connect, or after a call refused `fenced`) shows a later generation, it stops the
   handler, drops its claims, and leaves accepted work held (`lapsed`) and begun work `unknown`; it neither replaces at
   recovery after a restart nor enrolls again when the new holder's lease lapses. Accepted requests stay held on the
@@ -77,12 +77,13 @@
 ### Changed
 
 - **Step 4 reads Fabric's `spawned_from`** (FAA-156, Fabric 0.3.14): working-with-fabric links a piece filed with
-  `fabric_task_create` itself only when the answer says `spawned_from: null` (once; a refused link is told to the person
-  with `spawned_from_why`), or carries no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
-  the claimed task. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
+  `fabric_task_create` itself only when the answer says `spawned_from: null` without `proposed: true` (once; a refused link is told to the person
+  with `spawned_from_why`), or is filed (`created: true`) with no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
+  the claimed task. `created: false` with a `code` such as `source-unresolved` filed nothing and is never linked. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
   not linked again, and the person is told which parent Fabric chose (FAA-153). `proposed: true` now says what
   to do: file and link nothing for that piece, tell the person, go on with the rest. The goal display is named as
-  Fabric 0.3.14's. New scenario eval `spawned-from-decides-the-link`.
+  Fabric 0.3.14's. New scenario evals `spawned-from-decides-the-link`, `what-the-stop-hook-reads` (FAA-140) and
+  `moved-slot-needs-a-take-back-action` (FAA-155).
 - **A responder no longer takes back a slot that moved while it was away** (FAA-155). Before 0.53.0 a restarted
   responder replaced whoever held its slot (at recovery) or enrolled again when that holder lapsed, so a slot taken
   while it was down or after a crash came back by itself. It now stays with the new holder until the operator calls

@@ -39,10 +39,11 @@ uses Fabric (one line pointing at `fabric_whoami` in a folder with no sign of it
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
 project that uses Fabric; Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
 and the board's unread count, and, once the running Fabric takes them, the other repositories the turn touched (it then
-reads the last 512 KB of the session transcript (message text included), uses only tool names and path arguments, and sends host/owner/name, never a
+reads the last 512 KB of the session transcript (message text and tool output included, which can hold a secret the session displayed; read in memory only), uses only tool names and path arguments, and sends host/owner/name, never a
 local path or text); UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the
 session left claimed. Stop, UserPromptSubmit and SessionEnd spool and call Fabric only when the running Fabric
-advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched, never block the session, read no token and always
+advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched, never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
+kept or sent) and always
 exit 0. `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks
 --host codex|kimi|hermes|opencode|openclaw|pi` installs each host's native context bridge (dry run unless `--apply`).
 Codex receives structured SessionStart JSON; Hermes, OpenCode, OpenClaw and Pi use native plugin APIs.

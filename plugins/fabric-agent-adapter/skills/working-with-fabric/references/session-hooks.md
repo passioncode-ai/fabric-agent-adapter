@@ -38,7 +38,7 @@ session's transcript at all: the worker then leaves `observe-takes-repositories`
 `hooks.log`) and removes it when the schema stops saying so (after a Fabric downgrade, the turns that end before a worker next
 runs, about a minute, are still read; none of their names is sent); without it nothing below happens. With it, the hook reads the last 512 KB of the
 transcript (the payload's `transcript_path`; earlier turns included) and uses only the entries after the last prompt
-the person typed. Those lines hold message text too; of each entry it uses only a tool call's
+the person typed. Those lines hold message text and tool output too (file contents, command output: a secret the session displayed can be there; it stays in memory and is never spooled, logged or sent); of each entry it uses only a tool call's
 name and path argument: the `file_path` of Edit, Write and MultiEdit, the `notebook_path` of NotebookEdit, and in a
 Bash command `cd <absolute path>` and `git -C <path>` (absolute, or relative to the session's folder), split only in
 commands that hold `cd` or `git`, at most 64 KB of command text a turn. These are the repositories the turn
@@ -130,14 +130,14 @@ only variable names are looked at, never a value (two of them carry the session'
   tail and the other repositories' names (the git calls share at most 1.5 s; the tail read is at most 512 KB). Every call to Fabric happens in a detached worker with a 10 s deadline; at its end the worker closes
   `fabric-mcp`'s stdin and then ends its whole process group, so a wrapper (`npx`, a shell script,
   `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path.
-- **Read a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
+- **Keep a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
   those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log. Once Fabric
   takes repositories, an `origin` URL that embeds a credential (`https://user:token@host/...`) is read by
   `git config` with it; the Stop hook drops the credential in memory before anything is spooled, logged or sent.
 - **Send content, or use more than it reads for.** A turn is the HEAD commit, the number of files that differ from it
   (untracked included) and the lines added and removed against it, and, once Fabric takes them, the other repositories
   it touched by their `origin` name (`{host, owner, name}`); no path, branch name, commit message or diff text. The
-  transcript's tail is read, message text with it, and only tool names and path arguments are used; a sent turn's log
+  transcript's tail is read, message text and tool output with it, and only tool names and path arguments are used; a sent turn's log
   line counts its repositories, never names them. The board is read
   as a count (`com.status`), never a message. Git runs with `--no-optional-locks`.
 - **Start a second Fabric session.** A `fabric-mcp` started on its own would enroll a new session, and Fabric ends a
