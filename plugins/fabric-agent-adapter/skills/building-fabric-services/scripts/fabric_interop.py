@@ -39,6 +39,8 @@ from fabric_page_links import (  # noqa: E402 - DEC-0123
 
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     _days_from_civil,
+    UNREADABLE_PROJECT,
+    mandate_spend,
     PROTOCOL,
     EXTENSION_KEY,
     MCP_REVISION,
@@ -517,7 +519,10 @@ class CallContext:
         step: Dict[str, Any] = {"message": None}
         if self.server.agent_id is not None:
             caller = (self.delegation or {}).get("caller")
-            step = job_step(self.meta.get("mandate"), tier=self.tier, now=format_rfc3339(self.server._clock() * 1000),
+            carried = self.meta.get("mandate")
+            if carried is None and "mandate" in self.meta:
+                carried = {}  # a null mandate is present and unreadable, as the answer reads it; never "none" (FAA-178)
+            step = job_step(carried, tier=self.tier, now=format_rfc3339(self.server._clock() * 1000),
                             self_id=self.server.agent_id, capability=self.tool, key=key, effect=effect, caller_agent=caller,
                             spend_usd=spend_usd, project=project)
             if step["covered"]:
@@ -616,7 +621,7 @@ def mcp_request_headers(method: str, params: Dict[str, Any]) -> Dict[str, str]:
 
 
 _UNREADABLE = object()  # what a service's spend or project function answers when it raised
-_UNREADABLE_PROJECT = "\x00unreadable"  # never a member of a mandate's projects, so a scoped mandate refuses
+_UNREADABLE_PROJECT = UNREADABLE_PROJECT  # never a member of a mandate's projects, so a scoped mandate refuses
 
 
 class McpToolServer:

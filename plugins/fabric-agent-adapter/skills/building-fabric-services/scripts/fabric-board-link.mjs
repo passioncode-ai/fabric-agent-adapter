@@ -23,9 +23,9 @@ export class BoardSession {
     return run;
   }
 
-  async #send(body, method = 'POST') {
+  async #send(body, method = 'POST', timeout = null) {
     try {
-      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
+      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout ?? this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
     } catch (e) {
       if (e instanceof HubError) throw new BoardError('unreachable', 'Fabric\'s hub did not answer; a write may have been stored, so send it again with the same idempotency key.', true);
       throw e;
@@ -66,15 +66,18 @@ export class BoardSession {
     });
   }
 
-  close() {
+  /** Sends the DELETE (waiting `timeout` ms at most); true when Fabric answered it (2xx, or 404: already gone), so the slots are free now (FAA-163). */
+  close(timeout = null) {
     return this.#serial(async () => {
-      if (!this.mcpSession) return;
+      if (!this.mcpSession) return false;
+      let status = 0;
       try {
-        await this.#send({}, 'DELETE');
+        status = (await this.#send({}, 'DELETE', timeout)).status;
       } catch {
         // best effort: the lease lapses in 60 s anyway
       }
       this.mcpSession = null;
+      return (status >= 200 && status < 300) || status === 404;
     });
   }
 }

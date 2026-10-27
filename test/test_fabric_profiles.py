@@ -35,6 +35,27 @@ class SecretShapeTests(unittest.TestCase):
                     self.assertEqual(fn(value), case["expected"])
         self.assertGreaterEqual(sum(len(c) for c in VECTORS["secrets"].values()), 120)
 
+    def test_whitespace_dot_and_case_read_as_ecmascript(self):
+        """FAA-136: the answers of the contract's src/secret-shape.ts at the pin (00e050b, run under Node 24) where
+        Python's own \\s, `.` and case folding differ; both copies of the module answer them."""
+        import importlib.util
+        copy = Path(__file__).resolve().parent.parent / "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_secrets.py"
+        spec = importlib.util.spec_from_file_location("fabric_secrets_adapting_copy", copy)
+        adapting = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapting)
+        cases = (("credential_name", "api\x85key", False), ("credential_name", "api\ufeffkey", True),
+                 ("credential_name", "api\u2028key", True), ("credential_name", "api\x1ckey", False),
+                 ("secret_value", "bearer\ufeffabc", True), ("secret_value", "bearer\x85abc", False),
+                 ("secret_value", "bearer \u2028x", False), ("secret_value", "\u017fk-" + "a" * 20, False),
+                 ("secret_value", "SK-" + "a" * 20, True), ("secret_value", "Bearer\xa0abc", True),
+                 ("secret_argument", "--h=Authorization: Bearer\ufeffabc123456789012", True),
+                 ("secret_argument", "--h=Authorization: Bearer\x85abc123456789012", False),
+                 ("secret_argument", "x\u3000" + "aB1" * 14, True))
+        for module in (secrets_mod, adapting):
+            for name, value, expected in cases:
+                with self.subTest(name, value=ascii(value)[:30], module=module.__name__):
+                    self.assertEqual(getattr(module, name)(value), expected)
+
 
 class ResolutionTests(unittest.TestCase):
     def test_every_resolution_answers_as_the_contract_does(self):

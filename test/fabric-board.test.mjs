@@ -898,7 +898,7 @@ test('FAA-77 39: every transferred request resumes, one per idle tick', async (t
 });
 
 // --- FAA-155: a slot the operator moves to another session stays moved (contract DEC-0140 PR-2; CT-174, CT-175) --------
-const record = (hub) => {
+const slotRecord = (hub) => {
   const file = path.join(hub.data, 'board-checkpoint.json');
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).slots ?? {} : {};
 };
@@ -1175,7 +1175,7 @@ test('FAA-155 seam 3: an idle renew writes nothing; a clean leave forgets the re
   assert.equal(writes, 0);
   assert.equal(fs.statSync(file).mtimeMs, before);
   await r.shutdown(0);
-  assert.ok(!('video.render' in record(hub)));
+  assert.ok(!('video.render' in slotRecord(hub)));
   await hub.control({ op: 'move', capability: 'video.render' }); // an older kit enrolls the free slot, then stops
   await h.advance(61);
   const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
@@ -1314,6 +1314,118 @@ test('FAA-155 seam 7: a capability refused at connect never stops the others', a
     assert.equal((await h.state()).requests[rid].state, 'completed', code);
     assert.equal(r.slots['video.render'].state, 'held', code);
   }
+});
+
+// --- FAA-163 and FAA-158: one capability's refusal, a reconnect, a lapsed lease, the DELETE, a take-back ------------------
+const record = (hub) => {
+  const file = path.join(hub.data, 'board-checkpoint.json');
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).slots ?? {} : {};
+};
+const TWO = ['video.render', 'video.cut'];
+
+test('FAA-163: a refused first capability leaves the next one served, and asks again alone with a growing pause', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  await hub.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.render', code: 'capacity_exceeded' });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.cut' });
+  const r = h.responder({ capabilities: TWO });
+  for (let i = 0; i < 3; i += 1) {
+    await r.step();
+    await h.advance(1);
+  }
+  assert.equal(r.slots['video.cut'].state, 'held');
+  assert.equal(r.slots['video.render'].state, 'retry');
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  const first = r.slots['video.render'].retryAt - h.clock.t + 3;
+  await h.advance(r.slots['video.render'].retryAt - h.clock.t);
+  await r.step();
+  assert.equal(r.slots['video.render'].tries, 2);
+  assert.equal(r.slots['video.render'].retryAt - h.clock.t, 2 * first);
+  await hub.control({ op: 'unrefuse', tool: 'com.enroll', capability: 'video.render' });
+  await h.advance(2 * first);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.deepEqual(h.events.filter((e) => e[0] === 'board.slot.refused').map((e) => e[3].data.value), [{ capability: 'video.render', reason: 'capacity_exceeded' }]);
+});
+
+test('FAA-163: a lost enroll while another slot holds is asked again; a reconnect starts with no slot', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  await hub.control({ op: 'drop', tool: 'com.enroll', capability: 'video.cut' });
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  assert.ok(r.session);
+  assert.equal(r.slots['video.cut'].state, 'retry');
+  await h.advance(r.slots['video.cut'].retryAt - h.clock.t);
+  await r.step();
+  assert.equal(r.slots['video.cut'].state, 'held');
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+  await hub.control({ op: 'end-sessions' });
+  await r.step(); // session-ended: dropped
+  await hub.control({ op: 'fail', tool: 'com.status', code: 'capacity_exceeded' });
+  await h.advance(60);
+  await r.step();
+  assert.deepEqual(r.slots, {});
+  assert.equal(r.session, null); // refused with no slot held: reconnects, never skips recovery
+});
+
+test('FAA-163: a lapsed slot holds no lease; the record is forgotten only after a DELETE Fabric answered', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  r.slots['video.render'].renewedAt = -Infinity;
+  assert.ok(r.leaseLeft() > 0);
+  await hub.control({ op: 'set', values: { delete_fails: true } });
+  await r.shutdown();
+  assert.deepEqual(Object.keys(slotRecord(hub)).sort(), ['video.cut', 'video.render']);
+  await hub.control({ op: 'set', values: { delete_fails: false } });
+  const second = h.responder({ capabilities: TWO });
+  await h.advance(61);
+  await second.step();
+  await second.fault(new fb.BoardError('schema-unsupported', 'a test'));
+  assert.deepEqual(slotRecord(hub), {});
+});
+
+test('FAA-173: an idle stop waits three seconds for the DELETE, so it ends within LC-01\'s 5 s', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  await hub.control({ op: 'set', values: { delete_delay: 6 } });
+  const started = Date.now();
+  await r.shutdown();
+  assert.ok(Date.now() - started < (fb.IDLE_LEAVE_SECONDS + 1.5) * 1000, `${Date.now() - started} ms`);
+  assert.equal(r.state, 'stopped');
+  assert.ok('video.render' in slotRecord(hub)); // unanswered: the record stays
+});
+
+test('FAA-158: a take-back while a move is being read is kept; the move waits for a fenced call in flight', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.render' });
+  const status = r.status.bind(r);
+  r.status = async () => {
+    const answer = await status();
+    r.takeBack('video.render'); // the operator's action, between the read and the queue
+    return answer;
+  };
+  assert.equal(await r.gone('video.render'), false);
+  assert.ok(!('video.render' in slotRecord(hub)));
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+  r.status = status;
+  r.heldAt('video.render', 1);
+  let release;
+  const inFlight = r.locked(() => new Promise((resolve) => { release = resolve; }));
+  const moved = r.gone('video.render');
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.notEqual(r.slots['video.render'].state, 'moved'); // queued behind the fenced call
+  release();
+  await inFlight;
+  assert.equal(await moved, true);
+  assert.equal(r.slots['video.render'].state, 'moved');
 });
 
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {

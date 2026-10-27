@@ -1177,36 +1177,89 @@ class OriginNames(unittest.TestCase):
                 self.assertIsNone(MCP.parse_origin(url))
 
 
-@unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
 class BashPaths(unittest.TestCase):
     def test_cd_to_an_absolute_path_and_git_dash_c(self):
         cwd = Path("/work/start")
         got = MCP.bash_paths("cd /a/b && git -C ../c -c core.x=y status; (cd /d) | git --no-pager -C /e log -C "
                              "&& cd relative && cd ~ && cd && /usr/bin/git -C '/f g' diff && echo git -C /not-git",
-                             cwd)
-        self.assertEqual(got, ["/a/b", os.path.normpath("/work/c"), "/d", "/e", "/f g"])
+                             cwd, windows=False)
+        self.assertEqual(got, ["/a/b", "/a/c", "/d", "/e", "/f g"])
+
+    def test_a_relative_dash_c_follows_the_last_absolute_cd(self):
+        """FAA-166: `-C ../x` after `cd /work/other` is /work/x, not a folder beside the start folder."""
+        self.assertEqual(MCP.bash_paths("cd /work/other && git -C ../sibling status", Path("/home/me/proj"),
+                                        windows=False), ["/work/other", "/work/sibling"])
+        self.assertEqual(MCP.bash_paths("git -C ../sibling status", Path("/home/me/proj"), windows=False),
+                         ["/home/me/sibling"])
+
+    def test_a_relative_dash_c_after_an_unknown_cd_names_nothing(self):
+        """FAA-166: after `cd relative`, `cd ~`, `cd -` or a bare `cd` the shell's folder is not known here."""
+        for cd in ("cd rel", "cd ~", "cd -", "cd", "cd $HOME"):
+            with self.subTest(cd=cd):
+                self.assertEqual(MCP.bash_paths(cd + " && git -C ../x status; git -C y log", Path("/w"),
+                                                windows=False), [])
+        self.assertEqual(MCP.bash_paths("cd rel && cd /a && git -C b log", Path("/w"), windows=False), ["/a", "/a/b"])
+
+    def test_windows_reads_git_bash_and_native_paths(self):
+        """FAA-175: Git Bash writes /c/..., /cygdrive/c/..., C:/... and C:\\...; the Stop hook reads them as drive
+        paths. Another /... (Git's own root) is not this host's and is left out."""
+        got = MCP.bash_paths(r'cd /c/Users/me/one && git -C ../two status; cd "C:\work\three"; git -C D:/four log; '
+                             r'cd C:\five; cd /tmp; git -C x log; cd /cygdrive/e/six', Path(r"C:\Users\me\proj"),
+                             windows=True)
+        self.assertEqual(got, [r"C:\Users\me\one", r"C:\Users\me\two", r"C:\work\three", r"D:\four", r"C:\five",
+                               r"E:\six"])
+        self.assertEqual(MCP.bash_paths("git -C ../two log", Path(r"C:\Users\me\proj"), windows=True),
+                         [r"C:\Users\me\two"])
+        self.assertEqual(MCP.bash_paths("git.exe -C /d/x log", Path(r"C:\w"), windows=True), [r"D:\x"])
+
+    def test_cygwin_and_msys_read_posix_paths(self):
+        """FAA-177: a Cygwin or MSYS2 Python names its own /cygdrive/c/... paths; only native Windows translates."""
+        for platform in ("cygwin", "msys"):
+            with self.subTest(platform=platform), mock.patch.object(MCP.sys, "platform", platform):
+                self.assertEqual(MCP.bash_paths("cd /cygdrive/c/work && git -C ../x log", Path("/home/me")),
+                                 ["/cygdrive/c/work", "/cygdrive/c/x"])
+        with mock.patch.object(MCP.sys, "platform", "win32"):
+            self.assertEqual(MCP.bash_paths("cd /c/work", Path("C:\\w")), ["C:\\work"])
 
     def test_a_command_that_does_not_parse_names_nothing(self):
-        self.assertEqual(MCP.bash_paths("cd '/a/b", Path("/w")), [])
-        self.assertEqual(MCP.bash_paths("", Path("/w")), [])
+        for windows in (False, True):
+            self.assertEqual(MCP.bash_paths("cd '/a/b", Path("/w"), windows=windows), [])
+            self.assertEqual(MCP.bash_paths("", Path("/w"), windows=windows), [])
 
 
-WINDOWS_READS_NO_TRANSCRIPT = unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
+class TranscriptReadSwitch(unittest.TestCase):
+    """FAA-175 and FAA-160: the mark turns the transcript read on on every platform; the person turns it off."""
 
+    def env_with_mark(self, base):
+        env = {"XDG_CACHE_HOME": base, "LOCALAPPDATA": base, "HOME": base}
+        mark = fs.state_root(env=env) / fs.REPOSITORIES_MARK
+        mark.parent.mkdir(parents=True, exist_ok=True)
+        mark.write_text("")
+        return env
 
-class WindowsReadsNoTranscript(unittest.TestCase):
-    """FAA-175: on Windows the mark never turns the transcript read on."""
+    def test_the_mark_reads_on_windows_too(self):
+        with tempfile.TemporaryDirectory() as base:
+            env = self.env_with_mark(base)
+            for platform in ("win32", "linux", "darwin", "cygwin"):
+                with self.subTest(platform=platform), mock.patch.object(fs.sys, "platform", platform):
+                    self.assertTrue(fs.repositories_wanted(env))
 
-    def test_the_mark_reads_nothing_on_windows(self):
+    def test_the_person_turns_it_off(self):
+        with tempfile.TemporaryDirectory() as base:
+            env = self.env_with_mark(base)
+            for value, off in (("1", True), ("yes", True), ("0", False), ("", False)):
+                with self.subTest(value=value):
+                    self.assertEqual(fs.repositories_wanted(dict(env, **{fs.NO_REPOSITORIES_ENV: value})), not off)
+                    self.assertEqual(fs.repositories_off(dict(env, **{fs.NO_REPOSITORIES_ENV: value})), off)
+            (fs.state_root(env=env) / fs.NO_REPOSITORIES_MARK).write_text("")
+            self.assertTrue(fs.repositories_off(env))
+            self.assertFalse(fs.repositories_wanted(env))
+
+    def test_without_the_mark_nothing_is_read(self):
         with tempfile.TemporaryDirectory() as base:
             env = {"XDG_CACHE_HOME": base, "LOCALAPPDATA": base, "HOME": base}
-            mark = fs.state_root(env=env) / fs.REPOSITORIES_MARK
-            mark.parent.mkdir(parents=True, exist_ok=True)
-            mark.write_text("")
-            with mock.patch.object(fs.sys, "platform", "win32"):
-                self.assertFalse(fs.repositories_wanted(env))
-            with mock.patch.object(fs.sys, "platform", "linux"):
-                self.assertTrue(fs.repositories_wanted(env))
+            self.assertFalse(fs.repositories_wanted(env))
+            self.assertFalse(fs.repositories_off(env))
 
 
 class TurnRepositories(Base):
@@ -1250,7 +1303,6 @@ class TurnRepositories(Base):
         entry = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))[-1]
         return said, json.loads(entry.read_text())
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_turn_names_the_other_repositories_it_changed_and_no_path(self):
         one = self.git_repo("one", "https://user:TOKEN-SENTINEL@github.com/acme/one.git")
         two = self.git_repo("two", "git@bitbucket.org:team/two.git")
@@ -1290,14 +1342,12 @@ class TurnRepositories(Base):
             self.assertNotIn(leaked, stored)
         self.assertNotIn(str(self.base), self.log_text())
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_at_most_ten_repositories(self):
         folders = [self.git_repo("r%02d" % i, "https://github.com/acme/r%02d.git" % i) for i in range(12)]
         self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd %s" % f) for f in folders])
         _, entry = self.spool_turn()
         self.assertEqual([r["name"] for r in entry["repositories"]], ["r%02d" % i for i in range(10)])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_two_checkouts_of_one_repository_are_named_once(self):
         a = self.git_repo("a", "https://github.com/acme/same.git")
         b = self.git_repo("b", "git@github.com:acme/same")
@@ -1306,7 +1356,6 @@ class TurnRepositories(Base):
         _, entry = self.spool_turn()
         self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "same"}])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_another_checkout_of_the_start_repository_is_not_named(self):
         """A worktree or a second clone of the start folder's repository has another toplevel but the same origin: it
         is the start folder's repository, not another one."""
@@ -1908,9 +1957,23 @@ class Status(Base):
         self.assertEqual(done.returncode, 0)
         self.assertIn("Next: Call fabric_whoami.", done.stdout)
         self.assertNotIn("DOOR-TOKEN-SENTINEL", done.stdout)
+        self.assertIn("Repositories of a turn: not read until Fabric takes them", done.stdout)
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--json", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)
         self.assertEqual(json.loads(done.stdout)["hub"]["state"], "running")
+
+    def test_status_names_the_transcript_read_switch(self):
+        """FAA-160: status says whether the Stop hook reads the transcript and how to turn it off."""
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        mark = fs.state_root(env=self.env) / fs.REPOSITORIES_MARK
+        mark.parent.mkdir(parents=True, exist_ok=True)
+        mark.write_text("")
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "on")
+        self.assertEqual(fs.status(self.repo, dict(self.env, **{fs.NO_REPOSITORIES_ENV: "1"}))["transcriptRead"], "off")
+        done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
+                              capture_output=True, text=True, env=self.env, timeout=10)
+        self.assertIn("Repositories of a turn: read from the session's transcript (turn off: "
+                      "FABRIC_SESSION_NO_REPOSITORIES=1)", done.stdout)
 
 
 class PluginHooks(unittest.TestCase):

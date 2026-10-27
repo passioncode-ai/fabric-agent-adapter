@@ -106,6 +106,17 @@ export function feedDataFindings(page) {
   return findings;
 }
 
+/** The first place under a member that breaks the bound, for the refusal (FAA-122): `cited[0]` nests an object. */
+function tooDeep(key, member) {
+  const entries = Array.isArray(member) ? member.map((leaf, i) => [`${key}[${i}]`, leaf]) : isPlain(member) ? Object.entries(member).map(([inner, leaf]) => [`${key}.${inner}`, leaf]) : [];
+  if (entries.length > 32) return `: it has ${entries.length} entries`;
+  const bad = entries.find(([, leaf]) => !scalar(leaf));
+  if (!bad) return '';
+  const leaf = bad[1];
+  const what = typeof leaf === 'string' ? 'a string over 500 characters' : Array.isArray(leaf) ? 'a list' : isPlain(leaf) ? 'an object' : 'not a scalar';
+  return `: data.value.${bad[0]} is ${what}; nest two levels at most (flatten it into lists or members of their own)`;
+}
+
 /** DEC-0070's `data {schema, value}` as the schema bounds it, then FAC-SEM-101. */
 export function feedDataProblems(data) {
   if (!isPlain(data) || Object.keys(data).length !== 2 || !('schema' in data) || !('value' in data)) return ['data is {schema, value}'];
@@ -117,7 +128,7 @@ export function feedDataProblems(data) {
     if (scalar(member)) continue;
     if (Array.isArray(member) && member.length <= 32 && member.every(scalar)) continue;
     if (isPlain(member) && Object.keys(member).length <= 32 && Object.values(member).every(scalar)) continue;
-    problems.push(`data.value.${key} is a scalar (a string of at most 500 characters), a list of at most 32 scalars or an object of at most 32 scalar members`);
+    problems.push(`data.value.${key} is a scalar (a string of at most 500 characters), a list of at most 32 scalars or an object of at most 32 scalar members${tooDeep(key, member)}`);
   }
   if (problems.length) return problems;
   return feedDataFindings({ events: [{ data }] }).map((f) => `FAC-SEM-101: ${f.instancePath.replace('/events/0', '')} ${f.message}`);

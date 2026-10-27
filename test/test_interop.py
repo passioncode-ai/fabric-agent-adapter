@@ -811,6 +811,24 @@ class ActionGateMandateTests(unittest.TestCase):
             error = answer["result"]["structuredContent"]["error"]
             self.assertEqual((error["code"], error["data"]["detail"]), ("operator-decision-required", "outside-mandate: spend"))
 
+    def test_the_direct_gate_reads_spend_and_project_failing_closed(self):
+        """FAA-139: action_gate reads as McpToolServer does: a spend past the float range, NaN or infinite is none (a
+        ceiling refuses it, and no 5000-digit number reaches the refusal), a project that is no string is unreadable."""
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        for index, spend in enumerate((10 ** 5000, 10 ** 400, float("nan"), float("inf"), "0.5", True)):
+            with self.subTest(spend=index):
+                answer = self.gate(meta={"mandate": tight}, spend_usd=spend)
+                result = fd.refusal_tool_result(answer["refusal"])
+                json.dumps(result, allow_nan=False)
+                self.assertEqual(result["structuredContent"]["error"]["data"]["detail"], "outside-mandate: spend")
+        for project in (7, ["alpha"], {"id": "alpha"}):
+            with self.subTest(project=project):
+                answer = self.gate(meta={"mandate": scoped}, spend_usd=0.5, project=project)
+                self.assertEqual(fd.refusal_error(answer["refusal"])["error"]["data"]["detail"], "outside-mandate: project")
+        self.assertTrue(self.gate(meta={"mandate": scoped}, spend_usd=0.5, project="alpha")["ok"])
+        self.assertTrue(self.gate(meta={"mandate": tight}, spend_usd=1)["ok"])
+
     def test_a_huge_spend_and_a_raising_project_fail_closed(self):
         # Second seam reading of 0.51.0: an int past the float range never raises; a project function that raises
         # never reads as "no project", which a mandate limited to projects would cover.
@@ -1046,6 +1064,18 @@ class JobApprovalStepTests(unittest.TestCase):
         job_id, record = self.step()
         self.assertIsNone(record)
         self.assertIn("expired", self.jobs.get(job_id)["statusMessage"])
+
+    def test_a_null_mandate_reads_as_malformed_at_the_start_as_at_the_answer(self):
+        """FAA-178: `_meta.mandate: null` is present, not absent: the step waits saying the mandate cannot be read, as
+        an answer carrying it is refused mandate-malformed."""
+        self.start({"mandate": None})
+        job_id, record = self.step(message="Publish it?")
+        self.assertIsNone(record)
+        self.assertIn("mandate-malformed", self.jobs.get(job_id)["statusMessage"])
+        answer = fi.action_gate({"id": "approve-reply", "title": "Answer", "tool": "fabric.job.get", "gate": "relayed"}, tier="T0",
+                                caller="local:T0", meta={"mandate": None}, now=NOW, self_id="example-agent", effect="reply",
+                                mandate_capability="reviews.approve")
+        self.assertEqual(fd.refusal_error(answer["refusal"])["error"]["data"]["detail"], "mandate-malformed")
 
     def test_without_a_mandate_or_an_agent_id_the_step_asks_as_before(self):
         self.start({})

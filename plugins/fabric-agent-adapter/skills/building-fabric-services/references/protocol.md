@@ -162,7 +162,10 @@ path on the service origin, never an absolute URL. Optional SSE stream at
 **Machine-readable `data` (DEC-0070).** An event may carry `data {schema, value}` beside its sentence: `schema` is the
 absolute URI of a payload schema the service publishes; `value` is an object of at most 32 members, each a scalar (a
 string of at most 500 characters, a number, a boolean, null), a list of at most 32 scalars, or an object of at most 32
-scalar members. `text` stays the event: a host that ignores `data` loses nothing, and one that does not know the schema
+scalar members: two levels at most, so `value.cited` may be a list of ids or an object of counts, never a list of
+objects (FAA-122). Flatten a nested record into members of its own, `{"citedIds": ["a1", "b2"], "citedCoverage":
+[0.8, 0.4]}` in place of `{"cited": [{"id": "a1", "coverage": 0.8}, ...]}`; the refusal names the first place that
+nests too deep (`data.value.cited[0] is an object`). `text` stays the event: a host that ignores `data` loses nothing, and one that does not know the schema
 treats `value` as opaque. No string in `value` sits under a credential's name or has a credential's shape
 (`FAC-SEM-101`); personal data is the service's own duty. `make_event` / `makeEvent` (and `JsonlEventLog.append`) take
 `data=` and refuse one that breaks either rule, naming the place, never the value; `check_service.py` checks the feed it

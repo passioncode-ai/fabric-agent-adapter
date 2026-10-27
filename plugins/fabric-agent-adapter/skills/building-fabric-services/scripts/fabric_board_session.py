@@ -26,6 +26,13 @@ from fabric_board_link import (  # noqa: E402,F401 - re-exported: callers import
     BoardSession,
     Checkpoint,
 )
+from fabric_board_slots import (  # noqa: E402,F401 - the slot records (FAA-155, FAA-163); the constants re-exported
+    HOLD_RETRY_MAX_SECONDS,
+    LEASE_MARGIN_SECONDS,
+    SESSION_CODES,
+    SlotKeeper,
+    _whole,
+)
 
 
 RENEW_SECONDS = 20.0
@@ -35,6 +42,9 @@ POLL_SECONDS = 15.0
 POLL_JITTER_SECONDS = 5.0
 
 DRAIN_SECONDS = 10.0
+
+#: An idle responder's leave waits this long for the DELETE, so an idle stop ends within LC-01's 5 s (FAA-173).
+IDLE_LEAVE_SECONDS = 3.0
 
 EVENT_SCHEMA = "urn:fabric:schema:board-responder-event:1"
 
@@ -46,11 +56,7 @@ TERMINAL = frozenset(["completed", "failed_known", "cancelled", "expired"])
 #: participant reply (DEC-0098, DEC-0102; not terminal, the requester may still cancel it, and nobody claims it).
 NOT_OURS = frozenset(["queued", "claimed", "answered"])
 
-#: A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38).
-LEASE_MARGIN_SECONDS = 10.0
 
-#: How long a held slot waits before it asks again: doubling from the poll interval, never past this.
-HOLD_RETRY_MAX_SECONDS = 900.0
 
 
 class WorkContext:
@@ -84,10 +90,9 @@ class _Work:
 
 Handler = Callable[[BoardRequest, WorkContext], Dict[str, Any]]
 
-_whole = lambda v: int(v) if isinstance(v, float) and v.is_integer() else v  # noqa: E731 - 2.0 is 2, as Node reads it
 
 
-class Responder:
+class Responder(SlotKeeper):
     """One service's responder for one Project and one or more capabilities, one request at a time.
 
     `handler(request, ctx)` returns the outcome `{state, observed?, summary?, evidence?, reply?}`; `admit(request)`
@@ -193,6 +198,7 @@ class Responder:
 
     def _connect(self) -> None:
         self.state = "connecting"
+        self.slots = {}  # the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
         grant = self.hub.join_board(self.project, self.credential_file)
         missing = [c for c in self.capabilities if c not in grant.capabilities]
         session = self.session_factory(grant)
@@ -248,108 +254,6 @@ class Responder:
             self._emit("board.slot.released", "info", "The operator's hold on %s was lifted; the service takes new work "
                        "again." % capability, capability=capability)
 
-    # -- a slot moved to another session (FAA-155, DEC-0140 PR-2) ------------------------------------------------
-    def _held_at(self, capability: str, generation: int) -> None:
-        """The generation this responder holds the slot at, kept beside its checkpoint so a restart knows it."""
-        self._note(capability, {"project": self.project, "generation": generation})
-
-    def _note(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
-        """The slot record, best effort: one that cannot be written now is written at the next receipt."""
-        try:
-            self.checkpoint.slot(capability, record)
-        except BoardError:
-            pass
-
-    def _ask(self, capability: str, op: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        """An enroll or replace that can move the generation is recorded with its key first (a lost answer is no move)."""
-        held = self.checkpoint.slots.get(capability) or {}
-        if held.get("project") != self.project:
-            return self._call(op, args)  # no record: nothing a lost answer could be mistaken for
-        slot = self.slots.get(capability) or {}
-        if op == "com.enroll" and slot.get("state") == "held" and slot.get("generation") == held.get("generation") \
-                and self.now() - slot.get("renewed_at", 0.0) < LEASE_SECONDS - LEASE_MARGIN_SECONDS and "asking" not in held:
-            return self._call(op, args)  # a live holder's renew cannot change its generation: nothing to record
-        if isinstance(held.get("asking"), dict):
-            if self._gone(capability):  # an earlier lost ask is settled first; it may show the slot moved
-                raise BoardError("fenced", "The %s slot moved to another session." % capability, op=op)
-            held = self.checkpoint.slots.get(capability) or {}
-        try:
-            self.checkpoint.slot(capability, dict(held, asking={"op": op, "args": args}))
-            return self._call(op, args)
-        except BoardError as exc:
-            if exc.code == "checkpoint":
-                return self._call(op, args)
-            if exc.code not in ("unreachable", "session-ended"):
-                self._note(capability, held)
-            raise
-
-    def _replay(self, capability: str, held: Dict[str, Any], before: Any) -> Dict[str, Any]:
-        """Asks a lost enroll or replace again under its key. `repeated: true`: the generation is ours. Else it ran only now: past
-        a move (`before` beyond the record) the move is read. A refusal drops the record; a lost answer keeps it."""
-        asking = held.get("asking")
-        rest = {k: v for k, v in held.items() if k != "asking"}
-        if isinstance(asking, dict) and asking.get("op") in ("com.enroll", "com.responder_replace"):
-            try:
-                answer = self._receipt(asking["op"], self._call(asking["op"], asking.get("args")))
-                generation, moved = _whole(answer["slot"]["generation"]), _is_int(before, 1) and before > rest.get("generation", before)
-                if _is_int(generation, 1) and (answer.get("repeated") is True or not moved):
-                    rest = {"project": self.project, "generation": generation}
-            except BoardError as exc:
-                if exc.code in ("unreachable", "session-ended"):
-                    raise
-                if exc.code == "idempotency_window_expired":
-                    rest = {}  # a retired epoch refuses even a repeat: unknown, so no record (a first start, never a move)
-            except (KeyError, TypeError):
-                pass
-        self._note(capability, rest or None)
-        return rest
-
-    def _gone(self, capability: str, status: Optional[Dict[str, Any]] = None) -> bool:
-        """True when `com.status` shows the slot's generation past the record (the slot is left `moved`); else False."""
-        held = self.checkpoint.slots.get(capability) or {}
-        if held.get("project") != self.project or (not _is_int(held.get("generation"), 1) and "asking" not in held):
-            return False
-        status = self._status() if status is None else status
-        now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
-        held = self._replay(capability, held, now) if "asking" in held else held  # its own lost ask first
-        if "moved" in held and _is_int(held.get("moved"), 1) and not (_is_int(now, 1) and now > held.get("generation", now)):
-            now = held["moved"]  # a recorded move stays until take_back, whatever com.status says of the slot now
-        if not _is_int(now, 1) or not _is_int(held.get("generation"), 1) or now <= held["generation"]:
-            return False
-        with self._lock:
-            work = self.current
-            if work is not None and work.entry["capability"] == capability:
-                work.ctx.stopped.set()
-                self.current = None
-            for entry in [dict(e) for e in self.checkpoint.entries.values() if e.get("capability") == capability]:
-                if entry.get("step") == "claimed":
-                    self.checkpoint.drop(entry["request"])  # the move returned the claim to the queue
-                elif entry.get("step") not in ("unknown", "lapsed"):
-                    # Begun: outcome_unknown, which the slot's holder reconciles. Accepted: held on the board, continued only
-                    # by a transfer if the slot is this service's again; never a com.responder_replace on its own.
-                    entry["step"] = "unknown" if entry.get("effect") else "lapsed"
-                    self.checkpoint.put(entry)
-            self._to_resume = [r for r in self._to_resume if (self.checkpoint.entries.get(r) or {}).get("capability") != capability]
-            self.slots[capability] = {"state": "moved", "generation": now, "renewed_at": self.now()}
-        if "moved" not in held:  # once, even across restarts
-            self._emit("board.slot.moved", "warn", "The %s slot on this Project was moved to another session. This service stopped "
-                       "answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not "
-                       "take the slot back by itself. Its take-back action brings it back once the other session lets it go; without one, ask its "
-                       "maintainer." % capability,
-                       notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
-            self._note(capability, dict(held, moved=now))  # said again at the next start if it cannot be written
-        return True
-
-    def take_back(self, capability: str) -> None:
-        """The operator's act, never the kit's: forget the move; the next tick enrolls once the slot is free (FAA-155)."""
-        if capability not in self.capabilities:
-            raise BoardError("invalid_arguments", "This responder does not answer %s." % capability)
-        with self._lock:
-            self.checkpoint.slot(capability, None)
-            if (self.slots.get(capability) or {}).get("state") == "moved":
-                self.slots[capability] = {"state": "contested", "renewed_at": 0.0}
-            self._said.pop("board.slot.moved", None)
-
     # -- restart: reconcile and transfer -------------------------------------------------------------------------
     def _read_state(self, entry: Dict[str, Any]) -> Optional[str]:
         message = self._call("com.get", {"message": entry["message"]})
@@ -381,26 +285,39 @@ class Responder:
         responders = [r for r in status.get("responders") or [] if isinstance(r, dict)]
         generations = {r.get("capability"): _whole(r.get("generation", 0)) for r in responders}
         on_hold = {r.get("capability") for r in responders if r.get("held") is True}  # DEC-0079
+        failure: Optional[BoardError] = None
         for capability in capabilities:
             held, was = transfer.get(capability), (self.checkpoint.slots.get(capability) or {}).get("generation")
-            if self._gone(capability, status):
-                continue  # moved away: never replaced at recovery (FAA-155)
-            if capability in on_hold:
-                for entry in held or []:
-                    entry["step"] = "lapsed"  # taken back by a transfer once the hold is lifted
-                    self.checkpoint.put(entry)
-                self._pause(capability)
-            elif held:  # at the generation a replay of its own lost ask just recorded, else com.status's (seam 6)
-                mine = (self.checkpoint.slots.get(capability) or {}).get("generation")
-                self._replace(capability, held, mine if _is_int(mine, 1) and mine != was else generations.get(capability, 0))
-            else:
-                self._enroll(capability)
+            if failure is not None:  # the board session failed: the rest wait for the next tick (FAA-163)
+                self._retry_later(capability, held or [], failure)
+                continue
+            try:
+                self._settle(capability, lambda: self._recover_one(capability, status, held, was, generations, on_hold), held)
+            except BoardError as exc:
+                failure = exc
         for entry in reconcile:
             if self.slots.get(entry["capability"], {}).get("state") == "held":
                 self._reconcile(entry)
             elif entry.get("step") != "unknown":
                 entry["step"] = "unknown"  # the slot is not this session's yet: a later tick reconciles it (finding 38)
                 self.checkpoint.put(entry)
+        if failure is not None:
+            raise failure
+
+    def _recover_one(self, capability: str, status: Dict[str, Any], held: Optional[List[Dict[str, Any]]], was: Any,
+                     generations: Dict[Any, Any], on_hold: set) -> None:
+        if self._gone(capability, status):
+            return  # moved away: never replaced at recovery (FAA-155)
+        if capability in on_hold:
+            for entry in held or []:
+                entry["step"] = "lapsed"  # taken back by a transfer once the hold is lifted
+                self.checkpoint.put(entry)
+            self._pause(capability)
+        elif held:  # at the generation a replay of its own lost ask just recorded, else com.status's (seam 6)
+            mine = (self.checkpoint.slots.get(capability) or {}).get("generation")
+            self._replace(capability, held, mine if _is_int(mine, 1) and mine != was else generations.get(capability, 0))
+        else:
+            self._enroll(capability)
 
     def _replace(self, capability: str, entries: List[Dict[str, Any]], generation: Any) -> None:
         if not _is_int(generation, 0):
@@ -559,7 +476,8 @@ class Responder:
     def _lease_left(self) -> float:
         """Seconds this session's leases still run, by its own clock: the running attempt's, else the oldest held slot's."""
         renewed = [self.current.renewed_at or 0.0] if self.current is not None else \
-            [s.get("renewed_at", 0.0) for s in self.slots.values() if s.get("state") == "held"]
+            [s.get("renewed_at", 0.0) for s in self.slots.values() if s.get("state") == "held"
+             and s.get("renewed_at", 0.0) != float("-inf")]  # a lapsed slot holds no lease (FAA-163)
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:
@@ -610,8 +528,8 @@ class Responder:
             else:
                 work.ctx.stopped.set()  # the lease lapses; acting on would outlive the attempt
         session, self.session = self.session, None
-        if session is not None:
-            session.close()
+        if session is not None and session.close():
+            self.checkpoint.leave(self.project)  # the DELETE released the slots: a standby taking one is no move (FAA-163)
 
     def _tick(self) -> None:
         work = self.current
@@ -630,6 +548,10 @@ class Responder:
             if slot.get("state") == "paused":
                 if capability != held_by_work and self.now() >= slot.get("retry_at", 0.0):
                     self._enroll(capability)  # still held: a longer pause; lifted: the slot is ours again
+                continue
+            if slot.get("state") == "retry":  # its enroll was refused: asked again alone (FAA-163)
+                if self.now() >= slot.get("retry_at", 0.0):
+                    self._settle(capability, lambda: self._enroll(capability))
                 continue
             if capability != held_by_work and self.now() - slot.get("renewed_at", 0) >= RENEW_SECONDS - 0.5:
                 self._enroll(capability)  # the holder's enroll renews its lease (no event); a lapsed one re-enrolls
@@ -994,7 +916,8 @@ class Responder:
             except (BoardError, _hub.HubError):
                 pass  # the checkpoint keeps it
         if self.session is not None:
-            self.session.close()
-            self.session = None
-            self.checkpoint.leave(self.project)  # the slots were released: no record of them can read as a move
+            session, self.session = self.session, None
+            # Only a DELETE Fabric answered released the slots (FAA-163); an idle stop waits for it 3 s (FAA-173).
+            if session.close(IDLE_LEAVE_SECONDS if work is None else None):
+                self.checkpoint.leave(self.project)  # no record of them can read as a move
         self.state = "stopped"

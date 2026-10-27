@@ -177,18 +177,53 @@ def parse_origin(url: str) -> Optional[Dict[str, str]]:
     return None
 
 
-def bash_paths(command: str, cwd: Path) -> List[str]:
-    """The folders a Bash command names as `cd <absolute path>` or `git -C <path>` (absolute, or relative to `cwd`),
-    in order. Nothing else of the command is kept; a command that does not split is [] (FAA-140)."""
+_DRIVE_MOUNT = re.compile(r"/(?:cygdrive/)?([A-Za-z])(?=/|$)")
+
+
+def _windows_path(token: str) -> Optional[str]:
+    """A Git Bash path as this Windows host's (FAA-175): `/c/...` and `/cygdrive/c/...` are drive C, `C:/...` and
+    `C:\\...` stay a drive path, `\\\\host\\share` a share. None for another `/...` (Git's own root, which only
+    `cygpath` knows) and for a relative path."""
+    import ntpath
+    mount = _DRIVE_MOUNT.match(token)
+    if mount:
+        token = mount.group(1).upper() + ":\\" + token[mount.end():].lstrip("/")
+    elif token.startswith("/"):
+        return None
+    if not ntpath.isabs(token) or not (ntpath.splitdrive(token)[0]):
+        return None
+    return ntpath.normpath(token)
+
+
+def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[str]:
+    """The folders a Bash command names as `cd <absolute path>` or `git -C <path>`, in order. A relative `-C` is read
+    against the folder the command last changed into with an absolute `cd`, else `cwd`; after a `cd` to a relative or
+    unknown folder it is dropped (FAA-166). Nothing else of the command is kept; a command that does not split is []
+    (FAA-140). On Windows (`windows`, default `sys.platform == "win32"`) backslashes are not escapes and paths are read
+    as Git Bash writes them (FAA-175); Cygwin and MSYS2 Pythons read their own POSIX paths (FAA-177)."""
     import shlex  # only a Stop hook with a transcript needs it
+    windows = sys.platform == "win32" if windows is None else windows
+    if windows:
+        import ntpath as paths
+    else:
+        import posixpath as paths
     try:
         lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
+        if windows:
+            lexer.escape = ""  # `cd C:\\work` keeps its backslashes
         tokens = list(lexer)
     except ValueError:
         return []
+
+    def absolute(token: str) -> Optional[str]:
+        if windows:
+            return _windows_path(token)
+        return paths.normpath(token) if paths.isabs(token) else None
+
     found: List[str] = []
     separators = set("();&|<>")
+    base: Optional[str] = str(cwd)  # where a relative -C points: None once a cd went somewhere unknown
     start = True  # a command word may stand here
     index = 0
     while index < len(tokens):
@@ -196,13 +231,21 @@ def bash_paths(command: str, cwd: Path) -> List[str]:
         if token and set(token) <= separators:
             start, index = True, index + 1
             continue
-        if start and token == "cd" and index + 1 < len(tokens) and os.path.isabs(tokens[index + 1]):
-            found.append(os.path.normpath(tokens[index + 1]))
-        elif start and os.path.basename(token) == "git":
+        if start and token == "cd":
+            target = tokens[index + 1] if index + 1 < len(tokens) and not set(tokens[index + 1]) <= separators else None
+            folder = absolute(target) if target else None
+            if folder:
+                found.append(folder)
+            base = folder
+        elif start and paths.basename(token) in ("git", "git.exe"):
             look = index + 1
             while look < len(tokens) and tokens[look].startswith("-") and not set(tokens[look]) <= separators:
                 if tokens[look] == "-C" and look + 1 < len(tokens) and not set(tokens[look + 1]) <= separators:
-                    found.append(os.path.normpath(os.path.join(str(cwd), tokens[look + 1])))
+                    folder = absolute(tokens[look + 1])
+                    if folder is None and base is not None and not tokens[look + 1].startswith("/"):
+                        folder = paths.normpath(paths.join(base, tokens[look + 1]))
+                    if folder:
+                        found.append(folder)
                     look += 1
                 elif tokens[look] == "-c":
                     look += 1

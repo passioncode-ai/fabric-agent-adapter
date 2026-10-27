@@ -13,6 +13,8 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     HOSTS,
     LAUNCHED_MARK,
     NATIVE_PLUGIN_HOSTS,
+    NO_REPOSITORIES_ENV,
+    NO_REPOSITORIES_MARK,
     REJOIN_MIN_INTERVAL_S,
     SESSION_ID,
     UNREAD_LINE,
@@ -36,6 +38,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     prune_stale_sessions,
     read_small,
     rejoined_recently,
+    repositories_off,
     repositories_wanted,
     session_dir,
     spawn_worker,
@@ -244,7 +247,8 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     claude = claude_registration(cwd, env)
     report = {"fabricRoot": str(root), "hub": hub, "fabricMcp": str(binary) if binary else None,
               "claudeCode": claude, "codex": codex_registered(env),
-              "sessionHooks": "active" if HOOK_FEATURE in hub.get("features", []) else "inert"}
+              "sessionHooks": "active" if HOOK_FEATURE in hub.get("features", []) else "inert",
+              "transcriptRead": "off" if repositories_off(env) else ("on" if repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
     if binary is None and claude is None:
         report["next"] = "Install Fabric 0.4.0 or later; fabric-mcp is not at %s." % ", ".join(
@@ -273,6 +277,10 @@ def print_status(report: Dict[str, Any]) -> None:
     print("Codex: %s" % ("fabric registered" if report["codex"] else "not registered"))
     print("Session hooks: %s" % ("active" if report["sessionHooks"] == "active"
                                  else "inert (this Fabric does not advertise %s)" % HOOK_FEATURE))
+    print("Repositories of a turn: %s" % {
+        "on": "read from the session's transcript (turn off: %s=1)" % NO_REPOSITORIES_ENV,
+        "off": "off (%s or the file %s in the hooks' folder)" % (NO_REPOSITORIES_ENV, NO_REPOSITORIES_MARK),
+        "waiting": "not read until Fabric takes them"}[report["transcriptRead"]])
     print("Next: %s" % report["next"])
 
 

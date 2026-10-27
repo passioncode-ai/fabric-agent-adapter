@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -703,6 +704,122 @@ class RestartTests(Conversation):
         self.assertIsNone(self.board.slots["video.render"]["holder"])
         self.assertEqual(self.hub.sessions, {})
 
+
+
+class RecoveryFollowUpTests(Conversation):
+    """FAA-163 and FAA-158: one capability's refusal never stops the others, a reconnect starts with no slot, a lapsed
+    slot holds no lease, the record is forgotten only after a DELETE Fabric answered, and a take-back is not undone."""
+
+    CAPS = ("video.render", "video.cut")
+
+    def record(self):
+        path = self.data / "board-checkpoint.json"
+        return json.loads(path.read_text()).get("slots", {}) if path.exists() else {}
+
+    def test_a_refused_first_capability_leaves_the_next_one_served(self):
+        self.board.refuse_always[("com.enroll", "video.render")] = "capacity_exceeded"
+        rid = self.board.queue("video.cut")
+        r = self.responder()
+        for _ in range(3):
+            r.step()
+            self.board.advance(1)
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.assertEqual(r.slots["video.render"]["state"], "retry")
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual([e[3]["data"]["value"] for e in self.events if e[0] == "board.slot.refused"],
+                         [{"capability": "video.render", "reason": "capacity_exceeded"}])
+
+    def test_a_refused_capability_asks_again_alone_with_a_growing_pause(self):
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        r = self.responder()
+        r.step()
+        first = r.slots["video.cut"]["retry_at"] - self.board.now
+        self.board.advance(first)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["tries"], 2)
+        self.assertEqual(r.slots["video.cut"]["retry_at"] - self.board.now, 2 * first)
+        del self.board.refuse_always[("com.enroll", "video.cut")]
+        self.board.advance(2 * first)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.assertEqual(r.slots["video.render"]["state"], "held")
+        self.assertEqual(len([e for e in self.events if e[0] == "board.slot.refused"]), 1)
+
+    def test_a_lost_enroll_while_another_slot_holds_is_asked_again(self):
+        """The session stays (video.render's lease holds) and video.cut, whose answer was lost, is enrolled next."""
+        call, once = self.board.call, []
+
+        def dropping(sid, caps, tool, args):
+            answer = call(sid, caps, tool, args)
+            if tool == "com.enroll" and args.get("capability") == "video.cut" and not once:
+                once.append(1)
+                self.board.drop_next["com.enroll"] = 1
+            return answer
+        self.board.call = dropping
+        r = self.responder()
+        r.step()
+        self.assertIsNotNone(r.session)
+        self.assertEqual(r.slots["video.cut"]["state"], "retry")
+        self.board.advance(r.slots["video.cut"]["retry_at"] - self.board.now)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.assertEqual([e for e in self.events if e[0] == "board.slot.moved"], [])
+
+    def test_a_reconnect_starts_with_no_slot(self):
+        r = self.responder()
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        r.step()  # session-ended: dropped
+        self.board.fail_next["com.status"] = "capacity_exceeded"
+        self.board.advance(60)
+        r.step()
+        self.assertEqual(r.slots, {})
+        self.assertIsNone(r.session)  # refused with no slot held: reconnects, never skips recovery
+
+    def test_a_lapsed_slot_holds_no_lease(self):
+        r = self.responder()
+        r.step()
+        r.slots["video.render"]["renewed_at"] = float("-inf")
+        self.assertGreater(r._lease_left(), 0)
+
+    def test_the_record_is_forgotten_only_after_a_delete_fabric_answered(self):
+        r = self.responder()
+        r.step()
+        self.hub.delete_fails = True
+        r.shutdown()
+        self.assertEqual(set(self.record()), {"video.render", "video.cut"})
+        self.hub.delete_fails = False
+        second = self.responder()
+        self.board.advance(61)
+        second.step()
+        second._fault(fb.BoardError("schema-unsupported", "a test"))  # a dropped session whose DELETE was answered
+        self.assertEqual(self.record(), {})
+
+    def test_an_idle_stop_waits_three_seconds_for_the_delete(self):
+        """FAA-173: an idle responder's leave ends within LC-01's 5 s even when Fabric holds the DELETE."""
+        r = self.responder()
+        r.step()
+        self.hub.delete_delay = 6.0
+        started = time.monotonic()
+        r.shutdown()
+        self.assertLess(time.monotonic() - started, fb.IDLE_LEAVE_SECONDS + 1.5)
+        self.assertEqual(r.state, "stopped")
+        self.assertEqual(set(self.record()), {"video.render", "video.cut"})  # unanswered: the records stay
+
+    def test_a_take_back_during_a_move_check_is_kept(self):
+        r = self.responder()
+        r.step()
+        self.board.move("video.render")
+        status = r._status
+
+        def interleaved():
+            answer = status()
+            r.take_back("video.render")  # the operator's action thread, between the read and the lock
+            return answer
+        r._status = interleaved
+        self.assertFalse(r._gone("video.render"))
+        self.assertNotIn("video.render", self.record())
+        self.assertNotIn("board.slot.moved", self.kinds())
 
 
 class AuditFaultTests(Conversation):
@@ -1722,6 +1839,110 @@ class SampleWiringTests(unittest.TestCase):
             kinds = [e["kind"] for e in svc.log.fetch(None, 100)]
             self.assertIn("board.request.completed", kinds)
             self.assertIn("board.request.refused", kinds)
+            svc.board.shutdown(0.1)
+
+    @unittest.skipIf(sys.platform == "win32", "Windows ends a process without a catchable SIGTERM (TerminateProcess)")
+    def test_a_stop_leaves_the_board_session_and_forgets_the_record(self):
+        """FAA-163: SIGTERM to the reference service with the board on sends the session's DELETE (the slot is free)
+        and forgets the slot record, within LC-01's 5 s idle."""
+        import signal
+        import socket
+        sample = importlib.import_module("sample_service")
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            env = dict(os.environ, HOME=str(tmp), XDG_DATA_HOME=str(tmp / "share"), LOCALAPPDATA=str(tmp / "local"))
+            hub = FakeHub(fh.fabric_root(env=env), capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            data = tmp / "data"
+            data.mkdir(mode=0o700)
+            (data / "board.credential").write_text(hub.credential)
+            os.chmod(data / "board.credential", 0o600)
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            proc = subprocess.Popen([sys.executable, sample.__file__, "serve", "--port", str(port), "--data-dir", str(data),
+                                     "--board-project", PROJECT], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            self.addCleanup(lambda: proc.poll() is None and proc.kill())
+            deadline = time.monotonic() + 20
+            while (hub.board.slots.get("sample.echo") or {}).get("holder") is None:
+                self.assertLess(time.monotonic(), deadline, "the service never enrolled")
+                self.assertIsNone(proc.poll(), proc.stderr.read() if proc.poll() is not None else "")
+                time.sleep(0.05)
+            record = json.loads((data / "board-checkpoint.json").read_text())["slots"]
+            self.assertEqual(record["sample.echo"]["generation"], hub.board.slots["sample.echo"]["generation"])
+            started = time.monotonic()
+            proc.send_signal(signal.SIGTERM)
+            self.assertEqual(proc.wait(timeout=10), 0)
+            self.assertLess(time.monotonic() - started, 5.0)
+            proc.stderr.close()
+            self.assertIsNone(hub.board.slots["sample.echo"]["holder"])  # the DELETE released it
+            self.assertEqual(hub.sessions, {})
+            self.assertEqual(json.loads((data / "board-checkpoint.json").read_text()).get("slots", {}), {})
+
+    def test_the_operator_takes_a_moved_slot_back_from_the_dashboard(self):
+        """FAA-157: the page offers a moved slot's take-back; only the operator's signed-in session reaches it, and the
+        service enrolls again once the other session lets the slot go."""
+        import http.client
+        import socket
+        import threading
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            hub = FakeHub(tmp / "fabric", capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            (tmp / "data").mkdir(mode=0o700)
+            cred = tmp / "data" / "board.credential"
+            cred.write_text(hub.credential)
+            os.chmod(cred, 0o600)
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            sample = importlib.import_module("sample_service")
+            args = sample.build_parser().parse_args(["serve", "--port", str(port), "--data-dir", str(tmp / "data"),
+                                                     "--board-project", PROJECT])
+            svc = sample.Service(args)
+            svc.start()
+            self.addCleanup(svc.lock.release)
+            svc.board.hub = fh.HubClient(tmp / "fabric")
+            svc.board.now = lambda: hub.board.now
+            svc.board.spawn = lambda fn: fn()
+            server = sample.make_server(svc)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(server.shutdown)
+            svc.board.step()  # holds generation 1
+            hub.board.move("sample.echo")
+            hub.board.queue("sample.echo", text="hello")
+            hub.board.advance(15)
+            svc.board.step()  # the claim is fenced: com.status shows the move
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+
+            def request(method, path, headers=None, body=None):
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                conn.request(method, path, body=body, headers={"Host": "127.0.0.1:%d" % port, **(headers or {})})
+                res = conn.getresponse()
+                data = res.read()
+                conn.close()
+                return res.status, data, res.getheader("Set-Cookie") or ""
+            take = json.dumps({"capability": "sample.echo"})
+            token = {"Authorization": "Bearer " + svc.token, "X-Fabric-Request": "1", "Content-Type": "application/json"}
+            self.assertEqual(request("POST", "/api/board/take-back", token, take)[0], 401)  # a service token is not the operator
+            url = svc.codes.issue()["url"]
+            cookie = {"Cookie": request("GET", url)[2].split(";", 1)[0]}
+            status, page, _ = request("GET", "/", cookie)
+            self.assertEqual(status, 200)
+            self.assertIn(b'data-take-back="sample.echo"', page)
+            self.assertEqual(request("GET", "/board.js")[0], 200)
+            self.assertEqual(request("POST", "/api/board/take-back", cookie, take)[0], 403)  # no X-Fabric-Request
+            self.assertEqual(request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"},
+                                     json.dumps({"capability": "other"}))[0], 400)
+            status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
+            self.assertEqual(status, 200, said)
+            self.assertEqual(svc.board_moved(), [])
+            self.assertNotIn(b"data-take-back", request("GET", "/", cookie)[1])
+            hub.board.advance(61)  # the other session lets the slot go: the next tick enrolls
+            svc.board.step()
+            self.assertEqual(svc.board.slots["sample.echo"]["state"], "held")
+            self.assertIn("board.slot.returned", [e["kind"] for e in svc.log.fetch(None, 100)])
             svc.board.shutdown(0.1)
 
 
