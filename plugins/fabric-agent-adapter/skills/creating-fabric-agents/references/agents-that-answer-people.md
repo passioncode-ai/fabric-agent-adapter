@@ -5,10 +5,12 @@ channel where a person asks and the agent writes back. Every item below is a par
 first release, not a later improvement: each one was added late, after a measured failure, to an agent that shipped
 without it.
 
-Sources (public): the support quality standard, `support-quality.md` (A1 the record, A5 `support.quality_daily`), and
-the practices from an audit of five such agents, `support-practices.md` (P1 to P8), both in the `agent-evals` skill of
-[ssheleg/agent-stack](https://github.com/ssheleg/agent-stack) (`plugins/agent-stack/skills/agent-evals/references/`;
-the practices arrive with [PR #70](https://github.com/ssheleg/agent-stack/pull/70)). The standard says how such an agent
+Sources (public): the support quality standard,
+[`support-quality.md`](https://github.com/ssheleg/agent-stack/blob/28a0303c42038778e2650fc51096e589f4035239/plugins/agent-stack/skills/agent-evals/references/support-quality.md) (A1 the record, A5
+`support.quality_daily`), and the practices from an audit of five such agents,
+[`support-practices.md`](https://github.com/ssheleg/agent-stack/blob/f882358e3fb9627f6edb20db3981818912a9844c/plugins/agent-stack/skills/agent-evals/references/support-practices.md) (P1 to P8),
+both in the `agent-evals` skill of [ssheleg/agent-stack](https://github.com/ssheleg/agent-stack); the practices arrive
+with [PR #70](https://github.com/ssheleg/agent-stack/pull/70), linked here at its commit until it merges. The standard says how such an agent
 is measured; the practices say what worked and what failed. This page lists what the template carries and the check that
 proves each part. Read both sources before you design the reply pipeline.
 
