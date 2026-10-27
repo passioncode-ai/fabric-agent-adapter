@@ -215,9 +215,12 @@ held and not transferred). The responder keeps that move instead of undoing it:
   records its own generation. Only a replay the board refuses, or one that ran for the first time (`repeated: false`)
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
-- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and the next tick
-  enrolls once the other session lets the slot go (a live holder is waited for, as on a first start) and takes the work
-  left `lapsed` back with a transfer. The kit gives it no route of its own (the reference service has none yet,
+- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record. In the same board
+  session the next tick enrolls once the other session lets the slot go (a live holder is waited for) and takes the work
+  left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work held for the slot, takes it
+  back at once by `com.responder_replace`, as a restart did before 0.53.0: the operator asked for the slot back, so the
+  other session is replaced. In recovery, a refusal that leaves no slot held reconnects; one that leaves some held keeps
+  the session and serves them. The kit gives it no route of its own (the reference service has none yet,
   FAA-157): a service built on the kit declares it as an operator action, a button with its tool ([Every button has a
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so no other
   agent can call it on its own; on a server that reads mandates (`agent_id`) it also names its effect class, for example

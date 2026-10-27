@@ -563,7 +563,8 @@ class Responder:
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:
-        code, connecting = getattr(exc, "code", "unreachable"), self.state == "connecting"
+        code, slots = getattr(exc, "code", "unreachable"), self.slots.values()
+        connecting = self.state == "connecting" and not any(s.get("state") == "held" for s in slots)
         wait = self.backoff.next()
         left = self._lease_left() - LEASE_MARGIN_SECONDS
         keep = code == "unreachable" and left > 0  # finding 38: the lease holds, so the session and the work stay
@@ -588,7 +589,7 @@ class Responder:
                        notify=True, episode=code, reason=code)
         else:
             self.state = "down"
-            # A refusal before the connect finished (in recovery) reconnects too: never a slotless "ready" responder (seam 6).
+            # In recovery with no slot held a refusal reconnects (seam 6); with some held they are served (seam 7).
             if (connecting or code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol")) and not keep:
                 self._drop_session()
             self._emit("board.down", "warn", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
@@ -596,8 +597,7 @@ class Responder:
         return wait
 
     def _drop_session(self) -> None:
-        work, self.current = self.current, None
-        self._to_resume = []  # the next session transfers them again
+        work, self.current, self._to_resume = self.current, None, []  # the next session transfers them again
         if work is not None:
             entry = work.entry
             if work.done.is_set() and work.failure is None and not outcome_problems(work.outcome, bool(entry.get("effect"))):

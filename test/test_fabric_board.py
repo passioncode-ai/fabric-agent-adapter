@@ -207,6 +207,26 @@ class Conversation(unittest.TestCase):
         return [e[0] for e in self.events]
 
 
+class TwoCapabilityRecoveryTests(Conversation):
+    """Seam reading 7 of 0.53.0: a refusal in recovery that leaves some slots held keeps them served, as on 0.52."""
+
+    CAPS = ("video.render", "video.cut")
+
+    def test_a_capability_refused_at_connect_never_stops_the_others(self):
+        for code in ("capacity_exceeded", "invalid_arguments"):
+            with self.subTest(code=code):
+                self.setUp()
+                self.board.refuse_always[("com.enroll", "video.cut")] = code
+                rid = self.board.queue("video.render")
+                r = self.responder()
+                for _ in range(4):
+                    r.step()
+                    self.board.advance(15)
+                self.assertEqual(self.board.requests[rid]["state"], "completed")
+                self.assertEqual(r.slots["video.render"]["state"], "held")
+                self.tearDown()
+
+
 class ConversationTests(Conversation):
     def test_whole_conversation(self):
         rid = self.board.queue("video.render")

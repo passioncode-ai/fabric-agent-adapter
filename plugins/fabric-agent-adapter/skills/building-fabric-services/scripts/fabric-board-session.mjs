@@ -313,8 +313,8 @@ export class Responder {
   }
 
   /**
-   * The operator's act, never the kit's: forget that a capability's slot moved away. The next tick enrolls once the slot
-   * is free (a live holder is waited for, as on a first start); accepted work left held comes back by a transfer.
+   * The operator's act, never the kit's: forget that a capability's slot moved away. In the same board session the next
+   * tick enrolls once the slot is free; a reconnect with held work takes it back at once by a transfer (FAA-155).
    */
   takeBack(capability) {
     if (!this.capabilities.includes(capability)) throw new BoardError('invalid_arguments', `This responder does not answer ${capability}.`);
@@ -544,7 +544,7 @@ export class Responder {
 
   async fault(e) {
     const code = e.code ?? 'unreachable';
-    const connecting = this.state === 'connecting';
+    const connecting = this.state === 'connecting' && !Object.values(this.slots).some((s) => s?.state === 'held');
     let wait = this.backoff.next();
     const left = this.leaseLeft() - LEASE_MARGIN_SECONDS;
     const keep = code === 'unreachable' && left > 0; // finding 38: the lease holds, so the session and the work stay
@@ -564,7 +564,7 @@ export class Responder {
       this.emit('board.blocked', 'error', `The responder stopped answering requests: ${e.message}`, { notify: true, episode: code, reason: code });
     } else {
       this.state = 'down';
-      // A refusal before the connect finished (in recovery) reconnects too: never a slotless "ready" responder (seam 6).
+      // A refusal in recovery that left no slot held reconnects (seam 6); one that left some held serves them (seam 7).
       if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code)) && !keep) await this.dropSession();
       this.emit('board.down', 'warn', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
     }

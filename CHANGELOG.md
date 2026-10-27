@@ -41,7 +41,8 @@
   and a restart before the next one is recorded may then read as a move. A holder's renew within its live lease writes
   nothing; the reference service now waits at its stop for the responder to leave its board session. `Responder.take_back(capability)` /
   `takeBack(capability)` is the operator's act that brings a moved slot back: it enrolls once the other session lets
-  the slot go and takes the held work back by a transfer. The kit offers no route for it: a service declares one as an
+  the slot go and takes the held work back by a transfer; a restart or reconnect before that, with work held, replaces
+  the other session at once. The kit offers no route for it: a service declares one as an
   operator action with its tool and gate `relayed` (the operator's decision; never `none`; on a server that reads
   mandates it also names its effect class) (`fabric-actions/0.1`; the reference service's is FAA-157). The
   notice says begun work is the new holder's to settle and that the take-back action brings the slot back. Both
@@ -64,8 +65,8 @@
   forgot the record); after a crash, a 0.52 run that enrolled the slot and wrote nothing to the checkpoint reads as a move at the next 0.53 start, which
   the take-back action undoes. A `fenced` refusal on accepted work while the slot did not move now keeps the entry `lapsed`
   and the next tick transfers it back and finishes it (0.52 dropped the entry and left the request accepted on the
-  board). A refusal raised while the responder recovers at connect now reconnects instead of leaving it `ready` with no
-  slot. A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
+  board). A refusal raised while the responder recovers at connect, before any slot is held, now reconnects instead of
+  leaving it `ready` with no slot; one after some slots are held keeps them served. A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
 
 ## 0.52.0 (2026-10-26)
 

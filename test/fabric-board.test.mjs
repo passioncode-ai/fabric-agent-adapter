@@ -1300,6 +1300,22 @@ test('FAA-155 seam 6: a replace lost before the board recovers at the replayed g
   void hub;
 });
 
+test('FAA-155 seam 7: a capability refused at connect never stops the others', async (t) => {
+  for (const code of ['capacity_exceeded', 'invalid_arguments']) {
+    const hub = await fakeHub(t, ['video.render', 'video.cut']);
+    const h = harness(hub);
+    await hub.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.cut', code });
+    const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+    const r = h.responder({ capabilities: ['video.render', 'video.cut'] });
+    for (let i = 0; i < 4; i += 1) {
+      await r.step();
+      await h.advance(15);
+    }
+    assert.equal((await h.state()).requests[rid].state, 'completed', code);
+    assert.equal(r.slots['video.render'].state, 'held', code);
+  }
+});
+
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
   const dir = tempDir('faa155-cp-');
   const file = path.join(dir, 'cp.json');
