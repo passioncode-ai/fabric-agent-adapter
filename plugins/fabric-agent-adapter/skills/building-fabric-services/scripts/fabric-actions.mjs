@@ -125,12 +125,12 @@ const refuse = (code) => ({ ok: false, code });
  * (DEC-0126 OA-6). DEC-0125: a call with no decision that carries
  * `mandate` (its `_meta.mandate`) is answered as mandateCovers answers, given `self` (the service's own agent id),
  * `callerAgent` (only an agent id the service authenticated), `effect` (the action's effect class, the service's own
- * knowledge), `spendUsd` and `project`: covered, {by: 'operator', via: 'mandate', task, chain, source?, caller}. `{fault}`
- * (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing, self-missing) is the
- * service's own and is never sent to a caller.
- *
- * Kit input beside the contract's: mandateCapability, a job's kept step's capability, read by the mandate in place of
- * the action's tool (the contract's actionDecision does not take it; the service's own input, never a caller's).
+ * knowledge), `spendUsd` and `project`: covered, {by: 'operator', via: 'mandate', task, chain, source?, caller}.
+ * DEC-0141 MJ-1: a job's input request (tool fabric.job.get) under a mandate is read under `mandateCapability`, the
+ * job's own capability (the tool its start call named), its action the request key; any other action reads its own
+ * tool. `{fault}` (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing,
+ * self-missing, mandate-capability-missing) is the service's own and is never sent to a caller (actionGate answers
+ * mandate-capability-missing as operator-decision-required).
  */
 export function actionDecision(inputs) {
   const field = (key) => member(inputs, key);
@@ -166,6 +166,15 @@ export function actionDecision(inputs) {
   return { ok: true, recordAs: { by: 'operator', via: 'relayed-instruction', caller, ...(has(decision, 'source') ? { source: { ...decision.source } } : {}) } };
 }
 
+/** The tool of a job's input request (interop C3.3, AP-2): the call that answers it is fabric.job.get (DEC-0141 MJ-1). */
+export const JOB_STEP_TOOL = 'fabric.job.get';
+const CAPABILITY_NAME = /^[a-z][a-z0-9._-]{1,127}$/; // common.schema.json#/$defs/capabilityName
+
+/** A job's capability a mandate can read a step under (MJ-1): a capability name, never fabric.job.get itself. */
+export function jobCapability(value) {
+  return typeof value === 'string' && CAPABILITY_NAME.test(value) && value !== JOB_STEP_TOOL;
+}
+
 /**
  * A relayed action's call that carries a mandate and no decision (DEC-0125 MD-3): the mandate decides, as the contract's
  * byMandate reads it: the service's own `effect` and agent id `self` are required (else a fault), its estimate
@@ -176,13 +185,15 @@ function byMandate(field, action, caller) {
   const self = field('self');
   if (typeof effect !== 'string') return { fault: 'effect-missing' };
   if (typeof self !== 'string') return { fault: 'self-missing' };
+  // MJ-1: a job's step is read under the job's capability, never under the transport fabric.job.get itself.
+  const capability = action.tool === JOB_STEP_TOOL ? field('mandateCapability') : action.tool;
+  if (!jobCapability(capability)) return { fault: 'mandate-capability-missing' };
   const spendUsd = field('spendUsd');
   const project = field('project');
   const answer = mandateCovers({
     mandate: field('mandate'), tier: field('tier'), now: field('now'), self,
     ...(field('callerAgent') === undefined ? {} : { callerAgent: field('callerAgent') }),
-    // A job's kept step is read under the job's own capability (mandateCapability), as jobStep read it at the start.
-    call: { capability: typeof field('mandateCapability') === 'string' ? field('mandateCapability') : action.tool, action: action.id, effect, ...(typeof spendUsd === 'number' ? { spendUsd } : {}), ...(typeof project === 'string' ? { project } : {}) },
+    call: { capability, action: action.id, effect, ...(typeof spendUsd === 'number' ? { spendUsd } : {}), ...(typeof project === 'string' ? { project } : {}) },
   });
   if ('recordAs' in answer) return { ok: true, recordAs: { ...answer.recordAs, caller } };
   return answer; // never `ignored`: the tier was read first, so a T2 call answered approval-required before (MD-5)

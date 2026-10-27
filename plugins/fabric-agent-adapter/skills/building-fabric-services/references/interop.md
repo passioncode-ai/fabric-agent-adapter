@@ -285,10 +285,14 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   when it reads `source`; a caller that sees no such entry sends the call without `source`, and it is taken as before.
 - `action_gate(..., self_id=, effect=, caller_agent=, spend_usd=, project=)` / `actionGate({..., self, effect,
   callerAgent, spendUsd, project})` is the same gate for a server of your own; `action_decision` / `actionDecision`
-  take `mandate`, `self`, `callerAgent`, `effect`, `spendUsd` and `project` as the contract's function does
-  (`effect-missing`, `self-missing` are the service's own faults), and the kit's own `mandateCapability` (a job's kept
-  step: the capability the mandate is read under), which the contract's function does not take; like `effect`, it is
-  the service's own input, never the caller's.
+  take `mandate`, `self`, `callerAgent`, `effect`, `spendUsd`, `project` and `mandateCapability` as the contract's
+  function does (DEC-0141 MJ-1): for an action whose tool is `fabric.job.get` (a job's input request) the mandate is
+  read under `mandateCapability`, the job's own capability, with the request key as the action; any other action reads
+  its own tool. `effect-missing`, `self-missing` and `mandate-capability-missing` (a job's step with no usable
+  capability: absent, empty, blank, not a capability name, or `fabric.job.get` itself) are the service's own faults;
+  like `effect`, `mandateCapability` is the service's own input, never the caller's. The gate answers
+  `mandate-capability-missing` to the caller as `operator-decision-required` (`data.detail` names it), the fault kept
+  beside it for the service's log, and nothing is applied, so the job stays `input_required`.
 - **A job's approval step (interop C3.3).** A job reads the mandate its start call carried at its own approval step:
   `ctx.approval_step(job_id, key, request, effect=, spend_usd=, project=, message=)` on the start call's context (a
   server with `agent_id`) answers the record when the mandate covers the step `{capability: the job's, action: key,
@@ -301,10 +305,12 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   replaces the kept steps, and an answer clears them: pass `steps=` again on every question whose answer a mandate may
   cover. The answer's mandate is read under the job's own capability, as at the start (`action_gate(...,
   mandate_capability=)` / `actionGate({mandateCapability})`), so the start and the answer agree whatever the tool is
-  named; a mandate can name only capability names, so one that names capabilities never covers a tool named otherwise.
+  named: a job whose tool is not a capability name has no capability a mandate can read its step under, and both its
+  start and its answer wait for the operator (`mandate-capability-missing` in the message). A mandate whose
+  `capabilities` name `fabric.job.get` covers no step of another capability.
   Node has no tool server: a Node service reads `store.load(jobId).private.steps` and `.private.capability` BEFORE
   `store.answer` (which clears the steps), gates the answer with `actionGate({..., mandateCapability:
-  private.capability})`, then answers. Without a string capability the answer is read under `fabric.job.get`.
+  private.capability})`, then answers.
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,

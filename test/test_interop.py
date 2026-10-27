@@ -1116,18 +1116,24 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertEqual(self.jobs.private(job_id)["steps"], {}, "the answered step is gone in the same write")
 
     def test_the_start_and_the_answer_read_a_mandate_alike_whatever_the_tool_is_named(self):
-        # Seam round 3: under a mandate naming fabric.job.get the start refused and the answer took; now both refuse.
-        # A mandate cannot name a tool that is no capability name, so only one naming no capabilities covers both.
-        for scope, covered in (({"capabilities": ["fabric.job.get"], "actions": ["approve-reply"], "effects": ["reply"]}, False),
-                               ({"actions": ["approve-reply"], "effects": ["reply"]}, True)):
+        # Seam round 3 made the start and the answer agree; DEC-0141 MJ-1 (0.54.0): a job whose tool is no capability
+        # name has no capability a mandate can read its step under, so both refuse whatever the scope, the answer as
+        # operator-decision-required with the job left input_required.
+        for scope in ({"capabilities": ["fabric.job.get"], "actions": ["approve-reply"], "effects": ["reply"]},
+                      {"actions": ["approve-reply"], "effects": ["reply"]}):
             server = self.camel_server()
             self.start_camel(server, {"mandate": relayed_mandate(scope)})
-            _, record = self.step()
-            self.assertEqual(record is not None, covered, scope)
+            job_id, record = self.step()
+            self.assertIsNone(record, scope)
+            self.assertIn("mandate-capability-missing", self.jobs.get(job_id)["statusMessage"])
             server = self.camel_server()
             self.start_camel(server, {})
             job_id, _ = self.step()
-            self.assertEqual(not self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], covered, scope)
+            refused = self.answer(server, job_id, {"mandate": relayed_mandate(scope)})
+            self.assertTrue(refused["isError"], scope)
+            self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
+            self.assertEqual(refused["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")
+            self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
 
     def test_a_kept_step_does_not_outlive_its_question(self):
         # Seam round 1: a later plain question under the same key is not answered by a mandate alone.

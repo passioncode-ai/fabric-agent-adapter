@@ -338,6 +338,24 @@ test('actionGate reads a kept job step under mandateCapability, not the action\'
   const gate = (extra) => i.actionGate({ action: step, tier: 'T0', caller: 'local:T0', meta: { mandate }, now: NOW, self: 'example-agent', effect: 'reply', ...extra });
   assert.equal(gate({}).ok, false, 'under fabric.job.get the capability is not the job\'s');
   assert.equal(gate({ mandateCapability: 'reviews.approve' }).ok, true);
+  // DEC-0141 MJ-1: an unusable job capability is answered as a step the mandate does not cover, the fault kept.
+  for (const mandateCapability of [undefined, '', '  ', 'Reviews Approve', 'fabric.job.get']) {
+    const refused = gate({ mandateCapability });
+    assert.equal(refused.ok, false, String(mandateCapability));
+    assert.equal(refused.fault, 'mandate-capability-missing');
+    assert.equal(refused.refusal.code, 'operator-decision-required');
+    assert.equal(refused.refusal.data.detail, 'mandate-capability-missing');
+  }
+});
+
+test('jobStep reads an unusable job capability as the answer does (DEC-0141 MJ-1)', () => {
+  const mandate = leadMandate({ actions: ['approve-reply'], effects: ['reply'] });
+  for (const capability of ['replyDraft', 'fabric.job.get', '']) {
+    const step = i.jobStep({ mandate, tier: 'T0', now: NOW, self: 'example-agent', capability, key: 'approve-reply', effect: 'reply' });
+    assert.equal(step.covered, false, capability);
+    assert.equal(step.fault, 'mandate-capability-missing');
+    assert.match(step.message, /mandate-capability-missing/);
+  }
 });
 
 test('answer clears the answered question\'s kept steps in the same write', () => {

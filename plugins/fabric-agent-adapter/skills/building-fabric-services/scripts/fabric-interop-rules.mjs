@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import { ServiceError } from './fabric-base.mjs';
 import { jcs, refusalFromAction, refusalToolResult } from './fabric-delegation.mjs';
-import { actionDecision, decisionShape } from './fabric-actions.mjs'; // DEC-0121
+import { actionDecision, decisionShape, jobCapability } from './fabric-actions.mjs'; // DEC-0121
 import { EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, mandateCovers, mandateProblem, withoutSource } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
 import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 import { isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
@@ -218,6 +218,8 @@ export function requestMeta(traceparent, { decision, mandate, targetProtocols } 
   return meta;
 }
 
+const UNREADABLE_JOB_CAPABILITY = "The operator's mandate cannot be read for this step (mandate-capability-missing): answer it, or call fabric.job.get with a decision in _meta.decision.";
+
 /**
  * A job's own approval step under the mandate its start call carried (interop C3.3, DEC-0125 MD-3, MD-4; conformance:
  * "a job's approval step included"): the step is the call {capability: the job's, action: the input request's `key`,
@@ -231,6 +233,8 @@ export function requestMeta(traceparent, { decision, mandate, targetProtocols } 
 export function jobStep({ mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project } = {}) {
   if (mandate === undefined || mandate === null) return { covered: false, message: null };
   if (!EFFECT_CLASSES.includes(effect)) throw new InteropError(`A job's approval step names its effect class (one of ${EFFECT_CLASSES.join(', ')}; DEC-0125).`);
+  // MJ-1: read alike at the start and at the answer (actionGate).
+  if (!jobCapability(capability)) return { covered: false, detail: 'mandate-capability-missing', fault: 'mandate-capability-missing', message: UNREADABLE_JOB_CAPABILITY };
   const call = { capability, action: key, effect };
   if (typeof spendUsd === 'number') call.spendUsd = spendUsd;
   if (typeof project === 'string') call.project = project;
@@ -262,8 +266,8 @@ export function jobStep({ mandate, tier, now, self, capability, key, effect, cal
  * {ok: true, record: {by: 'operator', via: 'mandate', task, chain, caller}, decision: null, mandate}; without `self` the
  * mandate is not read and the call is answered as before it existed.
  *
- * mandateCapability: a job's kept step's capability the mandate is read under, not the action's tool (the kit's
- * input; the service's own, never a caller's).
+ * mandateCapability: a job's kept step's capability the mandate is read under (DEC-0141 MJ-1; the service's own input,
+ * never a caller's); unusable, the refusal is operator-decision-required.
  */
 export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };
@@ -285,7 +289,10 @@ export function actionGate({ action, tier, caller, meta, target, elicited = fals
     if (isObject(record) && record.via === 'mandate') out.mandate = inputs.mandate;
     return out;
   }
-  const out = { ok: false, refusal: refusalFromAction(answer) };
+  // MJ-1 (DEC-0141): a job's step the service cannot read under a mandate is answered as one the mandate does not
+  // cover; nothing is applied, so the job stays input_required.
+  const said = answer.fault === 'mandate-capability-missing' ? { ok: false, code: 'operator-decision-required', data: { detail: 'mandate-capability-missing' } } : answer;
+  const out = { ok: false, refusal: refusalFromAction(said) };
   if ('fault' in answer) out.fault = answer.fault;
   return out;
 }

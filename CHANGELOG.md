@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.54.0 (2026-10-27)
+
+### Changed
+
+- **Contract pin `00e050ba` (`v0.1.0+2026-10-27.1`, DEC-0141)** (FAA-159, CT-149, CT-177). A job's step under the
+  operator's mandate is read as its start was: under the job's own capability, its action the step's request key
+  (MJ-1). The kits' `action_decision` / `actionDecision` now read the reference's way: for an action whose tool is
+  `fabric.job.get` the mandate is read under `mandateCapability`, and without a usable one (absent, empty, blank, not a
+  capability name, or `fabric.job.get` itself) the answer is the service's fault `mandate-capability-missing`; any
+  other action reads its own tool, whatever `mandateCapability` says. Before, an absent capability was read as
+  `fabric.job.get`, a non-name string as given, and `mandateCapability` was read on any action. `action_gate` /
+  `actionGate` answer that fault to the caller as `operator-decision-required` (`data.detail`
+  `mandate-capability-missing`), the fault beside it for the service's log; nothing is applied, so the job stays
+  `input_required`. `job_step` / `jobStep` read an unusable job capability alike at the start: the step waits
+  `input_required`, its message naming `mandate-capability-missing`. So a job whose tool is not a capability name is no
+  longer covered by an `actions`-only mandate at either end, and a mandate whose `capabilities` name `fabric.job.get`
+  covers no step of another capability. The vendored `actions-vectors.json` gains the contract's `jobSteps` group (14
+  cases) and its two new `action-call` fixtures (18 in all); both twins run them. Bundles issued under the previous pin
+  `1197a90d` stay valid (`adapt_project.py`).
+- **working-with-fabric:** a leading agent covering a job's approval step names the job's capability in
+  `capabilities` without `actions` (the step's request key is the service's own). New scenario eval
+  `lead-covers-a-job-step-by-its-capability`. building-fabric-services' interop reference drops the sentence that
+  read an answer without a capability under `fabric.job.get`.
+
 ## 0.53.0 (2026-10-27)
 
 ### Added

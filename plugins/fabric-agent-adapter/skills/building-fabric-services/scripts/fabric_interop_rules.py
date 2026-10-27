@@ -17,7 +17,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_actions import action_decision, decision_shape  # noqa: E402 - DEC-0121
+from fabric_actions import action_decision, decision_shape, job_capability  # noqa: E402 - DEC-0121
 from fabric_mandate import (  # noqa: E402 - DEC-0125, DEC-0126
     EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, mandate_covers, mandate_problem, without_source)
 
@@ -319,6 +319,10 @@ def request_meta(traceparent: Optional[str] = None, decision: Any = None, mandat
     return meta
 
 
+_UNREADABLE_JOB_CAPABILITY = ("The operator's mandate cannot be read for this step (mandate-capability-missing): answer it, "
+                              "or call fabric.job.get with a decision in _meta.decision.")
+
+
 def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any, key: Any, effect: Any,
              caller_agent: Any = None, spend_usd: Any = None, project: Any = None) -> Dict[str, Any]:
     """A job's own approval step under the mandate its start call carried (interop C3.3, DEC-0125 MD-3, MD-4;
@@ -336,6 +340,9 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
         return {"covered": False, "message": None}
     if not (isinstance(effect, str) and effect in EFFECT_CLASSES):
         raise InteropError("A job's approval step names its effect class (one of %s; DEC-0125)." % ", ".join(EFFECT_CLASSES))
+    if not job_capability(capability):  # MJ-1: read alike at the start and at the answer (action_gate)
+        return {"covered": False, "detail": "mandate-capability-missing", "fault": "mandate-capability-missing",
+                "message": _UNREADABLE_JOB_CAPABILITY}
     call: Dict[str, Any] = {"capability": capability, "action": key, "effect": effect}
     if isinstance(spend_usd, (int, float)) and not isinstance(spend_usd, bool):
         call["spendUsd"] = spend_usd
@@ -377,7 +384,7 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     decision, given `effect` (the action's effect class, required: without it the call is the service's fault
     effect-missing), `caller_agent` (only an agent id the service authenticated: a delegation's caller, its own
     per-agent credential; never a name the call carries), `spend_usd` (its own estimate), `project`, and `mandate_capability` (a job's kept step: the job's capability
-    the mandate is read under, not the action's tool). A covered call
+    the mandate is read under, DEC-0141 MJ-1; unusable, the refusal is operator-decision-required). A covered call
     answers {ok: True, record: {by: operator, via: mandate, task, chain, caller}, decision: None, mandate}; without
     `self_id` the mandate is not read and the call is answered as before it existed."""
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19
@@ -401,7 +408,11 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
         if isinstance(record, dict) and record.get("via") == "mandate":
             out["mandate"] = inputs["mandate"]
         return out
-    out: Dict[str, Any] = {"ok": False, "refusal": _fd.refusal_from_action(answer)}
+    # MJ-1 (DEC-0141): a job's step the service cannot read under a mandate is answered as one the mandate does not
+    # cover; nothing is applied, so the job stays input_required.
+    said = {"ok": False, "code": "operator-decision-required", "data": {"detail": "mandate-capability-missing"}} \
+        if answer.get("fault") == "mandate-capability-missing" else answer
+    out: Dict[str, Any] = {"ok": False, "refusal": _fd.refusal_from_action(said)}
     if "fault" in answer:
         out["fault"] = answer["fault"]
     return out

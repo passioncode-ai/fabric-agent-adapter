@@ -3,8 +3,8 @@
 The scenario evals in test/evals/<skill>/scenarios.json are judged by a model, so hosted CI cannot run them. These
 tests hold the prose those scenarios grade to the words that carry the rule: each check names the scenario it serves.
 Contract DEC-0125 (`mandate/1`, docs/specification/delegation.md#the-operators-mandate, MD-1 to MD-6) and DEC-0126
-(one approval binds all the operator's agents, OA-1 to OA-7, `source` and `operator-source/1`) at the pin 1197a90d
-(`v0.1.0+2026-10-26.12`, 0.52.0, FAA-134); the operator's rule of 2026-10-26 (board thread 3e8f706c, request 519d7b21;
+(one approval binds all the operator's agents, OA-1 to OA-7, `source` and `operator-source/1`) and DEC-0141 (MJ-1, a
+job's step read under the job's capability) at the pin 00e050ba (`v0.1.0+2026-10-27.1`, 0.54.0, FAA-159); the operator's rule of 2026-10-26 (board thread 3e8f706c, request 519d7b21;
 fabric-workspace knowledge/agents-first.md) that DEC-0126 answers."""
 
 import unittest
@@ -17,7 +17,7 @@ class EvalsComeFirst(unittest.TestCase):
         wanted = {
             "working-with-fabric": {"operator-approval-binds-all-his-agents", "board-relay-from-a-trusted-project",
                                     "lead-hands-on-a-narrowed-mandate", "outside-mandate-asks-once-for-that-part",
-                                    "relay-source-goes-only-where-it-is-read"},
+                                    "relay-source-goes-only-where-it-is-read", "lead-covers-a-job-step-by-its-capability"},
             "building-fabric-services": {"service-reads-the-operators-mandate"},
         }
         for skill, ids in wanted.items():
@@ -52,6 +52,16 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         for words in ("DEC-0126", "OA-1", "OA-2", "OA-3", "OA-4", "OA-5", "OA-6", "OA-7", "copied unchanged",
                       "the runner's own delivery", "L0", "L1"):
             self.assertIn(words, self.rule, words)
+
+    def test_a_job_step_is_covered_by_its_capability(self):  # lead-covers-a-job-step-by-its-capability
+        flat_body = " ".join(self.body.split())
+        for words in ("names the job's capability in `capabilities` without `actions`", "DEC-0141 MJ-1",
+                      "its request key as the action"):
+            self.assertIn(words, flat_body, words)
+        interop = flat("building-fabric-services/references/interop.md")
+        for words in ("`mandate-capability-missing`", "covers no step of another capability", "stays `input_required`"):
+            self.assertIn(words, interop, words)
+        self.assertNotIn("the answer is read under `fabric.job.get`", interop)
 
     def test_source_goes_only_where_it_is_read(self):  # relay-source-goes-only-where-it-is-read
         for words in ("`source`", "`operator-source/1`", "request_meta(target_protocols=", "your own record",
