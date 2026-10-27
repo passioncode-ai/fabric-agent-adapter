@@ -257,7 +257,7 @@ def turn_paths(transcript: Any, cwd: Path, until: Optional[float] = None) -> Lis
             value = arguments.get(CHANGING_TOOLS[name])
             named = [os.path.normpath(os.path.join(str(cwd), value))] if isinstance(value, str) and value else []
         elif name == "Bash" and isinstance(arguments.get("command"), str) and left > 0 \
-                and ("cd" in arguments["command"] or "git" in arguments["command"]):
+                and any(word in arguments["command"] for word in ("cd", "git", "pushd")):
             command = arguments["command"][:left]
             left -= len(command)
             named = bash_paths(command, cwd)

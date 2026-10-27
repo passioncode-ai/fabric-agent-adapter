@@ -1979,6 +1979,13 @@ class SampleWiringTests(unittest.TestCase):
             status, page, _ = request("GET", "/", cookie)
             self.assertEqual(status, 200)
             self.assertIn(b'data-take-back="sample.echo"', page)
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            conn.request("GET", "/", headers={"Host": "127.0.0.1:%d" % port, **cookie})
+            res = conn.getresponse()
+            res.read()
+            conn.close()
+            self.assertIn("connect-src 'self'", res.getheader("Content-Security-Policy") or "",
+                          "the button's fetch is allowed by the page's own CSP (0.56.0 seam r5)")
             self.assertEqual(request("GET", "/board.js")[0], 200)
             self.assertEqual(request("POST", "/api/board/take-back", cookie, take)[0], 403)  # no X-Fabric-Request
             self.assertEqual(request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"},
@@ -2065,6 +2072,21 @@ class SampleWiringTests(unittest.TestCase):
         svc.board_take_back = lambda c, r=None: sample.Service.board_take_back(svc, c, r)
         with self.assertRaises(sample.fi.InteropError):
             sample.Service.board_take_back_tool(svc, {"capability": "video.render"}, NS(record=None))
+
+    def test_close_reads_an_answer_it_cannot_parse_as_no_release(self):
+        """0.56.0 seam r5: a post shim whose DELETE answer is not a status is no release, as the Node twin reads it."""
+        class Grant:
+            origin = "http://127.0.0.1:1"
+            capabilities = []
+
+            def bearer(self):
+                return "b" * 43
+        for answer in (None, (), ("200",), 200):
+            with self.subTest(answer=answer):
+                session = fb.BoardSession(Grant(), post=lambda *a, **k: answer)
+                session.mcp_session = "x"
+                self.assertFalse(session.close())
+                self.assertIsNone(session.mcp_session)
 
     def test_take_back_reads_the_record_while_fabric_is_down(self):
         """0.56.0 seam r3: after a restart, before the session reconnects, the checkpoint record alone knows the move;
@@ -2242,6 +2264,14 @@ class LeaveKeepsUnconfirmedRecords(Conversation):
         self.assertIn("board.slot.moved", self.kinds())
         r.shutdown(0.1)
         self.assertIn("moved", json.loads((self.data / "board-checkpoint.json").read_text())["slots"]["video.render"])
+
+    def test_a_hub_that_is_down_releases_nothing_at_a_stop(self):
+        """0.56.0 seam r5: with the hub down the DELETE gets no 2xx, so the records stay (the fake answers as Fabric)."""
+        r = self.responder()
+        r.step()
+        self.hub.down = True
+        r.shutdown(0.1)
+        self.assertIn("video.render", json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {}))
 
     def test_leave_forgets_a_record_at_or_below_the_confirmed_generation(self):
         """0.56.0 seam r3: a record whose write failed before the hold (lower than the confirmed generation) is forgotten

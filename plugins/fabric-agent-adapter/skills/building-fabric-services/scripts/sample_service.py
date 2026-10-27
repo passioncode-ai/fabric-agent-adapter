@@ -71,7 +71,8 @@ BOARD_JS = """document.addEventListener('click', function (e) {
   e.target.disabled = true;
   fetch('/api/board/take-back', {method: 'POST', credentials: 'same-origin',
     headers: {'Content-Type': 'application/json', 'X-Fabric-Request': '1'}, body: JSON.stringify({capability: cap})})
-    .then(function (r) { e.target.textContent = r.ok ? 'Asked back: waiting for the other session' : 'Refused (' + r.status + ')'; });
+    .then(function (r) { e.target.textContent = r.ok ? 'Asked back: waiting for the other session' : 'Refused (' + r.status + ')'; })
+    .catch(function () { e.target.disabled = false; e.target.textContent = 'Failed: try again'; });
 });
 """
 
@@ -254,7 +255,8 @@ def make_handler(svc: Service):
             self.send_response(status)
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; frame-ancestors 'self'")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; "
+                             "frame-ancestors 'self'")
             if body is not None:
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(payload)))

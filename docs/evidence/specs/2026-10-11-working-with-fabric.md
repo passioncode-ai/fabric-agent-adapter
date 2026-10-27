@@ -46,7 +46,7 @@ to name the other repositories a turn touched (principles 4 and 5 below say what
    them, on Windows too since 0.56.0 (FAA-175), and not when the person turned it off (FAA-160), a turn also carries the other repositories it touched as `{host, owner, name}`, read from the transcript's
    tail; still no local paths, no messages, no diff text.
 5. **Never block or slow.** SessionStart reads two small files and prints; Stop and SessionEnd write a spool entry
-   and start a detached worker that holds a 10 s deadline. Every hook exits 0; every failure is one log line in the
+   and start a detached worker that holds a 10 s deadline. Every hook exits 0 once `python3` starts (FAA-183); every failure is one log line in the
    adapter's cache folder (0600, rotated at 1 MB). No token is read: the hooks never open the door token or a
    credential, and nothing secret is in argv or the log. Amended 2026-10-27 (0.53.0): once Fabric takes repositories,
    on Windows too since 0.56.0 (FAA-175), and not when the person turned it off (FAA-160), Stop reads the transcript's last 512 KB (message text and tool output, which can hold a secret the session

@@ -534,7 +534,7 @@ class CallContext:
             self.server._fault(capability, step)  # the start hears it as the answer does, under the same name (MJ-1)
         spend = mandate_spend(spend_usd)  # a NaN or infinity reads as no estimate, and json would write a bare NaN
         kept = {"effect": effect, **({"spendUsd": spend} if spend is not None else {}),
-                **({"project": project} if project is not None else {})}
+                **({"project": project if isinstance(project, str) else UNREADABLE_PROJECT} if project is not None else {})}
         self.server.jobs.request_input(job_id, {key: request}, step["message"] or message, steps={key: kept})
         return None
 

@@ -70,8 +70,10 @@ name a wrong one: Claude Code keeps the Bash folder between calls, and a relativ
 against the session's folder, not the folder an earlier call moved to. Turn the read off (FAA-160)
 with `FABRIC_SESSION_NO_REPOSITORIES=1` in the environment, or a file named `no-repositories` in the hooks' folder:
 the turn's facts are still sent, without `repositories` (any value of the variable but empty or `0` turns it off; the
-file sits in a cache folder a cleaner may empty, so the variable, set in Claude Code's settings `env`, is the lasting form);
-`fabric_session.py status` says whether the read is on, off or waiting for Fabric.
+file sits in a cache folder a cleaner may empty, so the variable, set in Claude Code's settings `env`, is the lasting form:
+it reaches the hooks, measured in the owning repository's `docs/evidence/runs/2026-10-27-settings-env-reaches-hooks.md`);
+`fabric_session.py status` says whether the read is on, off or waiting for Fabric, as the environment of the shell it
+runs in has it.
 
 **A project that uses Fabric** (`project_uses_fabric`), cheapest sign first: `fabric` registered at local or project
 scope for the folder (user scope is every folder's, so it says nothing about this one); a `fabric-agent.json`,

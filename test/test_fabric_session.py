@@ -1426,6 +1426,7 @@ class TurnRepositories(Base):
         three = self.git_repo("three", "ssh://git@github.com/acme/three")
         four = self.git_repo("four", "https://github.com/acme/four.git")
         seven = self.git_repo("seven", "https://github.com/acme/seven.git")
+        five = self.git_repo("five", "https://github.com/acme/five.git")  # a pushd alone (0.56.0 seam r5)
         bare = self.git_repo("no-origin")
         read_only = self.git_repo("read-only", "https://github.com/acme/read-only.git")
         earlier = self.git_repo("earlier", "https://github.com/acme/earlier.git")
@@ -1437,6 +1438,7 @@ class TurnRepositories(Base):
             tool_entry("Write", file_path=str(two / "sub" / "new.txt"), content="CONTENT-SENTINEL"), result_entry(),
             tool_entry("Bash", command="cd '%s' && make" % three), result_entry(),
             tool_entry("Bash", command="git -C ../four status"), result_entry(),
+            tool_entry("Bash", command="pushd '%s' && make" % five), result_entry(),
             tool_entry("MultiEdit", file_path=str(one / "c.txt"), edits=[]), result_entry(),
             tool_entry("NotebookEdit", notebook_path=str(seven / "n.ipynb"), new_source="x"), result_entry(),
             tool_entry("Edit", file_path=str(bare / "a.txt")), result_entry(),
@@ -1452,6 +1454,7 @@ class TurnRepositories(Base):
             {"host": "bitbucket.org", "owner": "team", "name": "two"},
             {"host": "github.com", "owner": "acme", "name": "three"},
             {"host": "github.com", "owner": "acme", "name": "four"},
+            {"host": "github.com", "owner": "acme", "name": "five"},
             {"host": "github.com", "owner": "acme", "name": "seven"}])
         stored = json.dumps({k: v for k, v in entry.items() if k != "cwd"})
         for leaked in (str(self.base), "TOKEN-SENTINEL", "PROMPT-TEXT-SENTINEL", "CONTENT-SENTINEL", "OLD-SENTINEL",

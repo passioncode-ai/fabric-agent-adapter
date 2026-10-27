@@ -162,8 +162,10 @@ by a transfer once the slot is held. The capabilities after it are recovered as 
 rest `retry` too, says no `board.slot.refused`, and goes to the responder's fault, which says it by code:
 `board.access.needed` for `not_authorized`, `authority_changed` and `credential` (the session is left),
 `board.blocked` for a defect (`no-epoch`, `schema-unsupported`, `checkpoint`, `receipt-shape`,
-`idempotency_conflict`), and `board.down` for the rest, where it keeps the session while a held slot's lease runs (so a
-lost enroll of one capability is asked again at its next retry) and reconnects otherwise. A slot whose lease lapsed (`lease_expired`) holds
+`idempotency_conflict`), and `board.down` for the rest: `unreachable` keeps the session while a held slot's lease runs
+(so a lost enroll of one capability is asked again at its next retry), `not_available` keeps it while a slot is held,
+and `session-ended`, `not-running` and the other hub codes drop it (as a fault during connect or recovery does) and
+reconnect. A slot whose lease lapsed (`lease_expired`) holds
 no lease for that decision.
 
 ## When the operator holds work (DEC-0079)
@@ -200,10 +202,12 @@ held and not transferred). The responder keeps that move instead of undoing it:
   enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
   clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
   in the checkpoint and not moved is forgotten when this session confirmed its generation (held it, paused under the
-  operator's hold included, or read it unmoved in `com.status`) and no fenced call has put in doubt since; an
-  unconfirmed record stays, since the slot may have moved while the service was down. A paused or retrying slot reads
-  `com.status` before each new ask. A move made after the last renew or check and before the stop, with no call since,
-  is not known at the leave: the next start reads the slot as free (a moved slot's record stays too, so a clean stop never undoes a move): the slot is free, and whoever takes it next is no move. A file without the record
+  operator's hold included, or read it unmoved in `com.status`) and no fenced call has put in doubt since: the slot is
+  free, and whoever takes it next is no move. An unconfirmed record stays, since the slot may have moved while the
+  service was down, and a move this session saw keeps its record, so a clean stop never undoes it. A paused or
+  retrying slot reads `com.status` before each new ask. A move made after the slot's last renew or check and before
+  the stop, with no call since, is not seen at the leave: its record is forgotten, and the next start reads the slot
+  as free and may enroll it once the other holder lets it go (FAA-187). A file without the record
   reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first
   start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
   wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
@@ -287,7 +291,8 @@ Events go to `emit(kind, level, text, notify=…, data=…)` (`JsonlEventLog.app
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,
-`board.down`, each notifying episode said once.
+`board.down`, each notifying episode said once. The operator's hold (below) adds `board.held`, `board.slot.held`,
+`board.slot.released` and `board.request.waiting`.
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
 `NOT_RUN` when the well-known `protocols` names no `fabric-project-comms` revision; `FAIL` for a revision this kit does

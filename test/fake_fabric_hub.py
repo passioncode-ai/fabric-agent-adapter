@@ -515,6 +515,9 @@ class FakeHub:
                 self.wfile.write(data)
 
             def do_DELETE(self) -> None:  # noqa: N802
+                if hub.down:  # a hub that is down releases nothing, as its POST answers
+                    self._send(503, {"error": "hub down"})
+                    return
                 if hub.delete_delay:
                     time.sleep(hub.delete_delay)
                 with hub.lock:

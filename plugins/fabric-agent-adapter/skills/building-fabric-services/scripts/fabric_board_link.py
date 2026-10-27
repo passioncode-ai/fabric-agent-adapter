@@ -91,10 +91,12 @@ class BoardSession:
             if self.mcp_session is None:
                 return False
             try:
-                status = self._send({}, method="DELETE", timeout=timeout)[0]
+                answer = self._send({}, method="DELETE", timeout=timeout)
+                status = answer[0] if isinstance(answer, (tuple, list)) and answer and isinstance(answer[0], int) else 0
             except BoardError:
                 status = 0
-            self.mcp_session = None
+            finally:
+                self.mcp_session = None  # an answer it cannot read is no release, as the Node twin reads it
             return 200 <= status < 300
 
 

@@ -1084,6 +1084,10 @@ class JobApprovalStepTests(unittest.TestCase):
                 self.assertIsNone(record)
                 for path in Path(self.temp.name, "jobs").rglob("*.json"):
                     json.loads(path.read_text(), parse_constant=lambda c: self.fail("%s in %s" % (c, path.name)))
+        self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
+        self.step(project=float("nan"))  # 0.56.0 seam r5: a project that is no string is kept as the gate read it
+        for path in Path(self.temp.name, "jobs").rglob("*.json"):
+            json.loads(path.read_text(), parse_constant=lambda c: self.fail("%s in %s" % (c, path.name)))
 
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",

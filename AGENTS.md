@@ -139,7 +139,7 @@ this repository both obeys it and ships its service layer
   FAA-160), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text and tool output, which can
   hold a secret the session displayed, are read with it in memory only, and only the current turn's tool names and path arguments are used) and names the other Git repositories the turn
   touched as `{host, owner, name}` from their `origin`, one `git rev-parse` and one `git config` each inside the same 1.5 s
-  (FAA-140; measured 2026-10-27 at `f3765f1`, before the gate and the 64 KB cap, with a 4.8 MB transcript naming six other repositories: median 247 ms, against 109 ms
+  (FAA-140; measured 2026-10-27 at `f3765f1`, before the gate and the 64 K-character cap, with a 4.8 MB transcript naming six other repositories: median 247 ms, against 109 ms
   for 0.52.0 on the same transcript, [raw](docs/reports/2026-10-27-faa-140-turn-repositories/raw/stop-hook-timing.log)); and they
   write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**
   (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` in its own process group with a 10 s deadline

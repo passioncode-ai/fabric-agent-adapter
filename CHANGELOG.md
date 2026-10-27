@@ -58,7 +58,8 @@ gate behave.
   only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action an agent whose client sets `_meta`
   calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125). Its `/mcp` reads a loopback call the service token authenticated as T0. The
   page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
-  before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error.
+  before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. The
+  page's CSP allows the button's own `fetch` (`connect-src 'self'`), and a failed request says so on the button.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
 
@@ -75,6 +76,9 @@ gate behave.
 
 ### Upgrading
 
+- On Windows the Stop hook now reads the transcript's tail and the touched repositories' `origin` (FAA-175), once
+  Fabric takes `repositories`, as it does on macOS and Linux; `FABRIC_SESSION_NO_REPOSITORIES=1` (in Claude Code's
+  settings `env`, which reaches the hooks) turns it off.
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
   happens only then. A service that stops without the join still works; its
