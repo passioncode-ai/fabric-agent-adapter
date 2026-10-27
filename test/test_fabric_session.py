@@ -1191,6 +1191,9 @@ class BashPaths(unittest.TestCase):
         self.assertEqual(MCP.bash_paths("", Path("/w")), [])
 
 
+WINDOWS_READS_NO_TRANSCRIPT = unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
+
+
 class WindowsReadsNoTranscript(unittest.TestCase):
     """FAA-175: on Windows the mark never turns the transcript read on."""
 
@@ -1206,7 +1209,6 @@ class WindowsReadsNoTranscript(unittest.TestCase):
                 self.assertTrue(fs.repositories_wanted(env))
 
 
-@unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
 class TurnRepositories(Base):
     """FAA-140: the Stop hook names the other repositories the turn changed (REQ-1) and the worker sends them only
     where fabric_session_observe takes `repositories` (REQ-2)."""
@@ -1248,6 +1250,7 @@ class TurnRepositories(Base):
         entry = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))[-1]
         return said, json.loads(entry.read_text())
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_turn_names_the_other_repositories_it_changed_and_no_path(self):
         one = self.git_repo("one", "https://user:TOKEN-SENTINEL@github.com/acme/one.git")
         two = self.git_repo("two", "git@bitbucket.org:team/two.git")
@@ -1287,12 +1290,14 @@ class TurnRepositories(Base):
             self.assertNotIn(leaked, stored)
         self.assertNotIn(str(self.base), self.log_text())
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_at_most_ten_repositories(self):
         folders = [self.git_repo("r%02d" % i, "https://github.com/acme/r%02d.git" % i) for i in range(12)]
         self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd %s" % f) for f in folders])
         _, entry = self.spool_turn()
         self.assertEqual([r["name"] for r in entry["repositories"]], ["r%02d" % i for i in range(10)])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_two_checkouts_of_one_repository_are_named_once(self):
         a = self.git_repo("a", "https://github.com/acme/same.git")
         b = self.git_repo("b", "git@github.com:acme/same")
@@ -1301,6 +1306,7 @@ class TurnRepositories(Base):
         _, entry = self.spool_turn()
         self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "same"}])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_another_checkout_of_the_start_repository_is_not_named(self):
         """A worktree or a second clone of the start folder's repository has another toplevel but the same origin: it
         is the start folder's repository, not another one."""
@@ -1311,6 +1317,7 @@ class TurnRepositories(Base):
         _, entry = self.spool_turn()
         self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "other"}])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_a_missing_or_unreadable_transcript_names_none_and_is_no_error(self):
         garbage = self.base / "garbage.jsonl"
         garbage.write_bytes(b"\xff\xfe not json\n{\"type\": 3}\n[1, 2]\n")
@@ -1323,6 +1330,7 @@ class TurnRepositories(Base):
                 self.assertNotIn("repositories", entry)
                 self.assertIsInstance(entry["facts"]["head"], str)
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_only_the_tail_of_a_long_transcript_is_read(self):
         early = self.git_repo("early", "https://github.com/acme/early.git")
         late = self.git_repo("late", "https://github.com/acme/late.git")
@@ -1333,6 +1341,7 @@ class TurnRepositories(Base):
         self.assertGreater(self.transcript.stat().st_size, MCP.TRANSCRIPT_TAIL_BYTES + 1000)
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(late / "x")])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_bash_text_is_split_within_a_cap_and_never_after_the_budget(self):
         """Seam reading 1: a long unterminated quote costs shlex its whole length, so a turn's Bash text is capped."""
         one = self.git_repo("one", "https://github.com/acme/one.git")
@@ -1345,12 +1354,14 @@ class TurnRepositories(Base):
         self.assertLess(time.monotonic() - started, 1.5)
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo, until=time.monotonic()), [])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_a_spent_budget_names_none(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
         self.assertEqual(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic()), [])
         self.assertEqual(len(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic() + 5)), 1)
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_a_subagent_entry_and_a_meta_prompt_do_not_end_the_turn(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         side = self.git_repo("side", "https://github.com/acme/side.git")
@@ -1359,6 +1370,7 @@ class TurnRepositories(Base):
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x")), meta, sidechain])
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(one / "x")])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_end_entry_carries_no_repositories(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
@@ -1375,6 +1387,7 @@ class TurnRepositories(Base):
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         return [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_worker_sends_repositories_where_the_schema_lists_them(self):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "1"
         turns = self.deliver_two_turns()

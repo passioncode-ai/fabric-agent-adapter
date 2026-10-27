@@ -2,7 +2,8 @@
 
 ## 0.53.1 (2026-10-27)
 
-0.53.0 was tagged and never published: its release run failed on Windows, where the FAA-140 tests read a Bash
+0.53.0 was tagged and never released on npm or GitHub (the plugin marketplace, which reads `main`, offered it until
+0.53.1 merged): its release run failed on Windows, where the FAA-140 tests read a Bash
 command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix.
 
 ### Fixed
