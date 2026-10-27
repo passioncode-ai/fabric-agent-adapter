@@ -142,13 +142,16 @@ RECIPE_PARAGRAPH = (
     'checks by name in `reasons`, but takes no reason in and returns no refused draft yet, and it calls again under'
     ' a new message id, since the stored decision answers any repeat of the same id. `on_handoff` runs under the '
     "agent's lock, before the decision is saved, so it queues the hand-off and returns: since 0.55.0 a call to "
-    '`answer` from inside it is refused with `RecipeError` (and nothing is saved for that message), and the repair '
-    'step calls `answer` once the first call has returned. The original id stays a hand-off, which a repeat of it '
-    "returns; the repair step sends the retry's reply and records the turn as answered in the agent's own turn "
-    "record, which, not `decisions.jsonl` (one line per call), counts turns. The retry's own hand-off reaches "
+    '`answer` from inside it, on the same thread, is refused with `ReentryError` (a `RecipeError`), and unless '
+    '`on_handoff` catches it the first call raises it too, its draft paid and nothing saved or delivered. A call it'
+    ' hands to another thread and waits for waits for the lock forever, so it never waits: the repair step calls '
+    '`answer` once the first call has returned. The original id stays a hand-off, which a repeat of it returns; the'
+    " repair step sends the retry's reply and records the turn as answered in the agent's own turn record, which, "
+    "not `decisions.jsonl` (one line per message id decided), counts turns. The retry's own hand-off reaches "
     "`on_handoff` again, so the repair step bounds its retries (one repair is the practices') and passes any "
     "further hand-off to the person's channel. A copy of `support_agent.py` made before 0.55.0 takes no "
-    '`on_handoff` in `from_config` and hangs on such a call: copy it again. The recipe also lacks three parts of '
+    '`on_handoff` in `from_config` and hangs on such a call (`grep -c ReentryError support_agent.py` prints 0 for '
+    'it; `fabric_kit.py status` covers the kit modules only): copy it again. The recipe also lacks three parts of '
     'such an agent: the Lookup (shared words, best three) is a relevance rule of its own, where the agent reads the'
     " knowledge service's per-item `answer` flag and puts small closed rule sets into the prompt whole; "
     '`from_config` accepts a same-vendor fallback, refused only per call as `model:config`; and the decision does '
@@ -196,8 +199,8 @@ CHANGELOG_ENTRY = (
     'researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment` also the `limit` outcome), and '
     'tells such an agent to pass an `on_handoff` that redacts what it stores, in place of the outbox, and to keep '
     '30 days or fewer; `from_config` takes `on_handoff=`, and a call to `answer` from inside `on_handoff` is '
-    'refused at once rather than hanging (copy `support_agent.py` again to get both); building-fabric-services and '
-    'the README point at it. Backlog FAA-116 records what is left for the recipe.')
+    'refused at once with `ReentryError` rather than hanging (copy `support_agent.py` again to get both); '
+    'building-fabric-services and the README point at it. Backlog FAA-116 records what is left for the recipe.')
 
 
 def scenario():

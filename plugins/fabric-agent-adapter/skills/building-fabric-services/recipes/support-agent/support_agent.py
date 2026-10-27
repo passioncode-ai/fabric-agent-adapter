@@ -106,6 +106,11 @@ class RecipeError(Exception):
     pass
 
 
+class ReentryError(RecipeError):
+    """answer() called from inside on_handoff on the same thread: the service's own handler fault, never the caller's
+    input. The outer call's draft is already paid and nothing is saved for it unless on_handoff catches this."""
+
+
 def script_of(text: str) -> Optional[str]:
     """The script most of a text's letters are written in (citations and URLs left out), or None without letters."""
     counts: Dict[str, int] = {}
@@ -359,7 +364,8 @@ class SupportAgent:
         self.state_dir = Path(state_dir)
         self.max_tokens, self.max_chars, self.lookup_limit = max_tokens, max_chars, lookup_limit
         self.on_handoff = on_handoff or self._outbox
-        # Reentrant, so nothing on_handoff calls (prune) can deadlock it; answer() from on_handoff is refused below
+        # Reentrant, so prune() from on_handoff on the same thread does not deadlock (on another thread it waits for
+        # the lock until on_handoff returns); answer() from on_handoff is refused below
         # (0.55.0 readings 7 and 8: a plain lock hung there, a reentrant one let a refusing repair loop on paid calls).
         self._lock = threading.RLock()
         self._local = threading.local()
@@ -389,7 +395,7 @@ class SupportAgent:
         if not isinstance(text, str) or not text.strip():
             raise RecipeError("the message has no text")
         if getattr(self._local, "in_handoff", False):
-            raise RecipeError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
+            raise ReentryError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
                               "this call returns")
         text = re.sub("[\ud800-\udfff]", "\ufffd", text)  # a lone surrogate (bytes a terminal could not decode) is kept, not fatal
         with self._lock:  # one decision per message id, in this process; the service's instance lock covers others

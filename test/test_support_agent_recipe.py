@@ -364,7 +364,7 @@ class Recipe(unittest.TestCase):
         def handoff(row):
             try:
                 agent.answer(row["messageId"], row["question"])
-            except sa.RecipeError as err:
+            except sa.ReentryError as err:
                 refused.append(str(err))
         agent.on_handoff = handoff
         done = []
@@ -387,7 +387,7 @@ class Recipe(unittest.TestCase):
         self.assertEqual((first["action"], retry["action"]), ("handoff", "handoff"))
         self.assertEqual(len(model.calls), 2, "one draft and one repair")
         self.assertEqual([row["messageId"] for row in person], ["m-1-r1"], "the second refusal reaches a person")
-        self.assertEqual(len((self.dir / "decisions.jsonl").read_text().splitlines()), 2, "one line per call")
+        self.assertEqual(len((self.dir / "decisions.jsonl").read_text().splitlines()), 2, "one line per message id decided")
         self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "handoff",
                          "the original id stays a hand-off")
 

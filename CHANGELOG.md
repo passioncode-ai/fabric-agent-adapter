@@ -25,7 +25,7 @@
   and open a gap; a money reason is never researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment`
   also the `limit` outcome), and tells such an agent to pass an `on_handoff` that redacts what it stores, in place of
   the outbox, and to keep 30 days or fewer; `from_config` takes `on_handoff=`, and a call to `answer` from inside
-  `on_handoff` is refused at once rather than hanging (copy `support_agent.py` again to get both);
+  `on_handoff` is refused at once with `ReentryError` rather than hanging (copy `support_agent.py` again to get both);
   building-fabric-services and the README point at it. Backlog FAA-116 records what is left for the recipe.
 
 ## 0.54.0 (2026-10-27)
