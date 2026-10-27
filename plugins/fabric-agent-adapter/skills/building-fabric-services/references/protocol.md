@@ -23,7 +23,7 @@ DEC-0124; the operator's mandate `mandate/1`, handed on narrowed with a task DEC
 operator's agents, its `source` on a mandate and a decision DEC-0126; context hub keys and the organizations an estate
 record pins DEC-0127 and DEC-0128; the family and the agent network named DEC-0130 and DEC-0137; a reply delivered to
 the sender it answers, or to whom it names DEC-0135; a hand-over adds no naming list the scope in force leaves out
-DEC-0136. The organization's member list, draft exchange, relay and the machines' report, DEC-0129, DEC-0131 to DEC-0134,
+DEC-0136; a job's step under the mandate read under the job's own capability DEC-0141. The organization's member list, draft exchange, relay and the machines' report, DEC-0129, DEC-0131 to DEC-0134,
 reach the kit only as protocol register entries). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.

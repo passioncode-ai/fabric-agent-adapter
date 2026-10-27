@@ -334,6 +334,7 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
       mandate_covers' recordAs (`via: mandate`, the task, the chain and `source` when the mandate carries one).
     - {"covered": False, "message", "detail"}: the step waits input_required, `message` its statusMessage naming the
       part not covered, or saying the mandate expired or cannot be read; never the operator's words or `source`.
+      With `fault` mandate-capability-missing beside it when the job's capability cannot read the step (MJ-1).
     - {"covered": False, "message": None}: no mandate, or a T2 caller's (MD-5): ask as before; with `fault` when the
       service's own clock does not read."""
     if mandate is None:
@@ -409,11 +410,9 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
         if isinstance(record, dict) and record.get("via") == "mandate":
             out["mandate"] = inputs["mandate"]
         return out
-    # MJ-1 (DEC-0141): a job's step the service cannot read under a mandate is answered as one the mandate does not
-    # cover; nothing is applied, so the job stays input_required.
-    said = {"ok": False, "code": "operator-decision-required", "data": {"detail": "mandate-capability-missing"}} \
-        if answer.get("fault") == "mandate-capability-missing" else answer
-    out: Dict[str, Any] = {"ok": False, "refusal": _fd.refusal_from_action(said)}
+    # MJ-1 (DEC-0141): refusal_from_action answers mandate-capability-missing as operator-decision-required; nothing is
+    # applied, so the job stays input_required.
+    out: Dict[str, Any] = {"ok": False, "refusal": _fd.refusal_from_action(answer)}
     if "fault" in answer:
         out["fault"] = answer["fault"]
     return out

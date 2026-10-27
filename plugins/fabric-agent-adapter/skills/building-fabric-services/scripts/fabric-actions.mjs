@@ -3,7 +3,10 @@
 //
 // - actionDecision(inputs): whether a service takes a call of one declared action and as whose act it records it,
 //   exactly as the contract's actionDecision answers (AP-2, AP-4; DL-17, DL-18, DL-25). A `fault` is the service's
-//   own and is never sent to a caller.
+//   own and is never sent to a caller as such; actionGate answers mandate-capability-missing as
+//   operator-decision-required (DEC-0141 MJ-1).
+// - JOB_STEP_TOOL, jobCapability(value): the tool a job's answer comes through, and whether a job's capability can
+//   read its step under a mandate (a capability name other than fabric.job.get).
 // - decisionShape(value): a decision as decision.schema.json reads it, `at` read strictly (the contract's strictTime).
 // - actionsView(wellKnown): the host reader of the declaration, as the contract's actionsView.
 // - actionsExtensionRules(wellKnown), actionRules(kind, value): FAC-SEM-142.

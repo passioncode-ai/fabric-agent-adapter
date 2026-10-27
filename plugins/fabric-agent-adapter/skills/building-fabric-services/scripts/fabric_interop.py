@@ -510,7 +510,8 @@ class CallContext:
         carried (`_meta.mandate`) is read for it (job_step). Covered: answers the record (`via: mandate`, `source` when
         the mandate carries one) and asks nothing; the job goes on as the operator's decision. Otherwise the job waits
         input_required on `request`, its message naming the part not covered (or `message`), and answers None; the step
-        is kept so an answer's `_meta.mandate` that covers it is read when input_actions is on."""
+        is kept so an answer's `_meta.mandate` that covers it is read when input_actions is on. Any fault job_step answers
+        (mandate-capability-missing, MJ-1, or the server clock's now-unreadable) goes to on_fault under the job's tool."""
         if self.server.jobs is None:
             raise InteropError("This server has no job store.")
         step: Dict[str, Any] = {"message": None}
@@ -798,8 +799,8 @@ class McpToolServer:
             action = {"id": key, "title": "Answer %s" % key, "tool": "fabric.job.get", "gate": "relayed"}
             step, mandate = steps.get(key), {}
             if self.agent_id is not None and isinstance(step, dict):
-                # A kept step's mandate is read as approval_step read it, under the job's own capability; the action
-                # itself stays fabric.job.get, so it is readable whatever the tool is named.
+                # A kept step's mandate is read as approval_step read it, under the job's own capability, which must
+                # be a capability name (MJ-1); the action itself stays fabric.job.get, so it is a readable action.
                 capability = self.jobs.private(job_id).get("capability")
                 agent = (verdict or {}).get("caller")
                 mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),

@@ -8,6 +8,7 @@ import stat
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1138,6 +1139,17 @@ class JobApprovalStepTests(unittest.TestCase):
             self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
             self.assertEqual(self.faults, [("fabric.job.get", "mandate-capability-missing")], "and the answer")
 
+    def test_the_start_hands_any_job_step_fault_to_on_fault(self):
+        # 0.54.0 readings 4 (unit, seam): approval_step reports every job_step fault, not only MJ-1's.
+        server = self.camel_server()
+        self.start_camel(server, {"mandate": relayed_mandate()})
+        unreadable = {"covered": False, "message": None, "fault": "now-unreadable"}
+        with mock.patch.object(fi, "job_step", lambda *a, **k: unreadable):
+            job_id, record = self.step()
+        self.assertIsNone(record)
+        self.assertEqual(self.faults, [("reviewsApprove", "now-unreadable")])
+        self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
+
     def test_a_kept_step_does_not_outlive_its_question(self):
         # Seam round 1: a later plain question under the same key is not answered by a mandate alone.
         server = self.start({}, input_actions=True)
@@ -1190,3 +1202,10 @@ class JobApprovalStepTests(unittest.TestCase):
                 self.assertEqual(refused["fault"], "mandate-capability-missing")
                 self.assertEqual(refused["refusal"]["code"], "operator-decision-required")
                 self.assertEqual(refused["refusal"]["data"]["detail"], "mandate-capability-missing")
+                inputs = {"action": action, "tier": "T0", "caller": "local:T0", "mandate": mandate, "now": NOW,
+                          "self": "example-agent", "effect": "reply"}
+                if mandate_capability is not None:
+                    inputs["mandateCapability"] = mandate_capability
+                said = fi.action_refusal_tool_result(fa.action_decision(inputs))
+                self.assertEqual(said["structuredContent"]["error"]["code"], "operator-decision-required")
+                self.assertEqual(said["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")

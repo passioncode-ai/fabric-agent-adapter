@@ -227,7 +227,8 @@ const UNREADABLE_JOB_CAPABILITY = "The operator's mandate cannot be read for thi
  * agent id it authenticated for the start call. Answers {covered: true, record} (the step goes on as the operator's
  * decision, no input request; `record` is mandateCovers' recordAs, `source` included when the mandate carries one);
  * {covered: false, message, detail} (the step waits input_required, `message` its statusMessage naming the part not
- * covered, or saying the mandate expired or cannot be read; never the operator's words or `source`); or {covered: false,
+ * covered, or saying the mandate expired or cannot be read; never the operator's words or `source`; with `fault`
+ * mandate-capability-missing beside it when the job's capability cannot read the step, MJ-1); or {covered: false,
  * message: null} with no mandate or a T2 caller's (MD-5), with `fault` when the service's own clock does not read.
  */
 export function jobStep({ mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project } = {}) {
@@ -290,10 +291,9 @@ export function actionGate({ action, tier, caller, meta, target, elicited = fals
     if (isObject(record) && record.via === 'mandate') out.mandate = inputs.mandate;
     return out;
   }
-  // MJ-1 (DEC-0141): a job's step the service cannot read under a mandate is answered as one the mandate does not
-  // cover; nothing is applied, so the job stays input_required.
-  const said = answer.fault === 'mandate-capability-missing' ? { ok: false, code: 'operator-decision-required', data: { detail: 'mandate-capability-missing' } } : answer;
-  const out = { ok: false, refusal: refusalFromAction(said) };
+  // MJ-1 (DEC-0141): refusalFromAction answers mandate-capability-missing as operator-decision-required; nothing is
+  // applied, so the job stays input_required.
+  const out = { ok: false, refusal: refusalFromAction(answer) };
   if ('fault' in answer) out.fault = answer.fault;
   return out;
 }
