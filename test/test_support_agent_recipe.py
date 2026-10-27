@@ -355,6 +355,23 @@ class Recipe(unittest.TestCase):
         rows = [json.loads(l) for l in (self.dir / "state" / "handoffs.jsonl").read_text().splitlines()]
         self.assertEqual([r["reasons"] for r in rows], [["no-knowledge"], ["model:config"]], "the CLI keeps the outbox")
 
+    def test_a_repair_step_may_answer_again_from_on_handoff(self):  # 0.55.0 product round 7: it deadlocked
+        import threading
+        model = model_says("Open Settings.", "Open Settings [KB:password-reset].")
+        agent, _ = self.agent(model)
+        retried = []
+        agent.on_handoff = lambda row: retried.append(agent.answer(row["messageId"] + "-r1", row["question"]))
+        done = []
+        worker = threading.Thread(target=lambda: done.append(agent.answer("m-1", "How do I reset my password?")),
+                                  daemon=True)
+        worker.start()
+        worker.join(5)
+        self.assertFalse(worker.is_alive(), "the first answer returns")
+        self.assertEqual((done[0]["action"], done[0]["reasons"]), ("handoff", ["no-citation"]))
+        self.assertEqual(retried[0]["action"], "reply")
+        lines = (self.dir / "decisions.jsonl").read_text().splitlines()
+        self.assertEqual(len(lines), 2, "one line per call: the retry is a decision of its own")
+
     def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
         config = json.loads((RECIPE / "config.example.json").read_text())
         config.update(knowledge=str(RECIPE / "knowledge.example.json"), stateDir=str(self.dir / "state"))

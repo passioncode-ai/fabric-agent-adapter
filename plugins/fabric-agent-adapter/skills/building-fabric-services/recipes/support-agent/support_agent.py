@@ -270,7 +270,7 @@ def _append_line(path: Path, data: bytes) -> None:
 
 
 class DecisionLog:
-    """The decisions, one `{"at", "decision"}` line per message appended to `decisions.jsonl` (0600, fsync'd), with
+    """The decisions, one `{"at", "decision"}` line per message id appended to `decisions.jsonl` (0600, fsync'd), with
     an index by message id built once per process. Each message costs one line, never a rewrite of the whole file. A
     torn last line (a crash mid-write) is no decision; the next line starts on a new line. A `decisions.json` written
     by an earlier version of this recipe is read, never written."""
@@ -359,7 +359,9 @@ class SupportAgent:
         self.state_dir = Path(state_dir)
         self.max_tokens, self.max_chars, self.lookup_limit = max_tokens, max_chars, lookup_limit
         self.on_handoff = on_handoff or self._outbox
-        self._lock = threading.Lock()
+        # Reentrant (0.55.0 product round 7): on_handoff runs under it, and an agent's repair step may call answer()
+        # again from there on the same thread.
+        self._lock = threading.RLock()
         self._log = DecisionLog(self.state_dir)
 
     @property

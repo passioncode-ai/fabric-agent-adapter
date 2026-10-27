@@ -140,9 +140,12 @@ RECIPE_PARAGRAPH = (
     'refusal: the practices name that as the failing pattern (P2). An agent that repairs passes its own '
     '`on_handoff=` so a failed check reaches its repair step rather than a person; the recipe returns the failed '
     'checks by name in `reasons`, but takes no reason in and returns no refused draft yet, and it calls again under'
-    ' a new message id, since the stored decision answers any repeat of the same id. The recipe also lacks three '
-    'parts of such an agent: the Lookup (shared words, best three) is a relevance rule of its own, where the agent '
-    "reads the knowledge service's per-item `answer` flag and puts small closed rule sets into the prompt whole; "
+    ' a new message id, since the stored decision answers any repeat of the same id. `on_handoff` runs under the '
+    "agent's lock, before the decision is saved; the lock is reentrant, so the repair step may call `answer` again "
+    'on the same thread, but must not wait there for another thread that calls it. Each retry is one more line in '
+    "`decisions.jsonl`: the agent's own turn record, not that file, counts turns. The recipe also lacks three parts"
+    ' of such an agent: the Lookup (shared words, best three) is a relevance rule of its own, where the agent reads'
+    " the knowledge service's per-item `answer` flag and puts small closed rule sets into the prompt whole; "
     '`from_config` accepts a same-vendor fallback, refused only per call as `model:config`; and the decision does '
     'not record which model answered, so fallback recoveries are not counted. The recipe hands off nothing for '
     '`policy`: the calling service routes the categories a person must handle (refunds, unbans, account recovery) '
@@ -187,8 +190,9 @@ CHANGELOG_ENTRY = (
     '`infrastructure`; `no-knowledge` and `model-unsure` are `inability` and open a gap; a money reason is never '
     'researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment` also the `limit` outcome), and '
     'tells such an agent to pass an `on_handoff` that redacts what it stores, in place of the outbox, and to keep '
-    '30 days or fewer; `from_config` takes `on_handoff=`; building-fabric-services and the README point at it. '
-    'Backlog FAA-116 records what is left for the recipe.')
+    "30 days or fewer; `from_config` takes `on_handoff=`, and `on_handoff` may call `answer` again (the agent's "
+    'lock is reentrant); building-fabric-services and the README point at it. Backlog FAA-116 records what is left '
+    'for the recipe.')
 
 
 def scenario():

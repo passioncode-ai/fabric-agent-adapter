@@ -24,8 +24,9 @@
   after an outage or at the research time cap being `infrastructure`; `no-knowledge` and `model-unsure` are `inability`
   and open a gap; a money reason is never researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment`
   also the `limit` outcome), and tells such an agent to pass an `on_handoff` that redacts what it stores, in place of
-  the outbox, and to keep 30 days or fewer; `from_config` takes `on_handoff=`; building-fabric-services and the README
-  point at it. Backlog FAA-116 records what is left for the recipe.
+  the outbox, and to keep 30 days or fewer; `from_config` takes `on_handoff=`, and `on_handoff` may call `answer` again
+  (the agent's lock is reentrant); building-fabric-services and the README point at it. Backlog FAA-116 records what is
+  left for the recipe.
 
 ## 0.54.0 (2026-10-27)
 
