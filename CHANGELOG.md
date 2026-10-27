@@ -61,9 +61,12 @@ gate behave.
   `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose rule differs between 3.9 patch
   releases. `check_url` refuses the same ports and bracketed hosts (an IPv6 zone included), and on Python also a
   backslash, space, control character or `%` in the host, which urllib would decode or send to a host other than the
-  one logged (`h.example%3A8443` reached port 8443); it checks the host's shape, not its name (FAA-187 (14)). The
-  plain-http loopback rule for a JWKS source no longer counts `[::1%...]` as loopback, and attribution answers
-  `not-openrouter` for a port of other digits (`:٤٤٣`), as `new URL` reads it. The path is not redacted in either twin
+  one logged (`h.example%3A8443` reached port 8443); it checks the host's shape, not its name (FAA-187 (14)).
+  `redact_url` on Python reads a host holding `%` as `<unparseable url>` too, where Node writes it decoded, and a
+  `ws`, `wss` or `ftp` URL with no host or a port above 65535 as `<unparseable url>`, as Node does. A JWKS source's
+  host is read as urllib dials it, so neither `[::1%...]` nor `http://[::1]%2Eevil.example/` (which Python 3.9's
+  `urlsplit` reads as `::1`) nor a mapped `[::ffff:127.0.0.1]` (loopback to Python 3.13+) counts as loopback, and
+  attribution answers `not-openrouter` for a port of other digits (`:٤٤٣`), as `new URL` reads it. The path is not redacted in either twin
   (Node writes it as `new URL` normalises it, Python as given), so a key never belongs in it.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored

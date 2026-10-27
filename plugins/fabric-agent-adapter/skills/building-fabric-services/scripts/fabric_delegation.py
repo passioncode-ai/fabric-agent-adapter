@@ -628,7 +628,8 @@ def _loopback(host: str) -> bool:
     except ValueError:
         return False
     # A zone (`::1%eth0`) is no loopback: urllib decodes `%3A80` in it into another address (0.56.0 seam r13).
-    return address.is_loopback and not getattr(address, "scope_id", None)
+    # Nor an IPv4-mapped address, which Python 3.13+ counts as loopback and 3.9 and Node do not (0.56.0 seam r14).
+    return address.is_loopback and not getattr(address, "scope_id", None) and not getattr(address, "ipv4_mapped", None)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -705,6 +706,13 @@ class JwksCache:
             raise ValueError("the key set needs a source")
         if source.startswith(("https://", "http://")):
             parts = urllib.parse.urlsplit(source)
+            # The host as urllib will dial it: no `%` (urllib decodes it), backslash, space or control, and after a
+            # bracketed address only a port, so `http://[::1]%2Eevil.example/` is no loopback on 3.9 either, whose
+            # urlsplit reads its host as ::1 (0.56.0 unit r13).
+            hostport = parts.netloc.rpartition("@")[2]
+            if (any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" for c in hostport)
+                    or not re.fullmatch(r"(\[[0-9A-Fa-f:.]*\]|[^\[\]:]*)(:[0-9]*)?", hostport)):
+                raise ValueError("a key set URL's host does not parse")
             if parts.username or parts.password:
                 raise ValueError("a key set URL carries no credentials")
             if parts.scheme == "http" and not _loopback(parts.hostname or ""):

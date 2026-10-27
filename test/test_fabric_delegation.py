@@ -292,7 +292,10 @@ class JwksCacheTests(unittest.TestCase):
     def test_sources(self):
         # A zone is no loopback: urllib decodes `%3A80` into another address (0.56.0 seam r13).
         for bad in ("http://hub.example/jwks.json", "ftp://x/jwks.json", "https://user:pw@hub.example/j", "",
-                    "http://[::1%3A80]/jwks.json", "http://[::1%25lo0]/jwks.json"):
+                    "http://[::1%3A80]/jwks.json", "http://[::1%25lo0]/jwks.json",
+                    # 0.56.0 unit r13: 3.9's urlsplit reads the host of the first as ::1 and urllib dials the DNS
+                    # name; seam r14: 3.13+ counts a mapped ::ffff:127.0.0.1 as loopback, 3.9 and Node do not.
+                    "http://[::1]%2Eevil.example/jwks.json", "http://[::1]x/jwks.json", "http://[::ffff:127.0.0.1]/j"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json")

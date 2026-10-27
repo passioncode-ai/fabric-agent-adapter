@@ -154,13 +154,16 @@ def redact_url(url: str) -> str:
         # not by urlsplit, whose scheme rule differs between 3.9 patch releases (0.56.0 hosted floors on 10f6f9d).
         return "<unparseable url>"
     if scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
-        # A special scheme's authority is checked first, as `new URL` checks it, so `ftp://[` is unparseable in both
-        # twins rather than `ftp:<redacted>` in one (0.56.0 unit r12); on 3.9 a lax port would read as the path.
+        # A special scheme's authority is checked first, its shape as `new URL` checks it (a host, a port of ASCII
+        # digits up to 65535), so `ftp://[` and `ws://h:99999` are unparseable in both twins rather than `<scheme>:
+        # <redacted>` in one (0.56.0 unit r12, r13); on 3.9 a lax port would read as the path. A host name `new URL`
+        # refuses for its structure is not checked (FAA-187 (14)).
         try:
             parts = urllib.parse.urlsplit(url)
+            parts.port  # noqa: B018 - raises on a port out of range
         except ValueError:
             return "<unparseable url>"
-        if not _authority_ok(parts.netloc):
+        if not _authority_ok(parts.netloc) or not parts.hostname:
             return "<unparseable url>"
     if scheme.lower() not in ("http", "https"):
         # Only http and https are sent; any other scheme (a misspelled `htps:` included) keeps no more than its name,

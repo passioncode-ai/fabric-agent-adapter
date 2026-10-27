@@ -160,6 +160,22 @@
   [
    "https://h.example%3A8443/x",
    "<unparseable url>"
+  ],
+  [
+   "ws://h.example:99999/x",
+   "<unparseable url>"
+  ],
+  [
+   "ftp://h.example:65536/",
+   "<unparseable url>"
+  ],
+  [
+   "wss://",
+   "<unparseable url>"
+  ],
+  [
+   "ws://u:hunter2@:80/x",
+   "<unparseable url>"
   ]
  ],
  "checkUrl": [
