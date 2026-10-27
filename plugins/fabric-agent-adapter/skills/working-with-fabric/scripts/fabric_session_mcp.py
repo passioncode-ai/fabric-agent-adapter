@@ -23,6 +23,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     LOCK_STALE_S,
     NO_SESSION_MARK,
     NUDGES_FILE,
+    REPOSITORIES_MARK,
     SESSION_ID,
     VERSION,
     WORKER_DEADLINE_S,
@@ -117,6 +118,11 @@ def _count_status(z: str) -> int:
 
 #: FAA-140 (D2): the Stop hook reads at most this much of the transcript, from its end.
 TRANSCRIPT_TAIL_BYTES = 512 * 1024
+
+
+#: FAA-140 (seam reading 1): the Bash command text one turn may split, in characters; a long unterminated quote costs
+#: shlex its whole length, so this caps the Stop hook's time on it.
+BASH_BYTES = 65536
 
 
 #: FAA-140 (REQ-1): at most this many other repositories are named for one turn.
@@ -244,11 +250,12 @@ def _transcript_tail(transcript: str) -> List[bytes]:
     return lines[1:] if offset > 0 else lines  # the first line of a tail is cut
 
 
-def turn_paths(transcript: Any, cwd: Path) -> List[str]:
+def turn_paths(transcript: Any, cwd: Path, until: Optional[float] = None) -> List[str]:
     """The paths the current turn's tool calls name (FAA-140, D2): Edit, Write, MultiEdit and NotebookEdit's file, and
     the folders of `cd` and `git -C` in Bash, in order, without repeats. Only the tail of the transcript is read, from
     its end back to the last prompt the person typed; of an entry only a tool call's name and its path argument are
-    used, never a message's text. [] when the transcript is missing or unreadable."""
+    used, never a message's text. [] when the transcript is missing or unreadable. Bash commands are split only when
+    they hold `cd` or `git`, at most BASH_BYTES of them a turn, and none once `until` (a time.monotonic()) has passed."""
     if not isinstance(transcript, str) or not transcript or "\0" in transcript:
         return []
     try:
@@ -275,13 +282,19 @@ def turn_paths(transcript: Any, cwd: Path) -> List[str]:
             if isinstance(block, dict) and block.get("type") == "tool_use" and isinstance(block.get("input"), dict):
                 calls.append(block)
     found: List[str] = []
+    left = BASH_BYTES
     for block in reversed(calls):
+        if until is not None and time.monotonic() >= until:
+            break
         arguments, name = block["input"], block.get("name")
         if name in CHANGING_TOOLS:
             value = arguments.get(CHANGING_TOOLS[name])
             named = [os.path.normpath(os.path.join(str(cwd), value))] if isinstance(value, str) and value else []
-        elif name == "Bash" and isinstance(arguments.get("command"), str):
-            named = bash_paths(arguments["command"][:65536], cwd)
+        elif name == "Bash" and isinstance(arguments.get("command"), str) and left > 0 \
+                and ("cd" in arguments["command"] or "git" in arguments["command"]):
+            command = arguments["command"][:left]
+            left -= len(command)
+            named = bash_paths(command, cwd)
         else:
             continue
         for path in named:
@@ -323,7 +336,7 @@ def turn_repositories(transcript: Any, cwd: Path, until: float) -> List[Dict[str
     outside every checkout costs no git call. Never raises: what was found when the budget ran out is the answer."""
     found: List[Dict[str, str]] = []
     try:
-        paths = turn_paths(transcript, cwd)
+        paths = turn_paths(transcript, cwd, until)
         if not paths or time.monotonic() >= until:
             return found
         start = (_git(cwd, ("rev-parse", "--show-toplevel"), until) or "").strip() or None
@@ -723,6 +736,12 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
         client.notify("notifications/initialized")
         names = _wait_for_session_tools(client, deadline)
         _write_private(directory / "rejoined", "")
+        takes = _takes_repositories(client)
+        mark = directory.parent.parent / REPOSITORIES_MARK  # state_root: the Stop hook reads a transcript only with it
+        if takes and not mark.exists():
+            _write_private(mark, "")
+        elif not takes and mark.exists():
+            mark.unlink()
         while entries:
             for path in entries:
                 entry = _read_entry(path)
@@ -751,7 +770,7 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                     if event == "end":
                         arguments["reason"] = reason
                     repositories = stored_repositories(entry) if event == "turn" else []
-                    if repositories and "repositories" in _input_fields(client, OBSERVE_TOOL):
+                    if repositories and takes:
                         arguments["repositories"] = repositories  # FAA-140 (REQ-2): only where the tool takes it
                     elif repositories and not (directory / "repositories.degraded").exists():
                         note("session=%s event=turn outcome=degraded reason=%r"
@@ -857,6 +876,19 @@ def _input_fields(client: McpStdio, tool: str) -> List[str]:
             props = schema.get("properties") if isinstance(schema, dict) else None
             return [k for k in props if isinstance(k, str)] if isinstance(props, dict) else []
     return []
+
+
+def _takes_repositories(client: McpStdio) -> bool:
+    """Whether fabric_session_observe declares `repositories` as a list of objects with host, owner and name (FAA-140,
+    REQ-2): a field of another shape would fail Fabric's check and lose the turn's other facts with it."""
+    for listed in client.tools:
+        if listed.get("name") == OBSERVE_TOOL:
+            schema = listed.get("inputSchema")
+            field = (schema.get("properties") or {}).get("repositories") if isinstance(schema, dict) else None
+            items = field.get("items") if isinstance(field, dict) else None
+            props = items.get("properties") if isinstance(items, dict) else None
+            return isinstance(props, dict) and {"host", "owner", "name"} <= set(props)
+    return False
 
 
 def _wait_for_session_tools(client: McpStdio, deadline: float) -> List[str]:

@@ -76,6 +76,8 @@ from fabric_session_env import (  # noqa: F401
     spawn_worker,
     _remove_tree,
     NO_SESSION_MARK,
+    REPOSITORIES_MARK,
+    repositories_wanted,
     NO_SESSION_HOLD_S,
     no_session_held,
 )
@@ -102,6 +104,8 @@ from fabric_session_mcp import (  # noqa: F401
     NoSessionError,
     TRANSCRIPT_TAIL_BYTES,
     MAX_REPOSITORIES,
+    BASH_BYTES,
+    _takes_repositories,
     parse_origin,
     bash_paths,
     turn_paths,

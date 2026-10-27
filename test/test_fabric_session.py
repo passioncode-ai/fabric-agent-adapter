@@ -15,6 +15,7 @@ import tempfile
 import textwrap
 import time
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,8 +70,10 @@ FAKE_MCP = textwrap.dedent('''\
             def schema(n):
                 if n == "fabric_work_release" and os.environ.get("FAKE_MCP_RELEASE_OBSERVED"):
                     return {{"type": "object", "properties": {{"claims": {{"type": "string"}}, "observedAt": {{"type": "string"}}}}}}
-                if n == "fabric_session_observe" and os.environ.get("FAKE_MCP_OBSERVE_REPOSITORIES"):
-                    return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": {{"type": "array"}}}}}}
+                shape = os.environ.get("FAKE_MCP_OBSERVE_REPOSITORIES")
+                if n == "fabric_session_observe" and shape:
+                    items = {{"type": "string"}} if shape == "strings" else {{"type": "object", "properties": {{k: {{"type": "string"}} for k in ("host", "owner", "name")}}}}
+                    return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": {{"type": "array", "items": items}}}}}}
                 return {{"type": "object"}}
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": schema(n)}} for n in names]}}}})
         elif method == "tools/call":
@@ -1191,6 +1194,9 @@ class TurnRepositories(Base):
         subprocess.run(["git", "-C", str(self.repo), "config", "remote.origin.url", "https://github.com/acme/start.git"],
                        check=True)
         self.transcript = self.base / "transcript.jsonl"
+        self.mark = fs.state_root(env=self.env) / fs.REPOSITORIES_MARK
+        self.mark.parent.mkdir(parents=True, exist_ok=True)
+        self.mark.write_text("")  # as a worker leaves it once Fabric takes repositories
 
     def git_repo(self, name, origin=None):
         folder = self.base / name
@@ -1301,6 +1307,18 @@ class TurnRepositories(Base):
         self.assertGreater(self.transcript.stat().st_size, MCP.TRANSCRIPT_TAIL_BYTES + 1000)
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(late / "x")])
 
+    def test_bash_text_is_split_within_a_cap_and_never_after_the_budget(self):
+        """Seam reading 1: a long unterminated quote costs shlex its whole length, so a turn's Bash text is capped."""
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        noisy = "git log '" + "x" * 64000  # unterminated
+        self.write_transcript([prompt_entry()] + [tool_entry("Bash", command=noisy) for _ in range(8)]
+                              + [tool_entry("Bash", command="echo no-word-here " + "y" * 64000),
+                                 tool_entry("Edit", file_path=str(one / "x"))])
+        started = time.monotonic()
+        self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(one / "x")])
+        self.assertLess(time.monotonic() - started, 1.5)
+        self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo, until=time.monotonic()), [])
+
     def test_a_spent_budget_names_none(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
@@ -1338,6 +1356,36 @@ class TurnRepositories(Base):
         log = self.log_text()
         self.assertIn("repositories=1", log)
         self.assertNotIn("acme", log)
+
+    def test_without_the_mark_the_hook_reads_no_transcript(self):
+        """Product and seam readings 1: until a worker saw Fabric take `repositories`, the Stop hook does not open the
+        transcript at all (nothing changes for a Fabric before the 2026-11-21 slice)."""
+        self.mark.unlink()
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
+        with mock.patch.object(MCP, "_transcript_tail", side_effect=AssertionError("the transcript was read")):
+            _, entry = self.spool_turn()
+        self.assertNotIn("repositories", entry)
+
+    def test_the_worker_writes_the_mark_from_the_schema_and_removes_it_when_it_goes(self):
+        self.mark.unlink()
+        self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "1"
+        self.spool_turn(transcript=False)
+        fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
+        self.assertTrue(self.mark.exists())
+        for shape in ("strings", ""):  # another item shape, then none: the hook stops reading transcripts
+            self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = shape
+            self.spool_turn(transcript=False)
+            fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
+            self.assertFalse(self.mark.exists(), shape)
+            self.mark.write_text("")
+
+    def test_a_field_of_another_shape_is_not_sent(self):
+        self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "strings"
+        turns = self.deliver_two_turns()
+        for turn in turns:
+            self.assertNotIn("repositories", turn)
+        self.assertEqual(self.log_text().count("does not take repositories"), 1)
 
     def test_the_worker_drops_repositories_where_the_schema_does_not_list_them(self):
         turns = self.deliver_two_turns()

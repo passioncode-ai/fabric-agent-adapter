@@ -36,6 +36,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     prune_stale_sessions,
     read_small,
     rejoined_recently,
+    repositories_wanted,
     session_dir,
     spawn_worker,
     spool,
@@ -221,7 +222,7 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
     entry = {"event": event, "runtimeSessionId": session_id, "cwd": str(cwd),
              "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "facts": git_facts(cwd, until=until)}
-    if event == "turn":
+    if event == "turn" and repositories_wanted(env):  # only once Fabric takes them: no transcript read before (FAA-140)
         repositories = turn_repositories(payload.get("transcript_path"), cwd, until)
         if repositories:
             entry["repositories"] = repositories
