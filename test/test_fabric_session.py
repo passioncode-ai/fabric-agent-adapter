@@ -1317,7 +1317,6 @@ class TurnRepositories(Base):
         _, entry = self.spool_turn()
         self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "other"}])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_a_missing_or_unreadable_transcript_names_none_and_is_no_error(self):
         garbage = self.base / "garbage.jsonl"
         garbage.write_bytes(b"\xff\xfe not json\n{\"type\": 3}\n[1, 2]\n")
@@ -1330,7 +1329,6 @@ class TurnRepositories(Base):
                 self.assertNotIn("repositories", entry)
                 self.assertIsInstance(entry["facts"]["head"], str)
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_only_the_tail_of_a_long_transcript_is_read(self):
         early = self.git_repo("early", "https://github.com/acme/early.git")
         late = self.git_repo("late", "https://github.com/acme/late.git")
@@ -1341,7 +1339,6 @@ class TurnRepositories(Base):
         self.assertGreater(self.transcript.stat().st_size, MCP.TRANSCRIPT_TAIL_BYTES + 1000)
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(late / "x")])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_bash_text_is_split_within_a_cap_and_never_after_the_budget(self):
         """Seam reading 1: a long unterminated quote costs shlex its whole length, so a turn's Bash text is capped."""
         one = self.git_repo("one", "https://github.com/acme/one.git")
@@ -1354,14 +1351,12 @@ class TurnRepositories(Base):
         self.assertLess(time.monotonic() - started, 1.5)
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo, until=time.monotonic()), [])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_a_spent_budget_names_none(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
         self.assertEqual(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic()), [])
         self.assertEqual(len(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic() + 5)), 1)
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_a_subagent_entry_and_a_meta_prompt_do_not_end_the_turn(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         side = self.git_repo("side", "https://github.com/acme/side.git")
@@ -1370,7 +1365,6 @@ class TurnRepositories(Base):
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x")), meta, sidechain])
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(one / "x")])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_end_entry_carries_no_repositories(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
@@ -1393,7 +1387,6 @@ class TurnRepositories(Base):
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         return [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_worker_sends_repositories_where_the_schema_lists_them(self):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "1"
         turns = self.deliver_two_turns()

@@ -10,9 +10,10 @@ command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix
 
 - **No transcript read on Windows** (FAA-175): working-with-fabric's Stop hook never reads the session transcript on
   Windows, even once Fabric takes `repositories`; a Bash command's paths there are not the host's. Windows sessions send
-  their turn facts as before 0.53.0, without `repositories`. The FAA-140 tests that read a transcript or split a Bash
-  command are skipped on Windows; the worker's tests run there with the read turned on in the test, and a new test checks
-  that the mark turns nothing on there.
+  their turn facts as before 0.53.0, without `repositories`. `BashPaths` and the four tests that need the hook itself to
+  read (names from Edit and Bash paths, at most ten, one checkout named once, another checkout of the start repository)
+  are skipped on Windows; the rest run there, the worker's with the read turned on in the test, and a new test checks that
+  the mark turns nothing on there.
 
 ## 0.53.0 (2026-10-27, not published)
 
