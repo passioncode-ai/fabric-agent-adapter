@@ -36,9 +36,9 @@ class BoardSession:
         self._lock = threading.Lock()
         self._rpc = 0
 
-    def _send(self, body: Dict[str, Any], method: str = "POST"):
+    def _send(self, body: Dict[str, Any], method: str = "POST", timeout: Optional[float] = None):
         try:
-            return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session, timeout=self.timeout,
+            return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session, timeout=timeout or self.timeout,
                              method=method, protocol_version=self.protocol_version if self.mcp_session else None)
         except _hub.HubError as exc:
             raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored, so send it again with "
@@ -83,15 +83,19 @@ class BoardSession:
             raise BoardError(e["code"], e["message"], e["retryable"], op=tool)
         return value
 
-    def close(self) -> None:
+    def close(self, timeout: Optional[float] = None) -> bool:
+        """Sends the DELETE (waiting `timeout` seconds at most, else the session's); True when Fabric answered it (2xx,
+        or 404: the session was already gone), so the slots are free now. False when it did not: the lease lapses in
+        60 s anyway."""
         with self._lock:
             if self.mcp_session is None:
-                return
+                return False
             try:
-                self._send({}, method="DELETE")
+                status = self._send({}, method="DELETE", timeout=timeout)[0]
             except BoardError:
-                pass  # best effort: the lease lapses in 60 s anyway
+                status = 0
             self.mcp_session = None
+            return 200 <= status < 300 or status == 404
 
 
 class Checkpoint:

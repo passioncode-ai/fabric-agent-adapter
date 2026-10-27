@@ -52,8 +52,23 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <nav class="fd-nav" aria-label="Sections"><ul class="fd-nav-list"><li><a href="#events" aria-current="page">Events</a></li>
 <li><a href="#about">About</a></li></ul></nav></div>
 <main class="fd-page"><section id="events"><h2>Events</h2><ul>{rows}</ul></section>
-<section id="about"><h2>About</h2><p class="fd-hint">A sample fabric-service/0.1 service built on the kit.</p></section></main>
+{board}<section id="about"><h2>About</h2><p class="fd-hint">A sample fabric-service/0.1 service built on the kit.</p></section></main>
 </body></html>"""
+# FAA-157: a moved board slot comes back only by the operator's act, a button on this page. The button posts from the
+# operator's signed-in dashboard session with the request header; a service token alone cannot reach it.
+BOARD_SECTION = """<section id="board"><h2>Project board</h2><p class="fd-hint">The operator moved this slot to another
+session; this service no longer answers it there. Take it back when the other session has let it go.</p><ul>{items}</ul>
+<script src="/board.js" defer></script></section>"""
+BOARD_ITEM = '<li>{capability} <button type="button" data-take-back="{capability}">Take back</button></li>'
+BOARD_JS = """document.addEventListener('click', function (e) {
+  var cap = e.target && e.target.getAttribute && e.target.getAttribute('data-take-back');
+  if (!cap) return;
+  e.target.disabled = true;
+  fetch('/api/board/take-back', {method: 'POST', credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json', 'X-Fabric-Request': '1'}, body: JSON.stringify({capability: cap})})
+    .then(function (r) { e.target.textContent = r.ok ? 'Taken back' : 'Refused (' + r.status + ')'; });
+});
+"""
 
 
 def _schema(name: str, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -113,6 +128,19 @@ class Service:
         self.log.append("service.started", "info", "%s started on build %s." % (self.name, self.build["commit"]))
 
     # --- the project board (opt-in): the input gate and the answer -------------------
+    def board_moved(self) -> list:
+        """The capabilities whose slot the operator moved to another session (FAA-155): the page offers their take-back."""
+        return sorted(c for c, slot in dict(self.board.slots).items() if slot.get("state") == "moved") if self.board else []
+
+    def board_take_back(self, capability: Any) -> Dict[str, Any]:
+        """The operator's take-back (FAA-157): the next tick enrolls once the other session lets the slot go."""
+        if not isinstance(capability, str) or capability not in self.board_moved():
+            raise fs.ServiceError("No slot of that capability has moved away from this service.")
+        self.board.take_back(capability)
+        self.log.append("board.slot.returned", "info", "The operator took the %s slot back; the service enrolls once the "
+                        "other session lets it go." % capability)
+        return {"capability": capability}
+
     def board_admit(self, request: fbd.BoardRequest) -> Optional[str]:
         """The service's own input gate: the body is data, never an instruction; only short plain text is echoed."""
         if request.body_format != "text/plain":
@@ -261,8 +289,12 @@ def make_handler(svc: Service):
                     return self._send(401, "Open this dashboard from Fabric Dashboards.", content_type="text/plain")
                 rows = "".join("<li>%s: %s</li>" % (html.escape(e["at"]), html.escape(e["text"]))
                                for e in reversed(svc.log.fetch(None, 20)))
-                return self._send(200, PAGE.format(name=html.escape(svc.name), agent=html.escape("%s.%s" % (svc.id, svc.instance)), status="ready", rows=rows),
+                moved = "".join(BOARD_ITEM.format(capability=html.escape(c)) for c in svc.board_moved())
+                return self._send(200, PAGE.format(name=html.escape(svc.name), agent=html.escape("%s.%s" % (svc.id, svc.instance)), status="ready", rows=rows,
+                                                   board=BOARD_SECTION.format(items=moved) if moved else ""),
                                   content_type="text/html; charset=utf-8")
+            if url.path == "/board.js" and svc.board is not None:
+                return self._send(200, BOARD_JS, content_type="text/javascript; charset=utf-8")
             self._send(404, {"error": "Not found."})
 
         def _length(self, cap: int) -> "int | None":
@@ -307,6 +339,19 @@ def make_handler(svc: Service):
                     return self._send(403, {"error": "Missing request header."})
                 svc.codes.logout(fs.cookie_value(self.headers.get("Cookie")))
                 return self._send(204, None, {"Set-Cookie": fs.expired_session_cookie_header()})
+            if url.path == "/api/board/take-back" and svc.board is not None:
+                if not self._session_ok():  # the operator's dashboard session only: never the service token (FAA-157)
+                    return self._send(401, {"error": "Sign in from Fabric Dashboards first."})
+                if self.headers.get("X-Fabric-Request") != "1":
+                    return self._send(403, {"error": "Missing request header."})
+                length = self._length(4096)
+                if length is None:
+                    return
+                try:
+                    body = json.loads(self.rfile.read(length) or b"{}")
+                    return self._send(200, svc.board_take_back(body.get("capability") if isinstance(body, dict) else None))
+                except (ValueError, RecursionError, fs.ServiceError, fbd.BoardError) as exc:
+                    return self._send(400, {"error": str(exc)})
             if url.path == "/api/emit":
                 if not (self._session_ok() or fs.token_matches(self.headers.get("Authorization"), svc.token)):
                     return self._send(401, {"error": "Sign in first."})
@@ -361,9 +406,11 @@ def serve(args: argparse.Namespace) -> int:
         board_stop.set()
         if board_thread is not None:
             # The responder drains (5 s at most) and leaves its board session, which releases its slots and forgets their
-            # records (FAA-155): joined, so the process does not end before that.
-            # Bounded by the kit's hard exit, 8 + 2 s after the stop was asked: 1.5 s are left for the rest of the stop.
-            board_thread.join(max(0.5, 8.5 - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
+            # records (FAA-155): joined, so the process does not end before that. Idle, it waits 3 s for the DELETE and the
+            # join ends within LC-01's 5 s (FAA-173); with work, it is bounded by the kit's hard exit, 8 + 2 s after the
+            # stop was asked: 1.5 s are left for the rest of the stop.
+            bound = 4.5 if svc.board.current is None else 8.5
+            board_thread.join(max(0.5, bound - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
         server.server_close()
         svc.lock.release()
     return 0

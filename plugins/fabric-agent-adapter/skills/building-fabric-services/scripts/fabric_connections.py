@@ -15,7 +15,9 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_secrets import CREDENTIAL_PAIRS, CREDENTIAL_WORDS, JWT_SHAPE, _long_secret, raw_values  # noqa: E402
+from fabric_secrets import (  # noqa: E402
+    JWT_SHAPE, _BEARER_INSIDE as _BEARER, _long_secret, credential_name, raw_values, secret_argument, secret_value,
+)
 
 CONNECTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1"
 KINDS = ("service", "model", "connector", "store", "channel")
@@ -161,45 +163,9 @@ def _long_run(value: str) -> bool:
     return False
 
 
-# The shared detector (DEC-0044) as the contract's ECMAScript reads it: ASCII case folding, ECMAScript's \s and `.`,
-# an ASCII word boundary. The kit's fabric_secrets keeps Python's semantics for its other callers (LC-21); FAC-SEM-127
-# is held to the reference, so this module reads with the reference's (blind reading of 0.44.0, finding 1).
-_NOT_LINE_END = "[^\n\r\u2028\u2029]"
-_SECRET_VALUE = re.compile(r"(^bearer[%s]%s+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}"
-                           r"|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})" % (_JS_SPACE, _NOT_LINE_END), re.IGNORECASE | re.ASCII)
-_BEARER = re.compile(r"(?<![A-Za-z0-9_])bearer[%s]+(?=[A-Za-z0-9._~+/-]*[0-9])[A-Za-z0-9._~+/-]{12,}=*" % _JS_SPACE,
-                     re.IGNORECASE | re.ASCII)
-_PATH_LIKE = re.compile(r"(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*://)", re.IGNORECASE | re.ASCII)
-_ARGUMENT_SPLIT = re.compile("[%s=]" % _JS_SPACE)
-
-
-def _credential_name(name: str) -> bool:
-    """fabric_secrets.credential_name with ECMAScript's whitespace in the word split (U+FEFF splits a name there)."""
-    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
-    spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-    split = [w.lower() for w in re.split("[%s._-]+" % _JS_SPACE, spaced) if w]
-    words = split + [w[:-1] for w in split if len(w) > 2 and w.endswith("s")]
-    if any(w in CREDENTIAL_WORDS for w in words) or (len(split) == 1 and any(w in CREDENTIAL_PAIRS for w in words)):
-        return True
-    return any(word in words and any(p in words for p in partners) for word, partners in CREDENTIAL_PAIRS.items())
-
-
-def _secret_value(value: str) -> bool:
-    return bool(JWT_SHAPE.search(value) or _SECRET_VALUE.search(value) or _long_secret(value))
-
-
-def _path_like(piece: str) -> bool:
-    return bool(_PATH_LIKE.match(piece)) or (
-        bool(re.search(r"[\\/]", piece))
-        and (bool(re.search(r"\.[A-Za-z0-9]{1,8}\Z", piece))
-             or any(re.fullmatch(r"[a-z][a-z0-9_-]{2,}", segment) for segment in re.split(r"[\\/]", piece))))
-
-
-def _secret_argument(value: str) -> bool:
-    if JWT_SHAPE.search(value) or _SECRET_VALUE.search(value) or _BEARER.search(value):
-        return True
-    return any(any(_long_secret(part) for part in re.split(r"[\\/]", piece)) if _path_like(piece) else _long_secret(piece)
-               for piece in _ARGUMENT_SPLIT.split(value))
+# The shared detector (DEC-0044) as the contract's ECMAScript reads it: fabric_secrets reads so since 0.56.0 (FAA-136;
+# before, this module kept its own copy, blind reading of 0.44.0, finding 1).
+_credential_name, _secret_value, _secret_argument = credential_name, secret_value, secret_argument
 
 
 _SPECIAL = ("http", "https", "ws", "wss", "ftp", "file")

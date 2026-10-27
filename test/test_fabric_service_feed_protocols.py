@@ -67,6 +67,19 @@ class FeedData(unittest.TestCase):
                 problems = [p for e in f["document"]["events"] if "data" in e for p in fs.feed_data_problems(e["data"])]
                 self.assertEqual(not problems, f["valid"], problems)
 
+    def test_a_value_nested_too_deep_names_its_place(self):
+        """FAA-122: a list of objects in `value` is refused naming the first place that nests too deep."""
+        cases = (({"cited": [{"id": "a1", "coverage": 0.8}]}, "data.value.cited[0] is an object"),
+                 ({"counts": {"by": [1, 2]}}, "data.value.counts.by is a list"),
+                 ({"note": ["x" * 501]}, "data.value.note[0] is a string over 500 characters"),
+                 ({"many": list(range(33))}, "it has 33 entries"))
+        for value, said in cases:
+            with self.subTest(said=said):
+                (problem,) = fs.feed_data_problems({"schema": "urn:example:schema:day:1", "value": value})
+                self.assertIn(said, problem)
+        self.assertEqual(fs.feed_data_problems({"schema": "urn:example:schema:day:1",
+                                                "value": {"citedIds": ["a1", "b2"], "citedCoverage": [0.8, 0.4]}}), [])
+
     def test_fac_sem_101_at_the_contracts_places(self):
         self.assertEqual(len(V["feedPages"]), 10)
         for c in V["feedPages"]:

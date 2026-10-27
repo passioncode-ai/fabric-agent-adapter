@@ -111,6 +111,19 @@ def _scalar(value: Any) -> bool:
     return value is None or isinstance(value, (bool, int, float)) or (isinstance(value, str) and len(value) <= 500)
 
 
+def _too_deep(key: str, member: Any) -> str:
+    """The first place under a member that breaks the bound, for the refusal (FAA-122): `cited[0]` nests an object."""
+    if isinstance(member, (list, dict)) and len(member) > 32:
+        return ": it has %d entries" % len(member)
+    for inner, leaf in (enumerate(member) if isinstance(member, list) else member.items() if isinstance(member, dict) else ()):
+        if not _scalar(leaf):
+            place = "%s[%d]" % (key, inner) if isinstance(member, list) else "%s.%s" % (key, inner)
+            what = "a string over 500 characters" if isinstance(leaf, str) else "a list" if isinstance(leaf, list) else \
+                "an object" if isinstance(leaf, dict) else "not a scalar"
+            return ": data.value.%s is %s; nest two levels at most (flatten it into lists or members of their own)" % (place, what)
+    return ""
+
+
 def feed_data_problems(data: Any) -> List[str]:
     """DEC-0070's `data {schema, value}` as the schema bounds it, then FAC-SEM-101: no string in `value`, at either
     level, under a credential's name or of a credential's shape (named by its place, never its value)."""
@@ -130,7 +143,8 @@ def feed_data_problems(data: Any) -> List[str]:
             continue
         if isinstance(member, dict) and len(member) <= 32 and all(_scalar(m) for m in member.values()):
             continue
-        problems.append("data.value.%s is a scalar (a string of at most 500 characters), a list of at most 32 scalars or an object of at most 32 scalar members" % key)
+        problems.append("data.value.%s is a scalar (a string of at most 500 characters), a list of at most 32 scalars or an object of at most 32 scalar members%s"
+                        % (key, _too_deep(key, member)))
     if problems:
         return problems
     for finding in feed_data_findings({"events": [{"data": data}]}):

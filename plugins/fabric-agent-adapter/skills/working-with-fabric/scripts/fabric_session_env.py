@@ -480,6 +480,10 @@ NO_SESSION_MARK = "no-session"
 #: `repositories` as {host, owner, name}: a worker writes it from the tool's schema and removes it when the schema stops
 #: saying so. Until it exists the Stop hook reads no transcript (FAA-140, seam and product readings 1).
 REPOSITORIES_MARK = "observe-takes-repositories"
+#: The file in the hooks' own folder that turns the transcript read off (FAA-160): the turn's git facts are still
+#: measured. The environment variable FABRIC_SESSION_NO_REPOSITORIES=1 does the same for one environment.
+NO_REPOSITORIES_MARK = "no-repositories"
+NO_REPOSITORIES_ENV = "FABRIC_SESSION_NO_REPOSITORIES"
 NO_SESSION_HOLD_S = 15 * 60.0
 
 
@@ -531,10 +535,18 @@ def _write_private(path: Path, text: str) -> None:
     os.replace(str(tmp), str(path))
 
 
+def repositories_off(env: Optional[Dict[str, str]] = None) -> bool:
+    """Whether the person turned the transcript read off (FAA-160): FABRIC_SESSION_NO_REPOSITORIES set to anything but
+    "" or "0", or the file NO_REPOSITORIES_MARK in the hooks' own folder."""
+    value = (os.environ if env is None else env).get(NO_REPOSITORIES_ENV, "")
+    return value not in ("", "0") or (state_root(env=env) / NO_REPOSITORIES_MARK).exists()
+
+
 def repositories_wanted(env: Optional[Dict[str, str]] = None) -> bool:
     """Whether the Stop hook reads the transcript for the turn's other repositories (FAA-140): only once a worker
-    left the mark, and never on Windows, where a Bash command's paths are not this host's (FAA-175)."""
-    return sys.platform != "win32" and (state_root(env=env) / REPOSITORIES_MARK).exists()
+    left the mark, and not when the person turned it off (FAA-160). On Windows too (FAA-175): bash_paths reads a Git
+    Bash command's /c/... and C:/... paths as this host's."""
+    return not repositories_off(env) and (state_root(env=env) / REPOSITORIES_MARK).exists()
 
 
 def session_dir(session_id: str, env: Optional[Dict[str, str]] = None) -> Path:

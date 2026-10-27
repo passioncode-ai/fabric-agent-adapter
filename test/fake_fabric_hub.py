@@ -32,6 +32,7 @@ import secrets
 import socketserver
 import sys
 import threading
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 PROJECT = "3f2a6b1c-0d4e-4f5a-8b6c-7d8e9f0a1b2c"
@@ -488,6 +489,8 @@ class FakeHub:
         self.door = secrets.token_urlsafe(32)
         self.credential = secrets.token_urlsafe(32)
         self.down = False
+        self.delete_fails = False  # a session's DELETE answers 500 and releases nothing (FAA-163)
+        self.delete_delay = 0.0  # seconds a DELETE waits before it is answered (FAA-173)
         self.grant = True
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.bindings_seen: List[str] = []
@@ -511,10 +514,14 @@ class FakeHub:
                 self.wfile.write(data)
 
             def do_DELETE(self) -> None:  # noqa: N802
+                if hub.delete_delay:
+                    time.sleep(hub.delete_delay)
                 with hub.lock:
                     token = (self.headers.get("authorization") or "")[7:]
                     st = hub.sessions.get(token)
-                    if st and st["mcp"] == self.headers.get("mcp-session-id"):
+                    if hub.delete_fails:
+                        self._send(500, {"error": "the test asked for it"})
+                    elif st and st["mcp"] == self.headers.get("mcp-session-id"):
                         hub.board.release(st["id"])
                         del hub.sessions[token]
                         self._send(200)
@@ -617,9 +624,10 @@ class FakeHub:
             if tool not in RESPOND_TOOLS:
                 return 200, {"jsonrpc": "2.0", "id": rpc_id, "error": {"code": -32602, "message": "Tool %s not found" % tool}}, None
             answer = self.board.call(st["id"], st["capabilities"], tool, params.get("arguments") or {})
-            if self.board.drop_next.get(tool):
-                self.board.drop_next[tool] -= 1
-                return 200, {"_drop": True}, None
+            for key in (tool, (tool, (params.get("arguments") or {}).get("capability"))):  # one capability's too
+                if self.board.drop_next.get(key):
+                    self.board.drop_next[key] -= 1
+                    return 200, {"_drop": True}, None
             return 200, self._result(rpc_id, answer, structured=False), None
         if token == self.door:
             principal = "door"
@@ -673,7 +681,7 @@ class FakeHub:
             b.advance(float(cmd["seconds"]))
         elif op == "set":
             for key, value in cmd.get("values", {}).items():
-                if key in ("down", "grant"):
+                if key in ("down", "grant", "delete_fails", "delete_delay"):
                     setattr(self, key, value)
                 else:
                     setattr(b, key, value)
@@ -682,7 +690,9 @@ class FakeHub:
         elif op == "refuse":
             b.refuse_always[(cmd["tool"], cmd.get("capability"))] = cmd["code"]
         elif op == "drop":
-            b.drop_next[cmd["tool"]] = int(cmd.get("times", 1))
+            b.drop_next[(cmd["tool"], cmd["capability"]) if "capability" in cmd else cmd["tool"]] = int(cmd.get("times", 1))
+        elif op == "unrefuse":
+            b.refuse_always.pop((cmd["tool"], cmd.get("capability")), None)
         elif op == "allow":
             for r in self.access_requests.values():
                 r["status"] = "allowed"

@@ -2,7 +2,10 @@
 """The contract's one credential detector (Fabric Agent Contract DEC-0044, `src/secret-shape.ts` at the pin): a name
 that can only carry a credential, a value shaped like one, a launch argument that carries one, and a URL that does
 (LC-21). A port held to the contract's own answers by test/fixtures/contract/profile-vectors.json. Standard library
-only. The dashboard kit's fabric-button.js carries its own copy of the name and value checks (FL-4)."""
+only. The dashboard kit's fabric-button.js carries its own copy of the name and value checks (FL-4).
+
+It reads as the contract's ECMAScript does (FAA-136): ECMAScript's whitespace (Python's `\\s` also takes U+0085 and
+U+001C to U+001F, and not U+FEFF), `.` stopping at every line terminator, ASCII case folding, an ASCII word boundary."""
 
 from __future__ import annotations
 
@@ -22,12 +25,18 @@ CREDENTIAL_PAIRS: Dict[str, tuple] = {
     "session": ("token", "id"),
     "code": ("login", "auth", "access", "session"),
 }
+#: ECMAScript's \s, as a character class body.
+JS_SPACE = "\t\n\x0b\x0c\r \xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+_NOT_LINE_END = "[^\n\r\u2028\u2029]"  # ECMAScript's `.` without the s flag
 JWT_SHAPE = re.compile(r"eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*")
-SECRET_VALUE = re.compile(r"(^bearer\s.+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})",
-                          re.IGNORECASE | re.DOTALL)
+SECRET_VALUE = re.compile(r"(^bearer[%s]%s+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}"
+                          r"|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})" % (JS_SPACE, _NOT_LINE_END), re.IGNORECASE | re.ASCII)
 _LONG_RUN = re.compile(r"[A-Za-z0-9+/=_-]{40,}")
-_BEARER_INSIDE = re.compile(r"\bbearer\s+(?=[A-Za-z0-9._~+/-]*\d)[A-Za-z0-9._~+/-]{12,}=*", re.IGNORECASE)
-_PATH_LIKE = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*://)", re.IGNORECASE)
+_BEARER_INSIDE = re.compile(r"(?<![A-Za-z0-9_])bearer[%s]+(?=[A-Za-z0-9._~+/-]*[0-9])[A-Za-z0-9._~+/-]{12,}=*" % JS_SPACE,
+                            re.IGNORECASE | re.ASCII)
+_PATH_LIKE = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*://)", re.IGNORECASE | re.ASCII)
+_WORD_SPLIT = re.compile("[%s._-]+" % JS_SPACE)
+_ARGUMENT_SPLIT = re.compile("[%s=]" % JS_SPACE)
 _SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
 
@@ -35,7 +44,7 @@ def name_words(name: str) -> List[str]:
     """A name's words: split at `.`, `_`, `-` and camelCase humps, lowercased (`APIKey` is `api key`)."""
     spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
     spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", spaced)
-    return [w.lower() for w in re.split(r"[\s._-]+", spaced) if w]
+    return [w.lower() for w in _WORD_SPLIT.split(spaced) if w]
 
 
 def _with_singulars(words: List[str]) -> List[str]:
@@ -73,7 +82,7 @@ def secret_argument(value: str) -> bool:
     so a folder path holding a session id is not taken for a key."""
     if JWT_SHAPE.search(value) or SECRET_VALUE.search(value) or _BEARER_INSIDE.search(value):
         return True
-    for piece in re.split(r"[\s=]", value):
+    for piece in _ARGUMENT_SPLIT.split(value):
         if _path_like(piece):
             if any(_long_secret(part) for part in re.split(r"[\\/]", piece)):
                 return True
