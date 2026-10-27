@@ -47,7 +47,8 @@ and releases what the session left claimed at its end — without ever blocking 
    and start a detached worker that holds a 10 s deadline. Every hook exits 0; every failure is one log line in the
    adapter's cache folder (0600, rotated at 1 MB). No token is read: the hooks never open the door token or a
    credential, and nothing secret is in argv or the log. Amended 2026-10-27 (0.53.0): once Fabric takes repositories,
-   Stop reads the transcript's last 512 KB and runs `git config` in the repositories it names; a credential embedded in
+   Stop reads the transcript's last 512 KB (message text and tool output, which can hold a secret the session
+   displayed; read in memory only, never spooled, logged or sent) and runs `git config` in the repositories it names; a credential embedded in
    an `origin` URL is read with it and dropped in memory, never spooled, logged or sent.
 6. **SessionStart injects the preamble only when `fabric` is registered in Claude Code and Fabric is running**; when
    it is registered and Fabric is down, one line says so and points at the lifecycle broker. Unregistered: silent.

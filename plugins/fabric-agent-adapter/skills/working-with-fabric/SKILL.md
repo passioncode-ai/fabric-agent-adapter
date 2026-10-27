@@ -143,12 +143,13 @@ Fabric 0.4.0 (REQ-38):
    as ONE task whose title is that request in one line, with `origin: {kind: "person", ref: <where they said it: the session or thread>}`:
    from Fabric 0.3.14, which shows agents' goals, it is shown as yours. File each piece you split off with
    `fabric_task_create` while that task is claimed, and read the answer's `spawned_from` (Fabric 0.3.14 links the piece
-   from your single live claim). First `proposed: true`, even with `spawned_from: null`: nothing was filed, so do not
+   from your single live claim). `created: false` with a `code` filed nothing (`source-unresolved` names the `part` of
+   `source` that failed): correct the source or file without it, and never link. Then `proposed: true`, even with `spawned_from: null`: nothing was filed, so do not
    file or link that piece; tell the person it waits for the operator and go on with the rest. Otherwise, your claimed task's id there: it is linked, link nothing. Another task's id: link
    nothing either (Fabric chose that parent, FAA-153) and tell the person which. `spawned_from: null` comes
    with `spawned_from_why`: link it yourself once with `fabric_task_link {taskId: <the piece>, rel: "spawned",
    targetTaskId: <the claimed task>}`, and if that is refused too, tell the person that reason; never file the piece
-   again. No `spawned_from` at all is a Fabric before 0.3.14: link it yourself the same way unless the answer says
+   again. A filed piece (`created: true`) with no `spawned_from` at all is a Fabric before 0.3.14: link it yourself the same way unless the answer says
    `chained: true` with `chained_to` your claimed task (board `c42071bc`); an answer with `chained: false` names its
    `chain_reason`, which you tell the person if your link is refused.
 3. A related-work warning (same backlog row, a linked task, an overlapping folder) names the other agent, its
