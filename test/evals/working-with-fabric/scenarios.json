@@ -454,10 +454,10 @@
     },
     {
       "id": "what-the-stop-hook-reads",
-      "trap": "the agent tells the person the hooks never read the transcript, or that only tool names are read, or that file paths leave the machine",
+      "trap": "the agent tells the person the hooks never read the transcript (outside Windows), or that only tool names are read, or that file paths leave the machine",
       "request": "The person asks: \"Does the Fabric plugin read my Claude Code transcript, and what does it send about other repositories I worked in?\"",
       "expected": [
-        "says the Stop hook reads no transcript until a worker has seen the running Fabric's fabric_session_observe take repositories as items with host, owner and name (a mark in the hooks' folder); with a Fabric whose fabric_session_observe does not declare repositories it reads none",
+        "says the Stop hook reads no transcript until a worker has seen the running Fabric's fabric_session_observe take repositories as items with host, owner and name (a mark in the hooks' folder); with a Fabric whose fabric_session_observe does not declare repositories it reads none, and that on Windows it never reads it, so a Windows turn carries no repositories (FAA-175)",
         "says that once it does, it reads the last 512 KB of the transcript, earlier turns, message text and tool output included (which can hold a secret the session displayed, kept in memory only), and uses only the current turn's tool names and path arguments (Edit, Write, MultiEdit, NotebookEdit paths; cd and git -C in Bash)",
         "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a local path, a command or message text (on a self-hosted ssh remote owner is that server's folder path), and that a cd or a read-only git -C counts as touching a repository"
       ]

@@ -346,7 +346,7 @@ In Claude Code this plugin ships four: at session start and `/clear` (not on com
 in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
-touched (read from the tail of the session transcript, at most 512 KB with its message text and tool output, which can hold a secret the session displayed and stays in memory, of which only tool names and path arguments are used; host/owner/name are sent); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
+touched (never on Windows; read from the tail of the session transcript, at most 512 KB with its message text and tool output, which can hold a secret the session displayed and stays in memory, of which only tool names and path arguments are used; host/owner/name are sent); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
 `watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
