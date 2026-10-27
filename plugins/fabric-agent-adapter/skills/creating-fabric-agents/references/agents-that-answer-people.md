@@ -1,9 +1,9 @@
-# Agents that answer people: what they carry from the first commit
+# Agents that answer people: what they carry from the first release
 
 **Load this when the agent you are building answers people**: private chats, mail, store reviews, group chats, any
 channel where a person asks and the agent writes back. Every item below is a part of the agent, built and tested in its
-first release, not a later improvement: each one was added late, after a measured failure, to an agent that shipped
-without it.
+first release, not a later improvement. Each comes from the sources below: what the quality standard requires (A1,
+A5), and what an audit of five production agents found working or failing (P1 to P8).
 
 Sources (public): the support quality standard,
 [`support-quality.md`](https://github.com/ssheleg/agent-stack/blob/28a0303c42038778e2650fc51096e589f4035239/plugins/agent-stack/skills/agent-evals/references/support-quality.md) (A1 the record, A5
@@ -12,7 +12,9 @@ Sources (public): the support quality standard,
 both in the `agent-evals` skill of [ssheleg/agent-stack](https://github.com/ssheleg/agent-stack); the practices arrive
 with [PR #70](https://github.com/ssheleg/agent-stack/pull/70), linked here at its commit until it merges. The standard says how such an agent
 is measured; the practices say what worked and what failed. This page lists what the template carries and the check that
-proves each part. Read both sources before you design the reply pipeline.
+proves each part. Read both sources before you design the reply pipeline. The kit's support-agent recipe
+(building-fabric-services, `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: its
+hand-offs are where this page's repair, research and hold begin.
 
 ## Contents
 
@@ -33,41 +35,50 @@ proves each part. Read both sources before you design the reply pipeline.
   answer used, and whether the channel accepted the reply. Conversation text stays inside the agent, redacted, for at
   most 30 days. Check: a test that a turn without a trace id, or with an outcome outside the list, is refused.
 - **The agent publishes one `support.quality_daily` per closed UTC day and channel** on its events feed
-  (`/fabric/v1/events`, [events and notifications](../../building-fabric-services/references/events-and-notifications.md)):
+  (`/fabric/v1/events`; building-fabric-services, `references/events-and-notifications.md`):
   counts and codes only, the judge model and rubric version, and `notMeasured` naming every family not computed that
-  day. A metric not measured is null and named, never 0. Check: a test runs every `notMeasured` name the producer can
+  day. A metric not measured is null and named, never 0. The day goes in the event's `data` (`{schema, value}`, as
+  `fabric_events.py` writes it), at level `info` and without a notification; its schema is the standard's until the
+  contract carries one. Check: a test runs every `notMeasured` name the producer can
   emit through the published name pattern, iterating the producer's own list.
 
 ## Model lanes
 
-- **A table of lanes, each with a primary and a fallback of another vendor** (P4): classifier, writer, fallback writer,
-  checker, research, judge. The checker is another vendor than the writer; the judge is another vendor than both, at
-  temperature 0, on an open-vendor model where it reads what people wrote. Declare them as classes in the profile
-  ([models and providers](models-and-providers.md)). Check: the config loader refuses a lane whose fallback, checker
-  or judge shares the writer's vendor (the prefix before `/`).
+- **A table of lanes** (P4): classifier, writer, fallback writer, checker, research, judge. The checker is another
+  vendor than the writer; the judge is another vendor than both, at temperature 0, on an open-vendor model where it
+  reads what people wrote. Declare them as classes in the profile, where each lane's fallback is another vendor than
+  its primary ([models and providers](models-and-providers.md)); per turn the router picks the checker against the
+  model that actually drafted, a fallback writer included ([resilience and autonomy](resilience-and-autonomy.md),
+  item 3). Check: the config loader refuses a fallback that shares its own lane's primary vendor, a checker that
+  shares the vendor of the writer or the fallback writer, and a judge that shares the vendor of either writer or the
+  checker (the vendor is the prefix before `/`).
 - **Count what the fallback recovered**, not only what the first attempt lost: a day's report says how many calls
   failed and how many of those the fallback answered. Check: a test that a recovered call counts once as a failure of
   the primary and once as a recovery, and is never counted as an error of the turn.
-- **A writer model or reasoning budget changes only after an offline replay** of last week's judged sample, judged
-  blind, on the current model and the candidates.
+- **A writer model or reasoning budget changes only after an offline replay** (P4) of last week's judged sample, judged
+  blind, on the current model and the candidates. Check: the config loader refuses a change of the writer lane's
+  model or reasoning budget that names no replay report.
 
 ## Checks before a reply is sent
 
 - **Deterministic false-state gates come first** (P2): the reply may not say that money arrived, that something is live,
-  enabled or fixed, or that a person did something, unless the system backs it in this turn. Check: planted drafts with
+  enabled or fixed, or that a person did something, unless the system backs it. Check: planted drafts with
   each false claim are refused before any model checker runs.
 - **The checker sees the material, and sees it before the instructions**: the knowledge items and account state the
   writer used come first in its context, the operator's instructions after. A checker that receives the material cut
   short after long instructions refuses correct answers as invented. Check: a planted correct answer whose material is
   longer than the instructions passes the checker.
-- **Numbers and account state come from tools**, never from the model.
-- **Before sending, re-read the conversation's live tail**: if a person or the agent already answered, skip the turn.
+- **Numbers and account state come from tools**, never from the model (P1): prices from a calculator, the person's
+  account state and order from the system, injected per turn. Check: a planted draft with a price or an account state
+  that no tool result of the turn carries is refused.
+- **Before sending, re-read the conversation's live tail** (P1): if a person or the agent already answered, skip the
+  turn. Check: a reply that lands in the conversation while the draft is checked makes the agent send nothing.
 
 ## When the check refuses
 
 - **Repair, then research, then hold** (P2): one repair with the checker's reason; then one research turn on a stronger
   model that sees both refused drafts and approved past answers, under a hard time cap; only then an honest holding
-  line. A money question is never researched. Check: a planted refusal walks all three steps in order.
+  line. A refusal for a money reason is never researched. Check: a planted refusal walks all three steps in order.
 - **A hold comes back by itself**: when a person or the knowledge base answers the held question, the conversation is
   run again and the person gets the answer without asking twice. Check: closing the gap behind a held turn produces
   one reply in that conversation, and only one.

@@ -29,7 +29,7 @@ a provider because those actions require a real Fabric host/runtime.
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `00e050ba7429c0c60261cec871779e0fd6aeeb28` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
-| Inputs | capability, named consumer, workflow-or-agent decision, profile, effect declarations, where it runs and in which contexts, models per lane, who pays, how it learns, knowledge sources |
+| Inputs | capability, named consumer, workflow-or-agent decision, profile, effect declarations, where it runs and in which contexts, models per lane, who pays, how it learns, knowledge sources, whether it writes text for people and whether it answers people |
 | Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton, provider bundle via the sibling scaffolder, conformance report with the canary expectation |
 | Mutations | new project files plus the sibling scaffolder's documented target paths; collisions refused by default |
 | Network | not required for structural mode; a contract checkout (public repository) required for exact schema validation |

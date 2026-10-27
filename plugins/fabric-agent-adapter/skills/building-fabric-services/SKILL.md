@@ -165,8 +165,9 @@ handler.
 
 Calling out: [the connectors reference](references/connectors.md) (`fabric_http` with one
 deadline, safe retries and a size cap; `fabric_openrouter` with the agent's own key, a
-spend ceiling before every attempt, receipts and a fallback). A ready support agent on the
-kit: [`recipes/support-agent/`](recipes/support-agent/README.md).
+spend ceiling before every attempt, receipts and a fallback). The draft-and-check step of a
+support agent on the kit: [`recipes/support-agent/`](recipes/support-agent/README.md); what the whole agent carries is
+creating-fabric-agents' `references/agents-that-answer-people.md`.
 
 Startup order is the part that goes wrong; keep it exactly:
 

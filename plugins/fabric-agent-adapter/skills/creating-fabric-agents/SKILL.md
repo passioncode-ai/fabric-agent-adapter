@@ -95,7 +95,7 @@ prior art of its own:
 - [orchestration-and-learning.md](references/orchestration-and-learning.md): the work graph,
   calling other agents, stops for a person, learning loops, the loop guard.
 - [agents-that-answer-people.md](references/agents-that-answer-people.md): what an agent that
-  answers people carries from its first commit, each part with the check that proves it.
+  answers people carries from its first release, each part with the check that proves it.
 
 ## Step 2: the project skeleton
 
