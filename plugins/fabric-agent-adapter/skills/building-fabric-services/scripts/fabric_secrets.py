@@ -162,7 +162,7 @@ def _url_parts(value: str) -> Tuple[str, str, str]:
     else:
         authority = ""
     userinfo, at, _ = authority.rpartition("@")
-    return ((userinfo.partition(":")[2] if at else ""), _percent_encode(query, "'" if lowered in _SPECIAL else ""),
+    return ((userinfo.partition(":")[2] if at else ""), _percent_encode(query, "'" if lowered in _SPECIAL or lowered == "file" else ""),  # file is special too
             _percent_encode(fragment, "`"))
 
 

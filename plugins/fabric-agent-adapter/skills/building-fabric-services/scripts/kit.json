@@ -31,7 +31,7 @@
    "file": "fabric_secrets.py",
    "layer": "L0",
    "imports": [],
-   "sha256": "f3d00aee9b1c8fb8fd4ee4f02a85c89b6f93c7d9c8d367b090c40ffe336675b1"
+   "sha256": "1d0191f0ec108fdc68345056b8c574b1f691509d1c353e41d98bfd58a59e8d3c"
   },
   {
    "module": "fabric_crypto",
@@ -4143,7 +4143,7 @@
    "fabric_jsvalue.py": "12888a2c934a885d35999ac9782eaedc8d04946d9775213344a235a8814d3d28",
    "fabric_time.py": "588f383da4ac6a243ea95b6ffc3a0aa99ca94245732dc4937734f190b7af4ae9",
    "fabric_identifiers.py": "0fd814d521ac3aa39907458265870753046a73f48af3d8581ab864b93b211607",
-   "fabric_secrets.py": "f3d00aee9b1c8fb8fd4ee4f02a85c89b6f93c7d9c8d367b090c40ffe336675b1",
+   "fabric_secrets.py": "1d0191f0ec108fdc68345056b8c574b1f691509d1c353e41d98bfd58a59e8d3c",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
    "fabric_base.py": "f62bcc2ed9912660fa875d27a09f60867260cc4925f79873501fd9620be59611",
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",

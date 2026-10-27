@@ -70,7 +70,10 @@ class SecretShapeTests(unittest.TestCase):
                  ("secret_url", "https://h.example/?x=%zz\u00e9" + ("A1b" * 13)[:38], True),
                  ("secret_url", "https://h.example/#x=%zz<" + ("A1b" * 13)[:38], True),
                  ("secret_url", "https://h.example/?x=%zz\x1aKIA0123456789ABCDEF", True),
-                 ("secret_url", "https://h.example/?q=caf\u00e9", False))
+                 ("secret_url", "https://h.example/?q=caf\u00e9", False),
+                 # unit r9: file is a special scheme too, so its query encodes `'`
+                 ("secret_url", "file:///x?x=%zz'" + ("A1b" * 13)[:38], True),
+                 ("secret_url", "FILE://h/x?x=%zz'" + ("A1b" * 13)[:38], True))
         for module in (secrets_mod, adapting):
             for name, value, expected in cases:
                 with self.subTest(name, value=ascii(value)[:30], module=module.__name__):
