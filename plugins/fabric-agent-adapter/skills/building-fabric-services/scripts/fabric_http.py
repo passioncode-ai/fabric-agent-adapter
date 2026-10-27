@@ -116,7 +116,10 @@ def json_bytes(value: Any) -> bytes:
 def redact_url(url: str) -> str:
     """The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or
     fragment, which is where keys and tokens ride."""
-    url = str(url)
+    # What WHATWG URL parsing does first, as `new URL` does in the Node twin: trim C0 controls and space from the ends,
+    # then remove every tab, CR and LF, so ` https://u:pw@h` and `ht\ttps:u:pw@h` lose their password too (0.56.0
+    # seam r10; Python 3.9's urlsplit keeps a leading space in the scheme).
+    url = re.sub(r"[\t\n\r]", "", str(url).strip("".join(map(chr, range(0x21)))))
     scheme, colon, rest = url.partition(":")
     if colon and scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
         # A special scheme as WHATWG reads it: the authority starts after every slash or backslash that follows the
@@ -133,6 +136,8 @@ def redact_url(url: str) -> str:
         # since its user information may sit anywhere in the rest (0.56.0 product r10).
         return parts.scheme.lower() + ":<redacted>"
     host = parts.hostname or ""
+    if parts.scheme and not host:
+        return "<unparseable url>"  # an http or https URL with no host, which `new URL` refuses
     if ":" in host:
         host = "[%s]" % host
     try:

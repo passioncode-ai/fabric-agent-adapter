@@ -34,6 +34,26 @@
    "https://h.example/y"
   ],
   [
+   " https:u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "ht\ttps:u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   " https://u:hunter2@h.example/x \n",
+   "https://h.example/x"
+  ],
+  [
+   "\u0001https://u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "https:",
+   "<unparseable url>"
+  ],
+  [
    "htps:u:hunter2@api.example/x",
    "htps:<redacted>"
   ],
