@@ -32,6 +32,7 @@ class SlotKeeper:
     def _held_at(self, capability: str, generation: int) -> None:
         """The generation this responder holds the slot at, kept beside its checkpoint so a restart knows it."""
         self._note(capability, {"project": self.project, "generation": generation})
+        self._confirmed[capability] = generation
         self._said.pop("board.slot.refused:" + capability, None)  # held again: a later refusal is said again
 
     def _note(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
@@ -96,6 +97,8 @@ class SlotKeeper:
         if "moved" in held and _is_int(held.get("moved"), 1) and not (_is_int(now, 1) and now > held.get("generation", now)):
             now = held["moved"]  # a recorded move stays until take_back, whatever com.status says of the slot now
         if not _is_int(now, 1) or not _is_int(held.get("generation"), 1) or now <= held["generation"]:
+            if _is_int(now, 1) and _is_int(held.get("generation"), 1) and "moved" not in held:
+                self._confirmed[capability] = held["generation"]  # com.status shows it unmoved (0.56.0 seam r3)
             return False
         with self._lock:
             record = self.checkpoint.slots.get(capability) or {}
@@ -152,7 +155,7 @@ class SlotKeeper:
         tries = slot.get("tries", 0) + 1 if slot.get("state") == "retry" else 1
         wait = min(HOLD_RETRY_MAX_SECONDS, self.hold_delay * 2 ** (tries - 1))
         self.slots[capability] = {"state": "retry", "tries": tries, "retry_at": self.now() + wait, "renewed_at": self.now()}
-        if tries == 1 and exc.code not in SESSION_CODES:
+        if exc.code not in SESSION_CODES:  # once per episode (said_as), also after a silent session refusal
             self._emit("board.slot.refused", "warn", "Fabric refused to give this service the %s slot (%s); it asks again "
                        "later. Its other capabilities go on." % (capability, exc.code), episode=capability,
                        said_as="board.slot.refused:" + capability,

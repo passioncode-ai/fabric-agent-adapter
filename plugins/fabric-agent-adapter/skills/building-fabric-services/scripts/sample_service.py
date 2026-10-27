@@ -71,7 +71,7 @@ BOARD_JS = """document.addEventListener('click', function (e) {
   e.target.disabled = true;
   fetch('/api/board/take-back', {method: 'POST', credentials: 'same-origin',
     headers: {'Content-Type': 'application/json', 'X-Fabric-Request': '1'}, body: JSON.stringify({capability: cap})})
-    .then(function (r) { e.target.textContent = r.ok ? 'Taken back' : 'Refused (' + r.status + ')'; });
+    .then(function (r) { e.target.textContent = r.ok ? 'Asked back: waiting for the other session' : 'Refused (' + r.status + ')'; });
 });
 """
 
@@ -137,8 +137,15 @@ class Service:
 
     # --- the project board (opt-in): the input gate and the answer -------------------
     def board_moved(self) -> list:
-        """The capabilities whose slot the operator moved to another session (FAA-155): the page offers their take-back."""
-        return sorted(c for c, slot in dict(self.board.slots).items() if slot.get("state") == "moved") if self.board else []
+        """The capabilities whose slot the operator moved to another session (FAA-155): the page offers their take-back.
+        The live slot or the checkpoint's record says so: before a restart has reconnected (or while Fabric is down) the
+        record alone knows the move (0.56.0 seam r3)."""
+        if not self.board:
+            return []
+        live = {c for c, slot in dict(self.board.slots).items() if slot.get("state") == "moved"}
+        kept = {c for c, record in dict(self.board.checkpoint.slots).items()
+                if isinstance(record, dict) and record.get("project") == self.board_project and "moved" in record}
+        return sorted((live | kept) & set(self.board.capabilities))
 
     def board_take_back(self, capability: Any, record: Any = None) -> Dict[str, Any]:
         """The operator's take-back (FAA-157): the next tick enrolls once the other session lets the slot go. `record` is

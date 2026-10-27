@@ -11,7 +11,8 @@ gate behave.
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
   text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
   pipeline's stage or a list sent to the background no longer moves the folder a later relative `-C` is read
-  against, and a newline ends a command. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
+  against; a newline ends a command, a here-document's body is text, `&>` only redirects, and `pushd` and a `cd`
+  after `{` or `then` are read. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
   transcript on Windows at all, and a turn from Windows came without `repositories`. The hooks run `python3`, which
   must name Python 3.9 or later in Git Bash there (session-hooks.md; FAA-183 makes the plugin find it itself).
 - **A relative `git -C` after `cd`** (FAA-166) is read against the folder the command last changed into with an
@@ -24,12 +25,16 @@ gate behave.
   confirmed `DELETE` inside the hard exit, instead of letting the slot lapse. The slot records are forgotten only after
   a 2xx: a 404 (the session already gone) keeps them, since a move made before it ended is read at the next
   `com.status`. A refusal of the whole board session (`not_available` included) is the board down, never a refused
-  capability; a capability refused again after it was held is said again, once per capability. A clean leave forgets
-  only the records of slots this session holds now, so a slot moved while the service was down stays `moved` when the
-  session is dropped at connect or recovery stops early, and is never enrolled again on its own.
-- **`action_gate` fails closed** (FAA-139): a spend that is not a finite number and a project that cannot be read are
-  read as uncovered, never as absent. A `null` mandate in `_meta` reads as an unreadable one, not as none (FAA-178). A
-  job's start (`job_step`) reads spend and project as its answer does, so both fail closed alike.
+  capability; a capability refused, or contested, again after it was held is said again, once per capability. A clean
+  leave forgets only the records this session confirmed (a slot it held, paused under the operator's hold included, or
+  one `com.status` showed unmoved), so a slot moved while the service was down stays `moved` when the session is
+  dropped at connect or recovery stops early, and is never enrolled again on its own. `Checkpoint.leave(project, held)`
+  takes `held` as a required argument in both twins.
+- **`action_gate` fails closed** (FAA-139): a spend that is not a finite number is read as no estimate, which a
+  mandate's `perCallMaxUsd` ceiling refuses (a mandate with no ceiling covers it; the question is with the contract,
+  FAA-185), and a project that cannot be read is never covered by a mandate limited to `projects`. A `null` mandate in
+  `_meta` reads as an unreadable one, not as none (FAA-178; Python's `approval_step`, while a Node service passes `{}`
+  to `jobStep` itself, interop.md). A job's start (`job_step`) reads spend and project as its answer does.
 - **`fabric_secrets` matches the contract's ECMAScript reading** (FAA-136): `\s`, `.` and case folding as JavaScript
   reads them, so both ports flag the same values.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
@@ -46,7 +51,9 @@ gate behave.
   than the transcript's last 512 KB names only what that tail shows.
 - The reference service's dashboard shows a moved slot with a Take back button (`POST /api/board/take-back`, operator
   only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action an agent whose client sets `_meta`
-  calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125). Its `/mcp` reads a loopback call the service token authenticated as T0.
+  calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125). Its `/mcp` reads a loopback call the service token authenticated as T0. The
+  page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
+  before the session reconnects (or while Fabric is down) is kept.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
 
@@ -55,7 +62,8 @@ gate behave.
 - working-with-fabric names Fabric v0.3.5 as the release that brought `fabric-mcp` and the `fabric_work_*` tools, not
   0.4.0 (the plan milestone), and goes by whether the tools are listed (FAA-170).
 - The `board.slot.moved` notice says the accepted work stays `accepted` and unanswered (not "held", the operator's
-  word) and that a restart or reconnect with accepted work for the slot takes it back at once (FAA-164, FAA-171);
+  word) and that after its take-back action a restart or reconnect with accepted work for the slot takes it back at
+  once; a restart alone never does (FAA-164, FAA-171);
   project-board.md says the same to a requester. board.md says a take-back without the operator's relayed decision is
   refused. session-hooks.md gives the Bash cap as 64 K characters and the downgrade window as until a worker next
   reaches the running Fabric.

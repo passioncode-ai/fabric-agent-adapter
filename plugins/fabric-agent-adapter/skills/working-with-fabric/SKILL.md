@@ -13,8 +13,8 @@ description: >-
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: >-
   Needs the Fabric desktop app (v0.3.5 or later for fabric-mcp and the fabric_work tools) and an MCP client.
-  The status script needs Python 3.9+ (3.11+ to edit Kimi Code's config.toml). Starting Fabric needs the
-  local-lifecycle MCP server; without it the person opens Fabric. The full session hooks run in Claude Code from
+  The hooks and status script need python3 3.9+ (3.11+ to edit Kimi Code's config.toml). Starting Fabric needs the
+  local-lifecycle MCP server; else the person opens Fabric. The full session hooks run in Claude Code from
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai

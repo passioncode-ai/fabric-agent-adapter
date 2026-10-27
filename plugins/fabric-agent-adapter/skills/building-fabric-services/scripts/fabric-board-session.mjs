@@ -87,6 +87,7 @@ export class Responder extends SlotKeeper {
     this.fenceQueue = Promise.resolve();
     this.toResume = []; // transferred requests waiting until nothing runs (finding 39)
     this.suspect = new Set(); // capabilities a fenced call was refused on: com.status says whether they moved (FAA-155)
+    this.confirmed = {}; // this session's: the generation it held, or com.status showed unmoved
   }
 
   /** Runs fn after every fenced call queued before it (finding 36): an await inside a call never lets another in. */
@@ -96,9 +97,9 @@ export class Responder extends SlotKeeper {
     return run;
   }
 
-  /** The slots this session holds now, by generation: only their records a clean leave may forget. */
+  /** The generations this session confirmed (held, or compared with com.status and found unmoved), paused and retrying slots included: only their records a clean leave may forget (0.56.0 seam r2, r3). */
   heldNow() {
-    return Object.fromEntries(Object.entries(this.slots).filter(([, s]) => s?.state === 'held').map(([c, s]) => [c, s.generation]));
+    return { ...this.confirmed };
   }
 
   // -- events --
@@ -155,6 +156,7 @@ export class Responder extends SlotKeeper {
   async connect() {
     this.state = 'connecting';
     this.slots = {}; // the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
+    this.confirmed = {}; // nor its confirmations: a slot may have moved between the two sessions
     const grant = await this.hub.joinBoard(this.project, this.credentialFile);
     const missing = this.capabilities.filter((c) => !grant.capabilities.includes(c));
     const session = this.sessionFactory(grant);
@@ -183,14 +185,14 @@ export class Responder extends SlotKeeper {
       if (e.code === 'fenced') {
         if (await this.gone(capability)) return;
         this.slots[capability] = { state: 'contested', renewedAt: this.now() };
-        this.emit('board.slot.contested', 'warn', `Another responder holds the ${capability} slot on this Project; this service waits for it to lapse and never takes it over by itself.`, { notify: true, episode: capability, capability });
+        this.emit('board.slot.contested', 'warn', `Another responder holds the ${capability} slot on this Project; this service waits for it to lapse and never takes it over by itself.`, { notify: true, episode: capability, saidAs: `board.slot.contested:${capability}`, capability });
         return;
       }
       throw e;
     }
     this.slots[capability] = { state: 'held', generation: receipt.slot.generation, renewedAt: this.now() };
     this.heldAt(capability, receipt.slot.generation);
-    delete this.said['board.slot.contested'];
+    delete this.said[`board.slot.contested:${capability}`];
     this.lifted(capability);
   }
 

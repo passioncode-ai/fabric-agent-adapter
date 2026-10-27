@@ -2044,6 +2044,62 @@ class SampleWiringTests(unittest.TestCase):
             self.assertIn("operator-source/1", svc.well_known()["protocols"])
             svc.board.shutdown(0.1)
 
+    def test_take_back_reads_the_record_while_fabric_is_down(self):
+        """0.56.0 seam r3: after a restart, before the session reconnects, the checkpoint record alone knows the move;
+        the relayed take-back forgets it, never answers 'not moved' while it stays."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            hub = FakeHub(tmp / "fabric", capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            (tmp / "data").mkdir(mode=0o700)
+            cred = tmp / "data" / "board.credential"
+            cred.write_text(hub.credential)
+            os.chmod(cred, 0o600)
+            sample = importlib.import_module("sample_service")
+
+            def service():
+                svc = sample.Service(sample.build_parser().parse_args(["serve", "--port", "1", "--data-dir", str(tmp / "data"),
+                                                                       "--board-project", PROJECT]))
+                svc.start()
+                svc.board.hub = fh.HubClient(tmp / "fabric")
+                svc.board.now = lambda: hub.board.now
+                svc.board.spawn = lambda fn: fn()
+                return svc
+            svc = service()
+            svc.board.step()
+            hub.board.move("sample.echo")
+            hub.board.queue("sample.echo", text="hello")
+            hub.board.advance(15)
+            svc.board.step()
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+            svc.board.session = None  # the process dies
+            svc.lock.release()
+            svc2 = service()
+            self.addCleanup(svc2.lock.release)
+
+            def down(*args, **kw):
+                raise fh.HubError("not-running", "Fabric is not running.")
+            real, svc2.board.hub.join_board = svc2.board.hub.join_board, down
+            svc2.board.step()
+            self.assertEqual(svc2.board.slots, {})
+            self.assertEqual(svc2.board_moved(), ["sample.echo"], "the record knows the move")
+            at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            meta = {"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
+                                 "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}}
+            params = {"name": "board.take-back", "arguments": {"capability": "sample.echo"}, "_meta": meta}
+            done = svc2.mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, {}, tier="T0")["result"]
+            self.assertFalse(done["isError"], done)
+            self.assertNotIn("sample.echo", json.loads((tmp / "data" / "board-checkpoint.json").read_text()).get("slots", {}))
+            self.assertIn("board.slot.returned", [e["kind"] for e in svc2.log.fetch(None, 100)])
+            svc2.board.hub.join_board = real
+            hub.board.advance(61)
+            for _ in range(4):
+                svc2.board.wait_until = 0
+                svc2.board.step()
+                hub.board.advance(20)
+            self.assertEqual(svc2.board.slots["sample.echo"]["state"], "held")
+            svc2.board.shutdown(0.1)
+
 
 
 class MovesSurviveRecovery(Conversation):
@@ -2102,6 +2158,57 @@ class LeaveKeepsUnconfirmedRecords(Conversation):
                     r2.step()
                     self.board.advance(20)
                 self.assertEqual(r2.slots.get("video.render", {}).get("state"), "moved")
+
+    def test_a_slot_paused_under_a_hold_is_left_cleanly(self):
+        """0.56.0 seam r3: a slot paused under the operator's hold (DEC-0079) was held at its generation; its record is
+        forgotten at a clean leave, so a standby taking the free slot is no move at the next start."""
+        r = self.responder()
+        r.step()
+        self.board.holds = {"slots": [{"project": PROJECT, "capability": "video.render"}]}
+        self.board.advance(31)
+        r.wait_until = 0
+        r.step()  # the renewing enroll is refused `held`: paused
+        self.assertEqual(r.slots["video.render"]["state"], "paused")
+        r.shutdown(0.1)
+        record = json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {})
+        self.assertNotIn("video.render", record)
+        self.board.holds = {}
+        self.board.move("video.render")  # a standby takes the free slot
+        self.board.advance(61)  # and lets it lapse
+        r2 = self.responder()
+        r2.step()
+        self.assertEqual(r2.slots["video.render"]["state"], "held")
+        self.assertNotIn("board.slot.moved", self.kinds())
+
+    def test_leave_forgets_a_record_at_or_below_the_confirmed_generation(self):
+        """0.56.0 seam r3: a record whose write failed before the hold (lower than the confirmed generation) is forgotten
+        too; one above it, or one nothing confirmed, stays; `held` is required, as in the Node twin."""
+        cp = fb.Checkpoint(self.data / "leave.json")
+        for capability, generation in (("a", 1), ("b", 2), ("c", 3), ("d", 1)):
+            cp.slot(capability, {"project": PROJECT, "generation": generation})
+        cp.leave(PROJECT, {"a": 2, "b": 2, "c": 2})
+        self.assertEqual(sorted(cp.slots), ["c", "d"])
+        with self.assertRaises(TypeError):
+            cp.leave(PROJECT)
+
+
+class ContestedPerCapability(Conversation):
+    """0.56.0 seam r3: board.slot.contested is said once per capability, as board.slot.refused is."""
+    CAPS = ("video.render", "video.cut")
+
+    def test_two_contested_capabilities_are_each_said_once(self):
+        other_data = Path(self.tmp.name) / "other"
+        other_data.mkdir(mode=0o700)
+        other = self.responder(checkpoint_file=other_data / "board-checkpoint.json", emit=lambda *a, **k: None)
+        other.step()
+        me = self.responder()
+        me.step()
+        for _ in range(6):
+            self.board.advance(30)
+            other.wait_until = me.wait_until = 0
+            other.step()
+            me.step()
+        self.assertEqual(self.kinds().count("board.slot.contested"), 2)
 
 if __name__ == "__main__":
     unittest.main()

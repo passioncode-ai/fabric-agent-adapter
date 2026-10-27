@@ -163,20 +163,27 @@ class Checkpoint:
 
 
     def leave(self, project: str, held: Dict[str, Any]) -> None:
-        """At a clean leave (the session's DELETE released the slots): forget the record of each slot this session holds
-        now (`held`: capability to generation) at the recorded generation, for `project`, with no request left in the
-        checkpoint and not moved away. A record no live hold confirmed (a slot that may have moved while the service was
-        down, not yet compared with com.status) stays (0.56.0 seam r2). A later generation is then another
+        """At a clean leave (the session's DELETE released the slots): forget the record of each slot this session
+        confirmed (`held`: capability to the generation it held, or com.status showed unmoved; required) at that
+        generation or below, for `project`, with no request left in the checkpoint and not moved away. A record no
+        confirmation covers (a slot that may have moved while the service was down, not yet compared with com.status)
+        stays (0.56.0 seam r2, r3). A later generation is then another
         session taking a free slot, not a move, and a kit that keeps no record (rolled back to before 0.53.0) leaves
         nothing behind that reads as one. A record that cannot be written stays."""
         busy = {e.get("capability") for e in list(self.entries.values())}
         for capability, record in list(self.slots.items()):
             if (isinstance(record, dict) and record.get("project") == project and "moved" not in record
-                    and capability not in busy and capability in held and record.get("generation") == held[capability]):
+                    and capability not in busy and _covered(record.get("generation"), held.get(capability))):
                 try:
                     self.slot(capability, None)
                 except BoardError:
                     pass
+
+
+def _covered(recorded: Any, confirmed: Any) -> bool:
+    """A record at or below a generation this session confirmed: a lower one is a write that failed before the hold."""
+    whole = lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 1  # noqa: E731
+    return whole(recorded) and whole(confirmed) and recorded <= confirmed
 
 
 class BoardRequest:

@@ -33,10 +33,11 @@ async function fakeHub(t, capabilities) {
   const clock = { t: 0 };
   const events = [];
   const advance = async (s) => { clock.t += s; await control({ op: 'advance', seconds: s }); };
-  const responder = () => new fb.Responder({ hub: new fh.HubClient(root), projectId: info.project, capabilities, credentialFile: cred,
+  const options = () => ({ hub: new fh.HubClient(root), projectId: info.project, capabilities, credentialFile: cred,
     checkpointFile: path.join(data, 'board-checkpoint.json'), handler: async () => ({ state: 'completed' }), admit: () => null,
     observe: () => null, emit: (k) => events.push(k), service: 'example-agent', now: () => clock.t, rand: () => 0.5 });
-  return { data, control, clock, events, advance, responder };
+  const responder = () => new fb.Responder(options());
+  return { data, control, clock, events, advance, responder, options };
 }
 
 test('0.56.0 seam r2: a moved slot skipped by recovery is not enrolled by the retry tick', async (t) => {
@@ -76,3 +77,47 @@ for (const code of ['capacity_exceeded', 'no-epoch']) {
     assert.equal(r2.slots['video.render']?.state, 'moved');
   });
 }
+
+test('0.56.0 seam r3: a slot paused under a hold is left cleanly; a standby taking it is no move', async (t) => {
+  const h = await fakeHub(t, ['video.render']);
+  const r = h.responder();
+  await r.step();
+  await h.control({ op: 'set', values: { holds: { slots: [{ project: r.project, capability: 'video.render' }] } } });
+  await h.advance(31);
+  r.waitUntil = 0;
+  await r.step(); // the renewing enroll is refused `held`: paused
+  assert.equal(r.slots['video.render'].state, 'paused');
+  await r.shutdown(0.1);
+  const record = JSON.parse(fs.readFileSync(path.join(h.data, 'board-checkpoint.json'), 'utf8')).slots ?? {};
+  assert.ok(!('video.render' in record));
+  await h.control({ op: 'set', values: { holds: {} } });
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(61);
+  const r2 = h.responder();
+  await r2.step();
+  assert.equal(r2.slots['video.render'].state, 'held');
+  assert.ok(!h.events.includes('board.slot.moved'));
+});
+
+test('0.56.0 seam r3: leave forgets a record at or below the confirmed generation; held is required', () => {
+  const cp = new fb.Checkpoint(path.join(tempDir('faa056l-'), 'leave.json'));
+  for (const [c, g] of [['a', 1], ['b', 2], ['c', 3], ['d', 1]]) cp.slot(c, { project: 'p', generation: g });
+  cp.leave('p', { a: 2, b: 2, c: 2 });
+  assert.deepEqual(Object.keys(cp.slots).sort(), ['c', 'd']);
+  assert.throws(() => cp.leave('p'), TypeError);
+});
+
+test('0.56.0 seam r3: two contested capabilities are each said once', async (t) => {
+  const CAPS = ['video.render', 'video.cut'];
+  const h = await fakeHub(t, CAPS);
+  const other = new fb.Responder({ ...h.options(), checkpointFile: path.join(h.data, 'other-checkpoint.json'), emit: () => {} });
+  await other.step();
+  const me = h.responder();
+  await me.step();
+  for (let i = 0; i < 6; i += 1) {
+    await h.advance(30);
+    other.waitUntil = 0; me.waitUntil = 0;
+    await other.step(); await me.step();
+  }
+  assert.equal(h.events.filter((k) => k === 'board.slot.contested').length, 2);
+});

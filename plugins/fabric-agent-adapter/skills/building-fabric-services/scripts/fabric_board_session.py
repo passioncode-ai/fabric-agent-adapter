@@ -137,6 +137,7 @@ class Responder(SlotKeeper):
         self._lock = threading.RLock()
         self._to_resume: List[str] = []  # transferred requests waiting until nothing runs (finding 39)
         self._suspect: set = set()  # capabilities a fenced call was refused on: com.status says whether they moved (FAA-155)
+        self._confirmed: Dict[str, Any] = {}  # this session's: the generation it held, or com.status showed unmoved
 
     # -- events -------------------------------------------------------------------------------------------------
     def _emit(self, kind: str, level: str, text: str, notify: bool = False, episode: Optional[str] = None,
@@ -201,6 +202,7 @@ class Responder(SlotKeeper):
     def _connect(self) -> None:
         self.state = "connecting"
         self.slots = {}  # the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
+        self._confirmed = {}  # nor its confirmations: a slot may have moved between the two sessions
         grant = self.hub.join_board(self.project, self.credential_file)
         missing = [c for c in self.capabilities if c not in grant.capabilities]
         session = self.session_factory(grant)
@@ -231,12 +233,12 @@ class Responder(SlotKeeper):
                 self.slots[capability] = {"state": "contested", "renewed_at": self.now()}
                 self._emit("board.slot.contested", "warn", "Another responder holds the %s slot on this Project; this service "
                            "waits for it to lapse and never takes it over by itself." % capability, notify=True,
-                           episode=capability, capability=capability)
+                           episode=capability, said_as="board.slot.contested:" + capability, capability=capability)
                 return
             raise
         self.slots[capability] = {"state": "held", "generation": receipt["slot"]["generation"], "renewed_at": self.now()}
         self._held_at(capability, receipt["slot"]["generation"])
-        self._said.pop("board.slot.contested", None)
+        self._said.pop("board.slot.contested:" + capability, None)
         self._lifted(capability)
 
     def _pause(self, capability: str) -> None:
@@ -518,8 +520,9 @@ class Responder(SlotKeeper):
         return wait
 
     def _held(self) -> Dict[str, Any]:
-        """The slots this session holds now, by generation: only their records a clean leave may forget."""
-        return {c: s.get("generation") for c, s in dict(self.slots).items() if s.get("state") == "held"}
+        """The generations this session confirmed (held, or compared with com.status and found unmoved), paused and
+        retrying slots included: only their records a clean leave may forget (0.56.0 seam r2, r3)."""
+        return dict(self._confirmed)
 
     def _drop_session(self) -> None:
         work, self.current, self._to_resume = self.current, None, []  # the next session transfers them again

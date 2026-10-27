@@ -50,7 +50,8 @@ Bash command `cd <absolute path>` and `git -C <path>`, split only in commands th
 characters of command text a turn. A relative `-C` is read against the folder the command last changed into with an absolute
 `cd`, else the session's folder; after a `cd` to a relative or unknown folder (`cd sub`, `cd ~`, `cd -`) it is left
 out (FAA-166). A `cd` inside `( )`, in a pipeline's stage or in a list sent to the background with `&` moves only a
-subshell, so a later relative `-C` is read against the folder before it; a newline ends a command, as `;` does. On Windows (FAA-175) Git Bash's paths
+subshell, so a later relative `-C` is read against the folder before it; a newline ends a command, as `;` does (a `#` comment ends at its line, a `\` continuation joins two), a
+here-document's body is text, and `pushd` moves like `cd`. On Windows (FAA-175) Git Bash's paths
 are read as drive paths: `/c/...`, `/cygdrive/c/...`, `C:/...` and a quoted `C:\...` (Git Bash reads an unquoted
 backslash as an escape, so `cd C:\work` goes to `C:work`, which is left out); another `/...` (Git's own root, which only
 `cygpath` resolves) is left out. A Cygwin or MSYS2 Python reads its own POSIX paths (FAA-177). These are the repositories the turn

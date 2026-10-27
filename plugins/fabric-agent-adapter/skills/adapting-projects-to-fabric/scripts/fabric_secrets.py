@@ -128,7 +128,9 @@ def secret_url(value: str) -> bool:
     a value, or whose value is shaped like one. A string that is not an absolute URL is checked as an argument only."""
     if secret_argument(value):
         return True
-    value = value.strip(_C0_OR_SPACE)  # what WHATWG URL parsing trims; never other Unicode spaces, which it refuses
+    # What WHATWG URL parsing does first: trim C0 controls and space from the ends (never other Unicode spaces, which it
+    # refuses), then remove every tab, CR and LF.
+    value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
     if not _SCHEME.match(value):
         return False  # not an absolute URL (WHATWG URL parsing refuses it)
     try:

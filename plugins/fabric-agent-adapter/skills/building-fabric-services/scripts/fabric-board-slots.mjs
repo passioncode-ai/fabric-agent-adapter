@@ -22,6 +22,7 @@ export class SlotKeeper {
   /** The generation this responder holds the slot at, kept beside its checkpoint; a failed write is retried at the next receipt. */
   heldAt(capability, generation) {
     this.note(capability, { project: this.project, generation });
+    this.confirmed[capability] = generation;
     delete this.said[`board.slot.refused:${capability}`]; // held again: a later refusal is said again
   }
 
@@ -97,7 +98,10 @@ export class SlotKeeper {
     let now = ((status ?? await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if ('asking' in held) held = await this.replay(capability, held, now); // its own lost ask first
     if (isInt(held.moved, 1) /* a recorded move stays until takeBack */ && !(isInt(now, 1) && now > (held.generation ?? now))) now = held.moved;
-    if (!isInt(now, 1) || !isInt(held.generation, 1) || now <= held.generation) return false;
+    if (!isInt(now, 1) || !isInt(held.generation, 1) || now <= held.generation) {
+      if (isInt(now, 1) && isInt(held.generation, 1) && !('moved' in held)) this.confirmed[capability] = held.generation; // com.status shows it unmoved (0.56.0 seam r3)
+      return false;
+    }
     // On the fence queue (FAA-158): a fenced call in flight lands first, and a takeBack meanwhile wins.
     return this.locked(() => this.moved(capability, held, now));
   }
@@ -156,7 +160,7 @@ export class SlotKeeper {
     const tries = slot.state === 'retry' ? (slot.tries ?? 0) + 1 : 1;
     const wait = Math.min(HOLD_RETRY_MAX_SECONDS, this.holdDelay * 2 ** (tries - 1));
     this.slots[capability] = { state: 'retry', tries, retryAt: this.now() + wait, renewedAt: this.now() };
-    if (tries === 1 && !SESSION_CODES.has(e.code)) { // a refusal of the board session is the fault's to say
+    if (!SESSION_CODES.has(e.code)) { // once per episode (saidAs), also after a silent session refusal // a refusal of the board session is the fault's to say
       this.emit('board.slot.refused', 'warn', `Fabric refused to give this service the ${capability} slot (${e.code}); it asks again later. Its other capabilities go on.`, { episode: capability, saidAs: `board.slot.refused:${capability}`, capability, reason: e.code });
     }
   }

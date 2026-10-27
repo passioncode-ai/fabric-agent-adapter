@@ -1296,6 +1296,25 @@ class BashPaths(unittest.TestCase):
             "cd /a || exit 1; git -C sub commit": ["/a", "/a/sub"],
             "cd /a\ngit -C sub log": ["/a", "/a/sub"],
             "cd /a >/dev/null 2>&1; git -C sub log": ["/a", "/a/sub"],
+            # 0.56.0 product r3: a `#` comment ends at its line, and a `\` continuation joins two lines.
+            "git status  # note\ngit -C /x log": ["/x"],
+            "cd /a # go\ngit -C sub log": ["/a", "/a/sub"],
+            "ls # don't\ncd /y": ["/y"],
+            "git \\\n  -C /x log": ["/x"],
+            "cd /a # x\ncd /b\ngit -C sub status": ["/a", "/b", "/b/sub"],
+            # 0.56.0 unit r3: `&>` redirects, a here-document's body is text, reserved words and pushd are read.
+            "cd /a && make &>/dev/null && git -C sub status": ["/a", "/a/sub"],
+            "cd /a &>> log; git -C sub log": ["/a", "/a/sub"],
+            "cd /a >|/dev/null && git -C sub status": ["/a", "/a/sub"],
+            "cat > deploy.sh <<'EOF'\ncd /srv/app\ngit -C sub pull\nEOF": [],
+            "cat <<X\ncd /a\nX\ngit -C sub status": ["/w/sub"],
+            "cat <<-EOF\n\tcd /q\n\tEOF\ncd /r": ["/r"],
+            "cat <<<\"cd /z\"; git -C s log": ["/w/s"],
+            "{ cd /a; }; git -C sub status": ["/a", "/a/sub"],
+            "if true; then cd /a; fi; git -C sub status": ["/a", "/a/sub"],
+            "X=1 cd /a; git -C s log": ["/a", "/a/s"],
+            "cd /a && pushd /b && git -C sub status": ["/a", "/b", "/b/sub"],
+            "cd /a && popd && git -C sub status": ["/a"],
         }
         for command, expected in cases.items():
             with self.subTest(command=command):

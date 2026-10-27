@@ -124,7 +124,7 @@ this repository both obeys it and ships its service layer
   (`git rev-parse`, `git config`) and the services directory first; only when the repository owns a service (a
   descriptor names it as `source.repository`) does it read the tree (`git ls-files` or `git grep`), all within one
   3.5 s budget. It prints one line when that service's dashboard has no dashboard kit or an older one, prints nothing
-  when the budget runs out, and exits 0, always, within its 5 s timeout; it writes nothing. Measured under a
+  when the budget runs out, and exits 0, always once `python3` starts (on Windows it must name Python in Git Bash, FAA-183), within its 5 s timeout; it writes nothing. Measured under a
   load average of about 50: median 294–443 ms per session start.
 - `SessionStart`, `Stop`, `UserPromptSubmit`, `SessionEnd`: `fabric_session.py hook …` (working-with-fabric). Session
   start (matcher `startup|clear`) reads `~/.claude.json` and Fabric's `hub.json`, and prints the preamble only when
@@ -135,7 +135,8 @@ this repository both obeys it and ships its service layer
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s);
   only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'
-  folder), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text and tool output, which can
+  folder), and unless the person turned it off (`FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file,
+  FAA-160), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text and tool output, which can
   hold a secret the session displayed, are read with it in memory only, and only the current turn's tool names and path arguments are used) and names the other Git repositories the turn
   touched as `{host, owner, name}` from their `origin`, one `git rev-parse` and one `git config` each inside the same 1.5 s
   (FAA-140; measured 2026-10-27 at `f3765f1`, before the gate and the 64 KB cap, with a 4.8 MB transcript naming six other repositories: median 247 ms, against 109 ms
