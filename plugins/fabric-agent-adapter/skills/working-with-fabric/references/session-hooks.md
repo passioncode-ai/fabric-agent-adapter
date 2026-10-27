@@ -130,7 +130,7 @@ only variable names are looked at, never a value (two of them carry the session'
   tail and the other repositories' names (the git calls share at most 1.5 s; the tail read is at most 512 KB). Every call to Fabric happens in a detached worker with a 10 s deadline; at its end the worker closes
   `fabric-mcp`'s stdin and then ends its whole process group, so a wrapper (`npx`, a shell script,
   `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path.
-- **Read a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
+- **Keep a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
   those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log. Once Fabric
   takes repositories, an `origin` URL that embeds a credential (`https://user:token@host/...`) is read by
   `git config` with it; the Stop hook drops the credential in memory before anything is spooled, logged or sent.

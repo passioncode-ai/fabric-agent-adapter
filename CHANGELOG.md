@@ -58,7 +58,8 @@
   the claimed task. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
   not linked again, and the person is told which parent Fabric chose (FAA-153). `proposed: true` now says what
   to do: file and link nothing for that piece, tell the person, go on with the rest. The goal display is named as
-  Fabric 0.3.14's. New scenario eval `spawned-from-decides-the-link`.
+  Fabric 0.3.14's. New scenario evals `spawned-from-decides-the-link`, `what-the-stop-hook-reads` (FAA-140) and
+  `moved-slot-needs-a-take-back-action` (FAA-155).
 - **A responder no longer takes back a slot that moved while it was away** (FAA-155). Before 0.53.0 a restarted
   responder replaced whoever held its slot (at recovery) or enrolled again when that holder lapsed, so a slot taken
   while it was down or after a crash came back by itself. It now stays with the new holder until the operator calls

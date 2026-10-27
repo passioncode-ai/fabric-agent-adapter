@@ -347,7 +347,7 @@ touched (read from the tail of the session transcript, at most 512 KB with its m
 `watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no token. Read
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). Read
 [session hooks](references/session-hooks.md) when a person asks what the hooks do, where they log, how to turn them
 off, or what they need from Fabric.
 
