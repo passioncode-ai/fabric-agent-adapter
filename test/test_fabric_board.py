@@ -2003,6 +2003,8 @@ class SampleWiringTests(unittest.TestCase):
             status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
             self.assertEqual(status, 200, said)
             self.assertEqual(svc.board_moved(), [])
+            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
+            self.assertIn("Decided by operator, dashboard", returned[-1]["text"], "the page's take-back names who decided (seam r7)")
             status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
             self.assertEqual((status, json.loads(said)), (200, {"capability": "sample.echo", "moved": False}),
                              "a retry after a lost answer is answered as the tool answers it (0.56.0 seam r6)")
@@ -2325,7 +2327,7 @@ class RetryReadsTheMove(Conversation):
 
 
 class CloseReadsAsNode(unittest.TestCase):
-    """0.56.0 unit r6: any failure of the DELETE is no release, and close(0) sends 0, as the Node twin does."""
+    """0.56.0 unit r6: any failure of the DELETE is no release, as the Node twin reads it."""
 
     def session(self, post):
         link = fb.BoardSession.__new__(fb.BoardSession)
@@ -2341,11 +2343,14 @@ class CloseReadsAsNode(unittest.TestCase):
         self.assertFalse(link.close())
         self.assertIsNone(link.mcp_session)
 
-    def test_a_zero_timeout_is_sent_as_zero(self):
+    def test_a_timeout_not_above_zero_is_the_sessions_own(self):
+        """0.56.0 seam r7: http.client reads 0 as non-blocking and Node's http as no bound, so neither is sent."""
         sent = []
         link = self.session(lambda *_a, **k: sent.append(k["timeout"]) or (200, {}, None))
-        self.assertTrue(link.close(0))
-        self.assertEqual(sent, [0])
+        for timeout in (0, -1, 2.5):
+            link.mcp_session = "s-1"
+            self.assertTrue(link.close(timeout))
+        self.assertEqual(sent, [15.0, 15.0, 2.5])
 
 
 class ContestedPerCapability(Conversation):

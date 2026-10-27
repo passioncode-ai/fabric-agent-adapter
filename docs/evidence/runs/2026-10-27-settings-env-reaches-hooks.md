@@ -5,7 +5,9 @@ hooks Claude Code runs, so it is a lasting way to turn off the Stop hook's trans
 `plugins/fabric-agent-adapter/skills/working-with-fabric/references/session-hooks.md`). Found by the 0.56.0 product
 reading 5.
 
-Client: Claude Code 2.1.299 (`claude --version`), macOS. The variable was unset in the shell that started it.
+Client: Claude Code 2.1.299 (`claude --version`), macOS. The variable was unset in the shell that started it. Measured
+with hooks declared in a settings file (below), not the plugin's `hooks.json`, and not on Windows: a Windows run (Git
+Bash and PowerShell) is part of FAA-183.
 
 Settings file (a temporary folder; `<dir>` is that folder):
 

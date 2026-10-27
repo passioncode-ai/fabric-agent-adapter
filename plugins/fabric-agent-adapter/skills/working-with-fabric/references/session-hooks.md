@@ -46,7 +46,7 @@ reaches the running Fabric, about a minute (longer while rejoins fail, or after 
 transcript (the payload's `transcript_path`; earlier turns included) and uses only the entries after the last prompt
 the person typed. Those lines hold message text and tool output too (file contents, command output: a secret the session displayed can be there; it stays in memory and is never spooled, logged or sent); of each entry it uses only a tool call's
 name and path argument: the `file_path` of Edit, Write and MultiEdit, the `notebook_path` of NotebookEdit, and in a
-Bash command `cd <absolute path>` and `git -C <path>`, split only in commands that hold `cd` or `git`, at most 64 K
+Bash command `cd <absolute path>` and `git -C <path>`, split only in commands that hold `cd`, `git` or `pushd` (in any case), at most 64 K
 characters of command text a turn. A relative `-C` is read against the folder the command last changed into with an absolute
 `cd`, else the session's folder; after a `cd` to a relative or unknown folder (`cd sub`, `cd ~`, `cd -`) it is left
 out (FAA-166). A `cd` inside `( )`, in a pipeline's stage or in a list sent to the background with `&` moves only a

@@ -23,7 +23,8 @@ gate behave.
   under the responder's lock and only while its record is unchanged, so an operator's take-back at the same moment
   wins. The slot code moved to its own twin modules, `fabric_board_slots.py` and `fabric-board-slots.mjs`.
 - **An idle stop leaves the board within 3 s** (FAA-173): a responder with no work in hand closes its session with a
-  confirmed `DELETE` inside the hard exit, instead of letting the slot lapse (a board call already in flight when the
+  confirmed `DELETE` inside the hard exit (`close(timeout)`: a timeout not above 0 is the session's own, in both twins),
+  instead of letting the slot lapse (a board call already in flight when the
   stop comes runs first, and when the join ends before the DELETE the slot lapses as before). The slot records are forgotten only after
   a 2xx: a 404 (the session already gone) keeps them, since a move made before it ended is read at the next
   `com.status`. A refusal of the whole board session (`not_available` included) is the board down, never a refused
@@ -42,7 +43,12 @@ gate behave.
 - **`fabric_secrets` matches the contract's ECMAScript reading** (FAA-136): `\s`, `.` and case folding as JavaScript
   reads them, so both ports flag the same values. `secret_url` also reads a special scheme as `new URL` does: every
   slash or backslash after `https:` (or `http`, `ftp`, `ws`, `wss`) is skipped and a backslash before the query reads
-  as a slash, so `https:u:p@host` and `https:\\u:p@host` carry a password in Python as in Node.
+  as a slash, so `https:u:p@host` and `https:\\u:p@host` carry a password in Python as in Node. Python splits the URL
+  by hand rather than with `urlsplit`, which refuses a `[` or `]` outside an IPv6 host (`https://u:p[w@h/`), and drops
+  one leading `?` from a parameter's name as `URLSearchParams` does. Where `new URL` refuses a host (none, a port over
+  65535), Python still reads the password and the parameters, so it can flag more than Node, never less. The
+  `source.repository` check of a descriptor and of a provider entry reads a special scheme's password the same way
+  (`https:bot:pw@host`).
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
   capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer
@@ -61,7 +67,8 @@ gate behave.
   calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125). Its `/mcp` reads a loopback call the service token authenticated as T0. The
   page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
   before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
-  repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool. The service installs
+  repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool, and each take-back is
+  a `board.slot.returned` event naming who decided it (`by`, `via`, `caller`), never the decision's words. The service installs
   its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
   page's CSP allows the button's own `fetch` (`connect-src 'self'`), and a failed request says so on the button.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
@@ -82,7 +89,7 @@ gate behave.
 
 - On Windows the Stop hook now reads the transcript's tail and the touched repositories' `origin` (FAA-175), once
   Fabric takes `repositories`, as it does on macOS and Linux; `FABRIC_SESSION_NO_REPOSITORIES=1` (in Claude Code's
-  settings `env`, which reaches the hooks) turns it off.
+  settings `env`, which reached the hooks in a run on macOS; a Windows run is FAA-183's) turns it off.
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
   happens only then. A service that stops without the join still works; its

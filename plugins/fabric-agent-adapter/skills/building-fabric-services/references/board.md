@@ -208,8 +208,9 @@ held and not transferred). The responder keeps that move instead of undoing it:
   retrying slot reads `com.status` before each new ask. A move made after the slot's last renew or check and before
   the stop, with no call since, is not seen at the leave: its record is forgotten, and the next start reads the slot
   as free and may enroll it once the other holder lets it go (FAA-187). A file without the record
-  reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first
-  start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
+  reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, its DELETE answered 2xx and every slot confirmed
+  in that session, rolled back to 0.52 and up again starts as on a first start. Otherwise (a 404, the idle wait running
+  out, a slot left retrying or never compared with `com.status`) its records stay, and the case is the crash case below. After a crash the record stays: if 0.52 then ran, enrolled the slot and
   wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
 - An enroll or a replace is written into that record with its key before it is sent (`asking`). When its answer is
   lost, the next connect (or the next enroll) sends the same call again under the same key; the board answers the
@@ -259,7 +260,9 @@ held and not transferred). The responder keeps that move instead of undoing it:
   button has its tool, `board.take-back` with `{capability}`, declared under `extensions/actions/0.1` with gate
   `relayed` and target `capability`: an agent whose MCP client sets `_meta` calls it over `/mcp` with the operator's
   decision in `_meta.decision` (a call without one is `operator-decision-required`); Claude Code and Codex send
-  arguments only, so until CT-125 they hand the operator the page as Fabric Dashboards' `open_link`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
+  arguments only, so until CT-125 they hand the operator the page as Fabric Dashboards' `open_link`. Either door records
+  the take-back as a `board.slot.returned` event (info) naming who decided it (`by`, `via`, `caller`), never the
+  decision's words; a repeat after a lost answer is answered `{capability, moved: false}`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
   `change-policy` (DEC-0125); the operator reaches it through an agent that relays their decision in `_meta`, the
@@ -292,7 +295,7 @@ checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `boar
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,
 `board.down`, each notifying episode said once. The operator's hold (below) adds `board.held`, `board.slot.held`,
-`board.slot.released` and `board.request.waiting`.
+`board.slot.released` and `board.request.waiting`. The reference service adds `board.slot.returned` at a take-back.
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
 `NOT_RUN` when the well-known `protocols` names no `fabric-project-comms` revision; `FAIL` for a revision this kit does

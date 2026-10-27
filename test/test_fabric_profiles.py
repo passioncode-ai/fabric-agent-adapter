@@ -59,7 +59,12 @@ class SecretShapeTests(unittest.TestCase):
                  ("secret_url", "https:\\\\u:hunter2@host/", True), ("secret_url", "https:u:hunter2@host/", True),
                  ("secret_url", "https:/u:hunter2@host/", True), ("secret_url", "HTTPS:\\\\u:hunter2@host", True),
                  ("secret_url", "ftp:u:hunter2@host/", True), ("secret_url", "https:///host/?q=\\x", False),
-                 ("secret_url", "mailto:u:hunter2@host", False))
+                 ("secret_url", "mailto:u:hunter2@host", False),
+                 # unit r7: a `[` or `]` outside an IPv6 host, and one leading `?` before a parameter's name, as `new URL`
+                 ("secret_url", "https://user:p[w@h.example/", True), ("secret_url", "https://u[:p@h/?token=abc", True),
+                 ("secret_url", "wss:]]:@p?token=abc", True), ("secret_url", "https://h.example/#?token=abc", True),
+                 ("secret_url", "https://h.example/??token=abc", True), ("secret_url", "https://[::1]:8080/x", False),
+                 ("secret_url", "https://u:@h.example/", False), ("secret_url", "file://u:p@h/x", False))
         for module in (secrets_mod, adapting):
             for name, value, expected in cases:
                 with self.subTest(name, value=ascii(value)[:30], module=module.__name__):

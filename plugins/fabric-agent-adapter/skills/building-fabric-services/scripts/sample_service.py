@@ -385,7 +385,9 @@ def make_handler(svc: Service):
                     return
                 try:
                     body = json.loads(self.rfile.read(length) or b"{}")
-                    return self._send(200, svc.board_take_back(body.get("capability") if isinstance(body, dict) else None))
+                    # The event names who decided, as the tool's does: the operator, at the dashboard (0.56.0 seam r7).
+                    return self._send(200, svc.board_take_back(body.get("capability") if isinstance(body, dict) else None,
+                                                               {"by": "operator", "via": "dashboard", "caller": "the signed-in page"}))
                 except (ValueError, RecursionError, fs.ServiceError, fbd.BoardError) as exc:
                     return self._send(400, {"error": str(exc)})
             if url.path == "/api/emit":

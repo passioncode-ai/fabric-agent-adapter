@@ -191,3 +191,11 @@ test('0.56.0 seam r6: close reads only an integer 2xx status as a release, as Py
     assert.equal(s.mcpSession, null);
   }
 });
+
+test('0.56.0 seam r7: a close timeout not above 0 is the session\'s own, as in Python', async () => {
+  const grant = { origin: 'http://127.0.0.1:1', bearer: () => 'x' };
+  const sent = [];
+  const s = new fb.BoardSession(grant, { post: async (_o, _b, _t, opts) => { sent.push(opts.timeout); return { status: 200 }; } });
+  for (const timeout of [0, -1, 2500]) { s.mcpSession = 's-1'; assert.equal(await s.close(timeout), true); }
+  assert.deepEqual(sent, [15000, 15000, 2500]);
+});

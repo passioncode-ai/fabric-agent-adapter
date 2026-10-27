@@ -226,7 +226,10 @@ _SOURCE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9._~:/?#@!$&'()*
 # Brackets belong to an IP-literal host only (RFC 3986 3.2.2); the literal is set aside before the character check.
 _IP_LITERAL = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@\[\]]*@)?)\[[0-9A-Fa-f:.vV]+\]")
 _URI_AUTHORITY = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@]*@)?(?P<host>\[[^\]]*\]|[^/?#:]*)(?::(?P<port>[^/?#]*))?")
-_URI_PASSWORD = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://[^/?#@]*:[^/?#@]*@")
+# A special scheme (http, https, ws, wss, ftp) reads a user:password@ after any run of slashes, none included, as
+# `new URL` does: https:bot:pw@host carries the password too (0.56.0 seam r7).
+_URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*|[A-Za-z][A-Za-z0-9+.-]*://)"
+                           r"[^/\\?#@]*:[^/\\?#@]*@")
 
 
 _RESIDENCY = re.compile(r"^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])\Z", re.ASCII)

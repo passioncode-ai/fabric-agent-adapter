@@ -134,6 +134,8 @@ class RemotePlacement(unittest.TestCase):
                                ({"repository": "https://host:port/x"}, "source.repository names a host"),
                                ({"repository": "https://gh.example:65536/x"}, "source.repository names a host"),
                                ({"repository": "https://bot:hunter2@github.com/example/agent"}, "source.repository carries no password"),
+                               ({"repository": "https:bot:hunter2@github.com/example/agent"}, "source.repository carries no password"),
+                               ({"repository": "HTTPS:/bot:hunter2@github.com/example/agent"}, "source.repository carries no password"),
                                ({"repository": "https://github.com/example/agent?t=ghp_" + "a1B2" * 9}, "FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository")):
             with self.subTest(source=source):
                 with self.assertRaises(fs.ServiceError) as caught:

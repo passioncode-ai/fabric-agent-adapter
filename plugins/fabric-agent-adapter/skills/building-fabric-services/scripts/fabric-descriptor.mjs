@@ -140,7 +140,8 @@ function authorityOk(uri) {
   const port = m[2];
   return Boolean(m[1]) && (port === undefined || port === '' || (/^[0-9]{1,5}$/.test(port) && Number(port) <= 65535));
 }
-const URI_PASSWORD = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#@]*:[^/?#@]*@/;
+// A special scheme reads a user:password@ after any run of slashes, none included, as `new URL` does (0.56.0 seam r7).
+const URI_PASSWORD = /^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*|[A-Za-z][A-Za-z0-9+.-]*:\/\/)[^/\\?#@]*:[^/\\?#@]*@/;
 const RESIDENCY = /^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$/;
 
 const RUNNER_KIND_NAME = /^[a-z][a-z0-9-]{1,62}$/;

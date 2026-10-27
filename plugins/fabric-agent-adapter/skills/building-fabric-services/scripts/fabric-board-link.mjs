@@ -25,7 +25,7 @@ export class BoardSession {
 
   async #send(body, method = 'POST', timeout = null) {
     try {
-      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout ?? this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
+      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout > 0 ? timeout : this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
     } catch (e) {
       if (e instanceof HubError) throw new BoardError('unreachable', 'Fabric\'s hub did not answer; a write may have been stored, so send it again with the same idempotency key.', true);
       throw e;

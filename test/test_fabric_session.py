@@ -1416,7 +1416,10 @@ class TurnRepositories(Base):
         if transcript is not False:
             payload["transcript_path"] = str(transcript or self.transcript)
         spawned = []
-        said = fs.hook_spool(payload, "turn", self.env, spawn=spawned.append)
+        # These tests check what the turn names, not how fast: a loaded machine must not run out the 1.5 s budget
+        # (0.56.0 unit r7); the budget itself is tested with until= below.
+        with mock.patch.object(sys.modules["fabric_session_cli"], "FACTS_BUDGET_S", 60.0):
+            said = fs.hook_spool(payload, "turn", self.env, spawn=spawned.append)
         entry = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))[-1]
         return said, json.loads(entry.read_text())
 

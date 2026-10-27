@@ -39,7 +39,8 @@ class BoardSession:
     def _send(self, body: Dict[str, Any], method: str = "POST", timeout: Optional[float] = None):
         try:
             return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session,
-                             timeout=self.timeout if timeout is None else timeout,
+                             # none or not above 0 is the session's own: the transports read 0 in opposite ways
+                             timeout=timeout if timeout is not None and timeout > 0 else self.timeout,
                              method=method, protocol_version=self.protocol_version if self.mcp_session else None)
         except _hub.HubError as exc:
             raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored, so send it again with "
@@ -85,7 +86,7 @@ class BoardSession:
         return value
 
     def close(self, timeout: Optional[float] = None) -> bool:
-        """Sends the DELETE (waiting `timeout` seconds at most, else the session's); True when Fabric answered it with a
+        """Sends the DELETE (waiting `timeout` seconds at most when above 0, else the session's); True when Fabric answered it with a
         2xx, so the slots are free now. False otherwise, a 404 (the session was already gone) included: a move made
         before it ended may be read only at the next com.status, so the slot records stay; the lease lapses in 60 s."""
         with self._lock:

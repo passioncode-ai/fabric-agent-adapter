@@ -10,7 +10,7 @@ U+001C to U+001F, and not U+FEFF), `.` stopping at every line terminator, ASCII 
 from __future__ import annotations
 
 import re
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import urllib.parse
 
 CREDENTIAL_WORDS = (
@@ -104,7 +104,8 @@ def _decode_keeping_plus(raw: str) -> str:
 
 
 def _form_name(text: str) -> str:
-    pairs = urllib.parse.parse_qsl(text, keep_blank_values=True)
+    # URLSearchParams drops one leading `?` from the text it is given (0.56.0 unit r7).
+    pairs = urllib.parse.parse_qsl(text[1:] if text.startswith("?") else text, keep_blank_values=True)
     return pairs[0][0] if pairs else ""
 
 
@@ -124,6 +125,29 @@ def raw_values(query: str) -> Dict[str, List[str]]:
 _C0_OR_SPACE = "".join(map(chr, range(0x21)))
 
 
+def _url_parts(value: str) -> Tuple[str, str, str]:
+    """The password, query and fragment of an absolute URL as WHATWG URL parsing splits them, read by hand: urlsplit
+    refuses a `[` or `]` outside an IPv6 host (`https://u:p[w@h/`), where `new URL` reads the password (0.56.0 unit
+    r7). The fragment starts at the first `#`, the query at the first `?` before it. A special scheme's authority starts
+    after every slash or backslash that follows `scheme:` (the special authority ignore slashes state) and ends at the
+    next slash, backslash, `?` or `#`, so `https:u:p@h` and `https:\\u:p@h` carry the password p; any other scheme
+    has an authority only after `//`, and `file` has no user information. The user information ends at the authority's
+    last `@`, and the password follows its first `:`. A host `new URL` would refuse is not checked: such a URL is read
+    for its password and parameters all the same, the safe direction for a detector."""
+    scheme, _, rest = value.partition(":")
+    rest, _, fragment = rest.partition("#")
+    rest, _, query = rest.partition("?")
+    lowered = scheme.lower()
+    if lowered in _SPECIAL:
+        authority = rest.replace("\\", "/").lstrip("/").partition("/")[0]
+    elif lowered != "file" and rest.startswith("//"):
+        authority = rest[2:].partition("/")[0]
+    else:
+        authority = ""
+    userinfo, at, _ = authority.rpartition("@")
+    return (userinfo.partition(":")[2] if at else ""), query, fragment
+
+
 def secret_url(value: str) -> bool:
     """Whether a URL an MCP entry or a launch names carries a credential (LC-21): anything secret_argument finds, a
     password in its user information, or a query or fragment parameter whose name can only carry a credential and has
@@ -135,22 +159,10 @@ def secret_url(value: str) -> bool:
     value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
     if not _SCHEME.match(value):
         return False  # not an absolute URL (WHATWG URL parsing refuses it)
-    scheme, _, rest = value.partition(":")
-    if scheme.lower() in _SPECIAL:
-        # A special scheme's authority starts after every slash or backslash that follows `scheme:` (WHATWG's special
-        # authority ignore slashes state), and a backslash before the query or fragment reads as a slash: `https:u:p@h`
-        # and `https:\\u:p@h` both carry the password p (0.56.0 unit r6).
-        cut = min([at for at in (rest.find("?"), rest.find("#")) if at >= 0] or [len(rest)])
-        value = scheme + "://" + (rest[:cut].replace("\\", "/") + rest[cut:]).lstrip("/")
-    try:
-        parts = urllib.parse.urlsplit(value)
-    except ValueError:
-        return False
-    if not parts.scheme:
-        return False
-    if parts.password:
+    password, query, fragment = _url_parts(value)
+    if password:
         return True
-    for part in (parts.query, parts.fragment):
+    for part in (query, fragment):
         for name, raws in raw_values(part).items():
             if any((raw != "" and credential_name(name)) or secret_value(raw) for raw in raws):
                 return True
