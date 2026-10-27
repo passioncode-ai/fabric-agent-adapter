@@ -65,8 +65,9 @@
   forgot the record); after a crash, a 0.52 run that enrolled the slot and wrote nothing to the checkpoint reads as a move at the next 0.53 start, which
   the take-back action undoes. A `fenced` refusal on accepted work while the slot did not move now keeps the entry `lapsed`
   and the next tick transfers it back and finishes it (0.52 dropped the entry and left the request accepted on the
-  board). A refusal raised while the responder recovers at connect, before any slot is held, now reconnects instead of
-  leaving it `ready` with no slot; one after some slots are held keeps them served. A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
+  board). A refusal raised while the responder recovers at its first connect, before any slot is held, now reconnects
+  instead of leaving it `ready` with no slot; one after some slots are held keeps them served (a reconnect still
+  counts the previous session's slots as held: FAA-163). A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
 
 ## 0.52.0 (2026-10-26)
 
