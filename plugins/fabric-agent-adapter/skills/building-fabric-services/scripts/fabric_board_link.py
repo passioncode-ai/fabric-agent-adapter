@@ -38,7 +38,8 @@ class BoardSession:
 
     def _send(self, body: Dict[str, Any], method: str = "POST", timeout: Optional[float] = None):
         try:
-            return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session, timeout=timeout or self.timeout,
+            return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session,
+                             timeout=self.timeout if timeout is None else timeout,
                              method=method, protocol_version=self.protocol_version if self.mcp_session else None)
         except _hub.HubError as exc:
             raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored, so send it again with "
@@ -93,7 +94,7 @@ class BoardSession:
             try:
                 answer = self._send({}, method="DELETE", timeout=timeout)
                 status = answer[0] if isinstance(answer, (tuple, list)) and answer and isinstance(answer[0], int) else 0
-            except BoardError:
+            except Exception:  # noqa: BLE001 - any failure is no release, as the Node twin's catch reads it
                 status = 0
             finally:
                 self.mcp_session = None  # an answer it cannot read is no release, as the Node twin reads it

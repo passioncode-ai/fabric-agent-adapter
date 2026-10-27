@@ -1526,6 +1526,14 @@ class TurnRepositories(Base):
         self.assertEqual(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic()), [])
         self.assertEqual(len(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic() + 5)), 1)
 
+    def test_the_prefilter_passes_git_in_any_case(self):
+        """0.56.0 seam r6: on Windows `GIT.EXE -C` runs git and bash_paths reads it, so the prefilter passes it too."""
+        seen = []
+        self.write_transcript([prompt_entry(), tool_entry("Bash", command=r"C:\Git\cmd\GIT.EXE -C C:\work status")])
+        with mock.patch.object(MCP, "bash_paths", side_effect=lambda command, cwd: seen.append(command) or []):
+            MCP.turn_paths(str(self.transcript), self.repo)
+        self.assertEqual(seen, [r"C:\Git\cmd\GIT.EXE -C C:\work status"])
+
     def test_a_subagent_entry_and_a_meta_prompt_do_not_end_the_turn(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         side = self.git_repo("side", "https://github.com/acme/side.git")
@@ -2092,7 +2100,7 @@ class Status(Base):
         self.assertEqual(fs.status(self.repo, dict(self.env, **{fs.NO_REPOSITORIES_ENV: "1"}))["transcriptRead"], "off")
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)
-        self.assertIn("Repositories of a turn: read from the session's transcript (turn off: "
+        self.assertIn("Repositories of a turn: read from the session's transcript, as this shell's environment has it (turn off: "
                       "FABRIC_SESSION_NO_REPOSITORIES=1)", done.stdout)
 
 

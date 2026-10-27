@@ -38,6 +38,8 @@ _PATH_LIKE = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*://)", re.IG
 _WORD_SPLIT = re.compile("[%s._-]+" % JS_SPACE)
 _ARGUMENT_SPLIT = re.compile("[%s=]" % JS_SPACE)
 _SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+#: WHATWG's special schemes that carry an authority with user information (file has none).
+_SPECIAL = ("ftp", "http", "https", "ws", "wss")
 
 
 def name_words(name: str) -> List[str]:
@@ -133,6 +135,13 @@ def secret_url(value: str) -> bool:
     value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
     if not _SCHEME.match(value):
         return False  # not an absolute URL (WHATWG URL parsing refuses it)
+    scheme, _, rest = value.partition(":")
+    if scheme.lower() in _SPECIAL:
+        # A special scheme's authority starts after every slash or backslash that follows `scheme:` (WHATWG's special
+        # authority ignore slashes state), and a backslash before the query or fragment reads as a slash: `https:u:p@h`
+        # and `https:\\u:p@h` both carry the password p (0.56.0 unit r6).
+        cut = min([at for at in (rest.find("?"), rest.find("#")) if at >= 0] or [len(rest)])
+        value = scheme + "://" + (rest[:cut].replace("\\", "/") + rest[cut:]).lstrip("/")
     try:
         parts = urllib.parse.urlsplit(value)
     except ValueError:

@@ -278,7 +278,7 @@ def print_status(report: Dict[str, Any]) -> None:
     print("Session hooks: %s" % ("active" if report["sessionHooks"] == "active"
                                  else "inert (this Fabric does not advertise %s)" % HOOK_FEATURE))
     print("Repositories of a turn: %s" % {
-        "on": "read from the session's transcript (turn off: %s=1)" % NO_REPOSITORIES_ENV,
+        "on": "read from the session's transcript, as this shell's environment has it (turn off: %s=1)" % NO_REPOSITORIES_ENV,
         "off": "off (%s or the file %s in the hooks' folder)" % (NO_REPOSITORIES_ENV, NO_REPOSITORIES_MARK),
         "waiting": "not read until Fabric takes them"}[report["transcriptRead"]])
     print("Next: %s" % report["next"])

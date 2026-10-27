@@ -46,8 +46,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   host, owner and name, never a local path, a command or message text (on a self-hosted ssh
   remote, `owner` is the folder path on that server before the repository's name). The mark is
   removed only by a worker that sees a schema without the field, so after Fabric is downgraded
-  the turns that end before a worker next runs (about a minute) are still read; none of their
-  names is sent. They write their spool and log under the user's cache folder (0600),
+  the turns that end before a worker next reaches the running Fabric (about a minute; longer while
+  rejoins fail) are still read; none of their names is sent. They write their spool and log under the user's cache folder (0600),
   and the delivery worker starts `fabric-mcp` in its own process group and ends that group
   (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no Fabric token. An
   `origin` URL that embeds a credential (`https://user:token@host/...`) is read by `git config`

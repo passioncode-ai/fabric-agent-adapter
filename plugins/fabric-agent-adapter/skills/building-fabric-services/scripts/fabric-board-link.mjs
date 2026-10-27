@@ -72,7 +72,8 @@ export class BoardSession {
       if (!this.mcpSession) return false;
       let status = 0;
       try {
-        status = (await this.#send({}, 'DELETE', timeout)).status;
+        const answer = await this.#send({}, 'DELETE', timeout);
+        status = Number.isInteger(answer?.status) ? answer.status : 0; // an answer it cannot read is no release, as in Python
       } catch {
         // best effort: the lease lapses in 60 s anyway
       }

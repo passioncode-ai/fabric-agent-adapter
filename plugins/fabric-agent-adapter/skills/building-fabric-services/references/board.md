@@ -163,7 +163,7 @@ rest `retry` too, says no `board.slot.refused`, and goes to the responder's faul
 `board.access.needed` for `not_authorized`, `authority_changed` and `credential` (the session is left),
 `board.blocked` for a defect (`no-epoch`, `schema-unsupported`, `checkpoint`, `receipt-shape`,
 `idempotency_conflict`), and `board.down` for the rest: `unreachable` keeps the session while a held slot's lease runs
-(so a lost enroll of one capability is asked again at its next retry), `not_available` keeps it while a slot is held,
+(so a lost enroll of one capability is asked again at its next retry), `not_available` keeps it except at connect or recovery with no slot held,
 and `session-ended`, `not-running` and the other hub codes drop it (as a fault during connect or recovery does) and
 reconnect. A slot whose lease lapsed (`lease_expired`) holds
 no lease for that decision.

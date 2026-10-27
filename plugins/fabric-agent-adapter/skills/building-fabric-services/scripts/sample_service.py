@@ -56,9 +56,9 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 </body></html>"""
 # FAA-157: a moved board slot comes back only by the operator's act, a button on this page. The button posts from the
 # operator's signed-in dashboard session with the request header; a service token alone cannot reach it.
-BOARD_SECTION = """<section id="board"><h2>Project board</h2><p class="fd-hint">This slot was moved to another
-session; this service no longer answers it there. Take back asks for it again: the service enrolls once the other
-session lets it go.</p><ul>{items}</ul>
+BOARD_SECTION = """<section id="board"><h2>Project board</h2><p class="fd-hint">These slots were moved to another
+session; this service no longer answers them there. Take back asks for one again: the service enrolls once the other
+session lets it go, or at once when it restarts with accepted work for the slot.</p><ul>{items}</ul>
 <script src="/board.js" defer></script></section>"""
 #: The dashboard's Take back button and its tool (FAA-157, DEC-0121): the operator's decision, relayed in `_meta`.
 TAKE_BACK = {"id": "board.take-back", "title": "Take back", "tool": "board.take-back", "gate": "relayed"}
@@ -150,7 +150,12 @@ class Service:
 
     def board_take_back(self, capability: Any, record: Any = None) -> Dict[str, Any]:
         """The operator's take-back (FAA-157): the next tick enrolls once the other session lets the slot go. `record` is
-        the act the action gate recorded (by, via, caller), kept in the event; never the decision's words."""
+        the act the action gate recorded (by, via, caller), kept in the event; never the decision's words. A repeat for a
+        capability of this service that is no longer moved (its first answer lost) answers the same, from the page's
+        route as from the tool (0.56.0 seam r6)."""
+        if self.board is not None and isinstance(capability, str) and capability in self.board.capabilities \
+                and capability not in self.board_moved():
+            return {"capability": capability, "moved": False}
         if not isinstance(capability, str) or capability not in self.board_moved():
             raise fs.ServiceError("No slot of that capability has moved away from this service.")
         self.board.take_back(capability)
@@ -162,11 +167,8 @@ class Service:
 
     def board_take_back_tool(self, args: Dict[str, Any], ctx: fi.CallContext) -> Dict[str, Any]:
         """The take-back as a tool: the action gate has already read the operator's relayed decision (gate `relayed`)."""
-        capability = args.get("capability")
-        if self.board is not None and capability in self.board.capabilities and capability not in self.board_moved():
-            return {"capability": capability, "moved": False}  # a repeat after a lost answer: the slot is already back
         try:
-            return self.board_take_back(capability, ctx.record)
+            return self.board_take_back(args.get("capability"), ctx.record)  # a repeat answers moved: false
         except (fs.ServiceError, fbd.BoardError) as exc:
             raise fi.InteropError(str(exc))
 
@@ -422,11 +424,6 @@ def serve(args: argparse.Namespace) -> int:
     # hand-over that hangs is cut by the kit's hard exit, inside launchd's ExitTimeOut.
     import threading
     board_stop = threading.Event()
-    board_thread = None
-    if svc.board is not None:
-        board_thread = threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True)
-        board_thread.start()
-
     stop_asked: list = []
 
     def stopping() -> None:
@@ -434,6 +431,12 @@ def serve(args: argparse.Namespace) -> int:
         board_stop.set()  # stop claiming; the responder drains its request and leaves its board session
         svc.log.append("service.stopping", "info", "%s is stopping." % svc.name)
     svc.drain.install(lambda drained: server.shutdown(), on_stopping=stopping)
+    # The board thread starts only once the stop handler is installed: a SIGTERM in between would end the process with
+    # no drain and no DELETE, and the slot would stay held until its lease lapses (0.56.0 seam r6).
+    board_thread = None
+    if svc.board is not None:
+        board_thread = threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True)
+        board_thread.start()
     try:
         server.serve_forever(poll_interval=0.2)
     finally:

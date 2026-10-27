@@ -1910,22 +1910,32 @@ class SampleWiringTests(unittest.TestCase):
                 port = probe.getsockname()[1]
             proc = subprocess.Popen([sys.executable, sample.__file__, "serve", "--port", str(port), "--data-dir", str(data),
                                      "--board-project", PROJECT], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            self.addCleanup(lambda: proc.poll() is None and proc.kill())
-            deadline = time.monotonic() + 20
-            while (hub.board.slots.get("sample.echo") or {}).get("holder") is None:
-                self.assertLess(time.monotonic(), deadline, "the service never enrolled")
-                self.assertIsNone(proc.poll(), proc.stderr.read() if proc.poll() is not None else "")
-                time.sleep(0.05)
-            record = json.loads((data / "board-checkpoint.json").read_text())["slots"]
-            self.assertEqual(record["sample.echo"]["generation"], hub.board.slots["sample.echo"]["generation"])
-            started = time.monotonic()
-            proc.send_signal(signal.SIGTERM)
-            self.assertEqual(proc.wait(timeout=10), 0)
-            self.assertLess(time.monotonic() - started, 5.0)
-            proc.stderr.close()
-            self.assertIsNone(hub.board.slots["sample.echo"]["holder"])  # the DELETE released it
-            self.assertEqual(hub.sessions, {})
-            self.assertEqual(json.loads((data / "board-checkpoint.json").read_text()).get("slots", {}), {})
+            try:
+                deadline = time.monotonic() + 20
+
+                def recorded():  # the record is written after the enroll answer, so the hub's holder comes first
+                    try:
+                        slot = json.loads((data / "board-checkpoint.json").read_text()).get("slots", {}).get("sample.echo")
+                    except (OSError, ValueError):
+                        return False
+                    held = hub.board.slots.get("sample.echo") or {}
+                    return slot is not None and held.get("holder") is not None and slot.get("generation") == held.get("generation")
+                while not recorded():
+                    self.assertLess(time.monotonic(), deadline, "the service never enrolled and recorded the slot")
+                    self.assertIsNone(proc.poll(), proc.stderr.read() if proc.poll() is not None else "")
+                    time.sleep(0.05)
+                started = time.monotonic()
+                proc.send_signal(signal.SIGTERM)
+                self.assertEqual(proc.wait(timeout=10), 0)
+                self.assertLess(time.monotonic() - started, 5.0)
+                self.assertIsNone(hub.board.slots["sample.echo"]["holder"])  # the DELETE released it
+                self.assertEqual(hub.sessions, {})
+                self.assertEqual(json.loads((data / "board-checkpoint.json").read_text()).get("slots", {}), {})
+            finally:  # the child stops before its folder goes
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait(timeout=10)
+                proc.stderr.close()
 
     def test_the_operator_takes_a_moved_slot_back_from_the_dashboard(self):
         """FAA-157: the page offers a moved slot's take-back; only the operator's signed-in session reaches it, and the
@@ -1993,6 +2003,9 @@ class SampleWiringTests(unittest.TestCase):
             status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
             self.assertEqual(status, 200, said)
             self.assertEqual(svc.board_moved(), [])
+            status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
+            self.assertEqual((status, json.loads(said)), (200, {"capability": "sample.echo", "moved": False}),
+                             "a retry after a lost answer is answered as the tool answers it (0.56.0 seam r6)")
             self.assertNotIn(b"data-take-back", request("GET", "/", cookie)[1])
             hub.board.advance(61)  # the other session lets the slot go: the next tick enrolls
             svc.board.step()
@@ -2283,6 +2296,56 @@ class LeaveKeepsUnconfirmedRecords(Conversation):
         self.assertEqual(sorted(cp.slots), ["c", "d"])
         with self.assertRaises(TypeError):
             cp.leave(PROJECT)
+
+
+class RetryReadsTheMove(Conversation):
+    """0.56.0 unit r6: a capability whose own enroll was refused at recovery waits in retry, not suspect; when its slot
+    moves meanwhile, the retry reads com.status first and never enrolls the slot back on its own (FAA-155)."""
+    CAPS = ("video.render", "video.cut")
+
+    def test_the_retry_branch_reads_a_move_first(self):
+        r1 = self.responder()
+        r1.step()
+        r1.session = None  # the process dies: no DELETE, the records stay
+        self.board.advance(61)
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        r2 = self.responder()
+        r2.step()
+        self.assertEqual(r2.slots["video.cut"]["state"], "retry")
+        self.assertNotIn("video.cut", r2._suspect)
+        del self.board.refuse_always[("com.enroll", "video.cut")]
+        self.board.move("video.cut")
+        self.board.advance(61)  # the standby lets its lease lapse
+        for _ in range(8):
+            self.board.advance(max(1.0, r2.slots["video.cut"].get("retry_at", 0) - self.board.now))
+            r2.wait_until = 0
+            r2.step()
+        self.assertEqual(r2.slots["video.cut"].get("state"), "moved")
+        self.assertEqual(self.kinds().count("board.slot.moved"), 1)
+
+
+class CloseReadsAsNode(unittest.TestCase):
+    """0.56.0 unit r6: any failure of the DELETE is no release, and close(0) sends 0, as the Node twin does."""
+
+    def session(self, post):
+        link = fb.BoardSession.__new__(fb.BoardSession)
+        link.post, link.timeout, link.mcp_session, link.protocol_version = post, 15.0, "s-1", "2025-06-18"
+        link.grant = type("Grant", (), {"origin": "http://127.0.0.1:1", "bearer": staticmethod(lambda: "x")})()
+        link._lock, link._rpc = threading.Lock(), 0
+        return link
+
+    def test_an_unexpected_failure_is_no_release(self):
+        def post(*_a, **_k):
+            raise RuntimeError("a custom transport")
+        link = self.session(post)
+        self.assertFalse(link.close())
+        self.assertIsNone(link.mcp_session)
+
+    def test_a_zero_timeout_is_sent_as_zero(self):
+        sent = []
+        link = self.session(lambda *_a, **k: sent.append(k["timeout"]) or (200, {}, None))
+        self.assertTrue(link.close(0))
+        self.assertEqual(sent, [0])
 
 
 class ContestedPerCapability(Conversation):

@@ -40,7 +40,9 @@ gate behave.
   to `jobStep` itself, interop.md). A job's start (`job_step`) reads spend and project as its answer does, and keeps
   the spend as it read it (a NaN is no estimate, never a bare `NaN` in the job file).
 - **`fabric_secrets` matches the contract's ECMAScript reading** (FAA-136): `\s`, `.` and case folding as JavaScript
-  reads them, so both ports flag the same values.
+  reads them, so both ports flag the same values. `secret_url` also reads a special scheme as `new URL` does: every
+  slash or backslash after `https:` (or `http`, `ftp`, `ws`, `wss`) is skipped and a backslash before the query reads
+  as a slash, so `https:u:p@host` and `https:\\u:p@host` carry a password in Python as in Node.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
   capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer
@@ -58,7 +60,9 @@ gate behave.
   only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action an agent whose client sets `_meta`
   calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125). Its `/mcp` reads a loopback call the service token authenticated as T0. The
   page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
-  before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. The
+  before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
+  repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool. The service installs
+  its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
   page's CSP allows the button's own `fetch` (`connect-src 'self'`), and a failed request says so on the button.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.

@@ -42,7 +42,7 @@ once; for 15 minutes the hooks spool nothing for that id (an end removes the fol
 nothing else does the Stop hook read the
 session's transcript at all: the worker then leaves `observe-takes-repositories` in the hooks' folder (beside
 `hooks.log`) and removes it when the schema stops saying so (after a Fabric downgrade, the turns that end before a worker next
-reaches the running Fabric, about a minute (longer while rejoins fail or under the no-session hold), are still read; none of their names is sent); without it nothing below happens. With it, the hook reads the last 512 KB of the
+reaches the running Fabric, about a minute (longer while rejoins fail, or after a no-session hold, whose own turns are not read), are still read; none of their names is sent); without it nothing below happens. With it, the hook reads the last 512 KB of the
 transcript (the payload's `transcript_path`; earlier turns included) and uses only the entries after the last prompt
 the person typed. Those lines hold message text and tool output too (file contents, command output: a secret the session displayed can be there; it stays in memory and is never spooled, logged or sent); of each entry it uses only a tool call's
 name and path argument: the `file_path` of Edit, Write and MultiEdit, the `notebook_path` of NotebookEdit, and in a
@@ -51,7 +51,8 @@ characters of command text a turn. A relative `-C` is read against the folder th
 `cd`, else the session's folder; after a `cd` to a relative or unknown folder (`cd sub`, `cd ~`, `cd -`) it is left
 out (FAA-166). A `cd` inside `( )`, in a pipeline's stage or in a list sent to the background with `&` moves only a
 subshell, so a later relative `-C` is read against the folder before it; a newline ends a command, as `;` does (a `#` comment ends at its line, a `\` continuation joins two), a
-here-document's body is text, and `pushd` moves like `cd`. On Windows (FAA-175) Git Bash's paths
+here-document's body is text, and `pushd` moves like `cd` (an unbalanced quote in a here-document's body, or a quoted
+lone `&`, pipe sign, `(` or `)`, can make the hook skip that command or read it wrongly, FAA-187). On Windows (FAA-175) Git Bash's paths
 are read as drive paths: `/c/...`, `/cygdrive/c/...`, `C:/...` and a quoted `C:\...` (Git Bash reads an unquoted
 backslash as an escape, so `cd C:\work` goes to `C:work`, which is left out); another `/...` (Git's own root, which only
 `cygpath` resolves) is left out. A Cygwin or MSYS2 Python reads its own POSIX paths (FAA-177). These are the repositories the turn

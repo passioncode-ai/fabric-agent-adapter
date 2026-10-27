@@ -54,7 +54,12 @@ class SecretShapeTests(unittest.TestCase):
                  # 0.56.0 unit r1: URL parsing trims only U+0000 to U+0020 from the ends, as `new URL` does.
                  ("secret_url", "\xa0https://u:p@x.example/", False), ("secret_url", "\x01https://u:p@x.example/", True),
                  ("secret_url", " https://u:p@x.example/", True), ("secret_url", "\u3000https://x.example/?token=abc", False),
-                 ("secret_url", "ht\ttps://h.example/?token=abc", True))  # unit r3: tabs, CR and LF removed as by `new URL`
+                 ("secret_url", "ht\ttps://h.example/?token=abc", True),  # unit r3: tabs, CR and LF removed as by `new URL`
+                 # unit r6: a special scheme's slashes and backslashes after `scheme:` are skipped, as by `new URL`
+                 ("secret_url", "https:\\\\u:hunter2@host/", True), ("secret_url", "https:u:hunter2@host/", True),
+                 ("secret_url", "https:/u:hunter2@host/", True), ("secret_url", "HTTPS:\\\\u:hunter2@host", True),
+                 ("secret_url", "ftp:u:hunter2@host/", True), ("secret_url", "https:///host/?q=\\x", False),
+                 ("secret_url", "mailto:u:hunter2@host", False))
         for module in (secrets_mod, adapting):
             for name, value, expected in cases:
                 with self.subTest(name, value=ascii(value)[:30], module=module.__name__):

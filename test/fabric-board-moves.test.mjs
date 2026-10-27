@@ -157,3 +157,37 @@ test('0.56.0 seam r4: a move during a hold is read before the next ask', async (
   assert.equal(r.slots['video.render'].state, 'moved');
   assert.ok(h.events.includes('board.slot.moved'));
 });
+
+test('0.56.0 unit r6: the retry branch reads a move before it enrolls', async (t) => {
+  const CAPS = ['video.render', 'video.cut'];
+  const h = await fakeHub(t, CAPS);
+  const r1 = h.responder();
+  await r1.step();
+  r1.session = null; // the process dies: no DELETE, the records stay
+  await h.advance(61);
+  await h.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.cut', code: 'capacity_exceeded' });
+  const r2 = h.responder();
+  await r2.step();
+  assert.equal(r2.slots['video.cut'].state, 'retry');
+  await h.control({ op: 'unrefuse', tool: 'com.enroll', capability: 'video.cut' });
+  await h.control({ op: 'move', capability: 'video.cut' });
+  await h.advance(61); // the standby lets its lease lapse
+  for (let i = 0; i < 8; i += 1) {
+    await h.advance(Math.max(1, (r2.slots['video.cut'].retryAt ?? r2.slots['video.cut'].retry_at ?? 0) - h.clock.t));
+    r2.waitUntil = 0;
+    await r2.step();
+  }
+  assert.equal(r2.slots['video.cut']?.state, 'moved');
+  assert.equal(h.events.filter((k) => k === 'board.slot.moved').length, 1);
+});
+
+test('0.56.0 seam r6: close reads only an integer 2xx status as a release, as Python does', async () => {
+  const grant = { origin: 'http://127.0.0.1:1', bearer: () => 'x' };
+  for (const [answer, want] of [[null, false], [{}, false], [{ status: '200' }, false], [{ status: 200.5 }, false],
+    [{ status: 200 }, true], [{ status: 204 }, true], [{ status: 404 }, false]]) {
+    const s = new fb.BoardSession(grant, { post: async () => answer });
+    s.mcpSession = 's-1';
+    assert.equal(await s.close(), want, JSON.stringify(answer));
+    assert.equal(s.mcpSession, null);
+  }
+});
