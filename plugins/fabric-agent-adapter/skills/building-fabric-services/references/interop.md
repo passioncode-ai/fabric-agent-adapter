@@ -196,11 +196,13 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
   approval the call presented, or `None`. `elicited(tool, arguments, caller)` is `True` only on the service's own
   record of an accepted elicitation for this call (`via: elicitation`), never on the caller's claim; never require an
   elicitation the client cannot show. `on_fault(tool, fault)` hears a service fault the caller sees only as
-  `unknown-state`, but for one: `mandate-capability-missing` (DEC-0141 MJ-1), which the caller reads as
-  `operator-decision-required` with `data.detail` `mandate-capability-missing` (`approval-outcome-unreadable` when `approve` answers a refusal whose code or detail DL-18 does not know; an answer
+  `unknown-state` (`approval-outcome-unreadable` when `approve` answers a refusal whose code or detail DL-18 does not know; an answer
   that is neither `None` nor a dict is read as no approval, which fails closed; or
   `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
-  since `handle` defaults to T2 and a T2 call names nobody without them).
+  since `handle` defaults to T2 and a T2 call names nobody without them). One fault reaches the caller by name:
+  `mandate-capability-missing` (DEC-0141 MJ-1), read as `operator-decision-required` with that `data.detail`.
+  `on_fault` hears it from `ctx.approval_step` at a job's start under the job's tool, and at the answer under
+  `fabric.job.get`.
 - **Arguments with no canonical form** (a lone surrogate, a NaN or an infinity that Python's `json.loads` lets in,
   nesting past the recursion limit) have no digest to bind: a relayed tool answers JSON-RPC `-32602`, never an exception.
 - **The handler** reads `ctx.record` (`"caller"`, or `{by, via, caller}`) and writes it into the service's audit
@@ -312,7 +314,9 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   `capabilities` name `fabric.job.get` covers no step of another capability.
   Node has no tool server: a Node service reads `store.load(jobId).private.steps` and `.private.capability` BEFORE
   `store.answer` (which clears the steps), gates the answer with `actionGate({..., mandateCapability:
-  private.capability})`, then answers.
+  private.capability})`, then answers. It logs the `fault` that `jobStep` and `actionGate` return beside their
+  answer, as `on_fault` does in Python: `mandate-capability-missing` means the job's tool is not a capability name.
+  Without `mandateCapability` every answer a mandate used to cover now waits for the operator.
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,

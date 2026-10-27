@@ -186,7 +186,7 @@
     "fabric_mandate",
     "fabric_time"
    ],
-   "sha256": "f463cdf90efafc9087d184bf59a484669cf6e34763ccf280600c7541ec7f1c9c"
+   "sha256": "0efe81c7b73c63963348fb4936a3816a961d3424416abd5823fbeb1aa2cb0bbf"
   },
   {
    "module": "fabric_connections",
@@ -380,7 +380,7 @@
     "fabric_mandate",
     "fabric_time"
    ],
-   "sha256": "958bfb76a0bf1379a377129f04824096936c6b9cc6720d9f6edd6d39b41893ef"
+   "sha256": "e37531ef7e9e4d8bdcc9691a12c3d64ecb2e7d1b8353d1b516c818efc7730108"
   },
   {
    "module": "fabric_interop",
@@ -396,7 +396,7 @@
     "fabric_service",
     "fabric_time"
    ],
-   "sha256": "2ad40c135ac406f8771ce3964b356b3d86bd4f5e19a87db78d84c9132663c0d2"
+   "sha256": "8774a42f76077b7fc65b5563c78384a5dc2541f9038a95e158c8c230e07da1dd"
   },
   {
    "module": "fabric_hub",
@@ -663,7 +663,7 @@
     "fabric-mandate",
     "fabric-time"
    ],
-   "sha256": "67315c14c4b91622c34e211b4af5e65a50de0dff814a79db146edf88a0b94001"
+   "sha256": "35f34dccb6c4feb482b0b169f53682f9690b32012481bef3869e487e9637af09"
   },
   {
    "module": "fabric-connections",
@@ -855,7 +855,7 @@
     "fabric-jsvalue",
     "fabric-mandate"
    ],
-   "sha256": "cbd76b70ce52e9a0b7e8a9e229f2d83fe0892f37858ba8ed0fc2463adc39420f"
+   "sha256": "9ce921ffb15c0c7f293ef9aa6778e45811c83f605182984cb092e247dd5aafe7"
   },
   {
    "module": "fabric-interop",
@@ -3961,7 +3961,7 @@
    "fabric_package_schema.py": "e623f0408d38e3343ed66222fb812907c6c52e1a286eb1c1176ab2e64640c9ad",
    "fabric_package.py": "ff533f1b3f92b4ea0f532fcec50b68c610d47549930eef8ad5247692a64dfb3c",
    "fabric_protocols.py": "54ff0f26a8bda640c7edd826cf59151b6ff0483fe72e9c0626c0ba1b79738cd4",
-   "fabric_actions.py": "f463cdf90efafc9087d184bf59a484669cf6e34763ccf280600c7541ec7f1c9c",
+   "fabric_actions.py": "0efe81c7b73c63963348fb4936a3816a961d3424416abd5823fbeb1aa2cb0bbf",
    "fabric_connections.py": "77d3ccf863c70e9209d21ef45c46a6db9c06237019bc20d54f8d3946873f3f11",
    "fabric_a2a.py": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919",
    "fabric_page_links.py": "1b57ea573c550e2f90d1ec3edcc655917ceaa0db9dd1635fccf422ec3024d25e",
@@ -3976,8 +3976,8 @@
    "fabric_supervisors.py": "3c5b2e8c310738720b1c1b779be4710e90251013d9be4c68f9952edc0bf55d5f",
    "fabric_service.py": "a2e813469a47d4d3eea996628635c8903007498bdb6a1ae032a7a5ce6f49fe2f",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
-   "fabric_interop_rules.py": "958bfb76a0bf1379a377129f04824096936c6b9cc6720d9f6edd6d39b41893ef",
-   "fabric_interop.py": "2ad40c135ac406f8771ce3964b356b3d86bd4f5e19a87db78d84c9132663c0d2",
+   "fabric_interop_rules.py": "e37531ef7e9e4d8bdcc9691a12c3d64ecb2e7d1b8353d1b516c818efc7730108",
+   "fabric_interop.py": "8774a42f76077b7fc65b5563c78384a5dc2541f9038a95e158c8c230e07da1dd",
    "fabric_hub.py": "b9ac852e601b1d54cf61351677a628afc69faeed7d1fc74ebe541c1cf38e0c2a",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "55b552354deb60e50268c672912647bca57951fd6a3a27fb5d6dae11ec5a4fd7",
@@ -4003,7 +4003,7 @@
    "fabric-package-schema.mjs": "cd28092375db0fc21ffab1f0bb7794f7f8979ee08c64d3b9faf4b3845357caa6",
    "fabric-package.mjs": "13913ea6d12056c3a31b8222b6c4aab8395941fe519913692e1a06d8672e1c88",
    "fabric-protocols.mjs": "7da65440a7a08bf27d90a06e9158b1c4ee6d7f9204eecb712d452406bfe59962",
-   "fabric-actions.mjs": "67315c14c4b91622c34e211b4af5e65a50de0dff814a79db146edf88a0b94001",
+   "fabric-actions.mjs": "35f34dccb6c4feb482b0b169f53682f9690b32012481bef3869e487e9637af09",
    "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",
    "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
    "fabric-page-links.mjs": "a8834926e9d4bbf7c4857f551451d2ebf6ac8873bbccaaf89c5e30cf45b17ee6",
@@ -4018,7 +4018,7 @@
    "fabric-supervisors.mjs": "d45c38de0cb3ed85e083496c2d3c51dab004454accdd87f4762a512a6d442573",
    "fabric-service.mjs": "6aa673657427211b491a9b63f94b9847a7e6aa3ee1b7353e1af11f46469803a3",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
-   "fabric-interop-rules.mjs": "cbd76b70ce52e9a0b7e8a9e229f2d83fe0892f37858ba8ed0fc2463adc39420f",
+   "fabric-interop-rules.mjs": "9ce921ffb15c0c7f293ef9aa6778e45811c83f605182984cb092e247dd5aafe7",
    "fabric-interop.mjs": "b66fccf4edc1448b3cda31cf036a789574cf07b5044d8433e4a5bf12a9c9aa7a",
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",

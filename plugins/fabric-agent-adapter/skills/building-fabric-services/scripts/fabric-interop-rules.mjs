@@ -227,7 +227,8 @@ const UNREADABLE_JOB_CAPABILITY = "The operator's mandate cannot be read for thi
  * agent id it authenticated for the start call. Answers {covered: true, record} (the step goes on as the operator's
  * decision, no input request; `record` is mandateCovers' recordAs, `source` included when the mandate carries one);
  * {covered: false, message, detail} (the step waits input_required, `message` its statusMessage naming the part not
- * covered, or saying the mandate expired or cannot be read; never the operator's words or `source`); or {covered: false,
+ * covered, or saying the mandate expired or cannot be read; never the operator's words or `source`; with `fault`
+ * mandate-capability-missing beside it when the job's capability cannot read the step, MJ-1); or {covered: false,
  * message: null} with no mandate or a T2 caller's (MD-5), with `fault` when the service's own clock does not read.
  */
 export function jobStep({ mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project } = {}) {

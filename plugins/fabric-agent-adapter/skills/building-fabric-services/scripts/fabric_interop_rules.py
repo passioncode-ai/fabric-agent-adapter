@@ -334,6 +334,7 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
       mandate_covers' recordAs (`via: mandate`, the task, the chain and `source` when the mandate carries one).
     - {"covered": False, "message", "detail"}: the step waits input_required, `message` its statusMessage naming the
       part not covered, or saying the mandate expired or cannot be read; never the operator's words or `source`.
+      With `fault` mandate-capability-missing beside it when the job's capability cannot read the step (MJ-1).
     - {"covered": False, "message": None}: no mandate, or a T2 caller's (MD-5): ask as before; with `fault` when the
       service's own clock does not read."""
     if mandate is None:

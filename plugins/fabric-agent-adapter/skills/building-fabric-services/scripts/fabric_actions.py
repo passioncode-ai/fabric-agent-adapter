@@ -3,7 +3,10 @@ extensions/actions/0.1 (DEC-0121, FAC-SEM-142). Part of the service kit (layer L
 
 - ``action_decision(inputs)``: whether a service takes a call of one declared action and as whose act it records it,
   exactly as the contract's ``actionDecision`` answers (AP-2, AP-4; DL-17, DL-18, DL-25). A ``fault`` is the
-  service's own and is never sent to a caller.
+  service's own and is never sent to a caller as such; ``action_gate`` answers ``mandate-capability-missing`` as
+  operator-decision-required (DEC-0141 MJ-1).
+- ``JOB_STEP_TOOL`` and ``job_capability(value)``: the tool a job's answer comes through, and whether a job's
+  capability can read its step under a mandate (a capability name other than ``fabric.job.get``).
 - ``decision_shape(value)``: a decision as ``decision.schema.json`` reads it, ``at`` read strictly (the contract's
   ``strictTime``).
 - ``actions_view(well_known)``: the host reader of the declaration, as the contract's ``actionsView``.

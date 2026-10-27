@@ -510,7 +510,8 @@ class CallContext:
         carried (`_meta.mandate`) is read for it (job_step). Covered: answers the record (`via: mandate`, `source` when
         the mandate carries one) and asks nothing; the job goes on as the operator's decision. Otherwise the job waits
         input_required on `request`, its message naming the part not covered (or `message`), and answers None; the step
-        is kept so an answer's `_meta.mandate` that covers it is read when input_actions is on."""
+        is kept so an answer's `_meta.mandate` that covers it is read when input_actions is on. A fault job_step answers
+        (mandate-capability-missing, MJ-1) goes to on_fault under the job's tool."""
         if self.server.jobs is None:
             raise InteropError("This server has no job store.")
         step: Dict[str, Any] = {"message": None}

@@ -59,8 +59,10 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
                       "its request key as the action"):
             self.assertIn(words, flat_body, words)
         interop = flat("building-fabric-services/references/interop.md")
-        for words in ("`mandate-capability-missing`", "covers no step of another capability", "stays `input_required`"):
+        for words in ("`mandate-capability-missing`", "covers no step of another capability", "stays `input_required`",
+                      "One fault reaches the caller by name", "It logs the `fault`"):  # service-reads-the-operators-mandate
             self.assertIn(words, interop, words)
+        self.assertNotIn("`mandate-capability-missing` (`approval-outcome-unreadable`", interop)
         self.assertNotIn("the answer is read under `fabric.job.get`", interop)
 
     def test_source_goes_only_where_it_is_read(self):  # relay-source-goes-only-where-it-is-read

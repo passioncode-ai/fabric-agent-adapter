@@ -18,7 +18,8 @@
   `on_fault` at the start as at the answer. It is the one service fault a caller reads by name: `on_fault`'s and the
   delegation reference's rule (a caller sees a fault only as `unknown-state`) now names it. So a job whose tool is not a capability name is no
   longer covered by an `actions`-only mandate at either end, and a mandate whose `capabilities` name `fabric.job.get`
-  covers no step of another capability. The vendored `actions-vectors.json` gains the contract's `jobSteps` group (14
+  covers no step of another capability. A Node service gating a job's answer passes `mandateCapability:
+  private.capability` to `actionGate`; without it every answer a mandate used to cover now waits for the operator. The vendored `actions-vectors.json` gains the contract's `jobSteps` group (14
   cases) and its two new `action-call` fixtures (18 in all); both twins run them. Bundles issued under the previous pin
   `1197a90d` stay valid (`adapt_project.py`).
 - **working-with-fabric:** a leading agent covering a job's approval step names the job's capability in
