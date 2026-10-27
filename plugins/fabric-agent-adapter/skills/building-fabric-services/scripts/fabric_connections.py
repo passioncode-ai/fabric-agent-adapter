@@ -301,14 +301,15 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
 
 def _raw_values(query: str) -> Dict[str, List[str]]:
     """fabric_secrets.raw_values with the name read as URLSearchParams reads it: one leading `?` of the raw piece is
-    dropped before decoding (`??token` names `?token`, `%3Ftoken` names `?token`; round-3 reading)."""
+    dropped before decoding (`??token` names `?token`, `%3Ftoken` names `?token`; round-3 reading). raw_values drops
+    that one `?` itself since 0.56.0, so the piece's name is handed over as it stands (seam r8)."""
     values: Dict[str, List[str]] = {}
     for piece in query.split("&"):
         if piece == "":
             continue
         at = piece.find("=")
         raw_name = piece if at < 0 else piece[:at]
-        merged = raw_values(raw_name[1:] if raw_name.startswith("?") else raw_name)
+        merged = raw_values(raw_name)
         name = next(iter(merged), "")
         values.setdefault(name, []).extend(raw_values("x" + piece[at:])["x"] if at >= 0 else [""])
     return values

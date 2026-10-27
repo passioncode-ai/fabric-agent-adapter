@@ -125,6 +125,23 @@ def raw_values(query: str) -> Dict[str, List[str]]:
 _C0_OR_SPACE = "".join(map(chr, range(0x21)))
 
 
+_LONE_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def _percent_encode(text: str, also: str) -> str:
+    """WHATWG's percent-encoding of a query or a fragment: every C0 control, space, `"`, `<`, `>`, every code point
+    above U+007E and the characters in `also`, as UTF-8 %XX (a lone surrogate as U+FFFD, as a USVString reads it).
+    `new URL` hands the contract's secretUrl the text in this form, so a malformed escape left in it is read the same
+    way by both ports (0.56.0 unit r8)."""
+    out = []
+    for char in _LONE_SURROGATE.sub("\ufffd", text):
+        if ord(char) <= 0x20 or ord(char) > 0x7E or char in '"<>' or char in also:
+            out.append("".join("%%%02X" % byte for byte in char.encode("utf-8")))
+        else:
+            out.append(char)
+    return "".join(out)
+
+
 def _url_parts(value: str) -> Tuple[str, str, str]:
     """The password, query and fragment of an absolute URL as WHATWG URL parsing splits them, read by hand: urlsplit
     refuses a `[` or `]` outside an IPv6 host (`https://u:p[w@h/`), where `new URL` reads the password (0.56.0 unit
@@ -145,7 +162,8 @@ def _url_parts(value: str) -> Tuple[str, str, str]:
     else:
         authority = ""
     userinfo, at, _ = authority.rpartition("@")
-    return (userinfo.partition(":")[2] if at else ""), query, fragment
+    return ((userinfo.partition(":")[2] if at else ""), _percent_encode(query, "'" if lowered in _SPECIAL else ""),
+            _percent_encode(fragment, "`"))
 
 
 def secret_url(value: str) -> bool:

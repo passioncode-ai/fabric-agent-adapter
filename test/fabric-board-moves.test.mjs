@@ -199,3 +199,7 @@ test('0.56.0 seam r7: a close timeout not above 0 is the session\'s own, as in P
   for (const timeout of [0, -1, 2500]) { s.mcpSession = 's-1'; assert.equal(await s.close(timeout), true); }
   assert.deepEqual(sent, [15000, 15000, 2500]);
 });
+
+test('0.56.0 seam r8: a constructor timeout not above 0 is the default, as in Python', () => {
+  for (const timeout of [0, -1]) assert.equal(new fb.BoardSession({}, { timeout }).timeout, 15000);
+});

@@ -72,7 +72,8 @@ against the session's folder, not the folder an earlier call moved to. Turn the 
 with `FABRIC_SESSION_NO_REPOSITORIES=1` in the environment, or a file named `no-repositories` in the hooks' folder:
 the turn's facts are still sent, without `repositories` (any value of the variable but empty or `0` turns it off; the
 file sits in a cache folder a cleaner may empty, so the variable, set in Claude Code's settings `env`, is the lasting form:
-it reaches the hooks, measured in the owning repository's `docs/evidence/runs/2026-10-27-settings-env-reaches-hooks.md`);
+it reached hooks declared in settings in a run on macOS, recorded in the owning repository's
+`docs/evidence/runs/2026-10-27-settings-env-reaches-hooks.md`; the plugin's own hooks and Windows are FAA-183's run);
 `fabric_session.py status` says whether the read is on, off or waiting for Fabric, as the environment of the shell it
 runs in has it.
 

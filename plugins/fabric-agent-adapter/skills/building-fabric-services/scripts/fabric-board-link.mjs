@@ -10,7 +10,7 @@ import { BoardError, RESPOND_TOOLS, isObj, refusalProblems } from './fabric-boar
 /** MCP over HTTP with a board session's one-session bearer; calls are serialised; close() sends the session's DELETE. */
 export class BoardSession {
   constructor(grant, { timeout = 15000, post = postMcp } = {}) {
-    Object.assign(this, { grant, timeout, post });
+    Object.assign(this, { grant, timeout: timeout > 0 ? timeout : 15000, post }); // not above 0 is the default
     this.mcpSession = null;
     this.protocolVersion = MCP_PROTOCOL_VERSION;
     this.rpc = 0;

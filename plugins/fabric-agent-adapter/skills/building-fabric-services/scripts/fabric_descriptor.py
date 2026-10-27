@@ -228,8 +228,9 @@ _IP_LITERAL = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@\[\]]*@)?)\[[0-9
 _URI_AUTHORITY = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@]*@)?(?P<host>\[[^\]]*\]|[^/?#:]*)(?::(?P<port>[^/?#]*))?")
 # A special scheme (http, https, ws, wss, ftp) reads a user:password@ after any run of slashes, none included, as
 # `new URL` does: https:bot:pw@host carries the password too (0.56.0 seam r7).
-_URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*|[A-Za-z][A-Za-z0-9+.-]*://)"
-                           r"[^/\\?#@]*:[^/\\?#@]*@")
+_URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#]*:[^/\\?#]*@"
+                           # any other scheme: a backslash belongs to the user information (seam r8)
+                           r"|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*:[^/?#]*@)")
 
 
 _RESIDENCY = re.compile(r"^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])\Z", re.ASCII)
@@ -306,10 +307,10 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             repository = source["repository"]
             if not (isinstance(repository, str) and _SOURCE_URI.match(_IP_LITERAL.sub(r"\1h", repository, count=1))):
                 problems.append("source.repository is a URI (RFC 3986), such as https://github.com/owner/name")
+            elif _URI_PASSWORD.match(repository):  # before the host: user information is a credential, said as one
+                problems.append("source.repository carries no password: it names the repository, never a credential")
             elif not _authority_ok(repository):
                 problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
-            elif _URI_PASSWORD.match(repository):
-                problems.append("source.repository carries no password: it names the repository, never a credential")
             places.append(("/source/repository", repository))
     if "peer" in descriptor:
         peer = descriptor.get("peer")

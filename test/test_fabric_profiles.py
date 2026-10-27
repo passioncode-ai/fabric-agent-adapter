@@ -64,7 +64,13 @@ class SecretShapeTests(unittest.TestCase):
                  ("secret_url", "https://user:p[w@h.example/", True), ("secret_url", "https://u[:p@h/?token=abc", True),
                  ("secret_url", "wss:]]:@p?token=abc", True), ("secret_url", "https://h.example/#?token=abc", True),
                  ("secret_url", "https://h.example/??token=abc", True), ("secret_url", "https://[::1]:8080/x", False),
-                 ("secret_url", "https://u:@h.example/", False), ("secret_url", "file://u:p@h/x", False))
+                 ("secret_url", "https://u:@h.example/", False), ("secret_url", "file://u:p@h/x", False),
+                 # unit r8: the query and fragment are read percent-encoded, as `new URL` hands them over
+                 ("secret_url", 'https://h.example/?x=%zz"' + ("A1b" * 13)[:38], True),
+                 ("secret_url", "https://h.example/?x=%zz\u00e9" + ("A1b" * 13)[:38], True),
+                 ("secret_url", "https://h.example/#x=%zz<" + ("A1b" * 13)[:38], True),
+                 ("secret_url", "https://h.example/?x=%zz\x1aKIA0123456789ABCDEF", True),
+                 ("secret_url", "https://h.example/?q=caf\u00e9", False))
         for module in (secrets_mod, adapting):
             for name, value, expected in cases:
                 with self.subTest(name, value=ascii(value)[:30], module=module.__name__):

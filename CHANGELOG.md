@@ -23,7 +23,8 @@ gate behave.
   under the responder's lock and only while its record is unchanged, so an operator's take-back at the same moment
   wins. The slot code moved to its own twin modules, `fabric_board_slots.py` and `fabric-board-slots.mjs`.
 - **An idle stop leaves the board within 3 s** (FAA-173): a responder with no work in hand closes its session with a
-  confirmed `DELETE` inside the hard exit (`close(timeout)`: a timeout not above 0 is the session's own, in both twins),
+  confirmed `DELETE` inside the hard exit (`close(timeout)`: a timeout not above 0 is the session's own, and a session built
+  with one takes 15 s, in both twins),
   instead of letting the slot lapse (a board call already in flight when the
   stop comes runs first, and when the join ends before the DELETE the slot lapses as before). The slot records are forgotten only after
   a 2xx: a 404 (the session already gone) keeps them, since a move made before it ended is read at the next
@@ -48,7 +49,8 @@ gate behave.
   one leading `?` from a parameter's name as `URLSearchParams` does. Where `new URL` refuses a host (none, a port over
   65535), Python still reads the password and the parameters, so it can flag more than Node, never less. The
   `source.repository` check of a descriptor and of a provider entry reads a special scheme's password the same way
-  (`https:bot:pw@host`).
+  (`https:bot:pw@host`), up to the user information's last `@` (`https://me@corp.example:pw@host`), and says so
+  before it judges the host. The query and the fragment are read percent-encoded, as `new URL` hands them over.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
   capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer

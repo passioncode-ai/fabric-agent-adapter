@@ -210,7 +210,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   as free and may enroll it once the other holder lets it go (FAA-187). A file without the record
   reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, its DELETE answered 2xx and every slot confirmed
   in that session, rolled back to 0.52 and up again starts as on a first start. Otherwise (a 404, the idle wait running
-  out, a slot left retrying or never compared with `com.status`) its records stay, and the case is the crash case below. After a crash the record stays: if 0.52 then ran, enrolled the slot and
+  out, a slot this session never confirmed, one left retrying before `com.status` answered for it included) its records stay, and the case is the crash case below. After a crash the record stays: if 0.52 then ran, enrolled the slot and
   wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
 - An enroll or a replace is written into that record with its key before it is sent (`asking`). When its answer is
   lost, the next connect (or the next enroll) sends the same call again under the same key; the board answers the

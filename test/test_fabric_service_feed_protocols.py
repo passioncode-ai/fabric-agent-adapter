@@ -86,6 +86,12 @@ class FeedData(unittest.TestCase):
             with self.subTest(value=list(c["page"]["events"][0]["data"]["value"])):
                 self.assertEqual(paths(fs.feed_data_findings(c["page"])), [f["instancePath"] for f in c["findings"]])
 
+    def test_python_flags_a_password_where_new_url_refuses_the_host(self):
+        """0.56.0 seam r8: by design Python reads the password of a URL whose host `new URL` refuses, where the
+        contract's feedDataFindings sees no URL; it flags more, never less."""
+        page = {"events": [{"data": {"schema": "https://example.com/s.json", "value": {"note": "http://admin:pw@ (refused)"}}}]}
+        self.assertEqual(paths(fs.feed_data_findings(page)), ["/events/0/data/value/note"])
+
     def test_an_event_takes_data_and_refuses_a_credential(self):
         data = {"schema": "https://example.com/schemas/note.json", "value": {"notes": 3, "inputTokens": 1200}}
         self.assertEqual(fs.make_event(1, "2026-10-13T08:00:00Z", "job.done", "info", "A note was drafted.", data=data)["data"], data)

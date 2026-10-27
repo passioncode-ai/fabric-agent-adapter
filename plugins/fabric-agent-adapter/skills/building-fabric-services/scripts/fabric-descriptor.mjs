@@ -141,7 +141,8 @@ function authorityOk(uri) {
   return Boolean(m[1]) && (port === undefined || port === '' || (/^[0-9]{1,5}$/.test(port) && Number(port) <= 65535));
 }
 // A special scheme reads a user:password@ after any run of slashes, none included, as `new URL` does (0.56.0 seam r7).
-const URI_PASSWORD = /^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*|[A-Za-z][A-Za-z0-9+.-]*:\/\/)[^/\\?#@]*:[^/\\?#@]*@/;
+// To the last @, a user name may hold one; any other scheme keeps a backslash in the user information (seam r8).
+const URI_PASSWORD = /^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#]*:[^/\\?#]*@|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]*:[^/?#]*@)/;
 const RESIDENCY = /^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$/;
 
 const RUNNER_KIND_NAME = /^[a-z][a-z0-9-]{1,62}$/;
@@ -191,8 +192,8 @@ export function descriptorMemberProblems(d) {
     if ('repository' in source) {
       const repository = source.repository;
       if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
+      else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential'); // before the host
       else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
-      else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential');
       places.push(['/source/repository', repository]);
     }
   }

@@ -30,7 +30,8 @@ class BoardSession:
     DELETE, which releases every slot it holds (DEC-0073 §5). Thread-safe; the bearer never leaves the headers."""
 
     def __init__(self, grant: _hub.BoardGrant, *, timeout: float = 15.0, post: Callable[..., Any] = _hub.post_mcp):
-        self.grant, self.timeout, self.post = grant, timeout, post
+        # not above 0 is the default: the transports read 0 in opposite ways (seam r8)
+        self.grant, self.timeout, self.post = grant, timeout if timeout > 0 else 15.0, post
         self.mcp_session: Optional[str] = None
         self.protocol_version = _hub.MCP_PROTOCOL_VERSION
         self._lock = threading.Lock()

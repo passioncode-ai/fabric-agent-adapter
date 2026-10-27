@@ -2343,6 +2343,11 @@ class CloseReadsAsNode(unittest.TestCase):
         self.assertFalse(link.close())
         self.assertIsNone(link.mcp_session)
 
+    def test_a_constructor_timeout_not_above_zero_is_the_default(self):
+        """0.56.0 seam r8: the session's own timeout is never 0 either."""
+        for timeout in (0, -1):
+            self.assertEqual(fb.BoardSession(object(), timeout=timeout).timeout, 15.0)
+
     def test_a_timeout_not_above_zero_is_the_sessions_own(self):
         """0.56.0 seam r7: http.client reads 0 as non-blocking and Node's http as no bound, so neither is sent."""
         sent = []
