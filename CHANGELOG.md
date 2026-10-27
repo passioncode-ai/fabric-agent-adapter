@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.53.0 (2026-10-27)
+
+### Added
+
+- **The repositories a turn changed** (FAA-140, Fabric CO-367): working-with-fabric's Stop hook names the other Git
+  repositories a turn changed. It reads at most the last 512 KB of the session's transcript and only the current
+  turn's tool calls (Edit, Write, MultiEdit and NotebookEdit paths; `cd <absolute path>` and `git -C <path>` in Bash),
+  never message text. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside
+  the existing 1.5 s facts budget, and named `{host, owner, name}` from its `origin` (credentials, port and `.git`
+  dropped). The start folder's repository (any checkout of it), a repository without a parsable origin and duplicates
+  are left out; at most 10; no local path leaves the hook. The worker sends them as `repositories` on
+  `fabric_session_observe` for a turn only where the tool's input schema lists the field: nothing changes for today's
+  Fabric, and the log says so once per session, with a count, never names. Measured: the Stop hook's median is 247 ms
+  on a 4.8 MB transcript naming six repositories (0.52.0: 109 ms).
+- **A board slot the operator moves to another session stays moved** (FAA-155; contract DEC-0140, proposed; CT-174,
+  CT-175). The kit's board responder records the generation it holds each slot at, beside its checkpoint. When
+  `com.status` (at connect, or after a call refused `fenced`) shows a later generation, it stops the handler, drops
+  its claims, and leaves accepted work held (`lapsed`) and begun work `unknown`; it neither replaces at recovery after
+  a restart nor enrolls again when the new holder's lease lapses. One `board.slot.moved` event (notify) says so, once
+  across restarts. A first start, an equal generation, or an odd or lower generation behaves as before; a `fenced`
+  refusal on accepted work for a slot the responder recorded holding keeps the entry as `lapsed`.
+  `Responder.take_back(capability)` / `takeBack(capability)` is the operator's act that brings a moved slot back: it
+  enrolls once the slot is free and takes the held work back by a transfer. Both twins.
+
 ## 0.52.0 (2026-10-26)
 
 ### Changed
