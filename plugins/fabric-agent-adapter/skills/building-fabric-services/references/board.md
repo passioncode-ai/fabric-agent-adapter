@@ -178,7 +178,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   {project, generation, moved?, asking?}}`). The record is written when a receipt's generation changes and before an
   enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
   clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
-  in the checkpoint is forgotten: the slot is free, and whoever takes it next is no move. A file without the record
+  in the checkpoint and not moved is forgotten (a moved slot's record stays, so a clean stop never undoes a move): the slot is free, and whoever takes it next is no move. A file without the record
   reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first
   start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
   wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).

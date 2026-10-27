@@ -27,7 +27,7 @@
 - **A board slot the operator moves to another session stays moved** (FAA-155; contract DEC-0140, proposed; CT-174,
   CT-175). The kit's board responder records the generation it holds each slot at, beside its checkpoint: when a
   receipt's generation changes and before an enroll or replace that can change it; a live holder's renew writes
-  nothing, and a clean leave (the session's DELETE released the slots) forgets the record of a slot with no request
+  nothing, and a clean leave (the session's DELETE released the slots) forgets the record of a slot not moved and with no request
   left. When `com.status` (at connect, or after a call refused `fenced`) shows a later generation, it stops the
   handler, drops its claims, and leaves accepted work held (`lapsed`) and begun work `unknown`; it neither replaces at
   recovery after a restart nor enrolls again when the new holder's lease lapses. Accepted requests stay held on the
