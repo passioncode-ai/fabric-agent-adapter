@@ -420,7 +420,9 @@ class SupportAgent:
 def from_config(config_path: Path, *, on_handoff: Optional[Callable[[Dict[str, Any]], None]] = None,
                 **overrides: Any) -> SupportAgent:
     """An agent from a config file (see config.example.json): paths are relative to the config's folder. `on_handoff`
-    takes each hand-off in place of the outbox; the other keywords go to the model client."""
+    takes each hand-off in place of the outbox. Other keywords go to the model client (`transport`, `deadline_s`,
+    `retries`), except those the config already sets (`ceiling_usd`, `window`, `ledger`, `prices`, `key_env`,
+    `project_id`)."""
     config = json.loads(Path(config_path).read_text(encoding="utf-8"))
     home = Path(config_path).resolve().parent
     state = (home / config.get("stateDir", "state")).resolve()

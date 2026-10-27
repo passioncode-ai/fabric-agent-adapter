@@ -122,8 +122,9 @@ EXPECTED = (
     ' when the gap closes',
     "counts hand-offs by cause (policy, inability, infrastructure), never as answers, keeps them out of the judge's"
     ' sample, and keeps a commitments ledger',
-    "reads the knowledge service's answer flag with no threshold of its own, queues every abstention and every hold"
-    ' as a gap and asks again after it closes, and re-reads its feed once when it starts reading a new event kind',
+    "reads the knowledge service's answer flag with no threshold of its own, queues every abstention and every "
+    'inability, a hold on the material included, as a gap (a hold after an outage opens none) and asks again after '
+    'it closes, and re-reads its feed once when it starts reading a new event kind',
 )
 STEP_0_ROW = (
     '| **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it '
@@ -147,11 +148,11 @@ RECIPE_PARAGRAPH = (
     '`policy`: the calling service routes the categories a person must handle (refunds, unbans, account recovery) '
     "before it calls the recipe, or a model's `HANDOFF` on them is counted as a false knowledge gap. Count its "
     'hand-offs by cause: a failed check is a refusal for the agent to repair, research and hold, and only a hold on'
-    ' the material counts as `inability` (a hold after an outage is `infrastructure`); `unsupported:amount` is a '
-    'money reason, never researched, and so is `unsupported:number` while the decision returns no draft to tell a '
-    'price from another number; `no-knowledge` and `model-unsure` are `inability`; every `inability` opens a gap; '
-    "`model:*` is `infrastructure`, and `model:ceiling` and `model:payment` are also the turn's `limit` outcome. "
-    "The rest of the agent's parts with checks come from [agents that answer "
+    ' the material counts as `inability` (a hold after an outage or at the research time cap is `infrastructure`); '
+    '`unsupported:amount` is a money reason, never researched, and so is `unsupported:number` while the decision '
+    'returns no draft to tell a price from another number; `no-knowledge` and `model-unsure` are `inability`; every'
+    ' `inability` opens a gap; `model:*` is `infrastructure`, and `model:ceiling` and `model:payment` are also the '
+    "turn's `limit` outcome. The rest of the agent's parts with checks come from [agents that answer "
     'people](../../../creating-fabric-agents/references/agents-that-answer-people.md): the turn record, the daily '
     "`support.quality_daily` report, the other-vendor model checker that sees the material first (this recipe's "
     'checks are code only), the false-state gates, numbers and account state from tools, the live-tail re-read, the'
@@ -160,8 +161,9 @@ RECIPE_RETENTION = (
     "Every handoff row in `handoffs.jsonl` holds the customer's own message, which can carry an email address, a "
     "phone number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy "
     "states, at most 30 days for an agent that answers people (the standard's A1). A1 also asks for the text "
-    'redacted: the outbox keeps it as written, and `prune` takes any `--keep-days`, so such an agent redacts before'
-    ' `on_handoff` and schedules 30 days or fewer. Prune on a schedule:')
+    'redacted: the outbox keeps it as written, and `prune` takes any `--keep-days`, so such an agent passes an '
+    '`on_handoff` that redacts what it stores, which replaces the outbox, and keeps 30 days or fewer. Prune on a '
+    'schedule:')
 CHANGELOG_ENTRY = (
     '- **creating-fabric-agents: agents that answer people** (FAA-162, board request `1ad39d4e`). A new reference, '
     '`references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, '
@@ -181,11 +183,12 @@ CHANGELOG_ENTRY = (
     'message to a person at the first refusal (the refused draft is not kept), and its Lookup is a relevance rule '
     "an agent that answers people replaces with the knowledge service's `answer` flag. It says the calling service "
     'routes `policy` before it, maps its hand-offs to causes (a failed check goes to repair and counts as '
-    '`inability` only at a hold; `no-knowledge` and `model-unsure` are `inability` and open a gap; a money reason '
-    'is never researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment` also the `limit` '
-    'outcome), and tells such an agent to redact the outbox and prune it at 30 days or fewer; `from_config` takes '
-    '`on_handoff=`; building-fabric-services and the README point at it. Backlog FAA-116 records what is left for '
-    'the recipe.')
+    '`inability` only at a hold on the material, a hold after an outage or at the research time cap being '
+    '`infrastructure`; `no-knowledge` and `model-unsure` are `inability` and open a gap; a money reason is never '
+    'researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment` also the `limit` outcome), and '
+    'tells such an agent to pass an `on_handoff` that redacts what it stores, in place of the outbox, and to keep '
+    '30 days or fewer; `from_config` takes `on_handoff=`; building-fabric-services and the README point at it. '
+    'Backlog FAA-116 records what is left for the recipe.')
 
 
 def scenario():
@@ -200,7 +203,9 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
 
     def test_step_0_asks_and_step_1_links(self):  # an-agent-that-answers-people (expected 1)
         step_0 = section("creating-fabric-agents", "Step 0: the intake grill")
-        self.assertIn(STEP_0_ROW, " ".join(step_0.split()))
+        rows = [" ".join(line.split()) for line in text("creating-fabric-agents/SKILL.md").splitlines()
+                if line.startswith("| **Does it answer people?**")]
+        self.assertEqual(rows, [STEP_0_ROW], "the row whole, nothing added at its edges")
         self.assertIn("Does it answer people?", step_0)
         self.assertIn("(references/agents-that-answer-people.md)", step_0)
         for words in ("turn record", "support.quality_daily", "vendor exclusion", "offline replay", "false-state gates",
@@ -242,13 +247,16 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         self.assertEqual(lines, CHECKLIST)
         checklist = " ".join(lines)
         step_0 = section("creating-fabric-agents", "Step 0: the intake grill")
-        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split("## 0.55.0")[1].split("## 0.54.0")[0]
-        changelog = " ".join(changelog.split())
-        self.assertIn(CHANGELOG_ENTRY, changelog)
+        changelog_text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split("## 0.55.0")[1].split("## 0.54.0")[0]
+        changelog = " ".join(changelog_text.split())
+        # Unit round 5: each pin equals its whole block, so text added at its edges fails too.
+        entries = [" ".join(("- " + e).split()) for e in ("\n" + changelog_text).split("\n- ")[1:]
+                   if e.startswith("**creating-fabric-agents: agents that answer people**")]
+        self.assertEqual(entries, [CHANGELOG_ENTRY])
         for words in ("offline replay", "from tools", "live tail"):
             for where, said in (("checklist", checklist), ("Step 0", step_0), ("CHANGELOG", changelog)):
                 self.assertIn(words, said, (where, words))
-        for words in ("material before the instructions", "routes `policy` before it", "at 30 days or fewer"):
+        for words in ("material before the instructions", "routes `policy` before it", "keep 30 days or fewer"):
             self.assertIn(words, changelog, words)
         reference = flat(REFERENCE)
         self.assertIn("DEC-0070", reference)
@@ -264,15 +272,17 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
 
     def test_the_recipe_is_the_draft_and_check_step(self):  # seam round 1: the recipe and the reference agree
         recipe = flat("building-fabric-services/recipes/support-agent/README.md")
-        self.assertIn(RECIPE_PARAGRAPH, recipe)
-        self.assertIn(RECIPE_RETENTION, recipe)
+        readme = text("building-fabric-services/recipes/support-agent/README.md")
+        paragraphs = [" ".join(p.split()) for p in readme.split("\n\n")]
+        self.assertIn(RECIPE_PARAGRAPH, paragraphs, "the paragraph whole, nothing added at its edges")
+        self.assertIn(RECIPE_RETENTION, paragraphs)
         for words in ("the draft-and-check step of an agent that answers people, not that agent",
                       "agents-that-answer-people.md", "`infrastructure`", "`inability`", "`policy`",
                       "and so is `unsupported:number` while the decision returns no draft", "model checker",
                       "at most 30",
                       "only a hold on the material counts as `inability`", "at the first refusal", "`on_handoff=`",
                       "per-item `answer` flag", "under a new message id",
-                      "same-vendor fallback", "`model:payment`", "redacts before `on_handoff`"):
+                      "same-vendor fallback", "`model:payment`", "an `on_handoff` that redacts what it stores"):
             self.assertIn(words, recipe, words)
         self.assertIn("recipes/support-agent/", flat(REFERENCE))
         self.assertIn("agents-that-answer-people.md", flat("building-fabric-services/SKILL.md"))

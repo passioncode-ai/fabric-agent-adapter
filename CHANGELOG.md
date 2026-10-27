@@ -20,11 +20,12 @@
   says it is the draft-and-check step of such an agent, not the agent: used alone it hands the message to a person at
   the first refusal (the refused draft is not kept), and its Lookup is a relevance rule an agent that answers people
   replaces with the knowledge service's `answer` flag. It says the calling service routes `policy` before it, maps its
-  hand-offs to causes (a failed check goes to repair and counts as `inability` only at a hold; `no-knowledge` and
-  `model-unsure` are `inability` and open a gap; a money reason is never researched; `model:*` is `infrastructure`,
-  `model:ceiling` and `model:payment` also the `limit` outcome), and tells such an agent to redact the outbox and prune
-  it at 30 days or fewer; `from_config` takes `on_handoff=`; building-fabric-services and the README point at it.
-  Backlog FAA-116 records what is left for the recipe.
+  hand-offs to causes (a failed check goes to repair and counts as `inability` only at a hold on the material, a hold
+  after an outage or at the research time cap being `infrastructure`; `no-knowledge` and `model-unsure` are `inability`
+  and open a gap; a money reason is never researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment`
+  also the `limit` outcome), and tells such an agent to pass an `on_handoff` that redacts what it stores, in place of
+  the outbox, and to keep 30 days or fewer; `from_config` takes `on_handoff=`; building-fabric-services and the README
+  point at it. Backlog FAA-116 records what is left for the recipe.
 
 ## 0.54.0 (2026-10-27)
 

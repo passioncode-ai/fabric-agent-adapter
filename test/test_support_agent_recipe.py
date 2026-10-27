@@ -352,6 +352,8 @@ class Recipe(unittest.TestCase):
                               str(self.dir / "config.json"), "--message-id", "m-2", "--text", "reset my password"],
                              capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(json.loads(out.stdout)["reasons"], ["model:config"], "no key: handed off, never a crash")
+        rows = [json.loads(l) for l in (self.dir / "state" / "handoffs.jsonl").read_text().splitlines()]
+        self.assertEqual([r["reasons"] for r in rows], [["no-knowledge"], ["model:config"]], "the CLI keeps the outbox")
 
     def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
         config = json.loads((RECIPE / "config.example.json").read_text())

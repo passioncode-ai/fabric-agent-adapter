@@ -13,12 +13,12 @@ Sources (public): the support quality standard,
 (P1 to P8), both in the `agent-evals` skill of [ssheleg/agent-stack](https://github.com/ssheleg/agent-stack); the
 practices arrive with [PR #70](https://github.com/ssheleg/agent-stack/pull/70), linked here at its commit until it
 merges. The standard says how such an agent is measured; the practices say what worked and what failed. This page
-lists the parts that have a check, and the check that proves each; the practices the sources carry without one (the
-whole conversation in context, quoted mail stripped, debounce, per-conversation operator directives, stored supervisor
-verdicts, proposals gated in code) are read there. Read both sources before you design the reply pipeline. The kit's
-support-agent recipe (building-fabric-services, `recipes/support-agent/`) is one draft-and-check step of such an
-agent, not the agent: used alone it hands the message to a person at the first refusal (the refused draft is not
-kept), where this page repairs, researches and holds.
+lists parts that have a check, and the check that proves each; it leaves to the sources the standard's A2 families and
+per-channel targets, A3 (the rubric), A4 (the judge and its calibration), A6 (answer first, the queue's SLA, a safe
+default) and the rest of its checks that caught real defects, and the practices' other items of P1, P3, P5, P6, P7 and
+P8. Read both sources before you design the reply pipeline. The kit's support-agent recipe (building-fabric-services,
+`recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: used alone it hands the message
+to a person at the first refusal (the refused draft is not kept), where this page repairs, researches and holds.
 
 ## Contents
 
