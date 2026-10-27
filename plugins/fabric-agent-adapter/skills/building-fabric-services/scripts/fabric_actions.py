@@ -51,7 +51,8 @@ DECISION_INVALID = "decision-invalid"
 HUMAN_STEP_REQUIRED = "human-step-required"
 APPROVAL_REQUIRED = "approval-required"
 GATES = ("none", "relayed", "human")
-HUMAN_STEPS = ("sign-in", "consent", "payment", "secret", "spend-above-limit", "passkey")
+#: AP-4's steps a person takes; `comparison` (DEC-0142) is a comparison of codes between two people.
+HUMAN_STEPS = ("sign-in", "consent", "payment", "secret", "spend-above-limit", "passkey", "comparison")
 MAX_ACTIONS = 128
 #: How far ahead of the service's clock a decision's `at` may be (the contract's CLOCK_SKEW_SECONDS).
 CLOCK_SKEW_SECONDS = 60

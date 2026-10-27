@@ -11,6 +11,7 @@ directory:
 |---|---|
 | macOS | `~/Library/Application Support/ai.passioncode.fabric/providers/` |
 | Linux | `${XDG_DATA_HOME:-~/.local/share}/passioncode-fabric/providers/` |
+| Windows | `%LOCALAPPDATA%\passioncode-fabric\providers\` (the same root as the services folder, DEC-0032; `~\AppData\Local` when `LOCALAPPDATA` is unset) |
 | any | `FABRIC_PROVIDERS_DIR` when set |
 
 A service uses a descriptor instead (the `building-fabric-services` skill). One id is a
@@ -49,15 +50,23 @@ It refuses, with one sentence that never quotes a value:
   credential itself: a token prefix, a private key, a JWT (FAC-SEM-015: a value is
   checked by its form; name patterns apply to names);
 - what the pinned `provider.schema.json` refuses: a URL other than `http://127.0.0.1:<port>/mcp` with a port from 100
-  to 65535, a manifest path that is not an absolute or `~/` path to `fabric-agent.json` (or is a network share, or over
-  1024 characters), a shell-string command, more than 32 arguments or one over 1024 characters, more than 64 env
-  names, a `source.repository` that is not an absolute URI, an `installedAt` that is not an RFC 3339 date-time,
-  unknown fields. The patterns are the schema's, copied (`test_provider.SchemaParityTests` compares them with a
-  contract checkout at the pin when `FABRIC_CONTRACT_NEW` names one);
+  to 65535, a manifest path that is not an absolute, `~/` or `~\` path to a file named `fabric-agent.json` after
+  either separator (DEC-0145; or is a network share, or over 1024 characters), a shell-string command, more than 32
+  arguments or one over 1024 characters, more than 64 env names, a `source.repository` that is not an absolute URI, an
+  `installedAt` that is not an RFC 3339 date-time, unknown fields. The patterns are the schema's, copied
+  (`test_provider.SchemaParityTests` compares them with a contract checkout at the pin when `FABRIC_CONTRACT_NEW` names
+  one, as the contract job of the nightly CI does), and the reader is held to every `provider.schema.json` fixture of
+  the pin (`test/fixtures/contract/provider-fixtures.json`, `test_provider.ContractFixtureTests`);
 - a `source.repository` with a `user:password@` or a value shaped like a credential: it names the repository, never
-  reaches it (since 0.49.3, as the service kit's descriptor check).
+  reaches it (since 0.49.3, as the service kit's descriptor check);
+- a manifest whose name follows a backslash (`C:\Agents\example\fabric-agent.json`). The reader,
+  `validate_provider_entry`, accepts it since DEC-0145 (`MANIFEST_PATTERN`, the schema's), but a reader that has not
+  re-pinned to DEC-0145 refuses the entry, Fabric's registry among them (CT-192), so the writer does not emit it until
+  Fabric re-pins. Write the same path with `/` before the name (`C:/Agents/example/fabric-agent.json`), which every
+  reader accepts.
 
-`validate` also checks that the file is named `<id>.json` (FAC-SEM-014, slug half).
+`validate` also checks that the file is named `<id>.json` (FAC-SEM-014, slug half): the stem is what follows the last
+`/` or `\`, on every platform (CT-193).
 From Python: `write_provider_entry(entry)`, `remove_provider_entry(id)`,
 `validate_provider_entry(entry)`, `manifest_problems(entry)`, `providers_dir()`.
 

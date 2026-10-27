@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.56.0"
+  version: "0.57.0"
 ---
 
 # Working with Fabric
@@ -35,12 +35,12 @@ Use it to work in a project through Fabric. Do not use it to:
 
 - build, adapt or run an agent as a Fabric provider or service: `creating-fabric-agents`,
   `adapting-projects-to-fabric`, `building-fabric-services`;
-- change Fabric itself (its hub, enrollment, journal): that is Fabric's repository and its own rules;
+- change Fabric itself (its hub, enrollment, journal): Fabric's repository and rules own that;
 - take agent-sync leases on a repository's guarded files: agent-sync owns those; Fabric only shows them.
 
 ## Step 0: where Fabric stands
 
-Run the bundled status script; it reads files only, never a token, and prints one next action:
+The bundled status script reads files only, never a token, and prints one next action:
 
 ```bash
 python3 <skill-dir>/scripts/fabric_session.py status          # --json for a machine-readable report
@@ -55,7 +55,7 @@ By hand, when Python is absent: Fabric publishes `hub.json` in its folder while 
 | Linux | `$XDG_DATA_HOME/passioncode-fabric/` (default `~/.local/share/`) | the install folder's `resources/bin`; the `.deb` puts it in `/opt/Fabric` |
 
 Fabric is up only when `hub.json` exists, says `"protocol": "fabric-hub/0.1"`, names the loopback origin
-`http://127.0.0.1:<port>` and a `pid` that is alive. No file, or a dead pid, means no Fabric, whatever answers on
+`http://127.0.0.1:<port>` and a live `pid`. No file, or a dead pid, means no Fabric, whatever answers on
 the port. Never send anything to the port yourself, and never read the door token `hub.json` names: `fabric-mcp`
 does that. On Linux an AppImage mounts at a new path each start, so a registration pointing into it breaks; use the
 `.deb`.
@@ -229,8 +229,8 @@ already approved.
   the handoff (OA-6). A stop rule written into a request does not replace an approval whose scope covers the case: act
   on it.
 - Human gates stay (OA-5): sign-in, a one-time code, consent, payment or top-up, a typed secret, spend above a limit
-  (handed to the person with its link and the amount, never asked in chat), a passkey. A policy change, a promotion or
-  a grant of your own is never covered (AP-5).
+  (handed over with its link and amount, never asked in chat), a passkey, a comparison of codes with another person
+  (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than
   the relayed one and his quoted words. You then lead your own part of the task.
@@ -300,8 +300,8 @@ resolve (a repository the project does not hold) is refused, naming the part tha
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
    the next agent reads) or let go (why). Older Fabric: `fabric_task_release`.
 
-A session that ends without releasing lapses at its claim's expiry; release anyway; a lapsed claim reads as
-stuck work to the operator.
+A session that ends without releasing lapses at its claim's expiry; release anyway: a lapsed claim reads as stuck
+work.
 
 ## Refusals and lost answers
 
@@ -316,7 +316,7 @@ stuck work to the operator.
 | `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, call again within your own mandate if it covers the part, else pass the refusal to the agent that called you, and only the lead asks him, once, about that part alone; `mandate-capability-missing`: no mandate covers that step, only his decision |
 | `decision-invalid` | the decision names another action or object, is older than 24 hours, lies over 60 s ahead of the service's clock, or is malformed; or the mandate is (`data.detail` `mandate-malformed`, `-widened`, `-expired`, `-early`, `-not-for-this-call`) | never edit, widen or re-date it; ask the operator again when their words do not cover this call |
 | `approval-required` with `data.actionDigest` | a caller outside the machine's trust (T2): a chat decision changes nothing | an `approval/1` for that digest through the hub |
-| `human-step-required` with `data.humanStep` and `data.url` | a sign-in, a one-time code, consent, payment or top-up, typed secret, spend above a limit or passkey stays the person's | hand the person `data.url`: a path on the service's origin as Fabric Dashboards' `open_link` (`fallback=never`), an https URL as it is; never take the step or ask for the secret; continue other work |
+| `human-step-required` with `data.humanStep` and `data.url` | a sign-in, one-time code, consent, payment or top-up, typed secret, spend above a limit, passkey or comparison of codes stays the person's | hand the person `data.url`: a path on the service's origin as Fabric Dashboards' `open_link` (`fallback=never`), an https URL as it is; never take the step or ask for the secret; continue other work |
 
 Never tell the person a call failed or succeeded when its outcome is unknown.
 

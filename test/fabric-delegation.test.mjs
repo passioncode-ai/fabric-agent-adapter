@@ -232,7 +232,7 @@ test('R1: a token with a trailing newline is malformed', () => {
 // DL-19 (DEC-0039, DEC-0121): the kit's one code set is the contract's, each code answers with its own sentence, and
 // the refusals of an action call (fabric-actions.mjs) are DL-19 bodies. The twin of RefusalCodeSetTests.
 const ACTIONS = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/actions-vectors.json'), 'utf8'));
-const HUMAN_STEPS = ['sign-in', 'consent', 'payment', 'secret', 'spend-above-limit', 'passkey'];
+const HUMAN_STEPS = ['sign-in', 'consent', 'payment', 'secret', 'spend-above-limit', 'passkey', 'comparison'];
 function dl19Problems(body) {
   const error = body !== null && typeof body === 'object' && Object.keys(body).join() === 'error' ? body.error : undefined;
   if (error === null || typeof error !== 'object' || Object.keys(error).some((k) => !['code', 'message', 'data'].includes(k))) return ['shape'];

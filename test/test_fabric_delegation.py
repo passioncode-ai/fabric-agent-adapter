@@ -423,7 +423,7 @@ class GateTests(unittest.TestCase):
 
 
 ACTIONS = json.loads((Path(__file__).resolve().parent / "fixtures/contract/actions-vectors.json").read_text())
-HUMAN_STEPS = ("sign-in", "consent", "payment", "secret", "spend-above-limit", "passkey")
+HUMAN_STEPS = ("sign-in", "consent", "payment", "secret", "spend-above-limit", "passkey", "comparison")
 
 
 def dl19_problems(body):

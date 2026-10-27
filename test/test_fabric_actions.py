@@ -41,7 +41,7 @@ def view_of(view):
 
 class Vectors(unittest.TestCase):
     def test_every_case_answers_as_the_contract_does(self):
-        self.assertEqual(len(V["cases"]), 67)
+        self.assertEqual(len(V["cases"]), 68)
         for case in V["cases"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fa.action_decision(case["input"])), js(case["expected"]))
@@ -54,7 +54,7 @@ class Vectors(unittest.TestCase):
                 self.assertEqual(js(fa.action_decision(case["input"])), js(case["expected"]))
 
     def test_every_declaration_is_found_where_the_contract_finds_it(self):
-        self.assertEqual(len(V["declarations"]), 11)
+        self.assertEqual(len(V["declarations"]), 12)
         for case in V["declarations"]:
             with self.subTest(case["name"]):
                 findings = fa.actions_extension_rules(case["input"])

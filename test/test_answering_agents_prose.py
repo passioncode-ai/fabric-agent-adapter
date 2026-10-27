@@ -26,13 +26,19 @@ PARTS = (
     '(`/fabric/v1/events`; building-fabric-services, `references/events-and-notifications.md`): counts and codes '
     'only, the judge model and rubric version, and `notMeasured` naming every family not computed that day. A '
     "metric not measured is null and named, never 0. The day goes in the event's `data` (`{schema, value}`, as "
-    '`fabric_events.py` writes it), at level `info` and without a notification. Until the contract carries the '
-    'schema (A7), the producer names and pins its own: `data.schema` is the absolute URI of the payload schema the '
-    "agent publishes, and `data.value` stays within DEC-0070's bounds (at most 32 members, each a scalar, a list of"
-    ' scalars or a flat object; per-lane counts as objects such as `laneFailures` and `laneRecovered`; '
-    "building-fabric-services, `references/protocol.md`). Check: the producer's day passes `make_event`; a planted "
-    'day that writes 0 for a family not computed fails; and a test runs every `notMeasured` name the producer can '
-    "emit through the published name pattern, iterating the producer's own list.",
+    '`fabric_events.py` writes it), at level `info` and without a notification. `data.value` is valid against the '
+    "contract's `support-quality-daily.schema.json` (`support-quality-daily/1`, DEC-0095), `data.schema` is the "
+    "absolute URI of the producer's published copy of it (the contract's conformance row for this producer), and "
+    "the value stays within DEC-0070's bounds (at most 32 members, each a scalar, a list of scalars or a flat "
+    'object; per-lane counts as objects such as `laneFailures` and `laneRecovered`; building-fabric-services, '
+    "`references/protocol.md`). A judge's calibration, `calibration {week, labelled, helped}` with "
+    '`calibrationChecks` beside it (DEC-0144), goes in only once every reader of the feed it knows of has adopted '
+    "DEC-0144: the producer then re-publishes its copy from DEC-0144's bytes (CT-188), and leaves the calibration "
+    'out when the judge or the rubric changed after the labelled week. A reader validates against its own pinned '
+    "copy, never one fetched by `$id`: the bytes under the unchanged `$id` widened. Check: the producer's day "
+    "passes `make_event` and validates against the producer's pinned copy of the schema; a planted day that writes "
+    '0 for a family not computed fails; and a test runs every `notMeasured` name the producer can emit through the '
+    "published name pattern, iterating the producer's own list.",
     'A table of lanes** (P4): classifier, writer, fallback writer, checker, research, judge. The checker is another'
     ' vendor than the writer; the judge is another vendor than both, at temperature 0, on an open-vendor model '
     "where it reads what people wrote. Declare them as classes in the profile, where each lane's fallback is "
@@ -111,7 +117,9 @@ CHECKLIST = (
 EXPECTED = (
     'loads references/agents-that-answer-people.md and builds its parts into the first release, not later',
     'records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one '
-    'support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0',
+    'support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0, '
+    "its value valid against the contract's support-quality-daily.schema.json and a judge's calibration carried "
+    'only once its readers adopted DEC-0144',
     'declares lanes with a fallback of another vendor than its primary, a checker of another vendor than the writer'
     ' and a judge of another vendor than both, counts what the fallback recovered, and changes the writer model or '
     'reasoning budget only after an offline replay',
@@ -275,6 +283,21 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         self.assertIn("#model-answers-are-untrusted-until-accepted", reference)
         self.assertIn("reaches back only as far as the producer's feed keeps", reference)
         self.assertNotIn("the template carries", reference)
+
+    def test_the_daily_report_is_the_contracts_payload(self):  # an-agent-that-answers-people (expected 2); DEC-0144
+        # FAA-176 (0.57.0, pin 802c8d27): the contract has carried support-quality-daily.schema.json since DEC-0095, and
+        # DEC-0144 widened it with a judge's calibration, which a producer carries only once its readers adopted it.
+        body = text(REFERENCE).split("## Checklist")[0]
+        a5 = next(" ".join(p.split("\n## ")[0].split()) for p in re.split(r"^- \*\*", body, flags=re.MULTILINE)[1:]
+                  if p.startswith("The agent publishes one"))
+        self.assertNotIn("Until the contract carries the schema", a5)
+        for words in ("valid against the contract's `support-quality-daily.schema.json`", "DEC-0095",
+                      "the absolute URI of the producer's published copy", "`calibration {week, labelled, helped}`",
+                      "`calibrationChecks`", "once every reader of the feed it knows of has adopted DEC-0144",
+                      "re-publishes its copy from DEC-0144's bytes", "CT-188",
+                      "validates against its own pinned copy, never one fetched by `$id`"):
+            self.assertIn(words, a5, words)
+        self.assertIn("calibration carried only once its readers adopted DEC-0144", " ".join(scenario()["expected"]))
 
     def test_the_sources_are_addressed_by_commit(self):
         reference = flat(REFERENCE)

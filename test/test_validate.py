@@ -796,6 +796,18 @@ class WorkflowGuardTests(unittest.TestCase):
                 problems = self._problems(".github/workflows/validate.yml", lambda t: t.replace(needle, "removed:"))
                 self.assertTrue(any(repr(needle) in p for p in problems), problems)
 
+    def test_a_contract_gated_module_the_contract_job_does_not_run_fails(self):
+        # FAA-176 F1: a test gated on FABRIC_CONTRACT_NEW runs only where that job runs it, so every gated module is
+        # named on the job's command line (test_provider's schema parity was skipped on hosted CI until 0.57.0).
+        files = {p.relative_to(ROOT).as_posix(): p.read_text(encoding="utf-8")
+                 for p in sorted((ROOT / ".github/workflows").glob("*.yml"))}
+        files["test/test_gated_example.py"] = 'import os, unittest\n@unittest.skipUnless(os.environ.get("FABRIC_CONTRACT_NEW"), "NOT_RUN")\nclass T(unittest.TestCase):\n    pass\n'
+        tmp, root = _tree(files)
+        with tmp:
+            problems = validate.workflow_problems(root)
+        self.assertTrue(any("test_gated_example" in p for p in problems), problems)
+        self.assertEqual(validate.contract_gated_modules(), ["test_contract_revisions", "test_dashboard_kit", "test_provider"])
+
     def test_a_per_push_trigger_fails(self):
         problems = self._problems(".github/workflows/validate.yml",
                                   lambda t: t.replace("  workflow_dispatch:\n", "  workflow_dispatch:\n  push:\n", 1))
