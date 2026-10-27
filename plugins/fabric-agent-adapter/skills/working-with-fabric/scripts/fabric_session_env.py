@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.53.0"
+VERSION = "0.53.1"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -532,7 +532,9 @@ def _write_private(path: Path, text: str) -> None:
 
 
 def repositories_wanted(env: Optional[Dict[str, str]] = None) -> bool:
-    return (state_root(env=env) / REPOSITORIES_MARK).exists()
+    """Whether the Stop hook reads the transcript for the turn's other repositories (FAA-140): only once a worker
+    left the mark, and never on Windows, where a Bash command's paths are not this host's (FAA-175)."""
+    return sys.platform != "win32" and (state_root(env=env) / REPOSITORIES_MARK).exists()
 
 
 def session_dir(session_id: str, env: Optional[Dict[str, str]] = None) -> Path:

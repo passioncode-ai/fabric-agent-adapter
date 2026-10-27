@@ -1,6 +1,21 @@
 # Changelog
 
-## 0.53.0 (2026-10-27)
+## 0.53.1 (2026-10-27)
+
+0.53.0 was tagged and never released on npm or GitHub (the plugin marketplace, which reads `main`, offered it until
+0.53.1 merged): its release run failed on Windows, where the FAA-140 tests read a Bash
+command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix.
+
+### Fixed
+
+- **No transcript read on Windows** (FAA-175): working-with-fabric's Stop hook never reads the session transcript on
+  Windows, even once Fabric takes `repositories`; a Bash command's paths there are not the host's. Windows sessions send
+  their turn facts as before 0.53.0, without `repositories`. `BashPaths` and the four tests that need the hook itself to
+  read (names from Edit and Bash paths, at most ten, one checkout named once, another checkout of the start repository)
+  are skipped on Windows; the rest run there, the worker's with the read turned on in the test, and a new test checks that
+  the mark turns nothing on there.
+
+## 0.53.0 (2026-10-27, not published)
 
 ### Added
 

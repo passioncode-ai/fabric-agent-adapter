@@ -134,7 +134,7 @@ this repository both obeys it and ships its service layer
   and only in a project that uses Fabric. Stop and SessionEnd first remove
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s);
-  only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'
+  never on Windows and only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'
   folder), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text and tool output, which can
   hold a secret the session displayed, are read with it in memory only, and only the current turn's tool names and path arguments are used) and names the other Git repositories the turn
   touched as `{host, owner, name}` from their `origin`, one `git rev-parse` and one `git config` each inside the same 1.5 s
