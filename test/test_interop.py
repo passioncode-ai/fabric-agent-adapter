@@ -829,6 +829,23 @@ class ActionGateMandateTests(unittest.TestCase):
         self.assertTrue(self.gate(meta={"mandate": scoped}, spend_usd=0.5, project="alpha")["ok"])
         self.assertTrue(self.gate(meta={"mandate": tight}, spend_usd=1)["ok"])
 
+    def test_a_job_step_reads_spend_and_project_as_the_answer_does(self):
+        """0.56.0 seam r1: job_step (a job's start) and action_gate (its answer) read one step alike, failing closed."""
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        call = dict(tier="T0", now=NOW, self_id="example-agent", capability="reviews.approve", key="approve-reply",
+                    effect="reply")
+        for spend in (float("nan"), float("inf"), 10 ** 400, "0.5", True):
+            with self.subTest(spend=repr(spend)[:12]):
+                step = fi.job_step(tight, spend_usd=spend, **call)
+                self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: spend"))
+        for project in (7, ["alpha"]):
+            with self.subTest(project=project):
+                step = fi.job_step(scoped, spend_usd=0.5, project=project, **call)
+                self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: project"))
+        self.assertTrue(fi.job_step(scoped, spend_usd=0.5, project="alpha", **call)["covered"])
+        self.assertTrue(fi.job_step(tight, spend_usd=1, **call)["covered"])
+
     def test_a_huge_spend_and_a_raising_project_fail_closed(self):
         # Second seam reading of 0.51.0: an int past the float range never raises; a project function that raises
         # never reads as "no project", which a mandate limited to projects would cover.

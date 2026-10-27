@@ -1360,6 +1360,7 @@ test('FAA-163: a lost enroll while another slot holds is asked again; a reconnec
   await r.step();
   assert.equal(r.slots['video.cut'].state, 'held');
   assert.ok(!h.kinds().includes('board.slot.moved'));
+  assert.ok(!h.kinds().includes('board.slot.refused'), 'a lost answer is the session\'s, not a refusal (unit r1)');
   await hub.control({ op: 'end-sessions' });
   await r.step(); // session-ended: dropped
   await hub.control({ op: 'fail', tool: 'com.status', code: 'capacity_exceeded' });
@@ -1367,6 +1368,42 @@ test('FAA-163: a lost enroll while another slot holds is asked again; a reconnec
   await r.step();
   assert.deepEqual(r.slots, {});
   assert.equal(r.session, null); // refused with no slot held: reconnects, never skips recovery
+});
+
+test('0.56.0 seam r1: a board-wide not_available is the fault, not a refusal; a refusal after a held slot is said again', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  for (const capability of TWO) await hub.control({ op: 'refuse', tool: 'com.enroll', capability, code: 'not_available' });
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  assert.equal(r.state, 'down');
+  assert.ok(h.kinds().includes('board.down'));
+  assert.ok(!h.kinds().includes('board.slot.refused'));
+  const hub2 = await fakeHub(t, TWO);
+  const h2 = harness(hub2);
+  await hub2.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.cut', code: 'capacity_exceeded' });
+  const r2 = h2.responder({ capabilities: TWO });
+  await r2.step();
+  await hub2.control({ op: 'unrefuse', tool: 'com.enroll', capability: 'video.cut' });
+  await h2.advance(r2.slots['video.cut'].retryAt - h2.clock.t);
+  await r2.step();
+  assert.equal(r2.slots['video.cut'].state, 'held');
+  await hub2.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.cut', code: 'capacity_exceeded' });
+  await hub2.control({ op: 'end-sessions' });
+  await r2.step(); // session-ended: dropped
+  await h2.advance(61);
+  await r2.step(); // reconnects; the enroll is refused again
+  assert.equal(h2.kinds().filter((k) => k === 'board.slot.refused').length, 2);
+});
+
+test('0.56.0 seam r1: a DELETE answered 404 keeps the slot records', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  await hub.control({ op: 'set', values: { delete_status: 404 } });
+  await r.shutdown();
+  assert.deepEqual(Object.keys(slotRecord(hub)).sort(), ['video.cut', 'video.render']);
 });
 
 test('FAA-163: a lapsed slot holds no lease; the record is forgotten only after a DELETE Fabric answered', async (t) => {

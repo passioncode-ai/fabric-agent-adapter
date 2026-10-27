@@ -8,8 +8,9 @@ gate behave.
 ### Fixed
 
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
-  Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and `C:\...` paths, and `git.exe -C`; Bash text is split there
-  without backslash escapes. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
+  Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
+  text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` before `)` or a
+  pipe no longer moves the folder a later relative `-C` is read against. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
   transcript on Windows at all, and a turn from Windows came without `repositories`.
 - **A relative `git -C` after `cd`** (FAA-166) is read against the folder the command last changed into with an
   absolute `cd`; after a relative or unknown `cd` it is dropped, never read against the session's folder.
@@ -18,9 +19,13 @@ gate behave.
   under the responder's lock and only while its record is unchanged, so an operator's take-back at the same moment
   wins. The slot code moved to its own twin modules, `fabric_board_slots.py` and `fabric-board-slots.mjs`.
 - **An idle stop leaves the board within 3 s** (FAA-173): a responder with no work in hand closes its session with a
-  confirmed `DELETE` (2xx or 404) inside the hard exit, instead of letting the slot lapse.
+  confirmed `DELETE` inside the hard exit, instead of letting the slot lapse. The slot records are forgotten only after
+  a 2xx: a 404 (the session already gone) keeps them, since a move made before it ended is read at the next
+  `com.status`. A refusal of the whole board session (`not_available` included) is the board down, never a refused
+  capability; a capability refused again after it was held is said again.
 - **`action_gate` fails closed** (FAA-139): a spend that is not a finite number and a project that cannot be read are
-  read as uncovered, never as absent. A `null` mandate in `_meta` reads as an unreadable one, not as none (FAA-178).
+  read as uncovered, never as absent. A `null` mandate in `_meta` reads as an unreadable one, not as none (FAA-178). A
+  job's start (`job_step`) reads spend and project as its answer does, so both fail closed alike.
 - **`fabric_secrets` matches the contract's ECMAScript reading** (FAA-136): `\s`, `.` and case folding as JavaScript
   reads them, so both ports flag the same values.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
@@ -36,12 +41,15 @@ gate behave.
   whether it is on, off or waiting for Fabric. The repositories of a turn are a lower bound (FAA-174): a turn longer
   than the transcript's last 512 KB names only what that tail shows.
 - The reference service's dashboard shows a moved slot with a Take back button (`POST /api/board/take-back`, operator
-  only; FAA-157).
+  only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action the operator's agent calls with
+  their decision. Its `/mcp` reads a loopback call the service token authenticated as T0.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
 
 ### Changed
 
+- working-with-fabric names Fabric v0.3.5 as the release that brought `fabric-mcp` and the `fabric_work_*` tools, not
+  0.4.0 (the plan milestone), and goes by whether the tools are listed (FAA-170).
 - The `board.slot.moved` notice says the accepted work stays `accepted` and unanswered (not "held", the operator's
   word) and that a restart or reconnect with accepted work for the slot takes it back at once (FAA-164, FAA-171);
   project-board.md says the same to a requester. board.md says a take-back without the operator's relayed decision is
@@ -51,7 +59,8 @@ gate behave.
 ### Upgrading
 
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
-  (board.md, "Run it"): the idle leave above happens only then. A service that stops without the join still works; its
+  (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
+  happens only then. A service that stops without the join still works; its
   slot lapses on the board's clock as before.
 
 ## 0.55.0 (2026-10-27)

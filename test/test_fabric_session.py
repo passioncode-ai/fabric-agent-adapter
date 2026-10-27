@@ -942,6 +942,24 @@ class TurnNudges(Active):
                 self.assertIn("outcome=lost lost=%d" % expected, said[0])
                 self.assertEqual(fs.take_nudges(directory), [] if fail_both else pending)
 
+    def test_lost_counts_past_the_item_cap(self):
+        """0.56.0 unit r1: a full answer (MAX_NUDGE_ITEMS lines) and pending lines lost together are all counted."""
+        mcp = sys.modules["fabric_session_mcp"]
+        real = mcp._write_private
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True, exist_ok=True)
+        real(directory / fs.NUDGES_FILE, json.dumps(["P1", "P2"]))
+
+        def broken(path, text):
+            raise PermissionError("denied")
+        mcp._write_private = broken
+        said = []
+        try:
+            mcp._keep_nudges(directory, [{"says": "line %d" % i} for i in range(fs.MAX_NUDGE_ITEMS)], said.append, SID)
+        finally:
+            mcp._write_private = real
+        self.assertIn("outcome=lost lost=%d" % (fs.MAX_NUDGE_ITEMS + 2), said[0])
+
     def test_a_long_list_is_read_in_linear_time_up_to_its_cap(self):
         """FAA-143: only the first MAX_NUDGE_ITEMS items are read, and repeats are found by a set."""
         many = [{"says": "line %d" % i} for i in range(fs.MAX_NUDGE_ITEMS + 500)]
@@ -1250,13 +1268,24 @@ class BashPaths(unittest.TestCase):
         """FAA-175: Git Bash writes /c/..., /cygdrive/c/..., C:/... and C:\\...; the Stop hook reads them as drive
         paths. Another /... (Git's own root) is not this host's and is left out."""
         got = MCP.bash_paths(r'cd /c/Users/me/one && git -C ../two status; cd "C:\work\three"; git -C D:/four log; '
-                             r'cd C:\five; cd /tmp; git -C x log; cd /cygdrive/e/six', Path(r"C:\Users\me\proj"),
-                             windows=True)
+                             r"cd 'C:\five'; cd C:\unquoted; cd /tmp; git -C x log; cd /cygdrive/e/six",
+                             Path(r"C:\Users\me\proj"), windows=True)
         self.assertEqual(got, [r"C:\Users\me\one", r"C:\Users\me\two", r"C:\work\three", r"D:\four", r"C:\five",
                                r"E:\six"])
         self.assertEqual(MCP.bash_paths("git -C ../two log", Path(r"C:\Users\me\proj"), windows=True),
                          [r"C:\Users\me\two"])
         self.assertEqual(MCP.bash_paths("git.exe -C /d/x log", Path(r"C:\w"), windows=True), [r"D:\x"])
+        self.assertEqual(MCP.bash_paths("GIT.EXE -C /d/x log", Path(r"C:\w"), windows=True), [r"D:\x"],
+                         "Windows names are case-blind (0.56.0 unit r1)")
+        # Git Bash reads an unquoted backslash as an escape: `cd C:\work` goes to `C:work`, which is not named.
+        self.assertEqual(MCP.bash_paths(r"cd C:\work", Path(r"C:\w"), windows=True), [])
+
+    def test_a_subshell_or_pipe_cd_does_not_move_the_base(self):
+        """0.56.0 unit r1: `(cd /a) && git -C b` runs git in the outer folder, so the base is not known after `)`."""
+        for command in ("(cd /a) && git -C b log", "cd /a | git -C b log", "cd /a || git -C b log"):
+            with self.subTest(command=command):
+                self.assertEqual(MCP.bash_paths(command, Path("/w"), windows=False), ["/a"])
+        self.assertEqual(MCP.bash_paths("(cd /a && git -C b log)", Path("/w"), windows=False), ["/a", "/a/b"])
 
     def test_cygwin_and_msys_read_posix_paths(self):
         """FAA-177: a Cygwin or MSYS2 Python names its own /cygdrive/c/... paths; only native Windows translates."""

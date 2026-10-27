@@ -344,10 +344,11 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
     if not (isinstance(effect, str) and effect in EFFECT_CLASSES):
         raise InteropError("A job's approval step names its effect class (one of %s; DEC-0125)." % ", ".join(EFFECT_CLASSES))
     call: Dict[str, Any] = {"capability": capability, "action": key, "effect": effect}
-    if isinstance(spend_usd, (int, float)) and not isinstance(spend_usd, bool):
-        call["spendUsd"] = spend_usd
-    if isinstance(project, str):
-        call["project"] = project
+    spend = mandate_spend(spend_usd)  # read as action_gate reads it, so the start and the answer agree (FAA-139)
+    if spend is not None:
+        call["spendUsd"] = spend
+    if project is not None:
+        call["project"] = project if isinstance(project, str) else UNREADABLE_PROJECT
     covers: Dict[str, Any] = {"mandate": mandate, "tier": tier, "now": now, "self": self_id, "call": call}
     if isinstance(caller_agent, str) and caller_agent:
         covers["callerAgent"] = caller_agent

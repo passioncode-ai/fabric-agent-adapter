@@ -17,6 +17,12 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 
 ## What each hook does
 
+Each hook runs `python3 -S <script>`. On Windows, Claude Code runs a hook command in Git Bash, or in PowerShell when Git
+Bash is not installed ([hooks reference](https://code.claude.com/docs/en/hooks)), so `python3` must name Python 3.9 or
+later there: Python from python.org names itself `python` and `py`, and the Microsoft Store alias for `python3` opens
+the Store until Python is installed from it. Where `python3 --version` fails in Git Bash, every hook fails on each
+session start and turn; FAA-183 tracks making the plugin find the interpreter itself.
+
 | Event | When it acts | What it does |
 |---|---|---|
 | SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running, in a project that uses Fabric (below): adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric running in a folder with no such sign (a user-scope registration reaches every folder): one line pointing at `fabric_whoami`, which names the project when Fabric serves the folder anyway (FAA-60). Fabric down, in a project that uses Fabric: one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
@@ -43,9 +49,10 @@ name and path argument: the `file_path` of Edit, Write and MultiEdit, the `noteb
 Bash command `cd <absolute path>` and `git -C <path>`, split only in commands that hold `cd` or `git`, at most 64 K
 characters of command text a turn. A relative `-C` is read against the folder the command last changed into with an absolute
 `cd`, else the session's folder; after a `cd` to a relative or unknown folder (`cd sub`, `cd ~`, `cd -`) it is left
-out (FAA-166). On Windows (FAA-175) a backslash in a command is not an escape and Git Bash's paths are read as drive
-paths: `/c/...`, `/cygdrive/c/...`, `C:/...` and `C:\...`; another `/...` (Git's own root, which only `cygpath`
-resolves) is left out. A Cygwin or MSYS2 Python reads its own POSIX paths (FAA-177). These are the repositories the turn
+out (FAA-166), as it is after `)` or a pipe, whose `cd` moved only a subshell. On Windows (FAA-175) Git Bash's paths
+are read as drive paths: `/c/...`, `/cygdrive/c/...`, `C:/...` and a quoted `C:\...` (Git Bash reads an unquoted
+backslash as an escape, so `cd C:\work` goes to `C:work`, which is left out); another `/...` (Git's own root, which only
+`cygpath` resolves) is left out. A Cygwin or MSYS2 Python reads its own POSIX paths (FAA-177). These are the repositories the turn
 *touched*: a `cd` or a read-only `git -C <path> log` names one as much as an edit does. A subagent's entries are not
 read, so a repository only a subagent touched is not named. Each
 path is resolved with one `git rev-parse --show-toplevel` and its repository's `origin` with one `git config --get
@@ -173,7 +180,8 @@ check and a delete),
 removed at the session's end.
 
 Turn only the transcript read off with `FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file in the folder
-above (FAA-160). Turn them off with Claude Code's own switch (`/hooks`, or `"disableAllHooks": true` in settings), or remove the
+above (FAA-160). That folder is a cache: a cache cleaner may remove the file, and the read is on again; the variable,
+set where Claude Code starts, does not depend on it. Turn them off with Claude Code's own switch (`/hooks`, or `"disableAllHooks": true` in settings), or remove the
 `fabric` MCP server; the preamble and the Fabric calls stop without it. Uninstalling the plugin removes them; delete
 the cache folder above to leave nothing behind. Codex and Kimi Code: `install-host-hooks --host <host> --remove`.
 

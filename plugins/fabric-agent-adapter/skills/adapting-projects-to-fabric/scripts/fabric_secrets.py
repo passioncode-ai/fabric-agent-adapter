@@ -118,16 +118,21 @@ def raw_values(query: str) -> Dict[str, List[str]]:
     return values
 
 
+#: The C0 controls and space, U+0000 to U+0020: what WHATWG URL parsing trims from a URL's ends.
+_C0_OR_SPACE = "".join(map(chr, range(0x21)))
+
+
 def secret_url(value: str) -> bool:
     """Whether a URL an MCP entry or a launch names carries a credential (LC-21): anything secret_argument finds, a
     password in its user information, or a query or fragment parameter whose name can only carry a credential and has
     a value, or whose value is shaped like one. A string that is not an absolute URL is checked as an argument only."""
     if secret_argument(value):
         return True
-    if not _SCHEME.match(value.strip()):
+    value = value.strip(_C0_OR_SPACE)  # what WHATWG URL parsing trims; never other Unicode spaces, which it refuses
+    if not _SCHEME.match(value):
         return False  # not an absolute URL (WHATWG URL parsing refuses it)
     try:
-        parts = urllib.parse.urlsplit(value.strip())
+        parts = urllib.parse.urlsplit(value)
     except ValueError:
         return False
     if not parts.scheme:

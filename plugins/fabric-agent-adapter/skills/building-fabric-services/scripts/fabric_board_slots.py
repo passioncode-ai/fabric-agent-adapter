@@ -20,7 +20,7 @@ HOLD_RETRY_MAX_SECONDS = 900.0
 #: Refusals that are about the board session, not one capability: they end recovery and go to the responder's fault.
 SESSION_CODES = frozenset(["unreachable", "session-ended", "not_authorized", "authority_changed", "credential", "no-epoch",
                            "schema-unsupported", "checkpoint", "receipt-shape", "idempotency_conflict", "not-running",
-                           "not-a-hub", "hub-unavailable", "protocol"])
+                           "not-a-hub", "hub-unavailable", "protocol", "not_available"])
 
 _whole = lambda v: int(v) if isinstance(v, float) and v.is_integer() else v  # noqa: E731 - 2.0 is 2, as Node reads it
 
@@ -32,6 +32,8 @@ class SlotKeeper:
     def _held_at(self, capability: str, generation: int) -> None:
         """The generation this responder holds the slot at, kept beside its checkpoint so a restart knows it."""
         self._note(capability, {"project": self.project, "generation": generation})
+        if self._said.get("board.slot.refused") == capability:
+            self._said.pop("board.slot.refused", None)  # held again: a later refusal is said again
 
     def _note(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
         """The slot record, best effort: one that cannot be written now is written at the next receipt."""
@@ -138,7 +140,9 @@ class SlotKeeper:
     # -- one capability's refusal (FAA-163) ------------------------------------------------------------------------
     def _retry_later(self, capability: str, entries: List[Dict[str, Any]], exc: BoardError) -> None:
         """An enroll or replace of one capability was refused: its accepted work waits `lapsed` (a transfer takes it
-        back once the slot is held) and the capability asks again after a doubling pause; the others go on."""
+        back once the slot is held) and the capability asks again after a doubling pause; the others go on. A refusal
+        of the board session (SESSION_CODES) is not this capability's: it is left to retry and nothing is said, since
+        the responder's fault says the board is down."""
         if (self.slots.get(capability) or {}).get("state") == "held":
             return  # the replace landed: what failed came after it
         for entry in entries:
@@ -149,7 +153,7 @@ class SlotKeeper:
         tries = slot.get("tries", 0) + 1 if slot.get("state") == "retry" else 1
         wait = min(HOLD_RETRY_MAX_SECONDS, self.hold_delay * 2 ** (tries - 1))
         self.slots[capability] = {"state": "retry", "tries": tries, "retry_at": self.now() + wait, "renewed_at": self.now()}
-        if tries == 1:
+        if tries == 1 and exc.code not in SESSION_CODES:
             self._emit("board.slot.refused", "warn", "Fabric refused to give this service the %s slot (%s); it asks again "
                        "later. Its other capabilities go on." % (capability, exc.code), episode=capability,
                        capability=capability, reason=exc.code)

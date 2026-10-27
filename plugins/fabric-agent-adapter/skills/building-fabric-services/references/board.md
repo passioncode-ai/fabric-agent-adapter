@@ -58,7 +58,8 @@ board.start()
 board.join(timeout)
 ```
 
-Node: `new Responder({...same names in camelCase})`, then `responder.run({ signal, drain })`. A service that lists
+Node: `new Responder({...same names in camelCase})`, then `const running = responder.run({ signal, drain })`; at stop,
+abort the signal and `await running`, bounded inside the hard exit (the run leaves its board session before it settles). A service that lists
 `fabric-project-comms/0.1` in its well-known `protocols` (DEC-0067: only once its hosts are pinned at or after it)
 declares that it answers board requests; the probe checks that declaration.
 
@@ -146,16 +147,17 @@ once it has resumed: when the `com.complete` that sends a known outcome loses it
 key again in the same session (FAA-86). `shutdown()` drains, then leaves the session (its DELETE releases the slot).
 An idle responder waits 3 s at most for that DELETE (`IDLE_LEAVE_SECONDS`), so an idle stop ends within the org's 5 s
 (LC-01, FAA-173); one with work waits up to the session's 15 s client timeout. The slot records are forgotten only after
-a DELETE Fabric answered (2xx or 404), also when a session is dropped on a live board (FAA-163): an unanswered one keeps
+a DELETE Fabric answered with a 2xx (a 404, the session already gone, keeps them: a move made before it ended is read at the next `com.status`), also when a session is dropped on a live board (FAA-163): an unanswered one keeps
 them, and the slot lapses in 60 s.
 
 **One capability at a time (FAA-163).** At connect (and every reconnect) the responder starts with no slot. Each
 capability's enroll or replace is settled on its own: a refusal of that capability (`capacity_exceeded`,
 `invalid_arguments`, any code that is not about the board session) leaves it `retry`, asked again alone after 15 s,
-30 s, doubling to 15 minutes, with one `board.slot.refused` event (warn); its accepted work waits `lapsed` and goes back
+30 s, doubling to 15 minutes, with one `board.slot.refused` event (warn; said again if it is refused again after
+the slot was held); its accepted work waits `lapsed` and goes back
 by a transfer once the slot is held. The capabilities after it are recovered as before. A refusal of the board session
-(`unreachable`, `session-ended`, `not_authorized` and the other codes in `SESSION_CODES`) leaves the rest `retry` too
-and goes to the responder's fault, which keeps the session while a held slot's lease runs (so a lost enroll of one
+(`unreachable`, `session-ended`, `not_available`, `not_authorized` and the other codes in `SESSION_CODES`) leaves the
+rest `retry` too, says no `board.slot.refused`, and goes to the responder's fault (`board.down`), which keeps the session while a held slot's lease runs (so a lost enroll of one
 capability is asked again at its next retry) and reconnects otherwise. A slot whose lease lapsed (`lease_expired`) holds
 no lease for that decision.
 
@@ -219,7 +221,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   holder, or the estate owner, reconciles it now). No `com.claim`, `com.renew`, `com.complete`, `com.enroll` or
   `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
   holder's lease lapses, nor when com.status later names no generation for the slot (a recorded move stays until
-  take-back). Accepted requests stay held on the board, unanswered, until the slot is taken back (CT-175
+  take-back). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back (CT-175
   will hand them to the new holder). One `board.slot.moved` event (warn, notify) says so, once, also across restarts
   (the record keeps `moved`).
 - A responder that never held the slot (a first start: no record, or a record of another Project), or whose record
@@ -235,16 +237,19 @@ held and not transferred). The responder keeps that move instead of undoing it:
   call in flight) and only while the record is unchanged (FAA-158). Never edit the
   checkpoint's `slots` record by hand to undo a move. In the same board
   session the next tick enrolls once the other session lets the slot go (a live holder is waited for) and takes the work
-  left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work held for the slot, takes it
+  left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work waiting for the slot, takes it
   back at once by `com.responder_replace`, as a restart did before 0.53.0: the operator asked for the slot back, so the
   other session is replaced. In recovery, a refusal that leaves no slot held reconnects; one that leaves some held keeps
   the session and serves them. The kit gives it no route of its own. The reference service (`sample_service.py`) offers
   it on its dashboard (FAA-157): a moved slot shows a Take back button that posts `POST /api/board/take-back` from the
-  operator's signed-in session with the `X-Fabric-Request` header; the service token alone is refused. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
+  operator's signed-in session with the `X-Fabric-Request` header; the service token alone is refused. Since 0.56.0 the
+  button has its tool, `board.take-back` with `{capability}`, declared under `extensions/actions/0.1` with gate
+  `relayed` and target `capability`: the operator's agent calls it over `/mcp` with their decision in `_meta.decision`
+  (a call without one is `operator-decision-required`). A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
-  `change-policy` (DEC-0125); until Fabric's hub forwards decisions (CT-125) the operator reaches it through the
-  service's page or its elicitation, and names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
+  `change-policy` (DEC-0125); the operator reaches it through their own agent's relayed decision, the service's page
+  or its elicitation (a decision Fabric's hub forwards waits for CT-125), and the service names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
   detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
   surface.
 

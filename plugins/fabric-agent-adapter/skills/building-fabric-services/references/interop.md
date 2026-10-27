@@ -308,7 +308,10 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   step is kept in the job's private part (`request_input(..., steps=)`). An answer's `_meta.mandate` that covers that
   step is then read when `input_actions=True`, beside a decision for the key. The rule alone is `job_step(mandate, ...)`
   / `jobStep({mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project})`; Node's
-  `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Each `request_input`
+  `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Node has no
+  `approvalStep`, so a Node service calls `jobStep` itself and passes `{}` when the start call's `_meta` carried
+  `mandate: null` (`Object.hasOwn(meta, 'mandate') && meta.mandate === null ? {} : meta.mandate`): `null` is no mandate
+  to `jobStep`, while the answer reads it as an unreadable one (FAA-178). Each `request_input`
   replaces the kept steps, and an answer clears them: pass `steps=` again on every question whose answer a mandate may
   cover. The answer's mandate is read under the job's own capability, as at the start (`action_gate(...,
   mandate_capability=)` / `actionGate({mandateCapability})`), so the start and the answer agree whatever the tool is

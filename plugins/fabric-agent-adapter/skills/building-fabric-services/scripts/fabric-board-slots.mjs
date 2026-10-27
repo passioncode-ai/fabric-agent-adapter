@@ -14,7 +14,7 @@ export const HOLD_RETRY_MAX_SECONDS = 900;
 
 /** Refusals that are about the board session, not one capability: they end recovery and go to the responder's fault. */
 export const SESSION_CODES = Object.freeze(new Set(['unreachable', 'session-ended', 'not_authorized', 'authority_changed', 'credential', 'no-epoch',
-  'schema-unsupported', 'checkpoint', 'receipt-shape', 'idempotency_conflict', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol']));
+  'schema-unsupported', 'checkpoint', 'receipt-shape', 'idempotency_conflict', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol', 'not_available']));
 
 /** The slot methods of Responder, which owns every field they read (checkpoint, slots, project, locked). */
 export class SlotKeeper {
@@ -22,6 +22,7 @@ export class SlotKeeper {
   /** The generation this responder holds the slot at, kept beside its checkpoint; a failed write is retried at the next receipt. */
   heldAt(capability, generation) {
     this.note(capability, { project: this.project, generation });
+    if (this.said['board.slot.refused'] === capability) delete this.said['board.slot.refused']; // held again: a later refusal is said again
   }
 
   /** The slot record, best effort: one that cannot be written now is written at the next receipt. */
@@ -155,7 +156,7 @@ export class SlotKeeper {
     const tries = slot.state === 'retry' ? (slot.tries ?? 0) + 1 : 1;
     const wait = Math.min(HOLD_RETRY_MAX_SECONDS, this.holdDelay * 2 ** (tries - 1));
     this.slots[capability] = { state: 'retry', tries, retryAt: this.now() + wait, renewedAt: this.now() };
-    if (tries === 1) {
+    if (tries === 1 && !SESSION_CODES.has(e.code)) { // a refusal of the board session is the fault's to say
       this.emit('board.slot.refused', 'warn', `Fabric refused to give this service the ${capability} slot (${e.code}); it asks again later. Its other capabilities go on.`, { episode: capability, capability, reason: e.code });
     }
   }

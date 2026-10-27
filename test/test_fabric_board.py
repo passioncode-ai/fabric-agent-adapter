@@ -764,6 +764,41 @@ class RecoveryFollowUpTests(Conversation):
         r.step()
         self.assertEqual(r.slots["video.cut"]["state"], "held")
         self.assertEqual([e for e in self.events if e[0] == "board.slot.moved"], [])
+        self.assertNotIn("board.slot.refused", self.kinds(), "a lost answer is the session's, not a refusal (unit r1)")
+
+    def test_a_board_wide_not_available_is_the_fault_not_a_refusal(self):
+        """0.56.0 seam r1: not_available on every enroll is the board down, never one refused capability."""
+        for capability in self.CAPS:
+            self.board.refuse_always[("com.enroll", capability)] = "not_available"
+        r = self.responder()
+        r.step()
+        self.assertEqual(r.state, "down")
+        self.assertIn("board.down", self.kinds())
+        self.assertNotIn("board.slot.refused", self.kinds())
+
+    def test_a_refusal_after_the_slot_was_held_is_said_again(self):
+        """0.56.0 seam r1: board.slot.refused is said once per episode, and a capability held between ends one."""
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        r = self.responder()
+        r.step()
+        del self.board.refuse_always[("com.enroll", "video.cut")]
+        self.board.advance(r.slots["video.cut"]["retry_at"] - self.board.now)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        self.hub.control({"op": "end-sessions"})
+        r.step()  # session-ended: dropped
+        self.board.advance(61)
+        r.step()  # reconnects; the enroll is refused again
+        self.assertEqual(self.kinds().count("board.slot.refused"), 2)
+
+    def test_a_delete_answered_404_keeps_the_records(self):
+        """0.56.0 seam r1: a session already gone may hide a move the next status read would show."""
+        r = self.responder()
+        r.step()
+        self.hub.delete_status = 404
+        r.shutdown()
+        self.assertEqual(set(self.record()), {"video.render", "video.cut"})
 
     def test_a_reconnect_starts_with_no_slot(self):
         r = self.responder()
@@ -1943,6 +1978,50 @@ class SampleWiringTests(unittest.TestCase):
             svc.board.step()
             self.assertEqual(svc.board.slots["sample.echo"]["state"], "held")
             self.assertIn("board.slot.returned", [e["kind"] for e in svc.log.fetch(None, 100)])
+            svc.board.shutdown(0.1)
+
+    def test_the_take_back_button_has_a_relayed_tool(self):
+        """0.56.0 product r1: every button has a tool (DEC-0121); the operator's agent takes the slot back with their
+        relayed decision, and a call without one is refused."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            hub = FakeHub(tmp / "fabric", capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            (tmp / "data").mkdir(mode=0o700)
+            cred = tmp / "data" / "board.credential"
+            cred.write_text(hub.credential)
+            os.chmod(cred, 0o600)
+            sample = importlib.import_module("sample_service")
+            svc = sample.Service(sample.build_parser().parse_args(["serve", "--port", "1", "--data-dir", str(tmp / "data"),
+                                                                   "--board-project", PROJECT]))
+            svc.start()
+            self.addCleanup(svc.lock.release)
+            svc.board.hub = fh.HubClient(tmp / "fabric")
+            svc.board.now = lambda: hub.board.now
+            svc.board.spawn = lambda fn: fn()
+            wk = svc.well_known()
+            self.assertIn("board.take-back", wk["surfaces"]["mcp"]["capabilities"])
+            actions = wk["extensions"]["https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1"]["actions"]
+            self.assertEqual([(a["id"], a["tool"], a["gate"]) for a in actions], [("board.take-back", "board.take-back", "relayed")])
+            svc.board.step()
+            hub.board.move("sample.echo")
+            hub.board.queue("sample.echo", text="hello")
+            hub.board.advance(15)
+            svc.board.step()
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+
+            def call(meta):
+                params = {"name": "board.take-back", "arguments": {"capability": "sample.echo"}, "_meta": meta}
+                return svc.mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, {}, tier="T0")["result"]
+            refused = call({})
+            self.assertTrue(refused["isError"])
+            self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+            at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            done = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
+                                      "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
+            self.assertFalse(done["isError"], done)
+            self.assertEqual(svc.board_moved(), [])
             svc.board.shutdown(0.1)
 
 
