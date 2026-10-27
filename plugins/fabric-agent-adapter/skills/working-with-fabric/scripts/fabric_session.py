@@ -100,6 +100,13 @@ from fabric_session_mcp import (  # noqa: F401
     _wait_for_session_tools,
     NO_SESSION_EXIT,
     NoSessionError,
+    TRANSCRIPT_TAIL_BYTES,
+    MAX_REPOSITORIES,
+    parse_origin,
+    bash_paths,
+    turn_paths,
+    turn_repositories,
+    stored_repositories,
 )
 from fabric_session_mail import (  # noqa: F401
     WATCH_MIN_INTERVAL_S,

@@ -69,6 +69,8 @@ FAKE_MCP = textwrap.dedent('''\
             def schema(n):
                 if n == "fabric_work_release" and os.environ.get("FAKE_MCP_RELEASE_OBSERVED"):
                     return {{"type": "object", "properties": {{"claims": {{"type": "string"}}, "observedAt": {{"type": "string"}}}}}}
+                if n == "fabric_session_observe" and os.environ.get("FAKE_MCP_OBSERVE_REPOSITORIES"):
+                    return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": {{"type": "array"}}}}}}
                 return {{"type": "object"}}
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": schema(n)}} for n in names]}}}})
         elif method == "tools/call":
@@ -394,6 +396,9 @@ class StopAndEndInert(Base):
 class StopAndEndActive(Base):
     def setUp(self):
         super().setUp()
+        self.active_repository()
+
+    def active_repository(self):
         self.hub(features=["session-hooks/1"])
         self.record = self.base / "record.jsonl"
         fake = self.base / "bin" / "fabric-mcp"
@@ -1113,6 +1118,235 @@ class WatchMail(Active):
         proc.send_signal(signal.SIGTERM)
         self.assertEqual(proc.wait(timeout=10), 0)
         proc.stdout.close()
+
+
+MCP = sys.modules["fabric_session_mcp"]
+
+
+def prompt_entry(text="do the thing"):
+    return {"type": "user", "message": {"role": "user", "content": text}}
+
+
+def tool_entry(name, **arguments):
+    return {"type": "assistant", "message": {"role": "assistant", "content": [
+        {"type": "tool_use", "id": "toolu_x", "name": name, "input": arguments}]}}
+
+
+def result_entry():
+    return {"type": "user", "toolUseResult": {}, "message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": "toolu_x", "content": "RESULT-TEXT-SENTINEL"}]}}
+
+
+class OriginNames(unittest.TestCase):
+    """FAA-140 (D1): a repository is named {host, owner, name} from its origin, credentials and `.git` stripped."""
+
+    def test_the_forms_git_writes(self):
+        cases = {
+            "https://github.com/acme/one.git": ("github.com", "acme", "one"),
+            "https://user:TOKEN-SENTINEL@github.com/acme/one": ("github.com", "acme", "one"),
+            "https://x-access-token:p@ss@github.com/acme/one.git/": ("github.com", "acme", "one"),
+            "http://GitHub.com:8080/Acme/One.git": ("github.com", "Acme", "One"),
+            "git@github.com:acme/two.git": ("github.com", "acme", "two"),
+            "bitbucket.org:team/three": ("bitbucket.org", "team", "three"),
+            "ssh://git@bitbucket.org:7999/team/four.git": ("bitbucket.org", "team", "four"),
+            "git+ssh://git@gitlab.com/group/sub/five.git": ("gitlab.com", "group/sub", "five"),
+            " https://github.com/acme/six.git\n": ("github.com", "acme", "six"),
+        }
+        for url, (host, owner, name) in cases.items():
+            with self.subTest(url=url):
+                self.assertEqual(MCP.parse_origin(url), {"host": host, "owner": owner, "name": name})
+
+    def test_what_names_no_remote_repository_is_dropped(self):
+        for url in ("", "/srv/git/one.git", "file:///srv/git/one.git", "C:/repos/one", "C:\\repos\\one",
+                    "https://github.com/one", "https://github.com/", "github.com", "https://host_bad/a/b",
+                    "https://github.com/acme/../x", "https://github.com/acme/.git", "https://u:p/x@github.com/a/b",
+                    "https://github.com/acme/on e", "ftp://github.com/acme/one", "x" * 3000):
+            with self.subTest(url=url[:40]):
+                self.assertIsNone(MCP.parse_origin(url))
+
+
+class BashPaths(unittest.TestCase):
+    def test_cd_to_an_absolute_path_and_git_dash_c(self):
+        cwd = Path("/work/start")
+        got = MCP.bash_paths("cd /a/b && git -C ../c -c core.x=y status; (cd /d) | git --no-pager -C /e log -C "
+                             "&& cd relative && cd ~ && cd && /usr/bin/git -C '/f g' diff && echo git -C /not-git",
+                             cwd)
+        self.assertEqual(got, ["/a/b", os.path.normpath("/work/c"), "/d", "/e", "/f g"])
+
+    def test_a_command_that_does_not_parse_names_nothing(self):
+        self.assertEqual(MCP.bash_paths("cd '/a/b", Path("/w")), [])
+        self.assertEqual(MCP.bash_paths("", Path("/w")), [])
+
+
+class TurnRepositories(Base):
+    """FAA-140: the Stop hook names the other repositories the turn changed (REQ-1) and the worker sends them only
+    where fabric_session_observe takes `repositories` (REQ-2)."""
+
+    active_repository = StopAndEndActive.active_repository
+    records = StopAndEndActive.records
+
+    def setUp(self):
+        super().setUp()
+        self.active_repository()
+        subprocess.run(["git", "-C", str(self.repo), "config", "remote.origin.url", "https://github.com/acme/start.git"],
+                       check=True)
+        self.transcript = self.base / "transcript.jsonl"
+
+    def git_repo(self, name, origin=None):
+        folder = self.base / name
+        subprocess.run(["git", "init", "-q", str(folder)], check=True)
+        if origin:
+            subprocess.run(["git", "-C", str(folder), "config", "remote.origin.url", origin], check=True)
+        return folder
+
+    def write_transcript(self, entries, filler=b""):
+        with open(self.transcript, "wb") as handle:
+            for entry in entries:
+                if entry is None:
+                    handle.write(filler)
+                    continue
+                handle.write(json.dumps(entry).encode() + b"\n")
+
+    def spool_turn(self, transcript=None):
+        payload = {"session_id": SID, "cwd": str(self.repo), "hook_event_name": "Stop", "stop_hook_active": False}
+        if transcript is not False:
+            payload["transcript_path"] = str(transcript or self.transcript)
+        spawned = []
+        said = fs.hook_spool(payload, "turn", self.env, spawn=spawned.append)
+        entry = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))[-1]
+        return said, json.loads(entry.read_text())
+
+    def test_the_turn_names_the_other_repositories_it_changed_and_no_path(self):
+        one = self.git_repo("one", "https://user:TOKEN-SENTINEL@github.com/acme/one.git")
+        two = self.git_repo("two", "git@bitbucket.org:team/two.git")
+        three = self.git_repo("three", "ssh://git@github.com/acme/three")
+        four = self.git_repo("four", "https://github.com/acme/four.git")
+        seven = self.git_repo("seven", "https://github.com/acme/seven.git")
+        bare = self.git_repo("no-origin")
+        read_only = self.git_repo("read-only", "https://github.com/acme/read-only.git")
+        earlier = self.git_repo("earlier", "https://github.com/acme/earlier.git")
+        (two / "sub").mkdir()
+        self.write_transcript([
+            prompt_entry("an earlier turn"), tool_entry("Edit", file_path=str(earlier / "x.txt")), result_entry(),
+            prompt_entry("PROMPT-TEXT-SENTINEL"),
+            tool_entry("Edit", file_path=str(one / "a.txt"), old_string="OLD-SENTINEL", new_string="b"), result_entry(),
+            tool_entry("Write", file_path=str(two / "sub" / "new.txt"), content="CONTENT-SENTINEL"), result_entry(),
+            tool_entry("Bash", command="cd %s && make" % three), result_entry(),
+            tool_entry("Bash", command="git -C ../four status"), result_entry(),
+            tool_entry("MultiEdit", file_path=str(one / "c.txt"), edits=[]), result_entry(),
+            tool_entry("NotebookEdit", notebook_path=str(seven / "n.ipynb"), new_source="x"), result_entry(),
+            tool_entry("Edit", file_path=str(bare / "a.txt")), result_entry(),
+            tool_entry("Edit", file_path=str(self.repo / "tracked.txt")), result_entry(),
+            tool_entry("Read", file_path=str(read_only / "a.txt")), result_entry(),
+            tool_entry("Write", file_path=str(self.base / "outside" / "loose.txt")), result_entry(),
+            {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "done"}]}},
+        ])
+        said, entry = self.spool_turn()
+        self.assertEqual(said, "spooled: worker started")
+        self.assertEqual(entry["repositories"], [
+            {"host": "github.com", "owner": "acme", "name": "one"},
+            {"host": "bitbucket.org", "owner": "team", "name": "two"},
+            {"host": "github.com", "owner": "acme", "name": "three"},
+            {"host": "github.com", "owner": "acme", "name": "four"},
+            {"host": "github.com", "owner": "acme", "name": "seven"}])
+        stored = json.dumps({k: v for k, v in entry.items() if k != "cwd"})
+        for leaked in (str(self.base), "TOKEN-SENTINEL", "PROMPT-TEXT-SENTINEL", "CONTENT-SENTINEL", "OLD-SENTINEL",
+                       "RESULT-TEXT-SENTINEL", "read-only", "earlier", "start"):
+            self.assertNotIn(leaked, stored)
+        self.assertNotIn(str(self.base), self.log_text())
+
+    def test_at_most_ten_repositories(self):
+        folders = [self.git_repo("r%02d" % i, "https://github.com/acme/r%02d.git" % i) for i in range(12)]
+        self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd %s" % f) for f in folders])
+        _, entry = self.spool_turn()
+        self.assertEqual([r["name"] for r in entry["repositories"]], ["r%02d" % i for i in range(10)])
+
+    def test_two_checkouts_of_one_repository_are_named_once(self):
+        a = self.git_repo("a", "https://github.com/acme/same.git")
+        b = self.git_repo("b", "git@github.com:acme/same")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(a / "x")),
+                               tool_entry("Edit", file_path=str(b / "x"))])
+        _, entry = self.spool_turn()
+        self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "same"}])
+
+    def test_another_checkout_of_the_start_repository_is_not_named(self):
+        """A worktree or a second clone of the start folder's repository has another toplevel but the same origin: it
+        is the start folder's repository, not another one."""
+        clone = self.git_repo("clone", "git@github.com:acme/start.git")
+        other = self.git_repo("other", "https://github.com/acme/other.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(clone / "x")),
+                               tool_entry("Edit", file_path=str(other / "x"))])
+        _, entry = self.spool_turn()
+        self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "other"}])
+
+    def test_a_missing_or_unreadable_transcript_names_none_and_is_no_error(self):
+        garbage = self.base / "garbage.jsonl"
+        garbage.write_bytes(b"\xff\xfe not json\n{\"type\": 3}\n[1, 2]\n")
+        for transcript in (False, self.base / "absent.jsonl", self.base, garbage):
+            with self.subTest(transcript=str(transcript)):
+                _remove = fs.session_dir(SID, self.env)
+                shutil.rmtree(_remove, ignore_errors=True)
+                said, entry = self.spool_turn(transcript)
+                self.assertEqual(said, "spooled: worker started")
+                self.assertNotIn("repositories", entry)
+                self.assertIsInstance(entry["facts"]["head"], str)
+
+    def test_only_the_tail_of_a_long_transcript_is_read(self):
+        early = self.git_repo("early", "https://github.com/acme/early.git")
+        late = self.git_repo("late", "https://github.com/acme/late.git")
+        filler = b"".join(json.dumps({"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "x" * 1000}]}}).encode() + b"\n" for _ in range(600))
+        self.write_transcript([tool_entry("Edit", file_path=str(early / "x")), None,
+                               tool_entry("Edit", file_path=str(late / "x"))], filler=filler)
+        self.assertGreater(self.transcript.stat().st_size, MCP.TRANSCRIPT_TAIL_BYTES + 1000)
+        self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(late / "x")])
+
+    def test_a_spent_budget_names_none(self):
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
+        self.assertEqual(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic()), [])
+        self.assertEqual(len(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic() + 5)), 1)
+
+    def test_a_subagent_entry_and_a_meta_prompt_do_not_end_the_turn(self):
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        side = self.git_repo("side", "https://github.com/acme/side.git")
+        meta = dict(prompt_entry("caveat"), isMeta=True)
+        sidechain = dict(tool_entry("Edit", file_path=str(side / "x")), isSidechain=True)
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x")), meta, sidechain])
+        self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo), [str(one / "x")])
+
+    def test_the_end_entry_carries_no_repositories(self):
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo), "transcript_path": str(self.transcript)}, "end",
+                      self.env, spawn=lambda d: None)
+        (entry,) = fs.session_dir(SID, self.env).glob("*-end.json")
+        self.assertNotIn("repositories", json.loads(entry.read_text()))
+
+    def deliver_two_turns(self):
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
+        self.spool_turn()
+        self.spool_turn()
+        fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
+        return [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
+
+    def test_the_worker_sends_repositories_where_the_schema_lists_them(self):
+        self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "1"
+        turns = self.deliver_two_turns()
+        self.assertEqual([t["repositories"] for t in turns], [[{"host": "github.com", "owner": "acme", "name": "one"}]] * 2)
+        log = self.log_text()
+        self.assertIn("repositories=1", log)
+        self.assertNotIn("acme", log)
+
+    def test_the_worker_drops_repositories_where_the_schema_does_not_list_them(self):
+        turns = self.deliver_two_turns()
+        self.assertEqual(len(turns), 2)
+        for turn in turns:
+            self.assertNotIn("repositories", turn)
+        log = self.log_text()
+        self.assertEqual(log.count("does not take repositories"), 1, "said once per session")
+        self.assertNotIn("acme", log)
 
 
 class LaunchedByFabric(Active):
