@@ -129,7 +129,7 @@ reads the URL up to there, as Node does), or a character outside ASCII in its pa
 and every read fail; a trailing ASCII space or line break is trimmed as urllib reads it; a Unicode space ending the
 part before the first `#` is refused, as `check_url` refuses it, though urllib would trim it and read the keys,
 because Node keeps it percent-encoded; a leading space is refused as not a URL), a host holding `%`, a backslash, a Unicode space or a control character (urllib
-would decode or dial it as another host), a bracketed host that is no IPv6 address, a port above
+would decode or dial it as another host), a bracketed host that is no IPv6 address, a port that is not ASCII digits or is above
 65535, no host, and an empty userinfo. The Node kit accepts several of these as `new URL` reads them, among them a `%`
 host decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped and an extra slash before the
 host skipped. The

@@ -104,17 +104,18 @@ export class Client {
     if (/[?#]/.test(baseUrl)) { // `/chat/completions` would land in it (0.56.0 unit r19, FAA-187 (17))
       throw new OpenRouterError('the base URL holds no query or fragment', { kind: 'config' });
     }
-    // A Unicode space at the end stays in the path (`new URL` percent-encodes it) and every call would fail; the
-    // Python twin refuses it in check_url (0.56.0 seam r20, product r21).
-    if (/\s$/u.test(baseUrl.replace(/[\x00-\x20]+$/, ''))) {
-      throw new OpenRouterError('the base URL ends in a Unicode space', { kind: 'config' });
-    }
     checkAttribution(projectId, undefined);
     Object.assign(this, { ceilingUsd, ledger, keyEnv, window, attribution, projectId, unmeasuredCallUsd, deadlineS, retries });
     this.prices = Object.fromEntries(Object.entries(prices ?? {}).map(([k, v]) => [k, { ...v }]));
     // The base URL as checkUrl read it: `new URL` trims C0 controls and spaces from its ends, so `.../v1/ ` is not
     // composed as `.../v1/%20/chat/completions` (0.56.0 product r20; the Python twin trims the ends urllib does).
     this.baseUrl = baseUrl.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
+    // A Unicode space (or NEL, or a zero-width space) ending the base as it is composed stays in the path, where
+    // `new URL` percent-encodes it, and every call would fail; the Python twin refuses it in check_url (0.56.0 seam
+    // r20, r21, product r21, unit r21: `.../v1\u00a0/` is checked after its slash is gone).
+    if (/[\s\u0085\u180e\u200b]$/u.test(this.baseUrl)) {
+      throw new OpenRouterError('the base URL ends in a Unicode space', { kind: 'config' });
+    }
     this.env = env;
     this.transport = transport;
     this.sleep = sleep ?? ((s) => new Promise((resolve) => setTimeout(resolve, s * 1000)));

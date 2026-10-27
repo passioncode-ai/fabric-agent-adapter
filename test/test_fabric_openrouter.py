@@ -135,7 +135,8 @@ class Rules(unittest.TestCase):
         # 0.56.0 unit r19, seam r20: a query or fragment would take `/chat/completions`; a Unicode space at the end
         # stays in the path. Both are refused when the client is built.
         for base in ("https://openrouter.ai/api/v1?x=1", "https://openrouter.ai/api/v1#f", "https://openrouter.ai/api/v1\u00a0",
-                     "https://openrouter.ai/api/v1\u3000"):
+                     "https://openrouter.ai/api/v1\u3000", "https://openrouter.ai/api/v1\u00a0/", "https://openrouter.ai/api/v1\x85",
+                     "https://openrouter.ai/api/v1\u200b"):
             with self.subTest(base=base):
                 with self.assertRaises(Exception) as caught:  # OpenRouterError, or check_url's HttpError
                     fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],

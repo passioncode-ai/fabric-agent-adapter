@@ -169,7 +169,8 @@ test('a base URL ending in a line break or a space is composed without it', () =
   // 0.56.0 unit r19, seam r20: a query or fragment would take `/chat/completions`; a Unicode space at the end stays
   // in the path. Both are refused when the client is built.
   for (const baseUrl of ['https://openrouter.ai/api/v1?x=1', 'https://openrouter.ai/api/v1#f', 'https://openrouter.ai/api/v1\u00a0',
-    'https://openrouter.ai/api/v1\u3000', 'https://openrouter.ai/api/v1\u00a0\n']) {
+    'https://openrouter.ai/api/v1\u3000', 'https://openrouter.ai/api/v1\u00a0\n', 'https://openrouter.ai/api/v1\u00a0/',
+    'https://openrouter.ai/api/v1\u3000/', 'https://openrouter.ai/api/v1\u0085', 'https://openrouter.ai/api/v1\u200b']) {
     assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), (e) => e.kind === 'config', JSON.stringify(baseUrl));
   }
 });

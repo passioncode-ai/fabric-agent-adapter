@@ -82,6 +82,7 @@ const answer = await client.chat(messages, { model, fallback, maxTokens: 800 });
 | The fallback | required, of another vendor (the part before `/` differs) |
 | Content | text only: a string, null, or parts that are all `{"type": "text"}`; an image, audio or file part is refused (`config`), because what it is billed cannot be bounded from its bytes |
 | What the ceiling does not cover | the `provider` routing param can send a call to a provider priced above the catalog; two `Client` objects sharing one ledger each hold only their own calls in flight, so give an agent one client per key |
+| The base URL | `base_url` (`baseUrl`), by default `https://openrouter.ai/api/v1`: checked by `check_url` when the client is built; ASCII whitespace and `/` at its end are trimmed; a query or a fragment is refused (kind `config`, both twins), and so is a Unicode space ending it (Python: `check_url`'s `HttpError` kind `refused`; Node: kind `config`) |
 | Attribution | off unless an `attribution` setting is given (FAC-SEM-098, `fabric_usage.attribution_headers`) |
 | Request body | `model`, `messages`, `max_tokens`, `usage: {include: true}` and your params (temperature, reasoning, response_format, tools); `stream`, `model`, `messages`, `max_tokens` and `usage` as params are refused |
 
