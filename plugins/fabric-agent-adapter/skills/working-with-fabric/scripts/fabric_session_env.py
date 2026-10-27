@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.55.0"
+VERSION = "0.56.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -100,21 +100,26 @@ def nudge_shown(line: str) -> str:
 WATCH_NUDGES_FILE = "nudges.watch.json"
 MAX_NUDGES = 5
 MAX_NUDGE_CHARS = 400
+#: At most this many items of an answer's nudges are read (FAA-143): a broken Fabric's long list costs linear time.
+MAX_NUDGE_ITEMS = 1000
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
 
 
 def nudge_lines(value: Any, limit: Optional[int] = MAX_NUDGES) -> List[str]:
     """The `says` of a nudges list as clean lines: one line each (controls and line breaks become a space), cut to
-    MAX_NUDGE_CHARS, blanks and repeats dropped, at most `limit` (None: all). Anything that is not such a list gives []."""
+    MAX_NUDGE_CHARS, blanks and repeats dropped, at most `limit` (None: all) from the first MAX_NUDGE_ITEMS items.
+    Anything that is not such a list gives []."""
     lines: List[str] = []
+    seen = set()
     if not isinstance(value, list):
         return lines
-    for item in value:
+    for item in value[:MAX_NUDGE_ITEMS]:
         says = item.get("says") if isinstance(item, dict) else None
         if not isinstance(says, str):
             continue
         line = " ".join(_CONTROL.sub(" ", says).split())[:MAX_NUDGE_CHARS].rstrip()
-        if line and line not in lines:
+        if line and line not in seen:
+            seen.add(line)
             lines.append(line)
         if limit is not None and len(lines) == limit:
             break

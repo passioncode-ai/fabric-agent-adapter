@@ -37,6 +37,7 @@ from fabric_session_env import (  # noqa: F401
     NUDGES_FILE,
     MAX_NUDGES,
     MAX_NUDGE_CHARS,
+    MAX_NUDGE_ITEMS,
     nudge_lines,
     take_nudges,
     WATCH_NUDGES_FILE,

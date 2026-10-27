@@ -36,12 +36,12 @@ once; for 15 minutes the hooks spool nothing for that id (an end removes the fol
 nothing else does the Stop hook read the
 session's transcript at all: the worker then leaves `observe-takes-repositories` in the hooks' folder (beside
 `hooks.log`) and removes it when the schema stops saying so (after a Fabric downgrade, the turns that end before a worker next
-runs, about a minute, are still read; none of their names is sent); without it nothing below happens. With it, the hook reads the last 512 KB of the
+reaches the running Fabric, about a minute (longer while rejoins fail or under the no-session hold), are still read; none of their names is sent); without it nothing below happens. With it, the hook reads the last 512 KB of the
 transcript (the payload's `transcript_path`; earlier turns included) and uses only the entries after the last prompt
 the person typed. Those lines hold message text and tool output too (file contents, command output: a secret the session displayed can be there; it stays in memory and is never spooled, logged or sent); of each entry it uses only a tool call's
 name and path argument: the `file_path` of Edit, Write and MultiEdit, the `notebook_path` of NotebookEdit, and in a
-Bash command `cd <absolute path>` and `git -C <path>`, split only in commands that hold `cd` or `git`, at most 64 KB
-of command text a turn. A relative `-C` is read against the folder the command last changed into with an absolute
+Bash command `cd <absolute path>` and `git -C <path>`, split only in commands that hold `cd` or `git`, at most 64 K
+characters of command text a turn. A relative `-C` is read against the folder the command last changed into with an absolute
 `cd`, else the session's folder; after a `cd` to a relative or unknown folder (`cd sub`, `cd ~`, `cd -`) it is left
 out (FAA-166). On Windows (FAA-175) a backslash in a command is not an escape and Git Bash's paths are read as drive
 paths: `/c/...`, `/cygdrive/c/...`, `C:/...` and `C:\...`; another `/...` (Git's own root, which only `cygpath`

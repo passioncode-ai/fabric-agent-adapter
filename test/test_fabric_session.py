@@ -915,6 +915,41 @@ class TurnNudges(Active):
         self.assertEqual(fs.take_nudges(directory), ["A"], "the pending one is back; only this turn's B is lost")
         self.assertIn("outcome=lost lost=1", said[0])
 
+    def test_lost_counts_this_turn_s_capped_lines_and_both_failed_writes(self):
+        """FAA-143: with five pending and the write failing, the turn's lines past the cap are lost too; when the
+        write-back fails as well, the pending ones are counted lost with them, and nothing is left behind."""
+        mcp = sys.modules["fabric_session_mcp"]
+        real = mcp._write_private
+        for fail_both, pending, expected in ((False, ["P%d" % i for i in range(fs.MAX_NUDGES)], 3),
+                                             (True, ["P1", "P2"], 5)):
+            with self.subTest(fail_both=fail_both):
+                directory = fs.session_dir(SID, self.env)
+                directory.mkdir(parents=True, exist_ok=True)
+                real(directory / fs.NUDGES_FILE, json.dumps(pending))
+                calls = []
+
+                def flaky(path, text):
+                    calls.append(text)
+                    if len(calls) == 1 or fail_both:
+                        raise PermissionError("denied")
+                    real(path, text)
+                mcp._write_private = flaky
+                said = []
+                try:
+                    mcp._keep_nudges(directory, [{"says": "T1"}, {"says": "T2"}, {"says": "T3"}], said.append, SID)
+                finally:
+                    mcp._write_private = real
+                self.assertIn("outcome=lost lost=%d" % expected, said[0])
+                self.assertEqual(fs.take_nudges(directory), [] if fail_both else pending)
+
+    def test_a_long_list_is_read_in_linear_time_up_to_its_cap(self):
+        """FAA-143: only the first MAX_NUDGE_ITEMS items are read, and repeats are found by a set."""
+        many = [{"says": "line %d" % i} for i in range(fs.MAX_NUDGE_ITEMS + 500)]
+        lines = fs.nudge_lines(many, limit=None)
+        self.assertEqual(len(lines), fs.MAX_NUDGE_ITEMS)
+        self.assertEqual(lines[-1], "line %d" % (fs.MAX_NUDGE_ITEMS - 1))
+        self.assertEqual(fs.nudge_lines([{"says": "a"}, {"says": "b"}, {"says": "a"}], limit=None), ["a", "b"])
+
     def test_an_empty_absent_or_odd_list_prints_nothing(self):
         for value in ({"nudges": []}, {"recorded": True}, {"nudges": "go"}, {"nudges": [1, None, "x", {"kind": "a"},
                       {"kind": "a", "says": 7}, {"kind": "a", "says": "   "}]}, "not json", [1, 2]):
@@ -1002,6 +1037,17 @@ class WatchMail(Active):
         self.assertEqual(code, 0)
         self.assertEqual(printed.count("Fabric reminder: Your claim lapsed."), 1)
         self.assertIsNone(fs.hook_user_prompt_submit({"session_id": SID}, self.env), "the prompt hook does not repeat it")
+
+    def test_watch_mail_prints_a_fabric_line_as_fabric_wrote_it(self):
+        """FAA-143: a reminder that starts `Fabric:` is printed untagged by watch-mail, as by the prompt hook."""
+        nudges = self.base / "nudges.json"
+        nudges.write_text(json.dumps({"nudges": [{"kind": "claim", "says": "Fabric: your claim lapsed."}]}))
+        self.env["FAKE_MCP_NUDGES"] = str(nudges)
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=lambda directory: None)
+        code, printed, _ = self.watch(1)
+        self.assertEqual(code, 0)
+        self.assertEqual(printed.count("Fabric: your claim lapsed."), 1)
+        self.assertFalse(any(fs.NUDGE_PREFIX in line for line in printed))
 
     def test_watch_mail_leaves_the_stop_worker_s_nudges_to_the_prompt(self):
         nudges = self.base / "nudges.json"

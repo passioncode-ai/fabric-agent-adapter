@@ -118,8 +118,9 @@ class SlotKeeper:
                 self._note(capability, dict(held, moved=now))  # said again at the next start if it cannot be written
         if "moved" not in held:  # once, even across restarts
             self._emit("board.slot.moved", "warn", "The %s slot on this Project was moved to another session. This service stopped "
-                       "answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not "
-                       "take the slot back by itself. Its take-back action brings it back once the other session lets it go; without one, ask its "
+                       "answering it there, left its accepted work `accepted` and unanswered (work already begun is the new holder's to "
+                       "settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets "
+                       "it go, or at once at a restart or reconnect while it holds accepted work for the slot; without one, ask its "
                        "maintainer." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
         return True
