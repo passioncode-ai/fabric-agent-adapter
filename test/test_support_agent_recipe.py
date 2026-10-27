@@ -355,22 +355,41 @@ class Recipe(unittest.TestCase):
         rows = [json.loads(l) for l in (self.dir / "state" / "handoffs.jsonl").read_text().splitlines()]
         self.assertEqual([r["reasons"] for r in rows], [["no-knowledge"], ["model:config"]], "the CLI keeps the outbox")
 
-    def test_a_repair_step_may_answer_again_from_on_handoff(self):  # 0.55.0 product round 7: it deadlocked
+    def test_answer_from_on_handoff_is_refused_at_once(self):  # 0.55.0 readings 7 and 8: it hung, then looped
         import threading
         model = model_says("Open Settings.", "Open Settings [KB:password-reset].")
         agent, _ = self.agent(model)
-        retried = []
-        agent.on_handoff = lambda row: retried.append(agent.answer(row["messageId"] + "-r1", row["question"]))
+        refused = []
+
+        def handoff(row):
+            try:
+                agent.answer(row["messageId"], row["question"])
+            except sa.RecipeError as err:
+                refused.append(str(err))
+        agent.on_handoff = handoff
         done = []
         worker = threading.Thread(target=lambda: done.append(agent.answer("m-1", "How do I reset my password?")),
                                   daemon=True)
         worker.start()
         worker.join(5)
         self.assertFalse(worker.is_alive(), "the first answer returns")
+        self.assertEqual(len(refused), 1)
         self.assertEqual((done[0]["action"], done[0]["reasons"]), ("handoff", ["no-citation"]))
-        self.assertEqual(retried[0]["action"], "reply")
-        lines = (self.dir / "decisions.jsonl").read_text().splitlines()
-        self.assertEqual(len(lines), 2, "one line per call: the retry is a decision of its own")
+        self.assertEqual(len(model.calls), 1, "the refused call costs nothing")
+
+    def test_a_queued_repair_retries_once_then_reaches_a_person(self):  # the README's pattern, bounded
+        model = model_says("Open Settings.", "Open Settings again.")
+        agent, _ = self.agent(model)
+        queue, person = [], []
+        agent.on_handoff = lambda row: (person if row["messageId"].endswith("-r1") else queue).append(row)
+        first = agent.answer("m-1", "How do I reset my password?")
+        retry = agent.answer(queue[0]["messageId"] + "-r1", queue[0]["question"])
+        self.assertEqual((first["action"], retry["action"]), ("handoff", "handoff"))
+        self.assertEqual(len(model.calls), 2, "one draft and one repair")
+        self.assertEqual([row["messageId"] for row in person], ["m-1-r1"], "the second refusal reaches a person")
+        self.assertEqual(len((self.dir / "decisions.jsonl").read_text().splitlines()), 2, "one line per call")
+        self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "handoff",
+                         "the original id stays a hand-off")
 
     def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
         config = json.loads((RECIPE / "config.example.json").read_text())

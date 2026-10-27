@@ -24,21 +24,25 @@ of one. Every hand-off goes to `on_handoff`, by default the outbox a person read
 name that as the failing pattern (P2). An agent that repairs passes its own `on_handoff=` so a failed check reaches
 its repair step rather than a person; the recipe returns the failed checks by name in `reasons`, but takes no reason
 in and returns no refused draft yet, and it calls again under a new message id, since the stored decision answers any
-repeat of the same id. `on_handoff` runs under the agent's lock, before the decision is saved; the lock is reentrant,
-so the repair step may call `answer` again on the same thread, but must not wait there for another thread that calls
-it. Each retry is one more line in `decisions.jsonl`: the agent's own turn record, not that file, counts turns. The
-recipe also lacks three parts of such an agent: the Lookup (shared words, best three) is a relevance rule of its own,
-where the agent reads the knowledge service's per-item `answer` flag and puts small closed rule sets into the prompt
-whole; `from_config` accepts a same-vendor fallback, refused only per call as `model:config`; and the decision does
-not record which model answered, so fallback recoveries are not counted. The recipe hands off nothing for `policy`:
-the calling service routes the categories a person must handle (refunds, unbans, account recovery) before it calls the
-recipe, or a model's `HANDOFF` on them is counted as a false knowledge gap. Count its hand-offs by cause: a failed
-check is a refusal for the agent to repair, research and hold, and only a hold on the material counts as `inability`
-(a hold after an outage or at the research time cap is `infrastructure`); `unsupported:amount` is a money reason,
-never researched, and so is `unsupported:number` while the decision returns no draft to tell a price from another
-number; `no-knowledge` and `model-unsure` are `inability`; every `inability` opens a gap; `model:*` is
-`infrastructure`, and `model:ceiling` and `model:payment` are also the turn's `limit` outcome. The rest of the agent's
-parts with checks come from [agents that answer
+repeat of the same id. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
+hand-off and returns: since 0.55.0 a call to `answer` from inside it is refused with `RecipeError` (and nothing is
+saved for that message), and the repair step calls `answer` once the first call has returned. The original id stays a
+hand-off, which a repeat of it returns; the repair step sends the retry's reply and records the turn as answered in
+the agent's own turn record, which, not `decisions.jsonl` (one line per call), counts turns. The retry's own hand-off
+reaches `on_handoff` again, so the repair step bounds its retries (one repair is the practices') and passes any
+further hand-off to the person's channel. A copy of `support_agent.py` made before 0.55.0 takes no `on_handoff` in
+`from_config` and hangs on such a call: copy it again. The recipe also lacks three parts of such an agent: the Lookup
+(shared words, best three) is a relevance rule of its own, where the agent reads the knowledge service's per-item
+`answer` flag and puts small closed rule sets into the prompt whole; `from_config` accepts a same-vendor fallback,
+refused only per call as `model:config`; and the decision does not record which model answered, so fallback recoveries
+are not counted. The recipe hands off nothing for `policy`: the calling service routes the categories a person must
+handle (refunds, unbans, account recovery) before it calls the recipe, or a model's `HANDOFF` on them is counted as a
+false knowledge gap. Count its hand-offs by cause: a failed check is a refusal for the agent to repair, research and
+hold, and only a hold on the material counts as `inability` (a hold after an outage or at the research time cap is
+`infrastructure`); `unsupported:amount` is a money reason, never researched, and so is `unsupported:number` while the
+decision returns no draft to tell a price from another number; `no-knowledge` and `model-unsure` are `inability`;
+every `inability` opens a gap; `model:*` is `infrastructure`, and `model:ceiling` and `model:payment` are also the
+turn's `limit` outcome. The rest of the agent's parts with checks come from [agents that answer
 people](../../../creating-fabric-agents/references/agents-that-answer-people.md): the turn record, the daily
 `support.quality_daily` report, the other-vendor model checker that sees the material first (this recipe's checks are
 code only), the false-state gates, numbers and account state from tools, the live-tail re-read, the commitments ledger

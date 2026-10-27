@@ -359,9 +359,10 @@ class SupportAgent:
         self.state_dir = Path(state_dir)
         self.max_tokens, self.max_chars, self.lookup_limit = max_tokens, max_chars, lookup_limit
         self.on_handoff = on_handoff or self._outbox
-        # Reentrant (0.55.0 product round 7): on_handoff runs under it, and an agent's repair step may call answer()
-        # again from there on the same thread.
+        # Reentrant, so nothing on_handoff calls (prune) can deadlock it; answer() from on_handoff is refused below
+        # (0.55.0 readings 7 and 8: a plain lock hung there, a reentrant one let a refusing repair loop on paid calls).
         self._lock = threading.RLock()
+        self._local = threading.local()
         self._log = DecisionLog(self.state_dir)
 
     @property
@@ -387,6 +388,9 @@ class SupportAgent:
             raise RecipeError("message id: letters, digits, '.', '_', ':' or '-', up to 128")
         if not isinstance(text, str) or not text.strip():
             raise RecipeError("the message has no text")
+        if getattr(self._local, "in_handoff", False):
+            raise RecipeError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
+                              "this call returns")
         text = re.sub("[\ud800-\udfff]", "\ufffd", text)  # a lone surrogate (bytes a terminal could not decode) is kept, not fatal
         with self._lock:  # one decision per message id, in this process; the service's instance lock covers others
             done = self._log.get(message_id)
@@ -395,7 +399,11 @@ class SupportAgent:
             decision = self._decide(message_id, text, task_run_id)
             at = _now()
             if decision["action"] == "handoff":  # before the decision is saved: a crash repeats a handoff, never loses one
-                self.on_handoff(dict(decision, question=text, at=_stamp(at)))
+                self._local.in_handoff = True
+                try:
+                    self.on_handoff(dict(decision, question=text, at=_stamp(at)))
+                finally:
+                    self._local.in_handoff = False
             self._log.append(decision, at)
         return dict(decision, repeated=False)
 
