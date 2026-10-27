@@ -60,23 +60,30 @@ FACT_KEYS = ("head", "filesChanged", "linesAdded", "linesRemoved")
 HEAD = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
 
-def git_facts(cwd: Path, budget_s: Optional[float] = None) -> Dict[str, Optional[int]]:
+def _git(cwd: Any, args: Tuple[str, ...], until: Optional[float]) -> Optional[str]:
+    """One git call in `cwd`, its stdout or None (failed, or not answered before `until`, a time.monotonic())."""
+    timeout = GIT_TIMEOUT_S if until is None else min(GIT_TIMEOUT_S, until - time.monotonic())
+    if timeout <= 0:
+        return None
+    try:
+        done = subprocess.run(["git", "--no-optional-locks", "-C", str(cwd)] + list(args),
+                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                              timeout=timeout, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout.decode("utf-8", "replace") if done.returncode == 0 else None
+
+
+def git_facts(cwd: Path, budget_s: Optional[float] = None, until: Optional[float] = None) -> Dict[str, Optional[int]]:
     """HEAD, files that differ from it (untracked included) and lines added/removed. No path, no text. With
-    `budget_s`, every git call shares that total; a fact git could not give in time is None."""
+    `budget_s`, every git call shares that total; with `until` (a time.monotonic()), they share it with the caller's
+    other git calls (FAA-140). A fact git could not give in time is None."""
     facts: Dict[str, Any] = {"head": None, "filesChanged": None, "linesAdded": None, "linesRemoved": None}
-    until = None if budget_s is None else time.monotonic() + budget_s
+    if until is None and budget_s is not None:
+        until = time.monotonic() + budget_s
 
     def git(*args: str) -> Optional[str]:
-        timeout = GIT_TIMEOUT_S if until is None else min(GIT_TIMEOUT_S, until - time.monotonic())
-        if timeout <= 0:
-            return None
-        try:
-            done = subprocess.run(["git", "--no-optional-locks", "-C", str(cwd)] + list(args),
-                                  stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                  timeout=timeout, check=False)
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return done.stdout.decode("utf-8", "replace") if done.returncode == 0 else None
+        return _git(cwd, args, until)
 
     head = (git("rev-parse", "--verify", "-q", "HEAD") or "").strip()
     facts["head"] = head if HEAD.fullmatch(head) else None
@@ -106,6 +113,264 @@ def _count_status(z: str) -> int:
         count += 1
         skip = record[0] in "RC"  # a rename or copy carries its old path in the next record
     return count
+
+
+#: FAA-140 (D2): the Stop hook reads at most this much of the transcript, from its end.
+TRANSCRIPT_TAIL_BYTES = 512 * 1024
+
+
+#: FAA-140 (REQ-1): at most this many other repositories are named for one turn.
+MAX_REPOSITORIES = 10
+
+
+#: Distinct candidate paths one turn may offer; past it the rest of the turn is not looked at.
+MAX_CANDIDATES = 64
+
+
+#: The tools whose path argument is a file the turn changed, and the argument that names it.
+CHANGING_TOOLS = {"Edit": "file_path", "Write": "file_path", "MultiEdit": "file_path", "NotebookEdit": "notebook_path"}
+
+
+_HOST_NAME = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*")
+_PATH_SEGMENT = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._-]{0,99}|[.][A-Za-z0-9_][A-Za-z0-9._-]{0,98}")
+_URL = re.compile(r"(?i)(?:https?|ssh|git|git\+ssh|ssh\+git)://([^/]*)/(.*)")
+_SCP = re.compile(r"(?:[^@/:\s]+@)?([^@/:\s]+):(?!/)(.+)")
+
+
+def _repository(host: str, path: str) -> Optional[Dict[str, str]]:
+    """{host, owner, name} from a host and a remote path, or None when either is not a plain one."""
+    host = host.lower()
+    if len(host) > 253 or not _HOST_NAME.fullmatch(host):
+        return None
+    path = path.strip("/")
+    if path.lower().endswith(".git"):
+        path = path[:-4]
+    segments = path.split("/")
+    if len(segments) < 2 or not all(_PATH_SEGMENT.fullmatch(s) for s in segments):
+        return None
+    return {"host": host, "owner": "/".join(segments[:-1]), "name": segments[-1]}
+
+
+def parse_origin(url: str) -> Optional[Dict[str, str]]:
+    """A remote URL as {host, owner, name} (FAA-140, D1): https and http, `ssh://`, `git://` and the scp form
+    `git@host:owner/name.git`. Credentials, a port, `.git` and a trailing slash are dropped; a nested group stays in
+    `owner` (`group/sub`). None for a local path, a `file://` remote or anything that does not parse."""
+    url = (url or "").strip()
+    if not url or len(url) > 2048 or any(c.isspace() for c in url) or "\\" in url:
+        return None
+    match = _URL.fullmatch(url)
+    if match:
+        authority, path = match.groups()
+        host, _, port = authority.rpartition("@")[2].partition(":")
+        if port and not port.isdigit():
+            return None
+        return _repository(host, path)
+    match = _SCP.fullmatch(url)
+    if match and "://" not in url:
+        return _repository(*match.groups())
+    return None
+
+
+def bash_paths(command: str, cwd: Path) -> List[str]:
+    """The folders a Bash command names as `cd <absolute path>` or `git -C <path>` (absolute, or relative to `cwd`),
+    in order. Nothing else of the command is kept; a command that does not split is [] (FAA-140)."""
+    import shlex  # only a Stop hook with a transcript needs it
+    try:
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        return []
+    found: List[str] = []
+    separators = set("();&|<>")
+    start = True  # a command word may stand here
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token and set(token) <= separators:
+            start, index = True, index + 1
+            continue
+        if start and token == "cd" and index + 1 < len(tokens) and os.path.isabs(tokens[index + 1]):
+            found.append(os.path.normpath(tokens[index + 1]))
+        elif start and os.path.basename(token) == "git":
+            look = index + 1
+            while look < len(tokens) and tokens[look].startswith("-") and not set(tokens[look]) <= separators:
+                if tokens[look] == "-C" and look + 1 < len(tokens) and not set(tokens[look + 1]) <= separators:
+                    found.append(os.path.normpath(os.path.join(str(cwd), tokens[look + 1])))
+                    look += 1
+                elif tokens[look] == "-c":
+                    look += 1
+                look += 1
+        start = False
+        index += 1
+    return found
+
+
+def _prompt(entry: Dict[str, Any]) -> bool:
+    """Whether a transcript entry is a prompt the person typed: a user entry that is no tool result, no meta entry
+    and no subagent's."""
+    if entry.get("type") != "user" or entry.get("isMeta") or entry.get("isSidechain") or "toolUseResult" in entry:
+        return False
+    message = entry.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if isinstance(content, str):
+        return True
+    return isinstance(content, list) and bool(content) and not any(
+        isinstance(block, dict) and block.get("type") == "tool_result" for block in content)
+
+
+def _transcript_tail(transcript: str) -> List[bytes]:
+    """The whole lines of the transcript's last TRANSCRIPT_TAIL_BYTES; [] when it is not a regular file."""
+    import stat
+    flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+    fd = os.open(transcript, flags)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            return []
+        offset = max(0, info.st_size - TRANSCRIPT_TAIL_BYTES)
+        os.lseek(fd, offset, os.SEEK_SET)
+        chunks, left = [], info.st_size - offset
+        while left > 0:
+            chunk = os.read(fd, min(left, 65536))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            left -= len(chunk)
+    finally:
+        os.close(fd)
+    data = b"".join(chunks)
+    lines = data.split(b"\n")
+    return lines[1:] if offset > 0 else lines  # the first line of a tail is cut
+
+
+def turn_paths(transcript: Any, cwd: Path) -> List[str]:
+    """The paths the current turn's tool calls name (FAA-140, D2): Edit, Write, MultiEdit and NotebookEdit's file, and
+    the folders of `cd` and `git -C` in Bash, in order, without repeats. Only the tail of the transcript is read, from
+    its end back to the last prompt the person typed; of an entry only a tool call's name and its path argument are
+    used, never a message's text. [] when the transcript is missing or unreadable."""
+    if not isinstance(transcript, str) or not transcript or "\0" in transcript:
+        return []
+    try:
+        lines = _transcript_tail(transcript)
+    except OSError:
+        return []
+    calls: List[Dict[str, Any]] = []
+    for raw in reversed(lines):
+        if not raw.strip():
+            continue
+        try:
+            entry = json.loads(raw.decode("utf-8"))
+        except ValueError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        if _prompt(entry):
+            break
+        message = entry.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if entry.get("type") != "assistant" or entry.get("isSidechain") or not isinstance(content, list):
+            continue
+        for block in reversed(content):
+            if isinstance(block, dict) and block.get("type") == "tool_use" and isinstance(block.get("input"), dict):
+                calls.append(block)
+    found: List[str] = []
+    for block in reversed(calls):
+        arguments, name = block["input"], block.get("name")
+        if name in CHANGING_TOOLS:
+            value = arguments.get(CHANGING_TOOLS[name])
+            named = [os.path.normpath(os.path.join(str(cwd), value))] if isinstance(value, str) and value else []
+        elif name == "Bash" and isinstance(arguments.get("command"), str):
+            named = bash_paths(arguments["command"][:65536], cwd)
+        else:
+            continue
+        for path in named:
+            if path not in found and "\0" not in path and len(path) <= 4096:
+                found.append(path)
+                if len(found) >= MAX_CANDIDATES:
+                    return found
+    return found
+
+
+def _existing_folder(path: str) -> Optional[str]:
+    """The path when it is a folder, else the nearest existing folder above it (a file's own folder)."""
+    current = path
+    while not os.path.isdir(current):
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+    return current
+
+
+def _nearest_checkout(folder: str) -> Optional[str]:
+    """The nearest folder at or above `folder` with a `.git` entry; None outside a checkout. No subprocess."""
+    current = folder
+    while True:
+        if os.path.lexists(os.path.join(current, ".git")):
+            return current
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+
+
+def turn_repositories(transcript: Any, cwd: Path, until: float) -> List[Dict[str, str]]:
+    """The other Git repositories the current turn changed, as {host, owner, name} (FAA-140, REQ-1): each path of
+    turn_paths resolved with one `git rev-parse --show-toplevel` and its repository's `origin` with one `git config`,
+    every call before `until` (the Stop hook's facts budget). The start folder's repository (any checkout of it), a
+    repository without an `origin` that parses, and a second checkout of one repository are not named; at most MAX_REPOSITORIES. A path
+    outside every checkout costs no git call. Never raises: what was found when the budget ran out is the answer."""
+    found: List[Dict[str, str]] = []
+    try:
+        paths = turn_paths(transcript, cwd)
+        if not paths or time.monotonic() >= until:
+            return found
+        start = (_git(cwd, ("rev-parse", "--show-toplevel"), until) or "").strip() or None
+        checkouts, tops, keys = set(), set(), set()
+        own = parse_origin(_git(start, ("config", "--get", "remote.origin.url"), until) or "") if start else None
+        if own:  # another checkout of the start folder's repository (a worktree, a clone) is that repository
+            keys.add(tuple(own[k].lower() for k in ("host", "owner", "name")))
+        for path in paths:
+            if len(found) >= MAX_REPOSITORIES or time.monotonic() >= until:
+                break
+            folder = _existing_folder(path)
+            checkout = _nearest_checkout(folder) if folder else None
+            if checkout is None or checkout in checkouts:
+                continue
+            checkouts.add(checkout)
+            if start and os.path.realpath(checkout) == start:
+                continue
+            top = (_git(folder, ("rev-parse", "--show-toplevel"), until) or "").strip()
+            if not top or top == start or top in tops:
+                continue
+            tops.add(top)
+            repository = parse_origin(_git(top, ("config", "--get", "remote.origin.url"), until) or "")
+            key = tuple(repository[k].lower() for k in ("host", "owner", "name")) if repository else None
+            if key and key not in keys:
+                keys.add(key)
+                found.append(repository)
+    except Exception:  # noqa: BLE001 - a turn without its repositories is still a turn
+        pass
+    return found
+
+
+def stored_repositories(entry: Dict[str, Any]) -> List[Dict[str, str]]:
+    """The repositories a spool entry carries, checked again at delivery: each exactly {host, owner, name} as
+    parse_origin makes them, at most MAX_REPOSITORIES; anything else is left out."""
+    value = entry.get("repositories") if isinstance(entry, dict) else None
+    out: List[Dict[str, str]] = []
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict) or sorted(item) != ["host", "name", "owner"]:
+            continue
+        if not all(isinstance(item[k], str) for k in item):
+            continue
+        if _repository(item["host"], "%s/%s" % (item["owner"], item["name"])) != item:
+            continue
+        out.append(dict(item))
+        if len(out) >= MAX_REPOSITORIES:
+            break
+    return out
 
 
 def stored_facts(entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -432,7 +697,8 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
             answer = _answer_said(result)
         except JsonRpcError as exc:
             answer = exc.said()
-        note("session=%s event=%s tool=%s answer=%s" % (session_id[:8], event, tool, answer))
+        counted = " repositories=%d" % len(arguments["repositories"]) if "repositories" in arguments else ""
+        note("session=%s event=%s tool=%s answer=%s%s" % (session_id[:8], event, tool, answer, counted))
         return result
 
     try:
@@ -484,6 +750,13 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                                      observedAt=entry.get("observedAt"), idempotencyKey=key)
                     if event == "end":
                         arguments["reason"] = reason
+                    repositories = stored_repositories(entry) if event == "turn" else []
+                    if repositories and "repositories" in _input_fields(client, OBSERVE_TOOL):
+                        arguments["repositories"] = repositories  # FAA-140 (REQ-2): only where the tool takes it
+                    elif repositories and not (directory / "repositories.degraded").exists():
+                        note("session=%s event=turn outcome=degraded reason=%r"
+                             % (session_id[:8], "%s does not take repositories" % OBSERVE_TOOL))
+                        (directory / "repositories.degraded").touch()
                     answered = call(event, OBSERVE_TOOL, arguments)
                     if event == "turn" and not answered.get("isError"):
                         _keep_nudges(directory, _answer_json(answered).get("nudges"), note, session_id, nudges_file)

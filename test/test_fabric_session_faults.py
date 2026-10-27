@@ -258,6 +258,18 @@ class TurnFacts(Faults):
         self.assertEqual([turn[k] for k in ("head", "filesChanged", "linesAdded", "linesRemoved")], [None] * 4)
         self.assertNotIn("extra", turn)
 
+    def test_stored_repositories_of_the_wrong_shape_are_not_sent(self):
+        """FAA-140: what the worker sends is checked again at delivery: a name with a path or a space in it, a missing
+        field, an entry that is not an object, and anything past the tenth are left out."""
+        good = {"host": "github.com", "owner": "acme", "name": "one"}
+        stored = [good, {"host": "github.com", "owner": "/private/path", "name": "x"},
+                  {"host": "github.com", "owner": "acme"}, "github.com/acme/two", {"host": "Git Hub", "owner": "a", "name": "b"},
+                  dict(good, extra="x")] + [{"host": "github.com", "owner": "acme", "name": "r%d" % i} for i in range(12)]
+        got = MCP.stored_repositories({"repositories": stored})
+        self.assertEqual(got, [good] + [{"host": "github.com", "owner": "acme", "name": "r%d" % i} for i in range(9)])
+        for value in (None, "x", {}, {"repositories": "x"}, {"repositories": {}}):
+            self.assertEqual(MCP.stored_repositories(value if isinstance(value, dict) else {"repositories": value}), [])
+
 
 class WatchMailBounds(unittest.TestCase):
     def run_watch(self, results, rng, interval=10):

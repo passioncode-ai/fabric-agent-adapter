@@ -1,0 +1,20 @@
+# FAA-140: the Stop hook as Claude Code runs it (a subprocess, python3 -S), Fabric advertising session-hooks/1, this Mac.
+# Each run is a new session id, so each one also walks the ancestor processes once (a first turn); fabric-mcp is absent, so the worker it starts exits at once.
+## 0.53.0 (this change), run 1
+# 2026-10-27, 3.14.7, transcript 4792808 bytes (a real session's transcript plus one turn with 28 edits in 7 repositories and a Bash cd / git -C)
+# load average at the start: 32 43 45
+python3 -S -c pass (the floor): median 18 ms
+hook stop: median 247 ms, max 577 ms, exit 0, no output (15 runs)
+repositories named: 6 (names withheld)
+## 0.52.0 (main at c52a79d, which reads no transcript), same transcript, same minute
+# 2026-10-27, 3.14.7, transcript 4792808 bytes (a real session's transcript plus one turn with 28 edits in 7 repositories and a Bash cd / git -C)
+# load average at the start: 30 42 45
+python3 -S -c pass (the floor): median 14 ms
+hook stop: median 109 ms, max 204 ms, exit 0, no output (15 runs)
+repositories named: 0 (names withheld)
+## 0.53.0, run 2, same minute
+# 2026-10-27, 3.14.7, transcript 4792808 bytes (a real session's transcript plus one turn with 28 edits in 7 repositories and a Bash cd / git -C)
+# load average at the start: 30 42 45
+python3 -S -c pass (the floor): median 15 ms
+hook stop: median 247 ms, max 456 ms, exit 0, no output (15 runs)
+repositories named: 6 (names withheld)
