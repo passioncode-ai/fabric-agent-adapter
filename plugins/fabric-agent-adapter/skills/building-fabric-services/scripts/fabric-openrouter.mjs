@@ -101,6 +101,14 @@ export class Client {
       throw new OpenRouterError('retries is an integer from 0 to 5', { kind: 'config' });
     }
     http.checkUrl(baseUrl);
+    if (/[?#]/.test(baseUrl)) { // `/chat/completions` would land in it (0.56.0 unit r19, FAA-187 (17))
+      throw new OpenRouterError('the base URL holds no query or fragment', { kind: 'config' });
+    }
+    // A Unicode space at the end stays in the path (`new URL` percent-encodes it) and every call would fail; the
+    // Python twin refuses it in check_url (0.56.0 seam r20, product r21).
+    if (/\s$/u.test(baseUrl.replace(/[\x00-\x20]+$/, ''))) {
+      throw new OpenRouterError('the base URL ends in a Unicode space', { kind: 'config' });
+    }
     checkAttribution(projectId, undefined);
     Object.assign(this, { ceilingUsd, ledger, keyEnv, window, attribution, projectId, unmeasuredCallUsd, deadlineS, retries });
     this.prices = Object.fromEntries(Object.entries(prices ?? {}).map(([k, v]) => [k, { ...v }]));

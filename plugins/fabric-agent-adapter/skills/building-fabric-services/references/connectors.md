@@ -49,7 +49,7 @@ host, port and path (`redact_url`); a URL that is not http or https keeps only i
 one that does not parse as a URL is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
 normalises it, Python as given), so a key never belongs in it. Python's `check_url` refuses a host
 with a backslash, space, control character (C0, DEL or C1) or `%`, a URL with a space or ASCII control character before its
-first `#` (a URL is sent up to there, as Node sends it), or a character outside ASCII in its path or query (ASCII whitespace at its ends is trimmed, as urllib and `new URL` trim it; a Unicode space there is refused), and a port that is not
+first `#` (the default transport sends a URL up to there, as Node's does; a transport you pass receives the URL as given), or a character outside ASCII in its path or query (ASCII whitespace at its ends is trimmed, as urllib and `new URL` trim it; a Unicode space ending the part before the first `#` is refused, where Node keeps it percent-encoded), and a port that is not
 ASCII digits, all as kind `refused` before sending; it checks a host's shape, not its name. `redact_url` on Python reads a host holding `%` as `<unparseable url>`; Node writes it decoded. An error never carries a request header or body.
 
 ## fabric_openrouter
