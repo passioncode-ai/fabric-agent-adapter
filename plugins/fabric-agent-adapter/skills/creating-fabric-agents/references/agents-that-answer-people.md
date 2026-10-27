@@ -112,8 +112,10 @@ alone it hands a refused draft to a person at the first refusal, where this page
 ## Reading the events feed
 
 - **A reader that starts accepting a new event kind re-reads its feed once** (P6), from before its cursor: a reader that
-  only moves forward has already passed the first events of that kind. Check: a test adds a kind to the reader and sees
-  the earlier events of that kind delivered once.
+  only moves forward has already passed the first events of that kind. The re-read reaches back only as far as the
+  producer's feed keeps (at least 7 days or 1000 events, building-fabric-services
+  `references/events-and-notifications.md`); an older day is read from the producer's own store or not at all. Check: a
+  test adds a kind to the reader and sees the earlier events of that kind delivered once.
 
 ## Checklist
 

@@ -152,6 +152,7 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         reference = flat(REFERENCE)
         self.assertIn("DEC-0070", reference)
         self.assertIn("#model-answers-are-untrusted-until-accepted", reference)
+        self.assertIn("reaches back only as far as the producer's feed keeps", reference)
         self.assertNotIn("the template carries", reference)
 
     def test_the_sources_are_addressed_by_commit(self):
@@ -164,9 +165,11 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         recipe = flat("building-fabric-services/recipes/support-agent/README.md")
         for words in ("the draft-and-check step of an agent that answers people, not that agent",
                       "agents-that-answer-people.md", "`infrastructure`", "`inability`", "`policy`",
-                      "`unsupported:amount` is a money reason", "model checker", "at most 30",
+                      "`unsupported:number` where the reply states a price, is a money reason", "model checker",
+                      "at most 30",
                       "only a hold counts as `inability`", "at the first refusal", "`on_handoff=`",
-                      "per-item `answer` flag"):
+                      "per-item `answer` flag", "under a new message id",
+                      "same-vendor fallback", "`model:payment`", "redacts before `on_handoff`"):
             self.assertIn(words, recipe, words)
         self.assertIn("recipes/support-agent/", flat(REFERENCE))
         self.assertIn("agents-that-answer-people.md", flat("building-fabric-services/SKILL.md"))
