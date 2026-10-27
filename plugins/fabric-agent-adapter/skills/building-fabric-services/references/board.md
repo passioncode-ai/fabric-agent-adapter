@@ -68,7 +68,7 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 
 | Step | Board call | Checkpoint written first |
 |---|---|---|
-| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | none |
+| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | none for a first enroll or a live holder's renew; otherwise the slot's `asking` record (FAA-155) |
 | take a request | `com.claim`, the same key while nothing is claimable | `claimed` |
 | read it | `com.get`: the digest must equal the claim's, and the request must name this Project and capability | none |
 | accept | `com.accept` with the claim's exact fence (request, generation, attempt, digest, revision) | `accepting`, then `accepted` |
@@ -78,7 +78,8 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 | settle | `com.complete {state, observed, summary?, evidence?}` | `completing`, then the entry is dropped |
 
 The checkpoint is fsynced before each call it announces. A write that fails stops the step (`board.blocked`): nothing
-is sent that the checkpoint does not know about. A lost answer is sent again with the same idempotency key, so the
+is sent that the checkpoint does not know about. The one exception is the slot record: an `asking` or generation
+record that cannot be written is skipped and the enroll or replace still goes out (see below). A lost answer is sent again with the same idempotency key, so the
 board returns the first receipt; while the lease still holds, the session and the running work stay and the call goes
 again before the lease would lapse (FAA-77). One request is in flight at a time, and one fenced call: the fence is
 built, sent and its receipt applied under one lock, so the tick's `com.renew` never carries a revision the handler's
