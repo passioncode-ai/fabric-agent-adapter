@@ -624,9 +624,11 @@ def _loopback(host: str) -> bool:
     if host == "localhost":
         return True
     try:
-        return ipaddress.ip_address(host).is_loopback
+        address = ipaddress.ip_address(host)
     except ValueError:
         return False
+    # A zone (`::1%eth0`) is no loopback: urllib decodes `%3A80` in it into another address (0.56.0 seam r13).
+    return address.is_loopback and not getattr(address, "scope_id", None)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

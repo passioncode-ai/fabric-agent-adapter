@@ -116,9 +116,11 @@ def json_bytes(value: Any) -> bytes:
 def _authority_ok(netloc: str) -> bool:
     """The host and port of an authority as a WHATWG URL accepts them, where urlsplit is laxer: a port of ASCII digits
     only (Python 3.9's int() also takes `1_2`, `+1`, ` 12` and other scripts' digits), a bracketed host that is an IPv6
-    address, and no backslash, space or control character (0.56.0 unit r11, seam r12)."""
+    address with no zone, and no backslash, space, control character or `%` (0.56.0 unit r11, seam r12, seam r13:
+    urllib percent-decodes the host before it connects, so `h.example%3A8443` would reach port 8443 and `[::1%3A80]`
+    another address than the one checked; Node refuses a zone and every forbidden code point it decodes)."""
     hostport = netloc.rpartition("@")[2]
-    if any(c == "\\" or ord(c) <= 0x20 or c == "\x7f" for c in hostport):
+    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" for c in hostport):
         return False
     if hostport.startswith("["):
         close = hostport.find("]")
@@ -151,16 +153,19 @@ def redact_url(url: str) -> str:
         # No scheme as WHATWG reads one (`ht tps:`, `1ttps:`, a relative string): `new URL` refuses it too. Read here,
         # not by urlsplit, whose scheme rule differs between 3.9 patch releases (0.56.0 hosted floors on 10f6f9d).
         return "<unparseable url>"
+    if scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
+        # A special scheme's authority is checked first, as `new URL` checks it, so `ftp://[` is unparseable in both
+        # twins rather than `ftp:<redacted>` in one (0.56.0 unit r12); on 3.9 a lax port would read as the path.
+        try:
+            parts = urllib.parse.urlsplit(url)
+        except ValueError:
+            return "<unparseable url>"
+        if not _authority_ok(parts.netloc):
+            return "<unparseable url>"
     if scheme.lower() not in ("http", "https"):
         # Only http and https are sent; any other scheme (a misspelled `htps:` included) keeps no more than its name,
         # since its user information may sit anywhere in the rest (0.56.0 product r10).
         return scheme.lower() + ":<redacted>"
-    try:
-        parts = urllib.parse.urlsplit(url)
-    except ValueError:
-        return "<unparseable url>"
-    if not _authority_ok(parts.netloc):
-        return "<unparseable url>"  # `new URL` refuses it; on 3.9 the password's tail would read as the path
     host = parts.hostname or ""
     if not host:
         return "<unparseable url>"  # an http or https URL with no host, which `new URL` refuses

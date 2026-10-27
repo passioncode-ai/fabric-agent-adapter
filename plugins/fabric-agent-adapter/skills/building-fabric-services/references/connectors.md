@@ -47,7 +47,9 @@ Every answer comes back as a `Response`, whatever its status; `HttpError` means 
 `connection`, `timeout`, `too-large` or `refused`, the status when there was one, and the URL redacted to scheme,
 host, port and path (`redact_url`); a URL that is not http or https keeps only its scheme (`htps:<redacted>`), and
 one that does not parse as a URL is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
-normalises it, Python as given), so a key never belongs in it. An error never carries a request header or body.
+normalises it, Python as given), so a key never belongs in it. Python's `check_url` refuses a host
+with a backslash, space, control character or `%` and a port that is not ASCII digits, but checks a host's shape, not
+its name. An error never carries a request header or body.
 
 ## fabric_openrouter
 

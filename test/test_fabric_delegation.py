@@ -290,7 +290,9 @@ class JwksCacheTests(unittest.TestCase):
                                               now=1, capability="writer.write", effect="draft", issuer="urn:fabric:estate:example")["code"], "issuer-unavailable")
 
     def test_sources(self):
-        for bad in ("http://hub.example/jwks.json", "ftp://x/jwks.json", "https://user:pw@hub.example/j", ""):
+        # A zone is no loopback: urllib decodes `%3A80` into another address (0.56.0 seam r13).
+        for bad in ("http://hub.example/jwks.json", "ftp://x/jwks.json", "https://user:pw@hub.example/j", "",
+                    "http://[::1%3A80]/jwks.json", "http://[::1%25lo0]/jwks.json"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json")

@@ -144,9 +144,50 @@
   [
    "http://[zz]/x",
    "<unparseable url>"
+  ],
+  [
+   "https://[fe80::1%25en0]/x",
+   "<unparseable url>"
+  ],
+  [
+   "ftp://[",
+   "<unparseable url>"
+  ],
+  [
+   "ws://[/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://h.example%3A8443/x",
+   "<unparseable url>"
   ]
  ],
  "checkUrl": [
+  [
+   "https://h.example%3A8443/x",
+   false,
+   true
+  ],
+  [
+   "https://h.example%5Cv1/x",
+   false,
+   true
+  ],
+  [
+   "https://evil.example%40good.example/x",
+   false,
+   true
+  ],
+  [
+   "https://[fe80::1%25en0]/x",
+   false,
+   true
+  ],
+  [
+   "http://[::1%25lo0]/x",
+   false,
+   true
+  ],
   [
    "https://h.example:+443/x",
    false,

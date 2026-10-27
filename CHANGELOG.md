@@ -59,8 +59,11 @@ gate behave.
   no-break space) and a URL whose host or port `new URL` refuses (a password holding `/`, a port that is not ASCII
   digits such as `1_2` or `+1`, which Python 3.9's `int()` takes, a bracketed host that is no IPv6 address) read as
   `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose rule differs between 3.9 patch
-  releases. `check_url` refuses the same hosts and ports, and on Python also a backslash, space or control character
-  in the host, which urllib would send to a host other than the one logged. The path is not redacted in either twin
+  releases. `check_url` refuses the same ports and bracketed hosts (an IPv6 zone included), and on Python also a
+  backslash, space, control character or `%` in the host, which urllib would decode or send to a host other than the
+  one logged (`h.example%3A8443` reached port 8443); it checks the host's shape, not its name (FAA-187 (14)). The
+  plain-http loopback rule for a JWKS source no longer counts `[::1%...]` as loopback, and attribution answers
+  `not-openrouter` for a port of other digits (`:٤٤٣`), as `new URL` reads it. The path is not redacted in either twin
   (Node writes it as `new URL` normalises it, Python as given), so a key never belongs in it.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
