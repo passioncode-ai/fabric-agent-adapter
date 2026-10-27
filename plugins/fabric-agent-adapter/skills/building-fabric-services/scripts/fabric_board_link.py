@@ -84,9 +84,9 @@ class BoardSession:
         return value
 
     def close(self, timeout: Optional[float] = None) -> bool:
-        """Sends the DELETE (waiting `timeout` seconds at most, else the session's); True when Fabric answered it (2xx,
-        or 404: the session was already gone), so the slots are free now. False when it did not: the lease lapses in
-        60 s anyway."""
+        """Sends the DELETE (waiting `timeout` seconds at most, else the session's); True when Fabric answered it with a
+        2xx, so the slots are free now. False otherwise, a 404 (the session was already gone) included: a move made
+        before it ended may be read only at the next com.status, so the slot records stay; the lease lapses in 60 s."""
         with self._lock:
             if self.mcp_session is None:
                 return False
@@ -95,7 +95,7 @@ class BoardSession:
             except BoardError:
                 status = 0
             self.mcp_session = None
-            return 200 <= status < 300 or status == 404
+            return 200 <= status < 300
 
 
 class Checkpoint:

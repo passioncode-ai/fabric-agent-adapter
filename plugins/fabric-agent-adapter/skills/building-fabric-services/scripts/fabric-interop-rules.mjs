@@ -237,8 +237,9 @@ export function jobStep({ mandate, tier, now, self, capability, key, effect, cal
   if (mandate === undefined || mandate === null) return { covered: false, message: null };
   if (!EFFECT_CLASSES.includes(effect)) throw new InteropError(`A job's approval step names its effect class (one of ${EFFECT_CLASSES.join(', ')}; DEC-0125).`);
   const call = { capability, action: key, effect };
-  if (typeof spendUsd === 'number') call.spendUsd = spendUsd;
-  if (typeof project === 'string') call.project = project;
+  const spend = mandateSpend(spendUsd); // read as actionGate reads it, so the start and the answer agree (FAA-139)
+  if (spend !== undefined) call.spendUsd = spend;
+  if (project !== undefined && project !== null) call.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
   const covers = { mandate, tier, now, self, call };
   if (typeof callerAgent === 'string' && callerAgent.length > 0) covers.callerAgent = callerAgent;
   const answer = mandateCovers(covers);

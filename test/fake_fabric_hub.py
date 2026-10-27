@@ -491,6 +491,7 @@ class FakeHub:
         self.down = False
         self.delete_fails = False  # a session's DELETE answers 500 and releases nothing (FAA-163)
         self.delete_delay = 0.0  # seconds a DELETE waits before it is answered (FAA-173)
+        self.delete_status = 0  # a status a DELETE answers instead, releasing nothing (0.56.0 seam r1: 404)
         self.grant = True
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.bindings_seen: List[str] = []
@@ -521,6 +522,8 @@ class FakeHub:
                     st = hub.sessions.get(token)
                     if hub.delete_fails:
                         self._send(500, {"error": "the test asked for it"})
+                    elif hub.delete_status:
+                        self._send(hub.delete_status, {"error": "the test asked for it"})
                     elif st and st["mcp"] == self.headers.get("mcp-session-id"):
                         hub.board.release(st["id"])
                         del hub.sessions[token]
@@ -681,7 +684,7 @@ class FakeHub:
             b.advance(float(cmd["seconds"]))
         elif op == "set":
             for key, value in cmd.get("values", {}).items():
-                if key in ("down", "grant", "delete_fails", "delete_delay"):
+                if key in ("down", "grant", "delete_fails", "delete_delay", "delete_status"):
                     setattr(self, key, value)
                 else:
                     setattr(b, key, value)

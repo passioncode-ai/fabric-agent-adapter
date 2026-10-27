@@ -66,7 +66,7 @@ export class BoardSession {
     });
   }
 
-  /** Sends the DELETE (waiting `timeout` ms at most); true when Fabric answered it (2xx, or 404: already gone), so the slots are free now (FAA-163). */
+  /** Sends the DELETE (waiting `timeout` ms at most); true when Fabric answered it with a 2xx, so the slots are free now (FAA-163). A 404 (already gone) is false: a move made before it ended is read at the next com.status, so the slot records stay. */
   close(timeout = null) {
     return this.#serial(async () => {
       if (!this.mcpSession) return false;
@@ -77,7 +77,7 @@ export class BoardSession {
         // best effort: the lease lapses in 60 s anyway
       }
       this.mcpSession = null;
-      return (status >= 200 && status < 300) || status === 404;
+      return status >= 200 && status < 300;
     });
   }
 }

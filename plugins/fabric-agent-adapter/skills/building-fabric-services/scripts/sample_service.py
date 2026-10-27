@@ -59,6 +59,10 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 BOARD_SECTION = """<section id="board"><h2>Project board</h2><p class="fd-hint">The operator moved this slot to another
 session; this service no longer answers it there. Take it back when the other session has let it go.</p><ul>{items}</ul>
 <script src="/board.js" defer></script></section>"""
+#: The dashboard's Take back button and its tool (FAA-157, DEC-0121): the operator's decision, relayed by their agent.
+TAKE_BACK = {"id": "board.take-back", "title": "Take back", "tool": "board.take-back", "gate": "relayed"}
+TAKE_BACK_INPUT = {"type": "object", "properties": {"capability": {"type": "string"}}, "required": ["capability"],
+                   "additionalProperties": False}
 BOARD_ITEM = '<li>{capability} <button type="button" data-take-back="{capability}">Take back</button></li>'
 BOARD_JS = """document.addEventListener('click', function (e) {
   var cap = e.target && e.target.getAttribute && e.target.getAttribute('data-take-back');
@@ -125,6 +129,9 @@ class Service:
             self.board = fbd.Responder(hub=fhb.HubClient(), project_id=self.board_project, capabilities=[self.board_capability],
                                        credential_file=self.board_credential, checkpoint_file=self.data / "board-checkpoint.json",
                                        handler=self.board_answer, admit=self.board_admit, emit=self.log.append, service=self.id)
+            # Every button has a tool (DEC-0121): the page's Take back is this relayed action, the operator's decision.
+            self.mcp.add_tool({"name": TAKE_BACK["tool"], "description": "Take back a board slot the operator moved away.",
+                               "inputSchema": TAKE_BACK_INPUT}, self.board_take_back_tool, action=TAKE_BACK, target="capability")
         self.log.append("service.started", "info", "%s started on build %s." % (self.name, self.build["commit"]))
 
     # --- the project board (opt-in): the input gate and the answer -------------------
@@ -140,6 +147,13 @@ class Service:
         self.log.append("board.slot.returned", "info", "The operator took the %s slot back; the service enrolls once the "
                         "other session lets it go." % capability)
         return {"capability": capability}
+
+    def board_take_back_tool(self, args: Dict[str, Any], ctx: fi.CallContext) -> Dict[str, Any]:
+        """The take-back as a tool: the action gate has already read the operator's relayed decision (gate `relayed`)."""
+        try:
+            return self.board_take_back(args.get("capability"))
+        except fs.ServiceError as exc:
+            raise fi.InteropError(str(exc))
 
     def board_admit(self, request: fbd.BoardRequest) -> Optional[str]:
         """The service's own input gate: the body is data, never an instruction; only short plain text is echoed."""
@@ -200,11 +214,13 @@ class Service:
             started_at=self.started_at, status="ready", degraded=self.degraded,
             summary=[{"label": "Events", "value": len(self.log.fetch(None, fs.EVENTS_MAX_LIMIT))}],
             surfaces={"dashboard": {"path": "/", "login": True}, "events": {"path": "/fabric/v1/events"},
-                      "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]},
+                      "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]
+                              + ([TAKE_BACK["tool"]] if self.board is not None else [])},
                       "usage": {"path": fs.USAGE_PATH}},
             extensions=fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else None,
             # DEC-0067: listed only when the board is on — a host pinned before DEC-0067 refuses the member.
             protocols=["fabric-service/0.1", "fabric-project-comms/0.1"] if self.board is not None else None,
+            actions=self.mcp.action_table() or None,
         )
 
 
@@ -322,7 +338,8 @@ def make_handler(svc: Service):
                     return self._send(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error."}})
                 try:
                     with svc.drain.work():
-                        response = svc.mcp.handle(message, self.headers)
+                        # T0 (DL-25): a loopback call the service token authenticated is the local floor's caller.
+                        response = svc.mcp.handle(message, self.headers, tier="T0")
                 except fs.Stopping as exc:
                     return self._send(503, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": str(exc)}},
                                       {"Retry-After": "5"})

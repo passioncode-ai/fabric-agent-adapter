@@ -12,7 +12,7 @@ description: >-
   messaging people.
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: >-
-  Needs the Fabric desktop app (0.4.0 or later for fabric-mcp and the fabric_work tools) and an MCP client.
+  Needs the Fabric desktop app (v0.3.5 or later for fabric-mcp and the fabric_work tools) and an MCP client.
   The status script needs Python 3.9+ (3.11+ to edit Kimi Code's config.toml). Starting Fabric needs the
   local-lifecycle MCP server; without it the person opens Fabric. The full session hooks run in Claude Code from
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
@@ -133,7 +133,7 @@ board](references/project-board.md) before you submit, reply, or wait for an ans
 
 ## Step 4: before you start, who is working on what, then claim
 
-Fabric 0.4.0 (REQ-38):
+Fabric v0.3.5+ (REQ-38):
 
 1. `fabric_work_list`: each live claim (agent, how it came in, task and the backlog row it links, what it said it
    will touch, since, last sign of life), open tasks nobody holds, agent-sync leases read-only. If it cannot be
@@ -156,7 +156,7 @@ Fabric 0.4.0 (REQ-38):
    task and the overlap: tell the person, then coordinate (ask Fabric to hand it over, or link the tasks) or
    continue knowing it; say which, out loud.
 
-A Fabric older than 0.4.0 has no `fabric_work_*` tools: use `fabric_tasks_list` and `fabric_leases_list`, then
+A Fabric with no `fabric_work_*` tools listed (before v0.3.5): use `fabric_tasks_list` and `fabric_leases_list`, then
 `fabric_task_claim`, and say that the related-work warning is not available there.
 
 ## Step 5: while you work

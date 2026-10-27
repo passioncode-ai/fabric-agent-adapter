@@ -71,7 +71,7 @@ using Fabric (working-with-fabric) or the Fabric Dashboards app.
 |---|---|
 | Version | `0.56.0` |
 | Plugin | `fabric-agent-adapter` |
-| Fabric | the desktop app 0.4.0 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
+| Fabric | the desktop app v0.3.5 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
 | Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, relay the operator's own decision on a service's action, or the mandate he gave another of his agents (DEC-0125), coordinate, report, link backlog rows, release |
 | Inputs | the agent's folder; Fabric's `hub.json`; the agent's MCP configuration (read, not written, by the status script); the Stop hook, only once Fabric's `fabric_session_observe` takes `repositories`, the tail of the session transcript (at most 512 KB; message text and tool output, which can hold a secret the session displayed, are read with it in memory, and only tool names and path arguments are used; `FABRIC_SESSION_NO_REPOSITORIES=1` turns it off) and the `origin` of the other repositories those paths fall in |
 | Outputs | `fabric_session.py status`: Fabric's state, the registrations and one next action; `watch-mail`: one line each time the board's unread count rises, and the nudges of turns its look delivered |

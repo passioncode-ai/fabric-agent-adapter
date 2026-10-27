@@ -50,7 +50,10 @@ class SecretShapeTests(unittest.TestCase):
                  ("secret_value", "SK-" + "a" * 20, True), ("secret_value", "Bearer\xa0abc", True),
                  ("secret_argument", "--h=Authorization: Bearer\ufeffabc123456789012", True),
                  ("secret_argument", "--h=Authorization: Bearer\x85abc123456789012", False),
-                 ("secret_argument", "x\u3000" + "aB1" * 14, True))
+                 ("secret_argument", "x\u3000" + "aB1" * 14, True),
+                 # 0.56.0 unit r1: URL parsing trims only U+0000 to U+0020 from the ends, as `new URL` does.
+                 ("secret_url", "\xa0https://u:p@x.example/", False), ("secret_url", "\x01https://u:p@x.example/", True),
+                 ("secret_url", " https://u:p@x.example/", True), ("secret_url", "\u3000https://x.example/?token=abc", False))
         for module in (secrets_mod, adapting):
             for name, value, expected in cases:
                 with self.subTest(name, value=ascii(value)[:30], module=module.__name__):

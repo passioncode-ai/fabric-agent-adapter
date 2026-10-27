@@ -198,9 +198,11 @@ def _windows_path(token: str) -> Optional[str]:
 def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[str]:
     """The folders a Bash command names as `cd <absolute path>` or `git -C <path>`, in order. A relative `-C` is read
     against the folder the command last changed into with an absolute `cd`, else `cwd`; after a `cd` to a relative or
-    unknown folder it is dropped (FAA-166). Nothing else of the command is kept; a command that does not split is []
-    (FAA-140). On Windows (`windows`, default `sys.platform == "win32"`) backslashes are not escapes and paths are read
-    as Git Bash writes them (FAA-175); Cygwin and MSYS2 Pythons read their own POSIX paths (FAA-177)."""
+    unknown folder it is dropped (FAA-166), and so after `)` or a pipe, whose `cd` changed a subshell's folder. Nothing
+    else of the command is kept; a command that does not split is [] (FAA-140). On Windows (`windows`, default
+    `sys.platform == "win32"`) paths are read as Git Bash writes them, with its quoting: an unquoted `C:\\work` is
+    `C:work` there too, so a native path counts when it is quoted (FAA-175); Cygwin and MSYS2 Pythons read their own
+    POSIX paths (FAA-177)."""
     import shlex  # only a Stop hook with a transcript needs it
     windows = sys.platform == "win32" if windows is None else windows
     if windows:
@@ -210,8 +212,6 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
     try:
         lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
         lexer.whitespace_split = True
-        if windows:
-            lexer.escape = ""  # `cd C:\\work` keeps its backslashes
         tokens = list(lexer)
     except ValueError:
         return []
@@ -229,6 +229,8 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
     while index < len(tokens):
         token = tokens[index]
         if token and set(token) <= separators:
+            if set(token) & set(")|"):
+                base = None  # a subshell's or a pipe stage's cd changed no folder this side of it
             start, index = True, index + 1
             continue
         if start and token == "cd":
@@ -237,7 +239,7 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
             if folder:
                 found.append(folder)
             base = folder
-        elif start and paths.basename(token) in ("git", "git.exe"):
+        elif start and (paths.basename(token).lower() if windows else paths.basename(token)) in ("git", "git.exe"):
             look = index + 1
             while look < len(tokens) and tokens[look].startswith("-") and not set(tokens[look]) <= separators:
                 if tokens[look] == "-C" and look + 1 < len(tokens) and not set(tokens[look + 1]) <= separators:
@@ -896,9 +898,8 @@ def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], sessi
         except OSError:
             pass
         # Lost: every distinct line, pending or this turn's (capped ones included, FAA-143), that is not back in the file.
-        back = set(saved)
-        lost = len([line for line in nudge_lines([{"says": line} for line in kept + offered], limit=None)
-                    if line not in back])
+        # Both lists are clean lines already: counted as a set, never through nudge_lines' item cap (0.56.0 unit r1).
+        lost = len(set(kept).union(offered) - set(saved))
         note("session=%s event=turn nudges=%d outcome=lost lost=%d reason=%r"
              % (session_id[:8], len(offered), lost, type(exc).__name__))
 

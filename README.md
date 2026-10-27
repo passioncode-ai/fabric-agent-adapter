@@ -25,7 +25,7 @@ a terminal that works in a project through Fabric. It finds Fabric (`hub.json`, 
 lifecycle broker start it when it is down, registers `fabric-mcp` once with no secret, calls `fabric_whoami`
 first, reads the project board (`com.status`, `com.list`, `com.read_ack` only what was read) and asks other
 Projects only through `com.submit`, asks who is working on what and claims its task before it starts
-(`fabric_work_list`, `fabric_work_claim`, Fabric 0.4.0), links tasks to backlog rows instead of copying them, and
+(`fabric_work_list`, `fabric_work_claim`, Fabric v0.3.5 and later), links tasks to backlog rows instead of copying them, and
 releases at the end (`fabric_work_release`). `scripts/fabric_session.py status` prints where Fabric stands and one
 next action:
 
