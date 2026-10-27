@@ -342,8 +342,10 @@ def serve(args: argparse.Namespace) -> int:
     # hand-over that hangs is cut by the kit's hard exit, inside launchd's ExitTimeOut.
     import threading
     board_stop = threading.Event()
+    board_thread = None
     if svc.board is not None:
-        threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True).start()
+        board_thread = threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True)
+        board_thread.start()
 
     def stopping() -> None:
         board_stop.set()  # stop claiming; the responder drains its request and leaves its board session
@@ -352,6 +354,11 @@ def serve(args: argparse.Namespace) -> int:
     try:
         server.serve_forever(poll_interval=0.2)
     finally:
+        board_stop.set()
+        if board_thread is not None:
+            # The responder drains (5 s at most) and leaves its board session, which releases its slots and forgets their
+            # records (FAA-155): joined, so the process does not end before that.
+            board_thread.join(8.0)
         server.server_close()
         svc.lock.release()
     return 0

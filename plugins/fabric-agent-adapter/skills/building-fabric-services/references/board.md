@@ -174,9 +174,9 @@ held and not transferred). The responder keeps that move instead of undoing it:
   enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
   clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
   in the checkpoint is forgotten: the slot is free, and whoever takes it next is no move. A file without the record
-  reads as before; a kit before 0.53.0 reads the file and ignores the record. So a service stopped cleanly, rolled back
-  to 0.52 and up again starts as on a first start. After a crash the record stays: if 0.52 then ran and enrolled the
-  slot, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
+  reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly, rolled back
+  to 0.52 and up again starts as on a first start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
+  wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
 - An enroll or a replace is written into that record with its key before it is sent (`asking`). When its answer is
   lost, the next connect (or the next enroll) sends the same call again under the same key; the board answers the
   stored receipt, whose generation is this service's own, and the slot is then asked for once more for the new board
@@ -210,8 +210,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   enrolls once the other session lets the slot go (a live holder is waited for, as on a first start) and takes the work
   left `lapsed` back with a transfer. The kit gives it no route of its own (the reference service has none yet,
   FAA-157): a service built on the kit declares it as an operator action, a button with its tool ([Every button has a
-  tool](../SKILL.md), `fabric-actions/0.1`) with gate `human` (or `relayed`), never `none`, so no other agent can call
-  it, and names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
+  tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision, carried by their own agent or
+  the dashboard), never `none`, so no other agent can call it on its own, and names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
   detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
   surface.
 

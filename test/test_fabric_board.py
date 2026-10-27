@@ -1341,13 +1341,21 @@ class MovedSlotTests(Conversation):
 
     def test_an_idle_renew_writes_nothing(self):
         """Seam and product readings 3: a live holder's renew cannot change its generation, so it records nothing."""
+        import random
+        for seed in (None, 1, 2):  # the responder's own cadence: 15 s nominal, then jittered
+            with self.subTest(seed=seed):
+                r = self.responder()
+                r.rand = (lambda: 0.5) if seed is None else random.Random(seed).random
+                wait = r.step()
+                with mock.patch.object(fb.Checkpoint, "_write", autospec=True, side_effect=AssertionError("written")):
+                    for _ in range(40):
+                        self.board.advance(wait)
+                        wait = r.step()
+                self.assertGreaterEqual(self.tools().count("com.enroll"), 10)
+                self.tearDown()
+                self.setUp()
         r = self.responder()
         r.step()
-        with mock.patch.object(fb.Checkpoint, "_write", autospec=True, side_effect=AssertionError("written")):
-            for _ in range(5):
-                self.board.advance(20)
-                r.step()
-        self.assertGreaterEqual(self.tools().count("com.enroll"), 6)
         self.assertEqual(self.record()["video.render"], {"project": r.project, "generation": 1})
 
     def test_a_clean_leave_forgets_the_record_so_a_rollback_never_reads_as_a_move(self):
@@ -1371,6 +1379,40 @@ class MovedSlotTests(Conversation):
         _, first = self._crash_after(effect=False)
         first.shutdown(0)
         self.assertEqual(self.record()["video.render"]["generation"], 1)  # accepted work left: kept for the next start
+
+    def test_an_enroll_after_lease_expired_is_recorded_first(self):
+        """Seam reading 4: a lapsed holder's enroll may move the generation, so it is not skipped as a renew."""
+        r = self.responder()
+        r.step()
+        written = []
+        plain = fb.Checkpoint.slot
+
+        def slot(cp, capability, record):
+            written.append(record)
+            return plain(cp, capability, record)
+        self.board.fail_next["com.claim"] = "lease_expired"
+        with mock.patch.object(fb.Checkpoint, "slot", slot):
+            self.board.advance(1)
+            r.step()
+        self.assertTrue(any(isinstance(w, dict) and "asking" in w for w in written), written)
+
+    def test_a_lost_ask_on_a_full_disk_does_not_stop_the_responder(self):
+        r = self.responder()
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        path = self.data / "board-checkpoint.json"
+        doc = json.loads(path.read_text())
+        doc["slots"]["video.render"]["asking"] = {"op": "com.enroll", "args": {
+            "idempotency": {"epoch": 1, "key": "example-agent.enroll.lost"}, "capability": "video.render"}}
+        path.write_text(json.dumps(doc))
+        rid = self.board.queue("video.render")
+        second = self.responder()
+        with mock.patch.object(fb.Checkpoint, "slot", side_effect=fb.BoardError("checkpoint", "full")):
+            for _ in range(3):
+                second.step()
+                self.board.advance(1)
+        self.assertNotEqual(second.state, "down")
+        self.assertNotIn("board.blocked", self.kinds())
 
     def test_an_unwritable_record_never_stops_a_renew(self):
         """Seam reading 2: the record is best effort, as `_held_at` is; a full disk does not take a live holder down."""

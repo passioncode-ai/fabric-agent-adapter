@@ -773,11 +773,12 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                     if event == "end":
                         arguments["reason"] = reason
                     repositories = stored_repositories(entry) if event == "turn" else []
-                    if repositories and takes:
-                        arguments["repositories"] = repositories[:takes]  # FAA-140 (REQ-2): only where the tool takes it
+                    fitted = [r for r in repositories if _fits(r, _repository_rules(client))][:takes] if takes else []
+                    if fitted:
+                        arguments["repositories"] = fitted  # FAA-140 (REQ-2): only where the tool takes it
                     elif repositories and not (directory / "repositories.degraded").exists():
-                        note("session=%s event=turn outcome=degraded reason=%r"
-                             % (session_id[:8], "%s does not take repositories" % OBSERVE_TOOL))
+                        why = "repositories its schema refuses were left out" if takes else "does not take repositories"
+                        note("session=%s event=turn outcome=degraded reason=%r" % (session_id[:8], "%s %s" % (OBSERVE_TOOL, why)))
                         (directory / "repositories.degraded").touch()
                     answered = call(event, OBSERVE_TOOL, arguments)
                     if event == "turn" and not answered.get("isError"):
@@ -879,6 +880,35 @@ def _input_fields(client: McpStdio, tool: str) -> List[str]:
             props = schema.get("properties") if isinstance(schema, dict) else None
             return [k for k in props if isinstance(k, str)] if isinstance(props, dict) else []
     return []
+
+
+def _fits(item: Dict[str, str], props: Dict[str, Any]) -> bool:
+    """Whether one {host, owner, name} meets what the schema says of each field (type, length, pattern, enum): an item
+    that does not is left out, so Fabric's check never refuses the whole turn for it (seam reading 4)."""
+    for key, value in item.items():
+        rule = props.get(key)
+        if not isinstance(rule, dict):
+            continue
+        try:
+            if rule.get("type", "string") != "string" or len(value) > rule.get("maxLength", len(value)) \
+                    or len(value) < rule.get("minLength", 0) or ("enum" in rule and value not in rule["enum"]) \
+                    or ("pattern" in rule and not re.search(rule["pattern"], value)):
+                return False
+        except (TypeError, re.error):
+            return False
+    return True
+
+
+def _repository_rules(client: McpStdio) -> Dict[str, Any]:
+    """The item properties fabric_session_observe declares for `repositories`; {} when there are none."""
+    for listed in client.tools:
+        if listed.get("name") == OBSERVE_TOOL:
+            schema = listed.get("inputSchema")
+            field = (schema.get("properties") or {}).get("repositories") if isinstance(schema, dict) else None
+            items = field.get("items") if isinstance(field, dict) else None
+            props = items.get("properties") if isinstance(items, dict) else None
+            return props if isinstance(props, dict) else {}
+    return {}
 
 
 def _takes_repositories(client: McpStdio) -> int:

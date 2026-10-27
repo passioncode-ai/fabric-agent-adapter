@@ -78,6 +78,8 @@ FAKE_MCP = textwrap.dedent('''\
                     field = {{"type": "array", "items": items}}
                     if shape == "max1":
                         field["maxItems"] = 1
+                    if shape == "owner-flat":
+                        items["properties"]["owner"]["pattern"] = "^[^/]+$"
                     if shape == "untyped":
                         field.pop("type")
                     return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": field}}}}
@@ -1417,6 +1419,17 @@ class TurnRepositories(Base):
                 self.assertEqual(self.log_text().count("does not take repositories"), 1)
                 self.tearDown()
                 self.setUp()
+
+    def test_an_item_the_schema_refuses_is_left_out_and_the_turn_still_goes(self):
+        """Seam reading 4: a nested-group owner against a schema that refuses a slash is left out, never the turn."""
+        self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "owner-flat"
+        flat, nested = self.git_repo("flat", "https://github.com/acme/flat.git"), self.git_repo("nested", "https://gitlab.com/group/sub/nested.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(flat / "x")), tool_entry("Edit", file_path=str(nested / "y"))])
+        self.spool_turn()
+        fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
+        (turn,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
+        self.assertEqual(turn["repositories"], [{"host": "github.com", "owner": "acme", "name": "flat"}])
+        self.assertIn("filesChanged", turn)
 
     def test_at_most_the_schemas_max_items_are_sent(self):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "max1"

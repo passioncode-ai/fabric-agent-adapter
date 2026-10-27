@@ -251,10 +251,13 @@ class Responder:
 
     # -- a slot moved to another session (FAA-155, DEC-0140 PR-2) ------------------------------------------------
     def _held_at(self, capability: str, generation: int) -> None:
-        """The generation this responder holds the slot at, kept beside its checkpoint so a restart knows it. A record
-        that cannot be written now is written at the next receipt; the request steps fail closed on their own."""
+        """The generation this responder holds the slot at, kept beside its checkpoint so a restart knows it."""
+        self._note(capability, {"project": self.project, "generation": generation})
+
+    def _note(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
+        """The slot record, best effort: one that cannot be written now is written at the next receipt."""
         try:
-            self.checkpoint.slot(capability, {"project": self.project, "generation": generation})
+            self.checkpoint.slot(capability, record)
         except BoardError:
             pass
 
@@ -266,7 +269,7 @@ class Responder:
             return self._call(op, args)  # no record: nothing a lost answer could be mistaken for
         slot = self.slots.get(capability) or {}
         if op == "com.enroll" and slot.get("state") == "held" and slot.get("generation") == held.get("generation") \
-                and self.now() - slot.get("renewed_at", 0.0) < LEASE_SECONDS / 2 and "asking" not in held:
+                and self.now() - slot.get("renewed_at", 0.0) < LEASE_SECONDS - LEASE_MARGIN_SECONDS and "asking" not in held:
             return self._call(op, args)  # a live holder's renew cannot change its generation: nothing to record
         if isinstance(held.get("asking"), dict):
             if self._gone(capability):  # an earlier lost ask is settled first; it may show the slot moved
@@ -279,7 +282,7 @@ class Responder:
             if exc.code == "checkpoint":
                 return self._call(op, args)
             if exc.code not in ("unreachable", "session-ended"):
-                self.checkpoint.slot(capability, held)
+                self._note(capability, held)
             raise
 
     def _replay(self, capability: str, held: Dict[str, Any], before: Any) -> Dict[str, Any]:
@@ -299,7 +302,7 @@ class Responder:
                     raise
             except (KeyError, TypeError):
                 pass
-        self.checkpoint.slot(capability, rest)
+        self._note(capability, rest)
         return rest
 
     def _gone(self, capability: str, status: Optional[Dict[str, Any]] = None) -> bool:
@@ -334,10 +337,7 @@ class Responder:
                        "take the slot back by itself. Its take-back action brings it back once the other session lets it go; without one, ask its "
                        "maintainer." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
-            try:
-                self.checkpoint.slot(capability, dict(held, moved=now))
-            except BoardError:
-                pass
+            self._note(capability, dict(held, moved=now))  # said again at the next start if it cannot be written
         return True
 
     def take_back(self, capability: str) -> None:
@@ -670,6 +670,7 @@ class Responder:
                 answer = self._receipt("com.claim", self._call("com.claim", {"idempotency": self._idem(key), "capability": capability}))
             except BoardError as exc:
                 if exc.code == "lease_expired":
+                    self.slots[capability]["renewed_at"] = float("-inf")  # lapsed: the enroll below is recorded first
                     self._enroll(capability)  # the slot lapsed: enroll again (a new generation)
                     continue
                 if exc.code in ("idempotency_window_expired", "capacity_exceeded"):

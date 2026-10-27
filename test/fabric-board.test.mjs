@@ -1188,6 +1188,57 @@ test('FAA-155 seam 3: an idle renew writes nothing; a clean leave forgets the re
   assert.ok(!h.kinds().includes('board.slot.moved'));
 });
 
+test('FAA-155 seam 4: at its own cadence an idle holder writes nothing; a lapsed holder\'s enroll is recorded; a full disk never stops a replay', async (t) => {
+  let seed = 7;
+  const jitter = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  for (const rand of [() => 0.5, jitter]) {
+    const hub = await fakeHub(t);
+    const h = harness(hub);
+    const r = h.responder({ rand });
+    let wait = await r.step();
+    let changes = 0;
+    const plain = r.checkpoint.slot.bind(r.checkpoint);
+    r.checkpoint.slot = (c, rec) => { const was = JSON.stringify(r.checkpoint.slots); plain(c, rec); if (JSON.stringify(r.checkpoint.slots) !== was) changes += 1; };
+    for (let i = 0; i < 40; i += 1) {
+      await h.advance(wait);
+      wait = await r.step();
+    }
+    assert.equal(changes, 0);
+    assert.ok((await h.tools()).filter((c) => c === 'com.enroll').length >= 10);
+  }
+
+  const lapsed = await fakeHub(t);
+  const l = harness(lapsed);
+  const holder = l.responder();
+  await holder.step();
+  const seen = [];
+  const plain = holder.checkpoint.slot.bind(holder.checkpoint);
+  holder.checkpoint.slot = (c, rec) => { seen.push(rec); plain(c, rec); };
+  await lapsed.control({ op: 'fail', tool: 'com.claim', code: 'lease_expired' });
+  await l.advance(1);
+  await holder.step();
+  assert.ok(seen.some((rec) => isObjLike(rec) && 'asking' in rec), JSON.stringify(seen));
+
+  const full = await fakeHub(t);
+  const f = harness(full);
+  await f.responder().step();
+  await full.control({ op: 'end-sessions' });
+  const file = path.join(full.data, 'board-checkpoint.json');
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  doc.slots['video.render'].asking = { op: 'com.enroll', args: { idempotency: { epoch: 1, key: 'example-agent.enroll.lost' }, capability: 'video.render' } };
+  fs.writeFileSync(file, JSON.stringify(doc), { mode: 0o600 });
+  const second = f.responder();
+  second.checkpoint.slot = () => { throw new fb.BoardError('checkpoint', 'full'); };
+  for (let i = 0; i < 3; i += 1) {
+    await second.step();
+    await f.advance(1);
+  }
+  assert.notEqual(second.state, 'down');
+  assert.ok(!f.kinds().includes('board.blocked'));
+});
+
+const isObjLike = (v) => v !== null && typeof v === 'object';
+
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
   const dir = tempDir('faa155-cp-');
   const file = path.join(dir, 'cp.json');

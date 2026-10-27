@@ -214,8 +214,13 @@ export class Responder {
   // -- a slot moved to another session (FAA-155, DEC-0140 PR-2) --
   /** The generation this responder holds the slot at, kept beside its checkpoint; a failed write is retried at the next receipt. */
   heldAt(capability, generation) {
+    this.note(capability, { project: this.project, generation });
+  }
+
+  /** The slot record, best effort: one that cannot be written now is written at the next receipt. */
+  note(capability, record) {
     try {
-      this.checkpoint.slot(capability, { project: this.project, generation });
+      this.checkpoint.slot(capability, record);
     } catch {
       // the request steps fail closed on their own
     }
@@ -230,7 +235,7 @@ export class Responder {
     if (held.project !== this.project) return this.call(op, args); // no record: nothing a lost answer could be mistaken for
     const slot = this.slots[capability] ?? {};
     if (op === 'com.enroll' && slot.state === 'held' && slot.generation === held.generation
-      && this.now() - (slot.renewedAt ?? 0) < LEASE_SECONDS / 2 && !('asking' in held)) {
+      && this.now() - (slot.renewedAt ?? 0) < LEASE_SECONDS - LEASE_MARGIN_SECONDS && !('asking' in held)) {
       return this.call(op, args); // a live holder's renew cannot change its generation: nothing to record
     }
     if (isObj(held.asking)) {
@@ -246,7 +251,7 @@ export class Responder {
     try {
       return await this.call(op, args);
     } catch (e) {
-      if (!LOST.includes(e.code)) this.checkpoint.slot(capability, held);
+      if (!LOST.includes(e.code)) this.note(capability, held);
       throw e;
     }
   }
@@ -269,7 +274,7 @@ export class Responder {
         if (LOST.includes(e.code)) throw e;
       }
     }
-    this.checkpoint.slot(capability, record);
+    this.note(capability, record);
     return record;
   }
 
@@ -300,11 +305,7 @@ export class Responder {
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
     if (!('moved' in held)) { // once, even across restarts
       this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets it go; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
-      try {
-        this.checkpoint.slot(capability, { ...held, moved: now });
-      } catch {
-        // said again at the next start
-      }
+      this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written
     }
     return true;
   }
@@ -643,6 +644,7 @@ export class Responder {
         answer = this.receipt('com.claim', await this.call('com.claim', { idempotency: this.idem(this.claimKeys[capability]), capability }));
       } catch (e) {
         if (e.code === 'lease_expired') {
+          this.slots[capability].renewedAt = -Infinity; // lapsed: this enroll may move the generation, so it is recorded
           await this.enroll(capability);
           continue;
         }
