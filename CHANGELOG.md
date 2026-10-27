@@ -14,8 +14,8 @@
   `actionGate` answer that fault to the caller as `operator-decision-required` (`data.detail`
   `mandate-capability-missing`), the fault beside it for the service's log; nothing is applied, so the job stays
   `input_required`. `job_step` / `jobStep` read an unusable job capability alike at the start: the step waits
-  `input_required`, its message naming `mandate-capability-missing`, and the Python tool server hands that fault to
-  `on_fault` at the start as at the answer. It is the one service fault a caller reads by name: `on_fault`'s and the
+  `input_required`, its message naming `mandate-capability-missing`, and the Python tool server hands that fault (and any
+  other `job_step` answers, such as `now-unreadable`) to `on_fault` at the start as at the answer. It is the one service fault a caller reads by name: `on_fault`'s and the
   delegation reference's rule (a caller sees a fault only as `unknown-state`) now names it. So a job whose tool is not a capability name is no
   longer covered by an `actions`-only mandate at either end, and a mandate whose `capabilities` name `fabric.job.get`
   covers no step of another capability. Any service gating a job's answer itself passes the job's capability

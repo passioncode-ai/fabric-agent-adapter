@@ -396,7 +396,7 @@
     "fabric_service",
     "fabric_time"
    ],
-   "sha256": "8774a42f76077b7fc65b5563c78384a5dc2541f9038a95e158c8c230e07da1dd"
+   "sha256": "42e3f73a673f13775fbbdf476bfd5a96e4553fa3d0141e8ad223c8f88b0dd0b3"
   },
   {
    "module": "fabric_hub",
@@ -3977,7 +3977,7 @@
    "fabric_service.py": "a2e813469a47d4d3eea996628635c8903007498bdb6a1ae032a7a5ce6f49fe2f",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "42e88f4b3f22890022baa8cb999ee953978ab2a9a029e89e951767a4eabfd090",
-   "fabric_interop.py": "8774a42f76077b7fc65b5563c78384a5dc2541f9038a95e158c8c230e07da1dd",
+   "fabric_interop.py": "42e3f73a673f13775fbbdf476bfd5a96e4553fa3d0141e8ad223c8f88b0dd0b3",
    "fabric_hub.py": "b9ac852e601b1d54cf61351677a628afc69faeed7d1fc74ebe541c1cf38e0c2a",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "55b552354deb60e50268c672912647bca57951fd6a3a27fb5d6dae11ec5a4fd7",

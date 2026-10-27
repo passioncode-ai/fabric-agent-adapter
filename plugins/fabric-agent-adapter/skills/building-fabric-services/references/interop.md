@@ -202,7 +202,7 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
   since `handle` defaults to T2 and a T2 call names nobody without them). One fault reaches the caller by name:
   `mandate-capability-missing` (DEC-0141 MJ-1), read as `operator-decision-required` with that `data.detail`.
   `on_fault` hears it from `ctx.approval_step` at a job's start under the job's tool, and at the answer under
-  `fabric.job.get`.
+  `fabric.job.get`; at the start it hears any fault `job_step` answers (also `now-unreadable` from the server's clock).
 - **Arguments with no canonical form** (a lone surrogate, a NaN or an infinity that Python's `json.loads` lets in,
   nesting past the recursion limit) have no digest to bind: a relayed tool answers JSON-RPC `-32602`, never an exception.
 - **The handler** reads `ctx.record` (`"caller"`, or `{by, via, caller}`) and writes it into the service's audit
