@@ -1,5 +1,5 @@
 {
- "about": "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases, FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, and every decision and service-actions-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
+ "about": "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases and jobSteps (DEC-0141 MJ-1), FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, and every decision and service-actions-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
  "source": "fixtures/vectors/actions.json, fixtures/semantic/action-call-*.json, fixtures/semantic/service-well-known-actions-*.json, fixtures/catalogue.json, src/actions.ts",
  "cases": [
   {
@@ -1625,6 +1625,725 @@
    }
   }
  ],
+ "jobSteps": [
+  {
+   "name": "a step of a job the mandate's capabilities cover",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "reviews.approve",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "answer the reviews of the week",
+     "chain": [
+      "example-developer",
+      "example-reviewer"
+     ],
+     "caller": "agent:claude-code"
+    }
+   }
+  },
+  {
+   "name": "a step whose request key the mandate's actions list",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "reviews.approve",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "actions": [
+       "choose-variant"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "answer the reviews of the week",
+     "chain": [
+      "example-developer",
+      "example-reviewer"
+     ],
+     "caller": "agent:claude-code"
+    }
+   }
+  },
+  {
+   "name": "a mandate naming fabric.job.get covers no step of another capability",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "reviews.approve",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "fabric.job.get"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "ok": false,
+    "code": "operator-decision-required",
+    "data": {
+     "detail": "outside-mandate: capability"
+    }
+   }
+  },
+  {
+   "name": "a step of a job outside the mandate's capabilities",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "reviews.delete",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "ok": false,
+    "code": "operator-decision-required",
+    "data": {
+     "detail": "outside-mandate: capability"
+    }
+   }
+  },
+  {
+   "name": "a step whose effect is outside the mandate's ceiling",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "publish",
+    "mandateCapability": "reviews.approve",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "ok": false,
+    "code": "operator-decision-required",
+    "data": {
+     "detail": "outside-mandate: effect"
+    }
+   }
+  },
+  {
+   "name": "a decision still decides a step: with a mandate too, the job's capability is not read",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    },
+    "decision": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "action": "choose-variant",
+     "instruction": "take the second variant",
+     "at": "2026-10-24T09:30:00Z"
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "caller": "agent:claude-code"
+    }
+   }
+  },
+  {
+   "name": "a step under a mandate without the job's capability: the service's own fault",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "fault": "mandate-capability-missing"
+   }
+  },
+  {
+   "name": "a step whose job's capability is empty",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "fault": "mandate-capability-missing"
+   }
+  },
+  {
+   "name": "a step whose job's capability is only whitespace",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "  ",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "fault": "mandate-capability-missing"
+   }
+  },
+  {
+   "name": "a step whose job's capability is not a capability name",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "Reviews Approve",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "fault": "mandate-capability-missing"
+   }
+  },
+  {
+   "name": "a step whose job's capability is not a string",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": 7,
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "fault": "mandate-capability-missing"
+   }
+  },
+  {
+   "name": "a step passed fabric.job.get as its job's capability: never the transport",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "fabric.job.get",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "fabric.job.get"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "fault": "mandate-capability-missing"
+   }
+  },
+  {
+   "name": "a mandate that also lists actions covers a step only when it names the step's key",
+   "input": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "reviews.approve",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "actions": [
+       "approve-reply"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "ok": false,
+    "code": "operator-decision-required",
+    "data": {
+     "detail": "outside-mandate: action"
+    }
+   }
+  },
+  {
+   "name": "an ordinary action ignores mandateCapability: its own tool is read",
+   "input": {
+    "action": {
+     "id": "approve-reply",
+     "title": "Approve the reply",
+     "tool": "reviews.approve",
+     "gate": "relayed"
+    },
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "tier": "T0",
+    "self": "example-reviewer",
+    "callerAgent": "example-developer",
+    "effect": "reply",
+    "mandateCapability": "reviews.delete",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "answer the reviews of the week",
+     "chain": [
+      "example-developer",
+      "example-reviewer"
+     ],
+     "caller": "agent:claude-code"
+    }
+   }
+  }
+ ],
  "declarations": [
   {
    "name": "no key: nothing to check",
@@ -2093,6 +2812,141 @@
    "findings": [
     "/answer"
    ]
+  },
+  {
+   "name": "action-call-mandate-job-step-no-capability",
+   "description": "The same step answered as covered with no job's capability: actionDecision's answer is the service's own fault, so FAC-SEM-142 reports it (DEC-0141 MJ-1).",
+   "inputs": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "tier": "T0",
+    "caller": "agent:claude-code",
+    "callerAgent": "example-developer",
+    "self": "example-reviewer",
+    "now": "2026-10-24T09:30:00Z",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    },
+    "effect": "reply"
+   },
+   "answer": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "answer the reviews of the week",
+     "chain": [
+      "example-developer",
+      "example-reviewer"
+     ],
+     "caller": "agent:claude-code"
+    }
+   },
+   "expected": {
+    "fault": "mandate-capability-missing"
+   },
+   "findings": [
+    "/answer"
+   ]
+  },
+  {
+   "name": "action-call-mandate-job-step",
+   "description": "A job's input request answered under the operator's mandate, read under the job's capability (DEC-0141 MJ-1): the operator's act.",
+   "inputs": {
+    "action": {
+     "id": "choose-variant",
+     "title": "Choose a variant",
+     "tool": "fabric.job.get",
+     "gate": "relayed"
+    },
+    "tier": "T0",
+    "caller": "agent:claude-code",
+    "callerAgent": "example-developer",
+    "self": "example-reviewer",
+    "now": "2026-10-24T09:30:00Z",
+    "mandate": {
+     "kind": "mandate/1",
+     "by": "operator",
+     "task": "answer the reviews of the week",
+     "instruction": "approve the replies to this week's reviews",
+     "at": "2026-10-24T08:00:00Z",
+     "expiresAt": "2026-10-25T08:00:00Z",
+     "scope": {
+      "capabilities": [
+       "reviews.approve"
+      ],
+      "effects": [
+       "reply"
+      ]
+     },
+     "chain": [
+      {
+       "agent": "example-developer",
+       "at": "2026-10-24T08:01:00Z"
+      },
+      {
+       "agent": "example-reviewer",
+       "at": "2026-10-24T08:02:00Z"
+      }
+     ]
+    },
+    "effect": "reply",
+    "mandateCapability": "reviews.approve"
+   },
+   "answer": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "answer the reviews of the week",
+     "chain": [
+      "example-developer",
+      "example-reviewer"
+     ],
+     "caller": "agent:claude-code"
+    }
+   },
+   "expected": {
+    "ok": true,
+    "recordAs": {
+     "by": "operator",
+     "via": "mandate",
+     "task": "answer the reviews of the week",
+     "chain": [
+      "example-developer",
+      "example-reviewer"
+     ],
+     "caller": "agent:claude-code"
+    }
+   },
+   "findings": []
   },
   {
    "name": "action-call-mandate-source-dropped",

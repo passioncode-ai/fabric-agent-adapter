@@ -538,6 +538,13 @@ class RefusalCodeSetTests(unittest.TestCase):
                 refusal = dl.refusal_from_action(value)
                 self.assertEqual((refusal["code"], refusal["detail"]), ("unknown-state", "service-fault"))
 
+    def test_a_job_step_no_mandate_can_read_is_the_operators_decision(self):
+        # DEC-0141 MJ-1, seam round 3 of 0.54.0: every route from action_decision agrees with the gate.
+        refusal = dl.refusal_from_action({"fault": "mandate-capability-missing"})
+        self.assertEqual((refusal["code"], refusal["data"]), ("operator-decision-required", {"detail": "mandate-capability-missing"}))
+        self.assertEqual(dl.refusal_error(refusal)["error"]["data"]["detail"], "mandate-capability-missing")
+        self.assertEqual(dl.refusal_from_action({"fault": "effect-missing"})["code"], "unknown-state")
+
 
 class ReviewRegressionTests(unittest.TestCase):
     """Findings of the independent review of the port, each a test that failed first."""

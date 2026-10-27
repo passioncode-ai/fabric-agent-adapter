@@ -46,6 +46,13 @@ class Vectors(unittest.TestCase):
             with self.subTest(case["name"]):
                 self.assertEqual(js(fa.action_decision(case["input"])), js(case["expected"]))
 
+    def test_every_job_step_answers_as_the_contract_does(self):
+        """DEC-0141 MJ-1: a job's input request under a mandate is read under the job's capability."""
+        self.assertEqual(len(V["jobSteps"]), 14)
+        for case in V["jobSteps"]:
+            with self.subTest(case["name"]):
+                self.assertEqual(js(fa.action_decision(case["input"])), js(case["expected"]))
+
     def test_every_declaration_is_found_where_the_contract_finds_it(self):
         self.assertEqual(len(V["declarations"]), 11)
         for case in V["declarations"]:
@@ -55,7 +62,7 @@ class Vectors(unittest.TestCase):
                 self.assertTrue(all(f["code"] == "FAC-SEM-142" and f["message"] for f in findings))
 
     def test_the_action_call_fixtures(self):
-        self.assertEqual(len(V["actionCalls"]), 16)
+        self.assertEqual(len(V["actionCalls"]), 18)
         for case in V["actionCalls"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fa.action_decision(case["inputs"])), js(case["expected"]))

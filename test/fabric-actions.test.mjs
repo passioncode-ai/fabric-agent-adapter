@@ -29,6 +29,11 @@ test('every case answers as the contract does', () => {
   for (const c of V.cases) assert.deepEqual(actionDecision(c.input), c.expected, c.name);
 });
 
+test('every job step answers as the contract does (DEC-0141 MJ-1)', () => {
+  assert.equal(V.jobSteps.length, 14);
+  for (const c of V.jobSteps) assert.deepEqual(actionDecision(c.input), c.expected, c.name);
+});
+
 test('every declaration is found where the contract finds it', () => {
   assert.equal(V.declarations.length, 11);
   for (const c of V.declarations) {
@@ -39,7 +44,7 @@ test('every declaration is found where the contract finds it', () => {
 });
 
 test('the action-call fixtures', () => {
-  assert.equal(V.actionCalls.length, 16);
+  assert.equal(V.actionCalls.length, 18);
   for (const c of V.actionCalls) {
     assert.deepEqual(actionDecision(c.inputs), c.expected, c.name);
     const value = { ...c.inputs, answer: c.answer };

@@ -3,7 +3,10 @@ extensions/actions/0.1 (DEC-0121, FAC-SEM-142). Part of the service kit (layer L
 
 - ``action_decision(inputs)``: whether a service takes a call of one declared action and as whose act it records it,
   exactly as the contract's ``actionDecision`` answers (AP-2, AP-4; DL-17, DL-18, DL-25). A ``fault`` is the
-  service's own and is never sent to a caller.
+  service's own and is never sent to a caller as such; ``action_gate`` answers ``mandate-capability-missing`` as
+  operator-decision-required (DEC-0141 MJ-1).
+- ``JOB_STEP_TOOL`` and ``job_capability(value)``: the tool a job's answer comes through, and whether a job's
+  capability can read its step under a mandate (a capability name other than ``fabric.job.get``).
 - ``decision_shape(value)``: a decision as ``decision.schema.json`` reads it, ``at`` read strictly (the contract's
   ``strictTime``).
 - ``actions_view(well_known)``: the host reader of the declaration, as the contract's ``actionsView``.
@@ -166,14 +169,12 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
       the service authenticated), `effect` (the action's effect class, the service's own knowledge), `spendUsd` (its
       own estimate) and `project`: covered, `{by: operator, via: mandate, task, chain, source?, caller}`; otherwise
       `operator-decision-required` or `decision-invalid` with `data.detail`.
+    - DEC-0141 MJ-1: a job's input request (tool `fabric.job.get`) under a mandate is read under `mandateCapability`,
+      the job's own capability (the tool its start call named), its action the request key; any other action reads
+      its own tool.
     - `{"fault": ...}` (action-invalid, caller-missing, now-unreadable, digest-missing, url-missing, effect-missing,
-      self-missing) is the service's
-      own: an input it owes is missing or unreadable. It is never sent to a caller.
-    
-
-    Kit input beside the contract's: `mandateCapability`, a job's kept step's capability, read by the mandate in
-    place of the action's tool (the contract's actionDecision does not take it; the service's own input, never a
-    caller's)."""
+      self-missing, mandate-capability-missing) is the service's own: an input it owes is missing or unreadable. It is
+      never sent to a caller (action_gate answers mandate-capability-missing as operator-decision-required)."""
     action = get(inputs, "action")
     if not readable_action(action):
         return {"fault": "action-invalid"}
@@ -219,6 +220,15 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
     return {"ok": True, "recordAs": record}
 
 
+#: The tool of a job's input request (interop C3.3, AP-2): the call that answers it is fabric.job.get (DEC-0141 MJ-1).
+JOB_STEP_TOOL = "fabric.job.get"
+
+
+def job_capability(value: Any) -> bool:
+    """A job's capability a mandate can read a step under (MJ-1): a capability name, never fabric.job.get itself."""
+    return isinstance(value, str) and _CAPABILITY.fullmatch(value) is not None and value != JOB_STEP_TOOL
+
+
 def _by_mandate(inputs: Any, action: Dict[str, Any], caller: str) -> Dict[str, Any]:
     """A relayed action's call that carries a mandate and no decision (DEC-0125 MD-3): the mandate decides, as the
     contract's byMandate reads it: the service's own `effect` and agent id `self` are required (else a fault), its
@@ -228,11 +238,11 @@ def _by_mandate(inputs: Any, action: Dict[str, Any], caller: str) -> Dict[str, A
         return {"fault": "effect-missing"}
     if not isinstance(me, str):
         return {"fault": "self-missing"}
-    # A job's kept step is read under the job's own capability, as job_step read it at the start (`mandateCapability`,
-    # the kit's input; the action itself stays fabric.job.get).
-    capability = get(inputs, "mandateCapability")
-    call: Dict[str, Any] = {"capability": capability if isinstance(capability, str) else action["tool"],
-                            "action": action["id"], "effect": effect}
+    # MJ-1: a job's step is read under the job's capability, never under the transport fabric.job.get itself.
+    capability = get(inputs, "mandateCapability") if action["tool"] == JOB_STEP_TOOL else action["tool"]
+    if not job_capability(capability):
+        return {"fault": "mandate-capability-missing"}
+    call: Dict[str, Any] = {"capability": capability, "action": action["id"], "effect": effect}
     spend, project = get(inputs, "spendUsd"), get(inputs, "project")
     if is_number(spend):
         call["spendUsd"] = spend

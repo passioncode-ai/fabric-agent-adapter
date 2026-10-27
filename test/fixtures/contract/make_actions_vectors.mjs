@@ -45,6 +45,10 @@ const vectors = read('fixtures/vectors/actions.json');
 for (const c of vectors.cases) {
   if (!same(actionDecision(c.input), c.expected)) throw new Error(`the contract's actions case "${c.name}" no longer answers as written`);
 }
+// DEC-0141 MJ-1: a job's input request under a mandate is read under the job's capability (mandateCapability).
+for (const c of vectors.jobSteps) {
+  if (!same(actionDecision(c.input), c.expected)) throw new Error(`the contract's job step "${c.name}" no longer answers as written`);
+}
 for (const c of vectors.declarations) {
   if (!same(paths(actionsExtensionRules(c.input)), c.findings)) throw new Error(`the contract's declaration "${c.name}" no longer answers as written`);
 }
@@ -75,11 +79,11 @@ const fixtures = read('fixtures/catalogue.json')
   });
 
 fs.writeFileSync(out, `${JSON.stringify({
-  about: "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases, FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, and every decision and service-actions-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
+  about: "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases and jobSteps (DEC-0141 MJ-1), FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, and every decision and service-actions-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
   source: 'fixtures/vectors/actions.json, fixtures/semantic/action-call-*.json, fixtures/semantic/service-well-known-actions-*.json, fixtures/catalogue.json, src/actions.ts',
-  cases: vectors.cases, declarations: vectors.declarations, actionCalls, wellKnowns, fixtures,
+  cases: vectors.cases, jobSteps: vectors.jobSteps, declarations: vectors.declarations, actionCalls, wellKnowns, fixtures,
 }, null, 1)}\n`);
-console.log(`${vectors.cases.length} cases, ${vectors.declarations.length} declarations, ${actionCalls.length} action calls, ${wellKnowns.length} well-known documents, ${fixtures.length} fixtures`);
+console.log(`${vectors.cases.length} cases, ${vectors.jobSteps.length} job steps, ${vectors.declarations.length} declarations, ${actionCalls.length} action calls, ${wellKnowns.length} well-known documents, ${fixtures.length} fixtures`);
 
 if (args.extra) {
   const extra = JSON.parse(fs.readFileSync(args.extra, 'utf8'));

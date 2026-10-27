@@ -8,6 +8,7 @@ import stat
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1092,10 +1093,11 @@ class JobApprovalStepTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
-        self.contexts, self.inputs = [], []
+        self.contexts, self.inputs, self.faults = [], [], []
         server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, clock=lambda: NOW_SECONDS, agent_id="example-agent",
                                   input_actions=True, on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
-                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)))
+                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)),
+                                  on_fault=lambda tool, fault: self.faults.append((tool, fault)))
         server.add_tool({"name": "reviewsApprove", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
         return server
 
@@ -1116,18 +1118,37 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertEqual(self.jobs.private(job_id)["steps"], {}, "the answered step is gone in the same write")
 
     def test_the_start_and_the_answer_read_a_mandate_alike_whatever_the_tool_is_named(self):
-        # Seam round 3: under a mandate naming fabric.job.get the start refused and the answer took; now both refuse.
-        # A mandate cannot name a tool that is no capability name, so only one naming no capabilities covers both.
-        for scope, covered in (({"capabilities": ["fabric.job.get"], "actions": ["approve-reply"], "effects": ["reply"]}, False),
-                               ({"actions": ["approve-reply"], "effects": ["reply"]}, True)):
+        # Seam round 3 made the start and the answer agree; DEC-0141 MJ-1 (0.54.0): a job whose tool is no capability
+        # name has no capability a mandate can read its step under, so both refuse whatever the scope, the answer as
+        # operator-decision-required with the job left input_required.
+        for scope in ({"capabilities": ["fabric.job.get"], "actions": ["approve-reply"], "effects": ["reply"]},
+                      {"actions": ["approve-reply"], "effects": ["reply"]}):
             server = self.camel_server()
             self.start_camel(server, {"mandate": relayed_mandate(scope)})
-            _, record = self.step()
-            self.assertEqual(record is not None, covered, scope)
+            job_id, record = self.step()
+            self.assertIsNone(record, scope)
+            self.assertIn("mandate-capability-missing", self.jobs.get(job_id)["statusMessage"])
+            self.assertEqual(self.faults, [("reviewsApprove", "mandate-capability-missing")], "the start hears it")
             server = self.camel_server()
             self.start_camel(server, {})
             job_id, _ = self.step()
-            self.assertEqual(not self.answer(server, job_id, {"mandate": relayed_mandate(scope)})["isError"], covered, scope)
+            refused = self.answer(server, job_id, {"mandate": relayed_mandate(scope)})
+            self.assertTrue(refused["isError"], scope)
+            self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
+            self.assertEqual(refused["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")
+            self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
+            self.assertEqual(self.faults, [("fabric.job.get", "mandate-capability-missing")], "and the answer")
+
+    def test_the_start_hands_any_job_step_fault_to_on_fault(self):
+        # 0.54.0 readings 4 (unit, seam): approval_step reports every job_step fault, not only MJ-1's.
+        server = self.camel_server()
+        self.start_camel(server, {"mandate": relayed_mandate()})
+        unreadable = {"covered": False, "message": None, "fault": "now-unreadable"}
+        with mock.patch.object(fi, "job_step", lambda *a, **k: unreadable):
+            job_id, record = self.step()
+        self.assertIsNone(record)
+        self.assertEqual(self.faults, [("reviewsApprove", "now-unreadable")])
+        self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
 
     def test_a_kept_step_does_not_outlive_its_question(self):
         # Seam round 1: a later plain question under the same key is not answered by a mandate alone.
@@ -1160,3 +1181,31 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertIn("cannot be read", malformed["message"])
         self.assertTrue(fi.job_step(lead_mandate(), **dict(call, caller_agent="example-lead"))["covered"])
         self.assertEqual(fi.job_step(lead_mandate(), **dict(call, caller_agent="example-other"))["detail"], "mandate-not-for-this-call")
+
+    def test_an_unusable_job_capability_is_read_alike_at_both_ends(self):
+        """DEC-0141 MJ-1, as the Node twin: the start (job_step) and the answer (action_gate) refuse an unusable job
+        capability; a T2 caller's mandate is still ignored first (MD-5)."""
+        mandate = lead_mandate({"actions": ["approve-reply"], "effects": ["reply"]})
+        for capability in ("replyDraft", "fabric.job.get", ""):
+            with self.subTest(capability=capability):
+                call = dict(now=NOW, self_id="example-agent", capability=capability, key="approve-reply", effect="reply")
+                step = fi.job_step(mandate, tier="T0", **call)
+                self.assertEqual((step["covered"], step["fault"]), (False, "mandate-capability-missing"))
+                self.assertIn("mandate-capability-missing", step["message"])
+                self.assertEqual(fi.job_step(mandate, tier="T2", **call), {"covered": False, "message": None})
+        action = {"id": "approve-reply", "title": "Answer approve-reply", "tool": "fabric.job.get", "gate": "relayed"}
+        for mandate_capability in (None, "", "  ", "Reviews Approve", "fabric.job.get"):
+            with self.subTest(mandate_capability=mandate_capability):
+                refused = fi.action_gate(action, tier="T0", caller="local:T0", meta={"mandate": mandate}, now=NOW,
+                                         self_id="example-agent", effect="reply", mandate_capability=mandate_capability)
+                self.assertEqual(refused["ok"], False)
+                self.assertEqual(refused["fault"], "mandate-capability-missing")
+                self.assertEqual(refused["refusal"]["code"], "operator-decision-required")
+                self.assertEqual(refused["refusal"]["data"]["detail"], "mandate-capability-missing")
+                inputs = {"action": action, "tier": "T0", "caller": "local:T0", "mandate": mandate, "now": NOW,
+                          "self": "example-agent", "effect": "reply"}
+                if mandate_capability is not None:
+                    inputs["mandateCapability"] = mandate_capability
+                said = fi.action_refusal_tool_result(fa.action_decision(inputs))
+                self.assertEqual(said["structuredContent"]["error"]["code"], "operator-decision-required")
+                self.assertEqual(said["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")

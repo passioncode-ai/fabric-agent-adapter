@@ -307,4 +307,9 @@ test('a human step carries its step and link; what is not an answer is an unknow
     const r = d.refusalFromAction(value);
     assert.deepEqual([r.code, r.detail], ['unknown-state', 'service-fault'], JSON.stringify(value));
   }
+  // DEC-0141 MJ-1, seam round 3 of 0.54.0: every route from actionDecision agrees with the gate.
+  const step = d.refusalFromAction({ fault: 'mandate-capability-missing' });
+  assert.deepEqual([step.code, step.data], ['operator-decision-required', { detail: 'mandate-capability-missing' }]);
+  assert.equal(d.refusalError(step).error.data.detail, 'mandate-capability-missing');
+  assert.equal(d.refusalFromAction({ fault: 'effect-missing' }).code, 'unknown-state');
 });
