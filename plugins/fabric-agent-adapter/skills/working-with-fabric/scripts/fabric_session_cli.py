@@ -36,6 +36,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     prune_stale_sessions,
     read_small,
     rejoined_recently,
+    repositories_wanted,
     session_dir,
     spawn_worker,
     spool,
@@ -44,6 +45,7 @@ from fabric_session_mcp import (  # noqa: E402 - the kit (FAA-65)
     FACTS_BUDGET_S,
     deliver,
     git_facts,
+    turn_repositories,
 )
 from fabric_session_mail import (  # noqa: E402 - the kit (FAA-65)
     watch_mail_cli,
@@ -164,7 +166,8 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
 
 
 def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]] = None, spawn=spawn_worker) -> str:
-    """Stop (`turn`) and SessionEnd (`end`): spool one entry, with the turn's facts measured now, and start the worker.
+    """Stop (`turn`) and SessionEnd (`end`): spool one entry, with the turn's facts measured now (and a turn's other
+    repositories, FAA-140), and start the worker.
     Returns what happened, for the tests. Nothing is spooled and no worker runs unless the running Fabric advertises
     `session-hooks/1` and `fabric` is registered: hub.json is read first because it is the cheap check that fails for
     every Fabric before the one that ships the hooks' dependency (`status` says so: "Session hooks: inert"). Stale
@@ -213,10 +216,16 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
                 directory.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _write_private(directory / LAUNCHED_MARK, "")
             return "skipped: launched by Fabric"
-    # The turn's own facts, measured when it ended (counts and ids only, never a path), not when a worker runs.
+    # The turn's own facts, measured when it ended (counts and ids only, never a path), not when a worker runs. The
+    # other repositories the turn changed (FAA-140) share the same budget: git_facts first, then what time is left.
+    until = time.monotonic() + FACTS_BUDGET_S
     entry = {"event": event, "runtimeSessionId": session_id, "cwd": str(cwd),
              "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-             "facts": git_facts(cwd, budget_s=FACTS_BUDGET_S)}
+             "facts": git_facts(cwd, until=until)}
+    if event == "turn" and repositories_wanted(env):  # only once Fabric takes them: no transcript read before (FAA-140)
+        repositories = turn_repositories(payload.get("transcript_path"), cwd, until)
+        if repositories:
+            entry["repositories"] = repositories
     if event == "end" and isinstance(payload.get("reason"), str):
         entry["reason"] = payload["reason"][:64]
     spool(directory, entry)

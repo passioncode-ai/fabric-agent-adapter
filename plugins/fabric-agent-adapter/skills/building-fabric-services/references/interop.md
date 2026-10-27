@@ -148,7 +148,8 @@ and Fabric's hub forwarding decisions (CT-125) have landed (DEC-0121 *Compatibil
 operator's own coding agents: Claude Code and Codex cannot set `_meta`, so until the hub forwards `call.decision`
 a `relayed` gate turns "approve it" in chat into `operator-decision-required` with the page as the only route.
 Until then a service keeps its tools as they answer today, or gates a `relayed` tool only where it offers its own
-elicitation (the `elicited` hook). This is D8's reason, which keeps `input_actions` off, applied to tools.
+elicitation (the `elicited` hook). The one exception is the board responder's take-back action: it is declared
+`relayed` now and reached through the page or elicitation until CT-125 (`board.md`). This is D8's reason, which keeps `input_actions` off, applied to tools.
 
 **Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
 resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same

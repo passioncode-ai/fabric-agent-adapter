@@ -1,5 +1,77 @@
 # Changelog
 
+## 0.53.0 (2026-10-27)
+
+### Added
+
+- **The repositories a turn touched** (FAA-140, Fabric CO-367): working-with-fabric's Stop hook names the other Git
+  repositories a turn touched, once the running Fabric takes them. Nothing changes for a Fabric before that: the hook
+  reads no transcript until a worker has seen `fabric_session_observe` declare `repositories` as an array of items with
+  `host`, `owner` and `name` that require nothing else (it then leaves a mark in the hooks' folder, and removes it when
+  the schema stops saying so; after a Fabric downgrade, the turns that end before a worker next runs, about a minute, are still read; none of their
+  names is sent). With the mark, the
+  hook reads the last 512 KB of the session's transcript (earlier turns, message text and tool output included; a secret the session displayed can be there, read in memory only) and uses only the
+  current turn's tool names and path arguments: Edit, Write, MultiEdit and NotebookEdit paths, and `cd
+  <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
+  or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
+  read. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside the existing
+  1.5 s facts budget, and named `{host, owner, name}` from its `origin` (a credential embedded in the URL is read with it by `git config`; it, the port
+  and `.git` are dropped in memory, never spooled, logged or sent). The
+  repository of the session's folder when the turn ends (the Stop payload's `cwd`; any checkout of it), a repository without a parsable origin and duplicates are left out;
+  at most 10 (or the schema's `maxItems`), and an item whose host, owner or name the schema refuses (type, length,
+  pattern, enum) is left out, never the turn; no local path leaves the hook (on a self-hosted ssh remote `owner` is the
+  server's folder path). The worker sends them as `repositories` on `fabric_session_observe`. With a Fabric that never
+  took them nothing is read and nothing is logged; a turn spooled with the mark and delivered to a Fabric that no
+  longer takes them goes without them, and the log says so once per session, naming no repository. Measured with the read on, at `f3765f1` (before the gate and the 64 KB cap): the Stop hook's median is 247 ms on a 4.8 MB transcript naming
+  six repositories (0.52.0: 109 ms).
+- **A board slot the operator moves to another session stays moved** (FAA-155; contract DEC-0140, proposed; CT-174,
+  CT-175). The kit's board responder records the generation it holds each slot at, beside its checkpoint: when a
+  receipt's generation changes and before an enroll or replace that can change it; a live holder's renew writes
+  nothing, and a clean leave (the session's DELETE released the slots) forgets the record of a slot not moved and with no request
+  left. When `com.status` (at connect, or after a call refused `fenced`) shows a later generation, it stops the
+  handler, drops its claims, and leaves accepted work held (`lapsed`) and begun work `unknown`; it neither replaces at
+  recovery after a restart nor enrolls again when the new holder's lease lapses. Accepted requests stay held on the
+  board, unanswered, until the slot is taken back (CT-175 will hand them to the new holder). One `board.slot.moved`
+  event (notify) says so, once across restarts. A first start, an equal generation, or an odd or lower generation
+  behaves as before. An enroll or replace is recorded with its key before it is sent, so a lost answer to the
+  responder's own call is asked again under that key and never read as a move; a replay the board runs for the first
+  time (`repeated: false`) after the slot had moved past the record is read as that move, and the slot it took lapses
+  unused; a replay refused `idempotency_window_expired` (a retired epoch) forgets the record, so the slot reads as on a
+  first start. A recorded move stays even when `com.status` later names no generation for the slot. The record is best
+  effort: one that cannot be written (a full disk) never stops a call or the responder,
+  and a restart before the next one is recorded may then read as a move. A holder's renew within its live lease writes
+  nothing; the reference service now waits at its stop for the responder to leave its board session. `Responder.take_back(capability)` /
+  `takeBack(capability)` is the operator's act that brings a moved slot back: it enrolls once the other session lets
+  the slot go and takes the held work back by a transfer; a restart or reconnect before that, with work held, replaces
+  the other session at once. Moving the slot back to this service in Fabric does not bring it back (the responder
+  skips a moved slot until `take_back`; FAA-165). The kit offers no route for it: a service declares one as an
+  operator action with its tool and gate `relayed` (the operator's decision; never `none`; on a server that reads
+  mandates it also names its effect class) (`fabric-actions/0.1`; the reference service's is FAA-157). The
+  notice says begun work is the new holder's to settle and that the take-back action brings the slot back. Both
+  twins.
+
+### Changed
+
+- **Step 4 reads Fabric's `spawned_from`** (FAA-156, Fabric 0.3.14): working-with-fabric links a piece filed with
+  `fabric_task_create` itself only when the answer says `spawned_from: null` without `proposed: true` (once; a refused link is told to the person
+  with `spawned_from_why`), or is filed (`created: true`) with no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
+  the claimed task. `created: false` with a `code` such as `source-unresolved` filed nothing and is never linked. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
+  not linked again, and the person is told which parent Fabric chose (FAA-153). `proposed: true` now says what
+  to do: file and link nothing for that piece, tell the person, go on with the rest. The goal display is named as
+  Fabric 0.3.14's. New scenario evals `spawned-from-decides-the-link`, `what-the-stop-hook-reads` (FAA-140) and
+  `moved-slot-needs-a-take-back-action` (FAA-155).
+- **A responder no longer takes back a slot that moved while it was away** (FAA-155). Before 0.53.0 a restarted
+  responder replaced whoever held its slot (at recovery) or enrolled again when that holder lapsed, so a slot taken
+  while it was down or after a crash came back by itself. It now stays with the new holder until the operator calls
+  `take_back`; a second responder of the same capability is no longer a standby once the slot changed hands. A
+  service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first start (the clean leave
+  forgot the record); after a crash, a 0.52 run that enrolled the slot and wrote nothing to the checkpoint reads as a move at the next 0.53 start, which
+  the take-back action undoes. A `fenced` refusal on accepted work while the slot did not move now keeps the entry `lapsed`
+  and the next tick transfers it back and finishes it (0.52 dropped the entry and left the request accepted on the
+  board). A refusal raised while the responder recovers at its first connect, before any slot is held, now reconnects
+  instead of leaving it `ready` with no slot; one after some slots are held keeps them served (a reconnect still
+  counts the previous session's slots as held: FAA-163). A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
+
 ## 0.52.0 (2026-10-26)
 
 ### Changed

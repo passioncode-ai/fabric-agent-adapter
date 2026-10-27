@@ -9,7 +9,8 @@ built for tests, not a second implementation: one slot per (Project, capability)
 one live attempt per request, the fence checked in Fabric's order (request, authority, idempotency, digest, generation
 and holder, attempt, leases, revision), receipts kept per (operation, key), the replacement effects and the release on
 the session's DELETE. Its clock is a number the test moves (`advance`), never the wall clock. Knobs the tests turn:
-`fail_next[tool] = code` (one refusal), `drop_next[tool]` (the call commits but its answer is lost), `down` (every call
+`fail_next[tool] = code` (one refusal), `refuse_always[(tool, capability)] = code` (every such call refused),
+`drop_next[tool]` (the call commits but its answer is lost), `down` (every call
 503), `omit_transferred` (a board pinned before DEC-0078), `revoked` (the operator revoked the grant), `holds` (an
 operator's hold, DEC-0079: `{threads, projects, slots: [{project, capability}]}`, refused `held` at call time and named
 in `com.status`), `lift_holds_after` (a tool name: the board lifts every hold right after it refuses that tool
@@ -76,6 +77,7 @@ class Board:
         self.notes: List[Dict[str, Any]] = []
         self.calls: List[Tuple[str, Dict[str, Any]]] = []
         self.fail_next: Dict[str, str] = {}
+        self.refuse_always: Dict[Any, str] = {}
         self.drop_next: Dict[str, int] = {}
         self.omit_transferred = False
         self.revoked = False
@@ -205,6 +207,8 @@ class Board:
         if tool in self.fail_next:
             code = self.fail_next.pop(tool)
             return refusal(code, "a refusal the test asked for", retryable=code == "held")
+        if (tool, args.get("capability")) in self.refuse_always:
+            return refusal(self.refuse_always[(tool, args.get("capability"))], "a refusal the test asked for")
         if self._held(tool, args):
             if tool == self.lift_holds_after:
                 self.holds, self.lift_holds_after = {}, None
@@ -220,6 +224,8 @@ class Board:
             s = self._slot(cap)
             live = s["holder"] is not None and s["lease"] > self.now
             entry = {"capability": cap, "state": "active" if live else ("stale" if s["holder"] else "absent"), "generation": s["generation"]}
+            if "status_generation" in self.__dict__:  # a test's odd value (FAA-155); "absent" leaves it out
+                entry.pop("generation") if self.status_generation == "absent" else entry.update(generation=self.status_generation)
             if self.holds:
                 entry["held"] = self._slot_held(cap)
             if s["holder"]:
@@ -452,6 +458,14 @@ class Board:
             receipt["transferred"] = moved
         return self._store("com.responder_replace", args, d, receipt)
 
+    def move(self, capability: str, to: str = "s-moved") -> None:
+        """The operator moves the slot to another live session (contract DEC-0140 PR-2): one transition, as
+        com.responder_replace would make it for that session; accepted work is held and not transferred."""
+        s = self._slot(capability)
+        s["generation"] += 1
+        s["holder"], s["lease"] = to, self.now + LEASE
+        self._replacement(capability, s["generation"], returning_claimed=True)
+
     def release(self, session: str) -> None:
         for s in self.slots.values():
             if s["holder"] == session:
@@ -665,6 +679,8 @@ class FakeHub:
                     setattr(b, key, value)
         elif op == "fail":
             b.fail_next[cmd["tool"]] = cmd["code"]
+        elif op == "refuse":
+            b.refuse_always[(cmd["tool"], cmd.get("capability"))] = cmd["code"]
         elif op == "drop":
             b.drop_next[cmd["tool"]] = int(cmd.get("times", 1))
         elif op == "allow":
@@ -692,6 +708,8 @@ class FakeHub:
             if req["state"] != "queued":
                 return {"error": "only a queued request is answered (project-comms: queued -> answered)"}
             b._move(req, "answered")
+        elif op == "move":  # the operator moves the slot to another session (DEC-0140 PR-2)
+            b.move(cmd["capability"])
         elif op == "forget-sessions":  # the sessions end but no DELETE arrives: their slots lapse on their own (FAA-77)
             self.sessions.clear()
         elif op != "state":

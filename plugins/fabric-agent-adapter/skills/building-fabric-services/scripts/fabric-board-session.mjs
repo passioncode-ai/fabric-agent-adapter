@@ -26,6 +26,9 @@ const TERMINAL = new Set(['completed', 'failed_known', 'cancelled', 'expired']);
 // participant reply (DEC-0098, DEC-0102; not terminal, the requester may still cancel it, and nobody claims it).
 const NOT_OURS = new Set(['queued', 'claimed', 'answered']);
 
+// The answer may have been stored: send it again with the same key (BoardError).
+const LOST = ['unreachable', 'session-ended'];
+
 /** A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38). */
 export const LEASE_MARGIN_SECONDS = 10;
 
@@ -87,6 +90,7 @@ export class Responder {
     /** One fenced call at a time, and the entry edits beside them (FAA-77, finding 36). */
     this.fenceQueue = Promise.resolve();
     this.toResume = []; // transferred requests waiting until nothing runs (finding 39)
+    this.suspect = new Set(); // capabilities a fenced call was refused on: com.status says whether they moved (FAA-155)
   }
 
   /** Runs fn after every fenced call queued before it (finding 36): an await inside a call never lets another in. */
@@ -167,13 +171,14 @@ export class Responder {
     const args = { idempotency: this.idem(this.key('enroll')), capability };
     let receipt;
     try {
-      receipt = this.receipt('com.enroll', await this.call('com.enroll', args));
+      receipt = this.receipt('com.enroll', await this.ask(capability, 'com.enroll', args));
     } catch (e) {
       if (e.code === 'held') {
         this.pause(capability);
         return;
       }
       if (e.code === 'fenced') {
+        if (await this.gone(capability)) return;
         this.slots[capability] = { state: 'contested', renewedAt: this.now() };
         this.emit('board.slot.contested', 'warn', `Another responder holds the ${capability} slot on this Project; this service waits for it to lapse and never takes it over by itself.`, { notify: true, episode: capability, capability });
         return;
@@ -181,6 +186,7 @@ export class Responder {
       throw e;
     }
     this.slots[capability] = { state: 'held', generation: receipt.slot.generation, renewedAt: this.now() };
+    this.heldAt(capability, receipt.slot.generation);
     delete this.said['board.slot.contested'];
     this.lifted(capability);
   }
@@ -203,6 +209,118 @@ export class Responder {
   lifted(capability) {
     if (!this.onHold.delete(capability)) return;
     this.emit('board.slot.released', 'info', `The operator's hold on ${capability} was lifted; the service takes new work again.`, { capability });
+  }
+
+  // -- a slot moved to another session (FAA-155, DEC-0140 PR-2) --
+  /** The generation this responder holds the slot at, kept beside its checkpoint; a failed write is retried at the next receipt. */
+  heldAt(capability, generation) {
+    this.note(capability, { project: this.project, generation });
+  }
+
+  /** The slot record, best effort: one that cannot be written now is written at the next receipt. */
+  note(capability, record) {
+    try {
+      this.checkpoint.slot(capability, record);
+    } catch {
+      // the request steps fail closed on their own
+    }
+  }
+
+  /**
+   * An enroll or replace is recorded with its key before it is sent, so a lost answer is never read as a move; a refusal
+   * drops the record, a receipt replaces it (heldAt), a record that cannot be written is skipped.
+   */
+  async ask(capability, op, args) {
+    let held = this.checkpoint.slots[capability] ?? {};
+    if (held.project !== this.project) return this.call(op, args); // no record: nothing a lost answer could be mistaken for
+    const slot = this.slots[capability] ?? {};
+    if (op === 'com.enroll' && slot.state === 'held' && slot.generation === held.generation
+      && this.now() - (slot.renewedAt ?? 0) < LEASE_SECONDS - LEASE_MARGIN_SECONDS && !('asking' in held)) {
+      return this.call(op, args); // a live holder's renew cannot change its generation: nothing to record
+    }
+    if (isObj(held.asking)) {
+      // An earlier lost ask is settled first; it may show the slot moved.
+      if (await this.gone(capability)) throw new BoardError('fenced', `The ${capability} slot moved to another session.`, false, op);
+      held = this.checkpoint.slots[capability] ?? {};
+    }
+    try {
+      this.checkpoint.slot(capability, { ...held, asking: { op, args } });
+    } catch {
+      return this.call(op, args);
+    }
+    try {
+      return await this.call(op, args);
+    } catch (e) {
+      if (!LOST.includes(e.code)) this.note(capability, held);
+      throw e;
+    }
+  }
+
+  /**
+   * Asks a lost enroll or replace again under its key. `repeated: true`: it landed, the generation is ours. Else it ran
+   * only now: if the slot had moved past the record (`before`), the record stays and the move is read (the slot just
+   * taken lapses unused). A refusal or an odd receipt drops the record; a lost answer keeps it.
+   */
+  async replay(capability, held, before) {
+    const { asking, ...rest } = held;
+    let record = rest;
+    if (isObj(asking) && ['com.enroll', 'com.responder_replace'].includes(asking.op)) {
+      try {
+        const answer = this.receipt(asking.op, await this.call(asking.op, asking.args));
+        const generation = answer.slot?.generation;
+        const moved = isInt(before, 1) && isInt(rest.generation, 1) && before > rest.generation;
+        if (isInt(generation, 1) && (answer.repeated === true || !moved)) record = { project: this.project, generation };
+      } catch (e) {
+        if (LOST.includes(e.code)) throw e;
+        if (e.code === 'idempotency_window_expired') record = {}; // a retired epoch: unknown, so a first start, no move
+      }
+    }
+    this.note(capability, Object.keys(record).length ? record : null);
+    return record;
+  }
+
+  /**
+   * True when com.status shows the slot's generation past the one recorded held: the operator or another session moved
+   * it. The slot is left `moved`. No record, another Project's, an odd value or no later generation: false.
+   */
+  async gone(capability, status = null) {
+    let held = this.checkpoint.slots[capability] ?? {};
+    if (held.project !== this.project || (!isInt(held.generation, 1) && !('asking' in held))) return false;
+    let now = ((status ?? await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
+    if ('asking' in held) held = await this.replay(capability, held, now); // its own lost ask first
+    if (isInt(held.moved, 1) /* a recorded move stays until takeBack */ && !(isInt(now, 1) && now > (held.generation ?? now))) now = held.moved;
+    if (!isInt(now, 1) || !isInt(held.generation, 1) || now <= held.generation) return false;
+    if (this.current?.entry.capability === capability) {
+      this.current.ctx.stopped = true;
+      this.current = null;
+    }
+    for (const entry of Object.values(this.checkpoint.entries).filter((e) => e.capability === capability).map((e) => ({ ...e }))) {
+      if (entry.step === 'claimed') this.checkpoint.drop(entry.request); // the move returned the claim to the queue
+      else if (!['unknown', 'lapsed'].includes(entry.step)) {
+        // Begun: outcome_unknown, which the slot's holder reconciles. Accepted: held on the board, continued only by a
+        // transfer if the slot is this service's again; never a com.responder_replace on its own.
+        entry.step = entry.effect ? 'unknown' : 'lapsed';
+        this.checkpoint.put(entry);
+      }
+    }
+    this.toResume = this.toResume.filter((r) => this.checkpoint.entries[r]?.capability !== capability);
+    this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
+    if (!('moved' in held)) { // once, even across restarts
+      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets it go; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written
+    }
+    return true;
+  }
+
+  /**
+   * The operator's act, never the kit's: forget that a capability's slot moved away. In the same board session the next
+   * tick enrolls once the slot is free; a reconnect with held work takes it back at once by a transfer (FAA-155).
+   */
+  takeBack(capability) {
+    if (!this.capabilities.includes(capability)) throw new BoardError('invalid_arguments', `This responder does not answer ${capability}.`);
+    this.checkpoint.slot(capability, null);
+    if (this.slots[capability]?.state === 'moved') this.slots[capability] = { state: 'contested', renewedAt: 0 };
+    delete this.said['board.slot.moved'];
   }
 
   // -- restart: reconcile and transfer --
@@ -237,13 +355,18 @@ export class Responder {
     const generations = Object.fromEntries(responders.map((r) => [r.capability, r.generation ?? 0]));
     const onHold = new Set(responders.filter((r) => r.held === true).map((r) => r.capability)); // DEC-0079
     for (const capability of capabilities) {
+      const was = this.checkpoint.slots[capability]?.generation;
+      if (await this.gone(capability, status)) continue; // moved away: never replaced at recovery (FAA-155)
       if (onHold.has(capability)) {
         for (const entry of transfer[capability] ?? []) {
           entry.step = 'lapsed'; // taken back by a transfer once the hold is lifted
           this.checkpoint.put(entry);
         }
         this.pause(capability);
-      } else if (transfer[capability]?.length) await this.replace(capability, transfer[capability], generations[capability] ?? 0);
+      } else if (transfer[capability]?.length) { // at the generation a replay just recorded, else com.status's
+        const mine = this.checkpoint.slots[capability]?.generation;
+        await this.replace(capability, transfer[capability], isInt(mine, 1) && mine !== was ? mine : generations[capability] ?? 0);
+      }
       else await this.enroll(capability);
     }
     for (const entry of reconcile) {
@@ -260,8 +383,10 @@ export class Responder {
     if (entries.length) args.transfer = { requests: entries.map((e) => e.request).slice(0, 64), checkpoint: { summary: 'Resumed by the same service after a restart; no effect had begun.' } };
     let receipt;
     try {
-      receipt = this.receipt('com.responder_replace', await this.call('com.responder_replace', args));
+      receipt = this.receipt('com.responder_replace', await this.ask(capability, 'com.responder_replace', args));
     } catch (e) {
+      // An earlier lost ask showed the slot moved: said once as board.slot.moved, no outage.
+      if (e.code === 'fenced' && this.slots[capability]?.state === 'moved') return;
       if (e.code !== 'held') throw e;
       for (const entry of entries) {
         entry.step = 'lapsed'; // nothing moved: taken back by a transfer once the hold is lifted
@@ -271,6 +396,7 @@ export class Responder {
       return;
     }
     this.slots[capability] = { state: 'held', generation: receipt.slot.generation, renewedAt: this.now() };
+    this.heldAt(capability, receipt.slot.generation);
     this.lifted(capability);
     const moved = new Map((receipt.transferred ?? []).map((item) => [item.request, item]));
     for (const entry of entries) {
@@ -418,6 +544,7 @@ export class Responder {
 
   async fault(e) {
     const code = e.code ?? 'unreachable';
+    const connecting = this.state === 'connecting' && !Object.values(this.slots).some((s) => s?.state === 'held');
     let wait = this.backoff.next();
     const left = this.leaseLeft() - LEASE_MARGIN_SECONDS;
     const keep = code === 'unreachable' && left > 0; // finding 38: the lease holds, so the session and the work stay
@@ -437,7 +564,8 @@ export class Responder {
       this.emit('board.blocked', 'error', `The responder stopped answering requests: ${e.message}`, { notify: true, episode: code, reason: code });
     } else {
       this.state = 'down';
-      if (['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code) && !keep) await this.dropSession();
+      // A refusal in recovery that left no slot held reconnects (seam 6); one that left some held serves them (seam 7).
+      if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code)) && !keep) await this.dropSession();
       this.emit('board.down', 'warn', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
     }
     return wait;
@@ -470,7 +598,12 @@ export class Responder {
       else await this.renew(work);
     }
     const heldByWork = work && this.current ? work.entry.capability : null;
+    for (const capability of [...this.suspect]) { // kept until com.status answered, so it is asked before any enroll
+      await this.gone(capability);
+      this.suspect.delete(capability);
+    }
     for (const [capability, slot] of Object.entries(this.slots)) {
+      if (slot.state === 'moved') continue; // never enrolled again on its own, even when the new holder's lease lapses (FAA-155)
       if (slot.state === 'paused') {
         // still held: a longer pause; lifted: the slot is ours again
         if (capability !== heldByWork && this.now() >= (slot.retryAt ?? 0)) await this.enroll(capability);
@@ -521,6 +654,7 @@ export class Responder {
         answer = this.receipt('com.claim', await this.call('com.claim', { idempotency: this.idem(this.claimKeys[capability]), capability }));
       } catch (e) {
         if (e.code === 'lease_expired') {
+          this.slots[capability].renewedAt = -Infinity; // lapsed: this enroll may move the generation, so it is recorded
           await this.enroll(capability);
           continue;
         }
@@ -530,7 +664,7 @@ export class Responder {
           continue;
         }
         if (e.code === 'fenced') {
-          this.slots[capability] = { state: 'contested', renewedAt: this.now() };
+          if (!(await this.gone(capability))) this.slots[capability] = { state: 'contested', renewedAt: this.now() };
           continue;
         }
         if (e.code === 'held') {
@@ -648,6 +782,7 @@ export class Responder {
           continue;
         }
         if (STOP_CODES.has(e.code) || ['revision_conflict', 'invalid_transition', 'digest_conflict'].includes(e.code)) {
+          if (e.code === 'fenced') this.suspect.add(entry.capability); // the next tick asks com.status whether the slot moved
           this.lose(entry, e.code);
           if (e.code === 'authority_changed') throw e;
           return null;
@@ -663,10 +798,13 @@ export class Responder {
       entry.step = 'unknown';
       this.checkpoint.put(entry);
       this.emit('board.reconcile.needed', 'warn', 'The attempt was lost after its effect began; the outcome stays unknown until this service observes what happened.', { notify: true, episode: entry.request, request: entry.request, capability: entry.capability, reason: code });
-    } else if (code === 'lease_expired' && !['claimed', 'accepting'].includes(entry.step)) {
+    } else if (!['claimed', 'accepting'].includes(entry.step) && (code === 'lease_expired' || (code === 'fenced' && entry.capability in this.checkpoint.slots))) {
+      // Accepted work whose lease lapsed, or fenced off a slot this responder held (moved, FAA-155): the board holds it
+      // (C4). It continues only by a checkpoint transfer to this responder while it holds the slot.
       entry.step = 'lapsed';
       this.checkpoint.put(entry);
-      this.emit('board.attempt.lost', 'warn', 'This service\'s lease on an accepted request lapsed; it stopped working on it and takes it back by a transfer.', { request: entry.request, capability: entry.capability, reason: code });
+      this.emit('board.attempt.lost', 'warn', code === 'lease_expired' ? 'This service\'s lease on an accepted request lapsed; it stopped working on it and takes it back by a transfer.'
+        : 'The board fenced an accepted request away from this service; it stopped working on it, and nothing had been done outside it.', { request: entry.request, capability: entry.capability, reason: code });
     } else {
       this.checkpoint.drop(entry.request);
       this.emit('board.attempt.lost', 'warn', `The board took a request back from this service (${code}); it stopped working on it, and nothing had been done outside the service.`, { request: entry.request, capability: entry.capability, reason: code });
@@ -854,6 +992,7 @@ export class Responder {
     if (this.session) {
       await this.session.close();
       this.session = null;
+      this.checkpoint.leave(this.project); // the slots were released: no record of them can read as a move
     }
     this.state = 'stopped';
   }

@@ -16,6 +16,7 @@ skill's business (working-with-fabric, `references/project-board.md`).
 - Effects, observation, evidence and the reply
 - When the board says stop, and restarts
 - When the operator holds work (DEC-0079)
+- When the operator moves a slot to another session (FAA-155)
 - What a board session may call
 - Looking a Project up in the directory (FAC-SEM-107)
 - Events, the probe and the live smoke
@@ -50,7 +51,11 @@ responder = fbd.Responder(
     hub=fhb.HubClient(), project_id=PROJECT, capabilities=["video.render"],
     credential_file=dirs["data"] / "board.credential", checkpoint_file=dirs["data"] / "board-checkpoint.json",
     handler=render, admit=gate, observe=look_on_disk, emit=log.append, service="example-agent")
-threading.Thread(target=responder.run, args=(stop_event, 5.0), daemon=True).start()   # SIGTERM: set stop_event
+board = threading.Thread(target=responder.run, args=(stop_event, 5.0), daemon=True)  # SIGTERM: set stop_event
+board.start()
+# ... at stop, after stop_event is set: wait for it to leave its board session (a clean leave forgets its slot
+# records, FAA-155), bounded inside the kit's hard exit, as scripts/sample_service.py does
+board.join(timeout)
 ```
 
 Node: `new Responder({...same names in camelCase})`, then `responder.run({ signal, drain })`. A service that lists
@@ -63,7 +68,7 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 
 | Step | Board call | Checkpoint written first |
 |---|---|---|
-| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | none |
+| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | none for a first enroll or a live holder's renew; otherwise the slot's `asking` record (FAA-155) |
 | take a request | `com.claim`, the same key while nothing is claimable | `claimed` |
 | read it | `com.get`: the digest must equal the claim's, and the request must name this Project and capability | none |
 | accept | `com.accept` with the claim's exact fence (request, generation, attempt, digest, revision) | `accepting`, then `accepted` |
@@ -73,7 +78,8 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 | settle | `com.complete {state, observed, summary?, evidence?}` | `completing`, then the entry is dropped |
 
 The checkpoint is fsynced before each call it announces. A write that fails stops the step (`board.blocked`): nothing
-is sent that the checkpoint does not know about. A lost answer is sent again with the same idempotency key, so the
+is sent that the checkpoint does not know about. The one exception is the slot record: an `asking` or generation
+record that cannot be written is skipped and the enroll or replace still goes out (see below). A lost answer is sent again with the same idempotency key, so the
 board returns the first receipt; while the lease still holds, the session and the running work stay and the call goes
 again before the lease would lapse (FAA-77). One request is in flight at a time, and one fenced call: the fence is
 built, sent and its receipt applied under one lock, so the tick's `com.renew` never carries a revision the handler's
@@ -109,10 +115,10 @@ once the kit reads it (FAA-135).
 
 | Answer | What the kit does |
 |---|---|
-| `fenced` | the attempt is another responder's: stop the handler, drop the entry (nothing outside had begun) |
+| `fenced` | the attempt is another responder's: stop the handler, drop the entry (nothing outside had begun); accepted work on a slot this responder recorded holding stays as `lapsed`, and the next tick asks `com.status` whether the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155) |
 | `lease_expired` on accepted work | stop the handler; the board holds the request, and the kit takes it back with `com.responder_replace` and a transfer |
 | `authority_changed`, `not_authorized` | stop claiming; one `board.access.needed` event (notify) saying what to ask for |
-| `fenced` on enroll | another live holder: wait for it to lapse; never replace it on its own initiative |
+| `fenced` on enroll or claim | another live holder: wait for it to lapse; never replace it on its own initiative. When this responder recorded holding the slot, it first reads `com.status`: a newer generation means the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155), and it is not taken again even after that holder lapses |
 | lost after an effect began | keep the entry as `unknown`; `observe(entry)` is asked to settle it with `com.reconcile` |
 | Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning |
 | one call without an answer while the lease holds | `board.down`, but the session and the running work stay; the call goes again, with the same key, before the lease lapses |
@@ -124,7 +130,8 @@ On restart the checkpoint is read back: settled, queued, claimed or `answered` r
 the target Project's participant reply answered it, DEC-0098 and DEC-0102; not settled, the requester may still cancel
 it, but no longer this responder's); `in_progress` and `outcome_unknown` are
 reconciled from what `observe(entry)` answers (observed only; with no observation they stay unknown and notify);
-accepted ones go back to this responder with `com.responder_replace {expectedGeneration, transfer}`, whose receipt's
+accepted ones go back to this responder with `com.responder_replace {expectedGeneration, transfer}` (unless the slot
+moved to another session meanwhile: they stay `lapsed` until take-back, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)), whose receipt's
 `transferred` (DEC-0078: `{request, revision, attempt}`) carries the new fence. **A Fabric that does not answer
 `transferred` yet leaves the request held** (`board.request.held`, notify): the kit never claims it back, because the
 contract has no `com.claim` read-back and `com.claim` never moves an accepted request. A known outcome is sent after the
@@ -160,6 +167,70 @@ A receipt's request may carry `settledBy: "owner"` (DEC-0081): the estate owner 
 whose responder was gone. Read it as the owner's attestation, not the responder's; it appears only on `completed` or
 `failed_known`, and its absence means the responder settled it.
 
+## When the operator moves a slot to another session (FAA-155)
+
+The contract's DEC-0140 PR-2 (proposed, after this kit's pin; Fabric plans it for 0.3.15) lets the operator move a
+(Project, capability) slot to another live session of the Project: one transition, as `com.responder_replace` would make
+it for the receiving session (generation up, `claimed` back to `queued`, `in_progress` to `outcome_unknown`, `accepted`
+held and not transferred). The responder keeps that move instead of undoing it:
+
+- It records the generation it holds each slot at, in the checkpoint file beside the requests (`slots: {<capability>:
+  {project, generation, moved?, asking?}}`). The record is written when a receipt's generation changes and before an
+  enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
+  clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
+  in the checkpoint and not moved is forgotten (a moved slot's record stays, so a clean stop never undoes a move): the slot is free, and whoever takes it next is no move. A file without the record
+  reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first
+  start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
+  wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
+- An enroll or a replace is written into that record with its key before it is sent (`asking`). When its answer is
+  lost, the next connect (or the next enroll) sends the same call again under the same key; the board answers the
+  stored receipt, whose generation is this service's own, and the slot is then asked for once more for the new board
+  session. A refusal is an answer and drops the `asking` record, so a move that happened meanwhile is still seen; except
+  `idempotency_window_expired` (a retired epoch refuses even a repeat), which leaves it unknown whether the call
+  landed: the whole record is forgotten and the slot reads as on a first start, never as a move. An
+  `asking` record that cannot be written (a full disk) is skipped, as the generation record is: the call goes out
+  unrecorded, and a lost answer to it, or a restart before the next receipt is recorded, may then read as a move.
+- It reads the slot's generation from `com.status` at every connect (a restart), and after any call refused `fenced`:
+  at once for a claim or an enroll, at the next tick for a fenced call on running work. Only a responder with a record
+  asks, so a first start sends no extra call. A generation past the recorded one, with no own call of
+  this service left unanswered, is a move, whatever made it: the operator, or another session that took the slot while
+  this one was away or after it crashed. Before 0.53.0 a restarted responder took such a slot back by itself. So a
+  second responder of the same capability is no longer a standby once the slot changed hands: after any change of
+  holder it waits for take-back, not for the other's lapse.
+- A `fenced` refusal on accepted work while the slot did not move (the generation unchanged) keeps the entry
+  `lapsed`; the next tick takes it back with a transfer and goes on (before 0.53.0 the entry was dropped and the
+  request left accepted on the board).
+- Then the slot is `moved`: the running handler is told to stop (`ctx.stopped`); a `claimed` entry is dropped (the move
+  returned it to the queue); accepted work stays as `lapsed` and work whose effect began as `unknown` (only the slot's
+  holder, or the estate owner, reconciles it now). No `com.claim`, `com.renew`, `com.complete`, `com.enroll` or
+  `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
+  holder's lease lapses, nor when com.status later names no generation for the slot (a recorded move stays until
+  take-back). Accepted requests stay held on the board, unanswered, until the slot is taken back (CT-175
+  will hand them to the new holder). One `board.slot.moved` event (warn, notify) says so, once, also across restarts
+  (the record keeps `moved`).
+- A responder that never held the slot (a first start: no record, or a record of another Project), or whose record
+  equals the current generation, behaves as before: it enrolls, recovers and replaces its own lapsed work. A recorded or
+  reported generation that is not an integer of at least 1, or one not past the record (lower: the record is not this
+  board's), is not a move either: today's behaviour, not a stop, and the next receipt rewrites the record. A crash
+  between a receipt and its record's write leaves the `asking` record: the next start asks again under the same key and
+  records its own generation. Only a replay the board refuses, or one that ran for the first time (`repeated: false`)
+  after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
+  unused. A generation written `2.0` is `2`.
+- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record; never edit the
+  checkpoint's `slots` record by hand to undo a move. In the same board
+  session the next tick enrolls once the other session lets the slot go (a live holder is waited for) and takes the work
+  left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work held for the slot, takes it
+  back at once by `com.responder_replace`, as a restart did before 0.53.0: the operator asked for the slot back, so the
+  other session is replaced. In recovery, a refusal that leaves no slot held reconnects; one that leaves some held keeps
+  the session and serves them. The kit gives it no route of its own (the reference service has none yet,
+  FAA-157): a service built on the kit declares it as an operator action, a button with its tool ([Every button has a
+  tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so no other
+  agent can call it on its own; on a server that reads mandates (`agent_id`) it also names its effect class, for example
+  `change-policy` (DEC-0125); until Fabric's hub forwards decisions (CT-125) the operator reaches it through the
+  service's page or its elicitation, and names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
+  detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
+  surface.
+
 ## What a board session may call
 
 A board session (`fabric.board.join`) is served the respond scope only: `com.status`, `com.list`, `com.get`,
@@ -183,8 +254,8 @@ raises `directory-invalid` rather than answering; an unlisted Project may still 
 Events go to `emit(kind, level, text, notify=…, data=…)` (`JsonlEventLog.append` fits) with `data {schema, value}`
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
-`board.reconcile.needed`, `board.slot.contested`, `board.access.needed`, `board.blocked`, `board.down`, each
-notifying episode said once.
+`board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.access.needed`, `board.blocked`,
+`board.down`, each notifying episode said once.
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
 `NOT_RUN` when the well-known `protocols` names no `fabric-project-comms` revision; `FAIL` for a revision this kit does
@@ -208,12 +279,12 @@ message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,
 admit, observe=None, emit=None, service, now, rand, spawn, session_factory)` with `step()`, `run(stop, drain)`,
-`shutdown(drain)`; `WorkContext.progress(note)`, `.begin_effect(summary)`, `.stopped`; `BoardSession(grant)`;
+`shutdown(drain)`, `take_back(capability)`; `WorkContext.progress(note)`, `.begin_effect(summary)`, `.stopped`; `BoardSession(grant)`;
 `Checkpoint(path)`; `comms_canonical(value)`, `comms_digest(operation, value)`, `receipt_problems(value, op)`,
 `refusal_problems(value)`, `directory_findings(page)`, `directory_problems(page)`, `find_project(page, project_id,
 capability)`, `artifact_ref(uri, content|path, label)`, `evidence_problems(list)`, `outcome_problems(outcome,
 effect_began)`, `self_check()`; `BoardError`, `Stopped`.
 
 Node: the same names in camelCase (`locateHub(root, {alive, estate, now})`, `new HubClient(root, {alive, timeout,
-estate, post})`, `new Responder({...})` with async `step()`, `run({signal, drain})`, `shutdown(drain)`; `await
-ctx.progress(note)`, `await ctx.beginEffect(summary)`; `selfCheck()`). Both kits read and write the same checkpoint file.
+estate, post})`, `new Responder({...})` with async `step()`, `run({signal, drain})`, `shutdown(drain)`,
+`takeBack(capability)`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`; `selfCheck()`). Both kits read and write the same checkpoint file.

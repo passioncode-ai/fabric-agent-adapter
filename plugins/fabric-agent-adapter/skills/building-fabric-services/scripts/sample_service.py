@@ -26,6 +26,7 @@ import os
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 import sys
+import time
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -342,16 +343,27 @@ def serve(args: argparse.Namespace) -> int:
     # hand-over that hangs is cut by the kit's hard exit, inside launchd's ExitTimeOut.
     import threading
     board_stop = threading.Event()
+    board_thread = None
     if svc.board is not None:
-        threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True).start()
+        board_thread = threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True)
+        board_thread.start()
+
+    stop_asked: list = []
 
     def stopping() -> None:
+        stop_asked.append(time.monotonic())
         board_stop.set()  # stop claiming; the responder drains its request and leaves its board session
         svc.log.append("service.stopping", "info", "%s is stopping." % svc.name)
     svc.drain.install(lambda drained: server.shutdown(), on_stopping=stopping)
     try:
         server.serve_forever(poll_interval=0.2)
     finally:
+        board_stop.set()
+        if board_thread is not None:
+            # The responder drains (5 s at most) and leaves its board session, which releases its slots and forgets their
+            # records (FAA-155): joined, so the process does not end before that.
+            # Bounded by the kit's hard exit, 8 + 2 s after the stop was asked: 1.5 s are left for the rest of the stop.
+            board_thread.join(max(0.5, 8.5 - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
         server.server_close()
         svc.lock.release()
     return 0

@@ -423,9 +423,32 @@
       "request": "The person asked: \"Move the billing service to the new database and keep the old one read-only for a week.\" You will split it into a migration, a backfill and a cut-over, and you will need the person's choice of maintenance window. How do you make your goal and progress visible in Fabric?",
       "expected": [
         "reads the project's board at the start and answers requests addressed to its Project",
-        "claims the person's request as ONE task whose title is that request in one line, with origin {kind: person, ref: where they said it} (fabric_work_claim), then files each piece it splits off (migration, backfill, cut-over) with fabric_task_create while that task is claimed, and links each one with fabric_task_link rel spawned to the claimed task unless the answer says chained: true with chained_to that task",
+        "claims the person's request as ONE task whose title is that request in one line, with origin {kind: person, ref: where they said it} (fabric_work_claim), then files each piece it splits off (migration, backfill, cut-over) with fabric_task_create while that task is claimed, and reads each answer's spawned_from (Fabric 0.3.14 links the piece from the single live claim): links it itself with fabric_task_link rel spawned to the claimed task only when spawned_from is null (then once, and tells the person spawned_from_why if that link is refused), or when the answer has no spawned_from (Fabric before 0.3.14) and no chained: true with chained_to that task; never links a piece whose spawned_from names the claimed task",
         "reports its stage with step and ofSteps (fabric_stage_report, e.g. step 2 of 3) as it moves",
         "sends fabric_heartbeat with phase waiting before it waits on the person's choice of window, the wait in one line of note (waitingOn only for a question asked with fabric_question_ask)"
+      ]
+    },
+    {
+      "id": "spawned-from-decides-the-link",
+      "trap": "the agent links every piece it filed by hand even when Fabric already linked it, or trusts an old Fabric to link a piece it never linked",
+      "request": "You claimed the person's request and made six fabric_task_create calls, one for each piece you split off. The first answer says spawned_from: <your claimed task>. The second says spawned_from: null with spawned_from_why: \"two live claims; the parent is not certain\". The third, on another machine's older Fabric, has neither spawned_from nor chained. A fourth answer says proposed: true, spawned_from: null, spawned_from_why: \"proposed for the operator; nothing filed\". A fifth names another task than yours in spawned_from. A sixth answer says created: false, code: source-unresolved, part: path. What do you do for each?",
+      "expected": [
+        "first piece: links nothing (Fabric 0.3.14 already linked it to the claimed task through spawned_from)",
+        "second piece: links it once with fabric_task_link {taskId: the piece, rel: spawned, targetTaskId: the claimed task}; if that is refused too, tells the person spawned_from_why and never files the piece again",
+        "third piece: links it itself with fabric_task_link rel spawned to the claimed task (no spawned_from and no chained: true with chained_to that task means this Fabric did not link it)",
+        "fourth piece: files and links nothing for it (proposed: true wins over spawned_from: null), tells the person it waits for the operator, and goes on with the rest",
+        "fifth piece: links nothing (Fabric chose that parent) and tells the person which parent Fabric chose (FAA-153)",
+        "sixth piece: nothing was filed, so it links nothing; it corrects the source (the path part did not resolve) or files the piece without it"
+      ]
+    },
+    {
+      "id": "what-the-stop-hook-reads",
+      "trap": "the agent tells the person the hooks never read the transcript, or that only tool names are read, or that file paths leave the machine",
+      "request": "The person asks: \"Does the Fabric plugin read my Claude Code transcript, and what does it send about other repositories I worked in?\"",
+      "expected": [
+        "says the Stop hook reads no transcript until a worker has seen the running Fabric's fabric_session_observe take repositories as items with host, owner and name (a mark in the hooks' folder); with a Fabric whose fabric_session_observe does not declare repositories it reads none",
+        "says that once it does, it reads the last 512 KB of the transcript, earlier turns, message text and tool output included (which can hold a secret the session displayed, kept in memory only), and uses only the current turn's tool names and path arguments (Edit, Write, MultiEdit, NotebookEdit paths; cd and git -C in Bash)",
+        "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a local path, a command or message text (on a self-hosted ssh remote owner is that server's folder path), and that a cd or a read-only git -C counts as touching a repository"
       ]
     }
   ]

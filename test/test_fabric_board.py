@@ -15,6 +15,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -204,6 +205,26 @@ class Conversation(unittest.TestCase):
 
     def kinds(self):
         return [e[0] for e in self.events]
+
+
+class TwoCapabilityRecoveryTests(Conversation):
+    """Seam reading 7 of 0.53.0: a refusal in recovery that leaves some slots held keeps them served, as on 0.52."""
+
+    CAPS = ("video.render", "video.cut")
+
+    def test_a_capability_refused_at_connect_never_stops_the_others(self):
+        for code in ("capacity_exceeded", "invalid_arguments"):
+            with self.subTest(code=code):
+                self.setUp()
+                self.board.refuse_always[("com.enroll", "video.cut")] = code
+                rid = self.board.queue("video.render")
+                r = self.responder()
+                for _ in range(4):
+                    r.step()
+                    self.board.advance(15)
+                self.assertEqual(self.board.requests[rid]["state"], "completed")
+                self.assertEqual(r.slots["video.render"]["state"], "held")
+                self.tearDown()
 
 
 class ConversationTests(Conversation):
@@ -1159,6 +1180,411 @@ class HoldTests(Conversation):
         self.assertNotIn("board.down", self.kinds())
 
 
+_KEEP, _ABSENT = object(), object()
+
+
+class MovedSlotTests(Conversation):
+    """FAA-155 (contract DEC-0140 PR-2; CT-174, CT-175): a slot the operator moves to another session stays moved. The
+    responder records the generation it held; once com.status shows it moved past, it ends its claims there, leaves its
+    accepted work held, and neither replaces (at recovery) nor re-enrolls (when the new holder lapses) on its own."""
+
+    _crash_after = RestartTests._crash_after
+
+    def moved(self):
+        return [e for e in self.events if e[0] == "board.slot.moved"]
+
+    def record(self):
+        path = self.data / "board-checkpoint.json"
+        return json.loads(path.read_text()).get("slots", {}) if path.exists() else {}
+
+    def test_the_generation_held_is_recorded_beside_the_checkpoint(self):
+        r = self.responder()
+        r.step()
+        self.assertEqual(self.record(), {"video.render": {"project": r.project, "generation": 1}})
+        self.assertEqual(fb.Checkpoint(self.data / "board-checkpoint.json").slots["video.render"]["generation"], 1)
+
+    def test_a_restart_after_a_move_does_not_replace(self):
+        rid, _ = self._crash_after(effect=False)  # held at generation 1; accepted work in the checkpoint
+        self.board.move("video.render")  # the operator moves the slot: generation 2, another live session
+        self.board.calls.clear()
+        second = self.responder()
+        second.step()
+        self.assertNotIn("com.responder_replace", self.tools())
+        self.assertNotIn("com.enroll", self.tools())
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")  # held on the board, not transferred
+        self.assertEqual(self.checkpoint()[rid]["step"], "lapsed")
+        said = self.moved()
+        self.assertEqual(len(said), 1)
+        self.assertTrue(said[0][3]["notify"])
+        self.assertIn("moved to another session", said[0][2])
+        self.assertEqual(said[0][3]["data"]["value"], {"capability": "video.render", "generation": 2, "held": 1})
+        self.board.advance(61)  # the new holder lets its lease lapse
+        for _ in range(3):
+            second.step()
+            self.board.advance(20)
+        third = self.responder()  # and another restart
+        third.step()
+        self.assertFalse({"com.responder_replace", "com.enroll", "com.claim"} & set(self.tools()))
+        self.assertEqual(self.board.slots["video.render"]["generation"], 2)
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+        self.assertEqual(len(self.moved()), 1)  # said once, across the restart too
+        self.assertEqual(self.record()["video.render"]["moved"], 2)
+
+    def test_a_lapsed_new_holder_is_not_re_enrolled(self):
+        r = self.responder()
+        r.step()  # holds generation 1, idle
+        rid = self.board.queue("video.render")
+        self.board.move("video.render")
+        self.board.advance(15)
+        r.step()  # its com.claim is fenced: com.status shows generation 2
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertEqual(self.tools()[-2:], ["com.claim", "com.status"])
+        seen = len(self.tools())
+        self.board.advance(61)  # the new holder's lease lapses
+        for _ in range(4):
+            r.step()
+            self.board.advance(20)
+        self.assertEqual(self.tools()[seen:], [])
+        self.assertEqual(self.board.slots["video.render"]["generation"], 2)
+        self.assertEqual(self.board.requests[rid]["state"], "queued")
+        self.assertEqual(len(self.moved()), 1)
+
+    def test_work_running_when_the_slot_moves_stops_and_stays_held(self):
+        import time
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def slow(request, ctx):
+            release.wait(5)
+            return {"state": "completed"}
+        self.outcome = slow
+        rid = self.board.queue("video.render")
+        r = self.responder(spawn=lambda fn: threading.Thread(target=fn, daemon=True).start())
+        r.step()  # accepted; the handler works
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()  # its com.renew is fenced; com.status says the slot moved
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertIsNone(r.current)
+        self.assertEqual(self.checkpoint()[rid]["step"], "lapsed")
+        release.set()
+        time.sleep(0.1)
+        self.board.advance(61)
+        r.step()
+        r.step()
+        self.assertFalse({"com.complete", "com.responder_replace", "com.enroll"} & set(self.tools()[self.tools().index("com.renew"):]))
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+        self.assertEqual(len(self.moved()), 1)
+
+    def test_an_unmoved_restart_still_recovers_its_own_accepted_work(self):
+        rid, _ = self._crash_after(effect=False)
+        self.assertEqual(self.record()["video.render"]["generation"], 1)
+        second = self.responder()
+        second.step()
+        replace = dict(self.board.calls)["com.responder_replace"]
+        self.assertEqual((replace["expectedGeneration"], replace["transfer"]["requests"]), (1, [rid]))
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.record()["video.render"]["generation"], 2)
+        self.assertEqual(self.moved(), [])
+
+    def test_take_back_is_the_operators_act(self):
+        rid, _ = self._crash_after(effect=False)
+        self.board.move("video.render")
+        second = self.responder()
+        second.step()
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        with self.assertRaises(fb.BoardError):
+            second.take_back("other.capability")
+        second.take_back("video.render")
+        self.assertNotIn("video.render", self.record())
+        self.board.advance(61)  # the new holder lapsed: the next tick enrolls and transfers the work left held
+        second.step()
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.record()["video.render"]["generation"], self.board.slots["video.render"]["generation"])
+
+    def test_a_lost_answer_to_its_own_replace_is_asked_again_not_read_as_a_move(self):
+        """Seam reading 1: the board commits generation 2 for this service and the answer is lost. The record written
+        before the call makes the restart ask again under the same key; the board answers the stored receipt."""
+        rid, _ = self._crash_after(effect=False)
+        self.board.drop_next["com.responder_replace"] = 1
+        second = self.responder()
+        for _ in range(6):
+            second.step()
+            self.board.advance(1)
+        replaces = [args for tool, args in self.board.calls if tool == "com.responder_replace"]
+        self.assertEqual(replaces[0]["idempotency"], replaces[1]["idempotency"])  # the same key, asked again
+        # The stored receipt names the ended session's slot; the new session's first fenced call replaces once more.
+        self.assertEqual([a["expectedGeneration"] for a in replaces], [1, 1, 2])
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+        self.assertEqual(self.record()["video.render"], {"project": second.project, "generation": 3})
+
+    def test_a_lost_answer_to_its_own_enroll_after_a_lapse_is_not_a_move(self):
+        r = self.responder()
+        r.step()  # holds generation 1
+        self.hub.control({"op": "end-sessions"})
+        self.board.advance(61)  # its lease lapses while it is away
+        rid = self.board.queue("video.render")
+        self.board.drop_next["com.enroll"] = 1
+        second = self.responder()
+        for _ in range(6):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+
+    def test_a_lost_ask_that_never_landed_does_not_take_a_moved_slot_back(self):
+        """Seam reading 2: the replay of an ask that never reached the board runs it now (`repeated: false`). The slot
+        had moved past the record meanwhile, so it is read as moved, never taken back to work on."""
+        r = self.responder()
+        r.step()  # holds generation 1
+        self.hub.control({"op": "end-sessions"})  # it dies with an enroll recorded that never reached the board
+        path = self.data / "board-checkpoint.json"
+        doc = json.loads(path.read_text())
+        doc["slots"]["video.render"]["asking"] = {"op": "com.enroll", "args": {
+            "idempotency": {"epoch": 1, "key": "example-agent.enroll.never-sent"}, "capability": "video.render"}}
+        path.write_text(json.dumps(doc))
+        self.board.move("video.render")  # generation 2
+        self.board.advance(61)  # and that holder lapses
+        rid = self.board.queue("video.render")
+        self.board.calls.clear()
+        second = self.responder()
+        for _ in range(3):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(len(self.moved()), 1)
+        self.assertNotIn("com.claim", self.tools())
+        self.assertEqual(self.board.requests[rid]["state"], "queued")
+        self.assertEqual(self.record()["video.render"]["generation"], 1)
+
+    def test_an_idle_renew_writes_nothing(self):
+        """Seam and product readings 3: a live holder's renew cannot change its generation, so it records nothing."""
+        import random
+        for seed in (None, 1, 2):  # the responder's own cadence: 15 s nominal, then jittered
+            with self.subTest(seed=seed):
+                r = self.responder()
+                r.rand = (lambda: 0.5) if seed is None else random.Random(seed).random
+                wait = r.step()
+                with mock.patch.object(fb.Checkpoint, "_write", autospec=True, side_effect=AssertionError("written")):
+                    for _ in range(40):
+                        self.board.advance(wait)
+                        wait = r.step()
+                self.assertGreaterEqual(self.tools().count("com.enroll"), 10)
+                self.tearDown()
+                self.setUp()
+        r = self.responder()
+        r.step()
+        self.assertEqual(self.record()["video.render"], {"project": r.project, "generation": 1})
+
+    def test_a_clean_leave_forgets_the_record_so_a_rollback_never_reads_as_a_move(self):
+        """Seam reading 3: a service stopped cleanly released its slot; a kit before 0.53.0 (or anyone) that enrolls it
+        meanwhile is another session taking a free slot. With work left in the checkpoint the record stays."""
+        r = self.responder()
+        r.step()
+        r.shutdown(0)
+        self.assertNotIn("video.render", self.record())
+        self.board.move("video.render")  # an older kit of this service enrolls the free slot: generation 2
+        self.board.advance(61)  # and stops
+        rid = self.board.queue("video.render")
+        second = self.responder()
+        for _ in range(3):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+
+    def test_a_clean_leave_with_work_left_keeps_the_record(self):
+        _, first = self._crash_after(effect=False)
+        first.shutdown(0)
+        self.assertEqual(self.record()["video.render"]["generation"], 1)  # accepted work left: kept for the next start
+
+    def test_an_enroll_after_lease_expired_is_recorded_first(self):
+        """Seam reading 4: a lapsed holder's enroll may move the generation, so it is not skipped as a renew."""
+        r = self.responder()
+        r.step()
+        written = []
+        plain = fb.Checkpoint.slot
+
+        def slot(cp, capability, record):
+            written.append(record)
+            return plain(cp, capability, record)
+        self.board.fail_next["com.claim"] = "lease_expired"
+        with mock.patch.object(fb.Checkpoint, "slot", slot):
+            self.board.advance(1)
+            r.step()
+        self.assertTrue(any(isinstance(w, dict) and "asking" in w for w in written), written)
+
+    def test_a_lost_ask_on_a_full_disk_does_not_stop_the_responder(self):
+        r = self.responder()
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        path = self.data / "board-checkpoint.json"
+        doc = json.loads(path.read_text())
+        doc["slots"]["video.render"]["asking"] = {"op": "com.enroll", "args": {
+            "idempotency": {"epoch": 1, "key": "example-agent.enroll.lost"}, "capability": "video.render"}}
+        path.write_text(json.dumps(doc))
+        rid = self.board.queue("video.render")
+        second = self.responder()
+        with mock.patch.object(fb.Checkpoint, "slot", side_effect=fb.BoardError("checkpoint", "full")):
+            for _ in range(3):
+                second.step()
+                self.board.advance(1)
+        self.assertNotEqual(second.state, "down")
+        self.assertNotIn("board.blocked", self.kinds())
+
+    def test_a_lost_ask_refused_under_a_retired_epoch_is_no_move(self):
+        """Seam reading 5: a retired epoch refuses even a repeat, so whether the lost enroll landed is unknown; the
+        record is forgotten and the slot reads as on a first start, never as a move."""
+        r = self.responder()
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        self.board.advance(61)
+        self.board.drop_next["com.enroll"] = 1
+        second = self.responder()
+        second.step()  # the enroll lands at generation 2; its answer is lost
+        self.board.epoch = 2
+        rid = self.board.queue("video.render")
+        for _ in range(4):
+            second.step()
+            self.board.advance(20)
+        self.assertEqual(self.moved(), [])
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+
+    def test_a_recorded_move_stays_when_status_names_no_generation(self):
+        """Seam reading 5: the other session released the slot and com.status gives it no generation; the move stays."""
+        r = self.responder()
+        r.step()
+        self.board.move("video.render")
+        self.board.advance(15)
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.hub.control({"op": "end-sessions"})
+        self.board.status_generation = "absent"
+        self.board.calls.clear()
+        second = self.responder()
+        second.step()
+        self.assertNotIn("com.enroll", self.tools())
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+
+    def test_a_replace_lost_before_the_board_recovers_at_the_replayed_generation(self):
+        """Seam reading 6: the replay at the next connect runs the replace for the first time and moves the generation;
+        the replace that follows uses the record's generation, never the stale one, and the work completes."""
+        rid, _ = self._crash_after(effect=False)
+        self.board.advance(61)
+        plain, lost = fb.BoardSession.call, []
+
+        def call(session, op, args):
+            if op == "com.responder_replace" and not lost:
+                lost.append(op)
+                raise fb.BoardError("unreachable", "lost before the board", True, op=op)
+            return plain(session, op, args)
+        second = self.responder()
+        with mock.patch.object(fb.BoardSession, "call", call):
+            for _ in range(8):
+                second.step()
+                self.board.advance(20)
+        self.assertEqual(lost, ["com.responder_replace"])
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(second.slots["video.render"]["state"], "held")
+        self.assertEqual(self.moved(), [])
+
+    def test_an_unwritable_record_never_stops_a_renew(self):
+        """Seam reading 2: the record is best effort, as `_held_at` is; a full disk does not take a live holder down."""
+        r = self.responder()
+        r.step()
+        self.board.calls.clear()
+        with mock.patch.object(r.checkpoint, "slot", side_effect=fb.BoardError("checkpoint", "full")):
+            self.board.advance(20)
+            r.step()
+        self.assertEqual(r.state, "ready")
+        self.assertIn("com.enroll", self.tools())
+
+    def test_a_fenced_complete_without_a_move_transfers_its_own_work_back(self):
+        """Seam reading 2 pins it: a `fenced` refusal on accepted work while the slot did not move keeps the entry
+        `lapsed` (FAA-155); the next tick takes it back with a transfer and completes it."""
+        rid = self.board.queue("video.render")
+        self.board.fail_next["com.complete"] = "fenced"
+        r = self.responder()
+        for _ in range(4):
+            r.step()
+            self.board.advance(1)
+        self.assertIn("com.responder_replace", self.tools())
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+
+    def test_a_refused_ask_is_an_answer_and_a_real_move_is_still_seen(self):
+        """The record is dropped on a refusal: a move that happened while the ask was lost before reaching the board is
+        still read as a move."""
+        rid, _ = self._crash_after(effect=False)
+        self.board.move("video.render")
+        held = json.loads((self.data / "board-checkpoint.json").read_text())
+        held["slots"]["video.render"]["asking"] = {"op": "com.enroll", "args": {"idempotency": {"epoch": 1, "key": "x.enroll.lost"},
+                                                                                  "capability": "video.render"}}
+        (self.data / "board-checkpoint.json").write_text(json.dumps(held))
+        second = self.responder()
+        for _ in range(3):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(len(self.moved()), 1)
+        self.assertNotIn("asking", self.record()["video.render"])
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+
+    def test_an_integral_float_generation_reads_as_the_integer_in_both_twins(self):
+        """Seam reading 1: JSON's 2.0 is the number 2; Node cannot tell them apart, so Python reads it the same way."""
+        _, second = self._restart_with(status=2.0)
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(len(self.moved()), 1)
+
+    def _restart_with(self, record: object = _KEEP, status: object = _KEEP):
+        rid, _ = self._crash_after(effect=False)
+        path = self.data / "board-checkpoint.json"
+        if record is not _KEEP:
+            doc = json.loads(path.read_text())
+            doc["slots"] = record
+            path.write_text(json.dumps(doc))
+        if status is not _KEEP:
+            plain = self.board.op_status
+
+            def op_status(*args):
+                out = plain(*args)
+                for r in out["responders"]:
+                    r.pop("generation") if status is _ABSENT else r.update(generation=status)
+                return out
+            self.board.op_status = op_status
+        second = self.responder()
+        second.step()
+        return rid, second
+
+    def test_odd_or_lower_generations_are_never_read_as_a_move(self):
+        """Today's behaviour, not a fail-closed stop: no record (or one not this kit's), a status generation that is not
+        an integer, or one not past the record, is not a move, so the restart replaces as before."""
+        project = fh._project(PROJECT)
+        for record in ("x", {"video.render": "x"}, {"video.render": {"project": project, "generation": "1"}},
+                       {"video.render": {"project": project, "generation": True}}, {"video.render": {"project": project, "generation": 0}},
+                       {"video.render": {"project": "another-project", "generation": 1}},
+                       {"video.render": {"project": project, "generation": 5}}):  # lower on the board than recorded
+            with self.subTest(record=record):
+                rid, second = self._restart_with(record=record)
+                self.assertIn("com.responder_replace", self.tools())
+                self.assertEqual(self.board.requests[rid]["state"], "completed")
+                self.assertEqual(self.record()["video.render"], {"project": project, "generation": 2})  # rewritten
+                self.assertEqual(self.moved(), [])
+                self.tearDown()
+                self.setUp()
+        for status in (_ABSENT, None, "2", 2.5, True, -1):
+            with self.subTest(status=status):
+                _, second = self._restart_with(status=status)
+                replace = dict(self.board.calls)["com.responder_replace"]
+                self.assertEqual(replace["expectedGeneration"], 0)  # as before: an odd generation is sent as 0
+                self.assertNotEqual((second.slots.get("video.render") or {}).get("state"), "moved")
+                self.assertEqual(self.moved(), [])
+                self.tearDown()
+                self.setUp()
+
+
 class CheckpointTests(unittest.TestCase):
     def test_atomic_private_and_refuses_a_foreign_file(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1172,6 +1598,29 @@ class CheckpointTests(unittest.TestCase):
             path.write_text('{"version": 9}')
             with self.assertRaises(fb.BoardError):
                 fb.Checkpoint(path)
+
+    def test_the_slot_record_lives_beside_the_requests(self):
+        """FAA-155: written with the requests, kept by put and drop, forgotten with None; a malformed one is ignored."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cp.json"
+            cp = fb.Checkpoint(path)
+            cp.put({"request": "req_000000001", "step": "claimed"})
+            self.assertNotIn("slots", json.loads(path.read_text()))  # a file without a record reads as before
+            cp.slot("video.render", {"project": "p", "generation": 3})
+            cp.put({"request": "req_000000002", "step": "claimed"})
+            cp.drop("req_000000001")
+            again = fb.Checkpoint(path)
+            self.assertEqual((again.slots, list(again.entries)), ({"video.render": {"project": "p", "generation": 3}}, ["req_000000002"]))
+            writes = []
+            real = cp._write
+            cp._write = lambda *a: writes.append(a) or real(*a)
+            cp.slot("video.render", {"project": "p", "generation": 3})
+            self.assertEqual(writes, [])  # unchanged: nothing written
+            cp.slot("video.render", None)
+            self.assertEqual(fb.Checkpoint(path).slots, {})
+            for odd in ('"x"', "[1]", '{"video.render": 7}'):
+                path.write_text('{"version": 1, "requests": {}, "slots": %s}' % odd)
+                self.assertEqual(fb.Checkpoint(path).slots, {})
 
 
 class SelfCheckAndProbeTests(unittest.TestCase):

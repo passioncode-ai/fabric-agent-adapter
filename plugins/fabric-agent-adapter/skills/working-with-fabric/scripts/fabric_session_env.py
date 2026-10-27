@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.52.0"
+VERSION = "0.53.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -476,6 +476,10 @@ LAUNCHED_MARK = "launched"
 #: (Fabric 0.3.9, TR-11). For NO_SESSION_HOLD_S the hooks spool nothing for that id; after it, one rejoin tries again,
 #: so a Fabric that restarted and enrolled the id again is found (board thread 02bf19c5, ask 4).
 NO_SESSION_MARK = "no-session"
+#: The file in the hooks' own folder (state_root) that says the running Fabric's fabric_session_observe takes
+#: `repositories` as {host, owner, name}: a worker writes it from the tool's schema and removes it when the schema stops
+#: saying so. Until it exists the Stop hook reads no transcript (FAA-140, seam and product readings 1).
+REPOSITORIES_MARK = "observe-takes-repositories"
 NO_SESSION_HOLD_S = 15 * 60.0
 
 
@@ -525,6 +529,10 @@ def _write_private(path: Path, text: str) -> None:
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(text)
     os.replace(str(tmp), str(path))
+
+
+def repositories_wanted(env: Optional[Dict[str, str]] = None) -> bool:
+    return (state_root(env=env) / REPOSITORIES_MARK).exists()
 
 
 def session_dir(session_id: str, env: Optional[Dict[str, str]] = None) -> Path:

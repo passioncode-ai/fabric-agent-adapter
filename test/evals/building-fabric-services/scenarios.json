@@ -620,6 +620,16 @@
         "a mandate or a decision may carry source (DEC-0126): the record carries it (ctx.record, input_records) and the service keeps it, as instruction, off events, usage reports, logs and pages; a server that reads it lists operator-source/1 in its well-known protocols (McpToolServer.well_known_protocols()), and as a caller the kit sends source only with target_protocols naming it",
         "a job reads the mandate its start call carried at its own approval step (ctx.approval_step(job_id, key, request, effect=) / jobStep): a covered step asks nothing and is recorded via mandate; otherwise the job waits input_required naming the part, and an answer's _meta.mandate that covers the step is read when input_actions is on"
       ]
+    },
+    {
+      "id": "moved-slot-needs-a-take-back-action",
+      "trap": "the builder ships a board responder with no way for the operator to bring back a slot moved to another session, so the service stops answering for good after one move",
+      "request": "You are adding the kit's board responder to a service so it answers requests on Fabric's project board. What must the service offer its operator about a responder slot that is moved to another session?",
+      "expected": [
+        "says that from 0.53.0 a slot moved to another session (by the operator or another session that took it while this one was away) stays moved: the responder ends its claims, leaves accepted work held and never takes the slot back by itself",
+        "gives the operator an action that calls Responder.take_back(capability) (Node takeBack), declared as a button with its tool under fabric-actions/0.1 with gate relayed (the operator's decision, never none) and, on a server that reads mandates, its effect class, and names it in the service's docs",
+        "does not edit the checkpoint by hand to undo a move"
+      ]
     }
   ]
 }
