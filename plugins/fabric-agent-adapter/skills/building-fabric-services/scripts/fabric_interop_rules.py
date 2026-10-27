@@ -340,9 +340,6 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
         return {"covered": False, "message": None}
     if not (isinstance(effect, str) and effect in EFFECT_CLASSES):
         raise InteropError("A job's approval step names its effect class (one of %s; DEC-0125)." % ", ".join(EFFECT_CLASSES))
-    if not job_capability(capability):  # MJ-1: read alike at the start and at the answer (action_gate)
-        return {"covered": False, "detail": "mandate-capability-missing", "fault": "mandate-capability-missing",
-                "message": _UNREADABLE_JOB_CAPABILITY}
     call: Dict[str, Any] = {"capability": capability, "action": key, "effect": effect}
     if isinstance(spend_usd, (int, float)) and not isinstance(spend_usd, bool):
         call["spendUsd"] = spend_usd
@@ -352,10 +349,13 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
     if isinstance(caller_agent, str) and caller_agent:
         covers["callerAgent"] = caller_agent
     answer = mandate_covers(covers)
+    if "ignored" in answer or "fault" in answer:  # a T2 caller's mandate changes nothing (MD-5), first
+        return dict({"covered": False, "message": None}, **({"fault": answer["fault"]} if "fault" in answer else {}))
+    if not job_capability(capability):  # MJ-1: read alike at the start and at the answer (action_gate)
+        return {"covered": False, "detail": "mandate-capability-missing", "fault": "mandate-capability-missing",
+                "message": _UNREADABLE_JOB_CAPABILITY}
     if answer.get("ok") is True:
         return {"covered": True, "record": answer["recordAs"]}
-    if "ignored" in answer or "fault" in answer:
-        return dict({"covered": False, "message": None}, **({"fault": answer["fault"]} if "fault" in answer else {}))
     detail = answer["data"]["detail"]
     if detail == "mandate-expired":
         said = "The operator's mandate for this task expired before this step"

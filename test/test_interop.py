@@ -1166,3 +1166,24 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertIn("cannot be read", malformed["message"])
         self.assertTrue(fi.job_step(lead_mandate(), **dict(call, caller_agent="example-lead"))["covered"])
         self.assertEqual(fi.job_step(lead_mandate(), **dict(call, caller_agent="example-other"))["detail"], "mandate-not-for-this-call")
+
+    def test_an_unusable_job_capability_is_read_alike_at_both_ends(self):
+        """DEC-0141 MJ-1, as the Node twin: the start (job_step) and the answer (action_gate) refuse an unusable job
+        capability; a T2 caller's mandate is still ignored first (MD-5)."""
+        mandate = lead_mandate({"actions": ["approve-reply"], "effects": ["reply"]})
+        for capability in ("replyDraft", "fabric.job.get", ""):
+            with self.subTest(capability=capability):
+                call = dict(now=NOW, self_id="example-agent", capability=capability, key="approve-reply", effect="reply")
+                step = fi.job_step(mandate, tier="T0", **call)
+                self.assertEqual((step["covered"], step["fault"]), (False, "mandate-capability-missing"))
+                self.assertIn("mandate-capability-missing", step["message"])
+                self.assertEqual(fi.job_step(mandate, tier="T2", **call), {"covered": False, "message": None})
+        action = {"id": "approve-reply", "title": "Answer approve-reply", "tool": "fabric.job.get", "gate": "relayed"}
+        for mandate_capability in (None, "", "  ", "Reviews Approve", "fabric.job.get"):
+            with self.subTest(mandate_capability=mandate_capability):
+                refused = fi.action_gate(action, tier="T0", caller="local:T0", meta={"mandate": mandate}, now=NOW,
+                                         self_id="example-agent", effect="reply", mandate_capability=mandate_capability)
+                self.assertEqual(refused["ok"], False)
+                self.assertEqual(refused["fault"], "mandate-capability-missing")
+                self.assertEqual(refused["refusal"]["code"], "operator-decision-required")
+                self.assertEqual(refused["refusal"]["data"]["detail"], "mandate-capability-missing")
