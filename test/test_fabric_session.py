@@ -1379,11 +1379,17 @@ class TurnRepositories(Base):
         (entry,) = fs.session_dir(SID, self.env).glob("*-end.json")
         self.assertNotIn("repositories", json.loads(entry.read_text()))
 
+    def read_on(self):
+        """The worker's tests take turns that carry repositories on every host: the hook's read is turned on as the mark
+        turns it on where it is allowed, so these tests also run on Windows, where the gate is off (FAA-175)."""
+        return mock.patch.object(sys.modules["fabric_session_cli"], "repositories_wanted", lambda env=None: True)
+
     def deliver_two_turns(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
-        self.spool_turn()
-        self.spool_turn()
+        with self.read_on():
+            self.spool_turn()
+            self.spool_turn()
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         return [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
 
@@ -1455,7 +1461,8 @@ class TurnRepositories(Base):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "owner-flat"
         flat, nested = self.git_repo("flat", "https://github.com/acme/flat.git"), self.git_repo("nested", "https://gitlab.com/group/sub/nested.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(flat / "x")), tool_entry("Edit", file_path=str(nested / "y"))])
-        self.spool_turn()
+        with self.read_on():
+            self.spool_turn()
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         (turn,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
         self.assertEqual(turn["repositories"], [{"host": "github.com", "owner": "acme", "name": "flat"}])
@@ -1465,7 +1472,8 @@ class TurnRepositories(Base):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "max1"
         one, two = self.git_repo("one", "https://github.com/acme/one.git"), self.git_repo("two", "https://github.com/acme/two.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x")), tool_entry("Edit", file_path=str(two / "y"))])
-        self.spool_turn()
+        with self.read_on():
+            self.spool_turn()
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         (turn,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
         self.assertEqual(turn["repositories"], [{"host": "github.com", "owner": "acme", "name": "one"}])
