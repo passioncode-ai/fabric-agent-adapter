@@ -46,7 +46,8 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 Every answer comes back as a `Response`, whatever its status; `HttpError` means no usable answer came, with `kind`
 `connection`, `timeout`, `too-large` or `refused`, the status when there was one, and the URL redacted to scheme,
 host, port and path (`redact_url`); a URL that is not http or https keeps only its scheme (`htps:<redacted>`), and
-one that does not parse as a URL is `<unparseable url>`. The path is kept as given, so a key never belongs in it. An error never carries a request header or body.
+one that does not parse as a URL is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
+normalises it, Python as given), so a key never belongs in it. An error never carries a request header or body.
 
 ## fabric_openrouter
 

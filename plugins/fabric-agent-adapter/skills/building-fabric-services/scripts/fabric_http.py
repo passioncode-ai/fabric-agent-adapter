@@ -113,6 +113,26 @@ def json_bytes(value: Any) -> bytes:
     return json_stringify(value).encode("utf-8")
 
 
+def _authority_ok(netloc: str) -> bool:
+    """The host and port of an authority as a WHATWG URL accepts them, where urlsplit is laxer: a port of ASCII digits
+    only (Python 3.9's int() also takes `1_2`, `+1`, ` 12` and other scripts' digits), a bracketed host that is an IPv6
+    address, and no backslash, space or control character (0.56.0 unit r11, seam r12)."""
+    hostport = netloc.rpartition("@")[2]
+    if any(c == "\\" or ord(c) <= 0x20 or c == "\x7f" for c in hostport):
+        return False
+    if hostport.startswith("["):
+        close = hostport.find("]")
+        try:
+            ipaddress.IPv6Address(hostport[1:close])
+        except ValueError:
+            return False
+        port = hostport[close + 1:]
+        return port == "" or (port[:1] == ":" and re.fullmatch(r"[0-9]*", port[1:]) is not None)
+    if "]" in hostport:
+        return False
+    return re.fullmatch(r"[0-9]*", hostport.rpartition(":")[2] if ":" in hostport else "") is not None
+
+
 def redact_url(url: str) -> str:
     """The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or
     fragment, which is where keys and tokens ride."""
@@ -127,16 +147,20 @@ def redact_url(url: str) -> str:
         # seam r9; the Node twin reads it through `new URL`).
         cut = min([at for at in (rest.find("?"), rest.find("#")) if at >= 0] or [len(rest)])
         url = scheme + "://" + (rest[:cut].replace("\\", "/") + rest[cut:]).lstrip("/")
+    if not colon or not re.fullmatch(r"[A-Za-z][A-Za-z0-9+.-]*", scheme):
+        # No scheme as WHATWG reads one (`ht tps:`, `1ttps:`, a relative string): `new URL` refuses it too. Read here,
+        # not by urlsplit, whose scheme rule differs between 3.9 patch releases (0.56.0 hosted floors on 10f6f9d).
+        return "<unparseable url>"
+    if scheme.lower() not in ("http", "https"):
+        # Only http and https are sent; any other scheme (a misspelled `htps:` included) keeps no more than its name,
+        # since its user information may sit anywhere in the rest (0.56.0 product r10).
+        return scheme.lower() + ":<redacted>"
     try:
         parts = urllib.parse.urlsplit(url)
     except ValueError:
         return "<unparseable url>"
-    if not parts.scheme:
-        return "<unparseable url>"  # no scheme (`ht tps:`, `1ttps:`, a relative string): `new URL` refuses it too
-    if parts.scheme.lower() not in ("http", "https"):
-        # Only http and https are sent; any other scheme (a misspelled `htps:` included) keeps no more than its name,
-        # since its user information may sit anywhere in the rest (0.56.0 product r10).
-        return parts.scheme.lower() + ":<redacted>"
+    if not _authority_ok(parts.netloc):
+        return "<unparseable url>"  # `new URL` refuses it; on 3.9 the password's tail would read as the path
     host = parts.hostname or ""
     if not host:
         return "<unparseable url>"  # an http or https URL with no host, which `new URL` refuses
@@ -151,7 +175,7 @@ def redact_url(url: str) -> str:
     if port == {"http": 80, "https": 443}.get(parts.scheme.lower()):
         port = None  # as a WHATWG URL writes it, so both kits print one URL the same way
     netloc = host.lower() + (":%d" % port if port is not None else "")
-    path = parts.path or ("/" if parts.scheme.lower() in ("http", "https") else "")
+    path = parts.path or "/"
     return urllib.parse.urlunsplit((parts.scheme.lower(), netloc, path, "", ""))
 
 
@@ -181,6 +205,8 @@ def check_url(url: str, *, insecure: bool = False) -> None:
         parts = urllib.parse.urlsplit(url)
         host = parts.hostname
         parts.port  # noqa: B018 - raises on a bad port
+        if not _authority_ok(parts.netloc):
+            raise ValueError("authority")
     except (ValueError, TypeError):
         raise HttpError("the URL does not parse", url=redact_url(url), kind="refused")
     if parts.scheme not in ("http", "https") or not host:

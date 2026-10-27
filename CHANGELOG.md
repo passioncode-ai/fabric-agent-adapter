@@ -56,8 +56,12 @@ gate behave.
   its scheme in both twins (`htps:<redacted>`), since its user information may sit anywhere in the rest. It first trims
   C0 controls and space from the ends and removes tabs and line breaks, as `new URL` does, so ` https://u:pw@host`
   keeps no password on Python 3.9 either. A string with no scheme (`ht tps:`, `1ttps:`, a leading byte order mark or
-  no-break space) and a URL whose port does not parse (a password holding `/`) read as `<unparseable url>`, as
-  `new URL` refuses them. The path is kept as given in both twins (connectors.md says so).
+  no-break space) and a URL whose host or port `new URL` refuses (a password holding `/`, a port that is not ASCII
+  digits such as `1_2` or `+1`, which Python 3.9's `int()` takes, a bracketed host that is no IPv6 address) read as
+  `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose rule differs between 3.9 patch
+  releases. `check_url` refuses the same hosts and ports, and on Python also a backslash, space or control character
+  in the host, which urllib would send to a host other than the one logged. The path is not redacted in either twin
+  (Node writes it as `new URL` normalises it, Python as given), so a key never belongs in it.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
   capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer

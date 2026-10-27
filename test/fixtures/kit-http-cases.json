@@ -116,9 +116,62 @@
   [
    "ws://u:hunter2@h.example/x",
    "ws:<redacted>"
+  ],
+  [
+   "https://u:1_2/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:+1/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u: 12/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:\u0661\u0662/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://h.example:+443/x",
+   "<unparseable url>"
+  ],
+  [
+   "http://b][SEC0\\@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "http://[zz]/x",
+   "<unparseable url>"
   ]
  ],
  "checkUrl": [
+  [
+   "https://h.example:+443/x",
+   false,
+   true
+  ],
+  [
+   "https://h.example:1_0/x",
+   false,
+   true
+  ],
+  [
+   "https://h.example:\u0664\u0664\u0663/x",
+   false,
+   true
+  ],
+  [
+   "https://\u0001/x",
+   false,
+   true
+  ],
+  [
+   "https://[zz]/x",
+   false,
+   true
+  ],
   [
    "https://api.example/v1",
    false,
