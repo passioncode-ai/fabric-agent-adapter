@@ -34,7 +34,7 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   responder talks only to Fabric's hub on loopback.
 - The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
   in the session's folder (counts only, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
-  session Fabric launched. Stop also, only once the running Fabric's `fabric_session_observe` takes
+  session Fabric launched. Stop also, never on Windows and only once the running Fabric's `fabric_session_observe` takes
   `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark), reads the
   last 512 KB of the session's transcript (earlier turns included; only the entries after the
   last prompt the person typed are used; the tail holds message text and tool output too, file contents and

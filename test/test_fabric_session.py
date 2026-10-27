@@ -1177,6 +1177,7 @@ class OriginNames(unittest.TestCase):
                 self.assertIsNone(MCP.parse_origin(url))
 
 
+@unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
 class BashPaths(unittest.TestCase):
     def test_cd_to_an_absolute_path_and_git_dash_c(self):
         cwd = Path("/work/start")
@@ -1190,6 +1191,22 @@ class BashPaths(unittest.TestCase):
         self.assertEqual(MCP.bash_paths("", Path("/w")), [])
 
 
+class WindowsReadsNoTranscript(unittest.TestCase):
+    """FAA-175: on Windows the mark never turns the transcript read on."""
+
+    def test_the_mark_reads_nothing_on_windows(self):
+        with tempfile.TemporaryDirectory() as base:
+            env = {"XDG_CACHE_HOME": base, "LOCALAPPDATA": base, "HOME": base}
+            mark = fs.state_root(env=env) / fs.REPOSITORIES_MARK
+            mark.parent.mkdir(parents=True, exist_ok=True)
+            mark.write_text("")
+            with mock.patch.object(fs.sys, "platform", "win32"):
+                self.assertFalse(fs.repositories_wanted(env))
+            with mock.patch.object(fs.sys, "platform", "linux"):
+                self.assertTrue(fs.repositories_wanted(env))
+
+
+@unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
 class TurnRepositories(Base):
     """FAA-140: the Stop hook names the other repositories the turn changed (REQ-1) and the worker sends them only
     where fabric_session_observe takes `repositories` (REQ-2)."""

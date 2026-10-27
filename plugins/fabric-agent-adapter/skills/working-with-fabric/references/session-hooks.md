@@ -31,7 +31,8 @@ id, and keeps the retry only while the end is the newest entry. When `fabric-mcp
 no session holds the id), the worker drops the spool, writes a `no-session` mark in the session's folder and logs it
 once; for 15 minutes the hooks spool nothing for that id (an end removes the folder), then one rejoin tries again.
 
-**The other repositories a turn touched** (FAA-140, Fabric CO-367). Only after a worker has seen the running Fabric's
+**The other repositories a turn touched** (FAA-140, Fabric CO-367). Never on Windows (FAA-175: a Bash command's
+paths there are not the host's). Elsewhere, only after a worker has seen the running Fabric's
 `fabric_session_observe` declare `repositories` as an array of items with `host`, `owner` and `name` that require
 nothing else does the Stop hook read the
 session's transcript at all: the worker then leaves `observe-takes-repositories` in the hooks' folder (beside
