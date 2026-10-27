@@ -15,6 +15,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -1310,6 +1311,55 @@ class MovedSlotTests(Conversation):
         for _ in range(6):
             second.step()
             self.board.advance(1)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+
+    def test_a_lost_ask_that_never_landed_does_not_take_a_moved_slot_back(self):
+        """Seam reading 2: the replay of an ask that never reached the board runs it now (`repeated: false`). The slot
+        had moved past the record meanwhile, so it is read as moved, never taken back to work on."""
+        r = self.responder()
+        r.step()  # holds generation 1
+        self.hub.control({"op": "set", "values": {"down": True}})
+        self.board.advance(20)
+        r.step()  # the renew's enroll is recorded, then never reaches the board
+        self.assertIn("asking", self.record()["video.render"])
+        self.hub.control({"op": "set", "values": {"down": False}})
+        self.hub.control({"op": "end-sessions"})
+        self.board.move("video.render")  # generation 2
+        self.board.advance(61)  # and that holder lapses
+        rid = self.board.queue("video.render")
+        self.board.calls.clear()
+        second = self.responder()
+        for _ in range(3):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(len(self.moved()), 1)
+        self.assertNotIn("com.claim", self.tools())
+        self.assertEqual(self.board.requests[rid]["state"], "queued")
+        self.assertEqual(self.record()["video.render"]["generation"], 1)
+
+    def test_an_unwritable_record_never_stops_a_renew(self):
+        """Seam reading 2: the record is best effort, as `_held_at` is; a full disk does not take a live holder down."""
+        r = self.responder()
+        r.step()
+        self.board.calls.clear()
+        with mock.patch.object(r.checkpoint, "slot", side_effect=fb.BoardError("checkpoint", "full")):
+            self.board.advance(20)
+            r.step()
+        self.assertEqual(r.state, "ready")
+        self.assertIn("com.enroll", self.tools())
+
+    def test_a_fenced_complete_without_a_move_transfers_its_own_work_back(self):
+        """Seam reading 2 pins it: a `fenced` refusal on accepted work while the slot did not move keeps the entry
+        `lapsed` (FAA-155); the next tick takes it back with a transfer and completes it."""
+        rid = self.board.queue("video.render")
+        self.board.fail_next["com.complete"] = "fenced"
+        r = self.responder()
+        for _ in range(4):
+            r.step()
+            self.board.advance(1)
+        self.assertIn("com.responder_replace", self.tools())
         self.assertEqual(self.board.requests[rid]["state"], "completed")
         self.assertEqual(self.moved(), [])
 

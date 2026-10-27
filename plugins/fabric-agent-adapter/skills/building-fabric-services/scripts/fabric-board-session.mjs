@@ -222,14 +222,22 @@ export class Responder {
   }
 
   /**
-   * An enroll or replace can move the slot's generation: it is recorded with its key before it is sent, so a lost answer
-   * is never read as a move. A refusal drops the record; a receipt replaces it (heldAt).
+   * An enroll or replace is recorded with its key before it is sent, so a lost answer is never read as a move; a refusal
+   * drops the record, a receipt replaces it (heldAt), a record that cannot be written is skipped.
    */
   async ask(capability, op, args) {
     let held = this.checkpoint.slots[capability] ?? {};
     if (held.project !== this.project) return this.call(op, args); // no record: nothing a lost answer could be mistaken for
-    held = await this.replay(capability, held);
-    this.checkpoint.slot(capability, { ...held, asking: { op, args } }); // fails closed: nothing sent
+    if (isObj(held.asking)) {
+      // An earlier lost ask is settled first; it may show the slot moved.
+      if (await this.gone(capability)) throw new BoardError('fenced', `The ${capability} slot moved to another session.`, false, op);
+      held = this.checkpoint.slots[capability] ?? {};
+    }
+    try {
+      this.checkpoint.slot(capability, { ...held, asking: { op, args } });
+    } catch {
+      return this.call(op, args);
+    }
     try {
       return await this.call(op, args);
     } catch (e) {
@@ -239,17 +247,19 @@ export class Responder {
   }
 
   /**
-   * Asks a lost enroll or replace again under its key: the stored receipt's generation is this service's (its session may
-   * have ended; the caller asks again). A refusal or an odd receipt drops the record; a lost answer keeps it.
+   * Asks a lost enroll or replace again under its key. `repeated: true`: it landed, the generation is ours. Else it ran
+   * only now: if the slot had moved past the record (`before`), the record stays and the move is read (the slot just
+   * taken lapses unused). A refusal or an odd receipt drops the record; a lost answer keeps it.
    */
-  async replay(capability, held) {
+  async replay(capability, held, before) {
     const { asking, ...rest } = held;
-    if (asking === undefined) return held;
     let record = rest;
     if (isObj(asking) && ['com.enroll', 'com.responder_replace'].includes(asking.op)) {
       try {
-        const generation = this.receipt(asking.op, await this.call(asking.op, asking.args)).slot?.generation;
-        if (isInt(generation, 1)) record = { project: this.project, generation };
+        const answer = this.receipt(asking.op, await this.call(asking.op, asking.args));
+        const generation = answer.slot?.generation;
+        const moved = isInt(before, 1) && isInt(rest.generation, 1) && before > rest.generation;
+        if (isInt(generation, 1) && (answer.repeated === true || !moved)) record = { project: this.project, generation };
       } catch (e) {
         if (LOST.includes(e.code)) throw e;
       }
@@ -259,16 +269,15 @@ export class Responder {
   }
 
   /**
-   * True when com.status shows the slot's generation past the one this responder recorded holding: the operator moved it
-   * to another session (or another session took it while this one was away). The slot is then left as `moved`. Never
-   * held here (no record, another Project's, an odd value) or a generation not past it: false.
+   * True when com.status shows the slot's generation past the one recorded held: the operator or another session moved
+   * it. The slot is left `moved`. No record, another Project's, an odd value or no later generation: false.
    */
   async gone(capability, status = null) {
     let held = this.checkpoint.slots[capability] ?? {};
-    if (held.project === this.project) held = await this.replay(capability, held); // its own lost ask first
-    if (held.project !== this.project || !isInt(held.generation, 1)) return false;
+    if (held.project !== this.project || (!isInt(held.generation, 1) && !('asking' in held))) return false;
     const now = ((status ?? await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
-    if (!isInt(now, 1) || now <= held.generation) return false;
+    if ('asking' in held) held = await this.replay(capability, held, now); // its own lost ask first
+    if (!isInt(now, 1) || !isInt(held.generation, 1) || now <= held.generation) return false;
     if (this.current?.entry.capability === capability) {
       this.current.ctx.stopped = true;
       this.current = null;
@@ -285,7 +294,7 @@ export class Responder {
     this.toResume = this.toResume.filter((r) => this.checkpoint.entries[r]?.capability !== capability);
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held, and does not take the slot back by itself; the service's operator action that calls takeBack brings it back.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       try {
         this.checkpoint.slot(capability, { ...held, moved: now });
       } catch {

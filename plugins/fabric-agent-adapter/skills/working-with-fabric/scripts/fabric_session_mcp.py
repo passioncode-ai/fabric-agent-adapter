@@ -738,10 +738,13 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
         _write_private(directory / "rejoined", "")
         takes = _takes_repositories(client)
         mark = directory.parent.parent / REPOSITORIES_MARK  # state_root: the Stop hook reads a transcript only with it
-        if takes and not mark.exists():
-            _write_private(mark, "")
-        elif not takes and mark.exists():
-            mark.unlink()
+        try:  # shared by every session's worker: a race with another one never ends this delivery
+            if takes and not mark.exists():
+                _write_private(mark, "")
+            elif not takes and mark.exists():
+                mark.unlink()
+        except OSError as exc:
+            note("session=%s outcome=degraded reason=%r" % (session_id[:8], "the repositories mark: %s" % type(exc).__name__))
         while entries:
             for path in entries:
                 entry = _read_entry(path)

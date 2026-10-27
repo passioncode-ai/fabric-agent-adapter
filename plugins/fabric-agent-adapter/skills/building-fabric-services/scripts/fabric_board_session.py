@@ -267,50 +267,55 @@ class Responder:
             pass
 
     def _ask(self, capability: str, op: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        """An enroll or replace can move the slot's generation: it is recorded with its key before it is sent, so a lost
-        answer is never read as a move. A refusal drops the record; a receipt replaces it (`_held_at`)."""
+        """An enroll or replace is recorded with its key before it is sent, so a lost answer is never read as a move; a
+        refusal drops the record, a receipt replaces it (`_held_at`), a record that cannot be written is skipped."""
         held = self.checkpoint.slots.get(capability) or {}
         if held.get("project") != self.project:
             return self._call(op, args)  # no record: nothing a lost answer could be mistaken for
-        held = self._replay(capability, held)
-        self.checkpoint.slot(capability, dict(held, asking={"op": op, "args": args}))  # fails closed: nothing sent
+        if isinstance(held.get("asking"), dict):
+            if self._gone(capability):  # an earlier lost ask is settled first; it may show the slot moved
+                raise BoardError("fenced", "The %s slot moved to another session." % capability, op=op)
+            held = self.checkpoint.slots.get(capability) or {}
         try:
+            self.checkpoint.slot(capability, dict(held, asking={"op": op, "args": args}))
             return self._call(op, args)
         except BoardError as exc:
+            if exc.code == "checkpoint":
+                return self._call(op, args)
             if exc.code not in ("unreachable", "session-ended"):
                 self.checkpoint.slot(capability, held)
             raise
 
-    def _replay(self, capability: str, held: Dict[str, Any]) -> Dict[str, Any]:
-        """Asks a lost enroll or replace again under its key: the stored receipt's generation is this service's (its session
-        may have ended; the caller asks again). A refusal or an odd receipt drops the record; a lost answer keeps it."""
+    def _replay(self, capability: str, held: Dict[str, Any], before: Any) -> Dict[str, Any]:
+        """Asks a lost enroll or replace again under its key. `repeated: true`: it landed, the generation is ours. Else it
+        ran only now: if the slot had moved past the record (`before`), the record stays and the move is read (the slot
+        just taken lapses unused). A refusal or an odd receipt drops the record; a lost answer keeps it."""
         asking = held.get("asking")
-        if not isinstance(asking, dict) or asking.get("op") not in ("com.enroll", "com.responder_replace"):
-            return held if asking is None else {k: v for k, v in held.items() if k != "asking"}
         rest = {k: v for k, v in held.items() if k != "asking"}
-        try:
-            answer = self._receipt(asking.get("op"), self._call(asking.get("op"), asking.get("args")))
-            generation = _whole(answer["slot"]["generation"])
-            rest = {"project": self.project, "generation": generation} if _is_int(generation, 1) else rest
-        except BoardError as exc:
-            if exc.code in ("unreachable", "session-ended"):
-                raise
-        except (KeyError, TypeError):
-            pass
+        if isinstance(asking, dict) and asking.get("op") in ("com.enroll", "com.responder_replace"):
+            try:
+                answer = self._receipt(asking["op"], self._call(asking["op"], asking.get("args")))
+                generation, moved = _whole(answer["slot"]["generation"]), _is_int(before, 1) and before > rest.get("generation", before)
+                if _is_int(generation, 1) and (answer.get("repeated") is True or not moved):
+                    rest = {"project": self.project, "generation": generation}
+            except BoardError as exc:
+                if exc.code in ("unreachable", "session-ended"):
+                    raise
+            except (KeyError, TypeError):
+                pass
         self.checkpoint.slot(capability, rest)
         return rest
 
     def _gone(self, capability: str, status: Optional[Dict[str, Any]] = None) -> bool:
-        """True when `com.status` shows the slot's generation past the one this responder recorded holding: the operator
-        moved it to another session (or another session took it while this one was away). The slot is then left as
-        `moved`. Never held here (no record, another Project's, an odd value) or a generation not past it: False."""
+        """True when `com.status` shows the slot's generation past the one recorded held: the operator or another session
+        moved it. The slot is left `moved`. No record, another Project's, an odd value or no later generation: False."""
         held = self.checkpoint.slots.get(capability) or {}
-        held = self._replay(capability, held) if held.get("project") == self.project else held  # its own lost ask first
-        if held.get("project") != self.project or not _is_int(held.get("generation"), 1):
+        if held.get("project") != self.project or (not _is_int(held.get("generation"), 1) and "asking" not in held):
             return False
         status = self._status() if status is None else status
         now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
-        if not _is_int(now, 1) or now <= held["generation"]:
+        held = self._replay(capability, held, now) if "asking" in held else held  # its own lost ask first
+        if not _is_int(now, 1) or not _is_int(held.get("generation"), 1) or now <= held["generation"]:
             return False
         with self._lock:
             work = self.current
@@ -329,8 +334,8 @@ class Responder:
             self.slots[capability] = {"state": "moved", "generation": now, "renewed_at": self.now()}
         if "moved" not in held:  # once, even across restarts
             self._emit("board.slot.moved", "warn", "The %s slot on this Project was moved to another session. This service stopped "
-                       "answering it there, left its accepted work held, and does not take the slot back by itself; the service's "
-                       "operator action that calls take_back brings it back." % capability,
+                       "answering it there, left its accepted work held (work already begun is the new holder's to settle) and does not "
+                       "take the slot back by itself. Its take-back action brings it back; without one, ask its maintainer." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
             try:
                 self.checkpoint.slot(capability, dict(held, moved=now))

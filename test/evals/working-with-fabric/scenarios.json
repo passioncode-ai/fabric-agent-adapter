@@ -437,6 +437,16 @@
         "second piece: links it once with fabric_task_link {taskId: the piece, rel: spawned, targetTaskId: the claimed task}; if that is refused too, tells the person spawned_from_why and never files the piece again",
         "third piece: links it itself with fabric_task_link rel spawned to the claimed task (no spawned_from and no chained: true with chained_to that task means this Fabric did not link it)"
       ]
+    },
+    {
+      "id": "what-the-stop-hook-reads",
+      "trap": "the agent tells the person the hooks never read the transcript, or that only tool names are read, or that file paths leave the machine",
+      "request": "The person asks: \"Does the Fabric plugin read my Claude Code transcript, and what does it send about other repositories I worked in?\"",
+      "expected": [
+        "says the Stop hook reads no transcript until a worker has seen the running Fabric's fabric_session_observe take repositories as items with host, owner and name (a mark in the hooks' folder); with today's Fabric it reads none",
+        "says that once it does, it reads at most the last 512 KB of the transcript, message text included, and uses only the current turn's tool names and path arguments (Edit, Write, MultiEdit, NotebookEdit paths; cd and git -C in Bash)",
+        "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a path, a command or message text, and that a cd or a read-only git -C counts as touching a repository"
+      ]
     }
   ]
 }

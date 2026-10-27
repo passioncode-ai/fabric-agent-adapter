@@ -1106,6 +1106,59 @@ test('FAA-155 seam 1: a refused ask is an answer, so a real move is still seen; 
   assert.equal(r.slots['video.render'].state, 'moved');
 });
 
+test('FAA-155 seam 2: a lost ask that never landed does not take a moved slot back; a full disk never stops a renew; a fenced complete without a move transfers', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step(); // holds generation 1
+  await hub.control({ op: 'set', values: { down: true } });
+  await h.advance(20);
+  await r.step(); // the renew's enroll is recorded, then never reaches the board
+  assert.ok('asking' in record(hub)['video.render']);
+  await hub.control({ op: 'set', values: { down: false } });
+  await hub.control({ op: 'end-sessions' });
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(61);
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const before = (await h.tools()).length;
+  const second = h.responder();
+  for (let i = 0; i < 3; i += 1) {
+    await second.step();
+    await h.advance(1);
+  }
+  let s = await h.state();
+  assert.equal(second.slots['video.render'].state, 'moved');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+  assert.ok(!s.calls.slice(before).includes('com.claim'));
+  assert.equal(s.requests[rid].state, 'queued');
+  assert.equal(record(hub)['video.render'].generation, 1);
+
+  const full = await fakeHub(t);
+  const f = harness(full);
+  const live = f.responder();
+  await live.step();
+  live.checkpoint.slot = () => { throw new fb.BoardError('checkpoint', 'full'); };
+  const seen = (await f.tools()).length;
+  await f.advance(20);
+  await live.step();
+  assert.equal(live.state, 'ready');
+  assert.ok((await f.tools()).slice(seen).includes('com.enroll'));
+
+  const fenced = await fakeHub(t);
+  const c = harness(fenced);
+  const { request: done } = await fenced.control({ op: 'queue', capability: 'video.render' });
+  await fenced.control({ op: 'fail', tool: 'com.complete', code: 'fenced' });
+  const w = c.responder();
+  for (let i = 0; i < 4; i += 1) {
+    await w.step();
+    await c.advance(1);
+  }
+  s = await c.state();
+  assert.ok(s.calls.includes('com.responder_replace'));
+  assert.equal(s.requests[done].state, 'completed');
+  assert.ok(!c.kinds().includes('board.slot.moved'));
+});
+
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
   const dir = tempDir('faa155-cp-');
   const file = path.join(dir, 'cp.json');

@@ -1380,6 +1380,22 @@ class TurnRepositories(Base):
             self.assertFalse(self.mark.exists(), shape)
             self.mark.write_text("")
 
+    def test_a_mark_another_worker_removed_never_ends_the_delivery(self):
+        """Seam reading 2: the mark is shared by every session's worker; losing a race on it is logged, nothing more."""
+        self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "strings"
+        self.spool_turn(transcript=False)
+        plain = Path.unlink
+
+        def unlink(path, *args, **kwargs):
+            if path.name == fs.REPOSITORIES_MARK:
+                raise FileNotFoundError(str(path))  # another worker removed it first
+            return plain(path, *args, **kwargs)
+        with mock.patch.object(Path, "unlink", unlink):
+            fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
+        self.assertEqual(len([c for c in self.records("call") if c["name"] == "fabric_session_observe"]), 1)
+        self.assertEqual(list(fs.session_dir(SID, self.env).glob("*-turn.json")), [])
+        self.assertIn("the repositories mark: FileNotFoundError", self.log_text())
+
     def test_a_field_of_another_shape_is_not_sent(self):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "strings"
         turns = self.deliver_two_turns()
