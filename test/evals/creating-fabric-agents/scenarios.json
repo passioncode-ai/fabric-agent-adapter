@@ -193,7 +193,7 @@
       "request": "Build example-agent: it answers customers' questions in a support chat and by mail, using the product's knowledge base.",
       "expected": [
         "loads references/agents-that-answer-people.md and builds its parts into the first release, not later",
-        "records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0",
+        "records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0, its value valid against the contract's support-quality-daily.schema.json and a judge's calibration carried only once its readers adopted DEC-0144",
         "declares lanes with a fallback of another vendor than its primary, a checker of another vendor than the writer and a judge of another vendor than both, counts what the fallback recovered, and changes the writer model or reasoning budget only after an offline replay",
         "puts deterministic false-state gates before the model checker, gives the checker the material before the instructions, takes numbers and account state from tools, and re-reads the conversation's live tail before sending",
         "on a refusal repairs once, then runs one research turn, then holds honestly, and the hold comes back by itself when the gap closes",

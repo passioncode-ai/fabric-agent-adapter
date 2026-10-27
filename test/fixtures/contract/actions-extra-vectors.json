@@ -1449,6 +1449,37 @@
    }
   },
   {
+   "name": "a comparison of codes asked by a T2 caller with an operator decision (DEC-0142)",
+   "input": {
+    "caller": "agent:claude-code",
+    "now": "2026-10-24T09:30:00Z",
+    "action": {
+     "id": "compare-codes",
+     "title": "Compare the codes",
+     "tool": "share.compare",
+     "gate": "human",
+     "humanStep": "comparison"
+    },
+    "tier": "T2",
+    "decision": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "action": "compare-codes",
+     "instruction": "compare the codes with Anna",
+     "at": "2026-10-24T09:30:00Z"
+    },
+    "humanStepUrl": "https://share.example/compare"
+   },
+   "expected": {
+    "ok": false,
+    "code": "human-step-required",
+    "data": {
+     "humanStep": "comparison",
+     "url": "https://share.example/compare"
+    }
+   }
+  },
+  {
    "name": "a gate none needs nothing else",
    "input": {
     "action": {

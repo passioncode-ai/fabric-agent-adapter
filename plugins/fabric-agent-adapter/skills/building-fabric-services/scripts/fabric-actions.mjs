@@ -37,7 +37,8 @@ export const DECISION_INVALID = 'decision-invalid';
 export const HUMAN_STEP_REQUIRED = 'human-step-required';
 export const APPROVAL_REQUIRED = 'approval-required';
 export const GATES = Object.freeze(['none', 'relayed', 'human']);
-export const HUMAN_STEPS = Object.freeze(['sign-in', 'consent', 'payment', 'secret', 'spend-above-limit', 'passkey']);
+/** AP-4's steps a person takes; `comparison` (DEC-0142) is a comparison of codes between two people. */
+export const HUMAN_STEPS = Object.freeze(['sign-in', 'consent', 'payment', 'secret', 'spend-above-limit', 'passkey', 'comparison']);
 export const MAX_ACTIONS = 128;
 /** How far ahead of the service's clock a decision's `at` may be (the contract's CLOCK_SKEW_SECONDS). */
 export const CLOCK_SKEW_SECONDS = 60;

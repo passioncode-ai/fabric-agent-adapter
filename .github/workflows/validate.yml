@@ -133,7 +133,7 @@ jobs:
           set -euo pipefail
           cd test
           # A skip here is a gate that did not run: the job fails on one.
-          python3 -m unittest -v test_contract_revisions test_dashboard_kit 2>&1 | tee ../contract-tests.log
+          python3 -m unittest -v test_contract_revisions test_dashboard_kit test_provider 2>&1 | tee ../contract-tests.log
           if grep -q "skipped 'NOT_RUN" ../contract-tests.log; then
             echo "::error::a contract-gated test skipped although both checkouts are installed"
             exit 1

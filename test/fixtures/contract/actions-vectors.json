@@ -190,6 +190,28 @@
    }
   },
   {
+   "name": "human comparison from T0",
+   "input": {
+    "action": {
+     "id": "connect-store",
+     "title": "Do it yourself",
+     "tool": "accounts.connect",
+     "gate": "human",
+     "humanStep": "comparison"
+    },
+    "tier": "T0",
+    "humanStepUrl": "https://store.example/connect"
+   },
+   "expected": {
+    "ok": false,
+    "code": "human-step-required",
+    "data": {
+     "humanStep": "comparison",
+     "url": "https://store.example/connect"
+    }
+   }
+  },
+  {
    "name": "human from T1 with the operator's decision: still the person's step",
    "input": {
     "action": {
@@ -2398,6 +2420,45 @@
         "tool": "accounts.connect",
         "gate": "human",
         "humanStep": "sign-in"
+       }
+      ]
+     }
+    }
+   },
+   "findings": []
+  },
+  {
+   "name": "a human comparison of codes, a step DEC-0142 added",
+   "input": {
+    "surfaces": {
+     "events": {
+      "path": "/fabric/v1/events"
+     },
+     "mcp": {
+      "path": "/mcp",
+      "transport": "streamable-http",
+      "capabilities": [
+       "jobs.retry",
+       "reviews.approve",
+       "accounts.connect"
+      ]
+     }
+    },
+    "extensions": {
+     "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1": {
+      "actions": [
+       {
+        "id": "approve-reply",
+        "title": "Approve the reply",
+        "tool": "reviews.approve",
+        "gate": "relayed"
+       },
+       {
+        "id": "connect-store",
+        "title": "Do it yourself",
+        "tool": "accounts.connect",
+        "gate": "human",
+        "humanStep": "comparison"
        }
       ]
      }

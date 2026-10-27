@@ -161,7 +161,7 @@ dialog is one of those checks; an instruction that names the action satisfies it
 |---|---|---|
 | `none` | an act on the caller's own account: refresh, read, retry or cancel its own job | the caller's own act |
 | `relayed` | a decision on another party's proposal or draft, a send, a publish, a deletion, a spend within a limit, a restore, a policy change | the operator's act when a T0 or T1 caller carries a valid decision; else a refusal below |
-| `human` with `humanStep` | `sign-in`, `consent`, `payment`, `secret`, `spend-above-limit`, `passkey` (AP-4): they stay the person's | `human-step-required` with `data.humanStep` and `data.url`, the direct link to that step |
+| `human` with `humanStep` | `sign-in`, `consent`, `payment`, `secret`, `spend-above-limit`, `passkey`, `comparison` (a comparison of codes between two people or the choice to share without one, DEC-0142) (AP-4): they stay the person's | `human-step-required` with `data.humanStep` and `data.url`, the direct link to that step |
 
 ```python
 server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, authorize=gate,
