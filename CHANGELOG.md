@@ -8,15 +8,17 @@
   `references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, store
   reviews, a group) carries from its first release, each part with the check that proves it: a turn record with a trace
   id and a fixed outcome list, one `support.quality_daily` per closed UTC day and channel with `notMeasured` named,
-  model lanes whose fallback, checker and judge are other vendors with fallback recoveries counted, false-state gates
-  before the model checker, repair then research then a hold that comes back by itself, hand-offs by cause and never as
+  model lanes whose fallback, checker and judge are other vendors with fallback recoveries counted, a writer change
+  only after an offline replay, false-state gates before the model checker, numbers and account state from tools, the
+  live tail re-read before sending, repair then research then a hold that comes back by itself, hand-offs by cause and never as
   answers, a commitments ledger, a knowledge client that reads the service's `answer` flag, a gap queue, and a feed
   re-read when a reader starts on a new event kind. Its sources are agent-stack's support quality standard and the
   practices from an audit of five such agents, linked at their commits (the practices at agent-stack PR #70 until it
   merges). Step 0 of the skill gains the row "Does it answer people?" and Step 1 links the reference. New scenario eval
   `an-agent-that-answers-people` and its prose test (`test/test_answering_agents_prose.py`), which fails when a part or
   its check is removed. The support-agent recipe now says it is the draft-and-check step of such an agent, not the
-  agent, and maps its hand-offs to causes (`model:*` is `infrastructure`; the rest `inability`); building-fabric-services
+  agent, and maps its hand-offs to causes (a failed check goes to repair and counts as `inability` only at a hold;
+  `no-knowledge` and `model-unsure` are `inability` and open a gap; `model:*` is `infrastructure`); building-fabric-services
   and the README point at it so. Backlog FAA-116 records what is left for the recipe.
 
 ## 0.54.0 (2026-10-27)

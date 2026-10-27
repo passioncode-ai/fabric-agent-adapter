@@ -194,8 +194,8 @@
       "expected": [
         "loads references/agents-that-answer-people.md and builds its parts into the first release, not later",
         "records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0",
-        "declares lanes with a fallback, a checker and a judge of other vendors than the writer, and counts what the fallback recovered",
-        "puts deterministic false-state gates before the model checker, and gives the checker the material before the instructions",
+        "declares lanes with a fallback of another vendor than its primary, a checker of another vendor than the writer and a judge of another vendor than both, counts what the fallback recovered, and changes the writer model or reasoning budget only after an offline replay",
+        "puts deterministic false-state gates before the model checker, gives the checker the material before the instructions, takes numbers and account state from tools, and re-reads the conversation's live tail before sending",
         "on a refusal repairs once, then runs one research turn, then holds honestly, and the hold comes back by itself when the gap closes",
         "counts hand-offs by cause (policy, inability, infrastructure), never as answers, keeps them out of the judge's sample, and keeps a commitments ledger",
         "reads the knowledge service's answer flag with no threshold of its own, queues every abstention as a gap and asks again after it closes, and re-reads its feed once when it starts reading a new event kind"
