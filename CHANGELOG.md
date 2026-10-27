@@ -54,9 +54,8 @@
 
 - **Step 4 reads Fabric's `spawned_from`** (FAA-156, Fabric 0.3.14): working-with-fabric links a piece filed with
   `fabric_task_create` itself only when the answer says `spawned_from: null` without `proposed: true` (once; a refused link is told to the person
-  with `spawned_from_why`), or is filed (`created: true`) with no `spawned_from` (Fabric before 0.3.14); `created: false` with a `code` such as
-  `source-unresolved` filed nothing and is never linked and no `chained: true` with `chained_to`
-  the claimed task. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
+  with `spawned_from_why`), or is filed (`created: true`) with no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
+  the claimed task. `created: false` with a `code` such as `source-unresolved` filed nothing and is never linked. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
   not linked again, and the person is told which parent Fabric chose (FAA-153). `proposed: true` now says what
   to do: file and link nothing for that piece, tell the person, go on with the rest. The goal display is named as
   Fabric 0.3.14's. New scenario evals `spawned-from-decides-the-link`, `what-the-stop-hook-reads` (FAA-140) and
