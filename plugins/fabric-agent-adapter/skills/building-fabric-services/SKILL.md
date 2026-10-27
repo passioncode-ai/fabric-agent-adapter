@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.54.0"
+  version: "0.55.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "00e050ba7429c0c60261cec871779e0fd6aeeb28"
@@ -165,8 +165,9 @@ handler.
 
 Calling out: [the connectors reference](references/connectors.md) (`fabric_http` with one
 deadline, safe retries and a size cap; `fabric_openrouter` with the agent's own key, a
-spend ceiling before every attempt, receipts and a fallback). A ready support agent on the
-kit: [`recipes/support-agent/`](recipes/support-agent/README.md).
+spend ceiling before every attempt, receipts and a fallback). The draft-and-check step of a
+support agent on the kit: [`recipes/support-agent/`](recipes/support-agent/README.md); what the whole agent carries is
+creating-fabric-agents' `references/agents-that-answer-people.md`.
 
 Startup order is the part that goes wrong; keep it exactly:
 

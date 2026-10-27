@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.55.0 (2026-10-27)
+
+### Added
+
+- **creating-fabric-agents: agents that answer people** (FAA-162, board request `1ad39d4e`). A new reference,
+  `references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, store
+  reviews, a group) carries from its first release, each part with the check that proves it: a turn record with a trace
+  id and a fixed outcome list, one `support.quality_daily` per closed UTC day and channel with `notMeasured` named,
+  model lanes whose fallback, checker and judge are other vendors with fallback recoveries counted, a writer change only
+  after an offline replay, false-state gates before the model checker, a checker that sees the material before the
+  instructions, numbers and account state from tools, the live tail re-read before sending, repair then research then a
+  hold that comes back by itself, hand-offs by cause and never as answers, a commitments ledger, a knowledge client that
+  reads the service's `answer` flag, a gap queue, and a feed re-read when a reader starts on a new event kind. Its
+  sources are agent-stack's support quality standard and the practices from an audit of five such agents, linked at
+  their commits (the practices at agent-stack PR #70 until it merges). Step 0 of the skill gains the row "Does it answer
+  people?" and Step 1 links the reference. New scenario eval `an-agent-that-answers-people` and its prose test
+  (`test/test_answering_agents_prose.py`), which fails when a part or its check is removed. The support-agent recipe now
+  says it is the draft-and-check step of such an agent, not the agent: used alone it hands the message to a person at
+  the first refusal (the refused draft is not kept), and its Lookup is a relevance rule an agent that answers people
+  replaces with the knowledge service's `answer` flag. It says the calling service routes `policy` before it, maps its
+  hand-offs to causes (a failed check goes to repair and counts as `inability` only at a hold on the material, a hold
+  after an outage or at the research time cap being `infrastructure`; `no-knowledge` and `model-unsure` are `inability`
+  and open a gap; a money reason is never researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment`
+  also the `limit` outcome), and tells such an agent to pass an `on_handoff` that redacts what it stores, in place of
+  the outbox, and to keep 30 days or fewer; `from_config` takes `on_handoff=`, and a call to `answer` from inside
+  `on_handoff` is refused at once with `ReentryError` rather than hanging (copy `support_agent.py` again to get both);
+  building-fabric-services and the README point at it. Backlog FAA-116 records what is left for the recipe.
+
 ## 0.54.0 (2026-10-27)
 
 ### Changed

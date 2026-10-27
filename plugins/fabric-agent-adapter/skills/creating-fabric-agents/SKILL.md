@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.54.0"
+  version: "0.55.0"
   contract-version: "0.1.0"
   contract-commit: "00e050ba7429c0c60261cec871779e0fd6aeeb28"
 ---
@@ -61,6 +61,7 @@ No file is created until every row has an answer. An answer of "later" fails the
 | **Who pays?** | one key per agent and context with its own ceiling, from the estate's key manager, read from the environment; checked before every call; a personal key never pays for an organization |
 | **How does it learn?** | decisions recorded with reasons, one trace per turn, every failure a planted fixture first, history replayed, learnings proposed and never self-approved (references/orchestration-and-learning.md) |
 | **Text for people?** | if it writes anything a person reads (a reply, a message, a post, a report, a UI string), its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in new output, from the first commit (the resilience reference, *Text for people*) |
+| **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it carries from its first release the turn record and the daily `support.quality_daily` report, the lane table with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, false-state gates and a checker that sees the material first, numbers and account state from tools, the live tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never counted or judged as answers, a commitments ledger, a knowledge client that reads the service's `answer` flag, a gap queue and a feed re-read on a new event kind (references/agents-that-answer-people.md) |
 
 ## Step 1: the knowledge intake
 
@@ -93,6 +94,8 @@ prior art of its own:
   choice, several kinds of input and output, budgets, OpenRouter keys.
 - [orchestration-and-learning.md](references/orchestration-and-learning.md): the work graph,
   calling other agents, stops for a person, learning loops, the loop guard.
+- [agents-that-answer-people.md](references/agents-that-answer-people.md): what an agent that
+  answers people carries from its first release, each part with the check that proves it.
 
 ## Step 2: the project skeleton
 

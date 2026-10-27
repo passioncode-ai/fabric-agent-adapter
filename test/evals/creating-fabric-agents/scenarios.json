@@ -186,6 +186,20 @@
         "does not open or link the page in a browser",
         "makes the agent a fabric-service/0.1 service through building-fabric-services (descriptor, well-known document, login code, declared dashboard), or files a board row for that when it is not this task"
       ]
+    },
+    {
+      "id": "an-agent-that-answers-people",
+      "trap": "the agent scaffolds a reply bot with one model, no turn record and no daily report, hands off on the first refusal and counts hand-offs as answers, leaving the measurement and the hold for later",
+      "request": "Build example-agent: it answers customers' questions in a support chat and by mail, using the product's knowledge base.",
+      "expected": [
+        "loads references/agents-that-answer-people.md and builds its parts into the first release, not later",
+        "records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0",
+        "declares lanes with a fallback of another vendor than its primary, a checker of another vendor than the writer and a judge of another vendor than both, counts what the fallback recovered, and changes the writer model or reasoning budget only after an offline replay",
+        "puts deterministic false-state gates before the model checker, gives the checker the material before the instructions, takes numbers and account state from tools, and re-reads the conversation's live tail before sending",
+        "on a refusal repairs once, then runs one research turn, then holds honestly, and the hold comes back by itself when the gap closes",
+        "counts hand-offs by cause (policy, inability, infrastructure), never as answers, keeps them out of the judge's sample, and keeps a commitments ledger",
+        "reads the knowledge service's answer flag with no threshold of its own, queues every abstention and every inability, a hold on the material included, as a gap (a hold after an outage opens none) and asks again after it closes, and re-reads its feed once when it starts reading a new event kind"
+      ]
     }
   ]
 }

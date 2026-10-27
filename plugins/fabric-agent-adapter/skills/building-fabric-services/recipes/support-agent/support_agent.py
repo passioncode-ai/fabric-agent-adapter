@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""A support agent on the service kit: it answers one inbound question from a knowledge file, or hands it to a person.
+"""The draft-and-check step of a support agent on the service kit: it answers one inbound question from a knowledge
+file, or hands it to a person.
 
     support_agent.py answer --config config.json --message-id m-1 --text "How do I reset my password?"
     support_agent.py prune --config config.json --keep-days 30
@@ -103,6 +104,11 @@ STOPWORDS = frozenset("a an and are as at be by can do does for from how i in is
 
 class RecipeError(Exception):
     pass
+
+
+class ReentryError(RecipeError):
+    """answer() called from inside on_handoff on the same thread: the service's own handler fault, never the caller's
+    input. The outer call's draft is already paid and nothing is saved for it unless on_handoff catches this."""
 
 
 def script_of(text: str) -> Optional[str]:
@@ -269,7 +275,7 @@ def _append_line(path: Path, data: bytes) -> None:
 
 
 class DecisionLog:
-    """The decisions, one `{"at", "decision"}` line per message appended to `decisions.jsonl` (0600, fsync'd), with
+    """The decisions, one `{"at", "decision"}` line per message id appended to `decisions.jsonl` (0600, fsync'd), with
     an index by message id built once per process. Each message costs one line, never a rewrite of the whole file. A
     torn last line (a crash mid-write) is no decision; the next line starts on a new line. A `decisions.json` written
     by an earlier version of this recipe is read, never written."""
@@ -358,7 +364,11 @@ class SupportAgent:
         self.state_dir = Path(state_dir)
         self.max_tokens, self.max_chars, self.lookup_limit = max_tokens, max_chars, lookup_limit
         self.on_handoff = on_handoff or self._outbox
-        self._lock = threading.Lock()
+        # Reentrant, so prune() from on_handoff on the same thread does not deadlock (on another thread it waits for
+        # the lock until on_handoff returns); answer() from on_handoff is refused below
+        # (0.55.0 readings 7 and 8: a plain lock hung there, a reentrant one let a refusing repair loop on paid calls).
+        self._lock = threading.RLock()
+        self._local = threading.local()
         self._log = DecisionLog(self.state_dir)
 
     @property
@@ -384,6 +394,9 @@ class SupportAgent:
             raise RecipeError("message id: letters, digits, '.', '_', ':' or '-', up to 128")
         if not isinstance(text, str) or not text.strip():
             raise RecipeError("the message has no text")
+        if getattr(self._local, "in_handoff", False):
+            raise ReentryError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
+                              "this call returns")
         text = re.sub("[\ud800-\udfff]", "\ufffd", text)  # a lone surrogate (bytes a terminal could not decode) is kept, not fatal
         with self._lock:  # one decision per message id, in this process; the service's instance lock covers others
             done = self._log.get(message_id)
@@ -392,7 +405,11 @@ class SupportAgent:
             decision = self._decide(message_id, text, task_run_id)
             at = _now()
             if decision["action"] == "handoff":  # before the decision is saved: a crash repeats a handoff, never loses one
-                self.on_handoff(dict(decision, question=text, at=_stamp(at)))
+                self._local.in_handoff = True
+                try:
+                    self.on_handoff(dict(decision, question=text, at=_stamp(at)))
+                finally:
+                    self._local.in_handoff = False
             self._log.append(decision, at)
         return dict(decision, repeated=False)
 
@@ -416,8 +433,12 @@ class SupportAgent:
         return dict(base, action="reply", reply=checked["reply"], citations=checked["citations"], reasons=[])
 
 
-def from_config(config_path: Path, **overrides: Any) -> SupportAgent:
-    """An agent from a config file (see config.example.json): paths are relative to the config's folder."""
+def from_config(config_path: Path, *, on_handoff: Optional[Callable[[Dict[str, Any]], None]] = None,
+                **overrides: Any) -> SupportAgent:
+    """An agent from a config file (see config.example.json): paths are relative to the config's folder. `on_handoff`
+    takes each hand-off in place of the outbox. Other keywords go to the model client (`transport`, `deadline_s`,
+    `retries`), except those the config already sets (`ceiling_usd`, `window`, `ledger`, `prices`, `key_env`,
+    `project_id`)."""
     config = json.loads(Path(config_path).read_text(encoding="utf-8"))
     home = Path(config_path).resolve().parent
     state = (home / config.get("stateDir", "state")).resolve()
@@ -431,7 +452,7 @@ def from_config(config_path: Path, **overrides: Any) -> SupportAgent:
                                       project_id=config.get("projectId"), **overrides)
     return SupportAgent(knowledge=Knowledge.load(home / config["knowledge"]), client=client, model=config["model"],
                         fallback=config["fallback"], state_dir=state, max_tokens=int(config.get("maxTokens", 600)),
-                        max_chars=int(config.get("maxChars", 1200)))
+                        max_chars=int(config.get("maxChars", 1200)), on_handoff=on_handoff)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
