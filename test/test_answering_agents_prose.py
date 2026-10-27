@@ -12,49 +12,87 @@ from test_action_and_dashboard_prose import ROOT, flat, scenario_ids, section, t
 REFERENCE = "creating-fabric-agents/references/agents-that-answer-people.md"
 SCENARIO = "an-agent-that-answers-people"
 
-# Unit round 3: the part titles, their checks, the checklist and the graded lines are pinned whole, so removing any
-# clause of one fails here; a deliberate change edits these in the same commit.
+# Unit rounds 3 and 4: every part, the checklist, the graded lines, the Step 0 row, the recipe's paragraph and
+# retention, and the CHANGELOG entry are pinned whole (whitespace normalized), so removing any clause of one fails here;
+# a deliberate change edits these in the same commit.
 PARTS = (
-    ('Every inbound message is a turn with a trace id',
-     'Check: a test that a turn without a trace id, or with an outcome outside the list, is refused.'),
-    ('The agent publishes one `support.quality_daily` per closed UTC day and channel',
-     "Check: the producer's day passes `make_event`; and a test runs every `notMeasured` name the producer can emit"
-     " through the published name pattern, iterating the producer's own list."),
-    ('A table of lanes',
-     "Check: the config loader refuses a fallback that shares its own lane's primary vendor, a profile where some "
-     'writer route has no checker route of another vendor, and a judge with no route outside the vendors of the '
-     'writers and the checkers (the vendor is the prefix before `/`).'),
-    ('Count what the fallback recovered',
-     'Check: a test that a recovered call counts once as a failure of the primary and once as a recovery, and is '
-     'never counted as an error of the turn.'),
-    ('A writer model or reasoning budget changes only after an offline replay',
-     "Check: the config loader refuses a change of the writer lane's model or reasoning budget that names no replay"
-     ' report.'),
-    ('Deterministic false-state gates come first',
-     'Check: planted drafts with each false claim are refused before any model checker runs.'),
-    ('The checker sees the material, and sees it before the instructions',
-     'Check: a planted correct answer whose material is longer than the instructions passes the checker.'),
-    ('Numbers and account state come from tools',
-     'Check: a planted draft with a price or an account state that no tool result of the turn carries is refused.'),
-    ("Before sending, re-read the conversation's live tail",
-     'Check: a reply that lands in the conversation while the draft is checked makes the agent send nothing.'),
-    ('Repair, then research, then hold',
-     'Check: a planted refusal walks all three steps in order.'),
-    ('A hold comes back by itself',
-     'Check: closing the gap behind a held turn produces one reply in that conversation, and only one.'),
-    ('A hand-off is never an answer',
-     "Check: the daily report counts a hand-off under hand-offs, and the judge's sample builder leaves templated "
-     'replies out.'),
-    ('Hand-offs are counted by cause',
-     'Check: a checker outage produces `infrastructure` hand-offs, never `inability`.'),
-    ('A commitments ledger',
-     'Check: a reply that promises to come back without a ledger row is refused.'),
-    ('The knowledge client keeps no threshold of its own',
-     "Check: a test that changing the client's configuration cannot make an item with `answer: false` an answer."),
-    ('Every abstention and every inability, a hold included, becomes a gap in a queue',
-     'Check: a closed gap whose new answer comes back with `answer: false` leaves the hold in place.'),
-    ('A reader that starts accepting a new event kind re-reads its feed once',
-     'Check: a test adds a kind to the reader and sees the earlier events of that kind delivered once.'),
+    'Every inbound message is a turn with a trace id** (A1): the id is on the turn row, on each model call of that '
+    'turn, on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance,'
+    ' not covered, handed off, small talk, limit, error), the hand-off reason and category, the latency, the '
+    'knowledge revision the answer used, and whether the channel accepted the reply. Conversation text stays inside'
+    ' the agent, redacted, for at most 30 days. Check: a test that a turn without a trace id, or with an outcome '
+    'outside the list, is refused.',
+    'The agent publishes one `support.quality_daily` per closed UTC day and channel** (A5) on its events feed '
+    '(`/fabric/v1/events`; building-fabric-services, `references/events-and-notifications.md`): counts and codes '
+    'only, the judge model and rubric version, and `notMeasured` naming every family not computed that day. A '
+    "metric not measured is null and named, never 0. The day goes in the event's `data` (`{schema, value}`, as "
+    '`fabric_events.py` writes it), at level `info` and without a notification. Until the contract carries the '
+    'schema (A7), the producer names and pins its own: `data.schema` is the absolute URI of the payload schema the '
+    "agent publishes, and `data.value` stays within DEC-0070's bounds (at most 32 members, each a scalar, a list of"
+    ' scalars or a flat object; per-lane counts as objects such as `laneFailures` and `laneRecovered`; '
+    "building-fabric-services, `references/protocol.md`). Check: the producer's day passes `make_event`; a planted "
+    'day that writes 0 for a family not computed fails; and a test runs every `notMeasured` name the producer can '
+    "emit through the published name pattern, iterating the producer's own list.",
+    'A table of lanes** (P4): classifier, writer, fallback writer, checker, research, judge. The checker is another'
+    ' vendor than the writer; the judge is another vendor than both, at temperature 0, on an open-vendor model '
+    "where it reads what people wrote. Declare them as classes in the profile, where each lane's fallback is "
+    'another vendor than its primary ([models and providers](models-and-providers.md)); per turn the router picks '
+    'the checker against the model that actually drafted, a fallback writer included ([resilience and '
+    'autonomy](resilience-and-autonomy.md#model-answers-are-untrusted-until-accepted), item 3). A lane that reads '
+    'what people wrote has an open-vendor route (DEC-0083). Check: the config loader refuses a fallback that shares'
+    " its own lane's primary vendor, a profile where some writer route has no checker route of another vendor, and "
+    'a judge with no route outside the vendors of the writers and the checkers (the vendor is the prefix before '
+    '`/`).',
+    "Count what the fallback recovered** (P4), not only what the first attempt lost: a day's report says how many "
+    'calls failed and how many of those the fallback answered. Check: a test that a recovered call counts once as a'
+    ' failure of the primary and once as a recovery, and is never counted as an error of the turn.',
+    "A writer model or reasoning budget changes only after an offline replay** (P4) of last week's judged sample, "
+    'judged blind, on the current model and the candidates. Check: the config loader refuses a change of the writer'
+    " lane's model or reasoning budget that names no replay report.",
+    'Deterministic false-state gates come first** (P2): the reply may not say that money arrived, that something is'
+    ' live, enabled or fixed, or that a person did something, unless the system backs it. Check: planted drafts '
+    'with each false claim are refused before any model checker runs.',
+    'The checker sees the material, and sees it before the instructions** (P2): the knowledge items and account '
+    "state the writer used come first in its context, the operator's instructions after. A checker that receives "
+    'the material cut short after long instructions refuses correct answers as invented. Check: a planted correct '
+    'answer whose material is longer than the instructions passes the checker.',
+    "Numbers and account state come from tools**, never from the model (P1): prices from a calculator, the person's"
+    ' account state and order from the system, injected per turn. Check: a planted draft with a price or an account'
+    ' state that no tool result of the turn carries is refused.',
+    "Before sending, re-read the conversation's live tail** (P1): if a person or the agent already answered, skip "
+    'the turn. Check: a reply that lands in the conversation while the draft is checked makes the agent send '
+    'nothing.',
+    "Repair, then research, then hold** (P2): one repair with the checker's reason; then one research turn on a "
+    'stronger model that sees both refused drafts and approved past answers, under a hard time cap; only then an '
+    'honest holding line. A refusal for a money reason is never researched. Check: a planted refusal walks all '
+    'three steps in order.',
+    'A hold comes back by itself** (P2): when a person or the knowledge base answers the held question, the '
+    'conversation is run again and the person gets the answer without asking twice. Check: closing the gap behind a'
+    ' held turn produces one reply in that conversation, and only one.',
+    'A hand-off is never an answer** (P3): it is not counted as answered, and hand-off and fallback templates stay '
+    "out of the judge's sample. Check: the daily report counts a hand-off under hand-offs, and the judge's sample "
+    'builder leaves templated replies out.',
+    'Hand-offs are counted by cause** (P3): `policy`, `inability` and `infrastructure` apart, so the largest number'
+    ' names what to fix. A hold after a checker or model outage, or at the research time cap, is `infrastructure`; '
+    'only a hold after a refusal on the material is `inability`. Check: a checker outage produces `infrastructure` '
+    'hand-offs and holds, never `inability`.',
+    'A commitments ledger** (P3): every "I will pass this on and come back" is a row with an owner and a due date; '
+    "the week's report counts promises made and closed. Check: a reply that promises to come back without a ledger "
+    'row is refused.',
+    'The knowledge client keeps no threshold of its own** (P1, P8): the knowledge service decides whether an item '
+    'may be given as an answer and returns an `answer` flag per item; the client reads the flag and nothing else. '
+    'Small closed rule sets (prices, payment terms, refunds, sign-in) go into the prompt whole, dated and ordered '
+    "by owner. Check: a test that changing the client's configuration cannot make an item with `answer: false` an "
+    'answer.',
+    'Every abstention and every inability, a hold on the material included, becomes a gap in a queue** (P7), '
+    'restated without personal data and grouped by meaning. When a gap closes, the client asks again and rewrites '
+    'the held answer only once the new answer is confident. Check: a closed gap whose new answer comes back with '
+    '`answer: false` leaves the hold in place, and a hold after a checker outage opens no gap.',
+    'A reader that starts accepting a new event kind re-reads its feed once** (P6), from before its cursor: a '
+    'reader that only moves forward has already passed the first events of that kind. The re-read reaches back only'
+    " as far as the producer's feed keeps (at least 7 days or 1000 events, building-fabric-services "
+    "`references/events-and-notifications.md`); an older day is read from the producer's own store or not at all. "
+    'Check: a test adds a kind to the reader and sees the earlier events of that kind delivered once.',
 )
 CHECKLIST = (
     'Turn record with a trace id and an outcome from the fixed list (A1)',
@@ -87,6 +125,67 @@ EXPECTED = (
     "reads the knowledge service's answer flag with no threshold of its own, queues every abstention and every hold"
     ' as a gap and asks again after it closes, and re-reads its feed once when it starts reading a new event kind',
 )
+STEP_0_ROW = (
+    '| **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it '
+    'carries from its first release the turn record and the daily `support.quality_daily` report, the lane table '
+    'with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, '
+    'false-state gates and a checker that sees the material first, numbers and account state from tools, the live '
+    'tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never '
+    "counted or judged as answers, a commitments ledger, a knowledge client that reads the service's `answer` flag,"
+    ' a gap queue and a feed re-read on a new event kind (references/agents-that-answer-people.md) |')
+RECIPE_PARAGRAPH = (
+    'This recipe is the draft-and-check step of an agent that answers people, not that agent, and used alone it '
+    'falls short of one. Every hand-off goes to `on_handoff`, by default the outbox a person reads, at the first '
+    'refusal: the practices name that as the failing pattern (P2). An agent that repairs passes its own '
+    '`on_handoff=` so a failed check reaches its repair step rather than a person; the recipe returns the failed '
+    'checks by name in `reasons`, but takes no reason in and returns no refused draft yet, and it calls again under'
+    ' a new message id, since the stored decision answers any repeat of the same id. The recipe also lacks three '
+    'parts of such an agent: the Lookup (shared words, best three) is a relevance rule of its own, where the agent '
+    "reads the knowledge service's per-item `answer` flag and puts small closed rule sets into the prompt whole; "
+    '`from_config` accepts a same-vendor fallback, refused only per call as `model:config`; and the decision does '
+    'not record which model answered, so fallback recoveries are not counted. The recipe hands off nothing for '
+    '`policy`: the calling service routes the categories a person must handle (refunds, unbans, account recovery) '
+    "before it calls the recipe, or a model's `HANDOFF` on them is counted as a false knowledge gap. Count its "
+    'hand-offs by cause: a failed check is a refusal for the agent to repair, research and hold, and only a hold on'
+    ' the material counts as `inability` (a hold after an outage is `infrastructure`); `unsupported:amount` is a '
+    'money reason, never researched, and so is `unsupported:number` while the decision returns no draft to tell a '
+    'price from another number; `no-knowledge` and `model-unsure` are `inability`; every `inability` opens a gap; '
+    "`model:*` is `infrastructure`, and `model:ceiling` and `model:payment` are also the turn's `limit` outcome. "
+    "The rest of the agent's parts with checks come from [agents that answer "
+    'people](../../../creating-fabric-agents/references/agents-that-answer-people.md): the turn record, the daily '
+    "`support.quality_daily` report, the other-vendor model checker that sees the material first (this recipe's "
+    'checks are code only), the false-state gates, numbers and account state from tools, the live-tail re-read, the'
+    ' commitments ledger and the gap queue.')
+RECIPE_RETENTION = (
+    "Every handoff row in `handoffs.jsonl` holds the customer's own message, which can carry an email address, a "
+    "phone number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy "
+    "states, at most 30 days for an agent that answers people (the standard's A1). A1 also asks for the text "
+    'redacted: the outbox keeps it as written, and `prune` takes any `--keep-days`, so such an agent redacts before'
+    ' `on_handoff` and schedules 30 days or fewer. Prune on a schedule:')
+CHANGELOG_ENTRY = (
+    '- **creating-fabric-agents: agents that answer people** (FAA-162, board request `1ad39d4e`). A new reference, '
+    '`references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, '
+    'store reviews, a group) carries from its first release, each part with the check that proves it: a turn record'
+    ' with a trace id and a fixed outcome list, one `support.quality_daily` per closed UTC day and channel with '
+    '`notMeasured` named, model lanes whose fallback, checker and judge are other vendors with fallback recoveries '
+    'counted, a writer change only after an offline replay, false-state gates before the model checker, a checker '
+    'that sees the material before the instructions, numbers and account state from tools, the live tail re-read '
+    'before sending, repair then research then a hold that comes back by itself, hand-offs by cause and never as '
+    "answers, a commitments ledger, a knowledge client that reads the service's `answer` flag, a gap queue, and a "
+    "feed re-read when a reader starts on a new event kind. Its sources are agent-stack's support quality standard "
+    'and the practices from an audit of five such agents, linked at their commits (the practices at agent-stack PR '
+    '#70 until it merges). Step 0 of the skill gains the row "Does it answer people?" and Step 1 links the '
+    'reference. New scenario eval `an-agent-that-answers-people` and its prose test '
+    '(`test/test_answering_agents_prose.py`), which fails when a part or its check is removed. The support-agent '
+    'recipe now says it is the draft-and-check step of such an agent, not the agent: used alone it hands the '
+    'message to a person at the first refusal (the refused draft is not kept), and its Lookup is a relevance rule '
+    "an agent that answers people replaces with the knowledge service's `answer` flag. It says the calling service "
+    'routes `policy` before it, maps its hand-offs to causes (a failed check goes to repair and counts as '
+    '`inability` only at a hold; `no-knowledge` and `model-unsure` are `inability` and open a gap; a money reason '
+    'is never researched; `model:*` is `infrastructure`, `model:ceiling` and `model:payment` also the `limit` '
+    'outcome), and tells such an agent to redact the outbox and prune it at 30 days or fewer; `from_config` takes '
+    '`on_handoff=`; building-fabric-services and the README point at it. Backlog FAA-116 records what is left for '
+    'the recipe.')
 
 
 def scenario():
@@ -101,6 +200,7 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
 
     def test_step_0_asks_and_step_1_links(self):  # an-agent-that-answers-people (expected 1)
         step_0 = section("creating-fabric-agents", "Step 0: the intake grill")
+        self.assertIn(STEP_0_ROW, " ".join(step_0.split()))
         self.assertIn("Does it answer people?", step_0)
         self.assertIn("(references/agents-that-answer-people.md)", step_0)
         for words in ("turn record", "support.quality_daily", "vendor exclusion", "offline replay", "false-state gates",
@@ -126,15 +226,15 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
                       "A hand-off is never an answer", "stay out of the judge's sample",
                       "`policy`, `inability` and `infrastructure`", "A commitments ledger", "`answer` flag",
                       "keeps no threshold of its own", "becomes a gap in a queue", "the client asks again",
-                      "re-reads its feed once", "on its events feed", "every inability, a hold included",
+                      "re-reads its feed once", "on its events feed", "a hold on the material included",
                       "one repair with the checker's reason", "one research turn", "an honest holding line"):
             self.assertIn(words, parts_body, words)
         body = text(REFERENCE).split("## Checklist")[0]
         parts = re.split(r"^- \*\*", body, flags=re.MULTILINE)[1:]
-        found = [(" ".join(p.split("\n## ")[0].split()).split("**")[0],
-                  "Check:" + " ".join(p.split("\n## ")[0].split()).split("Check:", 1)[-1]) for p in parts]
+        found = tuple(" ".join(p.split("\n## ")[0].split()) for p in parts)
         self.assertEqual(len(found), 17)
-        self.assertEqual(tuple(found), PARTS, "every part, its title and its whole check")
+        self.assertEqual([p.split("**")[1] for p in found if "Check:" not in p], [], "every part carries its check")
+        self.assertEqual(found, PARTS, "every part whole")
         # Product round 2: the checklist, the Step 0 row and the CHANGELOG name the parts a builder could otherwise
         # skip.
         tail = text(REFERENCE).split("## Checklist")[1].splitlines()
@@ -144,10 +244,11 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         step_0 = section("creating-fabric-agents", "Step 0: the intake grill")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split("## 0.55.0")[1].split("## 0.54.0")[0]
         changelog = " ".join(changelog.split())
+        self.assertIn(CHANGELOG_ENTRY, changelog)
         for words in ("offline replay", "from tools", "live tail"):
             for where, said in (("checklist", checklist), ("Step 0", step_0), ("CHANGELOG", changelog)):
                 self.assertIn(words, said, (where, words))
-        for words in ("material before the instructions", "routes `policy` before it", "at most 30 days"):
+        for words in ("material before the instructions", "routes `policy` before it", "at 30 days or fewer"):
             self.assertIn(words, changelog, words)
         reference = flat(REFERENCE)
         self.assertIn("DEC-0070", reference)
@@ -163,11 +264,13 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
 
     def test_the_recipe_is_the_draft_and_check_step(self):  # seam round 1: the recipe and the reference agree
         recipe = flat("building-fabric-services/recipes/support-agent/README.md")
+        self.assertIn(RECIPE_PARAGRAPH, recipe)
+        self.assertIn(RECIPE_RETENTION, recipe)
         for words in ("the draft-and-check step of an agent that answers people, not that agent",
                       "agents-that-answer-people.md", "`infrastructure`", "`inability`", "`policy`",
-                      "`unsupported:number` where the reply states a price, is a money reason", "model checker",
+                      "and so is `unsupported:number` while the decision returns no draft", "model checker",
                       "at most 30",
-                      "only a hold counts as `inability`", "at the first refusal", "`on_handoff=`",
+                      "only a hold on the material counts as `inability`", "at the first refusal", "`on_handoff=`",
                       "per-item `answer` flag", "under a new message id",
                       "same-vendor fallback", "`model:payment`", "redacts before `on_handoff`"):
             self.assertIn(words, recipe, words)

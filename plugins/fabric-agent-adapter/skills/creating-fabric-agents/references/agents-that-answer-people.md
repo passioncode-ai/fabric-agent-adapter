@@ -7,15 +7,18 @@ A5), and what an audit of five production agents found working or failing (P1 to
 evidence: one estate, five agents, no control; their numbers are that estate's, never a forecast.
 
 Sources (public): the support quality standard,
-[`support-quality.md`](https://github.com/ssheleg/agent-stack/blob/28a0303c42038778e2650fc51096e589f4035239/plugins/agent-stack/skills/agent-evals/references/support-quality.md) (A1 the record, A5
-`support.quality_daily`), and the practices from an audit of five such agents,
-[`support-practices.md`](https://github.com/ssheleg/agent-stack/blob/f882358e3fb9627f6edb20db3981818912a9844c/plugins/agent-stack/skills/agent-evals/references/support-practices.md) (P1 to P8),
-both in the `agent-evals` skill of [ssheleg/agent-stack](https://github.com/ssheleg/agent-stack); the practices arrive
-with [PR #70](https://github.com/ssheleg/agent-stack/pull/70), linked here at its commit until it merges. The standard says how such an agent
-is measured; the practices say what worked and what failed. This page lists what the agent carries and the check that
-proves each part. Read both sources before you design the reply pipeline. The kit's support-agent recipe
-(building-fabric-services, `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: used
-alone it hands a refused draft to a person at the first refusal, where this page repairs, researches and holds.
+[`support-quality.md`](https://github.com/ssheleg/agent-stack/blob/28a0303c42038778e2650fc51096e589f4035239/plugins/agent-stack/skills/agent-evals/references/support-quality.md)
+(A1 the record, A5 `support.quality_daily`), and the practices from an audit of five such agents,
+[`support-practices.md`](https://github.com/ssheleg/agent-stack/blob/f882358e3fb9627f6edb20db3981818912a9844c/plugins/agent-stack/skills/agent-evals/references/support-practices.md)
+(P1 to P8), both in the `agent-evals` skill of [ssheleg/agent-stack](https://github.com/ssheleg/agent-stack); the
+practices arrive with [PR #70](https://github.com/ssheleg/agent-stack/pull/70), linked here at its commit until it
+merges. The standard says how such an agent is measured; the practices say what worked and what failed. This page
+lists the parts that have a check, and the check that proves each; the practices the sources carry without one (the
+whole conversation in context, quoted mail stripped, debounce, per-conversation operator directives, stored supervisor
+verdicts, proposals gated in code) are read there. Read both sources before you design the reply pipeline. The kit's
+support-agent recipe (building-fabric-services, `recipes/support-agent/`) is one draft-and-check step of such an
+agent, not the agent: used alone it hands the message to a person at the first refusal (the refused draft is not
+kept), where this page repairs, researches and holds.
 
 ## Contents
 
@@ -43,8 +46,8 @@ alone it hands a refused draft to a person at the first refusal, where this page
   own: `data.schema` is the absolute URI of the payload schema the agent publishes, and `data.value` stays within
   DEC-0070's bounds (at most 32 members, each a scalar, a list of scalars or a flat object; per-lane counts as objects
   such as `laneFailures` and `laneRecovered`; building-fabric-services, `references/protocol.md`). Check: the producer's
-  day passes `make_event`; and a test runs every `notMeasured` name the producer can emit through the published name
-  pattern, iterating the producer's own list.
+  day passes `make_event`; a planted day that writes 0 for a family not computed fails; and a test runs every
+  `notMeasured` name the producer can emit through the published name pattern, iterating the producer's own list.
 
 ## Model lanes
 
@@ -94,7 +97,9 @@ alone it hands a refused draft to a person at the first refusal, where this page
   the judge's sample. Check: the daily report counts a hand-off under hand-offs, and the judge's sample builder leaves
   templated replies out.
 - **Hand-offs are counted by cause** (P3): `policy`, `inability` and `infrastructure` apart, so the largest number names
-  what to fix. Check: a checker outage produces `infrastructure` hand-offs, never `inability`.
+  what to fix. A hold after a checker or model outage, or at the research time cap, is `infrastructure`; only a hold
+  after a refusal on the material is `inability`. Check: a checker outage produces `infrastructure` hand-offs and holds,
+  never `inability`.
 - **A commitments ledger** (P3): every "I will pass this on and come back" is a row with an owner and a due date; the
   week's report counts promises made and closed. Check: a reply that promises to come back without a ledger row is
   refused.
@@ -105,9 +110,10 @@ alone it hands a refused draft to a person at the first refusal, where this page
   given as an answer and returns an `answer` flag per item; the client reads the flag and nothing else. Small closed
   rule sets (prices, payment terms, refunds, sign-in) go into the prompt whole, dated and ordered by owner. Check: a
   test that changing the client's configuration cannot make an item with `answer: false` an answer.
-- **Every abstention and every inability, a hold included, becomes a gap in a queue** (P7), restated without personal
-  data and grouped by meaning. When a gap closes, the client asks again and rewrites the held answer only once the new
-  answer is confident. Check: a closed gap whose new answer comes back with `answer: false` leaves the hold in place.
+- **Every abstention and every inability, a hold on the material included, becomes a gap in a queue** (P7), restated
+  without personal data and grouped by meaning. When a gap closes, the client asks again and rewrites the held answer
+  only once the new answer is confident. Check: a closed gap whose new answer comes back with `answer: false` leaves the
+  hold in place, and a hold after a checker outage opens no gap.
 
 ## Reading the events feed
 

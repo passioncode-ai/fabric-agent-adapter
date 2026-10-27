@@ -95,7 +95,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 
 Beside the kit, not in `kit.json`: the probe (`check_service.py`, `check_service_rules.py`), the sample
 (`sample_service.py`, `sample-remote-service.mjs`), `fabric_kit.py` itself and the dashboard tools. Recipes built on
-the kit live in `../recipes/` ([the support agent](../recipes/support-agent/README.md)).
+the kit live in `../recipes/` ([the draft-and-check step of a support agent](../recipes/support-agent/README.md)).
 
 ## What 0.39 code keeps
 

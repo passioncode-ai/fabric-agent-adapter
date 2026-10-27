@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""A support agent on the service kit: it answers one inbound question from a knowledge file, or hands it to a person.
+"""The draft-and-check step of a support agent on the service kit: it answers one inbound question from a knowledge
+file, or hands it to a person.
 
     support_agent.py answer --config config.json --message-id m-1 --text "How do I reset my password?"
     support_agent.py prune --config config.json --keep-days 30
@@ -416,8 +417,10 @@ class SupportAgent:
         return dict(base, action="reply", reply=checked["reply"], citations=checked["citations"], reasons=[])
 
 
-def from_config(config_path: Path, **overrides: Any) -> SupportAgent:
-    """An agent from a config file (see config.example.json): paths are relative to the config's folder."""
+def from_config(config_path: Path, *, on_handoff: Optional[Callable[[Dict[str, Any]], None]] = None,
+                **overrides: Any) -> SupportAgent:
+    """An agent from a config file (see config.example.json): paths are relative to the config's folder. `on_handoff`
+    takes each hand-off in place of the outbox; the other keywords go to the model client."""
     config = json.loads(Path(config_path).read_text(encoding="utf-8"))
     home = Path(config_path).resolve().parent
     state = (home / config.get("stateDir", "state")).resolve()
@@ -431,7 +434,7 @@ def from_config(config_path: Path, **overrides: Any) -> SupportAgent:
                                       project_id=config.get("projectId"), **overrides)
     return SupportAgent(knowledge=Knowledge.load(home / config["knowledge"]), client=client, model=config["model"],
                         fallback=config["fallback"], state_dir=state, max_tokens=int(config.get("maxTokens", 600)),
-                        max_chars=int(config.get("maxChars", 1200)))
+                        max_chars=int(config.get("maxChars", 1200)), on_handoff=on_handoff)
 
 
 def main(argv: Optional[List[str]] = None) -> int:

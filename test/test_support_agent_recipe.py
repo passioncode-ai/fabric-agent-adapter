@@ -353,6 +353,16 @@ class Recipe(unittest.TestCase):
                              capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(json.loads(out.stdout)["reasons"], ["model:config"], "no key: handed off, never a crash")
 
+    def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
+        config = json.loads((RECIPE / "config.example.json").read_text())
+        config.update(knowledge=str(RECIPE / "knowledge.example.json"), stateDir=str(self.dir / "state"))
+        (self.dir / "config.json").write_text(json.dumps(config))
+        rows = []
+        agent = sa.from_config(self.dir / "config.json", on_handoff=rows.append)
+        self.assertEqual(agent.answer("m-1", "Mars weather?")["reasons"], ["no-knowledge"])
+        self.assertEqual([r["reasons"] for r in rows], [["no-knowledge"]])
+        self.assertFalse((self.dir / "state" / "handoffs.jsonl").exists(), "on_handoff replaces the outbox")
+
 
 if __name__ == "__main__":
     unittest.main()
