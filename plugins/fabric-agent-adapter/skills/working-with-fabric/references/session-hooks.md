@@ -49,7 +49,8 @@ name and path argument: the `file_path` of Edit, Write and MultiEdit, the `noteb
 Bash command `cd <absolute path>` and `git -C <path>`, split only in commands that hold `cd` or `git`, at most 64 K
 characters of command text a turn. A relative `-C` is read against the folder the command last changed into with an absolute
 `cd`, else the session's folder; after a `cd` to a relative or unknown folder (`cd sub`, `cd ~`, `cd -`) it is left
-out (FAA-166), as it is after `)` or a pipe, whose `cd` moved only a subshell. On Windows (FAA-175) Git Bash's paths
+out (FAA-166). A `cd` inside `( )`, in a pipeline's stage or in a list sent to the background with `&` moves only a
+subshell, so a later relative `-C` is read against the folder before it; a newline ends a command, as `;` does. On Windows (FAA-175) Git Bash's paths
 are read as drive paths: `/c/...`, `/cygdrive/c/...`, `C:/...` and a quoted `C:\...` (Git Bash reads an unquoted
 backslash as an escape, so `cd C:\work` goes to `C:work`, which is left out); another `/...` (Git's own root, which only
 `cygpath` resolves) is left out. A Cygwin or MSYS2 Python reads its own POSIX paths (FAA-177). These are the repositories the turn
@@ -143,7 +144,7 @@ only variable names are looked at, never a value (two of them carry the session'
   returns in tens of milliseconds, plus the turn's git facts in Stop and SessionEnd and, in Stop once Fabric takes them, the transcript's
   tail and the other repositories' names (the git calls share at most 1.5 s; the tail read is at most 512 KB). Every call to Fabric happens in a detached worker with a 10 s deadline; at its end the worker closes
   `fabric-mcp`'s stdin and then ends its whole process group, so a wrapper (`npx`, a shell script,
-  `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path.
+  `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path, once `python3` starts (above; FAA-183).
 - **Keep a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
   those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log. Once Fabric
   takes repositories, an `origin` URL that embeds a credential (`https://user:token@host/...`) is read by

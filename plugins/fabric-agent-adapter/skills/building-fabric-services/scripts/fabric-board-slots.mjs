@@ -22,7 +22,7 @@ export class SlotKeeper {
   /** The generation this responder holds the slot at, kept beside its checkpoint; a failed write is retried at the next receipt. */
   heldAt(capability, generation) {
     this.note(capability, { project: this.project, generation });
-    if (this.said['board.slot.refused'] === capability) delete this.said['board.slot.refused']; // held again: a later refusal is said again
+    delete this.said[`board.slot.refused:${capability}`]; // held again: a later refusal is said again
   }
 
   /** The slot record, best effort: one that cannot be written now is written at the next receipt. */
@@ -157,7 +157,7 @@ export class SlotKeeper {
     const wait = Math.min(HOLD_RETRY_MAX_SECONDS, this.holdDelay * 2 ** (tries - 1));
     this.slots[capability] = { state: 'retry', tries, retryAt: this.now() + wait, renewedAt: this.now() };
     if (tries === 1 && !SESSION_CODES.has(e.code)) { // a refusal of the board session is the fault's to say
-      this.emit('board.slot.refused', 'warn', `Fabric refused to give this service the ${capability} slot (${e.code}); it asks again later. Its other capabilities go on.`, { episode: capability, capability, reason: e.code });
+      this.emit('board.slot.refused', 'warn', `Fabric refused to give this service the ${capability} slot (${e.code}); it asks again later. Its other capabilities go on.`, { episode: capability, saidAs: `board.slot.refused:${capability}`, capability, reason: e.code });
     }
   }
 

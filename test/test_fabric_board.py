@@ -792,6 +792,19 @@ class RecoveryFollowUpTests(Conversation):
         r.step()  # reconnects; the enroll is refused again
         self.assertEqual(self.kinds().count("board.slot.refused"), 2)
 
+    def test_two_refused_capabilities_are_each_said_once_across_reconnects(self):
+        """0.56.0 unit r2: one refusal episode per capability, so two refused together are not said again by turns."""
+        for capability in self.CAPS:
+            self.board.refuse_always[("com.enroll", capability)] = "capacity_exceeded"
+        r = self.responder()
+        r.step()
+        for _ in range(2):
+            self.hub.control({"op": "end-sessions"})
+            r.step()
+            self.board.advance(61)
+            r.step()
+        self.assertEqual(self.kinds().count("board.slot.refused"), len(self.CAPS))
+
     def test_a_delete_answered_404_keeps_the_records(self):
         """0.56.0 seam r1: a session already gone may hide a move the next status read would show."""
         r = self.responder()
@@ -2022,8 +2035,73 @@ class SampleWiringTests(unittest.TestCase):
                                       "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
             self.assertFalse(done["isError"], done)
             self.assertEqual(svc.board_moved(), [])
+            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
+            self.assertIn("relayed-instruction", returned[-1]["text"], "the audit names the route")
+            again = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
+                                       "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
+            self.assertEqual(again["structuredContent"], {"capability": "sample.echo", "moved": False},
+                             "a repeat after a lost answer is answered the same way")
+            self.assertIn("operator-source/1", svc.well_known()["protocols"])
             svc.board.shutdown(0.1)
 
+
+
+class MovesSurviveRecovery(Conversation):
+    """0.56.0 seam r2: a slot moved while the service was down is read as moved, even when recovery stopped early or the
+    session was dropped at connect, and is never taken back by the kit on its own."""
+    CAPS = ("a.one", "b.two", "c.three")
+
+    def test_a_moved_slot_skipped_by_recovery_is_not_enrolled_by_the_retry_tick(self):
+        r1 = self.responder()
+        r1.step()
+        self.assertTrue(all(r1.slots[c]["state"] == "held" for c in self.CAPS))
+        r1.session = None  # the process dies: no DELETE, the records stay
+        self.board.advance(61)
+        self.board.move("c.three")
+        call, once = self.board.call, []
+
+        def dropping(sid, caps, tool, args):
+            answer = call(sid, caps, tool, args)
+            if tool == "com.enroll" and args.get("capability") == "b.two" and not once:
+                once.append(1)
+                self.board.drop_next["com.enroll"] = 1  # b.two's enroll answer is lost: recovery stops there
+            return answer
+        self.board.call = dropping
+        r2 = self.responder()
+        r2.step()
+        self.board.advance(61)  # the new holder of c.three lets its lease lapse
+        for _ in range(12):
+            r2.step()
+            self.board.advance(20)
+        self.assertEqual(r2.slots["c.three"].get("state"), "moved")
+        self.assertEqual(self.kinds().count("board.slot.moved"), 1)
+
+
+class LeaveKeepsUnconfirmedRecords(Conversation):
+    """0.56.0 seam r2: a clean leave forgets only the records of slots this session holds now."""
+
+    def test_a_move_while_down_survives_a_fault_at_connect(self):
+        for code in ("capacity_exceeded", "no-epoch"):
+            with self.subTest(code=code):
+                self.setUp()
+                r1 = self.responder()
+                r1.step()
+                r1.session = None
+                self.board.advance(61)
+                self.board.move("video.render")
+                self.board.fail_next["com.status"] = code
+                r2 = self.responder()
+                r2.step()  # com.status refused while connecting: the session is dropped with a DELETE
+                record = json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {})
+                self.assertIn("video.render", record, "the unconfirmed record stays")
+                for _ in range(3):
+                    self.board.advance(r2.wait_until - self.board.now + 0.1 if r2.wait_until > self.board.now else 1)
+                    r2.step()
+                self.board.advance(61)
+                for _ in range(6):
+                    r2.step()
+                    self.board.advance(20)
+                self.assertEqual(r2.slots.get("video.render", {}).get("state"), "moved")
 
 if __name__ == "__main__":
     unittest.main()

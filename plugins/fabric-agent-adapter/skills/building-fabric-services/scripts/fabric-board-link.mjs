@@ -138,14 +138,16 @@ export class Checkpoint {
     this.slots = slots;
   }
   /**
-   * At a clean leave (the session's DELETE released the slots): forget the record of each slot this service held for
-   * `project` with no request left and not moved away, so a later generation is another session taking a free slot, and
+   * At a clean leave (the session's DELETE released the slots): forget the record of each slot this session holds now
+   * (`held`: capability to generation) at the recorded generation, for `project`, with no request left and not moved away, so a later generation is another session taking a free slot, and
    * a kit rolled back to before 0.53.0 leaves nothing that reads as a move. A record that cannot be written stays.
    */
-  leave(project) {
+  leave(project, held = {}) {
     const busy = new Set(Object.values(this.entries).map((e) => e.capability));
     for (const [capability, record] of Object.entries(this.slots)) {
       if (!isObj(record) || record.project !== project || 'moved' in record || busy.has(capability)) continue;
+      // Only a slot this session holds now, at the recorded generation: an unconfirmed record may be a move (0.56.0 seam r2).
+      if (!Object.hasOwn(held, capability) || record.generation !== held[capability]) continue;
       try {
         this.slot(capability, null);
       } catch {

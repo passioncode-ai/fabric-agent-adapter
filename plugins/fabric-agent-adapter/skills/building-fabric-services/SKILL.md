@@ -104,8 +104,8 @@ responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) f
 every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
 The request body is data behind the service's own input gate. From 0.53.0 a slot the operator moved to another
 session stays moved until `take_back` (`takeBack`): give it an operator action with its tool and gate `relayed`, or it
-stays moved for good (the operator reaches it through their own agent's relayed decision, the service's page or its
-elicitation; a decision Fabric's hub forwards waits for CT-125). Read [the board reference](references/board.md).
+stays moved for good (the operator reaches it through an agent that relays their decision in `_meta`, the service's
+page or its elicitation; Claude Code and Codex wait for CT-125's forwarding). Read [the board reference](references/board.md).
 
 ## Step 2: the non-negotiables
 
@@ -260,9 +260,9 @@ or `human` with its `humanStep`) and declared with `build_well_known(actions=ser
 `extensions/actions/0.1`. A `relayed` action called by the operator's own agent with their decision in
 `_meta.decision` is the operator's act: never answer it "operator session required" or send them to the page.
 A service adopts the relayed gate once Fabric's hub forwards decisions (CT-125), as the contract says; until then its tools
-answer as today, except the board responder's take-back action, declared `relayed` now: the operator's own agent
-calls it with their decision, and the page or elicitation reach it too ([board.md](references/board.md); the
-reference service's `board.take-back`). Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
+answer as today, except the board responder's take-back action, declared `relayed` now: an agent whose client sets
+`_meta` calls it with the operator's decision; Claude Code and Codex reach it through the page until CT-125
+([board.md](references/board.md); the reference service's `board.take-back`). Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
 refusals.
 
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other

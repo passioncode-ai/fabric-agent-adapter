@@ -139,11 +139,13 @@ class Responder(SlotKeeper):
         self._suspect: set = set()  # capabilities a fenced call was refused on: com.status says whether they moved (FAA-155)
 
     # -- events -------------------------------------------------------------------------------------------------
-    def _emit(self, kind: str, level: str, text: str, notify: bool = False, episode: Optional[str] = None, **value: Any) -> None:
-        if episode is not None:
-            if self._said.get(kind) == episode:
+    def _emit(self, kind: str, level: str, text: str, notify: bool = False, episode: Optional[str] = None,
+              said_as: Optional[str] = None, **value: Any) -> None:
+        if episode is not None:  # `said_as` keeps one episode per key, such as one per capability
+            key = said_as or kind
+            if self._said.get(key) == episode:
                 return  # once per episode
-            self._said[kind] = episode
+            self._said[key] = episode
         data = {"schema": EVENT_SCHEMA, "value": {k: v for k, v in value.items() if v is not None}}
         problems = _fs.feed_data_problems(data)
         if problems:  # FAC-SEM-101: never a credential in data; drop the data, keep the sentence
@@ -290,6 +292,7 @@ class Responder(SlotKeeper):
             held, was = transfer.get(capability), (self.checkpoint.slots.get(capability) or {}).get("generation")
             if failure is not None:  # the board session failed: the rest wait for the next tick (FAA-163)
                 self._retry_later(capability, held or [], failure)
+                self._suspect.add(capability)  # its move check comes before its retry enrolls (0.56.0 seam r2)
                 continue
             try:
                 self._settle(capability, lambda: self._recover_one(capability, status, held, was, generations, on_hold), held)
@@ -514,6 +517,10 @@ class Responder(SlotKeeper):
                        episode="down", reason=code)
         return wait
 
+    def _held(self) -> Dict[str, Any]:
+        """The slots this session holds now, by generation: only their records a clean leave may forget."""
+        return {c: s.get("generation") for c, s in dict(self.slots).items() if s.get("state") == "held"}
+
     def _drop_session(self) -> None:
         work, self.current, self._to_resume = self.current, None, []  # the next session transfers them again
         if work is not None:
@@ -529,7 +536,7 @@ class Responder(SlotKeeper):
                 work.ctx.stopped.set()  # the lease lapses; acting on would outlive the attempt
         session, self.session = self.session, None
         if session is not None and session.close():
-            self.checkpoint.leave(self.project)  # the DELETE released the slots: a standby taking one is no move (FAA-163)
+            self.checkpoint.leave(self.project, self._held())  # the DELETE released them: a standby taking one is no move
 
     def _tick(self) -> None:
         work = self.current
@@ -919,5 +926,5 @@ class Responder(SlotKeeper):
             session, self.session = self.session, None
             # Only a DELETE Fabric answered released the slots (FAA-163); an idle stop waits for it 3 s (FAA-173).
             if session.close(IDLE_LEAVE_SECONDS if work is None else None):
-                self.checkpoint.leave(self.project)  # no record of them can read as a move
+                self.checkpoint.leave(self.project, self._held())  # no record of them can read as a move
         self.state = "stopped"

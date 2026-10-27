@@ -162,14 +162,17 @@ class Checkpoint:
                 self.slots = slots
 
 
-    def leave(self, project: str) -> None:
-        """At a clean leave (the session's DELETE released the slots): forget the record of each slot this service held
-        for `project` with no request left in the checkpoint and not moved away. A later generation is then another
+    def leave(self, project: str, held: Dict[str, Any]) -> None:
+        """At a clean leave (the session's DELETE released the slots): forget the record of each slot this session holds
+        now (`held`: capability to generation) at the recorded generation, for `project`, with no request left in the
+        checkpoint and not moved away. A record no live hold confirmed (a slot that may have moved while the service was
+        down, not yet compared with com.status) stays (0.56.0 seam r2). A later generation is then another
         session taking a free slot, not a move, and a kit that keeps no record (rolled back to before 0.53.0) leaves
         nothing behind that reads as one. A record that cannot be written stays."""
         busy = {e.get("capability") for e in list(self.entries.values())}
         for capability, record in list(self.slots.items()):
-            if isinstance(record, dict) and record.get("project") == project and "moved" not in record and capability not in busy:
+            if (isinstance(record, dict) and record.get("project") == project and "moved" not in record
+                    and capability not in busy and capability in held and record.get("generation") == held[capability]):
                 try:
                     self.slot(capability, None)
                 except BoardError:

@@ -61,7 +61,7 @@ with `--strict-mcp-config` and a temporary config.
   all enforced by `test/test_fabric_kit.py`). After changing a kit module run `python3 .../fabric_kit.py build`; CI
   fails a stale `kit.json` (`test_kit_json_is_what_the_sources_say`). At a release move `kit.json`'s own `"version"` first: `build` refuses to rewrite the digests of a version that has a release tag. The map, the layers and the rule for a new module: `references/kit-modules.md`. Recipes on the
   kit: `building-fabric-services/recipes/`. `fabric_session.py` in working-with-fabric is a facade over
-  `fabric_session_{env,mcp,mail,hosts,cli}.py`; hooks and workers always run the facade.
+  `fabric_session_{env,mcp,paths,mail,hosts,cli}.py`; hooks and workers always run the facade.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
   `test/evals/<skill>/`. `test/evals/run_evals.py` runs the trigger evals against a real client, only when asked
   (`FABRIC_REAL_CLIENT=1` and `claude` on PATH); hosted CI holds no model credential and does not run it. Measured

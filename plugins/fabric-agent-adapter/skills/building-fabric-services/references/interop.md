@@ -149,7 +149,8 @@ operator's own coding agents: Claude Code and Codex cannot set `_meta`, so until
 a `relayed` gate turns "approve it" in chat into `operator-decision-required` with the page as the only route.
 Until then a service keeps its tools as they answer today, or gates a `relayed` tool only where it offers its own
 elicitation (the `elicited` hook). The one exception is the board responder's take-back action: it is declared
-`relayed` now and reached through the page or elicitation until CT-125 (`board.md`). This is D8's reason, which keeps `input_actions` off, applied to tools.
+`relayed` now (the reference service's `board.take-back`); an agent whose MCP client sets `_meta` calls it with the
+operator's decision, and Claude Code and Codex reach it through the page until CT-125 (`board.md`). This is D8's reason, which keeps `input_actions` off, applied to tools.
 
 **Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
 resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same

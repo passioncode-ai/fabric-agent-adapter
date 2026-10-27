@@ -96,11 +96,17 @@ export class Responder extends SlotKeeper {
     return run;
   }
 
+  /** The slots this session holds now, by generation: only their records a clean leave may forget. */
+  heldNow() {
+    return Object.fromEntries(Object.entries(this.slots).filter(([, s]) => s?.state === 'held').map(([c, s]) => [c, s.generation]));
+  }
+
   // -- events --
-  emit(kind, level, text, { notify = false, episode, ...value } = {}) {
-    if (episode !== undefined) {
-      if (this.said[kind] === episode) return;
-      this.said[kind] = episode;
+  emit(kind, level, text, { notify = false, episode, saidAs, ...value } = {}) {
+    if (episode !== undefined) { // `saidAs` keeps one episode per key, such as one per capability
+      const key = saidAs ?? kind;
+      if (this.said[key] === episode) return;
+      this.said[key] = episode;
     }
     let data = { schema: EVENT_SCHEMA, value: Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined && v !== null)) };
     if (feedDataProblems(data).length) data = undefined; // FAC-SEM-101: drop the data, keep the sentence
@@ -244,11 +250,13 @@ export class Responder extends SlotKeeper {
       const was = this.checkpoint.slots[capability]?.generation;
       if (failure) { // the board session failed: the rest wait for the next tick (FAA-163)
         this.retryLater(capability, transfer[capability] ?? [], failure);
+        this.suspect.add(capability); // its move check comes before its retry enrolls (0.56.0 seam r2)
         continue;
       }
       try {
         await this.settle(capability, () => this.recoverOne(capability, status, transfer[capability], was, generations, onHold), transfer[capability] ?? []);
       } catch (e) {
+        if (!(e instanceof BoardError)) throw e; // as the Python twin: only the board's refusals are left to retry
         failure = e;
       }
     }
@@ -488,7 +496,7 @@ export class Responder extends SlotKeeper {
     const session = this.session;
     this.session = null;
     // The DELETE released the slots: a standby taking one is no move (FAA-163).
-    if (session && await session.close()) this.checkpoint.leave(this.project);
+    if (session && await session.close()) this.checkpoint.leave(this.project, this.heldNow());
   }
 
   async tick() {
@@ -898,7 +906,7 @@ export class Responder extends SlotKeeper {
       this.session = null;
       // Only a DELETE Fabric answered released the slots (FAA-163): no record of them can read as a move. An idle stop
       // waits for it 3 s (FAA-173).
-      if (await session.close(work ? null : IDLE_LEAVE_SECONDS * 1000)) this.checkpoint.leave(this.project);
+      if (await session.close(work ? null : IDLE_LEAVE_SECONDS * 1000)) this.checkpoint.leave(this.project, this.heldNow());
     }
     this.state = 'stopped';
   }

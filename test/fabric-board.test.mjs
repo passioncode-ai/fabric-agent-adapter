@@ -1396,6 +1396,21 @@ test('0.56.0 seam r1: a board-wide not_available is the fault, not a refusal; a 
   assert.equal(h2.kinds().filter((k) => k === 'board.slot.refused').length, 2);
 });
 
+test('0.56.0 unit r2: two refused capabilities are each said once across reconnects', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  for (const capability of TWO) await hub.control({ op: 'refuse', tool: 'com.enroll', capability, code: 'capacity_exceeded' });
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  for (let i = 0; i < 2; i += 1) {
+    await hub.control({ op: 'end-sessions' });
+    await r.step();
+    await h.advance(61);
+    await r.step();
+  }
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.refused').length, TWO.length);
+});
+
 test('0.56.0 seam r1: a DELETE answered 404 keeps the slot records', async (t) => {
   const hub = await fakeHub(t, TWO);
   const h = harness(hub);

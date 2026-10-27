@@ -32,8 +32,7 @@ class SlotKeeper:
     def _held_at(self, capability: str, generation: int) -> None:
         """The generation this responder holds the slot at, kept beside its checkpoint so a restart knows it."""
         self._note(capability, {"project": self.project, "generation": generation})
-        if self._said.get("board.slot.refused") == capability:
-            self._said.pop("board.slot.refused", None)  # held again: a later refusal is said again
+        self._said.pop("board.slot.refused:" + capability, None)  # held again: a later refusal is said again
 
     def _note(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
         """The slot record, best effort: one that cannot be written now is written at the next receipt."""
@@ -156,6 +155,7 @@ class SlotKeeper:
         if tries == 1 and exc.code not in SESSION_CODES:
             self._emit("board.slot.refused", "warn", "Fabric refused to give this service the %s slot (%s); it asks again "
                        "later. Its other capabilities go on." % (capability, exc.code), episode=capability,
+                       said_as="board.slot.refused:" + capability,
                        capability=capability, reason=exc.code)
 
     def _settle(self, capability: str, act, entries: Optional[List[Dict[str, Any]]] = None) -> None:

@@ -56,10 +56,11 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 </body></html>"""
 # FAA-157: a moved board slot comes back only by the operator's act, a button on this page. The button posts from the
 # operator's signed-in dashboard session with the request header; a service token alone cannot reach it.
-BOARD_SECTION = """<section id="board"><h2>Project board</h2><p class="fd-hint">The operator moved this slot to another
-session; this service no longer answers it there. Take it back when the other session has let it go.</p><ul>{items}</ul>
+BOARD_SECTION = """<section id="board"><h2>Project board</h2><p class="fd-hint">This slot was moved to another
+session; this service no longer answers it there. Take back asks for it again: the service enrolls once the other
+session lets it go.</p><ul>{items}</ul>
 <script src="/board.js" defer></script></section>"""
-#: The dashboard's Take back button and its tool (FAA-157, DEC-0121): the operator's decision, relayed by their agent.
+#: The dashboard's Take back button and its tool (FAA-157, DEC-0121): the operator's decision, relayed in `_meta`.
 TAKE_BACK = {"id": "board.take-back", "title": "Take back", "tool": "board.take-back", "gate": "relayed"}
 TAKE_BACK_INPUT = {"type": "object", "properties": {"capability": {"type": "string"}}, "required": ["capability"],
                    "additionalProperties": False}
@@ -139,19 +140,25 @@ class Service:
         """The capabilities whose slot the operator moved to another session (FAA-155): the page offers their take-back."""
         return sorted(c for c, slot in dict(self.board.slots).items() if slot.get("state") == "moved") if self.board else []
 
-    def board_take_back(self, capability: Any) -> Dict[str, Any]:
-        """The operator's take-back (FAA-157): the next tick enrolls once the other session lets the slot go."""
+    def board_take_back(self, capability: Any, record: Any = None) -> Dict[str, Any]:
+        """The operator's take-back (FAA-157): the next tick enrolls once the other session lets the slot go. `record` is
+        the act the action gate recorded (by, via, caller), kept in the event; never the decision's words."""
         if not isinstance(capability, str) or capability not in self.board_moved():
             raise fs.ServiceError("No slot of that capability has moved away from this service.")
         self.board.take_back(capability)
+        how = (" Decided by %s, %s, through %s." % (record.get("by"), record.get("via"), record.get("caller"))
+               if isinstance(record, dict) else "")
         self.log.append("board.slot.returned", "info", "The operator took the %s slot back; the service enrolls once the "
-                        "other session lets it go." % capability)
-        return {"capability": capability}
+                        "other session lets it go.%s" % (capability, how))
+        return {"capability": capability, "moved": False}
 
     def board_take_back_tool(self, args: Dict[str, Any], ctx: fi.CallContext) -> Dict[str, Any]:
         """The take-back as a tool: the action gate has already read the operator's relayed decision (gate `relayed`)."""
+        capability = args.get("capability")
+        if self.board is not None and capability in self.board.capabilities and capability not in self.board_moved():
+            return {"capability": capability, "moved": False}  # a repeat after a lost answer: the slot is already back
         try:
-            return self.board_take_back(args.get("capability"))
+            return self.board_take_back(capability, ctx.record)
         except fs.ServiceError as exc:
             raise fi.InteropError(str(exc))
 
@@ -219,7 +226,8 @@ class Service:
                       "usage": {"path": fs.USAGE_PATH}},
             extensions=fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else None,
             # DEC-0067: listed only when the board is on — a host pinned before DEC-0067 refuses the member.
-            protocols=["fabric-service/0.1", "fabric-project-comms/0.1"] if self.board is not None else None,
+            # DEC-0126 OA-7: a server serving a relayed action reads `source`, so it lists operator-source/1 too.
+            protocols=self.mcp.well_known_protocols(["fabric-service/0.1", "fabric-project-comms/0.1"]) if self.board is not None else None,
             actions=self.mcp.action_table() or None,
         )
 

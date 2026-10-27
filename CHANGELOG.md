@@ -9,9 +9,11 @@ gate behave.
 
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
-  text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` before `)` or a
-  pipe no longer moves the folder a later relative `-C` is read against. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
-  transcript on Windows at all, and a turn from Windows came without `repositories`.
+  text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
+  pipeline's stage or a list sent to the background no longer moves the folder a later relative `-C` is read
+  against, and a newline ends a command. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
+  transcript on Windows at all, and a turn from Windows came without `repositories`. The hooks run `python3`, which
+  must name Python 3.9 or later in Git Bash there (session-hooks.md; FAA-183 makes the plugin find it itself).
 - **A relative `git -C` after `cd`** (FAA-166) is read against the folder the command last changed into with an
   absolute `cd`; after a relative or unknown `cd` it is dropped, never read against the session's folder.
 - **The board responder's recovery** (FAA-163, FAA-158). A refused enroll of one capability no longer stops the
@@ -22,7 +24,9 @@ gate behave.
   confirmed `DELETE` inside the hard exit, instead of letting the slot lapse. The slot records are forgotten only after
   a 2xx: a 404 (the session already gone) keeps them, since a move made before it ended is read at the next
   `com.status`. A refusal of the whole board session (`not_available` included) is the board down, never a refused
-  capability; a capability refused again after it was held is said again.
+  capability; a capability refused again after it was held is said again, once per capability. A clean leave forgets
+  only the records of slots this session holds now, so a slot moved while the service was down stays `moved` when the
+  session is dropped at connect or recovery stops early, and is never enrolled again on its own.
 - **`action_gate` fails closed** (FAA-139): a spend that is not a finite number and a project that cannot be read are
   read as uncovered, never as absent. A `null` mandate in `_meta` reads as an unreadable one, not as none (FAA-178). A
   job's start (`job_step`) reads spend and project as its answer does, so both fail closed alike.
@@ -41,8 +45,8 @@ gate behave.
   whether it is on, off or waiting for Fabric. The repositories of a turn are a lower bound (FAA-174): a turn longer
   than the transcript's last 512 KB names only what that tail shows.
 - The reference service's dashboard shows a moved slot with a Take back button (`POST /api/board/take-back`, operator
-  only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action the operator's agent calls with
-  their decision. Its `/mcp` reads a loopback call the service token authenticated as T0.
+  only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action an agent whose client sets `_meta`
+  calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125). Its `/mcp` reads a loopback call the service token authenticated as T0.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
 
@@ -149,7 +153,7 @@ command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix
   names is sent). With the mark, the
   hook reads the last 512 KB of the session's transcript (earlier turns, message text and tool output included; a secret the session displayed can be there, read in memory only) and uses only the
   current turn's tool names and path arguments: Edit, Write, MultiEdit and NotebookEdit paths, and `cd
-  <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 K characters of them a turn. A `cd`
+  <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
   or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
   read. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside the existing
   1.5 s facts budget, and named `{host, owner, name}` from its `origin` (a credential embedded in the URL is read with it by `git config`; it, the port

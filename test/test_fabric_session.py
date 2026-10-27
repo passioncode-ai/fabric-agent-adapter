@@ -1281,11 +1281,25 @@ class BashPaths(unittest.TestCase):
         self.assertEqual(MCP.bash_paths(r"cd C:\work", Path(r"C:\w"), windows=True), [])
 
     def test_a_subshell_or_pipe_cd_does_not_move_the_base(self):
-        """0.56.0 unit r1: `(cd /a) && git -C b` runs git in the outer folder, so the base is not known after `)`."""
-        for command in ("(cd /a) && git -C b log", "cd /a | git -C b log", "cd /a || git -C b log"):
+        """0.56.0 unit r1, r2: a cd in `( )`, in a pipeline's stage or in a list sent to the background moves only a
+        subshell, so a later relative -C is read against the folder before it; a pipe or `( )` with no cd changes
+        nothing, `||` keeps the folder as `&&` does, and a newline ends a command."""
+        cases = {
+            "(cd /a) && git -C b log": ["/a", "/w/b"],
+            "cd /a | git -C b log": ["/a", "/w/b"],
+            "cd /a & git -C b log": ["/a", "/w/b"],
+            "(cd /a && git -C b log)": ["/a", "/a/b"],
+            "cd /a && (cd /b) && git -C c log": ["/a", "/b", "/a/c"],
+            "ls | wc -l && git -C ../other commit": ["/other"],
+            "git -C ../one log | head; git -C ../two commit": ["/one", "/two"],
+            "(make) && git -C x commit": ["/w/x"],
+            "cd /a || exit 1; git -C sub commit": ["/a", "/a/sub"],
+            "cd /a\ngit -C sub log": ["/a", "/a/sub"],
+            "cd /a >/dev/null 2>&1; git -C sub log": ["/a", "/a/sub"],
+        }
+        for command, expected in cases.items():
             with self.subTest(command=command):
-                self.assertEqual(MCP.bash_paths(command, Path("/w"), windows=False), ["/a"])
-        self.assertEqual(MCP.bash_paths("(cd /a && git -C b log)", Path("/w"), windows=False), ["/a", "/a/b"])
+                self.assertEqual(MCP.bash_paths(command, Path("/w"), windows=False), expected)
 
     def test_cygwin_and_msys_read_posix_paths(self):
         """FAA-177: a Cygwin or MSYS2 Python names its own /cygdrive/c/... paths; only native Windows translates."""
@@ -1393,7 +1407,7 @@ class TurnRepositories(Base):
             prompt_entry("PROMPT-TEXT-SENTINEL"),
             tool_entry("Edit", file_path=str(one / "a.txt"), old_string="OLD-SENTINEL", new_string="b"), result_entry(),
             tool_entry("Write", file_path=str(two / "sub" / "new.txt"), content="CONTENT-SENTINEL"), result_entry(),
-            tool_entry("Bash", command="cd %s && make" % three), result_entry(),
+            tool_entry("Bash", command="cd '%s' && make" % three), result_entry(),
             tool_entry("Bash", command="git -C ../four status"), result_entry(),
             tool_entry("MultiEdit", file_path=str(one / "c.txt"), edits=[]), result_entry(),
             tool_entry("NotebookEdit", notebook_path=str(seven / "n.ipynb"), new_source="x"), result_entry(),
@@ -1419,7 +1433,7 @@ class TurnRepositories(Base):
 
     def test_at_most_ten_repositories(self):
         folders = [self.git_repo("r%02d" % i, "https://github.com/acme/r%02d.git" % i) for i in range(12)]
-        self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd %s" % f) for f in folders])
+        self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd '%s'" % f) for f in folders])
         _, entry = self.spool_turn()
         self.assertEqual([r["name"] for r in entry["repositories"]], ["r%02d" % i for i in range(10)])
 
