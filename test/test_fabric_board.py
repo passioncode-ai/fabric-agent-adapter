@@ -1282,6 +1282,61 @@ class MovedSlotTests(Conversation):
         self.assertEqual(self.board.requests[rid]["state"], "completed")
         self.assertEqual(self.record()["video.render"]["generation"], self.board.slots["video.render"]["generation"])
 
+    def test_a_lost_answer_to_its_own_replace_is_asked_again_not_read_as_a_move(self):
+        """Seam reading 1: the board commits generation 2 for this service and the answer is lost. The record written
+        before the call makes the restart ask again under the same key; the board answers the stored receipt."""
+        rid, _ = self._crash_after(effect=False)
+        self.board.drop_next["com.responder_replace"] = 1
+        second = self.responder()
+        for _ in range(6):
+            second.step()
+            self.board.advance(1)
+        replaces = [args for tool, args in self.board.calls if tool == "com.responder_replace"]
+        self.assertEqual(replaces[0]["idempotency"], replaces[1]["idempotency"])  # the same key, asked again
+        # The stored receipt names the ended session's slot; the new session's first fenced call replaces once more.
+        self.assertEqual([a["expectedGeneration"] for a in replaces], [1, 1, 2])
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+        self.assertEqual(self.record()["video.render"], {"project": second.project, "generation": 3})
+
+    def test_a_lost_answer_to_its_own_enroll_after_a_lapse_is_not_a_move(self):
+        r = self.responder()
+        r.step()  # holds generation 1
+        self.hub.control({"op": "end-sessions"})
+        self.board.advance(61)  # its lease lapses while it is away
+        rid = self.board.queue("video.render")
+        self.board.drop_next["com.enroll"] = 1
+        second = self.responder()
+        for _ in range(6):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.moved(), [])
+
+    def test_a_refused_ask_is_an_answer_and_a_real_move_is_still_seen(self):
+        """The record is dropped on a refusal: a move that happened while the ask was lost before reaching the board is
+        still read as a move."""
+        rid, _ = self._crash_after(effect=False)
+        self.board.move("video.render")
+        held = json.loads((self.data / "board-checkpoint.json").read_text())
+        held["slots"]["video.render"]["asking"] = {"op": "com.enroll", "args": {"idempotency": {"epoch": 1, "key": "x.enroll.lost"},
+                                                                                  "capability": "video.render"}}
+        (self.data / "board-checkpoint.json").write_text(json.dumps(held))
+        second = self.responder()
+        for _ in range(3):
+            second.step()
+            self.board.advance(1)
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(len(self.moved()), 1)
+        self.assertNotIn("asking", self.record()["video.render"])
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+
+    def test_an_integral_float_generation_reads_as_the_integer_in_both_twins(self):
+        """Seam reading 1: JSON's 2.0 is the number 2; Node cannot tell them apart, so Python reads it the same way."""
+        _, second = self._restart_with(status=2.0)
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(len(self.moved()), 1)
+
     def _restart_with(self, record: object = _KEEP, status: object = _KEEP):
         rid, _ = self._crash_after(effect=False)
         path = self.data / "board-checkpoint.json"

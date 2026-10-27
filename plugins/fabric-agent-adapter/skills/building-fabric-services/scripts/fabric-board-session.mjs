@@ -26,6 +26,9 @@ const TERMINAL = new Set(['completed', 'failed_known', 'cancelled', 'expired']);
 // participant reply (DEC-0098, DEC-0102; not terminal, the requester may still cancel it, and nobody claims it).
 const NOT_OURS = new Set(['queued', 'claimed', 'answered']);
 
+// The answer may have been stored: send it again with the same key (BoardError).
+const LOST = ['unreachable', 'session-ended'];
+
 /** A lost call is sent again this long before the lease it keeps would lapse (FAA-77, finding 38). */
 export const LEASE_MARGIN_SECONDS = 10;
 
@@ -168,7 +171,7 @@ export class Responder {
     const args = { idempotency: this.idem(this.key('enroll')), capability };
     let receipt;
     try {
-      receipt = this.receipt('com.enroll', await this.call('com.enroll', args));
+      receipt = this.receipt('com.enroll', await this.ask(capability, 'com.enroll', args));
     } catch (e) {
       if (e.code === 'held') {
         this.pause(capability);
@@ -219,12 +222,50 @@ export class Responder {
   }
 
   /**
+   * An enroll or replace can move the slot's generation: it is recorded with its key before it is sent, so a lost answer
+   * is never read as a move. A refusal drops the record; a receipt replaces it (heldAt).
+   */
+  async ask(capability, op, args) {
+    let held = this.checkpoint.slots[capability] ?? {};
+    if (held.project !== this.project) return this.call(op, args); // no record: nothing a lost answer could be mistaken for
+    held = await this.replay(capability, held);
+    this.checkpoint.slot(capability, { ...held, asking: { op, args } }); // fails closed: nothing sent
+    try {
+      return await this.call(op, args);
+    } catch (e) {
+      if (!LOST.includes(e.code)) this.checkpoint.slot(capability, held);
+      throw e;
+    }
+  }
+
+  /**
+   * Asks a lost enroll or replace again under its key: the stored receipt's generation is this service's (its session may
+   * have ended; the caller asks again). A refusal or an odd receipt drops the record; a lost answer keeps it.
+   */
+  async replay(capability, held) {
+    const { asking, ...rest } = held;
+    if (asking === undefined) return held;
+    let record = rest;
+    if (isObj(asking) && ['com.enroll', 'com.responder_replace'].includes(asking.op)) {
+      try {
+        const generation = this.receipt(asking.op, await this.call(asking.op, asking.args)).slot?.generation;
+        if (isInt(generation, 1)) record = { project: this.project, generation };
+      } catch (e) {
+        if (LOST.includes(e.code)) throw e;
+      }
+    }
+    this.checkpoint.slot(capability, record);
+    return record;
+  }
+
+  /**
    * True when com.status shows the slot's generation past the one this responder recorded holding: the operator moved it
    * to another session (or another session took it while this one was away). The slot is then left as `moved`. Never
    * held here (no record, another Project's, an odd value) or a generation not past it: false.
    */
   async gone(capability, status = null) {
-    const held = this.checkpoint.slots[capability] ?? {};
+    let held = this.checkpoint.slots[capability] ?? {};
+    if (held.project === this.project) held = await this.replay(capability, held); // its own lost ask first
     if (held.project !== this.project || !isInt(held.generation, 1)) return false;
     const now = ((status ?? await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if (!isInt(now, 1) || now <= held.generation) return false;
@@ -321,7 +362,7 @@ export class Responder {
     if (entries.length) args.transfer = { requests: entries.map((e) => e.request).slice(0, 64), checkpoint: { summary: 'Resumed by the same service after a restart; no effect had begun.' } };
     let receipt;
     try {
-      receipt = this.receipt('com.responder_replace', await this.call('com.responder_replace', args));
+      receipt = this.receipt('com.responder_replace', await this.ask(capability, 'com.responder_replace', args));
     } catch (e) {
       if (e.code !== 'held') throw e;
       for (const entry of entries) {

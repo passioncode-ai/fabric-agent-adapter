@@ -1049,6 +1049,63 @@ test('FAA-155: an odd or lower generation, recorded or in com.status, is never r
   }
 });
 
+test('FAA-155 seam 1: a lost answer to its own replace or enroll is asked again under its key, never read as a move', async (t) => {
+  const { hub, h, rid, project } = await crashedHolding(t);
+  await hub.control({ op: 'drop', tool: 'com.responder_replace' }); // generation 2 is committed for it; the answer is lost
+  const second = h.responder();
+  for (let i = 0; i < 6; i += 1) {
+    await second.step();
+    await h.advance(1);
+  }
+  let s = await h.state();
+  const replaces = s.callArgs.filter((_, i) => s.calls[i] === 'com.responder_replace');
+  assert.deepEqual(replaces[0].idempotency, replaces[1].idempotency); // the same key, asked again
+  assert.deepEqual(replaces.map((a) => a.expectedGeneration), [1, 1, 2]); // then once more, for this session
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+  assert.deepEqual(record(hub)['video.render'], { project, generation: 3 });
+
+  const lapsed = await fakeHub(t);
+  const l = harness(lapsed);
+  await l.responder().step(); // holds generation 1
+  await lapsed.control({ op: 'end-sessions' });
+  await l.advance(61); // its lease lapses while it is away
+  const { request: queued } = await lapsed.control({ op: 'queue', capability: 'video.render' });
+  await lapsed.control({ op: 'drop', tool: 'com.enroll' });
+  const back = l.responder();
+  for (let i = 0; i < 6; i += 1) {
+    await back.step();
+    await l.advance(1);
+  }
+  s = await l.state();
+  assert.equal(s.requests[queued].state, 'completed');
+  assert.ok(!l.kinds().includes('board.slot.moved'));
+});
+
+test('FAA-155 seam 1: a refused ask is an answer, so a real move is still seen; 2.0 reads as 2 in both twins', async (t) => {
+  const { hub, h, rid } = await crashedHolding(t);
+  await hub.control({ op: 'move', capability: 'video.render' });
+  const file = path.join(hub.data, 'board-checkpoint.json');
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  doc.slots['video.render'].asking = { op: 'com.enroll', args: { idempotency: { epoch: 1, key: 'x.enroll.lost' }, capability: 'video.render' } };
+  fs.writeFileSync(file, JSON.stringify(doc), { mode: 0o600 });
+  const second = h.responder();
+  for (let i = 0; i < 3; i += 1) {
+    await second.step();
+    await h.advance(1);
+  }
+  assert.equal(second.slots['video.render'].state, 'moved');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+  assert.ok(!('asking' in record(hub)['video.render']));
+  assert.equal((await h.state()).requests[rid].state, 'accepted');
+
+  const whole = await crashedHolding(t);
+  await whole.hub.control({ op: 'set', values: { status_generation: 2.0 } });
+  const r = whole.h.responder();
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+});
+
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
   const dir = tempDir('faa155-cp-');
   const file = path.join(dir, 'cp.json');

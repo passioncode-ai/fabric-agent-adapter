@@ -10,12 +10,7 @@ import secrets
 import threading
 import time
 from pathlib import Path
-from typing import Any
-from typing import Callable
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import sys as _sys  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
@@ -24,15 +19,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 import fabric_hub as _hub
 import fabric_service as _fs
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
-    BoardError,
-    LEASE_SECONDS,
-    REQUEST_STATES,
-    SUMMARY_MAX,
-    Stopped,
-    _CAPABILITY,
-    _is_int,
-    outcome_problems,
-    receipt_problems,
+    BoardError, LEASE_SECONDS, REQUEST_STATES, SUMMARY_MAX, Stopped, _CAPABILITY, _is_int, outcome_problems, receipt_problems,
 )
 from fabric_board_link import (  # noqa: E402,F401 - re-exported: callers import them from here since 0.40.0
     BoardRequest,
@@ -104,6 +91,8 @@ class _Work:
 
 
 Handler = Callable[[BoardRequest, WorkContext], Dict[str, Any]]
+
+_whole = lambda v: int(v) if isinstance(v, float) and v.is_integer() else v  # noqa: E731 - 2.0 is 2, as Node reads it
 
 
 class Responder:
@@ -231,7 +220,7 @@ class Responder:
     def _enroll(self, capability: str) -> None:
         args = {"idempotency": self._idem(self._key("enroll")), "capability": capability}
         try:
-            receipt = self._receipt("com.enroll", self._call("com.enroll", args))
+            receipt = self._receipt("com.enroll", self._ask(capability, "com.enroll", args))
         except BoardError as exc:
             if exc.code == "held":
                 self._pause(capability)
@@ -277,15 +266,50 @@ class Responder:
         except BoardError:
             pass
 
+    def _ask(self, capability: str, op: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """An enroll or replace can move the slot's generation: it is recorded with its key before it is sent, so a lost
+        answer is never read as a move. A refusal drops the record; a receipt replaces it (`_held_at`)."""
+        held = self.checkpoint.slots.get(capability) or {}
+        if held.get("project") != self.project:
+            return self._call(op, args)  # no record: nothing a lost answer could be mistaken for
+        held = self._replay(capability, held)
+        self.checkpoint.slot(capability, dict(held, asking={"op": op, "args": args}))  # fails closed: nothing sent
+        try:
+            return self._call(op, args)
+        except BoardError as exc:
+            if exc.code not in ("unreachable", "session-ended"):
+                self.checkpoint.slot(capability, held)
+            raise
+
+    def _replay(self, capability: str, held: Dict[str, Any]) -> Dict[str, Any]:
+        """Asks a lost enroll or replace again under its key: the stored receipt's generation is this service's (its session
+        may have ended; the caller asks again). A refusal or an odd receipt drops the record; a lost answer keeps it."""
+        asking = held.get("asking")
+        if not isinstance(asking, dict) or asking.get("op") not in ("com.enroll", "com.responder_replace"):
+            return held if asking is None else {k: v for k, v in held.items() if k != "asking"}
+        rest = {k: v for k, v in held.items() if k != "asking"}
+        try:
+            answer = self._receipt(asking.get("op"), self._call(asking.get("op"), asking.get("args")))
+            generation = _whole(answer["slot"]["generation"])
+            rest = {"project": self.project, "generation": generation} if _is_int(generation, 1) else rest
+        except BoardError as exc:
+            if exc.code in ("unreachable", "session-ended"):
+                raise
+        except (KeyError, TypeError):
+            pass
+        self.checkpoint.slot(capability, rest)
+        return rest
+
     def _gone(self, capability: str, status: Optional[Dict[str, Any]] = None) -> bool:
         """True when `com.status` shows the slot's generation past the one this responder recorded holding: the operator
         moved it to another session (or another session took it while this one was away). The slot is then left as
         `moved`. Never held here (no record, another Project's, an odd value) or a generation not past it: False."""
         held = self.checkpoint.slots.get(capability) or {}
+        held = self._replay(capability, held) if held.get("project") == self.project else held  # its own lost ask first
         if held.get("project") != self.project or not _is_int(held.get("generation"), 1):
             return False
         status = self._status() if status is None else status
-        now = next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None)
+        now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
         if not _is_int(now, 1) or now <= held["generation"]:
             return False
         with self._lock:
@@ -353,7 +377,7 @@ class Responder:
             else:  # in_progress (lost result once a new generation holds the slot) or outcome_unknown
                 reconcile.append(entry)
         responders = [r for r in status.get("responders") or [] if isinstance(r, dict)]
-        generations = {r.get("capability"): r.get("generation", 0) for r in responders}
+        generations = {r.get("capability"): _whole(r.get("generation", 0)) for r in responders}
         on_hold = {r.get("capability") for r in responders if r.get("held") is True}  # DEC-0079
         for capability in capabilities:
             held = transfer.get(capability)
@@ -383,7 +407,7 @@ class Responder:
             args["transfer"] = {"requests": [e["request"] for e in entries][:64],
                                 "checkpoint": {"summary": "Resumed by the same service after a restart; no effect had begun."}}
         try:
-            receipt = self._receipt("com.responder_replace", self._call("com.responder_replace", args))
+            receipt = self._receipt("com.responder_replace", self._ask(capability, "com.responder_replace", args))
         except BoardError as exc:
             if exc.code != "held":
                 raise
