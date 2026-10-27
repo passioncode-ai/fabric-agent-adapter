@@ -143,14 +143,15 @@ Fabric 0.4.0 (REQ-38):
    as ONE task whose title is that request in one line, with `origin: {kind: "person", ref: <where they said it: the session or thread>}`:
    from Fabric 0.3.14, which shows agents' goals, it is shown as yours. File each piece you split off with
    `fabric_task_create` while that task is claimed, and read the answer's `spawned_from` (Fabric 0.3.14 links the piece
-   from your single live claim). Your claimed task's id there: it is linked, link nothing. Another task's id: link
+   from your single live claim). `created: false` with a `code` filed nothing (`source-unresolved` names the `part` of
+   `source` that failed): correct the source or file without it, and never link. Then `proposed: true`, even with `spawned_from: null`: nothing was filed, so do not
+   file or link that piece; tell the person it waits for the operator and go on with the rest. Otherwise, your claimed task's id there: it is linked, link nothing. Another task's id: link
    nothing either (Fabric chose that parent, FAA-153) and tell the person which. `spawned_from: null` comes
    with `spawned_from_why`: link it yourself once with `fabric_task_link {taskId: <the piece>, rel: "spawned",
    targetTaskId: <the claimed task>}`, and if that is refused too, tell the person that reason; never file the piece
-   again. No `spawned_from` at all is a Fabric before 0.3.14: link it yourself the same way unless the answer says
+   again. A filed piece (`created: true`) with no `spawned_from` at all is a Fabric before 0.3.14: link it yourself the same way unless the answer says
    `chained: true` with `chained_to` your claimed task (board `c42071bc`); an answer with `chained: false` names its
-   `chain_reason`, which you tell the person if your link is refused. `proposed: true` means nothing was filed: do not
-   file or link that piece, tell the person it waits for the operator, and go on with the rest.
+   `chain_reason`, which you tell the person if your link is refused.
 3. A related-work warning (same backlog row, a linked task, an overlapping folder) names the other agent, its
    task and the overlap: tell the person, then coordinate (ask Fabric to hand it over, or link the tasks) or
    continue knowing it; say which, out loud.
@@ -237,9 +238,9 @@ already approved.
   `{kind: "mandate/1", by: "operator", task, instruction, at, source?, expiresAt, scope, chain}`, `instruction` his
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you
   relayed, `expiresAt` at most seven days on, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
-  `perCallMaxUsd`, `projects`), `chain` starting with you. A task whose work runs as a job and asks the operator at a
-  step names the job's capability in `capabilities` without `actions`: a step is read under the job's capability with
-  its request key as the action, a key the service chooses and you cannot know in advance (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
+  `perCallMaxUsd`, `projects`), `chain` starting with you. For a job asking the operator at a step, name the job's capability in
+  `capabilities` without `actions`: the step is read with its request key as the action, unknown ahead
+  (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
   narrower `scope` when you hand on less, never wider; at most four agents; `source` never changes down the chain. It
   travels in the call's `_meta.mandate` or as `call.mandate` of Fabric's `agent.call` once Fabric's hub forwards it
   (CT-125), never in a tool's arguments; the service kits state and hand it on (`operator_mandate(source=)`,
@@ -260,7 +261,7 @@ already approved.
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,
   about that part alone (MD-4). A
   caller outside the machine's trust (T2) gets nothing from a mandate.
-- The contract's decision for request `519d7b21` is DEC-0126 (OA-1 to OA-7), pinned since 0.52.0 (FAA-134), with
+- The contract's decision for request `519d7b21` is DEC-0126 (OA-1 to OA-7), with
   `mandate/1` (DEC-0125) its machine form and `source` the place it names.
 
 ### A lane stopped on a limit: restart it at once
@@ -312,7 +313,7 @@ stuck work to the operator.
 | denied | the operator said no | stop; it stands until cleared in Agent access |
 | failed in the client before its answer arrived; outcome unknown | the call may have run | check its effect first (`fabric_work_list`, `fabric_tasks_list`); repeat only with the same idempotency key |
 | Fabric restarted or closed this session; nothing was done | refused before the call ran | call it again once `fabric_whoami` answers |
-| `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, call again within your own mandate if it covers the part, else pass the refusal to the agent that called you, and only the lead asks him, once, about that part alone |
+| `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, call again within your own mandate if it covers the part, else pass the refusal to the agent that called you, and only the lead asks him, once, about that part alone; `mandate-capability-missing`: no mandate covers that step, only his decision |
 | `decision-invalid` | the decision names another action or object, is older than 24 hours, lies over 60 s ahead of the service's clock, or is malformed; or the mandate is (`data.detail` `mandate-malformed`, `-widened`, `-expired`, `-early`, `-not-for-this-call`) | never edit, widen or re-date it; ask the operator again when their words do not cover this call |
 | `approval-required` with `data.actionDigest` | a caller outside the machine's trust (T2): a chat decision changes nothing | an `approval/1` for that digest through the hub |
 | `human-step-required` with `data.humanStep` and `data.url` | a sign-in, a one-time code, consent, payment or top-up, typed secret, spend above a limit or passkey stays the person's | hand the person `data.url`: a path on the service's origin as Fabric Dashboards' `open_link` (`fallback=never`), an https URL as it is; never take the step or ask for the secret; continue other work |
@@ -345,11 +346,11 @@ In Claude Code this plugin ships four: at session start and `/clear` (not on com
 in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
-touched (read from the tail of the session transcript, at most 512 KB with its message text, of which only tool names and path arguments are used; host/owner/name are sent); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
+touched (never on Windows; read from the tail of the session transcript, at most 512 KB with its message text and tool output, which can hold a secret the session displayed and stays in memory, of which only tool names and path arguments are used; host/owner/name are sent); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
 `watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no token. Read
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). Read
 [session hooks](references/session-hooks.md) when a person asks what the hooks do, where they log, how to turn them
 off, or what they need from Fabric.
 

@@ -355,6 +355,8 @@ test('jobStep reads an unusable job capability as the answer does (DEC-0141 MJ-1
     assert.equal(step.covered, false, capability);
     assert.equal(step.fault, 'mandate-capability-missing');
     assert.match(step.message, /mandate-capability-missing/);
+    // MD-5 first: a T2 caller's mandate changes nothing, whatever the job's capability.
+    assert.deepEqual(i.jobStep({ mandate, tier: 'T2', now: NOW, self: 'example-agent', capability, key: 'approve-reply', effect: 'reply' }), { covered: false, message: null });
   }
 });
 

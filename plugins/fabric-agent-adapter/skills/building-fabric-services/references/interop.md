@@ -148,7 +148,8 @@ and Fabric's hub forwarding decisions (CT-125) have landed (DEC-0121 *Compatibil
 operator's own coding agents: Claude Code and Codex cannot set `_meta`, so until the hub forwards `call.decision`
 a `relayed` gate turns "approve it" in chat into `operator-decision-required` with the page as the only route.
 Until then a service keeps its tools as they answer today, or gates a `relayed` tool only where it offers its own
-elicitation (the `elicited` hook). This is D8's reason, which keeps `input_actions` off, applied to tools.
+elicitation (the `elicited` hook). The one exception is the board responder's take-back action: it is declared
+`relayed` now and reached through the page or elicitation until CT-125 (`board.md`). This is D8's reason, which keeps `input_actions` off, applied to tools.
 
 **Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
 resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same
@@ -195,7 +196,8 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
   approval the call presented, or `None`. `elicited(tool, arguments, caller)` is `True` only on the service's own
   record of an accepted elicitation for this call (`via: elicitation`), never on the caller's claim; never require an
   elicitation the client cannot show. `on_fault(tool, fault)` hears a service fault the caller sees only as
-  `unknown-state` (`approval-outcome-unreadable` when `approve` answers a refusal whose code or detail DL-18 does not know; an answer
+  `unknown-state`, but for one: `mandate-capability-missing` (DEC-0141 MJ-1), which the caller reads as
+  `operator-decision-required` with `data.detail` `mandate-capability-missing` (`approval-outcome-unreadable` when `approve` answers a refusal whose code or detail DL-18 does not know; an answer
   that is neither `None` nor a dict is read as no approval, which fails closed; or
   `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
   since `handle` defaults to T2 and a T2 call names nobody without them).

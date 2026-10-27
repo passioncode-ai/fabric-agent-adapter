@@ -14,17 +14,35 @@
   `actionGate` answer that fault to the caller as `operator-decision-required` (`data.detail`
   `mandate-capability-missing`), the fault beside it for the service's log; nothing is applied, so the job stays
   `input_required`. `job_step` / `jobStep` read an unusable job capability alike at the start: the step waits
-  `input_required`, its message naming `mandate-capability-missing`. So a job whose tool is not a capability name is no
+  `input_required`, its message naming `mandate-capability-missing`, and the Python tool server hands that fault to
+  `on_fault` at the start as at the answer. It is the one service fault a caller reads by name: `on_fault`'s and the
+  delegation reference's rule (a caller sees a fault only as `unknown-state`) now names it. So a job whose tool is not a capability name is no
   longer covered by an `actions`-only mandate at either end, and a mandate whose `capabilities` name `fabric.job.get`
   covers no step of another capability. The vendored `actions-vectors.json` gains the contract's `jobSteps` group (14
   cases) and its two new `action-call` fixtures (18 in all); both twins run them. Bundles issued under the previous pin
   `1197a90d` stay valid (`adapt_project.py`).
 - **working-with-fabric:** a leading agent covering a job's approval step names the job's capability in
-  `capabilities` without `actions` (the step's request key is the service's own). New scenario eval
+  `capabilities` without `actions` (the step's request key is the service's own), and reads `data.detail`
+  `mandate-capability-missing` as a step no mandate covers: only the operator's decision answers it. New scenario eval
   `lead-covers-a-job-step-by-its-capability`. building-fabric-services' interop reference drops the sentence that
   read an answer without a capability under `fabric.job.get`.
 
-## 0.53.0 (2026-10-27)
+## 0.53.1 (2026-10-27)
+
+0.53.0 was tagged and never released on npm or GitHub (the plugin marketplace, which reads `main`, offered it until
+0.53.1 merged): its release run failed on Windows, where the FAA-140 tests read a Bash
+command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix.
+
+### Fixed
+
+- **No transcript read on Windows** (FAA-175): working-with-fabric's Stop hook never reads the session transcript on
+  Windows, even once Fabric takes `repositories`; a Bash command's paths there are not the host's. Windows sessions send
+  their turn facts as before 0.53.0, without `repositories`. `BashPaths` and the four tests that need the hook itself to
+  read (names from Edit and Bash paths, at most ten, one checkout named once, another checkout of the start repository)
+  are skipped on Windows; the rest run there, the worker's with the read turned on in the test, and a new test checks that
+  the mark turns nothing on there.
+
+## 0.53.0 (2026-10-27, not published)
 
 ### Added
 
@@ -34,7 +52,7 @@
   `host`, `owner` and `name` that require nothing else (it then leaves a mark in the hooks' folder, and removes it when
   the schema stops saying so; after a Fabric downgrade, the turns that end before a worker next runs, about a minute, are still read; none of their
   names is sent). With the mark, the
-  hook reads the last 512 KB of the session's transcript (earlier turns and message text included) and uses only the
+  hook reads the last 512 KB of the session's transcript (earlier turns, message text and tool output included; a secret the session displayed can be there, read in memory only) and uses only the
   current turn's tool names and path arguments: Edit, Write, MultiEdit and NotebookEdit paths, and `cd
   <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
   or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
@@ -51,7 +69,7 @@
 - **A board slot the operator moves to another session stays moved** (FAA-155; contract DEC-0140, proposed; CT-174,
   CT-175). The kit's board responder records the generation it holds each slot at, beside its checkpoint: when a
   receipt's generation changes and before an enroll or replace that can change it; a live holder's renew writes
-  nothing, and a clean leave (the session's DELETE released the slots) forgets the record of a slot with no request
+  nothing, and a clean leave (the session's DELETE released the slots) forgets the record of a slot not moved and with no request
   left. When `com.status` (at connect, or after a call refused `fenced`) shows a later generation, it stops the
   handler, drops its claims, and leaves accepted work held (`lapsed`) and begun work `unknown`; it neither replaces at
   recovery after a restart nor enrolls again when the new holder's lease lapses. Accepted requests stay held on the
@@ -77,12 +95,13 @@
 ### Changed
 
 - **Step 4 reads Fabric's `spawned_from`** (FAA-156, Fabric 0.3.14): working-with-fabric links a piece filed with
-  `fabric_task_create` itself only when the answer says `spawned_from: null` (once; a refused link is told to the person
-  with `spawned_from_why`), or carries no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
-  the claimed task. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
+  `fabric_task_create` itself only when the answer says `spawned_from: null` without `proposed: true` (once; a refused link is told to the person
+  with `spawned_from_why`), or is filed (`created: true`) with no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
+  the claimed task. `created: false` with a `code` such as `source-unresolved` filed nothing and is never linked. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
   not linked again, and the person is told which parent Fabric chose (FAA-153). `proposed: true` now says what
   to do: file and link nothing for that piece, tell the person, go on with the rest. The goal display is named as
-  Fabric 0.3.14's. New scenario eval `spawned-from-decides-the-link`.
+  Fabric 0.3.14's. New scenario evals `spawned-from-decides-the-link`, `what-the-stop-hook-reads` (FAA-140) and
+  `moved-slot-needs-a-take-back-action` (FAA-155).
 - **A responder no longer takes back a slot that moved while it was away** (FAA-155). Before 0.53.0 a restarted
   responder replaced whoever held its slot (at recovery) or enrolled again when that holder lapsed, so a slot taken
   while it was down or after a crash came back by itself. It now stays with the new holder until the operator calls

@@ -219,12 +219,11 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
 
 #: The tool of a job's input request (interop C3.3, AP-2): the call that answers it is fabric.job.get (DEC-0141 MJ-1).
 JOB_STEP_TOOL = "fabric.job.get"
-_CAPABILITY_NAME = re.compile(r"[a-z][a-z0-9._-]{1,127}")  # common.schema.json#/$defs/capabilityName
 
 
 def job_capability(value: Any) -> bool:
     """A job's capability a mandate can read a step under (MJ-1): a capability name, never fabric.job.get itself."""
-    return isinstance(value, str) and _CAPABILITY_NAME.fullmatch(value) is not None and value != JOB_STEP_TOOL
+    return isinstance(value, str) and _CAPABILITY.fullmatch(value) is not None and value != JOB_STEP_TOOL
 
 
 def _by_mandate(inputs: Any, action: Dict[str, Any], caller: str) -> Dict[str, Any]:

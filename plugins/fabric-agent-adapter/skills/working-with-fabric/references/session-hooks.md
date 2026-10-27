@@ -20,7 +20,7 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 | Event | When it acts | What it does |
 |---|---|---|
 | SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running, in a project that uses Fabric (below): adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric running in a folder with no such sign (a user-scope registration reaches every folder): one line pointing at `fabric_whoami`, which names the project when Fabric serves the folder anyway (FAA-60). Fabric down, in a project that uses Fabric: one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
-| Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | measures the turn's facts (HEAD, files changed, lines added and removed: counts and ids only, git sharing 1.5 s) and names the other Git repositories the turn touched (FAA-140, below: only once Fabric takes them), spools them in one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}` as stored (with `repositories` only where that tool's input schema lists the field as an array of items with host, owner and name requiring nothing else, at most its `maxItems`, each item meeting what the schema says of its fields or left out; a turn spooled with the mark and delivered to a Fabric whose schema no longer takes them goes without them, and the log says so once per session; with a Fabric that never took them nothing is read and nothing is logged), keeps the `nudges` its answer carries (Fabric 0.3.14: each `{kind, says, task_id?, request_id?}`, shown on a turn once, at most five; it stays for `fabric_work_list` and `fabric_heartbeat`, so it may come again there) in `nudges.json`, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
+| Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | measures the turn's facts (HEAD, files changed, lines added and removed: counts and ids only, git sharing 1.5 s) and names the other Git repositories the turn touched (FAA-140, below: only once Fabric takes them (not on Windows)), spools them in one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}` as stored (with `repositories` only where that tool's input schema lists the field as an array of items with host, owner and name requiring nothing else, at most its `maxItems`, each item meeting what the schema says of its fields or left out; a turn spooled with the mark and delivered to a Fabric whose schema no longer takes them goes without them, and the log says so once per session; with a Fabric that never took them nothing is read and nothing is logged), keeps the `nudges` its answer carries (Fabric 0.3.14: each `{kind, says, task_id?, request_id?}`, shown on a turn once, at most five; it stays for `fabric_work_list` and `fabric_heartbeat`, so it may come again there) in `nudges.json`, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
 | UserPromptSubmit | the session's spool holds a count or nudges | adds ONE line, `N unread on the project board: com.list`, only when the count rose since the last line (a fall or the same count says nothing), then each nudge's `says` once, as Fabric writes it (Fabric 0.3.14 starts each with `Fabric:`; any other line gets the tag `Fabric reminder: `), one line each, at most five lines of at most 400 characters; the nudges file is taken by renaming it away before they are printed (FAA-142). It reads, renames and writes small files in the session's folder and never calls Fabric. |
 | SessionEnd | as for Stop | spools the end; the worker sends `fabric_work_release {claims: "session", outcome: "let-go", …}` (with `observedAt`, the time the hook fired, where the tool's input schema names it: Fabric 0.3.9 then refuses an end from before the session enrolled), then `fabric_session_observe {event: "end", reason}`, and removes the session's spool. Reason `clear` ends nothing: `/clear` keeps the agent process and its fabric-mcp, so no claim is released and no end observed; turns already spooled still go out (since 0.42.0). Their nudges stay in the old id's folder and are not printed here; Fabric 0.3.14 only shows a nudge on a turn's answer and keeps it for `fabric_work_list` and `fabric_heartbeat`, so the new session gets it there (board `b605a636`; decision of 0.51.2, FAA-142) |
 
@@ -31,14 +31,15 @@ id, and keeps the retry only while the end is the newest entry. When `fabric-mcp
 no session holds the id), the worker drops the spool, writes a `no-session` mark in the session's folder and logs it
 once; for 15 minutes the hooks spool nothing for that id (an end removes the folder), then one rejoin tries again.
 
-**The other repositories a turn touched** (FAA-140, Fabric CO-367). Only after a worker has seen the running Fabric's
+**The other repositories a turn touched** (FAA-140, Fabric CO-367). Never on Windows (FAA-175: a Bash command's
+paths there are not the host's). Elsewhere, only after a worker has seen the running Fabric's
 `fabric_session_observe` declare `repositories` as an array of items with `host`, `owner` and `name` that require
 nothing else does the Stop hook read the
 session's transcript at all: the worker then leaves `observe-takes-repositories` in the hooks' folder (beside
 `hooks.log`) and removes it when the schema stops saying so (after a Fabric downgrade, the turns that end before a worker next
 runs, about a minute, are still read; none of their names is sent); without it nothing below happens. With it, the hook reads the last 512 KB of the
 transcript (the payload's `transcript_path`; earlier turns included) and uses only the entries after the last prompt
-the person typed. Those lines hold message text too; of each entry it uses only a tool call's
+the person typed. Those lines hold message text and tool output too (file contents, command output: a secret the session displayed can be there; it stays in memory and is never spooled, logged or sent); of each entry it uses only a tool call's
 name and path argument: the `file_path` of Edit, Write and MultiEdit, the `notebook_path` of NotebookEdit, and in a
 Bash command `cd <absolute path>` and `git -C <path>` (absolute, or relative to the session's folder), split only in
 commands that hold `cd` or `git`, at most 64 KB of command text a turn. These are the repositories the turn
@@ -126,18 +127,18 @@ only variable names are looked at, never a value (two of them carry the session'
 ## What they never do
 
 - **Block or slow the session.** Each hook has a 5 s ceiling in `hooks.json`; the script reads a few small files and
-  returns in tens of milliseconds, plus the turn's git facts in Stop and SessionEnd and, in Stop once Fabric takes them, the transcript's
+  returns in tens of milliseconds, plus the turn's git facts in Stop and SessionEnd and, in Stop once Fabric takes them (not on Windows), the transcript's
   tail and the other repositories' names (the git calls share at most 1.5 s; the tail read is at most 512 KB). Every call to Fabric happens in a detached worker with a 10 s deadline; at its end the worker closes
   `fabric-mcp`'s stdin and then ends its whole process group, so a wrapper (`npx`, a shell script,
   `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path.
-- **Read a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
+- **Keep a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
   those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log. Once Fabric
-  takes repositories, an `origin` URL that embeds a credential (`https://user:token@host/...`) is read by
+  takes repositories (not on Windows), an `origin` URL that embeds a credential (`https://user:token@host/...`) is read by
   `git config` with it; the Stop hook drops the credential in memory before anything is spooled, logged or sent.
 - **Send content, or use more than it reads for.** A turn is the HEAD commit, the number of files that differ from it
-  (untracked included) and the lines added and removed against it, and, once Fabric takes them, the other repositories
+  (untracked included) and the lines added and removed against it, and, once Fabric takes them (not on Windows), the other repositories
   it touched by their `origin` name (`{host, owner, name}`); no path, branch name, commit message or diff text. The
-  transcript's tail is read, message text with it, and only tool names and path arguments are used; a sent turn's log
+  transcript's tail is read, message text and tool output with it, and only tool names and path arguments are used; a sent turn's log
   line counts its repositories, never names them. The board is read
   as a count (`com.status`), never a message. Git runs with `--no-optional-locks`.
 - **Start a second Fabric session.** A `fabric-mcp` started on its own would enroll a new session, and Fabric ends a
@@ -157,7 +158,7 @@ One line per event that did something, never content: `~/Library/Caches/ai.passi
 (macOS), `$XDG_CACHE_HOME/fabric-agent-adapter/hooks.log` (Linux, default `~/.cache`),
 `%LOCALAPPDATA%\fabric-agent-adapter\hooks.log` (Windows). Mode 0600, rotated at 1 MB to `hooks.log.1`. The
 per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, each holding the session's folder when
-the turn ended (the Stop payload's `cwd`) and, when the turn touched another repository (only once Fabric takes them), `repositories` as `{host, owner, name}`; `board.json`, `board.shown`, `repositories.degraded` (the once-a-session note that repositories were left out: the schema no longer takes them, or refused every item), and the nudges not yet printed: `nudges.json` for the prompt
+the turn ended (the Stop payload's `cwd`) and, when the turn touched another repository (only once Fabric takes them (not on Windows)), `repositories` as `{host, owner, name}`; `board.json`, `board.shown`, `repositories.degraded` (the once-a-session note that repositories were left out: the schema no longer takes them, or refused every item), and the nudges not yet printed: `nudges.json` for the prompt
 hook, `nudges.watch.json` for `watch-mail`, each taken by renaming it away; a
 folder untouched for 7 days, whose worker failed or whose session ended without SessionEnd, is removed by the next
 Stop or SessionEnd hook, even while the hooks are inert; an end entry whose release or observation got no answer stays

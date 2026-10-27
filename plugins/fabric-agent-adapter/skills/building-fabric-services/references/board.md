@@ -68,7 +68,7 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 
 | Step | Board call | Checkpoint written first |
 |---|---|---|
-| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | none |
+| hold the slot | `com.enroll` (again at about 20 s while idle: the holder's enroll renews its 60 s lease) | none for a first enroll or a live holder's renew; otherwise the slot's `asking` record (FAA-155) |
 | take a request | `com.claim`, the same key while nothing is claimable | `claimed` |
 | read it | `com.get`: the digest must equal the claim's, and the request must name this Project and capability | none |
 | accept | `com.accept` with the claim's exact fence (request, generation, attempt, digest, revision) | `accepting`, then `accepted` |
@@ -78,7 +78,8 @@ One tick every 15 s ± 5 s (`step()` answers the wait):
 | settle | `com.complete {state, observed, summary?, evidence?}` | `completing`, then the entry is dropped |
 
 The checkpoint is fsynced before each call it announces. A write that fails stops the step (`board.blocked`): nothing
-is sent that the checkpoint does not know about. A lost answer is sent again with the same idempotency key, so the
+is sent that the checkpoint does not know about. The one exception is the slot record: an `asking` or generation
+record that cannot be written is skipped and the enroll or replace still goes out (see below). A lost answer is sent again with the same idempotency key, so the
 board returns the first receipt; while the lease still holds, the session and the running work stay and the call goes
 again before the lease would lapse (FAA-77). One request is in flight at a time, and one fenced call: the fence is
 built, sent and its receipt applied under one lock, so the tick's `com.renew` never carries a revision the handler's
@@ -177,7 +178,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   {project, generation, moved?, asking?}}`). The record is written when a receipt's generation changes and before an
   enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
   clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
-  in the checkpoint is forgotten: the slot is free, and whoever takes it next is no move. A file without the record
+  in the checkpoint and not moved is forgotten (a moved slot's record stays, so a clean stop never undoes a move): the slot is free, and whoever takes it next is no move. A file without the record
   reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first
   start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
   wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
@@ -215,7 +216,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   records its own generation. Only a replay the board refuses, or one that ran for the first time (`repeated: false`)
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
-- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record. In the same board
+- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record; never edit the
+  checkpoint's `slots` record by hand to undo a move. In the same board
   session the next tick enrolls once the other session lets the slot go (a live holder is waited for) and takes the work
   left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work held for the slot, takes it
   back at once by `com.responder_replace`, as a restart did before 0.53.0: the operator asked for the slot back, so the

@@ -33,11 +33,12 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   reads by name at run time; the kit itself calls no outside host on its own. A board
   responder talks only to Fabric's hub on loopback.
 - The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
-  in the session's folder (counts only, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
-  session Fabric launched. Stop also, only once the running Fabric's `fabric_session_observe` takes
+  in the session's folder (counts only, at most 1.5 s; with the mark below and not on Windows, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
+  session Fabric launched. Stop also, never on Windows and only once the running Fabric's `fabric_session_observe` takes
   `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark), reads the
   last 512 KB of the session's transcript (earlier turns included; only the entries after the
-  last prompt the person typed are used)
+  last prompt the person typed are used; the tail holds message text and tool output too, file contents and
+  command output that can carry a secret the session displayed, read in memory only and never spooled, logged or sent)
   and runs `git rev-parse --show-toplevel` and `git config --get remote.origin.url` in the
   other repositories the turn's tool calls name, within the same 1.5 s. Of the transcript they
   use only tool names and path arguments; what leaves the machine is each repository's

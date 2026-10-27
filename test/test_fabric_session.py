@@ -1177,6 +1177,7 @@ class OriginNames(unittest.TestCase):
                 self.assertIsNone(MCP.parse_origin(url))
 
 
+@unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
 class BashPaths(unittest.TestCase):
     def test_cd_to_an_absolute_path_and_git_dash_c(self):
         cwd = Path("/work/start")
@@ -1188,6 +1189,24 @@ class BashPaths(unittest.TestCase):
     def test_a_command_that_does_not_parse_names_nothing(self):
         self.assertEqual(MCP.bash_paths("cd '/a/b", Path("/w")), [])
         self.assertEqual(MCP.bash_paths("", Path("/w")), [])
+
+
+WINDOWS_READS_NO_TRANSCRIPT = unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
+
+
+class WindowsReadsNoTranscript(unittest.TestCase):
+    """FAA-175: on Windows the mark never turns the transcript read on."""
+
+    def test_the_mark_reads_nothing_on_windows(self):
+        with tempfile.TemporaryDirectory() as base:
+            env = {"XDG_CACHE_HOME": base, "LOCALAPPDATA": base, "HOME": base}
+            mark = fs.state_root(env=env) / fs.REPOSITORIES_MARK
+            mark.parent.mkdir(parents=True, exist_ok=True)
+            mark.write_text("")
+            with mock.patch.object(fs.sys, "platform", "win32"):
+                self.assertFalse(fs.repositories_wanted(env))
+            with mock.patch.object(fs.sys, "platform", "linux"):
+                self.assertTrue(fs.repositories_wanted(env))
 
 
 class TurnRepositories(Base):
@@ -1231,6 +1250,7 @@ class TurnRepositories(Base):
         entry = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))[-1]
         return said, json.loads(entry.read_text())
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_turn_names_the_other_repositories_it_changed_and_no_path(self):
         one = self.git_repo("one", "https://user:TOKEN-SENTINEL@github.com/acme/one.git")
         two = self.git_repo("two", "git@bitbucket.org:team/two.git")
@@ -1270,12 +1290,14 @@ class TurnRepositories(Base):
             self.assertNotIn(leaked, stored)
         self.assertNotIn(str(self.base), self.log_text())
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_at_most_ten_repositories(self):
         folders = [self.git_repo("r%02d" % i, "https://github.com/acme/r%02d.git" % i) for i in range(12)]
         self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd %s" % f) for f in folders])
         _, entry = self.spool_turn()
         self.assertEqual([r["name"] for r in entry["repositories"]], ["r%02d" % i for i in range(10)])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_two_checkouts_of_one_repository_are_named_once(self):
         a = self.git_repo("a", "https://github.com/acme/same.git")
         b = self.git_repo("b", "git@github.com:acme/same")
@@ -1284,6 +1306,7 @@ class TurnRepositories(Base):
         _, entry = self.spool_turn()
         self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "same"}])
 
+    @WINDOWS_READS_NO_TRANSCRIPT
     def test_another_checkout_of_the_start_repository_is_not_named(self):
         """A worktree or a second clone of the start folder's repository has another toplevel but the same origin: it
         is the start folder's repository, not another one."""
@@ -1350,11 +1373,17 @@ class TurnRepositories(Base):
         (entry,) = fs.session_dir(SID, self.env).glob("*-end.json")
         self.assertNotIn("repositories", json.loads(entry.read_text()))
 
+    def read_on(self):
+        """The worker's tests take turns that carry repositories on every host: the hook's read is turned on as the mark
+        turns it on where it is allowed, so these tests also run on Windows, where the gate is off (FAA-175)."""
+        return mock.patch.object(sys.modules["fabric_session_cli"], "repositories_wanted", lambda env=None: True)
+
     def deliver_two_turns(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
-        self.spool_turn()
-        self.spool_turn()
+        with self.read_on():
+            self.spool_turn()
+            self.spool_turn()
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         return [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
 
@@ -1425,7 +1454,8 @@ class TurnRepositories(Base):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "owner-flat"
         flat, nested = self.git_repo("flat", "https://github.com/acme/flat.git"), self.git_repo("nested", "https://gitlab.com/group/sub/nested.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(flat / "x")), tool_entry("Edit", file_path=str(nested / "y"))])
-        self.spool_turn()
+        with self.read_on():
+            self.spool_turn()
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         (turn,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
         self.assertEqual(turn["repositories"], [{"host": "github.com", "owner": "acme", "name": "flat"}])
@@ -1435,7 +1465,8 @@ class TurnRepositories(Base):
         self.env["FAKE_MCP_OBSERVE_REPOSITORIES"] = "max1"
         one, two = self.git_repo("one", "https://github.com/acme/one.git"), self.git_repo("two", "https://github.com/acme/two.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x")), tool_entry("Edit", file_path=str(two / "y"))])
-        self.spool_turn()
+        with self.read_on():
+            self.spool_turn()
         fs.deliver(fs.session_dir(SID, self.env), self.env, deadline_s=8)
         (turn,) = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
         self.assertEqual(turn["repositories"], [{"host": "github.com", "owner": "acme", "name": "one"}])

@@ -55,7 +55,7 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
 
     def test_a_job_step_is_covered_by_its_capability(self):  # lead-covers-a-job-step-by-its-capability
         flat_body = " ".join(self.body.split())
-        for words in ("names the job's capability in `capabilities` without `actions`", "DEC-0141 MJ-1",
+        for words in ("name the job's capability in `capabilities` without `actions`", "`mandate-capability-missing`: no mandate covers", "DEC-0141 MJ-1",
                       "its request key as the action"):
             self.assertIn(words, flat_body, words)
         interop = flat("building-fabric-services/references/interop.md")

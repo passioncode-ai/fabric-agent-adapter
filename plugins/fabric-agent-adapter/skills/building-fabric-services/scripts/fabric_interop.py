@@ -521,6 +521,7 @@ class CallContext:
                             spend_usd=spend_usd, project=project)
             if step["covered"]:
                 return step["record"]
+            self.server._fault(self.tool, step)  # the start hears it as the answer does (MJ-1)
         kept = {"effect": effect, **({"spendUsd": spend_usd} if spend_usd is not None else {}),
                 **({"project": project} if project is not None else {})}
         self.server.jobs.request_input(job_id, {key: request}, step["message"] or message, steps={key: kept})
@@ -644,7 +645,8 @@ class McpToolServer:
         # approval the call presented, or None; elicited(tool, arguments, caller) is True only on the service's own
         # record of an accepted elicitation. input_actions=True gates each answered input request as an action (D8).
         # on_fault(tool, fault) hears a service fault the caller only sees as unknown-state (e.g. caller-missing: an
-        # action-gated server needs a tier, identify or authorize that names who calls).
+        # action-gated server needs a tier, identify or authorize that names who calls), but for mandate-capability-missing
+        # (MJ-1), which the caller reads as operator-decision-required naming it in data.detail.
         # DEC-0125: agent_id is this service's own agent id; with it the server reads a call's _meta.mandate for a
         # relayed action added with its effect (the chain must end in agent_id, and in the delegation's caller before
         # it when authorize accepted a token); without it a mandate is not read, as before.
@@ -811,7 +813,8 @@ class McpToolServer:
         return {"ok": True, "records": records}
 
     def _fault(self, tool: str, gated: Dict[str, Any]) -> None:
-        """Hand a service fault to on_fault; the caller saw only unknown-state. A hook that raises is the service's."""
+        """Hand a service fault to on_fault; the caller saw unknown-state (operator-decision-required naming it for
+        mandate-capability-missing, MJ-1). A hook that raises is the service's."""
         if gated.get("fault") and self._on_fault is not None:
             try:
                 self._on_fault(tool, str(gated["fault"]))
