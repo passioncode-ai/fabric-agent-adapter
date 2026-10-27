@@ -746,7 +746,7 @@ class JwksCache:
                 parts = urllib.parse.urlsplit(sent)
             except ValueError:
                 raise ValueError("a key set URL's host does not parse") from None
-            if re.search(r"[\x00-\x20\x7f]", sent) or not (parts.path + parts.query).isascii():
+            if re.search(r"[\x00-\x20\x7f]", sent.partition("#")[0]) or not (parts.path + parts.query).isascii():
                 raise ValueError("a key set URL holds a space, an ASCII control character, or a character outside ASCII "
                                  "in its path or query")
             if "@" in parts.netloc:  # an empty one too: urllib would dial `@127.0.0.1` (0.56.0 unit r14)

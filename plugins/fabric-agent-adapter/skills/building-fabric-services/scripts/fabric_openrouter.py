@@ -171,7 +171,9 @@ class Client:
         self.prices = {str(k): dict(v) for k, v in prices.items()}
         self.key_env = key_env
         self.window = window
-        self.base_url = base_url.rstrip("/")
+        # The base URL as check_url read it and urllib would send it: its ends trimmed, so `.../v1\n` is not sent
+        # as `.../v1\n/chat/completions` (0.56.0 seam r18; the Node twin's `new URL` trims it too).
+        self.base_url = base_url.strip(fabric_http._URL_ENDS).rstrip("/")
         self.attribution = attribution
         self.project_id = project_id
         self.unmeasured_call_usd = unmeasured_call_usd

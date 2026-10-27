@@ -118,10 +118,11 @@ _URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
 
 
 def _sendable(url: str, parts: urllib.parse.SplitResult) -> bool:
-    """Whether urllib can send the URL as checked: no space or ASCII control character anywhere (urlsplit drops a tab
-    or line break that urllib then sends), and nothing outside ASCII in the path or query, which http.client cannot
-    write in a request line (a host outside ASCII is sent in IDNA)."""
-    return not re.search(r"[\x00-\x20\x7f]", url) and (parts.path + parts.query).isascii()
+    """Whether urllib can send the URL as checked: no space or ASCII control character before its fragment (urlsplit
+    drops a tab or line break that urllib then sends), and nothing outside ASCII in the path or query, which
+    http.client cannot write in a request line (a host outside ASCII is sent in IDNA)."""
+    # The fragment is never sent (urllib drops it), so only what precedes it is read (0.56.0 seam r18).
+    return not re.search(r"[\x00-\x20\x7f]", url.partition("#")[0]) and (parts.path + parts.query).isascii()
 
 
 def _authority_ok(netloc: str) -> bool:

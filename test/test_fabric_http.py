@@ -82,7 +82,8 @@ class Cases(unittest.TestCase):
     def test_check_url_reads_a_url_with_whitespace_at_its_ends_as_urllib_sends_it(self):
         # 0.56.0 product r17: 0.55.0 sent `https://h.example/x\n` (urllib trims the ends), and so does 0.56.0.
         for url in ("https://h.example/x\n", "https://h.example/x\r\n", "\nhttps://h.example/x", " https://h.example/x\t",
-                    "https://\u4f8b.example/x", "https://h.example/x#caf\u00e9"):  # an IDN host and fragment are sent
+                    "https://\u4f8b.example/x", "https://h.example/x#caf\u00e9",  # an IDN host; a fragment is not sent
+                    "https://h.example/x#a b"):
             with self.subTest(url=url):
                 fh.check_url(url)
 

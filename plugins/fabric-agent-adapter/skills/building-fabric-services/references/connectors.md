@@ -48,8 +48,8 @@ Every answer comes back as a `Response`, whatever its status; `HttpError` means 
 host, port and path (`redact_url`); a URL that is not http or https keeps only its scheme (`htps:<redacted>`), and
 one that does not parse as a URL is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
 normalises it, Python as given), so a key never belongs in it. Python's `check_url` refuses a host
-with a backslash, space, control character or `%`, a URL with a space or ASCII control character, or a character
-outside ASCII in its path or query (whitespace at its ends is trimmed, as urllib trims it), and a port that is not
+with a backslash, space, control character or `%`, a URL with a space or ASCII control character before its
+fragment, or a character outside ASCII in its path or query (whitespace at its ends is trimmed, as urllib trims it), and a port that is not
 ASCII digits, all as kind `refused` before sending; it checks a host's shape, not its name. `redact_url` on Python reads a host holding `%` as `<unparseable url>`; Node writes it decoded. An error never carries a request header or body.
 
 ## fabric_openrouter

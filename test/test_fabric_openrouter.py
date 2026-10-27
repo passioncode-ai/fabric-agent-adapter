@@ -125,6 +125,14 @@ class Rules(unittest.TestCase):
             self.assertNotIn(header.lower(), ("http-referer", "x-openrouter-title", "x-title"),
                              "attribution is off by default")
 
+    def test_a_base_url_ending_in_a_line_break_is_sent_without_it(self):
+        # 0.56.0 seam r18: check_url trims the ends, so the base it passed must be the base composed and sent.
+        for base in ("https://openrouter.ai/api/v1\n", "https://openrouter.ai/api/v1/ ", "https://openrouter.ai/api/v1/\r\n"):
+            with self.subTest(base=base):
+                c = fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"], environ={"OPENROUTER_API_KEY": KEY},
+                              base_url=base, now=lambda: NOW)
+                self.assertEqual(c.base_url, "https://openrouter.ai/api/v1")
+
     def test_attribution_only_with_a_setting(self):
         seen = []
         setting = {"product": "example-agent", "title": "Example Agent", "categories": ["cloud-agent"]}

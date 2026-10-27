@@ -1186,11 +1186,12 @@ class AuditFaultTests(Conversation):
         self.outcome = slow
         r = self.threaded()
         r.step()
-        # Step until both are done, not a fixed four rounds: on a loaded runner a work thread can outlast a round
-        # (hosted macOS on 111b4ae ended at ['completed', 'accepted']).
-        for _ in range(40):
-            if [self.board.requests[x]["state"] for x in rids] == ["completed", "completed"]:
-                break
+        # Four ticks, as before (each idle tick takes the next transferred request, finding 39), but each waits in
+        # wall time for the work thread first: on a loaded runner one outlasted its 50 ms (hosted macOS on 111b4ae
+        # ended at ['completed', 'accepted']), and the clock must not move while it runs (seam r18).
+        for _ in range(4):
+            if r.current is not None:
+                self.assertTrue(r.current.done.wait(10))
             self.settle(r, rounds=1, seconds=5)
         self.assertEqual([self.board.requests[x]["state"] for x in rids], ["completed", "completed"])
         self.assertEqual(self.checkpoint(), {})

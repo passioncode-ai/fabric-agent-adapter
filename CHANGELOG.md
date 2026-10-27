@@ -61,18 +61,19 @@ gate behave.
   `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose rule differs between 3.9 patch
   releases. `check_url` refuses the same ports and bracketed hosts (an IPv6 zone included). On Python it also refuses
   a backslash, `%`, space or control character in the host (a Unicode space included), which urllib would decode or
-  dial as another host (`h.example%3A8443` reached port 8443), and a space or ASCII control character anywhere in the
-  URL or a character outside ASCII in its path or query, which urllib sends and http.client refuses: such a URL is now
-  refused before it is sent (kind `refused`), where 0.55.0 retried it and answered kind `connection`. Whitespace at the
-  ends is trimmed as urllib trims it, so a URL ending in a line break is still sent, as in 0.55.0. The Node twin reads
+  dial as another host (`h.example%3A8443` reached port 8443), and a space or ASCII control character before the
+  URL's fragment (which is never sent) or a character outside ASCII in its path or query, which urllib sends and
+  http.client refuses: such a URL is now refused before it is sent (kind `refused`), where 0.55.0 retried it and
+  answered kind `connection`. Whitespace at the ends is trimmed as urllib trims it, so a URL ending in a line break is
+  still sent, as in 0.55.0, and the OpenRouter client sends a base URL ending in one without it. The Node twin reads
   several of these as `new URL` does, among them a tab or line break removed, a space or a character outside ASCII
   percent-encoded, a backslash as `/`, an extra slash before the host skipped and a `%` host decoded (refused when the
   decoded host is not allowed, as `h.example%3A8443`). Python's `check_url` checks the host's shape, not its name
   (FAA-187 (14)).
   `redact_url` on Python reads a host holding `%` as `<unparseable url>` too, where Node writes it decoded, and a
   `ws`, `wss` or `ftp` URL with no host or a port above 65535 as `<unparseable url>`, as Node does. The Python kit
-  reads a JWKS source's host and port as urllib dials them, https included: a space or ASCII control character in
-  the URL or a character outside ASCII in its path or query (a trailing space or line break is trimmed, as urllib
+  reads a JWKS source's host and port as urllib dials them, https included: a space or ASCII control character
+  before the URL's fragment or a character outside ASCII in its path or query (a trailing space or line break is trimmed, as urllib
   reads it; a leading one is refused as not a URL, as in 0.55.0 and in Node), a host holding `%`, a backslash or a
   Unicode space, a
   bracketed host that is no IPv6 address, a port above 65535, no host, or any `@` (an empty userinfo dialled
