@@ -1279,6 +1279,8 @@ class BashPaths(unittest.TestCase):
                          "Windows names are case-blind (0.56.0 unit r1)")
         # Git Bash reads an unquoted backslash as an escape: `cd C:\work` goes to `C:work`, which is not named.
         self.assertEqual(MCP.bash_paths(r"cd C:\work", Path(r"C:\w"), windows=True), [])
+        self.assertEqual(MCP.bash_paths(r"git -C C:\work st", r"D:\proj", windows=True), [],
+                         "a drive-relative C:work is not known here (0.56.0 unit r4)")
 
     def test_a_subshell_or_pipe_cd_does_not_move_the_base(self):
         """0.56.0 unit r1, r2: a cd in `( )`, in a pipeline's stage or in a list sent to the background moves only a
@@ -1315,6 +1317,13 @@ class BashPaths(unittest.TestCase):
             "X=1 cd /a; git -C s log": ["/a", "/a/s"],
             "cd /a && pushd /b && git -C sub status": ["/a", "/b", "/b/sub"],
             "cd /a && popd && git -C sub status": ["/a"],
+            # 0.56.0 unit r4: a here-string has no body; a comment never hides a here-document's line ends; git reads a
+            # relative -C against the -C before it and runs in the last
+            'jq . <<< "$x"\ncd /b && git -C r status': ["/b", "/b/r"],
+            "cat > s.sh <<'EOF'  # c\ncd /srv/other\nEOF\ncd /b": ["/b"],
+            "cat > f <<'EOF'\nx\n# c\nEOF\ncd /b": ["/b"],
+            "cat > f <<'EOF'\nx # c\nEOF\ncd /b": ["/b"],
+            "git -C /a -C b status": ["/a/b"],
         }
         for command, expected in cases.items():
             with self.subTest(command=command):

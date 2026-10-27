@@ -53,8 +53,8 @@ responder = fbd.Responder(
     handler=render, admit=gate, observe=look_on_disk, emit=log.append, service="example-agent")
 board = threading.Thread(target=responder.run, args=(stop_event, 5.0), daemon=True)  # SIGTERM: set stop_event
 board.start()
-# ... at stop, after stop_event is set: wait for it to leave its board session (a clean leave forgets its slot
-# records, FAA-155), bounded inside the kit's hard exit, as scripts/sample_service.py does
+# ... at stop, after stop_event is set: wait for it to leave its board session (a clean leave forgets the slot
+# records it confirmed, FAA-155), bounded inside the kit's hard exit, as scripts/sample_service.py does
 board.join(timeout)
 ```
 
@@ -146,7 +146,9 @@ in line and the next tick asks again, and a restart asks with the same old fence
 once it has resumed: when the `com.complete` that sends a known outcome loses its answer, the next tick sends the same
 key again in the same session (FAA-86). `shutdown()` drains, then leaves the session (its DELETE releases the slot).
 An idle responder waits 3 s at most for that DELETE (`IDLE_LEAVE_SECONDS`), so an idle stop ends within the org's 5 s
-(LC-01, FAA-173); one with work waits up to the session's 15 s client timeout. The slot records are forgotten only after
+(LC-01, FAA-173); one with work waits up to the session's 15 s client timeout. A board call already in flight when the
+stop comes (a poll against a slow hub) runs first; when the service's bounded join ends before the DELETE is sent, the
+slot lapses on the board's clock as before. The slot records are forgotten only after
 a DELETE Fabric answered with a 2xx (a 404, the session already gone, keeps them: a move made before it ended is read at the next `com.status`), also when a session is dropped on a live board (FAA-163): an unanswered one keeps
 them, and the slot lapses in 60 s.
 
@@ -157,8 +159,11 @@ capability's enroll or replace is settled on its own: a refusal of that capabili
 the slot was held); its accepted work waits `lapsed` and goes back
 by a transfer once the slot is held. The capabilities after it are recovered as before. A refusal of the board session
 (`unreachable`, `session-ended`, `not_available`, `not_authorized` and the other codes in `SESSION_CODES`) leaves the
-rest `retry` too, says no `board.slot.refused`, and goes to the responder's fault (`board.down`), which keeps the session while a held slot's lease runs (so a lost enroll of one
-capability is asked again at its next retry) and reconnects otherwise. A slot whose lease lapsed (`lease_expired`) holds
+rest `retry` too, says no `board.slot.refused`, and goes to the responder's fault, which says it by code:
+`board.access.needed` for `not_authorized`, `authority_changed` and `credential` (the session is left),
+`board.blocked` for a defect (`no-epoch`, `schema-unsupported`, `checkpoint`, `receipt-shape`,
+`idempotency_conflict`), and `board.down` for the rest, where it keeps the session while a held slot's lease runs (so a
+lost enroll of one capability is asked again at its next retry) and reconnects otherwise. A slot whose lease lapsed (`lease_expired`) holds
 no lease for that decision.
 
 ## When the operator holds work (DEC-0079)
@@ -195,8 +200,10 @@ held and not transferred). The responder keeps that move instead of undoing it:
   enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
   clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
   in the checkpoint and not moved is forgotten when this session confirmed its generation (held it, paused under the
-  operator's hold included, or read it unmoved in `com.status`); an unconfirmed record stays, since the slot may have
-  moved while the service was down (a moved slot's record stays too, so a clean stop never undoes a move): the slot is free, and whoever takes it next is no move. A file without the record
+  operator's hold included, or read it unmoved in `com.status`) and no fenced call has put in doubt since; an
+  unconfirmed record stays, since the slot may have moved while the service was down. A paused or retrying slot reads
+  `com.status` before each new ask. A move made after the last renew or check and before the stop, with no call since,
+  is not known at the leave: the next start reads the slot as free (a moved slot's record stays too, so a clean stop never undoes a move): the slot is free, and whoever takes it next is no move. A file without the record
   reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first
   start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
   wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).

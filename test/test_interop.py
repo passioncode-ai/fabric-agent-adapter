@@ -1074,6 +1074,17 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertIn("outside-mandate: action", job["statusMessage"])
         self.assertEqual(list(job["inputRequests"]), ["approve-reply"])
 
+    def test_a_spend_that_is_not_finite_is_kept_as_no_estimate(self):
+        """0.56.0 seam r4: the kept step holds the spend as the gate read it, so the job file stays JSON a Node JobStore
+        reads (json.dumps would write a bare NaN or Infinity)."""
+        for spend in (float("nan"), float("inf")):
+            with self.subTest(spend=spend):
+                self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
+                job_id, record = self.step(spend_usd=spend)
+                self.assertIsNone(record)
+                for path in Path(self.temp.name, "jobs").rglob("*.json"):
+                    json.loads(path.read_text(), parse_constant=lambda c: self.fail("%s in %s" % (c, path.name)))
+
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",
                                      expires_at="2026-10-24T09:20:00Z")

@@ -24,6 +24,7 @@ export class SlotKeeper {
     this.note(capability, { project: this.project, generation });
     this.confirmed[capability] = generation;
     delete this.said[`board.slot.refused:${capability}`]; // held again: a later refusal is said again
+    delete this.said[`board.slot.contested:${capability}`]; // and a later contest, by enroll or replace
   }
 
   /** The slot record, best effort: one that cannot be written now is written at the next receipt. */
@@ -125,6 +126,7 @@ export class SlotKeeper {
     }
     this.toResume = this.toResume.filter((r) => this.checkpoint.entries[r]?.capability !== capability);
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
+    delete this.confirmed[capability];
     if (!('moved' in held)) { // once, even across restarts
       this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work \`accepted\` and unanswered (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets it go, or at once at a restart or reconnect while it holds accepted work for the slot; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written

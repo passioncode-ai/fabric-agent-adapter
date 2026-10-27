@@ -522,7 +522,8 @@ class Responder(SlotKeeper):
     def _held(self) -> Dict[str, Any]:
         """The generations this session confirmed (held, or compared with com.status and found unmoved), paused and
         retrying slots included: only their records a clean leave may forget (0.56.0 seam r2, r3)."""
-        return dict(self._confirmed)
+        return {c: g for c, g in dict(self._confirmed).items()  # a fenced call (maybe moved) or a move withholds it
+                if c not in self._suspect and (self.slots.get(c) or {}).get("state") != "moved"}
 
     def _drop_session(self) -> None:
         work, self.current, self._to_resume = self.current, None, []  # the next session transfers them again
@@ -556,12 +557,12 @@ class Responder(SlotKeeper):
             if slot.get("state") == "moved":
                 continue  # never enrolled again on its own, even when the new holder's lease lapses (FAA-155)
             if slot.get("state") == "paused":
-                if capability != held_by_work and self.now() >= slot.get("retry_at", 0.0):
-                    self._enroll(capability)  # still held: a longer pause; lifted: the slot is ours again
+                if capability != held_by_work and self.now() >= slot.get("retry_at", 0.0) and not self._gone(capability):
+                    self._enroll(capability)  # still held: a longer pause; lifted: the slot is ours again (moved: read first)
                 continue
             if slot.get("state") == "retry":  # its enroll was refused: asked again alone (FAA-163)
                 if self.now() >= slot.get("retry_at", 0.0):
-                    self._settle(capability, lambda: self._enroll(capability))
+                    self._settle(capability, lambda: self._gone(capability) or self._enroll(capability))
                 continue
             if capability != held_by_work and self.now() - slot.get("renewed_at", 0) >= RENEW_SECONDS - 0.5:
                 self._enroll(capability)  # the holder's enroll renews its lease (no event); a lapsed one re-enrolls

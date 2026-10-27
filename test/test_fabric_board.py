@@ -2044,6 +2044,28 @@ class SampleWiringTests(unittest.TestCase):
             self.assertIn("operator-source/1", svc.well_known()["protocols"])
             svc.board.shutdown(0.1)
 
+    def test_the_take_back_tool_answers_a_checkpoint_fault_as_a_tool_error(self):
+        """0.56.0 seam r4: a take-back whose checkpoint write fails is a tool error, as the page's route answers 400, never
+        an exception through /mcp."""
+        sample = importlib.import_module("sample_service")
+
+        class NS:
+            def __init__(self, **kw):
+                self.__dict__.update(kw)
+
+        class Board:
+            capabilities = ["video.render"]
+            slots = {"video.render": {"state": "moved"}}
+            checkpoint = NS(slots={})
+
+            def take_back(self, capability):
+                raise fb.BoardError("checkpoint", "The board checkpoint could not be written; nothing was sent.")
+        svc = NS(board=Board(), board_project=PROJECT, log=NS(append=lambda *a, **k: None))
+        svc.board_moved = lambda: sample.Service.board_moved(svc)
+        svc.board_take_back = lambda c, r=None: sample.Service.board_take_back(svc, c, r)
+        with self.assertRaises(sample.fi.InteropError):
+            sample.Service.board_take_back_tool(svc, {"capability": "video.render"}, NS(record=None))
+
     def test_take_back_reads_the_record_while_fabric_is_down(self):
         """0.56.0 seam r3: after a restart, before the session reconnects, the checkpoint record alone knows the move;
         the relayed take-back forgets it, never answers 'not moved' while it stays."""
@@ -2179,6 +2201,47 @@ class LeaveKeepsUnconfirmedRecords(Conversation):
         r2.step()
         self.assertEqual(r2.slots["video.render"]["state"], "held")
         self.assertNotIn("board.slot.moved", self.kinds())
+
+    def test_a_suspect_slot_keeps_its_record_at_a_clean_stop(self):
+        """0.56.0 seam r4: a fenced accept puts the slot in doubt; a clean stop before the next tick keeps its record, so
+        the next start reads the move and never takes the slot back on its own."""
+        r = self.responder()
+        r.step()
+        self.board.advance(15)
+        self.board.queue("video.render")
+
+        def moving(request):
+            self.board.move("video.render")  # the operator moves the slot between the claim and the accept
+            return None
+        self.gate = moving
+        r.wait_until = 0
+        r.step()
+        self.gate = lambda request: None
+        self.assertIn("video.render", r._suspect)
+        r.shutdown(0.1)
+        self.assertIn("video.render", json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {}))
+        r2 = self.responder()
+        r2.step()
+        self.assertEqual(r2.slots["video.render"]["state"], "moved")
+
+    def test_a_move_during_a_hold_is_read_before_the_next_ask(self):
+        """0.56.0 seam r4: a paused slot reads com.status before each new ask, so a move made during the operator's hold
+        is said and its record survives a clean stop."""
+        r = self.responder()
+        r.step()
+        self.board.holds = {"slots": [{"project": PROJECT, "capability": "video.render"}]}
+        self.board.advance(31)
+        r.wait_until = 0
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "paused")
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.wait_until = 0
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertIn("board.slot.moved", self.kinds())
+        r.shutdown(0.1)
+        self.assertIn("moved", json.loads((self.data / "board-checkpoint.json").read_text())["slots"]["video.render"])
 
     def test_leave_forgets_a_record_at_or_below_the_confirmed_generation(self):
         """0.56.0 seam r3: a record whose write failed before the hold (lower than the confirmed generation) is forgotten

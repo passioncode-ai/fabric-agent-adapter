@@ -34,6 +34,7 @@ class SlotKeeper:
         self._note(capability, {"project": self.project, "generation": generation})
         self._confirmed[capability] = generation
         self._said.pop("board.slot.refused:" + capability, None)  # held again: a later refusal is said again
+        self._said.pop("board.slot.contested:" + capability, None)  # and a later contest, by enroll or replace
 
     def _note(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
         """The slot record, best effort: one that cannot be written now is written at the next receipt."""
@@ -118,6 +119,7 @@ class SlotKeeper:
                     self.checkpoint.put(entry)
             self._to_resume = [r for r in self._to_resume if (self.checkpoint.entries.get(r) or {}).get("capability") != capability]
             self.slots[capability] = {"state": "moved", "generation": now, "renewed_at": self.now()}
+            self._confirmed.pop(capability, None)
             if "moved" not in held:
                 self._note(capability, dict(held, moved=now))  # said again at the next start if it cannot be written
         if "moved" not in held:  # once, even across restarts

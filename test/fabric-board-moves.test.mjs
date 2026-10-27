@@ -32,12 +32,13 @@ async function fakeHub(t, capabilities) {
   const control = async (cmd) => (await fetch(`http://127.0.0.1:${info.port}/_control`, { method: 'POST', body: JSON.stringify(cmd) })).json();
   const clock = { t: 0 };
   const events = [];
+  const gate = { admit: () => null };
   const advance = async (s) => { clock.t += s; await control({ op: 'advance', seconds: s }); };
   const options = () => ({ hub: new fh.HubClient(root), projectId: info.project, capabilities, credentialFile: cred,
-    checkpointFile: path.join(data, 'board-checkpoint.json'), handler: async () => ({ state: 'completed' }), admit: () => null,
+    checkpointFile: path.join(data, 'board-checkpoint.json'), handler: async () => ({ state: 'completed' }), admit: (r) => gate.admit(r),
     observe: () => null, emit: (k) => events.push(k), service: 'example-agent', now: () => clock.t, rand: () => 0.5 });
   const responder = () => new fb.Responder(options());
-  return { data, control, clock, events, advance, responder, options };
+  return { data, control, clock, events, advance, responder, options, gate };
 }
 
 test('0.56.0 seam r2: a moved slot skipped by recovery is not enrolled by the retry tick', async (t) => {
@@ -120,4 +121,39 @@ test('0.56.0 seam r3: two contested capabilities are each said once', async (t) 
     await other.step(); await me.step();
   }
   assert.equal(h.events.filter((k) => k === 'board.slot.contested').length, 2);
+});
+
+test('0.56.0 seam r4: a suspect slot keeps its record at a clean stop', async (t) => {
+  const h = await fakeHub(t, ['video.render']);
+  const r = h.responder();
+  await r.step();
+  await h.advance(15);
+  await h.control({ op: 'queue', capability: 'video.render' });
+  h.gate.admit = async () => { await h.control({ op: 'move', capability: 'video.render' }); return null; };
+  r.waitUntil = 0;
+  await r.step();
+  h.gate.admit = () => null;
+  assert.ok(r.suspect.has('video.render'));
+  await r.shutdown(0.1);
+  assert.ok('video.render' in (JSON.parse(fs.readFileSync(path.join(h.data, 'board-checkpoint.json'), 'utf8')).slots ?? {}));
+  const r2 = h.responder();
+  await r2.step();
+  assert.equal(r2.slots['video.render'].state, 'moved');
+});
+
+test('0.56.0 seam r4: a move during a hold is read before the next ask', async (t) => {
+  const h = await fakeHub(t, ['video.render']);
+  const r = h.responder();
+  await r.step();
+  await h.control({ op: 'set', values: { holds: { slots: [{ project: r.project, capability: 'video.render' }] } } });
+  await h.advance(31);
+  r.waitUntil = 0;
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'paused');
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  r.waitUntil = 0;
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.ok(h.events.includes('board.slot.moved'));
 });

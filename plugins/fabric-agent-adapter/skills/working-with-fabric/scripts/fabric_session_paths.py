@@ -50,9 +50,10 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
     else:
         import posixpath as paths
     try:
-        # A `\` before a newline joins the lines, as in bash; a `;` after each newline keeps a `#` comment, which the
-        # lexer reads to the end of its line, newline included, from swallowing the next command.
-        command = command.replace("\\\n", "").replace("\n", "\n;")
+        # A `\` before a newline joins the lines, as in bash; a `;` and a second newline after each newline keep a `#`
+        # comment, which the lexer reads to the end of its line, newline included, from swallowing the next command or
+        # the line end a here-document counts.
+        command = command.replace("\\\n", "").replace("\n", "\n;\n")
         lexer = shlex.shlex(command, posix=True, punctuation_chars="();<>|&\n")
         lexer.whitespace = " \t\r"  # a newline ends a command, as `;` does
         lexer.whitespace_split = True
@@ -111,7 +112,10 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
                     end_pipeline()
                     at, ends_command = at + 2, True
                     continue
-                if pair == "<<" and token[at + 2:at + 3] != "<" and index + 1 < len(tokens):
+                if token.startswith("<<<", at):  # a here-string: its word is text, no body follows
+                    at += 3
+                    continue
+                if pair == "<<" and index + 1 < len(tokens):
                     delimiter = tokens[index + 1]  # <<EOF, <<'EOF', <<-EOF: shlex has taken the quotes off
                     if delimiter == "-" and index + 2 < len(tokens):
                         index, delimiter = index + 1, tokens[index + 2]
@@ -165,18 +169,22 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
                 found.append(folder)
             base = folder
         elif start and (paths.basename(token).lower() if windows else paths.basename(token)) in ("git", "git.exe"):
-            look = index + 1
+            look, at, moved = index + 1, base, False
             while look < len(tokens) and tokens[look].startswith("-") and not set(tokens[look]) <= separators:
                 if tokens[look] == "-C" and look + 1 < len(tokens) and not set(tokens[look + 1]) <= separators:
+                    # git reads each relative -C against the one before it and runs in the last
                     folder = absolute(tokens[look + 1])
-                    if folder is None and base is not None and not tokens[look + 1].startswith("/"):
-                        folder = paths.normpath(paths.join(base, tokens[look + 1]))
-                    if folder:
-                        found.append(folder)
+                    if folder is None and at is not None and not tokens[look + 1].startswith("/"):
+                        folder = paths.normpath(paths.join(at, tokens[look + 1]))
+                        if windows and not (paths.isabs(folder) and paths.splitdrive(folder)[0]):
+                            folder = None  # `C:work`, a drive-relative path: not known here
+                    at, moved = folder, True
                     look += 1
                 elif tokens[look] == "-c":
                     look += 1
                 look += 1
+            if moved and at:
+                found.append(at)
         start = False
         index += 1
     return found

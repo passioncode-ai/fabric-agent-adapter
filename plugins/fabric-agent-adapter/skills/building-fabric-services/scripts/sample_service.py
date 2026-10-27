@@ -166,7 +166,7 @@ class Service:
             return {"capability": capability, "moved": False}  # a repeat after a lost answer: the slot is already back
         try:
             return self.board_take_back(capability, ctx.record)
-        except fs.ServiceError as exc:
+        except (fs.ServiceError, fbd.BoardError) as exc:
             raise fi.InteropError(str(exc))
 
     def board_admit(self, request: fbd.BoardRequest) -> Optional[str]:

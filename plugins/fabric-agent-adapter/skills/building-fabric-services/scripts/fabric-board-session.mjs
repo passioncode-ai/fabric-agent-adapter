@@ -99,7 +99,8 @@ export class Responder extends SlotKeeper {
 
   /** The generations this session confirmed (held, or compared with com.status and found unmoved), paused and retrying slots included: only their records a clean leave may forget (0.56.0 seam r2, r3). */
   heldNow() {
-    return { ...this.confirmed };
+    // a fenced call (maybe moved) or a move withholds it
+    return Object.fromEntries(Object.entries(this.confirmed).filter(([c]) => !this.suspect.has(c) && this.slots[c]?.state !== 'moved'));
   }
 
   // -- events --
@@ -516,11 +517,11 @@ export class Responder extends SlotKeeper {
       if (slot.state === 'moved') continue; // never enrolled again on its own, even when the new holder's lease lapses (FAA-155)
       if (slot.state === 'paused') {
         // still held: a longer pause; lifted: the slot is ours again
-        if (capability !== heldByWork && this.now() >= (slot.retryAt ?? 0)) await this.enroll(capability);
+        if (capability !== heldByWork && this.now() >= (slot.retryAt ?? 0) && !(await this.gone(capability))) await this.enroll(capability); // a move is read first
         continue;
       }
       if (slot.state === 'retry') { // its enroll was refused: asked again alone (FAA-163)
-        if (this.now() >= (slot.retryAt ?? 0)) await this.settle(capability, () => this.enroll(capability));
+        if (this.now() >= (slot.retryAt ?? 0)) await this.settle(capability, async () => (await this.gone(capability)) || this.enroll(capability));
         continue;
       }
       if (capability !== heldByWork && this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.enroll(capability);
