@@ -238,9 +238,9 @@ already approved.
   `{kind: "mandate/1", by: "operator", task, instruction, at, source?, expiresAt, scope, chain}`, `instruction` his
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you
   relayed, `expiresAt` at most seven days on, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
-  `perCallMaxUsd`, `projects`), `chain` starting with you. A task whose work runs as a job and asks the operator at a
-  step names the job's capability in `capabilities` without `actions`: a step is read under the job's capability with
-  its request key as the action, a key the service chooses and you cannot know in advance (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
+  `perCallMaxUsd`, `projects`), `chain` starting with you. A job that asks the operator at a step names the job's capability in
+  `capabilities` without `actions`: the step is read with its request key as the action, a key you cannot know ahead
+  (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
   narrower `scope` when you hand on less, never wider; at most four agents; `source` never changes down the chain. It
   travels in the call's `_meta.mandate` or as `call.mandate` of Fabric's `agent.call` once Fabric's hub forwards it
   (CT-125), never in a tool's arguments; the service kits state and hand it on (`operator_mandate(source=)`,
