@@ -10,7 +10,7 @@
   `host`, `owner` and `name` that require nothing else (it then leaves a mark in the hooks' folder, and removes it when
   the schema stops saying so; after a Fabric downgrade, the turns that end before a worker next runs, about a minute, are still read; none of their
   names is sent). With the mark, the
-  hook reads the last 512 KB of the session's transcript (earlier turns and message text included) and uses only the
+  hook reads the last 512 KB of the session's transcript (earlier turns, message text and tool output included; a secret the session displayed can be there, read in memory only) and uses only the
   current turn's tool names and path arguments: Edit, Write, MultiEdit and NotebookEdit paths, and `cd
   <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
   or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
@@ -53,7 +53,7 @@
 ### Changed
 
 - **Step 4 reads Fabric's `spawned_from`** (FAA-156, Fabric 0.3.14): working-with-fabric links a piece filed with
-  `fabric_task_create` itself only when the answer says `spawned_from: null` (once; a refused link is told to the person
+  `fabric_task_create` itself only when the answer says `spawned_from: null` without `proposed: true` (once; a refused link is told to the person
   with `spawned_from_why`), or carries no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
   the claimed task. A piece whose `spawned_from` names the claimed task is already linked; one naming another task is
   not linked again, and the person is told which parent Fabric chose (FAA-153). `proposed: true` now says what
