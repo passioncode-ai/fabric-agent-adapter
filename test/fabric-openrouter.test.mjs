@@ -160,6 +160,14 @@ test('config refusals and totals', () => {
   assert.deepEqual(fo.totals([{ costUsd: 2, route: 'subscription' }, { costUsd: null }]), { calls: 2, spentUsd: null, unpricedCalls: 1 });
 });
 
+test('a base URL ending in a line break or a space is composed without it', () => {
+  // 0.56.0 product r20: checkUrl reads the base with its ends trimmed, so the base composed must be that one.
+  for (const baseUrl of ['https://openrouter.ai/api/v1\n', 'https://openrouter.ai/api/v1/ ', 'https://openrouter.ai/api/v1/\r\n']) {
+    const c = new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
+    assert.equal(c.baseUrl, 'https://openrouter.ai/api/v1', JSON.stringify(baseUrl));
+  }
+});
+
 test('unencodable requests and answers over the cap', async () => {
   const seen = [];
   const { cl } = client({ steps: [] }, seen, new Ledger());

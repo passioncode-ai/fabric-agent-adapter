@@ -185,7 +185,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"no")
         else:
-            body = json.dumps({"auth": self.headers.get("Authorization")}).encode()
+            body = json.dumps({"auth": self.headers.get("Authorization"), "path": self.path}).encode()
             self.send_response(200)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -208,9 +208,17 @@ class DefaultTransport(unittest.TestCase):
         # 0.56.0 product r17, unit r17: urllib trims the ends of what it sends; the request reaches /ok.
         self.assertEqual(fh.request("GET", self.base + "/ok\n", deadline_s=10).status, 200)
 
+    def test_a_url_is_sent_up_to_its_first_fragment_mark(self):
+        # 0.56.0 seam r19: urllib alone sends everything before the LAST `#`, so a space or line break between two of
+        # them passed check_url and failed on the wire, and `/ok#a#b` asked for `/ok#a`. Both kits send `/ok`.
+        for url in ("/ok#a#b", "/ok#a b#c", "/ok#\n#c", "/ok#caf\u00e9#c", "/ok#?admin=1#c"):
+            with self.subTest(url=url):
+                answer = fh.request("GET", self.base + url, deadline_s=10, retries=0)
+                self.assertEqual((answer.status, answer.json()["path"]), (200, "/ok"))
+
     def test_answers_redirects_and_caps(self):
         ok = fh.request("GET", self.base + "/ok", headers={"Authorization": "Bearer t"}, deadline_s=10)
-        self.assertEqual(ok.json(), {"auth": "Bearer t"})
+        self.assertEqual(ok.json(), {"auth": "Bearer t", "path": "/ok"})
         self.assertEqual(fh.request("GET", self.base + "/missing", deadline_s=10).status, 404)
         moved = fh.request("GET", self.base + "/redirect", deadline_s=10, retries=0)
         self.assertEqual(moved.status, 302, "a redirect is answered, never followed")

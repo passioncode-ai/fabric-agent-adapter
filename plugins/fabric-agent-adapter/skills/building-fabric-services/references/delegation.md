@@ -124,9 +124,10 @@ page as Fabric Dashboards' `open_link`; both kits carry the same sentence. The g
 `JwksCache` holds the estate's key set at most 10 minutes and, on a `kid` it does not hold, re-reads at most once
 a minute (DL-15), and waits 10 s after a failed read before trying again; after 10 minutes without a successful read it answers nothing, and the verifier says
 `issuer-unavailable`. It reads https, http on loopback only, or a file; a URL with credentials is refused. The
-Python kit also refuses, https included, a URL holding a space or ASCII control character before its fragment, or a
-character outside ASCII in its path or query (urllib would send it and every read fail; a trailing space or line break is trimmed as
-urllib reads it, a leading one is refused as not a URL), a host holding `%`, a backslash or a Unicode space (urllib
+Python kit also refuses, https included, a URL holding a space or ASCII control character before its first `#` (it
+reads the URL up to there, as Node does), or a character outside ASCII in its path or query (urllib would send it
+and every read fail; a trailing ASCII space or line break is trimmed as urllib reads it, a trailing Unicode space is
+refused, a leading space is refused as not a URL), a host holding `%`, a backslash or a Unicode space (urllib
 would decode or dial it as another host), a bracketed host that is no IPv6 address, a port above
 65535, no host, and an empty userinfo. The Node kit accepts several of these as `new URL` reads them, among them a `%`
 host decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped and an extra slash before the

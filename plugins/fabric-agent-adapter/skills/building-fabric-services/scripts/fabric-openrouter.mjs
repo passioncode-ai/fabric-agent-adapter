@@ -104,7 +104,9 @@ export class Client {
     checkAttribution(projectId, undefined);
     Object.assign(this, { ceilingUsd, ledger, keyEnv, window, attribution, projectId, unmeasuredCallUsd, deadlineS, retries });
     this.prices = Object.fromEntries(Object.entries(prices ?? {}).map(([k, v]) => [k, { ...v }]));
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    // The base URL as checkUrl read it: `new URL` trims C0 controls and spaces from its ends, so `.../v1/ ` is not
+    // composed as `.../v1/%20/chat/completions` (0.56.0 product r20; the Python twin trims the ends urllib does).
+    this.baseUrl = baseUrl.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
     this.env = env;
     this.transport = transport;
     this.sleep = sleep ?? ((s) => new Promise((resolve) => setTimeout(resolve, s * 1000)));

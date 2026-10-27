@@ -304,7 +304,9 @@ class JwksCacheTests(unittest.TestCase):
                     # 0.56.0 product r16, unit r15: a tab or line break, which urlsplit drops and urllib sends.
                     "http://127.0.0.1\r/j", "http://loc\talhost:7777/j", "https://hub.exa\nmple/j",
                     "https://hub.example/a b", "https://hub.example/a\x00b", "https://hub.example/caf\u00e9",
-                    "https://hub.example\u3000/j"):
+                    "https://hub.example\u3000/j",
+                    # 0.56.0 product r20: a C1 control in the host, which Node refuses.
+                    "https://hub\x80.example/j", "https://hub\x9f.example/j"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
         with self.assertRaisesRegex(ValueError, "key set"):  # 3.14's urlsplit refuses it first, said as the key set's
@@ -638,6 +640,9 @@ class ReviewRegressionTests(unittest.TestCase):
         server = http.server.HTTPServer(("127.0.0.1", 0), Keys)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:  # 0.56.0 product r17, unit r17: urllib trims the ends of what it reads
+            for tail in ("#a b#c", "#\n#c", "#caf\u00e9#c"):  # seam r19: read up to the first `#`, as Node reads it
+                self.assertEqual(dl.JwksCache("http://127.0.0.1:%d/jwks%s" % (server.server_address[1], tail)).get(),
+                                 VECTORS["jwks"], tail)
             self.assertEqual(dl.JwksCache("http://127.0.0.1:%d/jwks\n" % server.server_address[1]).get(), VECTORS["jwks"])
         finally:
             server.shutdown()

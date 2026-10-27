@@ -638,12 +638,12 @@ _URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
 
 def _source_authority_ok(parts: urllib.parse.SplitResult) -> bool:
     """A key set URL's host and port as urllib will dial them and `new URL` accepts them (fabric_http._authority_ok's
-    rule, which this module may not import): no `%` (urllib decodes it), backslash, space or control character; a
+    rule, which this module may not import): no `%` (urllib decodes it), backslash, space or C0, DEL or C1 control; a
     bracketed host that is an IPv6 address; any other host without `:`, `[` or `]`; a port of ASCII digits up to
     65535; a host at all. So `http://[::1]%2Eevil.example/` and `https://[1.2.3.4]/` (both read by Python 3.9's
     urlsplit) are refused (0.56.0 unit r13, r14)."""
     netloc = parts.netloc
-    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" or c.isspace() for c in netloc):
+    if any(c in "\\%" or ord(c) <= 0x20 or 0x7f <= ord(c) <= 0x9f or c.isspace() for c in netloc):
         return False
     if netloc.startswith("["):
         close = netloc.find("]")
@@ -705,7 +705,8 @@ def _opener(deadline: Dict[str, Any]) -> urllib.request.OpenerDirector:
 
 def _fetch(source: str) -> Any:
     if source.startswith(("https://", "http://")):
-        request = urllib.request.Request(source, headers={"Accept": "application/json"})
+        # Cut at the first `#`, as `new URL` and the check at construction read it (urllib cuts at the last one).
+        request = urllib.request.Request(source.partition("#")[0], headers={"Accept": "application/json"})
         deadline: Dict[str, Any] = {"end": time.monotonic() + JWKS_FETCH_SECONDS, "fired": False, "timer": None}
         try:
             with _opener(deadline).open(request, timeout=JWKS_FETCH_SECONDS) as response:  # https or loopback http only

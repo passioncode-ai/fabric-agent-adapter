@@ -138,6 +138,14 @@
    "<unparseable url>"
   ],
   [
+   "https://h\u0080.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://h\u009f.example/x",
+   "<unparseable url>"
+  ],
+  [
    "http://b][SEC0\\@h.example/x",
    "<unparseable url>"
   ],
@@ -185,6 +193,16 @@
  "checkUrl": [
   [
    "https://h.example%3A8443/x",
+   false,
+   true
+  ],
+  [
+   "https://h\u0080.example/x",
+   false,
+   true
+  ],
+  [
+   "https://h\u009f.example/x",
    false,
    true
   ],

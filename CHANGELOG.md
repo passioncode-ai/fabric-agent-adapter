@@ -60,12 +60,17 @@ gate behave.
   digits such as `1_2` or `+1`, which Python 3.9's `int()` takes, a bracketed host that is no IPv6 address) read as
   `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose rule differs between 3.9 patch
   releases. `check_url` refuses the same ports and bracketed hosts (an IPv6 zone included). On Python it also refuses
-  a backslash, `%`, space or control character in the host (a Unicode space included), which urllib would decode or
+  a backslash, `%`, space or control character in the host (a Unicode space and a C1 control included), which urllib would decode or
   dial as another host (`h.example%3A8443` reached port 8443), and a space or ASCII control character before the
   URL's fragment (which is never sent) or a character outside ASCII in its path or query, which urllib sends and
   http.client refuses: such a URL is now refused before it is sent (kind `refused`), where 0.55.0 retried it and
-  answered kind `connection`. Whitespace at the ends is trimmed as urllib trims it, so a URL ending in a line break is
-  still sent, as in 0.55.0, and the OpenRouter client sends a base URL ending in one without it. The Node twin reads
+  answered kind `connection`. A URL is now sent up to its first `#`, as the Node twin sends it (urllib alone kept
+  everything before the last one, so `/x#a#b` asked for `/x#a`). ASCII whitespace at the ends, which urllib and
+  `new URL` both trim, is trimmed, so a URL ending in a line break is still sent, as in 0.55.0 (on Python 3.9 a URL
+  with a leading space too, which 0.55.0 refused there), and both OpenRouter clients send a base URL ending in one,
+  or in a space, without it. A URL ending in a Unicode space (a no-break or ideographic space), which 0.55.0 sent
+  with it trimmed, is now refused, as an OpenRouter base URL ending in one is (0.55.0 failed every call with it).
+  The Node twin reads
   several of these as `new URL` does, among them a tab or line break removed, a space or a character outside ASCII
   percent-encoded, a backslash as `/`, an extra slash before the host skipped and a `%` host decoded (refused when the
   decoded host is not allowed, as `h.example%3A8443`). Python's `check_url` checks the host's shape, not its name
@@ -73,8 +78,8 @@ gate behave.
   `redact_url` on Python reads a host holding `%` as `<unparseable url>` too, where Node writes it decoded, and a
   `ws`, `wss` or `ftp` URL with no host or a port above 65535 as `<unparseable url>`, as Node does. The Python kit
   reads a JWKS source's host and port as urllib dials them, https included: a space or ASCII control character
-  before the URL's fragment or a character outside ASCII in its path or query (a trailing space or line break is trimmed, as urllib
-  reads it; a leading one is refused as not a URL, as in 0.55.0 and in Node), a host holding `%`, a backslash or a
+  before the URL's first `#` (it is read up to there, as in Node) or a character outside ASCII in its path or query
+  (a trailing ASCII space or line break is trimmed, as urllib reads it; a trailing Unicode space is refused; a leading one is refused as not a URL, as in 0.55.0 and in Node), a host holding `%`, a backslash or a
   Unicode space, a
   bracketed host that is no IPv6 address, a port above 65535, no host, or any `@` (an empty userinfo dialled
   `@127.0.0.1`) is refused. The Node kit accepts several of these as `new URL` reads them, among them a `%` host
@@ -126,6 +131,11 @@ gate behave.
   Fabric takes `repositories`, as it does on macOS and Linux; `FABRIC_SESSION_NO_REPOSITORIES=1` (in Claude Code's
   settings `env`, which reached hooks declared in settings and in a plugin's `hooks.json` in runs on macOS; Windows is
   FAA-183's run) turns it off.
+- A Python `JwksCache` whose source 0.55.0 accepted but could never read (a character outside ASCII in its path or
+  query, a Unicode space or a control character in its host) is now refused when it is built, so a service that
+  builds it at start stops there instead of answering every delegated call `issuer-unavailable`.
+- `check_url`, `request` and the OpenRouter client refuse a URL ending in a Unicode space (a no-break or ideographic
+  space), which 0.55.0 sent with it trimmed: trim it where the URL is configured.
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
   happens only then. A service that stops without the join still works; its

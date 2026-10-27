@@ -172,7 +172,7 @@ class Client:
         self.key_env = key_env
         self.window = window
         # The base URL as check_url read it and urllib would send it: its ends trimmed, so `.../v1\n` is not sent
-        # as `.../v1\n/chat/completions` (0.56.0 seam r18; the Node twin's `new URL` trims it too).
+        # as `.../v1\n/chat/completions` (0.56.0 seam r18; the Node twin trims the ends `new URL` does, product r20).
         self.base_url = base_url.strip(fabric_http._URL_ENDS).rstrip("/")
         self.attribution = attribution
         self.project_id = project_id

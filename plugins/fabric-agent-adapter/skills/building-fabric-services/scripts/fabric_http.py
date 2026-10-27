@@ -113,7 +113,8 @@ def json_bytes(value: Any) -> bytes:
     return json_stringify(value).encode("utf-8")
 
 
-# What both urllib (str.strip when it builds a Request) and a WHATWG parser remove from a URL's ends.
+# What both urllib (str.strip when it builds a Request) and a WHATWG parser remove from a URL's ends. urllib also
+# strips a Unicode space there, which `new URL` keeps (and percent-encodes): such a URL is refused (0.56.0 seam r19).
 _URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
 
 
@@ -121,18 +122,19 @@ def _sendable(url: str, parts: urllib.parse.SplitResult) -> bool:
     """Whether urllib can send the URL as checked: no space or ASCII control character before its fragment (urlsplit
     drops a tab or line break that urllib then sends), and nothing outside ASCII in the path or query, which
     http.client cannot write in a request line (a host outside ASCII is sent in IDNA)."""
-    # The fragment is never sent (urllib drops it), so only what precedes it is read (0.56.0 seam r18).
+    # The fragment is never sent: urllib_transport cuts the URL at its first `#`, as `new URL` does (urllib alone
+    # would cut at the last one), so only what precedes it is read (0.56.0 seam r18, r19).
     return not re.search(r"[\x00-\x20\x7f]", url.partition("#")[0]) and (parts.path + parts.query).isascii()
 
 
 def _authority_ok(netloc: str) -> bool:
     """The host and port of an authority as a WHATWG URL accepts them, where urlsplit is laxer: a port of ASCII digits
     only (Python 3.9's int() also takes `1_2`, `+1`, ` 12` and other scripts' digits), a bracketed host that is an IPv6
-    address with no zone, and no backslash, space, control character or `%` (0.56.0 unit r11, seam r12, seam r13:
+    address with no zone, and no backslash, space, control character (C0, DEL or C1) or `%` (0.56.0 unit r11, seam r12, seam r13, product r20:
     urllib percent-decodes the host before it connects, so `h.example%3A8443` would reach port 8443 and `[::1%3A80]`
     another address than the one checked; Node refuses a zone and every forbidden code point it decodes)."""
     hostport = netloc.rpartition("@")[2]
-    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" or c.isspace() for c in hostport):
+    if any(c in "\\%" or ord(c) <= 0x20 or 0x7f <= ord(c) <= 0x9f or c.isspace() for c in hostport):
         return False
     if hostport.startswith("["):
         close = hostport.find("]")
@@ -347,7 +349,9 @@ def _opener(watchdog: _Watchdog) -> urllib.request.OpenerDirector:
 def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optional[bytes], timeout_s: float,
                      max_bytes: int) -> Tuple[int, Dict[str, str], bytes]:
     """The default transport: urllib, no redirects followed, the body read to one byte past `max_bytes`."""
-    req = urllib.request.Request(url, data=body, method=method, headers=headers)
+    # Cut at the first `#`, as `new URL` and check_url read the URL: urllib keeps everything before the LAST one in
+    # the request line, so `/x#a#b` went out as `/x#a` (0.56.0 seam r19).
+    req = urllib.request.Request(url.partition("#")[0], data=body, method=method, headers=headers)
     end = time.monotonic() + timeout_s  # one deadline from the first byte sent, headers and body included
     watchdog = _Watchdog(end)
     try:
