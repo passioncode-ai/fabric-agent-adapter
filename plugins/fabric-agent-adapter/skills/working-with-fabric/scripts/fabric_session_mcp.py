@@ -122,7 +122,7 @@ TRANSCRIPT_TAIL_BYTES = 512 * 1024
 
 #: FAA-140 (seam reading 1): the Bash command text one turn may split, in characters; a long unterminated quote costs
 #: shlex its whole length, so this caps the Stop hook's time on it.
-BASH_BYTES = 65536
+BASH_BYTES = 65536  # characters of Bash command text a turn, despite the name (kept: the facade exports it)
 
 
 #: FAA-140 (REQ-1): at most this many other repositories are named for one turn.
@@ -888,13 +888,19 @@ def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], sessi
         _write_private(directory / name, json.dumps(merged))
         note("session=%s event=turn nudges=%d dropped=%d" % (session_id[:8], len(offered), dropped))
     except OSError as exc:
+        saved: List[str] = []
         try:
             if kept:
                 _write_private(directory / name, json.dumps(kept))
+                saved = kept
         except OSError:
-            kept = []
+            pass
+        # Lost: every distinct line, pending or this turn's (capped ones included, FAA-143), that is not back in the file.
+        back = set(saved)
+        lost = len([line for line in nudge_lines([{"says": line} for line in kept + offered], limit=None)
+                    if line not in back])
         note("session=%s event=turn nudges=%d outcome=lost lost=%d reason=%r"
-             % (session_id[:8], len(offered), len(merged) - len(kept), type(exc).__name__))
+             % (session_id[:8], len(offered), lost, type(exc).__name__))
 
 
 def _drop_stale_ends(entries: List[Path], note: Callable[[str], None], session_id: str) -> List[Path]:

@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.56.0 (2026-10-27)
+
+Stability and Windows: the debts of 0.53.0 to 0.55.0 that touch how the hooks, the board responder and the interop
+gate behave.
+
+### Fixed
+
+- **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
+  Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and `C:\...` paths, and `git.exe -C`; Bash text is split there
+  without backslash escapes. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
+  transcript on Windows at all, and a turn from Windows came without `repositories`.
+- **A relative `git -C` after `cd`** (FAA-166) is read against the folder the command last changed into with an
+  absolute `cd`; after a relative or unknown `cd` it is dropped, never read against the session's folder.
+- **The board responder's recovery** (FAA-163, FAA-158). A refused enroll of one capability no longer stops the
+  others: it is retried on its own, the pause doubling, and said once as `board.slot.refused`. A slot's move is written
+  under the responder's lock and only while its record is unchanged, so an operator's take-back at the same moment
+  wins. The slot code moved to its own twin modules, `fabric_board_slots.py` and `fabric-board-slots.mjs`.
+- **An idle stop leaves the board within 3 s** (FAA-173): a responder with no work in hand closes its session with a
+  confirmed `DELETE` (2xx or 404) inside the hard exit, instead of letting the slot lapse.
+- **`action_gate` fails closed** (FAA-139): a spend that is not a finite number and a project that cannot be read are
+  read as uncovered, never as absent. A `null` mandate in `_meta` reads as an unreadable one, not as none (FAA-178).
+- **`fabric_secrets` matches the contract's ECMAScript reading** (FAA-136): `\s`, `.` and case folding as JavaScript
+  reads them, so both ports flag the same values.
+- **A too-deep protocol value** is refused by name (FAA-122), in both twins.
+- **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
+  capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer
+  under `fabric.job.get`.
+- **Nudges** (FAA-143): `lost=` counts every reminder that did not make it back to the file (this turn's capped lines,
+  and the pending ones when the write-back fails too); an answer's nudges are read up to 1,000 items, in linear time.
+
+### Added
+
+- `FABRIC_SESSION_NO_REPOSITORIES=1` turns the transcript read off (FAA-160); `fabric_session.py status` says
+  whether it is on, off or waiting for Fabric. The repositories of a turn are a lower bound (FAA-174): a turn longer
+  than the transcript's last 512 KB names only what that tail shows.
+- The reference service's dashboard shows a moved slot with a Take back button (`POST /api/board/take-back`, operator
+  only; FAA-157).
+- working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
+  by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
+
+### Changed
+
+- The `board.slot.moved` notice says the accepted work stays `accepted` and unanswered (not "held", the operator's
+  word) and that a restart or reconnect with accepted work for the slot takes it back at once (FAA-164, FAA-171);
+  project-board.md says the same to a requester. board.md says a take-back without the operator's relayed decision is
+  refused. session-hooks.md gives the Bash cap as 64 K characters and the downgrade window as until a worker next
+  reaches the running Fabric.
+
+### Upgrading
+
+- A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
+  (board.md, "Run it"): the idle leave above happens only then. A service that stops without the join still works; its
+  slot lapses on the board's clock as before.
+
 ## 0.55.0 (2026-10-27)
 
 ### Added
@@ -86,7 +140,7 @@ command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix
   names is sent). With the mark, the
   hook reads the last 512 KB of the session's transcript (earlier turns, message text and tool output included; a secret the session displayed can be there, read in memory only) and uses only the
   current turn's tool names and path arguments: Edit, Write, MultiEdit and NotebookEdit paths, and `cd
-  <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
+  <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 K characters of them a turn. A `cd`
   or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
   read. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside the existing
   1.5 s facts budget, and named `{host, owner, name}` from its `origin` (a credential embedded in the URL is read with it by `git config`; it, the port

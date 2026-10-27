@@ -10,7 +10,9 @@ launched already does: find Fabric, have it started by the machine's lifecycle b
 `fabric-mcp` once with no secret, call `fabric_whoami` first, coordinate before it starts (`fabric_work_list`,
 `fabric_work_claim`), report while it works, link tasks to backlog rows instead of copying them, and release at the
 end. In Claude Code, a hook pack injects the preamble at session start, records each turn as facts with no content,
-and releases what the session left claimed at its end — without ever blocking or slowing the session.
+and releases what the session left claimed at its end — without ever blocking or slowing the session. Amended
+2026-10-27 (0.53.0): once the running Fabric takes them, the Stop hook also reads the tail of the session's transcript
+to name the other repositories a turn touched (principles 4 and 5 below say what it reads and what it sends).
 
 ## Source ledger
 

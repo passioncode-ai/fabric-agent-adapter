@@ -513,21 +513,25 @@ class CallContext:
         the mandate carries one) and asks nothing; the job goes on as the operator's decision. Otherwise the job waits
         input_required on `request`, its message naming the part not covered (or `message`), and answers None; the step
         is kept so an answer's `_meta.mandate` that covers it is read when input_actions is on. Any fault job_step answers
-        (mandate-capability-missing, MJ-1, or the server clock's now-unreadable) goes to on_fault under the job's tool."""
+        (mandate-capability-missing, MJ-1, or the server clock's now-unreadable) goes to on_fault under the job's
+        capability. The step is read under that capability, the name the job was created under (FAA-179), which is the
+        tool's own unless the handler created the job under another name with `server.jobs.create`."""
         if self.server.jobs is None:
             raise InteropError("This server has no job store.")
         step: Dict[str, Any] = {"message": None}
+        stored = self.server.jobs.private(job_id).get("capability")
+        capability = stored if isinstance(stored, str) else self.tool
         if self.server.agent_id is not None:
             caller = (self.delegation or {}).get("caller")
             carried = self.meta.get("mandate")
             if carried is None and "mandate" in self.meta:
                 carried = {}  # a null mandate is present and unreadable, as the answer reads it; never "none" (FAA-178)
             step = job_step(carried, tier=self.tier, now=format_rfc3339(self.server._clock() * 1000),
-                            self_id=self.server.agent_id, capability=self.tool, key=key, effect=effect, caller_agent=caller,
+                            self_id=self.server.agent_id, capability=capability, key=key, effect=effect, caller_agent=caller,
                             spend_usd=spend_usd, project=project)
             if step["covered"]:
                 return step["record"]
-            self.server._fault(self.tool, step)  # the start hears it as the answer does (MJ-1)
+            self.server._fault(capability, step)  # the start hears it as the answer does, under the same name (MJ-1)
         kept = {"effect": effect, **({"spendUsd": spend_usd} if spend_usd is not None else {}),
                 **({"project": project} if project is not None else {})}
         self.server.jobs.request_input(job_id, {key: request}, step["message"] or message, steps={key: kept})
@@ -920,7 +924,8 @@ class McpToolServer:
                 if not inputs["ok"] and "invalid" in inputs:
                     return self._error(rid, -32602, inputs["invalid"])
                 if not inputs["ok"]:
-                    self._fault(name, inputs)
+                    stored = self.jobs.private(str(arguments.get("id", ""))).get("capability")
+                    self._fault(stored if isinstance(stored, str) else name, inputs)  # as the start heard it (FAA-179)
                     import fabric_delegation as _fd  # noqa: E402 - DL-19
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(inputs["refusal"], traceparent=span)}
             context = {"tier": tier, "caller": caller, "meta": meta, "input_records": inputs["records"] if inputs else None}

@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.55.0"
+  version: "0.56.0"
 ---
 
 # Working with Fabric
@@ -140,10 +140,10 @@ Fabric 0.4.0 (REQ-38):
    read, the answer says so: never tell the person "nobody is working here".
 2. `fabric_work_claim` with your task (a board id, a backlog row as `source: {repository, path, id}`, or a new
    row's title with its evidence) and what you will touch (folders, files or patterns). Claim the person's request
-   as ONE task whose title is that request in one line, with `origin: {kind: "person", ref: <where they said it: the session or thread>}`:
-   from Fabric 0.3.14, which shows agents' goals, it is shown as yours. File each piece you split off with
+   as ONE task whose title is that request in one line, with `origin: {kind: "person", ref: <where they said it: the session or thread>}`
+   (Fabric 0.3.14 shows it as your goal). File each piece you split off with
    `fabric_task_create` while that task is claimed, and read the answer's `spawned_from` (Fabric 0.3.14 links the piece
-   from your single live claim). `created: false` with a `code` filed nothing (`source-unresolved` names the `part` of
+   from your single live claim). An error may have filed it anyway: find it by title in `fabric_work_list` before filing again. `created: false` with a `code` filed nothing (`source-unresolved` names the `part` of
    `source` that failed): correct the source or file without it, and never link. Then `proposed: true`, even with `spawned_from: null`: nothing was filed, so do not
    file or link that piece; tell the person it waits for the operator and go on with the rest. Otherwise, your claimed task's id there: it is linked, link nothing. Another task's id: link
    nothing either (Fabric chose that parent, FAA-153) and tell the person which. `spawned_from: null` comes
@@ -346,7 +346,7 @@ In Claude Code this plugin ships four: at session start and `/clear` (not on com
 in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
-touched (read from the tail of the session transcript, at most 512 KB with its message text and tool output, which can hold a secret the session displayed and stays in memory, of which only tool names and path arguments are used; host/owner/name are sent; `FABRIC_SESSION_NO_REPOSITORIES=1` turns it off); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
+touched (read in memory from the transcript's last 512 KB, which can hold a secret the session displayed; only tool names and path arguments are used, only host/owner/name sent; `FABRIC_SESSION_NO_REPOSITORIES=1` turns it off); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (or tagged `Fabric reminder: `; a turn
 `watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running

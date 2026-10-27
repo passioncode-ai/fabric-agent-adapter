@@ -1167,7 +1167,27 @@ class JobApprovalStepTests(unittest.TestCase):
             self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
             self.assertEqual(refused["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")
             self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
-            self.assertEqual(self.faults, [("fabric.job.get", "mandate-capability-missing")], "and the answer")
+            self.assertEqual(self.faults, [("reviewsApprove", "mandate-capability-missing")], "and the answer, by the same name")
+
+    def test_a_job_created_under_another_name_is_read_under_it_at_the_start_and_the_answer(self):
+        # FAA-179 (5): approval_step read self.tool while the answer read the job's stored capability.
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
+        self.contexts, self.inputs, self.faults = [], [], []
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, clock=lambda: NOW_SECONDS, agent_id="example-agent",
+                                  input_actions=True, on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
+                                  on_fault=lambda tool, fault: self.faults.append((tool, fault)))
+
+        def handler(args, ctx):
+            handle = ctx.server.jobs.create("reviews.approve", args, ctx.traceparent, None, ctx.delegation)
+            ctx.server.job_started(handle["job"]["id"], ctx)
+            return handle
+        server.add_tool({"name": "reviewsApprove", "inputSchema": OBJECT}, handler)
+        self.start_camel(server, {"mandate": relayed_mandate()})
+        job_id, record = self.step()
+        self.assertEqual((record or {}).get("via"), "mandate", "the start reads the step under reviews.approve")
+        self.assertEqual(self.faults, [])
 
     def test_the_start_hands_any_job_step_fault_to_on_fault(self):
         # 0.54.0 readings 4 (unit, seam): approval_step reports every job_step fault, not only MJ-1's.

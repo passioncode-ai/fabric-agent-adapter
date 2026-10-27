@@ -453,6 +453,15 @@
       ]
     },
     {
+      "id": "a-failed-create-may-have-filed",
+      "request": "You split a piece off your claimed task and called fabric_task_create for it. The call came back with an error (the transport dropped before the answer). What do you do before filing the piece again?",
+      "expected": [
+        "looks for the piece on the board by its title (fabric_work_list) before filing it again, since Fabric records the task first and an error after that leaves it filed (FAA-168)",
+        "files it again only when the board shows no such task, and links it then as Step 4 says",
+        "does not file the same piece twice"
+      ]
+    },
+    {
       "id": "what-the-stop-hook-reads",
       "trap": "the agent tells the person the hooks never read the transcript (outside Windows), or that only tool names are read, or that file paths leave the machine",
       "request": "The person asks: \"Does the Fabric plugin read my Claude Code transcript, and what does it send about other repositories I worked in?\"",

@@ -241,8 +241,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   the session and serves them. The kit gives it no route of its own. The reference service (`sample_service.py`) offers
   it on its dashboard (FAA-157): a moved slot shows a Take back button that posts `POST /api/board/take-back` from the
   operator's signed-in session with the `X-Fabric-Request` header; the service token alone is refused. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
-  tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so no other
-  agent can call it on its own; on a server that reads mandates (`agent_id`) it also names its effect class, for example
+  tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
+  without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
   `change-policy` (DEC-0125); until Fabric's hub forwards decisions (CT-125) the operator reaches it through the
   service's page or its elicitation, and names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
   detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
