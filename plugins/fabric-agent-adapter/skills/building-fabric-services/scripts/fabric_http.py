@@ -117,6 +117,13 @@ def json_bytes(value: Any) -> bytes:
 _URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
 
 
+def _sendable(url: str, parts: urllib.parse.SplitResult) -> bool:
+    """Whether urllib can send the URL as checked: no space or ASCII control character anywhere (urlsplit drops a tab
+    or line break that urllib then sends), and nothing outside ASCII in the path or query, which http.client cannot
+    write in a request line (a host outside ASCII is sent in IDNA)."""
+    return not re.search(r"[\x00-\x20\x7f]", url) and (parts.path + parts.query).isascii()
+
+
 def _authority_ok(netloc: str) -> bool:
     """The host and port of an authority as a WHATWG URL accepts them, where urlsplit is laxer: a port of ASCII digits
     only (Python 3.9's int() also takes `1_2`, `+1`, ` 12` and other scripts' digits), a bracketed host that is an IPv6
@@ -124,7 +131,7 @@ def _authority_ok(netloc: str) -> bool:
     urllib percent-decodes the host before it connects, so `h.example%3A8443` would reach port 8443 and `[::1%3A80]`
     another address than the one checked; Node refuses a zone and every forbidden code point it decodes)."""
     hostport = netloc.rpartition("@")[2]
-    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" for c in hostport):
+    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" or c.isspace() for c in hostport):
         return False
     if hostport.startswith("["):
         close = hostport.find("]")
@@ -209,13 +216,11 @@ def check_url(url: str, *, insecure: bool = False) -> None:
     """Refuse what this client never sends: a scheme other than http or https, no host, credentials in the URL, or
     plain http to a host that is not loopback (unless `insecure`)."""
     try:
-        # The ends are trimmed as urllib trims what it sends (and `new URL` too); inside, a space, tab, line break or
-        # other control character is refused: urlsplit drops some, urllib sends them and http.client refuses the
-        # request, so every call would fail, where the Node twin removes or percent-encodes them (0.56.0 product r16,
-        # r17, unit r16). A URL ending in a line break, which 0.55.0 sent, still passes.
+        # The ends are trimmed as urllib trims what it sends (and `new URL` too); a URL ending in a line break, which
+        # 0.55.0 sent, still passes (0.56.0 product r17).
+        if not isinstance(url, str):
+            raise TypeError("not a string")
         sent = url.strip(_URL_ENDS)
-        if re.search(r"[\x00-\x20\x7f]", sent):
-            raise ValueError("a space or control character")
         parts = urllib.parse.urlsplit(sent)
         host = parts.hostname
         parts.port  # noqa: B018 - raises on a bad port
@@ -223,6 +228,11 @@ def check_url(url: str, *, insecure: bool = False) -> None:
             raise ValueError("authority")
     except (ValueError, TypeError):
         raise HttpError("the URL does not parse", url=redact_url(url), kind="refused")
+    if not _sendable(sent, parts):
+        # urllib would send it and http.client refuse every call, where the Node twin percent-encodes it (0.56.0
+        # product r16, r18, unit r16, r17); 0.55.0 retried and answered kind connection.
+        raise HttpError("the URL holds a space, an ASCII control character, or a character outside ASCII in its path "
+                        "or query", url=redact_url(url), kind="refused")
     if parts.scheme not in ("http", "https") or not host:
         raise HttpError("only http and https URLs with a host are sent", url=redact_url(url), kind="refused")
     if parts.username is not None or parts.password is not None:

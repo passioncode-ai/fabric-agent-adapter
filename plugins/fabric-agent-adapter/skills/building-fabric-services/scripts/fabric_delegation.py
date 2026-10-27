@@ -632,6 +632,10 @@ def _loopback(host: str) -> bool:
     return address.is_loopback and not getattr(address, "scope_id", None) and not getattr(address, "ipv4_mapped", None)
 
 
+# fabric_http._URL_ENDS (this module may not import fabric_http; test_fabric_delegation pins them equal).
+_URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
+
+
 def _source_authority_ok(parts: urllib.parse.SplitResult) -> bool:
     """A key set URL's host and port as urllib will dial them and `new URL` accepts them (fabric_http._authority_ok's
     rule, which this module may not import): no `%` (urllib decodes it), backslash, space or control character; a
@@ -639,7 +643,7 @@ def _source_authority_ok(parts: urllib.parse.SplitResult) -> bool:
     65535; a host at all. So `http://[::1]%2Eevil.example/` and `https://[1.2.3.4]/` (both read by Python 3.9's
     urlsplit) are refused (0.56.0 unit r13, r14)."""
     netloc = parts.netloc
-    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" for c in netloc):
+    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" or c.isspace() for c in netloc):
         return False
     if netloc.startswith("["):
         close = netloc.find("]")
@@ -734,16 +738,17 @@ class JwksCache:
         if not isinstance(source, str) or not source:
             raise ValueError("the key set needs a source")
         if source.startswith(("https://", "http://")):
-            # The ends trimmed as urllib trims them when it reads; inside, a space, tab, line break or other control
-            # character is refused, since urllib would send it and http.client refuse every read (0.56.0 product r16,
-            # r17, unit r16). urlsplit's own refusals (`[1.2.3.4]` on 3.14) are said as the key set's.
-            sent = source.strip("\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f ")
-            if re.search(r"[\x00-\x20\x7f]", sent):
-                raise ValueError("a key set URL holds a space or a control character")
+            # The trailing end trimmed as urllib trims it when it reads (a leading one fails the scheme test above, as
+            # in 0.55.0 and in Node); inside, what urllib would send and http.client refuse on every read is refused
+            # (0.56.0 product r16, r17, r18, unit r16, r17). urlsplit's own refusals are said as the key set's.
+            sent = source.strip(_URL_ENDS)
             try:
                 parts = urllib.parse.urlsplit(sent)
             except ValueError:
                 raise ValueError("a key set URL's host does not parse") from None
+            if re.search(r"[\x00-\x20\x7f]", sent) or not (parts.path + parts.query).isascii():
+                raise ValueError("a key set URL holds a space, an ASCII control character, or a character outside ASCII "
+                                 "in its path or query")
             if "@" in parts.netloc:  # an empty one too: urllib would dial `@127.0.0.1` (0.56.0 unit r14)
                 raise ValueError("a key set URL carries no credentials")
             if not _source_authority_ok(parts):

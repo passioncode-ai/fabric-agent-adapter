@@ -60,16 +60,21 @@ gate behave.
   digits such as `1_2` or `+1`, which Python 3.9's `int()` takes, a bracketed host that is no IPv6 address) read as
   `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose rule differs between 3.9 patch
   releases. `check_url` refuses the same ports and bracketed hosts (an IPv6 zone included). On Python it also refuses
-  a backslash, space, control character or `%` in the host, which urllib would decode or dial as another host
-  (`h.example%3A8443` reached port 8443), and a space, tab, line break or other control character inside the URL,
-  which urllib sends and http.client refuses, so every call failed; whitespace at the ends is trimmed as urllib trims
-  it, so `https://h.example/x` followed by a line break is still sent, as in 0.55.0. The Node twin removes a tab or
-  line break, percent-encodes a space in the path, reads a backslash as `/` and decodes a `%` host, refusing it when
-  the decoded host is not allowed (`h.example%3A8443`). It checks the host's shape, not its name (FAA-187 (14)).
+  a backslash, `%`, space or control character in the host (a Unicode space included), which urllib would decode or
+  dial as another host (`h.example%3A8443` reached port 8443), and a space or ASCII control character anywhere in the
+  URL or a character outside ASCII in its path or query, which urllib sends and http.client refuses: such a URL is now
+  refused before it is sent (kind `refused`), where 0.55.0 retried it and answered kind `connection`. Whitespace at the
+  ends is trimmed as urllib trims it, so a URL ending in a line break is still sent, as in 0.55.0. The Node twin reads
+  several of these as `new URL` does, among them a tab or line break removed, a space or a character outside ASCII
+  percent-encoded, a backslash as `/`, an extra slash before the host skipped and a `%` host decoded (refused when the
+  decoded host is not allowed, as `h.example%3A8443`). Python's `check_url` checks the host's shape, not its name
+  (FAA-187 (14)).
   `redact_url` on Python reads a host holding `%` as `<unparseable url>` too, where Node writes it decoded, and a
   `ws`, `wss` or `ftp` URL with no host or a port above 65535 as `<unparseable url>`, as Node does. The Python kit
-  reads a JWKS source's host and port as urllib dials them, https included: a space, tab, line break or control
-  character inside the URL (its ends are trimmed, as urllib reads them), a host holding `%` or a backslash, a
+  reads a JWKS source's host and port as urllib dials them, https included: a space or ASCII control character in
+  the URL or a character outside ASCII in its path or query (a trailing space or line break is trimmed, as urllib
+  reads it; a leading one is refused as not a URL, as in 0.55.0 and in Node), a host holding `%`, a backslash or a
+  Unicode space, a
   bracketed host that is no IPv6 address, a port above 65535, no host, or any `@` (an empty userinfo dialled
   `@127.0.0.1`) is refused. The Node kit accepts several of these as `new URL` reads them, among them a `%` host
   decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped and an extra slash before the

@@ -303,7 +303,8 @@ class JwksCacheTests(unittest.TestCase):
                     "http://:@127.0.0.1:7777/j",
                     # 0.56.0 product r16, unit r15: a tab or line break, which urlsplit drops and urllib sends.
                     "http://127.0.0.1\r/j", "http://loc\talhost:7777/j", "https://hub.exa\nmple/j",
-                    "https://hub.example/a b", "https://hub.example/a\x00b"):
+                    "https://hub.example/a b", "https://hub.example/a\x00b", "https://hub.example/caf\u00e9",
+                    "https://hub.example\u3000/j"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
         with self.assertRaisesRegex(ValueError, "key set"):  # 3.14's urlsplit refuses it first, said as the key set's
@@ -312,6 +313,11 @@ class JwksCacheTests(unittest.TestCase):
             dl.JwksCache("https://hub.example/a\tb")
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json")
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json\n")  # urllib trims the ends: 0.55.0 read it (r17)
+        dl.JwksCache("https://\u4f8b.example/j")  # an IDN host is sent in IDNA
+        with self.assertRaisesRegex(ValueError, "https URL"):  # a leading space fails the scheme test, as in 0.55.0
+            dl.JwksCache(" https://hub.example/j")
+        # The two kits trim the same ends (fabric_delegation may not import fabric_http).
+        self.assertEqual(dl._URL_ENDS, load("fabric_http")._URL_ENDS)
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "jwks.json"
             path.write_text(json.dumps(VECTORS["jwks"]))
@@ -617,6 +623,25 @@ class ReviewRegressionTests(unittest.TestCase):
             self.assertIsNone(dl.JwksCache("http://127.0.0.1:%d/jwks" % server.server_address[1]).get("estate-new"))
         finally:
             server.shutdown()
+
+    def test_a_source_ending_in_a_line_break_is_read_as_in_0_55_0(self):
+        import http.server
+        class Keys(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                body = json.dumps(VECTORS["jwks"]).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *args):
+                pass
+        server = http.server.HTTPServer(("127.0.0.1", 0), Keys)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:  # 0.56.0 product r17, unit r17: urllib trims the ends of what it reads
+            self.assertEqual(dl.JwksCache("http://127.0.0.1:%d/jwks\n" % server.server_address[1]).get(), VECTORS["jwks"])
+        finally:
+            server.shutdown()
+            server.server_close()
 
     def test_a_failed_read_is_not_retried_on_every_call(self):
         now, calls = [1000.0], []

@@ -70,16 +70,26 @@ class Cases(unittest.TestCase):
         # sends and http.client refuses.
         for url in ("https://api.example\\v1/items", "https://h.example\\/x", "https://h .example/x",
                     "https://h.exa\tmple/x", "http://127.0.0.\t1:9/x", "https://h.example/a b", "https://h.example/a\x00b",
-                    "https://h.example/a?x=1 2", "https://h.example/a\x7f"):
+                    "https://h.example/a?x=1 2", "https://h.example/a\x7f",
+                    # product r18, unit r17: a path or query outside ASCII, which http.client cannot write (a C1
+                    # control included), and a Unicode space in the host, which urllib trims away and redact_url logs.
+                    "https://h.example/caf\u00e9", "https://h.example/a\x85b", "https://h.example/x?q=\u2028",
+                    "https://h.example\u3000/x", "https://h.example\u3000"):
             with self.subTest(url=url), self.assertRaises(fh.HttpError) as caught:
                 fh.check_url(url)
             self.assertEqual(caught.exception.kind, "refused")
 
     def test_check_url_reads_a_url_with_whitespace_at_its_ends_as_urllib_sends_it(self):
         # 0.56.0 product r17: 0.55.0 sent `https://h.example/x\n` (urllib trims the ends), and so does 0.56.0.
-        for url in ("https://h.example/x\n", "https://h.example/x\r\n", "\nhttps://h.example/x", " https://h.example/x\t"):
+        for url in ("https://h.example/x\n", "https://h.example/x\r\n", "\nhttps://h.example/x", " https://h.example/x\t",
+                    "https://\u4f8b.example/x", "https://h.example/x#caf\u00e9"):  # an IDN host and fragment are sent
             with self.subTest(url=url):
                 fh.check_url(url)
+
+    def test_a_refusal_says_what_cannot_be_sent(self):
+        with self.assertRaisesRegex(fh.HttpError, "space") as caught:
+            fh.check_url("https://h.example/a b")
+        self.assertEqual(caught.exception.kind, "refused")
 
     def test_retry_after(self):
         for value, now, expected in CASES["retryAfter"]:
@@ -192,6 +202,10 @@ class DefaultTransport(unittest.TestCase):
     def tearDownClass(cls):
         cls.server.shutdown()
         cls.server.server_close()
+
+    def test_a_url_ending_in_a_line_break_is_sent_as_in_0_55_0(self):
+        # 0.56.0 product r17, unit r17: urllib trims the ends of what it sends; the request reaches /ok.
+        self.assertEqual(fh.request("GET", self.base + "/ok\n", deadline_s=10).status, 200)
 
     def test_answers_redirects_and_caps(self):
         ok = fh.request("GET", self.base + "/ok", headers={"Authorization": "Bearer t"}, deadline_s=10)
