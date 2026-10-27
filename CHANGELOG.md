@@ -63,9 +63,12 @@ gate behave.
   backslash, space, control character or `%` in the host, which urllib would decode or send to a host other than the
   one logged (`h.example%3A8443` reached port 8443); it checks the host's shape, not its name (FAA-187 (14)).
   `redact_url` on Python reads a host holding `%` as `<unparseable url>` too, where Node writes it decoded, and a
-  `ws`, `wss` or `ftp` URL with no host or a port above 65535 as `<unparseable url>`, as Node does. A JWKS source's
-  host is read as urllib dials it, so neither `[::1%...]` nor `http://[::1]%2Eevil.example/` (which Python 3.9's
-  `urlsplit` reads as `::1`) nor a mapped `[::ffff:127.0.0.1]` (loopback to Python 3.13+) counts as loopback, and
+  `ws`, `wss` or `ftp` URL with no host or a port above 65535 as `<unparseable url>`, as Node does. The Python kit
+  reads a JWKS source's host and port as urllib dials them, https included: a host holding `%`, a backslash, a space
+  or a control character, a bracketed host that is no IPv6 address, a port above 65535, no host, or any `@` (an empty
+  userinfo dialled `@127.0.0.1`) is refused, where the Node kit reads the first decoded. So neither `[::1%...]` nor
+  `http://[::1]%2Eevil.example/` (which Python 3.9's `urlsplit` reads as `::1`) nor a mapped `[::ffff:127.0.0.1]`
+  (loopback to Python 3.13+) counts as loopback, and
   attribution answers `not-openrouter` for a port of other digits (`:٤٤٣`), as `new URL` reads it. The path is not redacted in either twin
   (Node writes it as `new URL` normalises it, Python as given), so a key never belongs in it.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.

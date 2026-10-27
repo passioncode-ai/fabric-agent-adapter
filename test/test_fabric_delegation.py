@@ -295,7 +295,12 @@ class JwksCacheTests(unittest.TestCase):
                     "http://[::1%3A80]/jwks.json", "http://[::1%25lo0]/jwks.json",
                     # 0.56.0 unit r13: 3.9's urlsplit reads the host of the first as ::1 and urllib dials the DNS
                     # name; seam r14: 3.13+ counts a mapped ::ffff:127.0.0.1 as loopback, 3.9 and Node do not.
-                    "http://[::1]%2Eevil.example/jwks.json", "http://[::1]x/jwks.json", "http://[::ffff:127.0.0.1]/j"):
+                    "http://[::1]%2Eevil.example/jwks.json", "http://[::1]x/jwks.json", "http://[::ffff:127.0.0.1]/j",
+                    # 0.56.0 unit r14: a port above 65535, no host, a bracketed host that is no IPv6 address (3.9
+                    # dialled 192.168.0.165 for one), and an empty userinfo (urllib dials `@127.0.0.1`).
+                    "https://hub.example:99999/j", "http://127.0.0.1:65536/j", "https://:443/j", "https://",
+                    "https://[1.2.3.4]/j", "http://[127.0.0.1]:7777/j", "http://@127.0.0.1:7777/j",
+                    "http://:@127.0.0.1:7777/j"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json")

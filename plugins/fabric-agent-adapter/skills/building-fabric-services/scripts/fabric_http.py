@@ -169,17 +169,11 @@ def redact_url(url: str) -> str:
         # Only http and https are sent; any other scheme (a misspelled `htps:` included) keeps no more than its name,
         # since its user information may sit anywhere in the rest (0.56.0 product r10).
         return scheme.lower() + ":<redacted>"
-    host = parts.hostname or ""
-    if not host:
-        return "<unparseable url>"  # an http or https URL with no host, which `new URL` refuses
+    # The host and port were checked above (a password holding `/`, `https://u:pw/x@h`, reads as a bad port there).
+    host = parts.hostname
     if ":" in host:
         host = "[%s]" % host
-    try:
-        port = parts.port
-    except ValueError:
-        # A port that does not parse, often a password holding `/` (`https://u:pw/x@h`): `new URL` refuses it, and
-        # the rest would be read as the path, password and all (0.56.0 unit r10).
-        return "<unparseable url>"
+    port = parts.port
     if port == {"http": 80, "https": 443}.get(parts.scheme.lower()):
         port = None  # as a WHATWG URL writes it, so both kits print one URL the same way
     netloc = host.lower() + (":%d" % port if port is not None else "")

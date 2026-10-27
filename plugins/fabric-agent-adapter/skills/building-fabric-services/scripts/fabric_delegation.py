@@ -632,6 +632,35 @@ def _loopback(host: str) -> bool:
     return address.is_loopback and not getattr(address, "scope_id", None) and not getattr(address, "ipv4_mapped", None)
 
 
+def _source_authority_ok(parts: urllib.parse.SplitResult) -> bool:
+    """A key set URL's host and port as urllib will dial them and `new URL` accepts them (fabric_http._authority_ok's
+    rule, which this module may not import): no `%` (urllib decodes it), backslash, space or control character; a
+    bracketed host that is an IPv6 address; any other host without `:`, `[` or `]`; a port of ASCII digits up to
+    65535; a host at all. So `http://[::1]%2Eevil.example/` and `https://[1.2.3.4]/` (both read by Python 3.9's
+    urlsplit) are refused (0.56.0 unit r13, r14)."""
+    netloc = parts.netloc
+    if any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" for c in netloc):
+        return False
+    if netloc.startswith("["):
+        close = netloc.find("]")
+        try:
+            ipaddress.IPv6Address(netloc[1:close] if close > 0 else "")
+        except ValueError:
+            return False
+        port = netloc[close + 1:]
+        if port and not re.fullmatch(r":[0-9]*", port):
+            return False
+    else:
+        host, _, port = netloc.partition(":")
+        if not host or any(c in "[]:" for c in host + port) or not re.fullmatch(r"[0-9]*", port):
+            return False
+    try:
+        parts.port  # noqa: B018 - raises on a port above 65535
+    except ValueError:
+        return False
+    return bool(parts.hostname)
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """A redirect could leave https or loopback for any scheme or host: none is followed."""
 
@@ -706,15 +735,10 @@ class JwksCache:
             raise ValueError("the key set needs a source")
         if source.startswith(("https://", "http://")):
             parts = urllib.parse.urlsplit(source)
-            # The host as urllib will dial it: no `%` (urllib decodes it), backslash, space or control, and after a
-            # bracketed address only a port, so `http://[::1]%2Eevil.example/` is no loopback on 3.9 either, whose
-            # urlsplit reads its host as ::1 (0.56.0 unit r13).
-            hostport = parts.netloc.rpartition("@")[2]
-            if (any(c in "\\%" or ord(c) <= 0x20 or c == "\x7f" for c in hostport)
-                    or not re.fullmatch(r"(\[[0-9A-Fa-f:.]*\]|[^\[\]:]*)(:[0-9]*)?", hostport)):
-                raise ValueError("a key set URL's host does not parse")
-            if parts.username or parts.password:
+            if "@" in parts.netloc:  # an empty one too: urllib would dial `@127.0.0.1` (0.56.0 unit r14)
                 raise ValueError("a key set URL carries no credentials")
+            if not _source_authority_ok(parts):
+                raise ValueError("a key set URL's host does not parse")
             if parts.scheme == "http" and not _loopback(parts.hostname or ""):
                 raise ValueError("a key set is read over https, or over http on loopback only")
         elif "://" in source:
