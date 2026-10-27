@@ -34,11 +34,11 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   responder talks only to Fabric's hub on loopback.
 - The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
   in the session's folder (counts only, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
-  session Fabric launched, and, only once the running Fabric's `fabric_session_observe` takes
-  `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark), read the
+  session Fabric launched. Stop also, only once the running Fabric's `fabric_session_observe` takes
+  `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark), reads the
   last 512 KB of the session's transcript (earlier turns included; only the entries after the
   last prompt the person typed are used)
-  and run `git rev-parse --show-toplevel` and `git config --get remote.origin.url` in the
+  and runs `git rev-parse --show-toplevel` and `git config --get remote.origin.url` in the
   other repositories the turn's tool calls name, within the same 1.5 s. Of the transcript they
   use only tool names and path arguments; what leaves the machine is each repository's
   host, owner and name, never a local path, a command or message text (on a self-hosted ssh
@@ -47,7 +47,10 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   the turns that end before a worker next runs (about a minute) are still read; none of their
   names is sent. They write their spool and log under the user's cache folder (0600),
   and the delivery worker starts `fabric-mcp` in its own process group and ends that group
-  (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no token.
+  (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no Fabric token. An
+  `origin` URL that embeds a credential (`https://user:token@host/...`) is read by `git config`
+  with it; the credential, the port and `.git` are dropped in memory before anything is spooled,
+  logged or sent.
 - `adapting-projects-to-fabric/scripts/adapt_project.py` reads the target project without
   executing it and writes only the seven documented bundle paths (`scaffold --dry-run`
   writes nothing); `check --contract` runs the contract checkout's own

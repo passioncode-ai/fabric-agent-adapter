@@ -15,7 +15,8 @@
   <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
   or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
   read. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside the existing
-  1.5 s facts budget, and named `{host, owner, name}` from its `origin` (credentials, port and `.git` dropped). The
+  1.5 s facts budget, and named `{host, owner, name}` from its `origin` (a credential embedded in the URL is read with it by `git config`; it, the port
+  and `.git` are dropped in memory, never spooled, logged or sent). The
   repository of the session's folder when the turn ends (the Stop payload's `cwd`; any checkout of it), a repository without a parsable origin and duplicates are left out;
   at most 10 (or the schema's `maxItems`), and an item whose host, owner or name the schema refuses (type, length,
   pattern, enum) is left out, never the turn; no local path leaves the hook (on a self-hosted ssh remote `owner` is the
@@ -42,7 +43,8 @@
   nothing; the reference service now waits at its stop for the responder to leave its board session. `Responder.take_back(capability)` /
   `takeBack(capability)` is the operator's act that brings a moved slot back: it enrolls once the other session lets
   the slot go and takes the held work back by a transfer; a restart or reconnect before that, with work held, replaces
-  the other session at once. The kit offers no route for it: a service declares one as an
+  the other session at once. Moving the slot back to this service in Fabric does not bring it back (the responder
+  skips a moved slot until `take_back`; FAA-165). The kit offers no route for it: a service declares one as an
   operator action with its tool and gate `relayed` (the operator's decision; never `none`; on a server that reads
   mandates it also names its effect class) (`fabric-actions/0.1`; the reference service's is FAA-157). The
   notice says begun work is the new holder's to settle and that the take-back action brings the slot back. Both

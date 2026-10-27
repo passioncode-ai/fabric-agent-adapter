@@ -131,7 +131,9 @@ only variable names are looked at, never a value (two of them carry the session'
   `fabric-mcp`'s stdin and then ends its whole process group, so a wrapper (`npx`, a shell script,
   `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path.
 - **Read a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
-  those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log.
+  those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log. Once Fabric
+  takes repositories, an `origin` URL that embeds a credential (`https://user:token@host/...`) is read by
+  `git config` with it; the Stop hook drops the credential in memory before anything is spooled, logged or sent.
 - **Send content, or use more than it reads for.** A turn is the HEAD commit, the number of files that differ from it
   (untracked included) and the lines added and removed against it, and, once Fabric takes them, the other repositories
   it touched by their `origin` name (`{host, owner, name}`); no path, branch name, commit message or diff text. The
