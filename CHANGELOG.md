@@ -51,6 +51,8 @@ gate behave.
   `source.repository` check of a descriptor and of a provider entry reads a special scheme's password the same way
   (`https:bot:pw@host`), up to the user information's last `@` (`https://me@corp.example:pw@host`), and says so
   before it judges the host. The query and the fragment are read percent-encoded, as `new URL` hands them over.
+  `fabric_http.redact_url` reads a special scheme the same way, so the URL an `HttpError` carries for
+  `https:u:pw@host` has no password, as in Node.
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
   capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer
@@ -91,7 +93,8 @@ gate behave.
 
 - On Windows the Stop hook now reads the transcript's tail and the touched repositories' `origin` (FAA-175), once
   Fabric takes `repositories`, as it does on macOS and Linux; `FABRIC_SESSION_NO_REPOSITORIES=1` (in Claude Code's
-  settings `env`, which reached the hooks in a run on macOS; a Windows run is FAA-183's) turns it off.
+  settings `env`, which reached hooks declared in settings and in a plugin's `hooks.json` in runs on macOS; Windows is
+  FAA-183's run) turns it off.
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
   happens only then. A service that stops without the join still works; its

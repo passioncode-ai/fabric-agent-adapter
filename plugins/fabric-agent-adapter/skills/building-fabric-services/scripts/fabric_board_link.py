@@ -31,7 +31,7 @@ class BoardSession:
 
     def __init__(self, grant: _hub.BoardGrant, *, timeout: float = 15.0, post: Callable[..., Any] = _hub.post_mcp):
         # not above 0 is the default: the transports read 0 in opposite ways (seam r8)
-        self.grant, self.timeout, self.post = grant, timeout if timeout > 0 else 15.0, post
+        self.grant, self.timeout, self.post = grant, timeout if timeout is not None and timeout > 0 else 15.0, post
         self.mcp_session: Optional[str] = None
         self.protocol_version = _hub.MCP_PROTOCOL_VERSION
         self._lock = threading.Lock()

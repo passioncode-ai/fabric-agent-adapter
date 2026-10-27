@@ -116,8 +116,16 @@ def json_bytes(value: Any) -> bytes:
 def redact_url(url: str) -> str:
     """The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or
     fragment, which is where keys and tokens ride."""
+    url = str(url)
+    scheme, colon, rest = url.partition(":")
+    if colon and scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
+        # A special scheme as WHATWG reads it: the authority starts after every slash or backslash that follows the
+        # colon, and a backslash before the query reads as a slash, so `https:u:pw@h` loses its password too (0.56.0
+        # seam r9; the Node twin reads it through `new URL`).
+        cut = min([at for at in (rest.find("?"), rest.find("#")) if at >= 0] or [len(rest)])
+        url = scheme + "://" + (rest[:cut].replace("\\", "/") + rest[cut:]).lstrip("/")
     try:
-        parts = urllib.parse.urlsplit(str(url))
+        parts = urllib.parse.urlsplit(url)
     except ValueError:
         return "<unparseable url>"
     host = parts.hostname or ""

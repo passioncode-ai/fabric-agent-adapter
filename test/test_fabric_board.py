@@ -2345,7 +2345,7 @@ class CloseReadsAsNode(unittest.TestCase):
 
     def test_a_constructor_timeout_not_above_zero_is_the_default(self):
         """0.56.0 seam r8: the session's own timeout is never 0 either."""
-        for timeout in (0, -1):
+        for timeout in (0, -1, None):
             self.assertEqual(fb.BoardSession(object(), timeout=timeout).timeout, 15.0)
 
     def test_a_timeout_not_above_zero_is_the_sessions_own(self):

@@ -20,6 +20,18 @@
   [
    "http://[::1]:9000/a",
    "http://[::1]:9000/a"
+  ],
+  [
+   "https:u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "https:\\u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "HTTPS:/u@x:hunter2@h.example/y?t=1",
+   "https://h.example/y"
   ]
  ],
  "checkUrl": [
