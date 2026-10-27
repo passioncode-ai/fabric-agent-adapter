@@ -81,10 +81,13 @@ gate behave.
     sent it trimmed when the space ended the URL and failed every call when a fragment followed it. Node keeps it
     percent-encoded.
   - The OpenRouter clients: both send a base URL ending in a line break or a space without it, and both refuse, when
-    they are built, a base URL holding a query or a fragment (`/chat/completions` would land in it, so a path-routed
-    endpoint such as OpenRouter failed every call in 0.55.0) or ending in a Unicode space (0.55.0 failed every call
-    with one), with kind `refused` from `check_url` on Python and kind `config` on Node for the Unicode space, kind
-    `config` in both for the query or fragment. Attribution answers `not-openrouter` for a port of other
+    they are built, a base URL holding a query or a fragment (kind `config`; `/chat/completions` would land in it, so
+    a path-routed endpoint such as OpenRouter failed every call in 0.55.0) or whose path ends in a Unicode space (0.55.0
+    failed every call with one): Python through `check_url` (kind `refused`, which also refuses any other space,
+    control or non-ASCII character in the path), Node with kind `config` for a space, a control or an invisible
+    character (U+0085, U+00A0, U+1680, U+180E, U+2000 to U+200D, U+2028, U+2029, U+202F, U+205F, U+2060, U+3000,
+    U+FEFF) ending the path once a tab or line break is removed anywhere and the ends and trailing slashes are trimmed,
+    as `new URL` composes it (so `.../v1\n/` is still sent to `.../v1/chat/completions` on Node). Attribution answers `not-openrouter` for a port of other
     digits (`:٤٤٣`), as `new URL` reads it.
   - A JWKS source: the Python kit reads its host and port as urllib dials them, https included. It refuses a space
     or ASCII control character before the URL's first `#` (it reads the URL up to there, as Node does), a character
@@ -92,7 +95,7 @@ gate behave.
     bracketed host that is no IPv6 address, a port that is not ASCII digits or is above 65535, no host, and any `@`
     (an empty userinfo dialled `@127.0.0.1`). A trailing ASCII space or line break is trimmed, as urllib reads it; a trailing Unicode space
     before the first `#` is refused for the same reason as in `check_url`, though urllib would trim it and read the
-    keys; a leading space is refused as not a URL, as in 0.55.0 and in Node. Neither `[::1%...]` nor
+    keys when it ends the URL; a leading space is refused as not a URL, as in 0.55.0 and in Node. Neither `[::1%...]` nor
     `http://[::1]%2Eevil.example/` (which Python 3.9's `urlsplit` reads as `::1`) nor a mapped `[::ffff:127.0.0.1]`
     (loopback to Python 3.13+) counts as loopback. The Node kit accepts several of these as `new URL` reads them,
     among them a `%` host decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped and an
@@ -140,18 +143,18 @@ gate behave.
   settings `env`, which reached hooks declared in settings and in a plugin's `hooks.json` in runs on macOS; Windows is
   FAA-183's run) turns it off.
 - A Python `JwksCache` source is now refused when the cache is built, so a service that builds it at start stops
-  there, if it is any source the key set item under Fixed lists. Among them, 0.55.0 read: a host holding `%` (an IPv6
-  zone included, as in `http://[::1%25lo0]/`), which urllib decoded and dialled; a port that is not ASCII digits
-  (`:1_8080`); a mapped `[::ffff:127.0.0.1]` loopback (on Python 3.13+); a Unicode space ending the URL. Write the
-  host and port plainly (`127.0.0.1:18080`) and trim the space. The rest (a character outside ASCII in the path or
-  query, a space or control character before the first `#`, a Unicode space or control character in the host) 0.55.0
-  accepted and then answered every delegated call `issuer-unavailable`.
+  there, if it is any source the JWKS source item under Fixed lists. Among them, 0.55.0 read: a host holding `%` (an
+  IPv6 zone included, as in `http://[::1%25lo0]/`), which urllib decoded and dialled; a port that is not ASCII digits
+  (`:1_8080`); a bracketed IPv4 host (`[127.0.0.1]`, which Python 3.9 dialled as `127.0.0.1`); a mapped
+  `[::ffff:127.0.0.1]` loopback (on Python 3.13+); a Unicode space ending the URL. Write the host and port plainly
+  (`127.0.0.1:18080`) and trim the space. The other sources it lists 0.55.0 accepted and then answered every
+  delegated call `issuer-unavailable`.
 - On Python, `check_url` and `request` now refuse before sending (kind `refused`) a URL that 0.55.0 sent: a host
   holding `%` (`h.example%3A8443` reached port 8443), a port that is not ASCII digits (`:1_2` reached port 12 on
-  3.9), and a URL whose part before its first `#` ends in a Unicode space (sent trimmed). A URL with a space, a
+  3.9), a bracketed IPv4 host (`[127.0.0.1]`, dialled on 3.9), and a URL whose part before its first `#` ends in a Unicode space (sent trimmed). A URL with a space, a
   control or a non-ASCII character in its path or query, which 0.55.0 retried and answered kind `connection`, is
-  refused the same way. Both OpenRouter clients refuse a base URL ending in a Unicode space or holding a query or a
-  fragment. Write the host and port plainly, trim the space, and drop the query or fragment where the URL is
+  refused the same way. Both OpenRouter clients refuse a base URL whose path ends in a Unicode space or that holds a
+  query or a fragment. Write the host and port plainly, trim the space, and drop the query or fragment where the URL is
   configured.
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above

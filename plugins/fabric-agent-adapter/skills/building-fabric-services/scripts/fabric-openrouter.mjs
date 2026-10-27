@@ -107,14 +107,16 @@ export class Client {
     checkAttribution(projectId, undefined);
     Object.assign(this, { ceilingUsd, ledger, keyEnv, window, attribution, projectId, unmeasuredCallUsd, deadlineS, retries });
     this.prices = Object.fromEntries(Object.entries(prices ?? {}).map(([k, v]) => [k, { ...v }]));
-    // The base URL as checkUrl read it: `new URL` trims C0 controls and spaces from its ends, so `.../v1/ ` is not
-    // composed as `.../v1/%20/chat/completions` (0.56.0 product r20; the Python twin trims the ends urllib does).
-    this.baseUrl = baseUrl.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
-    // A Unicode space (or NEL, or a zero-width space) ending the base as it is composed stays in the path, where
+    // The base URL as checkUrl read it: `new URL` removes tabs and line breaks anywhere and trims C0 controls and
+    // spaces from its ends, so `.../v1/ ` and `.../v1\n/` are composed as `.../v1/chat/completions`, as `new URL`
+    // composed them in 0.55.0 (0.56.0 product r20, unit r22, seam r22; the Python twin refuses what urllib cannot send).
+    this.baseUrl = baseUrl.replace(/[\t\n\r]/g, '').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
+    // A space, a control or an invisible character ending the base's path as it is composed stays in that path, where
     // `new URL` percent-encodes it, and every call would fail; the Python twin refuses it in check_url (0.56.0 seam
-    // r20, r21, product r21, unit r21: `.../v1\u00a0/` is checked after its slash is gone).
-    if (/[\s\u0085\u180e\u200b]$/u.test(this.baseUrl)) {
-      throw new OpenRouterError('the base URL ends in a Unicode space', { kind: 'config' });
+    // r20 to r22, unit r21, r22). The host is checkUrl's, which reads it as `new URL` does.
+    const path = /^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)?$/isu.exec(this.baseUrl)?.[1] ?? '';
+    if (/[\x00-\x20\u0085\u00a0\u1680\u180e\u2000-\u200d\u2028\u2029\u202f\u205f\u2060\u3000\ufeff]$/u.test(path)) {
+      throw new OpenRouterError("the base URL's path ends in a space, a control or an invisible character", { kind: 'config' });
     }
     this.env = env;
     this.transport = transport;

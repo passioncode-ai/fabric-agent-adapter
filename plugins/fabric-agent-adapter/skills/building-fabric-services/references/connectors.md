@@ -49,7 +49,7 @@ host, port and path (`redact_url`); a URL that is not http or https keeps only i
 one that does not parse as a URL is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
 normalises it, Python as given), so a key never belongs in it. Python's `check_url` refuses a host
 with a backslash, space, control character (C0, DEL or C1) or `%`, a URL with a space or ASCII control character before its
-first `#` (the default transport sends a URL up to there, as Node's does; a transport you pass receives the URL as given), or a character outside ASCII in its path or query (ASCII whitespace at its ends is trimmed, as urllib and `new URL` trim it; a Unicode space ending the part before the first `#` is refused, where Node keeps it percent-encoded), and a port that is not
+first `#` (the default transport sends a URL up to there, as Node's does; a transport you pass receives the URL as given), or a character outside ASCII in its path or query (ASCII whitespace at its ends is trimmed, as urllib and `new URL` trim it; a Unicode space ending the part before the first `#` is refused, where Node keeps it percent-encoded), a bracketed host that is not an IPv6 address with no zone, and a port that is not
 ASCII digits, all as kind `refused` before sending; it checks a host's shape, not its name. `redact_url` on Python reads a host holding `%` as `<unparseable url>`; Node writes it decoded. An error never carries a request header or body.
 
 ## fabric_openrouter
@@ -82,7 +82,7 @@ const answer = await client.chat(messages, { model, fallback, maxTokens: 800 });
 | The fallback | required, of another vendor (the part before `/` differs) |
 | Content | text only: a string, null, or parts that are all `{"type": "text"}`; an image, audio or file part is refused (`config`), because what it is billed cannot be bounded from its bytes |
 | What the ceiling does not cover | the `provider` routing param can send a call to a provider priced above the catalog; two `Client` objects sharing one ledger each hold only their own calls in flight, so give an agent one client per key |
-| The base URL | `base_url` (`baseUrl`), by default `https://openrouter.ai/api/v1`: checked by `check_url` when the client is built; ASCII whitespace and `/` at its end are trimmed; a query or a fragment is refused (kind `config`, both twins), and so is a Unicode space ending it (Python: `check_url`'s `HttpError` kind `refused`; Node: kind `config`) |
+| The base URL | `base_url` (`baseUrl`), by default `https://openrouter.ai/api/v1`: checked by `check_url` when the client is built; ASCII whitespace and `/` at its end are trimmed; a query or a fragment is refused (kind `config`, both twins), and so is a Unicode space ending its path (Python: `check_url`'s `HttpError` kind `refused`, as for any space, control or non-ASCII character in the path; Node: kind `config` for a space, a control or an invisible character ending the path once tabs and line breaks are removed and the ends and trailing slashes trimmed, as `new URL` composes it) |
 | Attribution | off unless an `attribution` setting is given (FAC-SEM-098, `fabric_usage.attribution_headers`) |
 | Request body | `model`, `messages`, `max_tokens`, `usage: {include: true}` and your params (temperature, reasoning, response_format, tools); `stream`, `model`, `messages`, `max_tokens` and `usage` as params are refused |
 

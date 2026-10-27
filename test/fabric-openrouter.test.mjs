@@ -162,7 +162,8 @@ test('config refusals and totals', () => {
 
 test('a base URL ending in a line break or a space is composed without it', () => {
   // 0.56.0 product r20: checkUrl reads the base with its ends trimmed, so the base composed must be that one.
-  for (const baseUrl of ['https://openrouter.ai/api/v1\n', 'https://openrouter.ai/api/v1/ ', 'https://openrouter.ai/api/v1/\r\n']) {
+  for (const baseUrl of ['https://openrouter.ai/api/v1\n', 'https://openrouter.ai/api/v1/ ', 'https://openrouter.ai/api/v1/\r\n',
+    'https://openrouter.ai/api/v1\n/', 'https://openrouter.ai/api/v1\t/']) { // `new URL` removes a tab or line break anywhere
     const c = new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
     assert.equal(c.baseUrl, 'https://openrouter.ai/api/v1', JSON.stringify(baseUrl));
   }
@@ -170,7 +171,8 @@ test('a base URL ending in a line break or a space is composed without it', () =
   // in the path. Both are refused when the client is built.
   for (const baseUrl of ['https://openrouter.ai/api/v1?x=1', 'https://openrouter.ai/api/v1#f', 'https://openrouter.ai/api/v1\u00a0',
     'https://openrouter.ai/api/v1\u3000', 'https://openrouter.ai/api/v1\u00a0\n', 'https://openrouter.ai/api/v1\u00a0/',
-    'https://openrouter.ai/api/v1\u3000/', 'https://openrouter.ai/api/v1\u0085', 'https://openrouter.ai/api/v1\u200b']) {
+    'https://openrouter.ai/api/v1\u3000/', 'https://openrouter.ai/api/v1\u0085', 'https://openrouter.ai/api/v1\u200b',
+    'https://openrouter.ai/api/v1\u180e', 'https://openrouter.ai/api/v1\u2060', 'https://openrouter.ai/api/v1 /']) {
     assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), (e) => e.kind === 'config', JSON.stringify(baseUrl));
   }
 });
