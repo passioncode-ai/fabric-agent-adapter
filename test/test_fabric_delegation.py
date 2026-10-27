@@ -300,9 +300,13 @@ class JwksCacheTests(unittest.TestCase):
                     # dialled 192.168.0.165 for one), and an empty userinfo (urllib dials `@127.0.0.1`).
                     "https://hub.example:99999/j", "http://127.0.0.1:65536/j", "https://:443/j", "https://",
                     "https://[1.2.3.4]/j", "http://[127.0.0.1]:7777/j", "http://@127.0.0.1:7777/j",
-                    "http://:@127.0.0.1:7777/j"):
+                    "http://:@127.0.0.1:7777/j",
+                    # 0.56.0 product r16, unit r15: a tab or line break, which urlsplit drops and urllib sends.
+                    "http://127.0.0.1\r/j", "http://loc\talhost:7777/j", "https://hub.exa\nmple/j"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
+        with self.assertRaisesRegex(ValueError, "key set"):  # 3.14's urlsplit refuses it first, said as the key set's
+            dl.JwksCache("https://[1.2.3.4]/j")
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json")
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "jwks.json"

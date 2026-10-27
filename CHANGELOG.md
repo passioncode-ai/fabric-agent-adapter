@@ -60,13 +60,16 @@ gate behave.
   digits such as `1_2` or `+1`, which Python 3.9's `int()` takes, a bracketed host that is no IPv6 address) read as
   `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose rule differs between 3.9 patch
   releases. `check_url` refuses the same ports and bracketed hosts (an IPv6 zone included), and on Python also a
-  backslash, space, control character or `%` in the host, which urllib would decode or send to a host other than the
-  one logged (`h.example%3A8443` reached port 8443); it checks the host's shape, not its name (FAA-187 (14)).
+  backslash, space, control character or `%` in the host, and a tab or line break anywhere in the URL (`urlsplit`
+  drops it, urllib sends it), which urllib would decode or send to a host other than the one logged
+  (`h.example%3A8443` reached port 8443), where Node decodes the `%` and removes the tab; it checks the host's shape, not its name (FAA-187 (14)).
   `redact_url` on Python reads a host holding `%` as `<unparseable url>` too, where Node writes it decoded, and a
   `ws`, `wss` or `ftp` URL with no host or a port above 65535 as `<unparseable url>`, as Node does. The Python kit
-  reads a JWKS source's host and port as urllib dials them, https included: a host holding `%`, a backslash, a space
-  or a control character, a bracketed host that is no IPv6 address, a port above 65535, no host, or any `@` (an empty
-  userinfo dialled `@127.0.0.1`) is refused, where the Node kit reads the first decoded. So neither `[::1%...]` nor
+  reads a JWKS source's host and port as urllib dials them, https included: a tab or line break anywhere, a host
+  holding `%`, a backslash, a space or a control character, a bracketed host that is no IPv6 address, a port above
+  65535, no host, or any `@` (an empty userinfo dialled `@127.0.0.1`) is refused. The Node kit accepts several of
+  these as `new URL` reads them: a `%` host decoded, a backslash as `/`, a tab or line break removed, an empty
+  userinfo dropped. So neither `[::1%...]` nor
   `http://[::1]%2Eevil.example/` (which Python 3.9's `urlsplit` reads as `::1`) nor a mapped `[::ffff:127.0.0.1]`
   (loopback to Python 3.13+) counts as loopback, and
   attribution answers `not-openrouter` for a port of other digits (`:٤٤٣`), as `new URL` reads it. The path is not redacted in either twin

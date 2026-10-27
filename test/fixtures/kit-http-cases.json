@@ -176,6 +176,10 @@
   [
    "ws://u:hunter2@:80/x",
    "<unparseable url>"
+  ],
+  [
+   "https://]@h.example[evil.example/x",
+   "<unparseable url>"
   ]
  ],
  "checkUrl": [

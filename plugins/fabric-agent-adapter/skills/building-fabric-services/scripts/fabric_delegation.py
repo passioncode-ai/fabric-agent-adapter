@@ -734,7 +734,14 @@ class JwksCache:
         if not isinstance(source, str) or not source:
             raise ValueError("the key set needs a source")
         if source.startswith(("https://", "http://")):
-            parts = urllib.parse.urlsplit(source)
+            # A tab or line break: urlsplit drops it and urllib sends it, so every read would fail (product r16); and
+            # urlsplit's own refusals (`[1.2.3.4]` on 3.14) are said as the key set's.
+            try:
+                if re.search(r"[\t\n\r]", source):
+                    raise ValueError("tab or line break")
+                parts = urllib.parse.urlsplit(source)
+            except ValueError:
+                raise ValueError("a key set URL's host does not parse") from None
             if "@" in parts.netloc:  # an empty one too: urllib would dial `@127.0.0.1` (0.56.0 unit r14)
                 raise ValueError("a key set URL carries no credentials")
             if not _source_authority_ok(parts):

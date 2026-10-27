@@ -66,7 +66,9 @@ class Cases(unittest.TestCase):
         # 0.56.0 seam r12: urllib sends `https://api.example\v1/items` to host `api.example\v1` while redact_url, read
         # as WHATWG reads it, logs `https://api.example/v1/items`. Python refuses it; the Node twin sends it to
         # api.example, so this case is the Python twin's own and not a shared vector.
-        for url in ("https://api.example\\v1/items", "https://h.example\\/x", "https://h .example/x"):
+        # 0.56.0 product r16: a tab or line break, which urlsplit drops and urllib sends (http.client refuses it).
+        for url in ("https://api.example\\v1/items", "https://h.example\\/x", "https://h .example/x",
+                    "https://h.exa\tmple/x", "http://127.0.0.\t1:9/x", "https://h.example/x\n"):
             with self.subTest(url=url), self.assertRaises(fh.HttpError) as caught:
                 fh.check_url(url)
             self.assertEqual(caught.exception.kind, "refused")

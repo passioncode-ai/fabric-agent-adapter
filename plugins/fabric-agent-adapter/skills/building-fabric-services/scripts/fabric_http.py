@@ -130,9 +130,10 @@ def _authority_ok(netloc: str) -> bool:
             return False
         port = hostport[close + 1:]
         return port == "" or (port[:1] == ":" and re.fullmatch(r"[0-9]*", port[1:]) is not None)
-    if "]" in hostport:
-        return False
-    return re.fullmatch(r"[0-9]*", hostport.rpartition(":")[2] if ":" in hostport else "") is not None
+    host, _, port = hostport.partition(":")
+    # No `[` in an unbracketed host: Python 3.9 reads the host after one (`https://]@h.example[evil.example/` as
+    # evil.example), where 3.14 and `new URL` refuse it (0.56.0 unit r15).
+    return not any(c in "[]:" for c in host + port) and re.fullmatch(r"[0-9]*", port) is not None
 
 
 def redact_url(url: str) -> str:
@@ -204,6 +205,10 @@ def check_url(url: str, *, insecure: bool = False) -> None:
     """Refuse what this client never sends: a scheme other than http or https, no host, credentials in the URL, or
     plain http to a host that is not loopback (unless `insecure`)."""
     try:
+        if re.search(r"[\t\n\r]", url):
+            # urlsplit drops a tab or line break that urllib then sends and http.client refuses, so the request
+            # would fail on every call; the Node twin removes them as WHATWG does (0.56.0 product r16).
+            raise ValueError("tab or line break")
         parts = urllib.parse.urlsplit(url)
         host = parts.hostname
         parts.port  # noqa: B018 - raises on a bad port
