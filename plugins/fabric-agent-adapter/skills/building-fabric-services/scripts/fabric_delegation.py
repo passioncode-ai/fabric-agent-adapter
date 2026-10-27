@@ -818,9 +818,14 @@ def refusal_from_action(answer: Any) -> Optional[Dict[str, Any]]:
     """DL-19 (DEC-0121): the refusal a service answers for an action call that fabric_actions.action_decision refused,
     or None when it took the call. operator-decision-required, decision-invalid and approval-required carry their
     detail; human-step-required carries `humanStep` and `url` (AP-4). A `fault` is the service's own and is never
-    sent: the caller reads unknown-state with the detail `service-fault`, as for anything else that is not an answer."""
+    sent: the caller reads unknown-state with the detail `service-fault`, as for anything else that is not an answer;
+    but `mandate-capability-missing` (DEC-0141 MJ-1), a job's step no mandate can be read for, is answered as
+    operator-decision-required with that detail, so the job stays input_required."""
     if isinstance(answer, dict) and answer.get("ok") is True:
         return None
+    if isinstance(answer, dict) and answer.get("fault") == "mandate-capability-missing":
+        return _refuse("operator-decision-required", _ACTION_DETAILS["operator-decision-required"],
+                       {"detail": "mandate-capability-missing"})
     code = answer.get("code") if isinstance(answer, dict) and answer.get("ok") is False else None
     if not isinstance(code, str) or code not in _ACTION_DETAILS:
         return _refuse("unknown-state", "service-fault")

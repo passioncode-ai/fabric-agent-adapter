@@ -315,8 +315,12 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   Node has no tool server: a Node service reads `store.load(jobId).private.steps` and `.private.capability` BEFORE
   `store.answer` (which clears the steps), gates the answer with `actionGate({..., mandateCapability:
   private.capability})`, then answers. It logs the `fault` that `jobStep` and `actionGate` return beside their
-  answer, as `on_fault` does in Python: `mandate-capability-missing` means the job's tool is not a capability name.
-  Without `mandateCapability` every answer a mandate used to cover now waits for the operator.
+  answer, as `on_fault` does in Python: `mandate-capability-missing` at the start means the job's tool is not a
+  capability name; at the answer it also means `mandateCapability` was not passed. Any service that gates a job's
+  answer itself (Node `actionGate`, or Python `action_gate(..., mandate_capability=)` outside `McpToolServer`, whose
+  own gate passes it) passes the job's capability; without it every answer a mandate used to cover now waits for the
+  operator. `refusal_from_action` / `refusalFromAction` and so `actionRefusalToolResult` answer that fault as
+  `operator-decision-required` too.
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,

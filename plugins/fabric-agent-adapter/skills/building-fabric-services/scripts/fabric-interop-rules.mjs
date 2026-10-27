@@ -291,10 +291,9 @@ export function actionGate({ action, tier, caller, meta, target, elicited = fals
     if (isObject(record) && record.via === 'mandate') out.mandate = inputs.mandate;
     return out;
   }
-  // MJ-1 (DEC-0141): a job's step the service cannot read under a mandate is answered as one the mandate does not
-  // cover; nothing is applied, so the job stays input_required.
-  const said = answer.fault === 'mandate-capability-missing' ? { ok: false, code: 'operator-decision-required', data: { detail: 'mandate-capability-missing' } } : answer;
-  const out = { ok: false, refusal: refusalFromAction(said) };
+  // MJ-1 (DEC-0141): refusalFromAction answers mandate-capability-missing as operator-decision-required; nothing is
+  // applied, so the job stays input_required.
+  const out = { ok: false, refusal: refusalFromAction(answer) };
   if ('fault' in answer) out.fault = answer.fault;
   return out;
 }

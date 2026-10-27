@@ -1190,3 +1190,10 @@ class JobApprovalStepTests(unittest.TestCase):
                 self.assertEqual(refused["fault"], "mandate-capability-missing")
                 self.assertEqual(refused["refusal"]["code"], "operator-decision-required")
                 self.assertEqual(refused["refusal"]["data"]["detail"], "mandate-capability-missing")
+                inputs = {"action": action, "tier": "T0", "caller": "local:T0", "mandate": mandate, "now": NOW,
+                          "self": "example-agent", "effect": "reply"}
+                if mandate_capability is not None:
+                    inputs["mandateCapability"] = mandate_capability
+                said = fi.action_refusal_tool_result(fa.action_decision(inputs))
+                self.assertEqual(said["structuredContent"]["error"]["code"], "operator-decision-required")
+                self.assertEqual(said["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")

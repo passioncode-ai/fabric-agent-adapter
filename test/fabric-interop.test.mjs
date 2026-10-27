@@ -345,6 +345,9 @@ test('actionGate reads a kept job step under mandateCapability, not the action\'
     assert.equal(refused.fault, 'mandate-capability-missing');
     assert.equal(refused.refusal.code, 'operator-decision-required');
     assert.equal(refused.refusal.data.detail, 'mandate-capability-missing');
+    const said = i.actionRefusalToolResult(k.actionDecision({ action: step, tier: 'T0', caller: 'local:T0', mandate, now: NOW, self: 'example-agent', effect: 'reply', mandateCapability }));
+    assert.equal(said.structuredContent.error.code, 'operator-decision-required');
+    assert.equal(said.structuredContent.error.data.detail, 'mandate-capability-missing');
   }
 });
 

@@ -506,11 +506,16 @@ export function refusalFromDenial(denial) {
  * DL-19 (DEC-0121): the refusal a service answers for an action call that fabric-actions.mjs's actionDecision refused,
  * or undefined when it took the call. operator-decision-required, decision-invalid and approval-required carry their
  * detail; human-step-required carries humanStep and url (AP-4). A `fault` is the service's own and is never sent: the
- * caller reads unknown-state with the detail service-fault, as for anything else that is not an answer.
+ * caller reads unknown-state with the detail service-fault, as for anything else that is not an answer; but
+ * mandate-capability-missing (DEC-0141 MJ-1), a job's step no mandate can be read for, is answered as
+ * operator-decision-required with that detail, so the job stays input_required.
  */
 export function refusalFromAction(answer) {
   const isRecord = answer !== null && typeof answer === 'object' && !Array.isArray(answer);
   if (isRecord && answer.ok === true) return undefined;
+  if (isRecord && answer.fault === 'mandate-capability-missing') {
+    return refuse('operator-decision-required', ACTION_DETAILS.get('operator-decision-required'), { detail: 'mandate-capability-missing' });
+  }
   const code = isRecord && answer.ok === false && typeof answer.code === 'string' ? answer.code : undefined;
   if (code === undefined || !ACTION_DETAILS.has(code)) return refuse('unknown-state', 'service-fault');
   const data = answer.data !== null && typeof answer.data === 'object' && !Array.isArray(answer.data) && Object.keys(answer.data).length ? { ...answer.data } : undefined;
