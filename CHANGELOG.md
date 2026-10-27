@@ -55,7 +55,9 @@ gate behave.
   `https:u:pw@host` has no password, as in Node; a URL of any other scheme (a misspelled `htps:` included) keeps only
   its scheme in both twins (`htps:<redacted>`), since its user information may sit anywhere in the rest. It first trims
   C0 controls and space from the ends and removes tabs and line breaks, as `new URL` does, so ` https://u:pw@host`
-  keeps no password on Python 3.9 either.
+  keeps no password on Python 3.9 either. A string with no scheme (`ht tps:`, `1ttps:`, a leading byte order mark or
+  no-break space) and a URL whose port does not parse (a password holding `/`) read as `<unparseable url>`, as
+  `new URL` refuses them. The path is kept as given in both twins (connectors.md says so).
 - **A too-deep protocol value** is refused by name (FAA-122), in both twins.
 - **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
   capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer

@@ -54,6 +54,58 @@
    "<unparseable url>"
   ],
   [
+   "ht tps://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "1ttps://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "+x:u:hunter2@h.example",
+   "<unparseable url>"
+  ],
+  [
+   "u:hunter2@h.example/x?k=1",
+   "u:<redacted>"
+  ],
+  [
+   "hunter2@host/x?k=1",
+   "<unparseable url>"
+  ],
+  [
+   "\ufeffhttps://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "\u00a0https://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:hun/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:hun\\ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https:u:hun/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "<https://u:hunter2@h.example/x>",
+   "<unparseable url>"
+  ],
+  [
+   "///u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "\\\\u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
    "htps:u:hunter2@api.example/x",
    "htps:<redacted>"
   ],
