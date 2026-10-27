@@ -66,12 +66,20 @@ class Cases(unittest.TestCase):
         # 0.56.0 seam r12: urllib sends `https://api.example\v1/items` to host `api.example\v1` while redact_url, read
         # as WHATWG reads it, logs `https://api.example/v1/items`. Python refuses it; the Node twin sends it to
         # api.example, so this case is the Python twin's own and not a shared vector.
-        # 0.56.0 product r16: a tab or line break, which urlsplit drops and urllib sends (http.client refuses it).
+        # 0.56.0 product r16, unit r16: a space, tab, line break or control character inside the URL, which urllib
+        # sends and http.client refuses.
         for url in ("https://api.example\\v1/items", "https://h.example\\/x", "https://h .example/x",
-                    "https://h.exa\tmple/x", "http://127.0.0.\t1:9/x", "https://h.example/x\n"):
+                    "https://h.exa\tmple/x", "http://127.0.0.\t1:9/x", "https://h.example/a b", "https://h.example/a\x00b",
+                    "https://h.example/a?x=1 2", "https://h.example/a\x7f"):
             with self.subTest(url=url), self.assertRaises(fh.HttpError) as caught:
                 fh.check_url(url)
             self.assertEqual(caught.exception.kind, "refused")
+
+    def test_check_url_reads_a_url_with_whitespace_at_its_ends_as_urllib_sends_it(self):
+        # 0.56.0 product r17: 0.55.0 sent `https://h.example/x\n` (urllib trims the ends), and so does 0.56.0.
+        for url in ("https://h.example/x\n", "https://h.example/x\r\n", "\nhttps://h.example/x", " https://h.example/x\t"):
+            with self.subTest(url=url):
+                fh.check_url(url)
 
     def test_retry_after(self):
         for value, now, expected in CASES["retryAfter"]:

@@ -302,12 +302,16 @@ class JwksCacheTests(unittest.TestCase):
                     "https://[1.2.3.4]/j", "http://[127.0.0.1]:7777/j", "http://@127.0.0.1:7777/j",
                     "http://:@127.0.0.1:7777/j",
                     # 0.56.0 product r16, unit r15: a tab or line break, which urlsplit drops and urllib sends.
-                    "http://127.0.0.1\r/j", "http://loc\talhost:7777/j", "https://hub.exa\nmple/j"):
+                    "http://127.0.0.1\r/j", "http://loc\talhost:7777/j", "https://hub.exa\nmple/j",
+                    "https://hub.example/a b", "https://hub.example/a\x00b"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
         with self.assertRaisesRegex(ValueError, "key set"):  # 3.14's urlsplit refuses it first, said as the key set's
             dl.JwksCache("https://[1.2.3.4]/j")
+        with self.assertRaisesRegex(ValueError, "control character"):  # not blamed on a host that is fine
+            dl.JwksCache("https://hub.example/a\tb")
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json")
+        dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json\n")  # urllib trims the ends: 0.55.0 read it (r17)
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "jwks.json"
             path.write_text(json.dumps(VECTORS["jwks"]))

@@ -124,10 +124,12 @@ page as Fabric Dashboards' `open_link`; both kits carry the same sentence. The g
 `JwksCache` holds the estate's key set at most 10 minutes and, on a `kid` it does not hold, re-reads at most once
 a minute (DL-15), and waits 10 s after a failed read before trying again; after 10 minutes without a successful read it answers nothing, and the verifier says
 `issuer-unavailable`. It reads https, http on loopback only, or a file; a URL with credentials is refused. The
-Python kit also refuses a URL holding a tab or line break, a host holding `%`, a backslash, a space or a control
-character (urllib would decode or dial it as another host), a bracketed host that is no IPv6 address, a port above
-65535, no host, and an empty userinfo, https included. The Node kit accepts several of these as `new URL` reads them
-(a `%` host decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped). The
+Python kit also refuses, https included, a URL holding a space, tab, line break or control character inside it (its
+ends are trimmed as urllib reads them; inside, urllib would send it and every read fail), a host holding `%` or a
+backslash (urllib would decode or dial it as another host), a bracketed host that is no IPv6 address, a port above
+65535, no host, and an empty userinfo. The Node kit accepts several of these as `new URL` reads them, among them a `%`
+host decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped and an extra slash before the
+host skipped. The
 Python kit verifies Ed25519 itself (RFC 8032, standard library only, strict as OpenSSL: `S` below the group order,
 canonical points, no small-order key); it follows no redirect when it reads the key set; the Node kit uses `node:crypto` and refuses small-order keys
 itself (`isSmallOrderKey`), because Node before 26 lets OpenSSL accept a signature under one.

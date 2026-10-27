@@ -1186,7 +1186,12 @@ class AuditFaultTests(Conversation):
         self.outcome = slow
         r = self.threaded()
         r.step()
-        self.settle(r, rounds=4, seconds=5)
+        # Step until both are done, not a fixed four rounds: on a loaded runner a work thread can outlast a round
+        # (hosted macOS on 111b4ae ended at ['completed', 'accepted']).
+        for _ in range(40):
+            if [self.board.requests[x]["state"] for x in rids] == ["completed", "completed"]:
+                break
+            self.settle(r, rounds=1, seconds=5)
         self.assertEqual([self.board.requests[x]["state"] for x in rids], ["completed", "completed"])
         self.assertEqual(self.checkpoint(), {})
 

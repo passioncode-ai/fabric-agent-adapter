@@ -113,6 +113,10 @@ def json_bytes(value: Any) -> bytes:
     return json_stringify(value).encode("utf-8")
 
 
+# What both urllib (str.strip when it builds a Request) and a WHATWG parser remove from a URL's ends.
+_URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
+
+
 def _authority_ok(netloc: str) -> bool:
     """The host and port of an authority as a WHATWG URL accepts them, where urlsplit is laxer: a port of ASCII digits
     only (Python 3.9's int() also takes `1_2`, `+1`, ` 12` and other scripts' digits), a bracketed host that is an IPv6
@@ -205,11 +209,14 @@ def check_url(url: str, *, insecure: bool = False) -> None:
     """Refuse what this client never sends: a scheme other than http or https, no host, credentials in the URL, or
     plain http to a host that is not loopback (unless `insecure`)."""
     try:
-        if re.search(r"[\t\n\r]", url):
-            # urlsplit drops a tab or line break that urllib then sends and http.client refuses, so the request
-            # would fail on every call; the Node twin removes them as WHATWG does (0.56.0 product r16).
-            raise ValueError("tab or line break")
-        parts = urllib.parse.urlsplit(url)
+        # The ends are trimmed as urllib trims what it sends (and `new URL` too); inside, a space, tab, line break or
+        # other control character is refused: urlsplit drops some, urllib sends them and http.client refuses the
+        # request, so every call would fail, where the Node twin removes or percent-encodes them (0.56.0 product r16,
+        # r17, unit r16). A URL ending in a line break, which 0.55.0 sent, still passes.
+        sent = url.strip(_URL_ENDS)
+        if re.search(r"[\x00-\x20\x7f]", sent):
+            raise ValueError("a space or control character")
+        parts = urllib.parse.urlsplit(sent)
         host = parts.hostname
         parts.port  # noqa: B018 - raises on a bad port
         if not _authority_ok(parts.netloc):
