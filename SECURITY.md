@@ -34,7 +34,13 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   responder talks only to Fabric's hub on loopback.
 - The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
   in the session's folder (counts only, at most 1.5 s), read the process table to tell a
-  session Fabric launched, write their spool and log under the user's cache folder (0600),
+  session Fabric launched, and, only once the running Fabric's `fabric_session_observe` takes
+  `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark), read the
+  tail of the session's transcript (at most 512 KB, back to the last prompt the person typed)
+  and run `git rev-parse --show-toplevel` and `git config --get remote.origin.url` in the
+  other repositories the turn's tool calls name, within the same 1.5 s. Of the transcript they
+  use only tool names and path arguments; what leaves the machine is each repository's
+  host, owner and name, never a path, a command or message text. They write their spool and log under the user's cache folder (0600),
   and the delivery worker starts `fabric-mcp` in its own process group and ends that group
   (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no token.
 - `adapting-projects-to-fabric/scripts/adapt_project.py` reads the target project without

@@ -285,7 +285,7 @@ export class Responder {
     this.toResume = this.toResume.filter((r) => this.checkpoint.entries[r]?.capability !== capability);
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held, and does not take the slot back by itself.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work held, and does not take the slot back by itself; the service's operator action that calls takeBack brings it back.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       try {
         this.checkpoint.slot(capability, { ...held, moved: now });
       } catch {

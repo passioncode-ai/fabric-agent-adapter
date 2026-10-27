@@ -4,16 +4,21 @@
 
 ### Added
 
-- **The repositories a turn changed** (FAA-140, Fabric CO-367): working-with-fabric's Stop hook names the other Git
-  repositories a turn changed. It reads at most the last 512 KB of the session's transcript and only the current
-  turn's tool calls (Edit, Write, MultiEdit and NotebookEdit paths; `cd <absolute path>` and `git -C <path>` in Bash),
-  never message text. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside
-  the existing 1.5 s facts budget, and named `{host, owner, name}` from its `origin` (credentials, port and `.git`
-  dropped). The start folder's repository (any checkout of it), a repository without a parsable origin and duplicates
-  are left out; at most 10; no local path leaves the hook. The worker sends them as `repositories` on
-  `fabric_session_observe` for a turn only where the tool's input schema lists the field: nothing changes for today's
-  Fabric, and the log says so once per session, with a count, never names. Measured: the Stop hook's median is 247 ms
-  on a 4.8 MB transcript naming six repositories (0.52.0: 109 ms).
+- **The repositories a turn touched** (FAA-140, Fabric CO-367): working-with-fabric's Stop hook names the other Git
+  repositories a turn touched, once the running Fabric takes them. Nothing changes for a Fabric before that: the hook
+  reads no transcript until a worker has seen `fabric_session_observe` declare `repositories` as items with `host`,
+  `owner` and `name` (it then leaves a mark in the hooks' folder, and removes it when the schema stops saying so). With
+  the mark, the hook reads at most the last 512 KB of the session's transcript (message text is read with it) and uses
+  only the current turn's tool names and path arguments: Edit, Write, MultiEdit and NotebookEdit paths, and `cd
+  <absolute path>` and `git -C <path>` in Bash commands that hold `cd` or `git`, at most 64 KB of them a turn. A `cd`
+  or a read-only `git -C <path> log` names a repository as much as an edit does; a subagent's tool calls are not
+  read. Each repository is resolved with one `git rev-parse --show-toplevel` and one `git config` inside the existing
+  1.5 s facts budget, and named `{host, owner, name}` from its `origin` (credentials, port and `.git` dropped). The
+  start folder's repository (any checkout of it), a repository without a parsable origin and duplicates are left out;
+  at most 10; no local path leaves the hook. The worker sends them as `repositories` on `fabric_session_observe`; a
+  schema without the field (or with items of another shape) gets today's call, and the log says so once per session,
+  naming no repository. Measured with the read on: the Stop hook's median is 247 ms on a 4.8 MB transcript naming
+  six repositories (0.52.0: 109 ms).
 - **A board slot the operator moves to another session stays moved** (FAA-155; contract DEC-0140, proposed; CT-174,
   CT-175). The kit's board responder records the generation it holds each slot at, beside its checkpoint. When
   `com.status` (at connect, or after a call refused `fenced`) shows a later generation, it stops the handler, drops
@@ -21,8 +26,24 @@
   a restart nor enrolls again when the new holder's lease lapses. One `board.slot.moved` event (notify) says so, once
   across restarts. A first start, an equal generation, or an odd or lower generation behaves as before; a `fenced`
   refusal on accepted work for a slot the responder recorded holding keeps the entry as `lapsed`.
-  `Responder.take_back(capability)` / `takeBack(capability)` is the operator's act that brings a moved slot back: it
-  enrolls once the slot is free and takes the held work back by a transfer. Both twins.
+  An enroll or replace is recorded with its key before it is sent, so a lost answer to the responder's own call is
+  asked again under that key and never read as a move. `Responder.take_back(capability)` / `takeBack(capability)` is
+  the operator's act that brings a moved slot back: it enrolls once the slot is free and takes the held work back by a
+  transfer. The kit offers no route for it: a service wires one into its own operator surface. Both twins.
+
+### Changed
+
+- **Step 4 reads Fabric's `spawned_from`** (FAA-156, Fabric 0.3.14): working-with-fabric links a piece filed with
+  `fabric_task_create` itself only when the answer says `spawned_from: null` (once; a refused link is told to the person
+  with `spawned_from_why`), or carries no `spawned_from` (Fabric before 0.3.14) and no `chained: true` with `chained_to`
+  the claimed task. A piece whose `spawned_from` names the claimed task is already linked. `proposed: true` now says what
+  to do: file and link nothing for that piece, tell the person, go on with the rest. The goal display is named as
+  Fabric 0.3.14's. New scenario eval `spawned-from-decides-the-link`.
+- **A responder no longer takes back a slot that moved while it was away** (FAA-155). Before 0.53.0 a restarted
+  responder replaced whoever held its slot (at recovery) or enrolled again when that holder lapsed, so a slot taken
+  while it was down or after a crash came back by itself. It now stays with the new holder until the operator calls
+  `take_back`. Going back to 0.52 rewrites the checkpoint without the slot record, and a later 0.53 then no longer
+  knows the slot moved. A generation written `2.0` now reads as `2` in the Python twin as it always did in Node.
 
 ## 0.52.0 (2026-10-26)
 

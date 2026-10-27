@@ -329,7 +329,8 @@ class Responder:
             self.slots[capability] = {"state": "moved", "generation": now, "renewed_at": self.now()}
         if "moved" not in held:  # once, even across restarts
             self._emit("board.slot.moved", "warn", "The %s slot on this Project was moved to another session. This service stopped "
-                       "answering it there, left its accepted work held, and does not take the slot back by itself." % capability,
+                       "answering it there, left its accepted work held, and does not take the slot back by itself; the service's "
+                       "operator action that calls take_back brings it back." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
             try:
                 self.checkpoint.slot(capability, dict(held, moved=now))

@@ -38,7 +38,9 @@ resume) puts that preamble into the session when the MCP server `fabric` is regi
 uses Fabric (one line pointing at `fabric_whoami` in a folder with no sign of it); when Fabric
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
 project that uses Fabric; Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
-and the board's unread count; UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the
+and the board's unread count, and, once the running Fabric takes them, the other repositories the turn touched (it then
+reads the tail of the session transcript, uses only tool names and path arguments, and sends host/owner/name, never a
+path or text); UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the
 session left claimed. Stop, UserPromptSubmit and SessionEnd spool and call Fabric only when the running Fabric
 advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched, never block the session, read no token and always
 exit 0. `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks

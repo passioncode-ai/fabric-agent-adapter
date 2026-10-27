@@ -134,9 +134,10 @@ this repository both obeys it and ships its service layer
   and only in a project that uses Fabric. Stop and SessionEnd first remove
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s);
-  Stop also reads the tail of the session's transcript (at most 512 KB from its end, only the current turn's tool calls:
-  tool names and path arguments, never message text) and names the other Git repositories the turn changed as
-  `{host, owner, name}` from their `origin`, one `git rev-parse` and one `git config` each inside the same 1.5 s
+  only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'
+  folder), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text is read with
+  it, and only the current turn's tool names and path arguments are used) and names the other Git repositories the turn
+  touched as `{host, owner, name}` from their `origin`, one `git rev-parse` and one `git config` each inside the same 1.5 s
   (FAA-140; measured 2026-10-27 with a 4.8 MB transcript naming six other repositories: median 247 ms, against 109 ms
   for 0.52.0 on the same transcript, [raw](docs/reports/2026-10-27-faa-140-turn-repositories/raw/stop-hook-timing.log)); and they
   write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**

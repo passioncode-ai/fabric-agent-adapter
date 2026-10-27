@@ -141,13 +141,15 @@ Fabric 0.4.0 (REQ-38):
 2. `fabric_work_claim` with your task (a board id, a backlog row as `source: {repository, path, id}`, or a new
    row's title with its evidence) and what you will touch (folders, files or patterns). Claim the person's request
    as ONE task whose title is that request in one line, with `origin: {kind: "person", ref: <where they said it: the session or thread>}`:
-   from the Fabric release that shows agents' goals, it is shown as yours. File each piece you split off with
-   `fabric_task_create` while that task is claimed. Unless the answer says `chained: true` with `chained_to` your
-   claimed task (Fabric to 0.3.14 links only a session it launched for a task, never one opened from its own
-   terminal), link it yourself with `fabric_task_link {taskId: <the piece>, rel: "spawned", targetTaskId: <the
-   claimed task>}` (board `c42071bc`). An answer with `chained: false` names its `chain_reason`: link it yourself once,
-   and if that is refused too, tell the person its reason; never file the piece again. `proposed: true` means nothing
-   was filed, so there is nothing to link: report it and stop, the piece waits for the operator.
+   from Fabric 0.3.14, which shows agents' goals, it is shown as yours. File each piece you split off with
+   `fabric_task_create` while that task is claimed, and read the answer's `spawned_from` (Fabric 0.3.14 links the piece
+   from your single live claim). Your claimed task's id there: it is linked, link nothing. `spawned_from: null` comes
+   with `spawned_from_why`: link it yourself once with `fabric_task_link {taskId: <the piece>, rel: "spawned",
+   targetTaskId: <the claimed task>}`, and if that is refused too, tell the person that reason; never file the piece
+   again. No `spawned_from` at all is a Fabric before 0.3.14: link it yourself the same way unless the answer says
+   `chained: true` with `chained_to` your claimed task (board `c42071bc`); an answer with `chained: false` names its
+   `chain_reason`, which you tell the person if your link is refused. `proposed: true` means nothing was filed: do not
+   file or link that piece, tell the person it waits for the operator, and go on with the rest.
 3. A related-work warning (same backlog row, a linked task, an overlapping folder) names the other agent, its
    task and the overlap: tell the person, then coordinate (ask Fabric to hand it over, or link the tasks) or
    continue knowing it; say which, out loud.
@@ -339,7 +341,8 @@ and do the work without claiming Fabric saw it.
 In Claude Code this plugin ships four: at session start and `/clear` (not on compact or resume) the preamble above
 in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
-and removed) and the board's unread count; at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
+and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
+touched (read from the tail of the session transcript: tool names and path arguments only; host/owner/name are sent); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (a turn
 `watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
