@@ -196,7 +196,8 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
   approval the call presented, or `None`. `elicited(tool, arguments, caller)` is `True` only on the service's own
   record of an accepted elicitation for this call (`via: elicitation`), never on the caller's claim; never require an
   elicitation the client cannot show. `on_fault(tool, fault)` hears a service fault the caller sees only as
-  `unknown-state` (`approval-outcome-unreadable` when `approve` answers a refusal whose code or detail DL-18 does not know; an answer
+  `unknown-state`, but for one: `mandate-capability-missing` (DEC-0141 MJ-1), which the caller reads as
+  `operator-decision-required` with `data.detail` `mandate-capability-missing` (`approval-outcome-unreadable` when `approve` answers a refusal whose code or detail DL-18 does not know; an answer
   that is neither `None` nor a dict is read as no approval, which fails closed; or
   `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
   since `handle` defaults to T2 and a T2 call names nobody without them).

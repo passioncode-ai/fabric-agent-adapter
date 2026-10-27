@@ -257,7 +257,8 @@ export function jobStep({ mandate, tier, now, self, capability, key, effect, cal
  * elicitation), `approval` (verifyApproval's accepted outcome), `actionDigest`, `humanStepUrl` and `now` (RFC 3339).
  * Answers {ok: true, record, decision}, `decision` being the one taken as the operator's (null otherwise), or {ok: false,
  * refusal} in the DL-19 form (refusalToolResult sends it); a service's own fault is the refusal unknown-state with
- * `fault` beside it for the service's log.
+ * `fault` beside it for the service's log, but for mandate-capability-missing (MJ-1): operator-decision-required naming
+ * it in data.detail, `fault` still beside it.
  *
  * DEC-0125: a service that names its own agent id (`self`) reads the call's `_meta.mandate` when it carries no
  * decision, given `effect` (the action's effect class, required: without it the call is the service's fault

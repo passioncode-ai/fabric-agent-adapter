@@ -378,7 +378,8 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     record of an accepted elicitation), `approval` (verify_approval's accepted outcome), `action_digest`,
     `human_step_url` and `now` (RFC 3339). Answers {ok: True, record, decision}, `decision` being the one taken as the
     operator's (None otherwise), or {ok: False, refusal} in the DL-19 form (fabric_delegation.refusal_tool_result
-    sends it); a service's own fault is the refusal unknown-state with `fault` beside it for the service's log.
+    sends it); a service's own fault is the refusal unknown-state with `fault` beside it for the service's log, but for
+    mandate-capability-missing (MJ-1): operator-decision-required naming it in data.detail, `fault` still beside it.
 
     DEC-0125: a service that names its own agent id (`self_id`) reads the call's `_meta.mandate` when it carries no
     decision, given `effect` (the action's effect class, required: without it the call is the service's fault

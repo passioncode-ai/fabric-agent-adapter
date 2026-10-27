@@ -1092,10 +1092,11 @@ class JobApprovalStepTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
-        self.contexts, self.inputs = [], []
+        self.contexts, self.inputs, self.faults = [], [], []
         server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, clock=lambda: NOW_SECONDS, agent_id="example-agent",
                                   input_actions=True, on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
-                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)))
+                                  on_input=lambda job_id, matched, ctx: self.inputs.append((matched, ctx)),
+                                  on_fault=lambda tool, fault: self.faults.append((tool, fault)))
         server.add_tool({"name": "reviewsApprove", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
         return server
 
@@ -1126,6 +1127,7 @@ class JobApprovalStepTests(unittest.TestCase):
             job_id, record = self.step()
             self.assertIsNone(record, scope)
             self.assertIn("mandate-capability-missing", self.jobs.get(job_id)["statusMessage"])
+            self.assertEqual(self.faults, [("reviewsApprove", "mandate-capability-missing")], "the start hears it")
             server = self.camel_server()
             self.start_camel(server, {})
             job_id, _ = self.step()
@@ -1134,6 +1136,7 @@ class JobApprovalStepTests(unittest.TestCase):
             self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
             self.assertEqual(refused["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")
             self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
+            self.assertEqual(self.faults, [("fabric.job.get", "mandate-capability-missing")], "and the answer")
 
     def test_a_kept_step_does_not_outlive_its_question(self):
         # Seam round 1: a later plain question under the same key is not answered by a mandate alone.

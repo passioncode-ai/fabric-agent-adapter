@@ -168,11 +168,10 @@ export function actionDecision(inputs) {
 
 /** The tool of a job's input request (interop C3.3, AP-2): the call that answers it is fabric.job.get (DEC-0141 MJ-1). */
 export const JOB_STEP_TOOL = 'fabric.job.get';
-const CAPABILITY_NAME = /^[a-z][a-z0-9._-]{1,127}$/; // common.schema.json#/$defs/capabilityName
 
 /** A job's capability a mandate can read a step under (MJ-1): a capability name, never fabric.job.get itself. */
 export function jobCapability(value) {
-  return typeof value === 'string' && CAPABILITY_NAME.test(value) && value !== JOB_STEP_TOOL;
+  return typeof value === 'string' && CAPABILITY.test(value) && value !== JOB_STEP_TOOL;
 }
 
 /**

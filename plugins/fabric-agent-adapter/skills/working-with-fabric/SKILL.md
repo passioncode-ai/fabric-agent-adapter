@@ -238,8 +238,8 @@ already approved.
   `{kind: "mandate/1", by: "operator", task, instruction, at, source?, expiresAt, scope, chain}`, `instruction` his
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you
   relayed, `expiresAt` at most seven days on, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
-  `perCallMaxUsd`, `projects`), `chain` starting with you. A job that asks the operator at a step names the job's capability in
-  `capabilities` without `actions`: the step is read with its request key as the action, a key you cannot know ahead
+  `perCallMaxUsd`, `projects`), `chain` starting with you. For a job asking the operator at a step, name the job's capability in
+  `capabilities` without `actions`: the step is read with its request key as the action, unknown ahead
   (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
   narrower `scope` when you hand on less, never wider; at most four agents; `source` never changes down the chain. It
   travels in the call's `_meta.mandate` or as `call.mandate` of Fabric's `agent.call` once Fabric's hub forwards it
@@ -261,7 +261,7 @@ already approved.
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,
   about that part alone (MD-4). A
   caller outside the machine's trust (T2) gets nothing from a mandate.
-- The contract's decision for request `519d7b21` is DEC-0126 (OA-1 to OA-7), pinned since 0.52.0 (FAA-134), with
+- The contract's decision for request `519d7b21` is DEC-0126 (OA-1 to OA-7), with
   `mandate/1` (DEC-0125) its machine form and `source` the place it names.
 
 ### A lane stopped on a limit: restart it at once
@@ -313,7 +313,7 @@ stuck work to the operator.
 | denied | the operator said no | stop; it stands until cleared in Agent access |
 | failed in the client before its answer arrived; outcome unknown | the call may have run | check its effect first (`fabric_work_list`, `fabric_tasks_list`); repeat only with the same idempotency key |
 | Fabric restarted or closed this session; nothing was done | refused before the call ran | call it again once `fabric_whoami` answers |
-| `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, call again within your own mandate if it covers the part, else pass the refusal to the agent that called you, and only the lead asks him, once, about that part alone |
+| `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, call again within your own mandate if it covers the part, else pass the refusal to the agent that called you, and only the lead asks him, once, about that part alone; `mandate-capability-missing`: no mandate covers that step, only his decision |
 | `decision-invalid` | the decision names another action or object, is older than 24 hours, lies over 60 s ahead of the service's clock, or is malformed; or the mandate is (`data.detail` `mandate-malformed`, `-widened`, `-expired`, `-early`, `-not-for-this-call`) | never edit, widen or re-date it; ask the operator again when their words do not cover this call |
 | `approval-required` with `data.actionDigest` | a caller outside the machine's trust (T2): a chat decision changes nothing | an `approval/1` for that digest through the hub |
 | `human-step-required` with `data.humanStep` and `data.url` | a sign-in, a one-time code, consent, payment or top-up, typed secret, spend above a limit or passkey stays the person's | hand the person `data.url`: a path on the service's origin as Fabric Dashboards' `open_link` (`fallback=never`), an https URL as it is; never take the step or ask for the secret; continue other work |

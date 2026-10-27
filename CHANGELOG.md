@@ -14,13 +14,16 @@
   `actionGate` answer that fault to the caller as `operator-decision-required` (`data.detail`
   `mandate-capability-missing`), the fault beside it for the service's log; nothing is applied, so the job stays
   `input_required`. `job_step` / `jobStep` read an unusable job capability alike at the start: the step waits
-  `input_required`, its message naming `mandate-capability-missing`. So a job whose tool is not a capability name is no
+  `input_required`, its message naming `mandate-capability-missing`, and the Python tool server hands that fault to
+  `on_fault` at the start as at the answer. It is the one service fault a caller reads by name: `on_fault`'s and the
+  delegation reference's rule (a caller sees a fault only as `unknown-state`) now names it. So a job whose tool is not a capability name is no
   longer covered by an `actions`-only mandate at either end, and a mandate whose `capabilities` name `fabric.job.get`
   covers no step of another capability. The vendored `actions-vectors.json` gains the contract's `jobSteps` group (14
   cases) and its two new `action-call` fixtures (18 in all); both twins run them. Bundles issued under the previous pin
   `1197a90d` stay valid (`adapt_project.py`).
 - **working-with-fabric:** a leading agent covering a job's approval step names the job's capability in
-  `capabilities` without `actions` (the step's request key is the service's own). New scenario eval
+  `capabilities` without `actions` (the step's request key is the service's own), and reads `data.detail`
+  `mandate-capability-missing` as a step no mandate covers: only the operator's decision answers it. New scenario eval
   `lead-covers-a-job-step-by-its-capability`. building-fabric-services' interop reference drops the sentence that
   read an answer without a capability under `fabric.job.get`.
 
