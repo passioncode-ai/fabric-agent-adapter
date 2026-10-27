@@ -198,7 +198,7 @@
         "puts deterministic false-state gates before the model checker, gives the checker the material before the instructions, takes numbers and account state from tools, and re-reads the conversation's live tail before sending",
         "on a refusal repairs once, then runs one research turn, then holds honestly, and the hold comes back by itself when the gap closes",
         "counts hand-offs by cause (policy, inability, infrastructure), never as answers, keeps them out of the judge's sample, and keeps a commitments ledger",
-        "reads the knowledge service's answer flag with no threshold of its own, queues every abstention as a gap and asks again after it closes, and re-reads its feed once when it starts reading a new event kind"
+        "reads the knowledge service's answer flag with no threshold of its own, queues every abstention and every hold as a gap and asks again after it closes, and re-reads its feed once when it starts reading a new event kind"
       ]
     }
   ]

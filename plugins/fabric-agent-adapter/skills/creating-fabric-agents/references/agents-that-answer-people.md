@@ -14,8 +14,8 @@ both in the `agent-evals` skill of [ssheleg/agent-stack](https://github.com/sshe
 with [PR #70](https://github.com/ssheleg/agent-stack/pull/70), linked here at its commit until it merges. The standard says how such an agent
 is measured; the practices say what worked and what failed. This page lists what the agent carries and the check that
 proves each part. Read both sources before you design the reply pipeline. The kit's support-agent recipe
-(building-fabric-services, `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: a failed
-check of its draft is where this page's repair, research and hold begin, and its abstentions open a gap.
+(building-fabric-services, `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: used
+alone it hands a refused draft to a person at the first refusal, where this page repairs, researches and holds.
 
 ## Contents
 
@@ -35,7 +35,7 @@ check of its draft is where this page's repair, research and hold begin, and its
   handed off, small talk, limit, error), the hand-off reason and category, the latency, the knowledge revision the
   answer used, and whether the channel accepted the reply. Conversation text stays inside the agent, redacted, for at
   most 30 days. Check: a test that a turn without a trace id, or with an outcome outside the list, is refused.
-- **The agent publishes one `support.quality_daily` per closed UTC day and channel** on its events feed
+- **The agent publishes one `support.quality_daily` per closed UTC day and channel** (A5) on its events feed
   (`/fabric/v1/events`; building-fabric-services, `references/events-and-notifications.md`): counts and codes only, the
   judge model and rubric version, and `notMeasured` naming every family not computed that day. A metric not measured is
   null and named, never 0. The day goes in the event's `data` (`{schema, value}`, as `fabric_events.py` writes it), at
@@ -53,10 +53,10 @@ check of its draft is where this page's repair, research and hold begin, and its
   reads what people wrote. Declare them as classes in the profile, where each lane's fallback is another vendor than its
   primary ([models and providers](models-and-providers.md)); per turn the router picks the checker against the model
   that actually drafted, a fallback writer included ([resilience and
-  autonomy](resilience-and-autonomy.md#model-answers-are-untrusted-until-accepted), item 3). Check: the config loader
-  refuses a fallback that shares its own lane's primary vendor, a checker route (primary or fallback) that shares the
-  vendor of the writer or the fallback writer, and a judge route (primary or fallback) that shares the vendor of either
-  writer or of either checker route (the vendor is the prefix before `/`).
+  autonomy](resilience-and-autonomy.md#model-answers-are-untrusted-until-accepted), item 3). A lane that reads what
+  people wrote has an open-vendor route (DEC-0083). Check: the config loader refuses a fallback that shares its own
+  lane's primary vendor, a profile where some writer route has no checker route of another vendor, and a judge with no
+  route outside the vendors of the writers and the checkers (the vendor is the prefix before `/`).
 - **Count what the fallback recovered** (P4), not only what the first attempt lost: a day's report says how many calls
   failed and how many of those the fallback answered. Check: a test that a recovered call counts once as a failure of
   the primary and once as a recovery, and is never counted as an error of the turn.
@@ -105,9 +105,9 @@ check of its draft is where this page's repair, research and hold begin, and its
   given as an answer and returns an `answer` flag per item; the client reads the flag and nothing else. Small closed
   rule sets (prices, payment terms, refunds, sign-in) go into the prompt whole, dated and ordered by owner. Check: a
   test that changing the client's configuration cannot make an item with `answer: false` an answer.
-- **Every abstention becomes a gap in a queue** (P7), restated without personal data and grouped by meaning. When a gap
-  closes, the client asks again and rewrites the held answer only once the new answer is confident. Check: a closed gap
-  whose new answer comes back with `answer: false` leaves the hold in place.
+- **Every abstention and every inability, a hold included, becomes a gap in a queue** (P7), restated without personal
+  data and grouped by meaning. When a gap closes, the client asks again and rewrites the held answer only once the new
+  answer is confident. Check: a closed gap whose new answer comes back with `answer: false` leaves the hold in place.
 
 ## Reading the events feed
 
