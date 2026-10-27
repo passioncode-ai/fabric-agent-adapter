@@ -83,6 +83,7 @@ export class BoardSession {
 export class Checkpoint {
   constructor(file) {
     this.file = file;
+    this.slots = {}; // the responder's own record of each slot it held: {project, generation, moved?} (FAA-155)
     this.entries = this.#load();
   }
   #load() {
@@ -100,13 +101,16 @@ export class Checkpoint {
       doc = null;
     }
     if (!isObj(doc) || doc.version !== 1 || !isObj(doc.requests)) throw new BoardError('checkpoint', `The board checkpoint ${this.file} is not one this kit writes.`);
+    // a record that is not an object is ignored, as a file without one is
+    this.slots = isObj(doc.slots) ? Object.fromEntries(Object.entries(doc.slots).filter(([, v]) => isObj(v))) : {};
     return doc.requests;
   }
-  #write(entries) {
+  #write(entries, slots = this.slots) {
     try {
       ensurePrivateDir(path.dirname(this.file));
-      const sorted = Object.fromEntries(Object.keys(entries).sort().map((k) => [k, entries[k]]));
-      atomicWrite(this.file, `${JSON.stringify({ requests: sorted, version: 1 }, null, 1)}\n`, 0o600);
+      const sort = (o) => Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
+      const doc = Object.keys(slots).length ? { requests: sort(entries), slots: sort(slots), version: 1 } : { requests: sort(entries), version: 1 };
+      atomicWrite(this.file, `${JSON.stringify(doc, null, 1)}\n`, 0o600);
     } catch (e) {
       throw new BoardError('checkpoint', `The board checkpoint could not be written (${e.code ?? e.message}); nothing was sent.`);
     }
@@ -122,7 +126,17 @@ export class Checkpoint {
     this.#write(entries);
     this.entries = entries;
   }
+  /** Writes the record of a slot this responder held (null forgets it); nothing is written when it is unchanged. */
+  slot(capability, record) {
+    const { [capability]: _old, ...slots } = this.slots;
+    if (record !== null) slots[capability] = JSON.parse(JSON.stringify(record));
+    if (JSON.stringify(sortDeep(slots)) === JSON.stringify(sortDeep(this.slots))) return;
+    this.#write(this.entries, slots);
+    this.slots = slots;
+  }
 }
+
+const sortDeep = (v) => (isObj(v) ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])])) : v);
 
 /** A claimed request as data: never an instruction. */
 export class BoardRequest {

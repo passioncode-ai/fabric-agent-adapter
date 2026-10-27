@@ -1159,6 +1159,176 @@ class HoldTests(Conversation):
         self.assertNotIn("board.down", self.kinds())
 
 
+_KEEP, _ABSENT = object(), object()
+
+
+class MovedSlotTests(Conversation):
+    """FAA-155 (contract DEC-0140 PR-2; CT-174, CT-175): a slot the operator moves to another session stays moved. The
+    responder records the generation it held; once com.status shows it moved past, it ends its claims there, leaves its
+    accepted work held, and neither replaces (at recovery) nor re-enrolls (when the new holder lapses) on its own."""
+
+    _crash_after = RestartTests._crash_after
+
+    def moved(self):
+        return [e for e in self.events if e[0] == "board.slot.moved"]
+
+    def record(self):
+        path = self.data / "board-checkpoint.json"
+        return json.loads(path.read_text()).get("slots", {}) if path.exists() else {}
+
+    def test_the_generation_held_is_recorded_beside_the_checkpoint(self):
+        r = self.responder()
+        r.step()
+        self.assertEqual(self.record(), {"video.render": {"project": r.project, "generation": 1}})
+        self.assertEqual(fb.Checkpoint(self.data / "board-checkpoint.json").slots["video.render"]["generation"], 1)
+
+    def test_a_restart_after_a_move_does_not_replace(self):
+        rid, _ = self._crash_after(effect=False)  # held at generation 1; accepted work in the checkpoint
+        self.board.move("video.render")  # the operator moves the slot: generation 2, another live session
+        self.board.calls.clear()
+        second = self.responder()
+        second.step()
+        self.assertNotIn("com.responder_replace", self.tools())
+        self.assertNotIn("com.enroll", self.tools())
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")  # held on the board, not transferred
+        self.assertEqual(self.checkpoint()[rid]["step"], "lapsed")
+        said = self.moved()
+        self.assertEqual(len(said), 1)
+        self.assertTrue(said[0][3]["notify"])
+        self.assertIn("moved to another session", said[0][2])
+        self.assertEqual(said[0][3]["data"]["value"], {"capability": "video.render", "generation": 2, "held": 1})
+        self.board.advance(61)  # the new holder lets its lease lapse
+        for _ in range(3):
+            second.step()
+            self.board.advance(20)
+        third = self.responder()  # and another restart
+        third.step()
+        self.assertFalse({"com.responder_replace", "com.enroll", "com.claim"} & set(self.tools()))
+        self.assertEqual(self.board.slots["video.render"]["generation"], 2)
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+        self.assertEqual(len(self.moved()), 1)  # said once, across the restart too
+        self.assertEqual(self.record()["video.render"]["moved"], 2)
+
+    def test_a_lapsed_new_holder_is_not_re_enrolled(self):
+        r = self.responder()
+        r.step()  # holds generation 1, idle
+        rid = self.board.queue("video.render")
+        self.board.move("video.render")
+        self.board.advance(15)
+        r.step()  # its com.claim is fenced: com.status shows generation 2
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertEqual(self.tools()[-2:], ["com.claim", "com.status"])
+        seen = len(self.tools())
+        self.board.advance(61)  # the new holder's lease lapses
+        for _ in range(4):
+            r.step()
+            self.board.advance(20)
+        self.assertEqual(self.tools()[seen:], [])
+        self.assertEqual(self.board.slots["video.render"]["generation"], 2)
+        self.assertEqual(self.board.requests[rid]["state"], "queued")
+        self.assertEqual(len(self.moved()), 1)
+
+    def test_work_running_when_the_slot_moves_stops_and_stays_held(self):
+        import time
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def slow(request, ctx):
+            release.wait(5)
+            return {"state": "completed"}
+        self.outcome = slow
+        rid = self.board.queue("video.render")
+        r = self.responder(spawn=lambda fn: threading.Thread(target=fn, daemon=True).start())
+        r.step()  # accepted; the handler works
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()  # its com.renew is fenced; com.status says the slot moved
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertIsNone(r.current)
+        self.assertEqual(self.checkpoint()[rid]["step"], "lapsed")
+        release.set()
+        time.sleep(0.1)
+        self.board.advance(61)
+        r.step()
+        r.step()
+        self.assertFalse({"com.complete", "com.responder_replace", "com.enroll"} & set(self.tools()[self.tools().index("com.renew"):]))
+        self.assertEqual(self.board.requests[rid]["state"], "accepted")
+        self.assertEqual(len(self.moved()), 1)
+
+    def test_an_unmoved_restart_still_recovers_its_own_accepted_work(self):
+        rid, _ = self._crash_after(effect=False)
+        self.assertEqual(self.record()["video.render"]["generation"], 1)
+        second = self.responder()
+        second.step()
+        replace = dict(self.board.calls)["com.responder_replace"]
+        self.assertEqual((replace["expectedGeneration"], replace["transfer"]["requests"]), (1, [rid]))
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.record()["video.render"]["generation"], 2)
+        self.assertEqual(self.moved(), [])
+
+    def test_take_back_is_the_operators_act(self):
+        rid, _ = self._crash_after(effect=False)
+        self.board.move("video.render")
+        second = self.responder()
+        second.step()
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+        with self.assertRaises(fb.BoardError):
+            second.take_back("other.capability")
+        second.take_back("video.render")
+        self.assertNotIn("video.render", self.record())
+        self.board.advance(61)  # the new holder lapsed: the next tick enrolls and transfers the work left held
+        second.step()
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.record()["video.render"]["generation"], self.board.slots["video.render"]["generation"])
+
+    def _restart_with(self, record: object = _KEEP, status: object = _KEEP):
+        rid, _ = self._crash_after(effect=False)
+        path = self.data / "board-checkpoint.json"
+        if record is not _KEEP:
+            doc = json.loads(path.read_text())
+            doc["slots"] = record
+            path.write_text(json.dumps(doc))
+        if status is not _KEEP:
+            plain = self.board.op_status
+
+            def op_status(*args):
+                out = plain(*args)
+                for r in out["responders"]:
+                    r.pop("generation") if status is _ABSENT else r.update(generation=status)
+                return out
+            self.board.op_status = op_status
+        second = self.responder()
+        second.step()
+        return rid, second
+
+    def test_odd_or_lower_generations_are_never_read_as_a_move(self):
+        """Today's behaviour, not a fail-closed stop: no record (or one not this kit's), a status generation that is not
+        an integer, or one not past the record, is not a move, so the restart replaces as before."""
+        project = fh._project(PROJECT)
+        for record in ("x", {"video.render": "x"}, {"video.render": {"project": project, "generation": "1"}},
+                       {"video.render": {"project": project, "generation": True}}, {"video.render": {"project": project, "generation": 0}},
+                       {"video.render": {"project": "another-project", "generation": 1}},
+                       {"video.render": {"project": project, "generation": 5}}):  # lower on the board than recorded
+            with self.subTest(record=record):
+                rid, second = self._restart_with(record=record)
+                self.assertIn("com.responder_replace", self.tools())
+                self.assertEqual(self.board.requests[rid]["state"], "completed")
+                self.assertEqual(self.record()["video.render"], {"project": project, "generation": 2})  # rewritten
+                self.assertEqual(self.moved(), [])
+                self.tearDown()
+                self.setUp()
+        for status in (_ABSENT, None, "2", 2.5, True, -1):
+            with self.subTest(status=status):
+                _, second = self._restart_with(status=status)
+                replace = dict(self.board.calls)["com.responder_replace"]
+                self.assertEqual(replace["expectedGeneration"], 0)  # as before: an odd generation is sent as 0
+                self.assertNotEqual((second.slots.get("video.render") or {}).get("state"), "moved")
+                self.assertEqual(self.moved(), [])
+                self.tearDown()
+                self.setUp()
+
+
 class CheckpointTests(unittest.TestCase):
     def test_atomic_private_and_refuses_a_foreign_file(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1172,6 +1342,29 @@ class CheckpointTests(unittest.TestCase):
             path.write_text('{"version": 9}')
             with self.assertRaises(fb.BoardError):
                 fb.Checkpoint(path)
+
+    def test_the_slot_record_lives_beside_the_requests(self):
+        """FAA-155: written with the requests, kept by put and drop, forgotten with None; a malformed one is ignored."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "cp.json"
+            cp = fb.Checkpoint(path)
+            cp.put({"request": "req_000000001", "step": "claimed"})
+            self.assertNotIn("slots", json.loads(path.read_text()))  # a file without a record reads as before
+            cp.slot("video.render", {"project": "p", "generation": 3})
+            cp.put({"request": "req_000000002", "step": "claimed"})
+            cp.drop("req_000000001")
+            again = fb.Checkpoint(path)
+            self.assertEqual((again.slots, list(again.entries)), ({"video.render": {"project": "p", "generation": 3}}, ["req_000000002"]))
+            writes = []
+            real = cp._write
+            cp._write = lambda *a: writes.append(a) or real(*a)
+            cp.slot("video.render", {"project": "p", "generation": 3})
+            self.assertEqual(writes, [])  # unchanged: nothing written
+            cp.slot("video.render", None)
+            self.assertEqual(fb.Checkpoint(path).slots, {})
+            for odd in ('"x"', "[1]", '{"video.render": 7}'):
+                path.write_text('{"version": 1, "requests": {}, "slots": %s}' % odd)
+                self.assertEqual(fb.Checkpoint(path).slots, {})
 
 
 class SelfCheckAndProbeTests(unittest.TestCase):

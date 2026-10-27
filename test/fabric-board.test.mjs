@@ -896,3 +896,172 @@ test('FAA-77 39: every transferred request resumes, one per idle tick', async (t
   assert.deepEqual(rids.map((x) => s.requests[x].state), ['completed', 'completed']);
   assert.deepEqual(h.checkpoint(), {});
 });
+
+// --- FAA-155: a slot the operator moves to another session stays moved (contract DEC-0140 PR-2; CT-174, CT-175) --------
+const record = (hub) => {
+  const file = path.join(hub.data, 'board-checkpoint.json');
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).slots ?? {} : {};
+};
+
+async function crashedHolding(t) {
+  // One responder holds the slot at generation 1, accepts a request and dies inside its work; its session ends.
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = () => new Promise(() => {});
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const first = h.responder();
+  await first.step();
+  assert.deepEqual(record(hub), { 'video.render': { project: first.project, generation: 1 } });
+  await hub.control({ op: 'end-sessions' });
+  h.outcome = { state: 'completed', summary: 'Rendered after the restart.' };
+  return { hub, h, rid, project: first.project };
+}
+
+test('FAA-155: a restart after a move neither replaces nor re-enrolls, says so once, and leaves accepted work held', async (t) => {
+  const { hub, h, rid } = await crashedHolding(t);
+  await hub.control({ op: 'move', capability: 'video.render' }); // generation 2, another live session
+  const before = (await h.tools()).length;
+  const second = h.responder();
+  await second.step();
+  assert.equal(second.slots['video.render'].state, 'moved');
+  assert.equal(h.checkpoint()[rid].step, 'lapsed');
+  const said = h.events.filter((e) => e[0] === 'board.slot.moved');
+  assert.equal(said.length, 1);
+  assert.ok(said[0][3].notify);
+  assert.match(said[0][2], /moved to another session/);
+  assert.deepEqual(said[0][3].data.value, { capability: 'video.render', generation: 2, held: 1 });
+  await h.advance(61); // the new holder lets its lease lapse
+  for (let i = 0; i < 3; i += 1) {
+    await second.step();
+    await h.advance(20);
+  }
+  await h.responder().step(); // another restart
+  const s = await h.state();
+  assert.ok(!s.calls.slice(before).some((c) => ['com.responder_replace', 'com.enroll', 'com.claim'].includes(c)), s.calls.slice(before).join());
+  assert.equal(s.slots['video.render'].generation, 2);
+  assert.equal(s.requests[rid].state, 'accepted');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+  assert.equal(record(hub)['video.render'].moved, 2);
+});
+
+test('FAA-155: a live responder whose slot moved is not enrolled again when the new holder lapses', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(15);
+  await r.step(); // its com.claim is fenced: com.status shows generation 2
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.deepEqual((await h.tools()).slice(-2), ['com.claim', 'com.status']);
+  const seen = (await h.tools()).length;
+  await h.advance(61);
+  for (let i = 0; i < 4; i += 1) {
+    await r.step();
+    await h.advance(20);
+  }
+  const s = await h.state();
+  assert.deepEqual(s.calls.slice(seen), []);
+  assert.equal(s.slots['video.render'].generation, 2);
+  assert.equal(s.requests[rid].state, 'queued');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+});
+
+test('FAA-155: work running when the slot moves stops, stays held, and is never completed or transferred', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  h.outcome = async () => {
+    await gate;
+    return { state: 'completed' };
+  };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await r.step(); // accepted; the handler works
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step(); // its com.renew is fenced; com.status says the slot moved
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.equal(r.current, null);
+  assert.equal(h.checkpoint()[rid].step, 'lapsed');
+  release();
+  await sleep(20);
+  await h.advance(61);
+  await r.step();
+  await r.step();
+  const s = await h.state();
+  assert.ok(!s.calls.slice(s.calls.indexOf('com.renew')).some((c) => ['com.complete', 'com.responder_replace', 'com.enroll'].includes(c)));
+  assert.equal(s.requests[rid].state, 'accepted');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+});
+
+test('FAA-155: an unmoved restart recovers its own accepted work; takeBack is the operator\'s act', async (t) => {
+  const { hub, h, rid } = await crashedHolding(t);
+  await h.responder().step();
+  let s = await h.state();
+  const replace = s.callArgs[s.calls.indexOf('com.responder_replace')];
+  assert.deepEqual([replace.expectedGeneration, replace.transfer.requests], [1, [rid]]);
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(record(hub)['video.render'].generation, 2);
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+
+  const moved = await crashedHolding(t);
+  await moved.hub.control({ op: 'move', capability: 'video.render' });
+  const second = moved.h.responder();
+  await second.step();
+  assert.equal(second.slots['video.render'].state, 'moved');
+  assert.throws(() => second.takeBack('other.capability'), (e) => e.code === 'invalid_arguments');
+  second.takeBack('video.render');
+  assert.ok(!('video.render' in record(moved.hub)));
+  await moved.h.advance(61); // the new holder lapsed: the next tick enrolls and transfers the work left held
+  await second.step();
+  s = await moved.h.state();
+  assert.equal(s.requests[moved.rid].state, 'completed');
+  assert.equal(record(moved.hub)['video.render'].generation, s.slots['video.render'].generation);
+});
+
+test('FAA-155: an odd or lower generation, recorded or in com.status, is never read as a move (today\'s behaviour)', async (t) => {
+  const records = (project) => ['x', { 'video.render': 'x' }, { 'video.render': { project, generation: '1' } }, { 'video.render': { project, generation: true } },
+    { 'video.render': { project: 'another-project', generation: 1 } }, { 'video.render': { project, generation: 5 } }];
+  for (let i = 0; i < records('').length; i += 1) {
+    const { hub, h, rid, project } = await crashedHolding(t);
+    const file = path.join(hub.data, 'board-checkpoint.json');
+    const odd = records(project)[i];
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), slots: odd }), { mode: 0o600 });
+    await h.responder().step();
+    const s = await h.state();
+    assert.ok(s.calls.includes('com.responder_replace'), JSON.stringify(odd));
+    assert.equal(s.requests[rid].state, 'completed', JSON.stringify(odd));
+    assert.deepEqual(record(hub)['video.render'], { project, generation: 2 });
+    assert.ok(!h.kinds().includes('board.slot.moved'));
+  }
+  for (const odd of ['absent', null, '2', 2.5, true, -1]) {
+    const { hub, h } = await crashedHolding(t);
+    await hub.control({ op: 'set', values: { status_generation: odd } });
+    const r = h.responder();
+    await r.step();
+    const s = await h.state();
+    assert.equal(s.callArgs[s.calls.indexOf('com.responder_replace')].expectedGeneration, 0, String(odd)); // as before: sent as 0
+    assert.notEqual(r.slots['video.render']?.state, 'moved');
+    assert.ok(!h.kinds().includes('board.slot.moved'));
+  }
+});
+
+test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
+  const dir = tempDir('faa155-cp-');
+  const file = path.join(dir, 'cp.json');
+  const cp = new fb.Checkpoint(file);
+  cp.put({ request: 'req_000000001', step: 'lapsed', keys: {} });
+  cp.slot('video.render', { project: 'p', generation: 3, moved: 4 });
+  const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
+  const py = spawnSync('python3', ['-c', `import sys, json; sys.path.insert(0, ${JSON.stringify(scripts)}); import fabric_board as fb
+c = fb.Checkpoint(${JSON.stringify(file)}); print(json.dumps(c.slots, sort_keys=True)); c.slot("text.write", {"project": "p", "generation": 1})`], { encoding: 'utf8' });
+  assert.equal(py.status, 0, py.stderr);
+  assert.deepEqual(JSON.parse(py.stdout), { 'video.render': { generation: 3, moved: 4, project: 'p' } });
+  const back = new fb.Checkpoint(file);
+  assert.deepEqual(back.slots, { 'text.write': { generation: 1, project: 'p' }, 'video.render': { generation: 3, moved: 4, project: 'p' } });
+  assert.deepEqual(Object.keys(back.entries), ['req_000000001']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});

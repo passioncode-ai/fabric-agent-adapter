@@ -97,11 +97,14 @@ class BoardSession:
 class Checkpoint:
     """The responder's own journal: one JSON file (0600) holding every request it has claimed and not yet settled, each
     with its fence and the idempotency key of the step in flight. Written atomically and fsynced BEFORE the step it
-    announces is sent; a write that fails raises `BoardError("checkpoint")` and the step is not taken."""
+    announces is sent; a write that fails raises `BoardError("checkpoint")` and the step is not taken. Beside the
+    requests, `slots` keeps the responder's own record of each slot it held (`{project, generation, moved?}`, FAA-155);
+    a record that is not an object is ignored, as a file without one is."""
 
     def __init__(self, path: Path):
         self.path = Path(path)
         self._lock = threading.Lock()
+        self.slots: Dict[str, Dict[str, Any]] = {}
         self.entries: Dict[str, Dict[str, Any]] = self._load()
 
     def _load(self) -> Dict[str, Dict[str, Any]]:
@@ -115,12 +118,16 @@ class Checkpoint:
         entries = doc.get("requests") if isinstance(doc, dict) and doc.get("version") == 1 else None
         if not isinstance(entries, dict):
             raise BoardError("checkpoint", "The board checkpoint %s is not one this kit writes." % self.path)
+        slots = doc.get("slots")
+        self.slots = {k: v for k, v in slots.items() if isinstance(v, dict)} if isinstance(slots, dict) else {}
         return entries
 
-    def _write(self, entries: Dict[str, Dict[str, Any]]) -> None:
+    def _write(self, entries: Dict[str, Dict[str, Any]], slots: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
+        slots = self.slots if slots is None else slots
+        doc: Dict[str, Any] = {"version": 1, "requests": entries, **({"slots": slots} if slots else {})}
         try:
             _fs.ensure_private_dir(self.path.parent)
-            _fs.atomic_write(self.path, (json.dumps({"version": 1, "requests": entries}, indent=1, sort_keys=True) + "\n").encode())
+            _fs.atomic_write(self.path, (json.dumps(doc, indent=1, sort_keys=True) + "\n").encode())
         except OSError as exc:
             raise BoardError("checkpoint", "The board checkpoint could not be written (%s); nothing was sent." % (exc.strerror or exc.__class__.__name__)) from None
 
@@ -139,6 +146,16 @@ class Checkpoint:
             del entries[request_id]
             self._write(entries)
             self.entries = entries
+
+    def slot(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
+        """Writes the record of a slot this responder held (None forgets it); nothing is written when it is unchanged."""
+        with self._lock:
+            slots = {k: v for k, v in self.slots.items() if k != capability}
+            if record is not None:
+                slots[capability] = json.loads(json.dumps(record))
+            if slots != self.slots:
+                self._write(self.entries, slots)
+                self.slots = slots
 
 
 class BoardRequest:

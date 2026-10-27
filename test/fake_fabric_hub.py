@@ -220,6 +220,8 @@ class Board:
             s = self._slot(cap)
             live = s["holder"] is not None and s["lease"] > self.now
             entry = {"capability": cap, "state": "active" if live else ("stale" if s["holder"] else "absent"), "generation": s["generation"]}
+            if "status_generation" in self.__dict__:  # a test's odd value (FAA-155); "absent" leaves it out
+                entry.pop("generation") if self.status_generation == "absent" else entry.update(generation=self.status_generation)
             if self.holds:
                 entry["held"] = self._slot_held(cap)
             if s["holder"]:
@@ -451,6 +453,14 @@ class Board:
         if moved and not self.omit_transferred:
             receipt["transferred"] = moved
         return self._store("com.responder_replace", args, d, receipt)
+
+    def move(self, capability: str, to: str = "s-moved") -> None:
+        """The operator moves the slot to another live session (contract DEC-0140 PR-2): one transition, as
+        com.responder_replace would make it for that session; accepted work is held and not transferred."""
+        s = self._slot(capability)
+        s["generation"] += 1
+        s["holder"], s["lease"] = to, self.now + LEASE
+        self._replacement(capability, s["generation"], returning_claimed=True)
 
     def release(self, session: str) -> None:
         for s in self.slots.values():
@@ -692,6 +702,8 @@ class FakeHub:
             if req["state"] != "queued":
                 return {"error": "only a queued request is answered (project-comms: queued -> answered)"}
             b._move(req, "answered")
+        elif op == "move":  # the operator moves the slot to another session (DEC-0140 PR-2)
+            b.move(cmd["capability"])
         elif op == "forget-sessions":  # the sessions end but no DELETE arrives: their slots lapse on their own (FAA-77)
             self.sessions.clear()
         elif op != "state":
