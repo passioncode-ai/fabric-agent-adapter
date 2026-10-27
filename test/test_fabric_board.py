@@ -1414,6 +1414,40 @@ class MovedSlotTests(Conversation):
         self.assertNotEqual(second.state, "down")
         self.assertNotIn("board.blocked", self.kinds())
 
+    def test_a_lost_ask_refused_under_a_retired_epoch_is_no_move(self):
+        """Seam reading 5: a retired epoch refuses even a repeat, so whether the lost enroll landed is unknown; the
+        record is forgotten and the slot reads as on a first start, never as a move."""
+        r = self.responder()
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        self.board.advance(61)
+        self.board.drop_next["com.enroll"] = 1
+        second = self.responder()
+        second.step()  # the enroll lands at generation 2; its answer is lost
+        self.board.epoch = 2
+        rid = self.board.queue("video.render")
+        for _ in range(4):
+            second.step()
+            self.board.advance(20)
+        self.assertEqual(self.moved(), [])
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+
+    def test_a_recorded_move_stays_when_status_names_no_generation(self):
+        """Seam reading 5: the other session released the slot and com.status gives it no generation; the move stays."""
+        r = self.responder()
+        r.step()
+        self.board.move("video.render")
+        self.board.advance(15)
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.hub.control({"op": "end-sessions"})
+        self.board.status_generation = "absent"
+        self.board.calls.clear()
+        second = self.responder()
+        second.step()
+        self.assertNotIn("com.enroll", self.tools())
+        self.assertEqual(second.slots["video.render"]["state"], "moved")
+
     def test_an_unwritable_record_never_stops_a_renew(self):
         """Seam reading 2: the record is best effort, as `_held_at` is; a full disk does not take a live holder down."""
         r = self.responder()

@@ -35,13 +35,15 @@
   behaves as before. An enroll or replace is recorded with its key before it is sent, so a lost answer to the
   responder's own call is asked again under that key and never read as a move; a replay the board runs for the first
   time (`repeated: false`) after the slot had moved past the record is read as that move, and the slot it took lapses
-  unused. The record is best effort: one that cannot be written (a full disk) never stops a call or the responder,
+  unused; a replay refused `idempotency_window_expired` (a retired epoch) forgets the record, so the slot reads as on a
+  first start. A recorded move stays even when `com.status` later names no generation for the slot. The record is best
+  effort: one that cannot be written (a full disk) never stops a call or the responder,
   and a restart before the next one is recorded may then read as a move. A holder's renew within its live lease writes
   nothing; the reference service now waits at its stop for the responder to leave its board session. `Responder.take_back(capability)` /
   `takeBack(capability)` is the operator's act that brings a moved slot back: it enrolls once the other session lets
   the slot go and takes the held work back by a transfer. The kit offers no route for it: a service declares one as an
-  operator action with its tool and gate `relayed` (the operator's decision, possibly through their own agent; never
-  `none`) (`fabric-actions/0.1`; the reference service's is FAA-157). The
+  operator action with its tool and gate `relayed` (the operator's decision; never `none`; on a server that reads
+  mandates it also names its effect class) (`fabric-actions/0.1`; the reference service's is FAA-157). The
   notice says begun work is the new holder's to settle and that the take-back action brings the slot back. Both
   twins.
 
@@ -57,7 +59,8 @@
 - **A responder no longer takes back a slot that moved while it was away** (FAA-155). Before 0.53.0 a restarted
   responder replaced whoever held its slot (at recovery) or enrolled again when that holder lapsed, so a slot taken
   while it was down or after a crash came back by itself. It now stays with the new holder until the operator calls
-  `take_back`. A service stopped cleanly, rolled back to 0.52 and up again starts as on a first start (the clean leave
+  `take_back`; a second responder of the same capability is no longer a standby once the slot changed hands. A
+  service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first start (the clean leave
   forgot the record); after a crash, a 0.52 run that enrolled the slot and wrote nothing to the checkpoint reads as a move at the next 0.53 start, which
   the take-back action undoes. A `fenced` refusal on accepted work while the slot did not move now keeps the entry `lapsed`
   and the next tick transfers it back and finishes it (0.52 dropped the entry and left the request accepted on the

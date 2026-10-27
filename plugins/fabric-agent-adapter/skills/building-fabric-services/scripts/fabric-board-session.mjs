@@ -272,9 +272,12 @@ export class Responder {
         if (isInt(generation, 1) && (answer.repeated === true || !moved)) record = { project: this.project, generation };
       } catch (e) {
         if (LOST.includes(e.code)) throw e;
+        // A retired epoch refuses even a repeat: landed or not is unknown, so the record goes and the slot reads as on a
+        // first start, never as a move.
+        if (e.code === 'idempotency_window_expired') record = {};
       }
     }
-    this.note(capability, record);
+    this.note(capability, Object.keys(record).length ? record : null);
     return record;
   }
 
@@ -285,8 +288,10 @@ export class Responder {
   async gone(capability, status = null) {
     let held = this.checkpoint.slots[capability] ?? {};
     if (held.project !== this.project || (!isInt(held.generation, 1) && !('asking' in held))) return false;
-    const now = ((status ?? await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
+    let now = ((status ?? await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if ('asking' in held) held = await this.replay(capability, held, now); // its own lost ask first
+    // A recorded move stays until takeBack, whatever com.status says of the slot now.
+    if (isInt(held.moved, 1) && !(isInt(now, 1) && now > (held.generation ?? now))) now = held.moved;
     if (!isInt(now, 1) || !isInt(held.generation, 1) || now <= held.generation) return false;
     if (this.current?.entry.capability === capability) {
       this.current.ctx.stopped = true;

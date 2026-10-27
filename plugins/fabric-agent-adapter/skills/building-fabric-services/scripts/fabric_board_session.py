@@ -262,8 +262,7 @@ class Responder:
             pass
 
     def _ask(self, capability: str, op: str, args: Dict[str, Any]) -> Dict[str, Any]:
-        """An enroll or replace is recorded with its key before it is sent, so a lost answer is never read as a move; a
-        refusal drops the record, a receipt replaces it (`_held_at`), a record that cannot be written is skipped."""
+        """An enroll or replace that can move the generation is recorded with its key first (a lost answer is no move)."""
         held = self.checkpoint.slots.get(capability) or {}
         if held.get("project") != self.project:
             return self._call(op, args)  # no record: nothing a lost answer could be mistaken for
@@ -286,9 +285,8 @@ class Responder:
             raise
 
     def _replay(self, capability: str, held: Dict[str, Any], before: Any) -> Dict[str, Any]:
-        """Asks a lost enroll or replace again under its key. `repeated: true`: it landed, the generation is ours. Else it
-        ran only now: if the slot had moved past the record (`before`), the record stays and the move is read (the slot
-        just taken lapses unused). A refusal or an odd receipt drops the record; a lost answer keeps it."""
+        """Asks a lost enroll or replace again under its key. `repeated: true`: the generation is ours. Else it ran only now: past
+        a move (`before` beyond the record) the move is read. A refusal drops the record; a lost answer keeps it."""
         asking = held.get("asking")
         rest = {k: v for k, v in held.items() if k != "asking"}
         if isinstance(asking, dict) and asking.get("op") in ("com.enroll", "com.responder_replace"):
@@ -300,20 +298,23 @@ class Responder:
             except BoardError as exc:
                 if exc.code in ("unreachable", "session-ended"):
                     raise
+                if exc.code == "idempotency_window_expired":
+                    rest = {}  # a retired epoch refuses even a repeat: unknown, so no record (a first start, never a move)
             except (KeyError, TypeError):
                 pass
-        self._note(capability, rest)
+        self._note(capability, rest or None)
         return rest
 
     def _gone(self, capability: str, status: Optional[Dict[str, Any]] = None) -> bool:
-        """True when `com.status` shows the slot's generation past the one recorded held: the operator or another session
-        moved it. The slot is left `moved`. No record, another Project's, an odd value or no later generation: False."""
+        """True when `com.status` shows the slot's generation past the record (the slot is left `moved`); else False."""
         held = self.checkpoint.slots.get(capability) or {}
         if held.get("project") != self.project or (not _is_int(held.get("generation"), 1) and "asking" not in held):
             return False
         status = self._status() if status is None else status
         now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
         held = self._replay(capability, held, now) if "asking" in held else held  # its own lost ask first
+        if "moved" in held and _is_int(held.get("moved"), 1) and not (_is_int(now, 1) and now > held.get("generation", now)):
+            now = held["moved"]  # a recorded move stays until take_back, whatever com.status says of the slot now
         if not _is_int(now, 1) or not _is_int(held.get("generation"), 1) or now <= held["generation"]:
             return False
         with self._lock:

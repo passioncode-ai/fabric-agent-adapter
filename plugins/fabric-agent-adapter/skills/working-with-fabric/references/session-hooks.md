@@ -49,7 +49,7 @@ remote.origin.url`, every call inside the same 1.5 s as the turn's facts (the fa
 checkout costs no git call, and when the budget runs out the hook spools what it found. Each repository is named
 `{host, owner, name}` from its `origin` (https, `ssh://`, `git@host:owner/name`; credentials, a port and `.git`
 dropped; a nested group stays in `owner`, and on a self-hosted ssh remote `owner` is the folder path on that server
-before the repository's name, which may hold a user name). The start folder's repository (any checkout of it: a worktree, a clone), a repository whose `origin`
+before the repository's name, which may hold a user name). The repository of the session's folder when the turn ends (the Stop payload's `cwd`; any checkout of it: a worktree, a clone), a repository whose `origin`
 is missing or does not parse, and a second checkout of one repository are not named; at most 10. No local path leaves the hook; a
 missing or unreadable transcript names none and is no error.
 
@@ -155,7 +155,7 @@ One line per event that did something, never content: `~/Library/Caches/ai.passi
 (macOS), `$XDG_CACHE_HOME/fabric-agent-adapter/hooks.log` (Linux, default `~/.cache`),
 `%LOCALAPPDATA%\fabric-agent-adapter\hooks.log` (Windows). Mode 0600, rotated at 1 MB to `hooks.log.1`. The
 per-session spool is `sessions/<session id>/` beside it (turn entries capped at 50, each holding the folder the
-session started in and, when the turn touched another repository (only once Fabric takes them), `repositories` as `{host, owner, name}`; `board.json`, `board.shown`, `repositories.degraded` (the once-a-session note that Fabric no longer takes them), and the nudges not yet printed: `nudges.json` for the prompt
+session started in and, when the turn touched another repository (only once Fabric takes them), `repositories` as `{host, owner, name}`; `board.json`, `board.shown`, `repositories.degraded` (the once-a-session note that repositories were left out: the schema no longer takes them, or refused every item), and the nudges not yet printed: `nudges.json` for the prompt
 hook, `nudges.watch.json` for `watch-mail`, each taken by renaming it away; a
 folder untouched for 7 days, whose worker failed or whose session ended without SessionEnd, is removed by the next
 Stop or SessionEnd hook, even while the hooks are inert; an end entry whose release or observation got no answer stays

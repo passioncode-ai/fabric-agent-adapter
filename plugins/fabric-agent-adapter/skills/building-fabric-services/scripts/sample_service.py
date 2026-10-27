@@ -26,6 +26,7 @@ import os
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 import sys
+import time
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -347,7 +348,10 @@ def serve(args: argparse.Namespace) -> int:
         board_thread = threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True)
         board_thread.start()
 
+    stop_asked: list = []
+
     def stopping() -> None:
+        stop_asked.append(time.monotonic())
         board_stop.set()  # stop claiming; the responder drains its request and leaves its board session
         svc.log.append("service.stopping", "info", "%s is stopping." % svc.name)
     svc.drain.install(lambda drained: server.shutdown(), on_stopping=stopping)
@@ -358,7 +362,8 @@ def serve(args: argparse.Namespace) -> int:
         if board_thread is not None:
             # The responder drains (5 s at most) and leaves its board session, which releases its slots and forgets their
             # records (FAA-155): joined, so the process does not end before that.
-            board_thread.join(8.0)
+            # Bounded by the kit's hard exit, 8 + 2 s after the stop was asked: leave at least half a second for the rest.
+            board_thread.join(max(0.5, 9.5 - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
         server.server_close()
         svc.lock.release()
     return 0

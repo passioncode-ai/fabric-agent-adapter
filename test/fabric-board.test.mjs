@@ -1239,6 +1239,41 @@ test('FAA-155 seam 4: at its own cadence an idle holder writes nothing; a lapsed
 
 const isObjLike = (v) => v !== null && typeof v === 'object';
 
+test('FAA-155 seam 5: a lost ask refused under a retired epoch is no move; a recorded move stays when status names no generation', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  await h.responder().step();
+  await hub.control({ op: 'end-sessions' });
+  await h.advance(61);
+  await hub.control({ op: 'drop', tool: 'com.enroll' });
+  const second = h.responder();
+  await second.step(); // the enroll lands at generation 2; its answer is lost
+  await hub.control({ op: 'set', values: { epoch: 2 } });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  for (let i = 0; i < 4; i += 1) {
+    await second.step();
+    await h.advance(20);
+  }
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+
+  const moved = await fakeHub(t);
+  const m = harness(moved);
+  const r = m.responder();
+  await r.step();
+  await moved.control({ op: 'move', capability: 'video.render' });
+  await m.advance(15);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  await moved.control({ op: 'end-sessions' });
+  await moved.control({ op: 'set', values: { status_generation: 'absent' } });
+  const before = (await m.tools()).length;
+  const again = m.responder();
+  await again.step();
+  assert.ok(!(await m.tools()).slice(before).includes('com.enroll'));
+  assert.equal(again.slots['video.render'].state, 'moved');
+});
+
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
   const dir = tempDir('faa155-cp-');
   const file = path.join(dir, 'cp.json');
