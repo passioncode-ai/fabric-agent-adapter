@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.57.0"
+  version: "0.58.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -122,6 +122,13 @@ at start. Either way: no `.env` of its own, no key file beside its data, no valu
 configuration or a commit. A workflow names the keys it needs in its checkpoint (`credentials`),
 never their values.
 
+**The source stays apart from the instance**, from the first commit: instance values (the service label, the
+repository address, folders, the owner, accounts, hosts) live in a configuration outside the repository, read through a
+named variable with a neutral default and a committed `*.example`; records, logs and state documents live in the
+instance folder; fixtures use neutral ids. Load [the source and the instance](references/source-and-instance.md). The
+sibling's `scripts/fabric_source_check.py check <project-root>` finds instance data in the tree without repeating it;
+the skeleton is done when it exits 0. Handing the source over stays the owner's act.
+
 ## Step 3: scaffold the provider bundle
 
 Reuse the sibling skill's scaffolder against the new skeleton with the profile chosen at
@@ -181,8 +188,8 @@ lets the output decide what counts as success.
 
 Run the sibling skill's `check` (structural, then exact when the contract checkout is
 available) and complete `fabric/FABRIC-CONFORMANCE.md` with dated receipts, exactly as
-its workflow steps 5–7 prescribe; this skill adds no second verification path on
-purpose. Then record one expectation the report must carry:
+its workflow steps 5–7 prescribe, and run its `fabric_source_check.py check` again (exit 0); this skill adds no
+second verification path on purpose. Then record one expectation the report must carry:
 
 > When a Fabric host admits this provider, it enters under a **canary binding** (a
 > checker on its output and a budget cap), regardless of who wrote it. Unsupervised

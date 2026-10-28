@@ -1,0 +1,2 @@
+# Tests carry synthetic credential shapes and home paths on purpose: they are the vectors the kit is checked with.
+test/
