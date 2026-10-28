@@ -448,7 +448,7 @@
     "fabric_hub",
     "fabric_service"
    ],
-   "sha256": "715a22b2777d2132e3333f065f44a1581af0a8a67381897109c21736888cd17b"
+   "sha256": "5983899974a869a2e9ef7809763ab87551bf5a9a6723d792363f9fe2ba9ad557"
   },
   {
    "module": "fabric_board_fixture",
@@ -930,7 +930,7 @@
     "fabric-hub",
     "fabric-service"
    ],
-   "sha256": "2a2a60471330614094e3ced0b515ae2d3c853ad46153b063590314c56dced842"
+   "sha256": "04aa920b24a379157c55ebe3de516eb8b46bd0b0db50e4b883528d4ede7ed978"
   },
   {
    "module": "fabric-board-fixture",
@@ -4178,7 +4178,7 @@
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "e8d2310e5f53c75e4bf642c3d980b2faba692731eaf56ec245cea05446e38bef",
    "fabric_board_slots.py": "3b42ada72925e158ba4343164863eccdf05085e5fe48bb34382b18e606595b3c",
-   "fabric_board_session.py": "715a22b2777d2132e3333f065f44a1581af0a8a67381897109c21736888cd17b",
+   "fabric_board_session.py": "5983899974a869a2e9ef7809763ab87551bf5a9a6723d792363f9fe2ba9ad557",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "34c1200860040aa61cdd35f911f70d34d64b4a5cd91f892328d1169e4a89d8cd",
    "fabric_http.py": "80e22ae0bba91de13a94d64b595108b39c58f16f7b4137f3a48bdd9503f424fe",
@@ -4221,7 +4221,7 @@
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
    "fabric-board-link.mjs": "b1ac329b65b679193b94b81fe735922e14427ed540ba910b1a815ce3447e3220",
    "fabric-board-slots.mjs": "b24737a8e8be21a4c3cd0158f378b2be27a10ea022a9ff6c461198e8c1f36ec8",
-   "fabric-board-session.mjs": "2a2a60471330614094e3ced0b515ae2d3c853ad46153b063590314c56dced842",
+   "fabric-board-session.mjs": "04aa920b24a379157c55ebe3de516eb8b46bd0b0db50e4b883528d4ede7ed978",
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
    "fabric-board.mjs": "0d75c3e27a0b791bdbc35b2e93b3299e5831d3ab3003ce441e6268397e32b448",
    "fabric-http.mjs": "9f899829073470b9c2b449605a9371b773848eec4e3a0122ed4ccde5eddcdb4b",

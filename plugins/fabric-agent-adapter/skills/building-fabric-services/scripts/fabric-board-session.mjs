@@ -52,18 +52,21 @@ export class WorkContext {
 const clean = (text, max = SUMMARY_MAX) => String(text).split(/\s+/).filter(Boolean).join(' ').slice(0, max);
 
 /**
- * One service's responder for one Project and its capabilities, one request at a time. handler(request, ctx) answers
- * the outcome (may be async); admit(request) is the input gate; observe(entry) reads the world after a restart;
- * emit(kind, level, text, extra) receives events. run({signal}) ticks until aborted; step() is one tick.
+ * A notice's subject ({type, id}): its request, else its capability, else its episode (a cause such as a block's code,
+ * so two causes are two episodes for a host), else the Project. 128 code points, as Python.
  */
-/** A notice's subject ({type, id}): its request, else its capability, else the Project. */
-function noticeSubject(value, project) {
-  for (const kind of ['request', 'capability']) {
-    if (typeof value[kind] === 'string' && value[kind].length > 0 && value[kind].length <= 128) return { type: kind, id: value[kind] };
+function noticeSubject(value, project, episode) {
+  for (const [kind, id] of [['request', value.request], ['capability', value.capability], ['episode', episode]]) {
+    if (typeof id === 'string' && id.length > 0 && [...id].length <= 128) return { type: kind, id };
   }
   return { type: 'project', id: project };
 }
 
+/**
+ * One service's responder for one Project and its capabilities, one request at a time. handler(request, ctx) answers
+ * the outcome (may be async); admit(request) is the input gate; observe(entry) reads the world after a restart;
+ * emit(kind, level, text, extra) receives events. run({signal}) ticks until aborted; step() is one tick.
+ */
 export class Responder extends SlotKeeper {
   constructor({ hub, projectId, capabilities, credentialFile, checkpointFile, handler, admit, observe, emit, service = 'service',
     now = () => performance.now() / 1000, rand = Math.random, sessionFactory } = {}) {
@@ -123,7 +126,7 @@ export class Responder extends SlotKeeper {
     if (!this.emitTo) return;
     // The thing the notice is about, so a host tells one request's or one capability's episode from another's
     // (events-and-notifications.md, "Say who wants what"; 0.56.0 seam r30).
-    const subject = noticeSubject(value, this.project);
+    const subject = noticeSubject(value, this.project, episode);
     try {
       this.emitTo(kind, level, text, { notify, subject, ...(data ? { data } : {}) });
     } catch {

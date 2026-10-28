@@ -1507,9 +1507,18 @@ test('a board notice names its subject: its request, else its capability, else t
   fb.Responder.prototype.emit.call(r, 'board.slot.contested', 'warning', 'Another responder holds it.', { notify: true, episode: 'x', saidAs: 'c', capability: 'sample.echo' });
   fb.Responder.prototype.emit.call(r, 'board.down', 'warning', 'Fabric\'s board cannot be reached.', { episode: 'down' });
   assert.deepEqual(rows.map((x) => x[2].subject), [{ type: 'request', id: 'req-1' }, { type: 'request', id: 'req-2' },
-    { type: 'capability', id: 'sample.echo' }, { type: 'project', id: 'p-1' }]);
+    { type: 'capability', id: 'sample.echo' }, { type: 'episode', id: 'down' }]);
   assert.deepEqual(rows.map((x) => x[1]), ['warning', 'warning', 'warning', 'warning']);
   const slots = fs.readFileSync(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board-slots.mjs'), 'utf8');
-  const moved = slots.match(/`(The \$\{capability\} slot on this Project moved[^`]*(?:\\`[^`]*)*)`/)[1].replace(/\\`/g, '`');
+  const moved = slots.match(/`(The \$\{capability\} slot on this Project moved(?:[^`\\]|\\.)*)`/)[1].replace(/\\`/g, '`');
+  assert.ok(moved.endsWith('ask its maintainer.'), moved); // the whole notice, read through its escaped backticks
   assert.ok(moved.replace('${capability}', 'c'.repeat(128)).length <= 500, 'the moved notice keeps its last sentence');
+  const python = fs.readFileSync(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_board_slots.py'), 'utf8');
+  const py = [...python.slice(python.indexOf('"The %s slot on this Project moved')).split('% capability')[0].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+    .map((m) => m[1]).join('');
+  assert.equal(py.replace('%s', '${capability}'), moved, 'both twins say the same');
+  const astral = '\u{1F600}'.repeat(100); // 100 code points, 200 UTF-16 units: a request id within 128, as in Python
+  const rows2 = [];
+  fb.Responder.prototype.emit.call({ said: {}, emitTo: (k, l, t, x) => rows2.push(x), project: 'p-1' }, 'board.request.held', 'warning', 'x', { request: astral });
+  assert.equal(rows2[0].subject.type, 'request');
 });

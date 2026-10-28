@@ -13,8 +13,9 @@ gate behave.
   `board.reconcile.needed`, `board.attempt.lost` and `board.outcome.invalid` were dropped wherever `emit=log.append`
   (the reference service included, since 0.28.0; `board.slot.moved` since 0.53.0). They are sent at `warning` now, in
   both twins, as is the new `board.slot.refused` (FAA-163). Each notice names its `subject` (`{type, id}`: its request,
-  else its capability, else the Project), so a host tells one request's or one capability's episode from another's; a
-  service's own `emit` that takes no `subject` still gets the notice, without one.
+  else its capability, else its episode, such as a block's cause, else the Project), so a host tells one request's,
+  capability's or cause's episode from another's; a service's own `emit` whose signature takes no `subject` (by name or
+  `**kwargs`) still gets the notice, once, without one.
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
   text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a

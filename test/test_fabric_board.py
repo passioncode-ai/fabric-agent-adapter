@@ -1924,13 +1924,35 @@ class SampleWiringTests(unittest.TestCase):
             self.assertEqual([(e["kind"], e["level"], e.get("notify")) for e in rows],
                              [("board.reconcile.needed", "warning", True)] * 2 + [("board.down", "warning", None)])
             self.assertEqual([e["subject"] for e in rows], [{"type": "request", "id": "req-1"}, {"type": "request", "id": "req-2"},
-                                                            {"type": "project", "id": PROJECT}])
+                                                            {"type": "episode", "id": "down"}])
             self.assertEqual(rows[0]["data"]["value"]["request"], "req-1")
             said = []  # an emit written before 0.56.0, with no subject: the notice still goes
             old = SimpleNamespace(_said={}, _emit_to=lambda kind, level, text, notify=False, data=None: said.append(kind),
                                   project=PROJECT)
             session.Responder._emit(old, "board.down", "warning", "Fabric's board cannot be reached.")
             self.assertEqual(said, ["board.down"])
+            calls = []  # unit r31: a TypeError raised inside an emit that delivered the notice: never sent twice
+
+            def failing(kind, level, text, **extra):
+                calls.append(extra.get("subject"))
+                raise TypeError("the host's own bug")
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=failing, project=PROJECT), "board.down", "warning", "x")
+            self.assertEqual(calls, [{"type": "project", "id": PROJECT}])
+            import functools  # seam r31: a wrapped emit without subject still gets the notice, once
+
+            def inner(kind, level, text, notify=False, data=None):
+                said.append(kind)
+
+            @functools.wraps(inner)
+            def wrapped(*a, **kw):
+                return inner(*a, **kw)
+            said.clear()
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=wrapped, project=PROJECT), "board.blocked", "error", "x",
+                                    episode="no-epoch")
+            self.assertEqual(said, ["board.blocked"])
+            # two blocking causes are two subjects, so a host shows the second within the first's cooldown
+            subjects = [session._notice_subject({}, PROJECT, code) for code in ("no-epoch", "checkpoint")]
+            self.assertEqual(subjects, [{"type": "episode", "id": "no-epoch"}, {"type": "episode", "id": "checkpoint"}])
         # The longest notice keeps its last instruction with the longest capability a Project accepts (128 characters).
         slots = (scripts / "fabric_board_slots.py").read_text(encoding="utf-8")
         start = slots.index('"The %s slot on this Project moved')

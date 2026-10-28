@@ -3,6 +3,7 @@ accept the exact digest, effect, progress, complete; stop when fenced). The sess
 in fabric_board_link and are re-exported here. Part of the board connector (FAA-65, layer L4)."""
 from __future__ import annotations
 
+import inspect
 import json
 import random
 import re
@@ -92,12 +93,22 @@ Handler = Callable[[BoardRequest, WorkContext], Dict[str, Any]]
 
 
 
-def _notice_subject(value: Dict[str, Any], project: str) -> Dict[str, str]:
-    """A notice's subject (`{type, id}`): its request, else its capability, else the Project."""
-    for kind in ("request", "capability"):
-        if isinstance(value.get(kind), str) and 0 < len(value[kind]) <= 128:
-            return {"type": kind, "id": value[kind]}
+def _notice_subject(value: Dict[str, Any], project: str, episode: Optional[str] = None) -> Dict[str, str]:
+    """A notice's subject (`{type, id}`): its request, else its capability, else its episode (a cause such as a block's
+    code, so two causes are two episodes for a host, seam r31), else the Project."""
+    for kind, given in (("request", value.get("request")), ("capability", value.get("capability")), ("episode", episode)):
+        if isinstance(given, str) and 0 < len(given) <= 128:
+            return {"type": kind, "id": given}
     return {"type": "project", "id": project}
+
+
+def _takes_subject(emit: Callable[..., Any]) -> bool:
+    """Whether an emit's signature takes `subject` (by name or **kwargs); one that cannot be read is given it."""
+    try:
+        params = inspect.signature(emit).parameters.values()
+    except (TypeError, ValueError):
+        return True
+    return any(p.name == "subject" or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
 
 
 class Responder(SlotKeeper):
@@ -163,15 +174,13 @@ class Responder(SlotKeeper):
             return
         # The thing the notice is about, so a host tells one request's or one capability's episode from another's
         # (events-and-notifications.md, "Say who wants what"; 0.56.0 seam r30).
-        subject = _notice_subject(value, self.project)
         extra = {"data": data} if data else {}
+        # An emit written before 0.56.0 may take no subject: read from its signature, never from an error, so a notice
+        # goes once, without a subject there (unit r31, seam r31).
+        if _takes_subject(self._emit_to):
+            extra["subject"] = _notice_subject(value, self.project, episode)
         try:
-            self._emit_to(kind, level, text, notify=notify, subject=subject, **extra)
-        except TypeError:  # an emit written before 0.56.0 may take no subject: the notice still goes, without one
-            try:
-                self._emit_to(kind, level, text, notify=notify, **extra)
-            except Exception:  # noqa: BLE001
-                pass
+            self._emit_to(kind, level, text, notify=notify, **extra)
         except Exception:  # noqa: BLE001 - an event that cannot be written never stops the responder
             pass
 
