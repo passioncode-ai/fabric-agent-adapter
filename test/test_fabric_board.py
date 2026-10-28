@@ -1895,6 +1895,23 @@ class SampleWiringTests(unittest.TestCase):
             self.assertIn("board.request.refused", kinds)
             svc.board.shutdown(0.1)
 
+    def test_every_board_notice_level_is_one_the_event_log_takes(self):
+        """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refuses, so a service with
+        emit=log.append (the reference service) never logged them. Every level both twins pass is one LEVELS holds."""
+        import re
+        import fabric_events
+        scripts = Path(importlib.import_module("fabric_board").__file__).parent
+        found = []
+        for name in ("fabric_board_session.py", "fabric_board_slots.py", "fabric-board-session.mjs", "fabric-board-slots.mjs"):
+            text = (scripts / name).read_text(encoding="utf-8")
+            found += [(name, level) for level in re.findall(r"emit\(\s*[\"']board\.[a-z._]+[\"']\s*,\s*[\"']([a-z]+)[\"']", text)]
+        self.assertGreater(len(found), 20)
+        self.assertEqual([f for f in found if f[1] not in fabric_events.LEVELS], [])
+        with tempfile.TemporaryDirectory() as tmp:  # and a notice reaches the log
+            log = fabric_events.JsonlEventLog(Path(tmp) / "events.jsonl")
+            log.append("board.down", "warning", "Fabric's board cannot be reached.", notify=True)
+            self.assertEqual([e["kind"] for e in log.fetch(None, 10)], ["board.down"])
+
     def test_the_probe_passes_the_sample_with_its_board_on(self):
         """0.56.0 product r28, seam r28: registered with the board, the take-back tool the well-known lists is in the
         manifest and the kit's own probe passes; a serve whose board mode differs leaves the manifest as register wrote it

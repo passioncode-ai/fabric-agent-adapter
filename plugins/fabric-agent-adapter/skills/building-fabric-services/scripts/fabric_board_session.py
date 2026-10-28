@@ -210,7 +210,7 @@ class Responder(SlotKeeper):
         self.session = session
         status = self._status()
         if missing:
-            self._emit("board.access.needed", "warn", "The operator has not let this service answer %s on this Project; ask in "
+            self._emit("board.access.needed", "warning", "The operator has not let this service answer %s on this Project; ask in "
                        "Fabric (Agents & access)." % ", ".join(missing), notify=True, episode=",".join(missing),
                        capabilities=missing)
         self.slots = {}
@@ -231,7 +231,7 @@ class Responder(SlotKeeper):
                 if self._gone(capability):
                     return
                 self.slots[capability] = {"state": "contested", "renewed_at": self.now()}
-                self._emit("board.slot.contested", "warn", "Another responder holds the %s slot on this Project; this service "
+                self._emit("board.slot.contested", "warning", "Another responder holds the %s slot on this Project; this service "
                            "waits for it to lapse and never takes it over by itself." % capability, notify=True,
                            episode=capability, said_as="board.slot.contested:" + capability, capability=capability)
                 return
@@ -354,7 +354,7 @@ class Responder(SlotKeeper):
                 # start (or the operator) decides.
                 entry["step"] = "held"
                 self.checkpoint.put(entry)
-                self._emit("board.request.held", "warn", "An accepted request could not be resumed: this Fabric does not hand "
+                self._emit("board.request.held", "warning", "An accepted request could not be resumed: this Fabric does not hand "
                            "back a transferred attempt (DEC-0078). It stays held; nothing was done.", notify=True,
                            episode=entry["request"], request=entry["request"], capability=capability)
                 continue
@@ -439,7 +439,7 @@ class Responder(SlotKeeper):
         if outcome is None:
             entry["step"] = "unknown"
             self.checkpoint.put(entry)
-            self._emit("board.reconcile.needed", "warn", "A request's outcome is unknown: the work may have happened. It stays "
+            self._emit("board.reconcile.needed", "warning", "A request's outcome is unknown: the work may have happened. It stays "
                        "unknown until this service observes what happened.", notify=True, episode=entry["request"],
                        request=entry["request"], capability=entry["capability"])
             return
@@ -497,7 +497,7 @@ class Responder(SlotKeeper):
         if code in ("not_authorized", "authority_changed", "credential"):
             self.state = "not-authorized"
             self._drop_session()
-            self._emit("board.access.needed", "warn", "This service may not answer requests for this Project: the operator "
+            self._emit("board.access.needed", "warning", "This service may not answer requests for this Project: the operator "
                        "has to allow it in Fabric (Agents & access). Nothing is claimed until then.", notify=True,
                        episode="access", reason=code)
         elif code == "held":
@@ -515,7 +515,7 @@ class Responder(SlotKeeper):
             # In recovery with no slot held a refusal reconnects (seam 6); with some held they are served (seam 7).
             if (connecting or code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol")) and not keep:
                 self._drop_session()
-            self._emit("board.down", "warn", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
+            self._emit("board.down", "warning", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
                        episode="down", reason=code)
         return wait
 
@@ -640,14 +640,14 @@ class Responder(SlotKeeper):
         req = message.get("request") if isinstance(message, dict) else None
         if message.get("digest") != entry["digest"]:
             self.checkpoint.drop(entry["request"])
-            self._emit("board.request.skipped", "warn", "A claimed request was not accepted: the message read back carries "
+            self._emit("board.request.skipped", "warning", "A claimed request was not accepted: the message read back carries "
                        "another digest than the claim. Nothing was done; the claim lapses.", request=entry["request"],
                        capability=capability, reason="digest-mismatch")
             return
         if not isinstance(req, dict) or req.get("id") != entry["request"] or req.get("capability") != capability \
                 or req.get("target") != self.project:
             self.checkpoint.drop(entry["request"])
-            self._emit("board.request.skipped", "warn", "A claimed request was not accepted: it is not addressed to this "
+            self._emit("board.request.skipped", "warning", "A claimed request was not accepted: it is not addressed to this "
                        "Project and capability. Nothing was done; the claim lapses.", request=entry["request"],
                        capability=capability, reason="not-addressed")
             return
@@ -752,7 +752,7 @@ class Responder(SlotKeeper):
             if entry.get("effect"):
                 entry["step"] = "unknown"
                 self.checkpoint.put(entry)
-                self._emit("board.reconcile.needed", "warn", "The attempt was lost after its effect began; the outcome stays "
+                self._emit("board.reconcile.needed", "warning", "The attempt was lost after its effect began; the outcome stays "
                            "unknown until this service observes what happened.", notify=True, episode=entry["request"],
                            request=entry["request"], capability=entry["capability"], reason=code)
             elif entry.get("step") not in ("claimed", "accepting") and (code == "lease_expired" or (
@@ -761,13 +761,13 @@ class Responder(SlotKeeper):
                 # it (C4). It continues only by a checkpoint transfer to this responder while it holds the slot.
                 entry["step"] = "lapsed"
                 self.checkpoint.put(entry)
-                self._emit("board.attempt.lost", "warn", ("This service's lease on an accepted request lapsed; it stopped working "
+                self._emit("board.attempt.lost", "warning", ("This service's lease on an accepted request lapsed; it stopped working "
                            "on it and takes it back by a transfer." if code == "lease_expired" else "The board fenced an accepted "
                            "request away from this service; it stopped working on it, and nothing had been done outside it."),
                            request=entry["request"], capability=entry["capability"], reason=code)
             else:
                 self.checkpoint.drop(entry["request"])
-                self._emit("board.attempt.lost", "warn", "The board took a request back from this service (%s); it stopped working "
+                self._emit("board.attempt.lost", "warning", "The board took a request back from this service (%s); it stopped working "
                            "on it, and nothing had been done outside the service." % code, request=entry["request"],
                            capability=entry["capability"], reason=code)
 
@@ -843,7 +843,7 @@ class Responder(SlotKeeper):
                        "summary": "The service could not do this (%s)." % work.failure.__class__.__name__}
         problems = outcome_problems(outcome, bool(entry.get("effect")))
         if problems:
-            self._emit("board.outcome.invalid", "warn", "The handler's outcome was not sent: %s." % problems[0],
+            self._emit("board.outcome.invalid", "warning", "The handler's outcome was not sent: %s." % problems[0],
                        request=entry["request"], capability=entry["capability"])
             if entry.get("effect"):
                 self._settle_live(entry, "observation_required" if any("observation_required" in p for p in problems) else "outcome")

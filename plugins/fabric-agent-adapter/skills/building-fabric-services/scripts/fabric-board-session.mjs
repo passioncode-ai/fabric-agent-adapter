@@ -165,7 +165,7 @@ export class Responder extends SlotKeeper {
     this.session = session;
     const status = await this.status();
     if (missing.length) {
-      this.emit('board.access.needed', 'warn', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Agents & access).`, { notify: true, episode: missing.join(','), capabilities: missing });
+      this.emit('board.access.needed', 'warning', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Agents & access).`, { notify: true, episode: missing.join(','), capabilities: missing });
     }
     this.slots = {};
     await this.recover(status, this.capabilities.filter((c) => grant.capabilities.includes(c)));
@@ -186,7 +186,7 @@ export class Responder extends SlotKeeper {
       if (e.code === 'fenced') {
         if (await this.gone(capability)) return;
         this.slots[capability] = { state: 'contested', renewedAt: this.now() };
-        this.emit('board.slot.contested', 'warn', `Another responder holds the ${capability} slot on this Project; this service waits for it to lapse and never takes it over by itself.`, { notify: true, episode: capability, saidAs: `board.slot.contested:${capability}`, capability });
+        this.emit('board.slot.contested', 'warning', `Another responder holds the ${capability} slot on this Project; this service waits for it to lapse and never takes it over by itself.`, { notify: true, episode: capability, saidAs: `board.slot.contested:${capability}`, capability });
         return;
       }
       throw e;
@@ -314,7 +314,7 @@ export class Responder extends SlotKeeper {
         // A board pinned before DEC-0078 hands back no attempt. Never claim it back: it stays held.
         entry.step = 'held';
         this.checkpoint.put(entry);
-        this.emit('board.request.held', 'warn', 'An accepted request could not be resumed: this Fabric does not hand back a transferred attempt (DEC-0078). It stays held; nothing was done.', { notify: true, episode: entry.request, request: entry.request, capability });
+        this.emit('board.request.held', 'warning', 'An accepted request could not be resumed: this Fabric does not hand back a transferred attempt (DEC-0078). It stays held; nothing was done.', { notify: true, episode: entry.request, request: entry.request, capability });
         continue;
       }
       if (entry.step === 'replying' && !entry.replied && entry.keys?.reply && !entry.probe) {
@@ -406,7 +406,7 @@ export class Responder extends SlotKeeper {
     if (!outcome) {
       entry.step = 'unknown';
       this.checkpoint.put(entry);
-      this.emit('board.reconcile.needed', 'warn', 'A request\'s outcome is unknown: the work may have happened. It stays unknown until this service observes what happened.', { notify: true, episode: entry.request, request: entry.request, capability: entry.capability });
+      this.emit('board.reconcile.needed', 'warning', 'A request\'s outcome is unknown: the work may have happened. It stays unknown until this service observes what happened.', { notify: true, episode: entry.request, request: entry.request, capability: entry.capability });
       return;
     }
     const sent = Object.fromEntries(['state', 'summary', 'evidence'].filter((k) => k in outcome).map((k) => [k, outcome[k]]));
@@ -463,7 +463,7 @@ export class Responder extends SlotKeeper {
     if (['not_authorized', 'authority_changed', 'credential'].includes(code)) {
       this.state = 'not-authorized';
       await this.dropSession();
-      this.emit('board.access.needed', 'warn', 'This service may not answer requests for this Project: the operator has to allow it in Fabric (Agents & access). Nothing is claimed until then.', { notify: true, episode: 'access', reason: code });
+      this.emit('board.access.needed', 'warning', 'This service may not answer requests for this Project: the operator has to allow it in Fabric (Agents & access). Nothing is claimed until then.', { notify: true, episode: 'access', reason: code });
     } else if (code === 'held') {
       this.state = 'paused';
       this.emit('board.held', 'info', 'The operator holds new work on this Project; the responder waits and asks again with a growing pause.', { episode: 'held', reason: code });
@@ -476,7 +476,7 @@ export class Responder extends SlotKeeper {
       this.state = 'down';
       // A refusal in recovery that left no slot held reconnects (seam 6); one that left some held serves them (seam 7).
       if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code)) && !keep) await this.dropSession();
-      this.emit('board.down', 'warn', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
+      this.emit('board.down', 'warning', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
     }
     return wait;
   }
@@ -607,12 +607,12 @@ export class Responder extends SlotKeeper {
     const req = isObj(message) ? message.request : null;
     if (message.digest !== entry.digest) {
       this.checkpoint.drop(entry.request);
-      this.emit('board.request.skipped', 'warn', 'A claimed request was not accepted: the message read back carries another digest than the claim. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'digest-mismatch' });
+      this.emit('board.request.skipped', 'warning', 'A claimed request was not accepted: the message read back carries another digest than the claim. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'digest-mismatch' });
       return;
     }
     if (!isObj(req) || req.id !== entry.request || req.capability !== capability || req.target !== this.project) {
       this.checkpoint.drop(entry.request);
-      this.emit('board.request.skipped', 'warn', 'A claimed request was not accepted: it is not addressed to this Project and capability. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'not-addressed' });
+      this.emit('board.request.skipped', 'warning', 'A claimed request was not accepted: it is not addressed to this Project and capability. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'not-addressed' });
       return;
     }
     const request = new BoardRequest(message, capability);
@@ -712,17 +712,17 @@ export class Responder extends SlotKeeper {
     if (entry.effect) {
       entry.step = 'unknown';
       this.checkpoint.put(entry);
-      this.emit('board.reconcile.needed', 'warn', 'The attempt was lost after its effect began; the outcome stays unknown until this service observes what happened.', { notify: true, episode: entry.request, request: entry.request, capability: entry.capability, reason: code });
+      this.emit('board.reconcile.needed', 'warning', 'The attempt was lost after its effect began; the outcome stays unknown until this service observes what happened.', { notify: true, episode: entry.request, request: entry.request, capability: entry.capability, reason: code });
     } else if (!['claimed', 'accepting'].includes(entry.step) && (code === 'lease_expired' || (code === 'fenced' && entry.capability in this.checkpoint.slots))) {
       // Accepted work whose lease lapsed, or fenced off a slot this responder held (moved, FAA-155): the board holds it
       // (C4). It continues only by a checkpoint transfer to this responder while it holds the slot.
       entry.step = 'lapsed';
       this.checkpoint.put(entry);
-      this.emit('board.attempt.lost', 'warn', code === 'lease_expired' ? 'This service\'s lease on an accepted request lapsed; it stopped working on it and takes it back by a transfer.'
+      this.emit('board.attempt.lost', 'warning', code === 'lease_expired' ? 'This service\'s lease on an accepted request lapsed; it stopped working on it and takes it back by a transfer.'
         : 'The board fenced an accepted request away from this service; it stopped working on it, and nothing had been done outside it.', { request: entry.request, capability: entry.capability, reason: code });
     } else {
       this.checkpoint.drop(entry.request);
-      this.emit('board.attempt.lost', 'warn', `The board took a request back from this service (${code}); it stopped working on it, and nothing had been done outside the service.`, { request: entry.request, capability: entry.capability, reason: code });
+      this.emit('board.attempt.lost', 'warning', `The board took a request back from this service (${code}); it stopped working on it, and nothing had been done outside the service.`, { request: entry.request, capability: entry.capability, reason: code });
     }
   }
 
@@ -807,7 +807,7 @@ export class Responder extends SlotKeeper {
     }
     const problems = outcomeProblems(outcome, !!entry.effect);
     if (problems.length) {
-      this.emit('board.outcome.invalid', 'warn', `The handler's outcome was not sent: ${problems[0]}.`, { request: entry.request, capability: entry.capability });
+      this.emit('board.outcome.invalid', 'warning', `The handler's outcome was not sent: ${problems[0]}.`, { request: entry.request, capability: entry.capability });
       if (entry.effect) await this.settleLive(entry, problems.some((p) => p.includes('observation_required')) ? 'observation_required' : 'outcome');
       else {
         entry.outcome = { state: 'failed_known', observed: true, summary: 'The service answered in a form it cannot send.' };

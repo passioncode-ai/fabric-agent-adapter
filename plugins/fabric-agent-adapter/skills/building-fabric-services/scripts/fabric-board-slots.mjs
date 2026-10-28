@@ -128,7 +128,7 @@ export class SlotKeeper {
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
     delete this.confirmed[capability];
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warn', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work \`accepted\` and unanswered (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets it go, or at once at a restart or reconnect while it holds accepted work for the slot; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project was moved to another session. This service stopped answering it there, left its accepted work \`accepted\` and unanswered (work already begun is the new holder's to settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets it go, or at once at a restart or reconnect while it holds accepted work for the slot; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written
     }
     return true;
@@ -163,7 +163,7 @@ export class SlotKeeper {
     const wait = Math.min(HOLD_RETRY_MAX_SECONDS, this.holdDelay * 2 ** (tries - 1));
     this.slots[capability] = { state: 'retry', tries, retryAt: this.now() + wait, renewedAt: this.now() };
     if (!SESSION_CODES.has(e.code)) { // once per episode (saidAs), also after a silent session refusal // a refusal of the board session is the fault's to say
-      this.emit('board.slot.refused', 'warn', `Fabric refused to give this service the ${capability} slot (${e.code}); it asks again later. Its other capabilities go on.`, { episode: capability, saidAs: `board.slot.refused:${capability}`, capability, reason: e.code });
+      this.emit('board.slot.refused', 'warning', `Fabric refused to give this service the ${capability} slot (${e.code}); it asks again later. Its other capabilities go on.`, { episode: capability, saidAs: `board.slot.refused:${capability}`, capability, reason: e.code });
     }
   }
 

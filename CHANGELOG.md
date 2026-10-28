@@ -7,6 +7,12 @@ gate behave.
 
 ### Fixed
 
+- The board responder's notices reach a service's event feed: they were sent at level `warn`, which
+  `JsonlEventLog.append` refuses (its levels are `info`, `notice`, `warning`, `error`), so `board.down`,
+  `board.access.needed`, `board.slot.moved`, `board.slot.refused`, `board.slot.contested`, `board.request.held`,
+  `board.request.skipped`, `board.reconcile.needed`, `board.attempt.lost` and `board.outcome.invalid` were dropped
+  wherever `emit=log.append` (the reference service included, since 0.28.0). They are sent at `warning` now, in both
+  twins.
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
   text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
@@ -108,7 +114,8 @@ gate behave.
 
 ### Added
 
-- `FABRIC_SESSION_NO_REPOSITORIES=1` turns the transcript read off (FAA-160); `fabric_session.py status` says
+- `FABRIC_SESSION_NO_REPOSITORIES=1`, or a `no-repositories` file in the hooks' folder (which a cache cleaner may
+  remove), turns the transcript read off (FAA-160); `fabric_session.py status` says
   whether it is on (only while a running Fabric advertises `session-hooks/1`, `fabric` is registered for the folder and
   Fabric takes the repositories), off, waiting for Fabric, or not done because `fabric` is not registered. The repositories of a turn can miss one (FAA-174): a turn longer
   than the transcript's last 512 KB names only what that tail shows; until FAA-184 they can also name a wrong one,
@@ -168,6 +175,10 @@ gate behave.
   slot lapses on the board's clock as before.
 - A service that calls `Checkpoint.leave` itself now passes the generations it confirmed (`held`, required in both
   twins); the responder's own leave does this.
+- A service's own `emit` that matched the board responder's level `warn` now sees `warning`.
+- A reference service served with `--board-project` registers again with the same `--board-project`
+  (`sample_service.py register ... --board-project <uuid>`): a registration from 0.55.0 lacks `board.take-back`, so
+  `check_service.py` fails `interop.well-known-capabilities` and the log says `service.manifest.mismatch`.
 
 ## 0.55.0 (2026-10-27)
 

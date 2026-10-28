@@ -157,7 +157,7 @@ them, and the slot lapses in 60 s.
 **One capability at a time (FAA-163).** At connect (and every reconnect) the responder starts with no slot. Each
 capability's enroll or replace is settled on its own: a refusal of that capability (`capacity_exceeded`,
 `invalid_arguments`, any code that is not about the board session) leaves it `retry`, asked again alone after 15 s,
-30 s, doubling to 15 minutes, with one `board.slot.refused` event (warn; said again if it is refused again after
+30 s, doubling to 15 minutes, with one `board.slot.refused` event (warning; said again if it is refused again after
 the slot was held); its accepted work waits `lapsed` and goes back
 by a transfer once the slot is held. The capabilities after it are recovered as before. A refusal of the board session
 (`unreachable`, `session-ended`, `not_available`, `not_authorized` and the other codes in `SESSION_CODES`) leaves the
@@ -238,7 +238,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
   holder's lease lapses, nor when com.status later names no generation for the slot (a recorded move stays until
   take-back). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back (CT-175
-  will hand them to the new holder). One `board.slot.moved` event (warn, notify) says so, once, also across restarts
+  will hand them to the new holder). One `board.slot.moved` event (warning, notify) says so, once, also across restarts
   (the record keeps `moved`).
 - A responder that never held the slot (a first start: no record, or a record of another Project), or whose record
   equals the current generation, behaves as before: it enrolls, recovers and replaces its own lapsed work. A recorded or
@@ -293,7 +293,8 @@ raises `directory-invalid` rather than answering; an unlisted Project may still 
 
 ## Events, the probe and the live smoke
 
-Events go to `emit(kind, level, text, notify=…, data=…)` (`JsonlEventLog.append` fits) with `data {schema, value}`
+Events go to `emit(kind, level, text, notify=…, data=…)` (`JsonlEventLog.append` fits: every level is one of its
+`info`, `notice`, `warning`, `error`) with `data {schema, value}`
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,

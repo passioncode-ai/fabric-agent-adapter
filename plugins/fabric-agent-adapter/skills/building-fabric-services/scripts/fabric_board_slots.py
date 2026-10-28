@@ -123,7 +123,7 @@ class SlotKeeper:
             if "moved" not in held:
                 self._note(capability, dict(held, moved=now))  # said again at the next start if it cannot be written
         if "moved" not in held:  # once, even across restarts
-            self._emit("board.slot.moved", "warn", "The %s slot on this Project was moved to another session. This service stopped "
+            self._emit("board.slot.moved", "warning", "The %s slot on this Project was moved to another session. This service stopped "
                        "answering it there, left its accepted work `accepted` and unanswered (work already begun is the new holder's to "
                        "settle) and does not take the slot back by itself. Its take-back action brings it back once the other session lets "
                        "it go, or at once at a restart or reconnect while it holds accepted work for the slot; without one, ask its "
@@ -158,7 +158,7 @@ class SlotKeeper:
         wait = min(HOLD_RETRY_MAX_SECONDS, self.hold_delay * 2 ** (tries - 1))
         self.slots[capability] = {"state": "retry", "tries": tries, "retry_at": self.now() + wait, "renewed_at": self.now()}
         if exc.code not in SESSION_CODES:  # once per episode (said_as), also after a silent session refusal
-            self._emit("board.slot.refused", "warn", "Fabric refused to give this service the %s slot (%s); it asks again "
+            self._emit("board.slot.refused", "warning", "Fabric refused to give this service the %s slot (%s); it asks again "
                        "later. Its other capabilities go on." % (capability, exc.code), episode=capability,
                        said_as="board.slot.refused:" + capability,
                        capability=capability, reason=exc.code)
