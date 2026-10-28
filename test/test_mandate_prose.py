@@ -154,10 +154,12 @@ class AComparisonOfCodesIsAHumanStep(unittest.TestCase):
     def test_the_service_references_list_seven_steps(self):  # service-reads-the-operators-mandate
         interop = flat("building-fabric-services/references/interop.md")
         self.assertIn("`passkey`, `comparison` (a comparison of codes between two people or the choice to share without one, DEC-0142)", interop)
-        self.assertIn("a reader pinned before it (a 0.56.0 or older kit, Fabric's node before CO-479) refuses the whole declaration", interop)
+        self.assertIn("a reader pinned before it (a 0.56.0 or older kit, Fabric Dashboards before 0.8.9) refuses the whole declaration", interop)
+        self.assertIn("Fabric's hub reads no declaration and forwards the step unchanged (CT-186)", interop)
         delegation = flat("building-fabric-services/references/delegation.md")
         self.assertIn("`passkey`, and since DEC-0142 `comparison`: a comparison of codes between two people or the choice to share without one", delegation)
         self.assertIn("a reader pinned before DEC-0142 refuses a whole declaration that names it", delegation)
+        self.assertIn("a caller that validates the refusal against a `delegation-refusal.schema.json` pinned before DEC-0142 refuses that refusal", delegation)
 
 
 if __name__ == "__main__":

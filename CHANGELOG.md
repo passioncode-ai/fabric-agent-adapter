@@ -9,8 +9,8 @@ The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA
 - **`comparison` as a human step** (DEC-0142, contract CT-186). `humanStep` in an action declaration may be
   `comparison`: the person compares two codes shown on two screens. Both kits' action-declaration checks take it
   (`fabric_actions.py`, `fabric-actions.mjs`, `actions-vectors.json` regenerated: 68 cases, 12 declarations), the probe
-  passes a declaration that uses it, and interop.md, delegation.md and working-with-fabric's refusal table name it. A
-  kit pinned before refuses such a declaration, which Project Observatory declares on its share buttons from OBS-264.
+  passes a declaration that uses it, and interop.md, delegation.md and working-with-fabric's human gates (OA-5), which its refusal table cites, name it.
+  A reader pinned before (a 0.56.0 kit, Fabric Dashboards before 0.8.9) refuses such a declaration, which Project Observatory declares on its share buttons from OBS-264.
 - **The protocol register** gains the six peer-share revisions (DEC-0142, `fabric-peer-share/1` and its parts) and
   `org-adaptation/1` and `org-adaptation-receipt/1` (DEC-0138) in both twins (`feed-protocols-vectors.json`), so a
   service's well-known that names one is read as a known revision.
