@@ -1950,7 +1950,7 @@ class SampleWiringTests(unittest.TestCase):
                 calls.append(extra.get("subject"))
                 raise TypeError("the host's own bug")
             session.Responder._emit(SimpleNamespace(_said={}, _emit_to=failing, project=PROJECT), "board.down", "warning", "x")
-            self.assertEqual(calls, [{"type": "project", "id": PROJECT}])
+            self.assertEqual(calls, [None])  # only **extra: called as 0.55.0 called it, once, without a subject
             import functools  # seam r31: a wrapped emit without subject still gets the notice, once
 
             def inner(kind, level, text, notify=False, data=None):
@@ -1974,6 +1974,18 @@ class SampleWiringTests(unittest.TestCase):
                 return narrow(kind, level, text, **kw)
             session.Responder._emit(SimpleNamespace(_said={}, _emit_to=forwarder, project=PROJECT), "board.down", "warning", "x")
             self.assertEqual(narrow_said, ["board.down"])
+            # unit r33: an emit that forwards to a sink taking subject and sets its own keeps it, and the notice goes
+            # once; a subject bound with functools.partial stands too
+            with tempfile.TemporaryDirectory() as own:
+                own_log = fabric_events.JsonlEventLog(Path(own) / "events.jsonl")
+
+                def binder(kind, level, text, **kw):
+                    return own_log.append(kind, level, text, subject={"type": "service", "id": "me"}, **kw)
+                session.Responder._emit(SimpleNamespace(_said={}, _emit_to=binder, project=PROJECT), "board.down", "warning", "x")
+                bound = functools.partial(own_log.append, subject={"type": "service", "id": "bound"})
+                session.Responder._emit(SimpleNamespace(_said={}, _emit_to=bound, project=PROJECT), "board.down", "warning", "x")
+                self.assertEqual([e.get("subject") for e in own_log.fetch(None, 10)],
+                                 [{"type": "service", "id": "me"}, {"type": "service", "id": "bound"}])
             # two blocking causes are two subjects, so a host shows the second within the first's cooldown
             subjects = [session._notice_subject({}, PROJECT, code) for code in ("no-epoch", "checkpoint")]
             self.assertEqual(subjects, [{"type": "episode", "id": "no-epoch"}, {"type": "episode", "id": "checkpoint"}])

@@ -119,11 +119,13 @@ class JsonlEventLog:
                 continue
         return out
 
-    def append(self, kind: str, level: str, text: str, **extra: Any) -> Dict[str, Any]:
+    def append(self, kind: str, level: str, text: str, subject: Optional[Dict[str, str]] = None,
+               **extra: Any) -> Dict[str, Any]:
+        # `subject` is named so a caller that reads the signature (the board responder) knows this log takes one.
         with self._lock:
             rows = self._all()
             next_id = int(rows[-1]["id"]) + 1 if rows else 1
-            event = make_event(next_id, now_iso(), kind, level, text, **extra)
+            event = make_event(next_id, now_iso(), kind, level, text, subject=subject, **extra)
             rows.append(event)
             rows = rows[-self.keep:]
             atomic_write(self.path, ("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n").encode(), 0o600)

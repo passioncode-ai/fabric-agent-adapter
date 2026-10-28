@@ -14,8 +14,9 @@ gate behave.
   (the reference service included, since 0.28.0; `board.slot.moved` since 0.53.0). They are sent at `warning` now, in
   both twins, as is the new `board.slot.refused` (FAA-163). Each notice names its `subject` (`{type, id}`: its request,
   else its capability, else its episode, such as a block's cause, else the Project), so a host tells one request's,
-  capability's or cause's episode from another's; a service's own `emit` whose signature takes no `subject` (by name or
-  `**kwargs`), or one that passes `**kwargs` on to a sink without it, still gets the notice, once, without one.
+  capability's or cause's episode from another's. The subject goes to an `emit` whose signature names a `subject`
+  parameter with no value bound (`JsonlEventLog.append` now names one); any other `emit` (only `**kwargs`, a subject
+  bound with `functools.partial`, a signature that cannot be read) is called as 0.55.0 called it, once, without one.
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
   text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
@@ -178,8 +179,9 @@ gate behave.
   slot lapses on the board's clock as before.
 - A service that calls `Checkpoint.leave` itself now passes the generations it confirmed (`held`, required in both
   twins); the responder's own leave does this.
-- A service's own `emit` that matched the board responder's level `warn` now sees `warning`, with a `subject`. A
-  service with `emit=log.append` now logs the board's notices, and those with `notify` (access needed, a contested or
+- A service's own `emit` that matched the board responder's level `warn` now sees `warning`, with a `subject` when its
+  signature names one. A service with
+  `emit=log.append` now logs the board's notices, and those with `notify` (access needed, a contested or
   moved slot, a held request, a reconcile needed) reach the host's banners, without a link to the page that resolves
   them (FAA-187 (21)).
 - A reference service served with `--board-project` registers again with the same `--board-project`

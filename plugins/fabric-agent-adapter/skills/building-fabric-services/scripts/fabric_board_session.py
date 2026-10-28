@@ -103,12 +103,16 @@ def _notice_subject(value: Dict[str, Any], project: str, episode: Optional[str] 
 
 
 def _takes_subject(emit: Callable[..., Any]) -> bool:
-    """Whether an emit's signature takes `subject` (by name or **kwargs); one that cannot be read is given it."""
+    """Whether an emit's signature names a `subject` parameter, as JsonlEventLog.append does. Any other emit (one with
+    only **kwargs, which may forward them to a sink without it or set its own, or one whose signature cannot be read)
+    is called as 0.55.0 called it, without one (0.56.0 unit r33). A subject already bound into the emit, as with
+    functools.partial(log.append, subject=...), stands."""
     try:
         params = inspect.signature(emit).parameters.values()
     except (TypeError, ValueError):
-        return True
-    return any(p.name == "subject" or p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
+        return False
+    return any(p.name == "subject" and p.kind is not inspect.Parameter.VAR_KEYWORD
+               and p.default in (inspect.Parameter.empty, None) for p in params)
 
 
 class Responder(SlotKeeper):
@@ -181,16 +185,6 @@ class Responder(SlotKeeper):
             extra["subject"] = _notice_subject(value, self.project, episode)
         try:
             self._emit_to(kind, level, text, notify=notify, **extra)
-        except TypeError as error:
-            # An emit that forwards **kwargs to a sink without `subject` (0.55.0's documented shape) refuses the keyword
-            # before it writes: say the notice again without it, once (0.56.0 seam r32). Any other TypeError is the
-            # emit's own, and the notice is not said twice.
-            if "subject" in extra and "unexpected keyword argument 'subject'" in str(error):
-                del extra["subject"]
-                try:
-                    self._emit_to(kind, level, text, notify=notify, **extra)
-                except Exception:  # noqa: BLE001 - as below
-                    pass
         except Exception:  # noqa: BLE001 - an event that cannot be written never stops the responder
             pass
 
