@@ -135,7 +135,7 @@ class BuildingFabricServicesReadsTheMandate(unittest.TestCase):
 
 
 class AComparisonOfCodesIsAHumanStep(unittest.TestCase):
-    """DEC-0142 (contract CT-186) at the pin 802c8d27 (`v0.1.0+2026-10-27.4`, 0.57.0, FAA-176): AP-4's steps gain
+    """DEC-0142 (contract CT-186) at the pin 3830a33 (`v0.1.0+2026-10-27.6`, 0.57.0, FAA-176): AP-4's steps gain
     `comparison`, a comparison of codes between two people or the choice to share without one; it stays the person's."""
 
     def test_the_scenarios_ask_for_it(self):  # human-step-required-hands-over-the-link, operator-approval-binds-all-his-agents

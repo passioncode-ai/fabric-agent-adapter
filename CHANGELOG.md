@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.57.0 (2026-10-28)
+
+The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA-176).
+
+### Added
+
+- **`comparison` as a human step** (DEC-0142, contract CT-186). `humanStep` in an action declaration may be
+  `comparison`: the person compares two codes shown on two screens. Both kits' action-declaration checks take it
+  (`fabric_actions.py`, `fabric-actions.mjs`, `actions-vectors.json` regenerated: 68 cases, 12 declarations), the probe
+  passes a declaration that uses it, and interop.md, delegation.md and working-with-fabric's refusal table name it. A
+  kit pinned before refuses such a declaration, which Project Observatory declares on its share buttons from OBS-264.
+- **The protocol register** gains the six peer-share revisions (DEC-0142, `fabric-peer-share/1` and its parts) and
+  `org-adaptation/1` and `org-adaptation-receipt/1` (DEC-0138) in both twins (`feed-protocols-vectors.json`), so a
+  service's well-known that names one is read as a known revision.
+- **The provider entry's manifest path** (DEC-0145, CT-192): `fabric_provider.py` names the schema's
+  `MANIFEST_PATTERN`, read as a search that ends at the string's end; the reader accepts the manifest's name after a
+  backslash, the writer still writes it with `/` and refuses the other with a sentence naming CT-192, and the CLI's
+  stem is read after either separator (CT-193). The contract's ten `provider.schema.json` fixtures are vendored
+  (`provider-fixtures.json`) and tested in every run.
+
+### Changed
+
+- On Windows, `services_dir()` and `providers_dir()` read `%LOCALAPPDATA%\passioncode-fabric` (provider.md).
+- agents-that-answer-people.md (A5) names the contract's `support-quality-daily.schema.json`, says when a producer may
+  carry `calibration` (CT-188) and that a reader validates against its own pinned copy (DEC-0144).
+- The hosted contract job runs `test_provider`, and `test/validate.py` fails a workflow whose contract job leaves out a
+  module that holds a test gated on the contract.
+
+### Upgrading
+
+- A bundle or provider entry pinned to `00e050ba` or an earlier supported commit keeps working; `adapt_project.py`
+  accepts it (`SUPPORTED_CONTRACT_COMMITS`). A new scaffold writes `3830a33`.
+- DEC-0139 (the machines' report) and DEC-0138's organization server route reach no kit code: the adapter registers
+  their protocol revisions and implements neither side.
+
 ## 0.56.0 (2026-10-28)
 
 Stability and Windows: the debts of 0.53.0 to 0.55.0 that touch how the hooks, the board responder and the interop

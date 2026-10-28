@@ -13,7 +13,7 @@ export const PROTOCOL_REVISIONS = new Map(Object.entries({
   'fabric-package': ['1'],
   'fabric-peer-share': ['1'], 'fabric-peer-share-envelope': ['1'], 'fabric-peer-share-report': ['1'], 'fabric-project-comms': ['0.1'], 'fabric-proposal': ['1'], 'fabric-provider': ['0.1'], 'fabric-relay': ['0.1'],
   'fabric-secret-envelope': ['1'], 'fabric-service': ['0.1'], 'fabric-settings-backup': ['1'], heartbeat: ['1'], 'learning-note': ['1'], 'machine-report': ['1'], mandate: ['1'],
-  memory: ['0.1'], 'node-summary': ['1'], 'operator-source': ['1'], 'org-authority': ['1'], 'org-authority-draft': ['1'],
+  memory: ['0.1'], 'node-summary': ['1'], 'operator-source': ['1'], 'org-adaptation': ['1'], 'org-adaptation-receipt': ['1'], 'org-authority': ['1'], 'org-authority-draft': ['1'],
   'org-key-set': ['1'], 'org-key-set-draft': ['1'], 'org-membership': ['1'], 'org-root-registration': ['1'], 'pairing-message': ['1'],
   'peer-share-deletion': ['1'], 'peer-share-frame': ['1'], 'peer-share-revocation': ['1'], pipeline: ['0.1'], 'repair-request': ['1'], 'repair-result': ['1'],
   'revocation-delta': ['1'], 'session-handoff': ['1'], 'service-load': ['1'],

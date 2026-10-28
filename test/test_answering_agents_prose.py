@@ -285,7 +285,7 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         self.assertNotIn("the template carries", reference)
 
     def test_the_daily_report_is_the_contracts_payload(self):  # an-agent-that-answers-people (expected 2); DEC-0144
-        # FAA-176 (0.57.0, pin 802c8d27): the contract has carried support-quality-daily.schema.json since DEC-0095, and
+        # FAA-176 (0.57.0, pin 3830a33): the contract has carried support-quality-daily.schema.json since DEC-0095, and
         # DEC-0144 widened it with a judge's calibration, which a producer carries only once its readers adopted it.
         body = text(REFERENCE).split("## Checklist")[0]
         a5 = next(" ".join(p.split("\n## ")[0].split()) for p in re.split(r"^- \*\*", body, flags=re.MULTILINE)[1:]
