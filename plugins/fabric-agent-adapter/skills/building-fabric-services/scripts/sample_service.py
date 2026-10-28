@@ -198,12 +198,16 @@ class Service:
         self.board.take_back(capability)
         # Who decided and by which route are words in the sentence; the caller, a machine id, goes in data only
         # (events-and-notifications.md, "Writing an event"; 0.56.0 product r34).
+        # The route in words; the tokens by and via, with the caller, in data (product r35).
         act = record if isinstance(record, dict) else {}
-        how = " Decided by %s, %s." % (act.get("by"), act.get("via")) if act else ""
+        how = {"dashboard": " on this service's page", "relayed-instruction": " through an agent they told",
+               "mandate": " under a standing mandate"}.get(act.get("via"), "")
         value = {"capability": capability, **{k: act[k] for k in ("by", "via", "caller") if isinstance(act.get(k), str)}}
-        self.log.append("board.slot.returned", "info", "The operator took the %s slot back; the service enrolls once the "
-                        "other session lets it go.%s" % (capability, how),
-                        data={"schema": fbd.EVENT_SCHEMA, "value": value})
+        data = {"schema": fbd.EVENT_SCHEMA, "value": value}
+        extra = {} if fs.feed_data_problems(data) else {"data": data}  # a caller the feed refuses never undoes the answer
+        self.log.append("board.slot.returned", "info", "The operator took the %s slot back%s; the service enrolls once the "
+                        "other session lets it go." % (capability, how),
+                        subject={"type": "capability", "id": capability}, **extra)
         return {"capability": capability, "moved": False}
 
     def board_take_back_tool(self, args: Dict[str, Any], ctx: fi.CallContext) -> Dict[str, Any]:

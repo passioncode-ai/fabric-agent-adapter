@@ -1986,6 +1986,23 @@ class SampleWiringTests(unittest.TestCase):
                 session.Responder._emit(SimpleNamespace(_said={}, _emit_to=bound, project=PROJECT), "board.down", "warning", "x")
                 self.assertEqual([e.get("subject") for e in own_log.fetch(None, 10)],
                                  [{"type": "service", "id": "me"}, {"type": "service", "id": "bound"}])
+
+                @functools.wraps(own_log.append)  # unit r34: read as itself, not as the log it wraps
+                def wrapped_own(*a, **kw):
+                    return own_log.append(*a, subject={"type": "service", "id": "wrapped"}, **kw)
+                session.Responder._emit(SimpleNamespace(_said={}, _emit_to=wrapped_own, project=PROJECT), "board.down", "warning", "x")
+                self.assertEqual(own_log.fetch(None, 10)[-1].get("subject"), {"type": "service", "id": "wrapped"})
+
+            class Touchy:  # unit r34: a default that raises on == never stops the responder
+                def __eq__(self, other):
+                    raise RuntimeError("no")
+                __hash__ = object.__hash__
+            touched = []
+
+            def touchy(kind, level, text, subject=Touchy(), **kw):
+                touched.append(kind)
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=touchy, project=PROJECT), "board.down", "warning", "x")
+            self.assertEqual(touched, ["board.down"])
             # two blocking causes are two subjects, so a host shows the second within the first's cooldown
             subjects = [session._notice_subject({}, PROJECT, code) for code in ("no-epoch", "checkpoint")]
             self.assertEqual(subjects, [{"type": "episode", "id": "no-epoch"}, {"type": "episode", "id": "checkpoint"}])
@@ -2186,7 +2203,9 @@ class SampleWiringTests(unittest.TestCase):
             self.assertEqual(status, 200, said)
             self.assertEqual(svc.board_moved(), [])
             returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
-            self.assertIn("Decided by operator, dashboard", returned[-1]["text"], "the page's take-back names who decided (seam r7)")
+            self.assertIn("on this service's page", returned[-1]["text"], "the page's take-back names the route in words (seam r7)")
+            self.assertEqual({k: returned[-1]["data"]["value"][k] for k in ("by", "via")}, {"by": "operator", "via": "dashboard"})
+            self.assertEqual(returned[-1]["subject"], {"type": "capability", "id": "sample.echo"}, "the moved slot's subject (product r35)")
             status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
             self.assertEqual((status, json.loads(said)), (200, {"capability": "sample.echo", "moved": False}),
                              "a retry after a lost answer is answered as the tool answers it (0.56.0 seam r6)")
@@ -2240,10 +2259,19 @@ class SampleWiringTests(unittest.TestCase):
             self.assertFalse(done["isError"], done)
             self.assertEqual(svc.board_moved(), [])
             returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
-            self.assertIn("relayed-instruction", returned[-1]["text"], "the audit names the route")
+            self.assertIn("through an agent they told", returned[-1]["text"], "the audit names the route in words")
+            self.assertNotIn("relayed-instruction", returned[-1]["text"], "a token goes in data (product r35)")
+            self.assertEqual(returned[-1]["data"]["value"]["via"], "relayed-instruction")
             self.assertNotIn("local:", returned[-1]["text"], "the caller is a machine id: in data, never the sentence (product r34)")
             self.assertTrue(returned[-1]["data"]["value"]["caller"].startswith("local:"), returned[-1])
             self.assertNotIn("take the slot back", json.dumps(returned[-1]), "never the decision's words")
+            # unit r34: a caller the feed refuses (too long, credential-shaped) drops the data, never the answer
+            with mock.patch.object(svc.board, "take_back"), mock.patch.object(svc, "board_moved", return_value=["sample.echo"]):
+                answer = svc.board_take_back("sample.echo", {"by": "operator", "via": "relayed-instruction", "caller": "x" * 501})
+            self.assertEqual(answer, {"capability": "sample.echo", "moved": False})
+            last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
+            self.assertNotIn("data", last)
+            self.assertIn("through an agent they told", last["text"])
             again = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
                                        "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
             self.assertEqual(again["structuredContent"], {"capability": "sample.echo", "moved": False},

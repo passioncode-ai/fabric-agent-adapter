@@ -14,9 +14,10 @@ gate behave.
   (the reference service included, since 0.28.0; `board.slot.moved` since 0.53.0). They are sent at `warning` now, in
   both twins, as is the new `board.slot.refused` (FAA-163). Each notice names its `subject` (`{type, id}`: its request,
   else its capability, else its episode, such as a block's cause, else the Project), so a host tells one request's,
-  capability's or cause's episode from another's. The subject goes to an `emit` whose signature names a `subject`
-  parameter with no value bound (`JsonlEventLog.append` now names one); any other `emit` (only `**kwargs`, a subject
-  bound with `functools.partial`, a signature that cannot be read) is called as 0.55.0 called it, once, without one.
+  capability's or cause's episode from another's. In Python the subject goes to an `emit` whose signature names a
+  `subject` parameter with no value bound (`JsonlEventLog.append` now names one); any other `emit` (only `**kwargs`, a
+  subject bound with `functools.partial`, a signature that cannot be read) is called as 0.55.0 called it, once, without
+  one. The Node responder always passes it in its options object, which an `emit` that does not read it ignores.
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
   text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
@@ -134,8 +135,8 @@ gate behave.
   page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
   before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
   repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool, and each take-back is
-  a `board.slot.returned` event whose sentence names who decided it (`by`, `via`) and whose `data` adds the `caller`,
-  never the decision's words. The service installs its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
+  a `board.slot.returned` event (the capability as its subject) whose sentence says the route in words and whose `data`
+  holds `by`, `via` and the `caller`, never the decision's words. The service installs its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
   page's CSP allows the button's own `fetch` (`connect-src 'self'`), and a failed request says so on the button.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
@@ -180,10 +181,10 @@ gate behave.
 - A service that calls `Checkpoint.leave` itself now passes the generations it confirmed (`held`, required in both
   twins); the responder's own leave does this.
 - A service's own `emit` that matched the board responder's level `warn` now sees `warning`, with a `subject` when its
-  signature names one. A service with
-  `emit=log.append` now logs the board's notices, and those with `notify` (access needed, a contested or
-  moved slot, a held request, a reconcile needed) reach the host's banners, without a link to the page that resolves
-  them (FAA-187 (21)).
+  signature names one. A service with `emit=log.append` now logs the board's notices, and those with `notify` (access
+  needed, a contested or moved slot, a held request, a reconcile needed) reach the host's banners, without a link to
+  the page that resolves them (FAA-187 (21)). A Fabric outage's `board.down` (no notify) is now a row in the feed too,
+  said again after each recovery (FAA-187 (22)).
 - A reference service served with `--board-project` registers again with the same `--board-project`
   (`sample_service.py register ... --board-project <uuid>`): a registration from 0.55.0 lacks `board.take-back`, so
   `check_service.py` fails `interop.well-known-capabilities` and the log says `service.manifest.mismatch`. Register

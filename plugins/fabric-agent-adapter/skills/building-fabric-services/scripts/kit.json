@@ -448,7 +448,7 @@
     "fabric_hub",
     "fabric_service"
    ],
-   "sha256": "f34e6c69622407792cabc259b2d4f495d7ce6149910c1cf8cdf69da34831e50c"
+   "sha256": "9032c04fbafb63fd93809b494518aaa039215abef973ad181d960350beb56a9f"
   },
   {
    "module": "fabric_board_fixture",
@@ -4178,7 +4178,7 @@
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "e8d2310e5f53c75e4bf642c3d980b2faba692731eaf56ec245cea05446e38bef",
    "fabric_board_slots.py": "a3c705cded822103703a6c2d734bcd505fcd1d6c0293150c77dfa266fd416d53",
-   "fabric_board_session.py": "f34e6c69622407792cabc259b2d4f495d7ce6149910c1cf8cdf69da34831e50c",
+   "fabric_board_session.py": "9032c04fbafb63fd93809b494518aaa039215abef973ad181d960350beb56a9f",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "34c1200860040aa61cdd35f911f70d34d64b4a5cd91f892328d1169e4a89d8cd",
    "fabric_http.py": "80e22ae0bba91de13a94d64b595108b39c58f16f7b4137f3a48bdd9503f424fe",

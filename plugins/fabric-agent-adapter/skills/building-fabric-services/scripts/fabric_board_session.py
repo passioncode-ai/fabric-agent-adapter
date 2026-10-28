@@ -106,13 +106,17 @@ def _takes_subject(emit: Callable[..., Any]) -> bool:
     """Whether an emit's signature names a `subject` parameter, as JsonlEventLog.append does. Any other emit (one with
     only **kwargs, which may forward them to a sink without it or set its own, or one whose signature cannot be read)
     is called as 0.55.0 called it, without one (0.56.0 unit r33). A subject already bound into the emit, as with
-    functools.partial(log.append, subject=...), stands."""
+    functools.partial(log.append, subject=...), stands.
+
+    The signature is the emit's own, not a wrapped function's: a functools.wraps forwarder that sets its own subject
+    would otherwise be passed a second one (0.56.0 unit r34). Nothing here raises, so a notice never stops the
+    responder."""
     try:
-        params = inspect.signature(emit).parameters.values()
-    except (TypeError, ValueError):
+        params = inspect.signature(emit, follow_wrapped=False).parameters.values()
+        return any(p.name == "subject" and p.kind is not inspect.Parameter.VAR_KEYWORD
+                   and (p.default is inspect.Parameter.empty or p.default is None) for p in params)
+    except Exception:  # noqa: BLE001 - an unreadable signature (or a default that raises) is called without one
         return False
-    return any(p.name == "subject" and p.kind is not inspect.Parameter.VAR_KEYWORD
-               and p.default in (inspect.Parameter.empty, None) for p in params)
 
 
 class Responder(SlotKeeper):
