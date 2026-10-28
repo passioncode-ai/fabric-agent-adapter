@@ -35,6 +35,50 @@ class SecretShapeTests(unittest.TestCase):
                     self.assertEqual(fn(value), case["expected"])
         self.assertGreaterEqual(sum(len(c) for c in VECTORS["secrets"].values()), 120)
 
+    def test_whitespace_dot_and_case_read_as_ecmascript(self):
+        """FAA-136: the answers of the contract's src/secret-shape.ts at the pin (00e050b, run under Node 24) where
+        Python's own \\s, `.` and case folding differ; both copies of the module answer them."""
+        import importlib.util
+        copy = Path(__file__).resolve().parent.parent / "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_secrets.py"
+        spec = importlib.util.spec_from_file_location("fabric_secrets_adapting_copy", copy)
+        adapting = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapting)
+        cases = (("credential_name", "api\x85key", False), ("credential_name", "api\ufeffkey", True),
+                 ("credential_name", "api\u2028key", True), ("credential_name", "api\x1ckey", False),
+                 ("secret_value", "bearer\ufeffabc", True), ("secret_value", "bearer\x85abc", False),
+                 ("secret_value", "bearer \u2028x", False), ("secret_value", "\u017fk-" + "a" * 20, False),
+                 ("secret_value", "SK-" + "a" * 20, True), ("secret_value", "Bearer\xa0abc", True),
+                 ("secret_argument", "--h=Authorization: Bearer\ufeffabc123456789012", True),
+                 ("secret_argument", "--h=Authorization: Bearer\x85abc123456789012", False),
+                 ("secret_argument", "x\u3000" + "aB1" * 14, True),
+                 # 0.56.0 unit r1: URL parsing trims only U+0000 to U+0020 from the ends, as `new URL` does.
+                 ("secret_url", "\xa0https://u:p@x.example/", False), ("secret_url", "\x01https://u:p@x.example/", True),
+                 ("secret_url", " https://u:p@x.example/", True), ("secret_url", "\u3000https://x.example/?token=abc", False),
+                 ("secret_url", "ht\ttps://h.example/?token=abc", True),  # unit r3: tabs, CR and LF removed as by `new URL`
+                 # unit r6: a special scheme's slashes and backslashes after `scheme:` are skipped, as by `new URL`
+                 ("secret_url", "https:\\\\u:hunter2@host/", True), ("secret_url", "https:u:hunter2@host/", True),
+                 ("secret_url", "https:/u:hunter2@host/", True), ("secret_url", "HTTPS:\\\\u:hunter2@host", True),
+                 ("secret_url", "ftp:u:hunter2@host/", True), ("secret_url", "https:///host/?q=\\x", False),
+                 ("secret_url", "mailto:u:hunter2@host", False),
+                 # unit r7: a `[` or `]` outside an IPv6 host, and one leading `?` before a parameter's name, as `new URL`
+                 ("secret_url", "https://user:p[w@h.example/", True), ("secret_url", "https://u[:p@h/?token=abc", True),
+                 ("secret_url", "wss:]]:@p?token=abc", True), ("secret_url", "https://h.example/#?token=abc", True),
+                 ("secret_url", "https://h.example/??token=abc", True), ("secret_url", "https://[::1]:8080/x", False),
+                 ("secret_url", "https://u:@h.example/", False), ("secret_url", "file://u:p@h/x", False),
+                 # unit r8: the query and fragment are read percent-encoded, as `new URL` hands them over
+                 ("secret_url", 'https://h.example/?x=%zz"' + ("A1b" * 13)[:38], True),
+                 ("secret_url", "https://h.example/?x=%zz\u00e9" + ("A1b" * 13)[:38], True),
+                 ("secret_url", "https://h.example/#x=%zz<" + ("A1b" * 13)[:38], True),
+                 ("secret_url", "https://h.example/?x=%zz\x1aKIA0123456789ABCDEF", True),
+                 ("secret_url", "https://h.example/?q=caf\u00e9", False),
+                 # unit r9: file is a special scheme too, so its query encodes `'`
+                 ("secret_url", "file:///x?x=%zz'" + ("A1b" * 13)[:38], True),
+                 ("secret_url", "FILE://h/x?x=%zz'" + ("A1b" * 13)[:38], True))
+        for module in (secrets_mod, adapting):
+            for name, value, expected in cases:
+                with self.subTest(name, value=ascii(value)[:30], module=module.__name__):
+                    self.assertEqual(getattr(module, name)(value), expected)
+
 
 class ResolutionTests(unittest.TestCase):
     def test_every_resolution_answers_as_the_contract_does(self):

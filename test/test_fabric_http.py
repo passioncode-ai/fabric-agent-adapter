@@ -62,6 +62,36 @@ class Cases(unittest.TestCase):
                 else:
                     fh.check_url(url, insecure=insecure)
 
+    def test_check_url_refuses_an_authority_it_would_send_elsewhere_than_it_logs(self):
+        # 0.56.0 seam r12: urllib sends `https://api.example\v1/items` to host `api.example\v1` while redact_url, read
+        # as WHATWG reads it, logs `https://api.example/v1/items`. Python refuses it; the Node twin sends it to
+        # api.example, so this case is the Python twin's own and not a shared vector.
+        # 0.56.0 product r16, unit r16: a space, tab, line break or control character inside the URL, which urllib
+        # sends and http.client refuses.
+        for url in ("https://api.example\\v1/items", "https://h.example\\/x", "https://h .example/x",
+                    "https://h.exa\tmple/x", "http://127.0.0.\t1:9/x", "https://h.example/a b", "https://h.example/a\x00b",
+                    "https://h.example/a?x=1 2", "https://h.example/a\x7f",
+                    # product r18, unit r17: a path or query outside ASCII, which http.client cannot write (a C1
+                    # control included), and a Unicode space in the host, which urllib trims away and redact_url logs.
+                    "https://h.example/caf\u00e9", "https://h.example/a\x85b", "https://h.example/x?q=\u2028",
+                    "https://h.example\u3000/x", "https://h.example\u3000"):
+            with self.subTest(url=url), self.assertRaises(fh.HttpError) as caught:
+                fh.check_url(url)
+            self.assertEqual(caught.exception.kind, "refused")
+
+    def test_check_url_reads_a_url_with_whitespace_at_its_ends_as_urllib_sends_it(self):
+        # 0.56.0 product r17: 0.55.0 sent `https://h.example/x\n` (urllib trims the ends), and so does 0.56.0.
+        for url in ("https://h.example/x\n", "https://h.example/x\r\n", "\nhttps://h.example/x", " https://h.example/x\t",
+                    "https://\u4f8b.example/x", "https://h.example/x#caf\u00e9",  # an IDN host; a fragment is not sent
+                    "https://h.example/x#a b"):
+            with self.subTest(url=url):
+                fh.check_url(url)
+
+    def test_a_refusal_says_what_cannot_be_sent(self):
+        with self.assertRaisesRegex(fh.HttpError, "space") as caught:
+            fh.check_url("https://h.example/a b")
+        self.assertEqual(caught.exception.kind, "refused")
+
     def test_retry_after(self):
         for value, now, expected in CASES["retryAfter"]:
             self.assertEqual(fh.retry_after_s(value, now=now), expected, value)
@@ -155,7 +185,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"no")
         else:
-            body = json.dumps({"auth": self.headers.get("Authorization")}).encode()
+            body = json.dumps({"auth": self.headers.get("Authorization"), "path": self.path}).encode()
             self.send_response(200)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -174,9 +204,21 @@ class DefaultTransport(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
 
+    def test_a_url_ending_in_a_line_break_is_sent_as_in_0_55_0(self):
+        # 0.56.0 product r17, unit r17: urllib trims the ends of what it sends; the request reaches /ok.
+        self.assertEqual(fh.request("GET", self.base + "/ok\n", deadline_s=10).status, 200)
+
+    def test_a_url_is_sent_up_to_its_first_fragment_mark(self):
+        # 0.56.0 seam r19: urllib alone sends everything before the LAST `#`, so a space or line break between two of
+        # them passed check_url and failed on the wire, and `/ok#a#b` asked for `/ok#a`. Both kits send `/ok`.
+        for url in ("/ok#a#b", "/ok#a b#c", "/ok#\n#c", "/ok#caf\u00e9#c", "/ok#?admin=1#c"):
+            with self.subTest(url=url):
+                answer = fh.request("GET", self.base + url, deadline_s=10, retries=0)
+                self.assertEqual((answer.status, answer.json()["path"]), (200, "/ok"))
+
     def test_answers_redirects_and_caps(self):
         ok = fh.request("GET", self.base + "/ok", headers={"Authorization": "Bearer t"}, deadline_s=10)
-        self.assertEqual(ok.json(), {"auth": "Bearer t"})
+        self.assertEqual(ok.json(), {"auth": "Bearer t", "path": "/ok"})
         self.assertEqual(fh.request("GET", self.base + "/missing", deadline_s=10).status, 404)
         moved = fh.request("GET", self.base + "/redirect", deadline_s=10, retries=0)
         self.assertEqual(moved.status, 302, "a redirect is answered, never followed")

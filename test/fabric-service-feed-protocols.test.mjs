@@ -41,3 +41,14 @@ test('two revisions of one protocol are N and N−1 (a register with three, as t
     k.PROTOCOL_REVISIONS.delete('example-protocol');
   }
 });
+
+test('FAA-122: a value nested too deep names its place, as the Python twin does', () => {
+  const cases = [[{ cited: [{ id: 'a1', coverage: 0.8 }] }, 'data.value.cited[0] is an object'], [{ counts: { by: [1, 2] } }, 'data.value.counts.by is a list'],
+    [{ note: ['x'.repeat(501)] }, 'data.value.note[0] is a string over 500 characters'], [{ many: Array.from({ length: 33 }, (_, i) => i) }, 'it has 33 entries']];
+  for (const [value, said] of cases) {
+    const problems = k.feedDataProblems({ schema: 'urn:example:schema:day:1', value });
+    assert.equal(problems.length, 1);
+    assert.ok(problems[0].includes(said), problems[0]);
+  }
+  assert.deepEqual(k.feedDataProblems({ schema: 'urn:example:schema:day:1', value: { citedIds: ['a1', 'b2'], citedCoverage: [0.8, 0.4] } }), []);
+});

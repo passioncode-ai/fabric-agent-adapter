@@ -16,6 +16,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+from fabric_session_paths import _windows_path, bash_paths  # noqa: E402,F401 - read by turn_paths and the tests
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     BOARD_STATUS_TOOL,
     GIT_TIMEOUT_S,
@@ -122,7 +123,7 @@ TRANSCRIPT_TAIL_BYTES = 512 * 1024
 
 #: FAA-140 (seam reading 1): the Bash command text one turn may split, in characters; a long unterminated quote costs
 #: shlex its whole length, so this caps the Stop hook's time on it.
-BASH_BYTES = 65536
+BASH_BYTES = 65536  # characters of Bash command text a turn, despite the name (kept: the facade exports it)
 
 
 #: FAA-140 (REQ-1): at most this many other repositories are named for one turn.
@@ -175,41 +176,6 @@ def parse_origin(url: str) -> Optional[Dict[str, str]]:
     if match and "://" not in url:
         return _repository(*match.groups())
     return None
-
-
-def bash_paths(command: str, cwd: Path) -> List[str]:
-    """The folders a Bash command names as `cd <absolute path>` or `git -C <path>` (absolute, or relative to `cwd`),
-    in order. Nothing else of the command is kept; a command that does not split is [] (FAA-140)."""
-    import shlex  # only a Stop hook with a transcript needs it
-    try:
-        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-        lexer.whitespace_split = True
-        tokens = list(lexer)
-    except ValueError:
-        return []
-    found: List[str] = []
-    separators = set("();&|<>")
-    start = True  # a command word may stand here
-    index = 0
-    while index < len(tokens):
-        token = tokens[index]
-        if token and set(token) <= separators:
-            start, index = True, index + 1
-            continue
-        if start and token == "cd" and index + 1 < len(tokens) and os.path.isabs(tokens[index + 1]):
-            found.append(os.path.normpath(tokens[index + 1]))
-        elif start and os.path.basename(token) == "git":
-            look = index + 1
-            while look < len(tokens) and tokens[look].startswith("-") and not set(tokens[look]) <= separators:
-                if tokens[look] == "-C" and look + 1 < len(tokens) and not set(tokens[look + 1]) <= separators:
-                    found.append(os.path.normpath(os.path.join(str(cwd), tokens[look + 1])))
-                    look += 1
-                elif tokens[look] == "-c":
-                    look += 1
-                look += 1
-        start = False
-        index += 1
-    return found
 
 
 def _prompt(entry: Dict[str, Any]) -> bool:
@@ -291,7 +257,7 @@ def turn_paths(transcript: Any, cwd: Path, until: Optional[float] = None) -> Lis
             value = arguments.get(CHANGING_TOOLS[name])
             named = [os.path.normpath(os.path.join(str(cwd), value))] if isinstance(value, str) and value else []
         elif name == "Bash" and isinstance(arguments.get("command"), str) and left > 0 \
-                and ("cd" in arguments["command"] or "git" in arguments["command"]):
+                and any(word in arguments["command"].lower() for word in ("cd", "git", "pushd")):  # GIT.EXE on Windows
             command = arguments["command"][:left]
             left -= len(command)
             named = bash_paths(command, cwd)
@@ -845,13 +811,18 @@ def _keep_nudges(directory: Path, value: Any, note: Callable[[str], None], sessi
         _write_private(directory / name, json.dumps(merged))
         note("session=%s event=turn nudges=%d dropped=%d" % (session_id[:8], len(offered), dropped))
     except OSError as exc:
+        saved: List[str] = []
         try:
             if kept:
                 _write_private(directory / name, json.dumps(kept))
+                saved = kept
         except OSError:
-            kept = []
+            pass
+        # Lost: every distinct line, pending or this turn's (capped ones included, FAA-143), that is not back in the file.
+        # Both lists are clean lines already: counted as a set, never through nudge_lines' item cap (0.56.0 unit r1).
+        lost = len(set(kept).union(offered) - set(saved))
         note("session=%s event=turn nudges=%d outcome=lost lost=%d reason=%r"
-             % (session_id[:8], len(offered), len(merged) - len(kept), type(exc).__name__))
+             % (session_id[:8], len(offered), lost, type(exc).__name__))
 
 
 def _drop_stale_ends(entries: List[Path], note: Callable[[str], None], session_id: str) -> List[Path]:

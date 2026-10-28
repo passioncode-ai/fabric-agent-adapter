@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import secrets
 from typing import Any, Callable, Dict, List, Optional
@@ -336,16 +337,18 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
       part not covered, or saying the mandate expired or cannot be read; never the operator's words or `source`.
       With `fault` mandate-capability-missing beside it when the job's capability cannot read the step (MJ-1).
     - {"covered": False, "message": None}: no mandate, or a T2 caller's (MD-5): ask as before; with `fault` when the
-      service's own clock does not read."""
+      service's own clock does not read. None is no mandate: a call that carried `_meta.mandate: null` passes `{}`, so
+      it reads as mandate-malformed here as it does at the answer (FAA-178; McpToolServer does)."""
     if mandate is None:
         return {"covered": False, "message": None}
     if not (isinstance(effect, str) and effect in EFFECT_CLASSES):
         raise InteropError("A job's approval step names its effect class (one of %s; DEC-0125)." % ", ".join(EFFECT_CLASSES))
     call: Dict[str, Any] = {"capability": capability, "action": key, "effect": effect}
-    if isinstance(spend_usd, (int, float)) and not isinstance(spend_usd, bool):
-        call["spendUsd"] = spend_usd
-    if isinstance(project, str):
-        call["project"] = project
+    spend = mandate_spend(spend_usd)  # read as action_gate reads it, so the start and the answer agree (FAA-139)
+    if spend is not None:
+        call["spendUsd"] = spend
+    if project is not None:
+        call["project"] = project if isinstance(project, str) else UNREADABLE_PROJECT
     covers: Dict[str, Any] = {"mandate": mandate, "tier": tier, "now": now, "self": self_id, "call": call}
     if isinstance(caller_agent, str) and caller_agent:
         covers["callerAgent"] = caller_agent
@@ -368,6 +371,23 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
             "message": said + ": answer it, or call fabric.job.get with a mandate that covers it in _meta.mandate."}
 
 
+#: The project of a call whose project could not be read: never a member of a mandate's projects, so a mandate limited
+#: to projects refuses it (FAA-139).
+UNREADABLE_PROJECT = "\x00unreadable"
+
+
+def mandate_spend(value: Any) -> Any:
+    """A spend estimate as a mandate reads it (FAA-139): a number read as a double, as the contract does; one that is
+    not a finite double (an int past the float range, NaN, infinity) or not a number is none, which a mandate's
+    ceiling refuses (fail closed). A finite number stays as given (25 stays 25)."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    try:
+        return value if math.isfinite(float(value)) else None
+    except OverflowError:
+        return None
+
+
 def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target: Optional[str] = None,
                 elicited: bool = False, approval: Any = None, action_digest: Optional[str] = None,
                 human_step_url: Optional[str] = None, now: Any = None, self_id: Optional[str] = None,
@@ -386,7 +406,9 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     decision, given `effect` (the action's effect class, required: without it the call is the service's fault
     effect-missing), `caller_agent` (only an agent id the service authenticated: a delegation's caller, its own
     per-agent credential; never a name the call carries), `spend_usd` (its own estimate), `project`, and `mandate_capability` (a job's kept step: the job's capability
-    the mandate is read under, DEC-0141 MJ-1; unusable, the refusal is operator-decision-required). A covered call
+    the mandate is read under, DEC-0141 MJ-1; unusable, the refusal is operator-decision-required). Both are read failing
+    closed, as McpToolServer reads them (FAA-139): a spend that is not a finite double is none (`mandate_spend`), a
+    project that is not a string is UNREADABLE_PROJECT, which a mandate limited to projects refuses. A covered call
     answers {ok: True, record: {by: operator, via: mandate, task, chain, caller}, decision: None, mandate}; without
     `self_id` the mandate is not read and the call is answered as before it existed."""
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19
@@ -398,6 +420,8 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
             inputs[name] = value
     if self_id is not None and isinstance(meta, dict) and "mandate" in meta:
         inputs.update({"mandate": meta["mandate"], "self": self_id})
+        spend_usd = mandate_spend(spend_usd)
+        project = project if project is None or isinstance(project, str) else UNREADABLE_PROJECT
         for name, value in (("effect", effect), ("callerAgent", caller_agent), ("spendUsd", spend_usd), ("project", project),
                             ("mandateCapability", mandate_capability)):
             if value is not None:

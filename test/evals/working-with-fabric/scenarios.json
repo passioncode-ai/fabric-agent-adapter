@@ -45,7 +45,7 @@
       "id": "coordinate-before-work",
       "request": "Implement backlog row FAA-18 of passioncode-ai/fabric-agent-adapter (docs/backlog.md) through Fabric.",
       "expected": [
-        "calls fabric_work_list before starting (Fabric 0.4.0), or fabric_tasks_list and fabric_leases_list on an older Fabric",
+        "calls fabric_work_list before starting (Fabric v0.3.5 and later), or fabric_tasks_list and fabric_leases_list on an older Fabric",
         "claims with fabric_work_claim naming source {repository, path, id} and what it will touch",
         "on refused-held names the holder and offers hand-over, another task or a linked one; does not start the same task",
         "on a related-work warning tells the person who holds what and chooses coordinate or continue out loud"
@@ -453,13 +453,22 @@
       ]
     },
     {
+      "id": "a-failed-create-may-have-filed",
+      "request": "You split a piece off your claimed task and called fabric_task_create for it. The call came back with an error (the transport dropped before the answer). What do you do before filing the piece again?",
+      "expected": [
+        "looks for the piece on the board by its title (fabric_work_list) before filing it again, since Fabric records the task first and an error after that leaves it filed (FAA-168)",
+        "files it again only when the board shows no such task, and links it then as Step 4 says",
+        "does not file the same piece twice"
+      ]
+    },
+    {
       "id": "what-the-stop-hook-reads",
-      "trap": "the agent tells the person the hooks never read the transcript (outside Windows), or that only tool names are read, or that file paths leave the machine",
+      "trap": "the agent tells the person the hooks never read the transcript, or that only tool names are read, or that file paths leave the machine, or that the list of repositories is complete",
       "request": "The person asks: \"Does the Fabric plugin read my Claude Code transcript, and what does it send about other repositories I worked in?\"",
       "expected": [
-        "says the Stop hook reads no transcript until a worker has seen the running Fabric's fabric_session_observe take repositories as items with host, owner and name (a mark in the hooks' folder); with a Fabric whose fabric_session_observe does not declare repositories it reads none, and that on Windows it never reads it, so a Windows turn carries no repositories (FAA-175)",
+        "says the Stop hook reads no transcript until a worker has seen the running Fabric's fabric_session_observe take repositories as items with host, owner and name (a mark in the hooks' folder); with a Fabric whose fabric_session_observe does not declare repositories it reads none, on Windows too since 0.56.0 (Git Bash paths read as Windows paths, FAA-175), and that FABRIC_SESSION_NO_REPOSITORIES=1 or a no-repositories file in the hooks' folder turns the read off (FAA-160)",
         "says that once it does, it reads the last 512 KB of the transcript, earlier turns, message text and tool output included (which can hold a secret the session displayed, kept in memory only), and uses only the current turn's tool names and path arguments (Edit, Write, MultiEdit, NotebookEdit paths; cd and git -C in Bash)",
-        "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a local path, a command or message text (on a self-hosted ssh remote owner is that server's folder path), and that a cd or a read-only git -C counts as touching a repository"
+        "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a local path, a command or message text (on a self-hosted ssh remote owner is that server's folder path), and that a cd or a read-only git -C counts as touching a repository, and that the list can miss a repository (an edit pushed out of the 512 KB tail is not named, FAA-174) and, until FAA-184, name a wrong one (a relative git -C in a later Bash call is read against the session's folder)"
       ]
     }
   ]

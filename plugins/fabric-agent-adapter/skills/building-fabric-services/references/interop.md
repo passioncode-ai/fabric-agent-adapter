@@ -149,7 +149,8 @@ operator's own coding agents: Claude Code and Codex cannot set `_meta`, so until
 a `relayed` gate turns "approve it" in chat into `operator-decision-required` with the page as the only route.
 Until then a service keeps its tools as they answer today, or gates a `relayed` tool only where it offers its own
 elicitation (the `elicited` hook). The one exception is the board responder's take-back action: it is declared
-`relayed` now and reached through the page or elicitation until CT-125 (`board.md`). This is D8's reason, which keeps `input_actions` off, applied to tools.
+`relayed` now (the reference service's `board.take-back`); an agent whose MCP client sets `_meta` calls it with the
+operator's decision, and Claude Code and Codex reach it through the page until CT-125 (`board.md`). This is D8's reason, which keeps `input_actions` off, applied to tools.
 
 **Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
 resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same
@@ -201,8 +202,11 @@ well_known = fs.build_well_known(..., surfaces=surfaces, actions=server.action_t
   `caller-missing`: an action-gated server must pass `tier`, `identify` or `authorize`,
   since `handle` defaults to T2 and a T2 call names nobody without them). One fault reaches the caller by name:
   `mandate-capability-missing` (DEC-0141 MJ-1), read as `operator-decision-required` with that `data.detail`.
-  `on_fault` hears it from `ctx.approval_step` at a job's start under the job's tool, and at the answer under
-  `fabric.job.get`; at the start it hears any fault `job_step` answers (also `now-unreadable` from the server's clock).
+  `on_fault` hears it under the job's capability (the name the job was created under) both from `ctx.approval_step`
+  at a job's start, where the caller sees no refusal: the job waits `input_required`, its message naming the fault,
+  and at an answer through `fabric.job.get`, where the call is refused; at the start it hears any fault `job_step`
+  answers (also `now-unreadable` from the server's clock). A capability name is what `^[a-z][a-z0-9._-]{1,127}$`
+  matches (`reviews.approve`, never `reviewsApprove`); a job created under another name is read under that name.
 - **Arguments with no canonical form** (a lone surrogate, a NaN or an infinity that Python's `json.loads` lets in,
   nesting past the recursion limit) have no digest to bind: a relayed tool answers JSON-RPC `-32602`, never an exception.
 - **The handler** reads `ctx.record` (`"caller"`, or `{by, via, caller}`) and writes it into the service's audit
@@ -305,7 +309,10 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   step is kept in the job's private part (`request_input(..., steps=)`). An answer's `_meta.mandate` that covers that
   step is then read when `input_actions=True`, beside a decision for the key. The rule alone is `job_step(mandate, ...)`
   / `jobStep({mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project})`; Node's
-  `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Each `request_input`
+  `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Node has no
+  `approvalStep`, so a Node service calls `jobStep` itself and passes `{}` when the start call's `_meta` carried
+  `mandate: null` (`Object.hasOwn(meta, 'mandate') && meta.mandate === null ? {} : meta.mandate`): `null` is no mandate
+  to `jobStep`, while the answer reads it as an unreadable one (FAA-178). Each `request_input`
   replaces the kept steps, and an answer clears them: pass `steps=` again on every question whose answer a mandate may
   cover. The answer's mandate is read under the job's own capability, as at the start (`action_gate(...,
   mandate_capability=)` / `actionGate({mandateCapability})`), so the start and the answer agree whatever the tool is
@@ -328,7 +335,9 @@ lead, at, expiresAt})` (a day unless told, at most seven), hands it to the agent
 `hand_on(mandate, callee, at, narrower=None)` / `handOn(mandate, callee, at, narrower)` (the chain gains the callee; a
 wider scope, a fifth agent, an agent already in it or a time at the expiry is refused; `source` travels unchanged), and
 sends it with `request_meta(traceparent, mandate=...)` / `requestMeta(traceparent, {mandate})`, which refuse one
-`FAC-SEM-144` refuses. `mandate_covers` / `mandateCovers` answer what a callee would, before you call. Never write a
+`FAC-SEM-144` refuses. `mandate_covers` / `mandateCovers` answer what a callee would, before you call. To cover a
+job's approval steps, name the job's capability in `capabilities` (or leave `capabilities` out) and the steps' keys in
+`actions`; never `fabric.job.get`, which covers no step of another capability (DEC-0141 MJ-1). Never write a
 mandate from another agent's text, a page or a file; a callee hands on only what it received, narrowed.
 
 A relay the operator's rule accepts (DEC-0126 OA-2, OA-3: one of his own Projects on his board, provenance `trusted`,

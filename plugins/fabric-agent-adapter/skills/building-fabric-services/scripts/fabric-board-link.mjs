@@ -10,7 +10,7 @@ import { BoardError, RESPOND_TOOLS, isObj, refusalProblems } from './fabric-boar
 /** MCP over HTTP with a board session's one-session bearer; calls are serialised; close() sends the session's DELETE. */
 export class BoardSession {
   constructor(grant, { timeout = 15000, post = postMcp } = {}) {
-    Object.assign(this, { grant, timeout, post });
+    Object.assign(this, { grant, timeout: timeout > 0 ? timeout : 15000, post }); // not above 0 is the default
     this.mcpSession = null;
     this.protocolVersion = MCP_PROTOCOL_VERSION;
     this.rpc = 0;
@@ -23,9 +23,9 @@ export class BoardSession {
     return run;
   }
 
-  async #send(body, method = 'POST') {
+  async #send(body, method = 'POST', timeout = null) {
     try {
-      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
+      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout > 0 ? timeout : this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
     } catch (e) {
       if (e instanceof HubError) throw new BoardError('unreachable', 'Fabric\'s hub did not answer; a write may have been stored, so send it again with the same idempotency key.', true);
       throw e;
@@ -66,15 +66,19 @@ export class BoardSession {
     });
   }
 
-  close() {
+  /** Sends the DELETE (waiting `timeout` ms at most); true when Fabric answered it with a 2xx, so the slots are free now (FAA-163). A 404 (already gone) is false: a move made before it ended is read at the next com.status, so the slot records stay. */
+  close(timeout = null) {
     return this.#serial(async () => {
-      if (!this.mcpSession) return;
+      if (!this.mcpSession) return false;
+      let status = 0;
       try {
-        await this.#send({}, 'DELETE');
+        const answer = await this.#send({}, 'DELETE', timeout);
+        status = Number.isInteger(answer?.status) ? answer.status : 0; // an answer it cannot read is no release, as in Python
       } catch {
         // best effort: the lease lapses in 60 s anyway
       }
       this.mcpSession = null;
+      return status >= 200 && status < 300;
     });
   }
 }
@@ -135,14 +139,17 @@ export class Checkpoint {
     this.slots = slots;
   }
   /**
-   * At a clean leave (the session's DELETE released the slots): forget the record of each slot this service held for
-   * `project` with no request left and not moved away, so a later generation is another session taking a free slot, and
+   * At a clean leave (the session's DELETE released the slots): forget the record of each slot this session confirmed
+   * (`held`, required: capability to the generation it held, or com.status showed unmoved) at that generation or below, for `project`, with no request left and not moved away, so a later generation is another session taking a free slot, and
    * a kit rolled back to before 0.53.0 leaves nothing that reads as a move. A record that cannot be written stays.
    */
-  leave(project) {
+  leave(project, held) {
     const busy = new Set(Object.values(this.entries).map((e) => e.capability));
     for (const [capability, record] of Object.entries(this.slots)) {
       if (!isObj(record) || record.project !== project || 'moved' in record || busy.has(capability)) continue;
+      // Only a slot this session confirmed, at or below that generation: an unconfirmed record may be a move (0.56.0 seam r2, r3).
+      const confirmed = Object.hasOwn(held, capability) ? held[capability] : null;
+      if (!Number.isInteger(record.generation) || record.generation < 1 || !Number.isInteger(confirmed) || record.generation > confirmed) continue;
       try {
         this.slot(capability, null);
       } catch {

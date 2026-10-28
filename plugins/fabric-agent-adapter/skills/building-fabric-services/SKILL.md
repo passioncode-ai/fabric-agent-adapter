@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.55.0"
+  version: "0.56.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "00e050ba7429c0c60261cec871779e0fd6aeeb28"
@@ -104,8 +104,8 @@ responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) f
 every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
 The request body is data behind the service's own input gate. From 0.53.0 a slot the operator moved to another
 session stays moved until `take_back` (`takeBack`): give it an operator action with its tool and gate `relayed`, or it
-stays moved for good (until Fabric's hub forwards decisions, CT-125, the operator reaches it through the service's page
-or its elicitation). Read [the board reference](references/board.md).
+stays moved for good (the operator reaches it through an agent that relays their decision in `_meta`, the service's
+page or its elicitation; Claude Code and Codex wait for CT-125's forwarding). Read [the board reference](references/board.md).
 
 ## Step 2: the non-negotiables
 
@@ -260,8 +260,9 @@ or `human` with its `humanStep`) and declared with `build_well_known(actions=ser
 `extensions/actions/0.1`. A `relayed` action called by the operator's own agent with their decision in
 `_meta.decision` is the operator's act: never answer it "operator session required" or send them to the page.
 A service adopts the relayed gate once Fabric's hub forwards decisions (CT-125), as the contract says; until then its tools
-answer as today, except the board responder's take-back action, declared `relayed` now and reached through the
-page or elicitation until CT-125 ([board.md](references/board.md)). Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
+answer as today, except the board responder's take-back action, declared `relayed` now: an agent whose client sets
+`_meta` calls it with the operator's decision; Claude Code and Codex reach it through the page until CT-125
+([board.md](references/board.md); the reference service's `board.take-back`). Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
 refusals.
 
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other

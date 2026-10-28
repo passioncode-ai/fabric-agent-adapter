@@ -32,6 +32,14 @@ class Attribution(unittest.TestCase):
             with self.subTest(url=url):
                 self.assertNotIn("none", fs.attribution_headers(setting, {"url": url, "originated": True}))
 
+    def test_a_port_new_url_refuses_is_not_openrouter(self):
+        """0.56.0 seam r13: a port of another script's digits (`٤٤٣`) or a superscript (`²`) is no port to `new URL`,
+        so the Node twin answers not-openrouter; Python's isdigit() took the first as 443 and int() raised on the second."""
+        setting = {"product": "example-agent", "title": "Example Agent"}
+        for url in ("https://openrouter.ai:\u0664\u0664\u0663/x", "https://openrouter.ai:\u00b2/x"):
+            with self.subTest(url=url):
+                self.assertEqual(fs.attribution_headers(setting, {"url": url, "originated": True}), {"headers": {}, "none": "not-openrouter"})
+
     def test_off_by_default_and_the_setting_rule(self):
         self.assertEqual(fs.attribution_headers(None, {"url": "https://openrouter.ai/api/v1", "originated": True}), {"headers": {}, "none": "no-setting"})
         self.assertEqual(fs.attribution_setting_findings({"product": "example-agent", "title": "Example Agent"}), [])

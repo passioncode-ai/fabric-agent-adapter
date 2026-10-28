@@ -1,8 +1,8 @@
 """working-with-fabric: where Fabric is, the registrations, and the session hooks of a coding agent opened outside
 Fabric (COM-04). The command the plugin's hooks run: fabric_session.py hook <event>.
 
-Since 0.40.0 (FAA-65) the code is in five modules beside this file, lowest first: fabric_session_env,
-fabric_session_mcp, fabric_session_mail, fabric_session_hosts and fabric_session_cli. This file re-exports every name
+Since 0.40.0 (FAA-65) the code is in modules beside this file, lowest first: fabric_session_env,
+fabric_session_paths (0.56.0), fabric_session_mcp, fabric_session_mail, fabric_session_hosts and fabric_session_cli. This file re-exports every name
 it defined at 0.39.1. Standard library only, Python 3.9+."""
 from __future__ import annotations
 
@@ -37,6 +37,7 @@ from fabric_session_env import (  # noqa: F401
     NUDGES_FILE,
     MAX_NUDGES,
     MAX_NUDGE_CHARS,
+    MAX_NUDGE_ITEMS,
     nudge_lines,
     take_nudges,
     WATCH_NUDGES_FILE,
@@ -76,7 +77,10 @@ from fabric_session_env import (  # noqa: F401
     spawn_worker,
     _remove_tree,
     NO_SESSION_MARK,
+    NO_REPOSITORIES_ENV,
+    NO_REPOSITORIES_MARK,
     REPOSITORIES_MARK,
+    repositories_off,
     repositories_wanted,
     NO_SESSION_HOLD_S,
     no_session_held,

@@ -87,6 +87,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
 | L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data |
+| L4 | `fabric_board_slots` | the responder's slot records: the generation held, a move and its take-back, one capability's refusal retried alone (FAA-163) |
 | L4 | `fabric_board_session` | the board responder: the work context, the fenced request, transfer and recovery |
 | L4 | `fabric_board_fixture` | the scripted board the probe runs a responder against |
 | L4 | `fabric_board` | the facade of the board connector ([board](board.md)) |

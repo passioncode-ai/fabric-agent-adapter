@@ -160,6 +160,46 @@ test('config refusals and totals', () => {
   assert.deepEqual(fo.totals([{ costUsd: 2, route: 'subscription' }, { costUsd: null }]), { calls: 2, spentUsd: null, unpricedCalls: 1 });
 });
 
+test('a base URL that is not a string is refused as checkUrl refuses it', () => {
+  // 0.56.0 unit r28: the same class and kind as Python, a query or not.
+  for (const baseUrl of [null, 5, new URL('https://openrouter.ai/api/v1?x=1'), new URL('https://openrouter.ai/api/v1')]) {
+    assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }),
+      (e) => e.name === 'HttpError' && e.kind === 'refused' && e.url === '<unparseable url>', String(baseUrl));
+  }
+});
+
+test('the shared base URL cases', () => {
+  // 0.56.0 seam r27: one table both twins read, so the order of the query check and checkUrl cannot drift.
+  for (const [baseUrl, want] of CASES.baseUrls.cases) {
+    const make = () => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
+    if (want === 'config') assert.throws(make, (e) => e instanceof fo.OpenRouterError && e.kind === 'config', JSON.stringify(baseUrl));
+    else assert.equal(make().baseUrl, want, JSON.stringify(baseUrl));
+  }
+});
+
+test('a base URL ending in a line break or a space is composed without it', () => {
+  // 0.56.0 product r20: checkUrl reads the base with its ends trimmed, so the base composed must be that one.
+  for (const baseUrl of ['https://openrouter.ai/api/v1\n', 'https://openrouter.ai/api/v1/ ', 'https://openrouter.ai/api/v1/\r\n',
+    'https://openrouter.ai/api/v1\n/', 'https://openrouter.ai/api/v1\t/']) { // `new URL` removes a tab or line break anywhere
+    const c = new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
+    assert.equal(c.baseUrl, 'https://openrouter.ai/api/v1', JSON.stringify(baseUrl));
+  }
+  // 0.56.0 unit r19: a query or fragment would take `/chat/completions`, so both twins refuse it when the client is
+  // built. A space, a control or a character outside ASCII in the path is Python's to refuse (check_url); Node sends
+  // it percent-encoded, as in 0.55.0 (FAA-187 (18)).
+  for (const baseUrl of ['https://openrouter.ai/api/v1?x=1', 'https://openrouter.ai/api/v1#f', 'https://openrouter.ai/api/v1/#',
+    'https://openrouter.ai/api/v1?a b', 'https://openrouter.ai/api/v1?caf\u00e9', 'http://example.com/v1?x',
+    'https://u:p@example.com/v1?x', 'ftp://example.com/v1#f']) { // unit r27: before checkUrl, as in Python
+    assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), (e) => e.kind === 'config', JSON.stringify(baseUrl));
+  }
+  for (const [baseUrl, sent] of [['https://openrouter.ai\u200b', 'https://openrouter.ai/chat/completions'],
+    ['https://gw.example/caf\u00e9/v1', 'https://gw.example/caf%C3%A9/v1/chat/completions'],
+    ['https://gw.example/v1%20', 'https://gw.example/v1%20/chat/completions']]) {
+    const c = new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
+    assert.equal(new URL(`${c.baseUrl}/chat/completions`).href, sent, JSON.stringify(baseUrl)); // as 0.55.0 sent it
+  }
+});
+
 test('unencodable requests and answers over the cap', async () => {
   const seen = [];
   const { cl } = client({ steps: [] }, seen, new Ledger());

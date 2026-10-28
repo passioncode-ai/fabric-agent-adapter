@@ -33,9 +33,10 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   reads by name at run time; the kit itself calls no outside host on its own. A board
   responder talks only to Fabric's hub on loopback.
 - The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
-  in the session's folder (counts only, at most 1.5 s; with the mark below and not on Windows, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
-  session Fabric launched. Stop also, never on Windows and only once the running Fabric's `fabric_session_observe` takes
-  `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark), reads the
+  in the session's folder (counts only, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
+  session Fabric launched. Stop also, only once the running Fabric's `fabric_session_observe` takes
+  `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark) and unless the person turned it off
+  (`FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file in the hooks' folder, FAA-160), reads the
   last 512 KB of the session's transcript (earlier turns included; only the entries after the
   last prompt the person typed are used; the tail holds message text and tool output too, file contents and
   command output that can carry a secret the session displayed, read in memory only and never spooled, logged or sent)
@@ -45,8 +46,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   host, owner and name, never a local path, a command or message text (on a self-hosted ssh
   remote, `owner` is the folder path on that server before the repository's name). The mark is
   removed only by a worker that sees a schema without the field, so after Fabric is downgraded
-  the turns that end before a worker next runs (about a minute) are still read; none of their
-  names is sent. They write their spool and log under the user's cache folder (0600),
+  the turns that end before a worker next reaches the running Fabric (about a minute; longer while
+  rejoins fail) are still read; none of their names is sent. They write their spool and log under the user's cache folder (0600),
   and the delivery worker starts `fabric-mcp` in its own process group and ends that group
   (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no Fabric token. An
   `origin` URL that embeds a credential (`https://user:token@host/...`) is read by `git config`

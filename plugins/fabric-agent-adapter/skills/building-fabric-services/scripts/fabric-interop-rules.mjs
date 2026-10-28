@@ -230,13 +230,16 @@ const UNREADABLE_JOB_CAPABILITY = "The operator's mandate cannot be read for thi
  * covered, or saying the mandate expired or cannot be read; never the operator's words or `source`; with `fault`
  * mandate-capability-missing beside it when the job's capability cannot read the step, MJ-1); or {covered: false,
  * message: null} with no mandate or a T2 caller's (MD-5), with `fault` when the service's own clock does not read.
+ * Undefined and null are no mandate: a call that carried `_meta.mandate: null` passes `{}`, so it reads as
+ * mandate-malformed here as it does at the answer (FAA-178).
  */
 export function jobStep({ mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project } = {}) {
   if (mandate === undefined || mandate === null) return { covered: false, message: null };
   if (!EFFECT_CLASSES.includes(effect)) throw new InteropError(`A job's approval step names its effect class (one of ${EFFECT_CLASSES.join(', ')}; DEC-0125).`);
   const call = { capability, action: key, effect };
-  if (typeof spendUsd === 'number') call.spendUsd = spendUsd;
-  if (typeof project === 'string') call.project = project;
+  const spend = mandateSpend(spendUsd); // read as actionGate reads it, so the start and the answer agree (FAA-139)
+  if (spend !== undefined) call.spendUsd = spend;
+  if (project !== undefined && project !== null) call.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
   const covers = { mandate, tier, now, self, call };
   if (typeof callerAgent === 'string' && callerAgent.length > 0) covers.callerAgent = callerAgent;
   const answer = mandateCovers(covers);
@@ -271,6 +274,14 @@ export function jobStep({ mandate, tier, now, self, capability, key, effect, cal
  * mandateCapability: a job's kept step's capability the mandate is read under (DEC-0141 MJ-1; the service's own input,
  * never a caller's); unusable, the refusal is operator-decision-required.
  */
+/** The project of a call whose project could not be read: never in a mandate's projects (FAA-139). */
+export const UNREADABLE_PROJECT = '\u0000unreadable';
+
+/** A spend estimate as a mandate reads it (FAA-139): a finite number stays, anything else is none (a ceiling refuses it). */
+export function mandateSpend(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };
   if (isObject(meta) && Object.hasOwn(meta, 'decision')) inputs.decision = meta.decision;
@@ -279,7 +290,8 @@ export function actionGate({ action, tier, caller, meta, target, elicited = fals
   }
   if (self !== undefined && self !== null && isObject(meta) && Object.hasOwn(meta, 'mandate')) {
     Object.assign(inputs, { mandate: meta.mandate, self });
-    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', spendUsd], ['project', project], ['mandateCapability', mandateCapability]]) {
+    const read = project === undefined || project === null || typeof project === 'string' ? project : UNREADABLE_PROJECT; // fail closed (FAA-139)
+    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', mandateSpend(spendUsd)], ['project', read], ['mandateCapability', mandateCapability]]) {
       if (value !== undefined && value !== null) inputs[name] = value;
     }
   }

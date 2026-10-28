@@ -114,6 +114,10 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
     [{ repository: 'https://host:port/x' }, 'source.repository names a host'],
     [{ repository: 'https://gh.example:65536/x' }, 'source.repository names a host'],
     [{ repository: 'https://bot:hunter2@github.com/example/agent' }, 'source.repository carries no password'],
+    [{ repository: 'https:bot:hunter2@github.com/example/agent' }, 'source.repository carries no password'],
+    [{ repository: 'HTTPS:/bot:hunter2@github.com/example/agent' }, 'source.repository carries no password'],
+    [{ repository: 'https:me@corp.example:hunter2@github.com/a/b' }, 'source.repository carries no password'],
+    [{ repository: 'https://me@corp.example:hunter2@github.com/a/b' }, 'source.repository carries no password'],
     [{ repository: `https://github.com/example/agent?t=ghp_${'a1B2'.repeat(9)}` }, 'FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository'],
   ]) {
     assert.throws(() => k.registerRemote({ id: 'example-bad', name: 'Bad', origin: 'https://bad.example.com', token: 't'.repeat(40), dir, source }),

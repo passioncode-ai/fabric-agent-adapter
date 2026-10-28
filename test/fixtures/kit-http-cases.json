@@ -20,9 +20,237 @@
   [
    "http://[::1]:9000/a",
    "http://[::1]:9000/a"
+  ],
+  [
+   "https:u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "https:\\u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "HTTPS:/u@x:hunter2@h.example/y?t=1",
+   "https://h.example/y"
+  ],
+  [
+   " https:u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "ht\ttps:u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   " https://u:hunter2@h.example/x \n",
+   "https://h.example/x"
+  ],
+  [
+   "\u0001https://u:hunter2@h.example/x",
+   "https://h.example/x"
+  ],
+  [
+   "https:",
+   "<unparseable url>"
+  ],
+  [
+   "ht tps://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "1ttps://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "+x:u:hunter2@h.example",
+   "<unparseable url>"
+  ],
+  [
+   "u:hunter2@h.example/x?k=1",
+   "u:<redacted>"
+  ],
+  [
+   "hunter2@host/x?k=1",
+   "<unparseable url>"
+  ],
+  [
+   "\ufeffhttps://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "\u00a0https://u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:hun/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:hun\\ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https:u:hun/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "<https://u:hunter2@h.example/x>",
+   "<unparseable url>"
+  ],
+  [
+   "///u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "\\\\u:hunter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "htps:u:hunter2@api.example/x",
+   "htps:<redacted>"
+  ],
+  [
+   "mailto:u:hunter2@h.example",
+   "mailto:<redacted>"
+  ],
+  [
+   "ws://u:hunter2@h.example/x",
+   "ws:<redacted>"
+  ],
+  [
+   "https://u:1_2/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:+1/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u: 12/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://u:\u0661\u0662/ter2@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://h.example:+443/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://h\u0080.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://h\u009f.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "http://b][SEC0\\@h.example/x",
+   "<unparseable url>"
+  ],
+  [
+   "http://[zz]/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://[fe80::1%25en0]/x",
+   "<unparseable url>"
+  ],
+  [
+   "ftp://[",
+   "<unparseable url>"
+  ],
+  [
+   "ws://[/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://h.example%3A8443/x",
+   "<unparseable url>"
+  ],
+  [
+   "ws://h.example:99999/x",
+   "<unparseable url>"
+  ],
+  [
+   "ftp://h.example:65536/",
+   "<unparseable url>"
+  ],
+  [
+   "wss://",
+   "<unparseable url>"
+  ],
+  [
+   "ws://u:hunter2@:80/x",
+   "<unparseable url>"
+  ],
+  [
+   "https://]@h.example[evil.example/x",
+   "<unparseable url>"
   ]
  ],
  "checkUrl": [
+  [
+   "https://h.example%3A8443/x",
+   false,
+   true
+  ],
+  [
+   "https://h\u0080.example/x",
+   false,
+   true
+  ],
+  [
+   "https://h\u009f.example/x",
+   false,
+   true
+  ],
+  [
+   "https://h.example%5Cv1/x",
+   false,
+   true
+  ],
+  [
+   "https://evil.example%40good.example/x",
+   false,
+   true
+  ],
+  [
+   "https://[fe80::1%25en0]/x",
+   false,
+   true
+  ],
+  [
+   "http://[::1%25lo0]/x",
+   false,
+   true
+  ],
+  [
+   "https://h.example:+443/x",
+   false,
+   true
+  ],
+  [
+   "https://h.example:1_0/x",
+   false,
+   true
+  ],
+  [
+   "https://h.example:\u0664\u0664\u0663/x",
+   false,
+   true
+  ],
+  [
+   "https://\u0001/x",
+   false,
+   true
+  ],
+  [
+   "https://[zz]/x",
+   false,
+   true
+  ],
   [
    "https://api.example/v1",
    false,

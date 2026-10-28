@@ -31,6 +31,7 @@ export {
   EVENT_SCHEMA,
   STOP_CODES,
   HOLD_RETRY_MAX_SECONDS,
+  IDLE_LEAVE_SECONDS,
   BoardSession,
   Checkpoint,
   BoardRequest,

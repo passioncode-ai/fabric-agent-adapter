@@ -13,7 +13,10 @@ once, and `sample.draft` is a job that stops for a titled choice before it compl
 Opt-in, off by default: `serve --board-project <Project uuid>` also answers that Project's `sample.echo` requests on
 Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Responder, from a board.respond grant whose
 credential is in `<data>/board.credential` (0600; `--board-credential` names another file). The request body is data:
-the gate admits plain text of at most 2,000 characters, and the answer is a reply carrying the same text.
+the gate admits plain text of at most 2,000 characters, and the answer is a reply carrying the same text. Its
+dashboard's Take back has the tool `board.take-back`, which the manifest lists when registered with the same
+`--board-project`; a serve whose board mode differs from the registered manifest at its start logs
+`service.manifest.mismatch`.
 """
 
 from __future__ import annotations
@@ -52,8 +55,29 @@ PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <nav class="fd-nav" aria-label="Sections"><ul class="fd-nav-list"><li><a href="#events" aria-current="page">Events</a></li>
 <li><a href="#about">About</a></li></ul></nav></div>
 <main class="fd-page"><section id="events"><h2>Events</h2><ul>{rows}</ul></section>
-<section id="about"><h2>About</h2><p class="fd-hint">A sample fabric-service/0.1 service built on the kit.</p></section></main>
+{board}<section id="about"><h2>About</h2><p class="fd-hint">A sample fabric-service/0.1 service built on the kit.</p></section></main>
 </body></html>"""
+# FAA-157: a moved board slot comes back only by the operator's act, a button on this page. The button posts from the
+# operator's signed-in dashboard session with the request header; a service token alone cannot reach it.
+BOARD_SECTION = """<section id="board"><h2>Project board</h2><p class="fd-hint">These slots were moved to another
+session; this service no longer answers them there. Take back asks for one again: the service enrolls once the other
+session lets it go, or at once when it restarts with accepted work for the slot.</p><ul>{items}</ul>
+<script src="/board.js" defer></script></section>"""
+#: The dashboard's Take back button and its tool (FAA-157, DEC-0121): the operator's decision, relayed in `_meta`.
+TAKE_BACK = {"id": "board.take-back", "title": "Take back", "tool": "board.take-back", "gate": "relayed"}
+TAKE_BACK_INPUT = {"type": "object", "properties": {"capability": {"type": "string"}}, "required": ["capability"],
+                   "additionalProperties": False}
+BOARD_ITEM = '<li>{capability} <button type="button" data-take-back="{capability}">Take back</button></li>'
+BOARD_JS = """document.addEventListener('click', function (e) {
+  var cap = e.target && e.target.getAttribute && e.target.getAttribute('data-take-back');
+  if (!cap) return;
+  e.target.disabled = true;
+  fetch('/api/board/take-back', {method: 'POST', credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json', 'X-Fabric-Request': '1'}, body: JSON.stringify({capability: cap})})
+    .then(function (r) { e.target.textContent = r.ok ? 'Asked back: waiting for the other session' : 'Refused (' + r.status + ')'; })
+    .catch(function () { e.target.disabled = false; e.target.textContent = 'Failed: try again'; });
+});
+"""
 
 
 def _schema(name: str, body: Dict[str, Any]) -> Dict[str, Any]:
@@ -72,10 +96,26 @@ CAPABILITIES = [
      "output": _schema("sample.draft-output", {"type": "object", "additionalProperties": False,
                                                  "properties": {"title": {"type": "string"}, "body": {"type": "string"}}, "required": ["title", "body"]})},
 ]
+#: The take-back tool as a manifest capability (0.56.0 product r28): every tool the well-known lists is in the
+#: manifest, so `register --board-project` writes it there.
+TAKE_BACK_CAPABILITY: Dict[str, Any] = {
+    "name": TAKE_BACK["tool"], "effect": "change-policy", "idempotency": "required", "job": False,
+    "description": "Take back a board slot the operator moved away.",
+    # A relayed action: a probe call carries no operator decision, so it is refused and changes nothing (unit r28).
+    "probeAssertion": "is refused as operator-decision-required without the operator's decision in _meta",
+    "input": _schema("board.take-back-input", TAKE_BACK_INPUT),
+    "output": _schema("board.take-back-output", {"type": "object", "additionalProperties": False,
+                                                  "properties": {"capability": {"type": "string"}, "moved": {"const": False}},
+                                                  "required": ["capability", "moved"]})}
+
+
+def served_capabilities(board: bool) -> list:
+    return CAPABILITIES + ([TAKE_BACK_CAPABILITY] if board else [])
 
 
 class Service:
     def __init__(self, args: argparse.Namespace):
+        self.args = args
         self.id = args.id
         self.instance = args.instance
         self.name = args.name
@@ -110,9 +150,73 @@ class Service:
             self.board = fbd.Responder(hub=fhb.HubClient(), project_id=self.board_project, capabilities=[self.board_capability],
                                        credential_file=self.board_credential, checkpoint_file=self.data / "board-checkpoint.json",
                                        handler=self.board_answer, admit=self.board_admit, emit=self.log.append, service=self.id)
+            # Every button has a tool (DEC-0121): the page's Take back is this relayed action, the operator's decision.
+            cap = TAKE_BACK_CAPABILITY
+            self.mcp.add_tool(fi.tool_for_capability(cap, cap["input"], cap["output"]), self.board_take_back_tool,
+                              action=TAKE_BACK, target="capability")
         self.log.append("service.started", "info", "%s started on build %s." % (self.name, self.build["commit"]))
+        self.check_manifest()
+
+    def check_manifest(self) -> None:
+        """The registered manifest is register's to write, never serve's (0.56.0 seam r28): a serve whose board mode
+        differs from it at its start says so, and the probe fails until it is registered again (interop.tools-match when
+        the manifest lists a take-back this run does not serve, interop.well-known-capabilities when it lacks one this run
+        lists)."""
+        try:
+            listed = {c.get("name") for c in json.loads((self.data / "fabric-agent.json").read_text(encoding="utf-8"))["capabilities"]
+                      if isinstance(c, dict)}
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return  # not registered here, or not a manifest of this shape: nothing to compare
+        if (TAKE_BACK["tool"] in listed) != (self.board is not None):
+            self.log.append("service.manifest.mismatch", "warning",
+                            "The registered manifest %s the take-back tool, which this run %s: register again %s --board-project."
+                            % ("lists" if TAKE_BACK["tool"] in listed else "lacks",
+                               "does not serve" if self.board is None else "serves", "without" if self.board is None else "with"))
 
     # --- the project board (opt-in): the input gate and the answer -------------------
+    def board_moved(self) -> list:
+        """The capabilities whose slot the operator moved to another session (FAA-155): the page offers their take-back.
+        The live slot or the checkpoint's record says so: before a restart has reconnected (or while Fabric is down) the
+        record alone knows the move (0.56.0 seam r3)."""
+        if not self.board:
+            return []
+        live = {c for c, slot in dict(self.board.slots).items() if slot.get("state") == "moved"}
+        kept = {c for c, record in dict(self.board.checkpoint.slots).items()
+                if isinstance(record, dict) and record.get("project") == self.board_project and "moved" in record}
+        return sorted((live | kept) & set(self.board.capabilities))
+
+    def board_take_back(self, capability: Any, record: Any = None) -> Dict[str, Any]:
+        """The operator's take-back (FAA-157): the next tick enrolls once the other session lets the slot go. `record` is
+        the act the action gate recorded (by, via, caller), kept in the event; never the decision's words. A repeat for a
+        capability of this service that is no longer moved (its first answer lost) answers the same, from the page's
+        route as from the tool (0.56.0 seam r6)."""
+        if self.board is not None and isinstance(capability, str) and capability in self.board.capabilities \
+                and capability not in self.board_moved():
+            return {"capability": capability, "moved": False}
+        if not isinstance(capability, str) or capability not in self.board_moved():
+            raise fs.ServiceError("No slot of that capability has moved away from this service.")
+        self.board.take_back(capability)
+        # Who decided and by which route are words in the sentence; the caller, a machine id, goes in data only
+        # (events-and-notifications.md, "Writing an event"; 0.56.0 product r34).
+        # The route in words; the tokens by and via, with the caller, in data (product r35).
+        act = record if isinstance(record, dict) else {}
+        how = {"dashboard": " on this service's page", "relayed-instruction": " through an agent they told",
+               "mandate": " under a standing mandate"}.get(act.get("via"), "")
+        value = {"capability": capability, **{k: act[k] for k in ("by", "via", "caller") if isinstance(act.get(k), str)}}
+        data = {"schema": fbd.EVENT_SCHEMA, "value": value}
+        extra = {} if fs.feed_data_problems(data) else {"data": data}  # a caller the feed refuses never undoes the answer
+        self.log.append("board.slot.returned", "info", "The operator took the %s slot back%s; the service enrolls once the "
+                        "other session lets it go." % (capability, how),
+                        subject={"type": "capability", "id": capability}, **extra)
+        return {"capability": capability, "moved": False}
+
+    def board_take_back_tool(self, args: Dict[str, Any], ctx: fi.CallContext) -> Dict[str, Any]:
+        """The take-back as a tool: the action gate has already read the operator's relayed decision (gate `relayed`)."""
+        try:
+            return self.board_take_back(args.get("capability"), ctx.record)  # a repeat answers moved: false
+        except (fs.ServiceError, fbd.BoardError) as exc:
+            raise fi.InteropError(str(exc))
+
     def board_admit(self, request: fbd.BoardRequest) -> Optional[str]:
         """The service's own input gate: the body is data, never an instruction; only short plain text is echoed."""
         if request.body_format != "text/plain":
@@ -172,11 +276,14 @@ class Service:
             started_at=self.started_at, status="ready", degraded=self.degraded,
             summary=[{"label": "Events", "value": len(self.log.fetch(None, fs.EVENTS_MAX_LIMIT))}],
             surfaces={"dashboard": {"path": "/", "login": True}, "events": {"path": "/fabric/v1/events"},
-                      "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]},
+                      "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]
+                              + ([TAKE_BACK["tool"]] if self.board is not None else [])},
                       "usage": {"path": fs.USAGE_PATH}},
             extensions=fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else None,
             # DEC-0067: listed only when the board is on — a host pinned before DEC-0067 refuses the member.
-            protocols=["fabric-service/0.1", "fabric-project-comms/0.1"] if self.board is not None else None,
+            # DEC-0126 OA-7: a server serving a relayed action reads `source`, so it lists operator-source/1 too.
+            protocols=self.mcp.well_known_protocols(["fabric-service/0.1", "fabric-project-comms/0.1"]) if self.board is not None else None,
+            actions=self.mcp.action_table() or None,
         )
 
 
@@ -195,7 +302,8 @@ def make_handler(svc: Service):
             self.send_response(status)
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; frame-ancestors 'self'")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; "
+                             "frame-ancestors 'self'")
             if body is not None:
                 self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(payload)))
@@ -261,8 +369,12 @@ def make_handler(svc: Service):
                     return self._send(401, "Open this dashboard from Fabric Dashboards.", content_type="text/plain")
                 rows = "".join("<li>%s: %s</li>" % (html.escape(e["at"]), html.escape(e["text"]))
                                for e in reversed(svc.log.fetch(None, 20)))
-                return self._send(200, PAGE.format(name=html.escape(svc.name), agent=html.escape("%s.%s" % (svc.id, svc.instance)), status="ready", rows=rows),
+                moved = "".join(BOARD_ITEM.format(capability=html.escape(c)) for c in svc.board_moved())
+                return self._send(200, PAGE.format(name=html.escape(svc.name), agent=html.escape("%s.%s" % (svc.id, svc.instance)), status="ready", rows=rows,
+                                                   board=BOARD_SECTION.format(items=moved) if moved else ""),
                                   content_type="text/html; charset=utf-8")
+            if url.path == "/board.js" and svc.board is not None:
+                return self._send(200, BOARD_JS, content_type="text/javascript; charset=utf-8")
             self._send(404, {"error": "Not found."})
 
         def _length(self, cap: int) -> "int | None":
@@ -290,7 +402,8 @@ def make_handler(svc: Service):
                     return self._send(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error."}})
                 try:
                     with svc.drain.work():
-                        response = svc.mcp.handle(message, self.headers)
+                        # T0 (DL-25): a loopback call the service token authenticated is the local floor's caller.
+                        response = svc.mcp.handle(message, self.headers, tier="T0")
                 except fs.Stopping as exc:
                     return self._send(503, {"jsonrpc": "2.0", "id": None, "error": {"code": -32000, "message": str(exc)}},
                                       {"Retry-After": "5"})
@@ -307,6 +420,21 @@ def make_handler(svc: Service):
                     return self._send(403, {"error": "Missing request header."})
                 svc.codes.logout(fs.cookie_value(self.headers.get("Cookie")))
                 return self._send(204, None, {"Set-Cookie": fs.expired_session_cookie_header()})
+            if url.path == "/api/board/take-back" and svc.board is not None:
+                if not self._session_ok():  # the operator's dashboard session only: never the service token (FAA-157)
+                    return self._send(401, {"error": "Sign in from Fabric Dashboards first."})
+                if self.headers.get("X-Fabric-Request") != "1":
+                    return self._send(403, {"error": "Missing request header."})
+                length = self._length(4096)
+                if length is None:
+                    return
+                try:
+                    body = json.loads(self.rfile.read(length) or b"{}")
+                    # The event names who decided, as the tool's does: the operator, at the dashboard (0.56.0 seam r7).
+                    return self._send(200, svc.board_take_back(body.get("capability") if isinstance(body, dict) else None,
+                                                               {"by": "operator", "via": "dashboard", "caller": "the signed-in page"}))
+                except (ValueError, RecursionError, fs.ServiceError, fbd.BoardError) as exc:
+                    return self._send(400, {"error": str(exc)})
             if url.path == "/api/emit":
                 if not (self._session_ok() or fs.token_matches(self.headers.get("Authorization"), svc.token)):
                     return self._send(401, {"error": "Sign in first."})
@@ -343,11 +471,6 @@ def serve(args: argparse.Namespace) -> int:
     # hand-over that hangs is cut by the kit's hard exit, inside launchd's ExitTimeOut.
     import threading
     board_stop = threading.Event()
-    board_thread = None
-    if svc.board is not None:
-        board_thread = threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True)
-        board_thread.start()
-
     stop_asked: list = []
 
     def stopping() -> None:
@@ -355,30 +478,39 @@ def serve(args: argparse.Namespace) -> int:
         board_stop.set()  # stop claiming; the responder drains its request and leaves its board session
         svc.log.append("service.stopping", "info", "%s is stopping." % svc.name)
     svc.drain.install(lambda drained: server.shutdown(), on_stopping=stopping)
+    # The board thread starts only once the stop handler is installed: a SIGTERM in between would end the process with
+    # no drain and no DELETE, and the slot would stay held until its lease lapses (0.56.0 seam r6).
+    board_thread = None
+    if svc.board is not None:
+        board_thread = threading.Thread(target=svc.board.run, args=(board_stop, 5.0), name="board-responder", daemon=True)
+        board_thread.start()
     try:
         server.serve_forever(poll_interval=0.2)
     finally:
         board_stop.set()
         if board_thread is not None:
             # The responder drains (5 s at most) and leaves its board session, which releases its slots and forgets their
-            # records (FAA-155): joined, so the process does not end before that.
-            # Bounded by the kit's hard exit, 8 + 2 s after the stop was asked: 1.5 s are left for the rest of the stop.
-            board_thread.join(max(0.5, 8.5 - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
+            # records (FAA-155): joined, so the process does not end before that. Idle, it waits 3 s for the DELETE and the
+            # join ends within LC-01's 5 s (FAA-173); with work, it is bounded by the kit's hard exit, 8 + 2 s after the
+            # stop was asked: 1.5 s are left for the rest of the stop.
+            bound = 4.5 if svc.board.current is None else 8.5
+            board_thread.join(max(0.5, bound - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
         server.server_close()
         svc.lock.release()
     return 0
 
 
-def write_manifest(args: argparse.Namespace, data: Path) -> Path:
-    """The provider manifest for this service, naming its descriptor (G-07), with its schemas beside it."""
+def write_manifest(args: argparse.Namespace, data: Path, board: bool = False) -> Path:
+    """The provider manifest for this service, naming its descriptor (G-07), with its schemas beside it; with `board`,
+    the take-back tool too."""
     schemas = data / "fabric" / "schemas"
-    for cap in CAPABILITIES:
+    for cap in served_capabilities(board):
         for side in ("input", "output"):
             fs.atomic_write(schemas / ("%s-%s.schema.json" % (cap["name"], side)),
                             (json.dumps(cap[side], indent=2) + "\n").encode(), 0o600)
     origin = "http://127.0.0.1:%d" % args.port
     capabilities = []
-    for cap in CAPABILITIES:
+    for cap in served_capabilities(board):
         capabilities.append({
             "id": "urn:fabric:capability:%s" % cap["name"], "name": cap["name"], "description": cap["description"],
             "inputSchema": cap["input"]["$id"], "outputSchema": cap["output"]["$id"],
@@ -388,7 +520,7 @@ def write_manifest(args: argparse.Namespace, data: Path) -> Path:
                         "requiredFeatures": ["tool:%s" % cap["name"]],
                         "probes": [{"id": "%s-shape" % cap["name"].replace(".", "-"), "inputFixture": "urn:fabric:fixture:%s" % cap["name"],
                                     "outputSchema": cap["output"]["$id"], "timeoutMs": 5000, "sideEffectCeiling": "none",
-                                    "assertions": ["returns a value valid against its output schema"]}]},
+                                    "assertions": [cap.get("probeAssertion", "returns a value valid against its output schema")]}]},
             "extensions": {fi.EXTENSION_KEY: {"job": cap["job"]}},
         })
     digest = hashlib.sha256(json.dumps(capabilities, sort_keys=True).encode()).hexdigest()
@@ -408,7 +540,7 @@ def write_manifest(args: argparse.Namespace, data: Path) -> Path:
 
 def register(args: argparse.Namespace) -> int:
     data = Path(args.data_dir)
-    manifest = write_manifest(args, data)
+    manifest = write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
     descriptor = {
         "protocol": fs.PROTOCOL, "id": args.id, "instance": args.instance, "name": args.name,
         "summary": "Sample fabric-service/0.1 service.",
@@ -449,6 +581,8 @@ def build_parser() -> argparse.ArgumentParser:
             p.add_argument("--board-capability", default="sample.echo")
             p.add_argument("--board-credential", help="the board.respond credential file (0600); default <data>/board.credential")
         else:
+            p.add_argument("--board-project", help="the Project the service will answer on the board: lists its take-back "
+                                                   "tool in the manifest (serve with the same --board-project)")
             p.add_argument("--services-dir")
             p.add_argument("--label")
             p.add_argument("--plist")

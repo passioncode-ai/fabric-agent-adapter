@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.55.0"
+VERSION = "0.56.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -100,21 +100,26 @@ def nudge_shown(line: str) -> str:
 WATCH_NUDGES_FILE = "nudges.watch.json"
 MAX_NUDGES = 5
 MAX_NUDGE_CHARS = 400
+#: At most this many items of an answer's nudges are read (FAA-143): a broken Fabric's long list costs linear time.
+MAX_NUDGE_ITEMS = 1000
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]+")
 
 
 def nudge_lines(value: Any, limit: Optional[int] = MAX_NUDGES) -> List[str]:
     """The `says` of a nudges list as clean lines: one line each (controls and line breaks become a space), cut to
-    MAX_NUDGE_CHARS, blanks and repeats dropped, at most `limit` (None: all). Anything that is not such a list gives []."""
+    MAX_NUDGE_CHARS, blanks and repeats dropped, at most `limit` (None: all) from the first MAX_NUDGE_ITEMS items.
+    Anything that is not such a list gives []."""
     lines: List[str] = []
+    seen = set()
     if not isinstance(value, list):
         return lines
-    for item in value:
+    for item in value[:MAX_NUDGE_ITEMS]:
         says = item.get("says") if isinstance(item, dict) else None
         if not isinstance(says, str):
             continue
         line = " ".join(_CONTROL.sub(" ", says).split())[:MAX_NUDGE_CHARS].rstrip()
-        if line and line not in lines:
+        if line and line not in seen:
+            seen.add(line)
             lines.append(line)
         if limit is not None and len(lines) == limit:
             break
@@ -480,6 +485,10 @@ NO_SESSION_MARK = "no-session"
 #: `repositories` as {host, owner, name}: a worker writes it from the tool's schema and removes it when the schema stops
 #: saying so. Until it exists the Stop hook reads no transcript (FAA-140, seam and product readings 1).
 REPOSITORIES_MARK = "observe-takes-repositories"
+#: The file in the hooks' own folder that turns the transcript read off (FAA-160): the turn's git facts are still
+#: measured. The environment variable FABRIC_SESSION_NO_REPOSITORIES=1 does the same for one environment.
+NO_REPOSITORIES_MARK = "no-repositories"
+NO_REPOSITORIES_ENV = "FABRIC_SESSION_NO_REPOSITORIES"
 NO_SESSION_HOLD_S = 15 * 60.0
 
 
@@ -531,10 +540,18 @@ def _write_private(path: Path, text: str) -> None:
     os.replace(str(tmp), str(path))
 
 
+def repositories_off(env: Optional[Dict[str, str]] = None) -> bool:
+    """Whether the person turned the transcript read off (FAA-160): FABRIC_SESSION_NO_REPOSITORIES set to anything but
+    "" or "0", or the file NO_REPOSITORIES_MARK in the hooks' own folder."""
+    value = (os.environ if env is None else env).get(NO_REPOSITORIES_ENV, "")
+    return value not in ("", "0") or (state_root(env=env) / NO_REPOSITORIES_MARK).exists()
+
+
 def repositories_wanted(env: Optional[Dict[str, str]] = None) -> bool:
     """Whether the Stop hook reads the transcript for the turn's other repositories (FAA-140): only once a worker
-    left the mark, and never on Windows, where a Bash command's paths are not this host's (FAA-175)."""
-    return sys.platform != "win32" and (state_root(env=env) / REPOSITORIES_MARK).exists()
+    left the mark, and not when the person turned it off (FAA-160). On Windows too (FAA-175): bash_paths reads a Git
+    Bash command's /c/... and C:/... paths as this host's."""
+    return not repositories_off(env) and (state_root(env=env) / REPOSITORIES_MARK).exists()
 
 
 def session_dir(session_id: str, env: Optional[Dict[str, str]] = None) -> Path:

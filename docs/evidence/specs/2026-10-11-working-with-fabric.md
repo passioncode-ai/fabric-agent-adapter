@@ -10,7 +10,9 @@ launched already does: find Fabric, have it started by the machine's lifecycle b
 `fabric-mcp` once with no secret, call `fabric_whoami` first, coordinate before it starts (`fabric_work_list`,
 `fabric_work_claim`), report while it works, link tasks to backlog rows instead of copying them, and release at the
 end. In Claude Code, a hook pack injects the preamble at session start, records each turn as facts with no content,
-and releases what the session left claimed at its end — without ever blocking or slowing the session.
+and releases what the session left claimed at its end, without ever blocking or slowing the session. Amended
+2026-10-27 (0.53.0): once the running Fabric takes them, the Stop hook also reads the tail of the session's transcript
+to name the other repositories a turn touched (principles 4 and 5 below say what it reads and what it sends).
 
 ## Source ledger
 
@@ -41,13 +43,13 @@ and releases what the session left claimed at its end — without ever blocking 
 4. **No content, ever.** A turn observation carries the HEAD commit, the count of changed files and the lines added
    and removed against HEAD — no paths, no branch names, no messages, no diff text.
    Amended 2026-10-27 (0.53.0, [brief D1, D2, D7](2026-10-27-faa-140-155-brief.md)): once the running Fabric takes
-   them, and never on Windows (0.53.1, FAA-175), a turn also carries the other repositories it touched as `{host, owner, name}`, read from the transcript's
+   them, on Windows too since 0.56.0 (FAA-175), and not when the person turned it off (FAA-160), a turn also carries the other repositories it touched as `{host, owner, name}`, read from the transcript's
    tail; still no local paths, no messages, no diff text.
 5. **Never block or slow.** SessionStart reads two small files and prints; Stop and SessionEnd write a spool entry
-   and start a detached worker that holds a 10 s deadline. Every hook exits 0; every failure is one log line in the
+   and start a detached worker that holds a 10 s deadline. Every hook exits 0 once `python3` starts (FAA-183); every failure is one log line in the
    adapter's cache folder (0600, rotated at 1 MB). No token is read: the hooks never open the door token or a
    credential, and nothing secret is in argv or the log. Amended 2026-10-27 (0.53.0): once Fabric takes repositories,
-   and never on Windows (0.53.1, FAA-175), Stop reads the transcript's last 512 KB (message text and tool output, which can hold a secret the session
+   on Windows too since 0.56.0 (FAA-175), and not when the person turned it off (FAA-160), Stop reads the transcript's last 512 KB (message text and tool output, which can hold a secret the session
    displayed; read in memory only, never spooled, logged or sent) and runs `git config` in the repositories it names; a credential embedded in
    an `origin` URL is read with it and dropped in memory, never spooled, logged or sent.
 6. **SessionStart injects the preamble only when `fabric` is registered in Claude Code and Fabric is running**; when

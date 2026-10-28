@@ -125,6 +125,56 @@ class Rules(unittest.TestCase):
             self.assertNotIn(header.lower(), ("http-referer", "x-openrouter-title", "x-title"),
                              "attribution is off by default")
 
+    def test_a_base_url_that_is_not_a_string_is_refused_as_check_url_refuses_it(self):
+        # 0.56.0 unit r28: the same class and kind in both twins, a query or not.
+        for base in (None, 5, b"https://openrouter.ai/api/v1?x=1", ["https://openrouter.ai/api/v1"]):
+            with self.subTest(base=base):
+                with self.assertRaises(fo.fabric_http.HttpError) as caught:
+                    fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
+                              environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
+                self.assertEqual(caught.exception.kind, "refused")
+                self.assertEqual(caught.exception.url, "<unparseable url>")
+
+    def test_the_shared_base_url_cases(self):
+        # 0.56.0 seam r27: one table both twins read, so the order of the query check and check_url cannot drift.
+        for base, want in CASES["baseUrls"]["cases"]:
+            with self.subTest(base=base):
+                make = lambda: fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
+                                         environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
+                if want == "config":
+                    with self.assertRaises(fo.OpenRouterError) as caught:
+                        make()
+                    self.assertEqual(caught.exception.kind, "config")
+                else:
+                    self.assertEqual(make().base_url, want)
+
+    def test_a_base_url_ending_in_a_line_break_is_sent_without_it(self):
+        # 0.56.0 seam r18: check_url trims the ends, so the base it passed must be the base composed and sent.
+        for base in ("https://openrouter.ai/api/v1\n", "https://openrouter.ai/api/v1/ ", "https://openrouter.ai/api/v1/\r\n"):
+            with self.subTest(base=base):
+                c = fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"], environ={"OPENROUTER_API_KEY": KEY},
+                              base_url=base, now=lambda: NOW)
+                self.assertEqual(c.base_url, "https://openrouter.ai/api/v1")
+        # 0.56.0 unit r19, seam r20: a query or fragment would take `/chat/completions`; a Unicode space at the end
+        # stays in the path. Both are refused when the client is built.
+        for base in ("https://openrouter.ai/api/v1?x=1", "https://openrouter.ai/api/v1#f", "https://openrouter.ai/api/v1\u00a0",
+                     "https://openrouter.ai/api/v1\u3000", "https://openrouter.ai/api/v1\u00a0/", "https://openrouter.ai/api/v1\x85",
+                     "https://openrouter.ai/api/v1\u200b"):
+            with self.subTest(base=base):
+                with self.assertRaises(Exception) as caught:  # OpenRouterError, or check_url's HttpError
+                    fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
+                              environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
+                self.assertIn(getattr(caught.exception, "kind", None), ("config", "refused"))
+        # 0.56.0 product r27: a query is refused as a query (OpenRouterError config) even when it also holds a space
+        # or a character outside ASCII that check_url refuses, as on Node.
+        for base in ("https://openrouter.ai/api/v1?a b", "https://openrouter.ai/api/v1?caf\u00e9", "https://openrouter.ai/api/v1#a b",
+                     "http://example.com/v1?x", "https://u:p@example.com/v1?x", "ftp://example.com/v1#f"):
+            with self.subTest(base=base):
+                with self.assertRaises(fo.OpenRouterError) as caught:
+                    fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
+                              environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
+                self.assertEqual(caught.exception.kind, "config")
+
     def test_attribution_only_with_a_setting(self):
         seen = []
         setting = {"product": "example-agent", "title": "Example Agent", "categories": ["cloud-agent"]}

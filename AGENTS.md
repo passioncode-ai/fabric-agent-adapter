@@ -61,7 +61,7 @@ with `--strict-mcp-config` and a temporary config.
   all enforced by `test/test_fabric_kit.py`). After changing a kit module run `python3 .../fabric_kit.py build`; CI
   fails a stale `kit.json` (`test_kit_json_is_what_the_sources_say`). At a release move `kit.json`'s own `"version"` first: `build` refuses to rewrite the digests of a version that has a release tag. The map, the layers and the rule for a new module: `references/kit-modules.md`. Recipes on the
   kit: `building-fabric-services/recipes/`. `fabric_session.py` in working-with-fabric is a facade over
-  `fabric_session_{env,mcp,mail,hosts,cli}.py`; hooks and workers always run the facade.
+  `fabric_session_{env,mcp,paths,mail,hosts,cli}.py`; hooks and workers always run the facade.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
   `test/evals/<skill>/`. `test/evals/run_evals.py` runs the trigger evals against a real client, only when asked
   (`FABRIC_REAL_CLIENT=1` and `claude` on PATH); hosted CI holds no model credential and does not run it. Measured
@@ -124,7 +124,7 @@ this repository both obeys it and ships its service layer
   (`git rev-parse`, `git config`) and the services directory first; only when the repository owns a service (a
   descriptor names it as `source.repository`) does it read the tree (`git ls-files` or `git grep`), all within one
   3.5 s budget. It prints one line when that service's dashboard has no dashboard kit or an older one, prints nothing
-  when the budget runs out, and exits 0, always, within its 5 s timeout; it writes nothing. Measured under a
+  when the budget runs out, and exits 0, always once `python3` starts (on Windows it must name Python in Git Bash, FAA-183), within its 5 s timeout; it writes nothing. Measured under a
   load average of about 50: median 294–443 ms per session start.
 - `SessionStart`, `Stop`, `UserPromptSubmit`, `SessionEnd`: `fabric_session.py hook …` (working-with-fabric). Session
   start (matcher `startup|clear`) reads `~/.claude.json` and Fabric's `hub.json`, and prints the preamble only when
@@ -134,11 +134,12 @@ this repository both obeys it and ships its service layer
   and only in a project that uses Fabric. Stop and SessionEnd first remove
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s);
-  never on Windows and only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'
-  folder), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text and tool output, which can
+  only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'
+  folder), and unless the person turned it off (`FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file,
+  FAA-160), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text and tool output, which can
   hold a secret the session displayed, are read with it in memory only, and only the current turn's tool names and path arguments are used) and names the other Git repositories the turn
   touched as `{host, owner, name}` from their `origin`, one `git rev-parse` and one `git config` each inside the same 1.5 s
-  (FAA-140; measured 2026-10-27 at `f3765f1`, before the gate and the 64 KB cap, with a 4.8 MB transcript naming six other repositories: median 247 ms, against 109 ms
+  (FAA-140; measured 2026-10-27 at `f3765f1`, before the gate and the 64 K-character cap, with a 4.8 MB transcript naming six other repositories: median 247 ms, against 109 ms
   for 0.52.0 on the same transcript, [raw](docs/reports/2026-10-27-faa-140-turn-repositories/raw/stop-hook-timing.log)); and they
   write a spool entry (0600, at most 50 per session) in the user's cache folder and start a **detached worker**
   (`fabric_session.py deliver`) that runs `fabric-mcp --rejoin-only` in its own process group with a 10 s deadline

@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -705,6 +706,170 @@ class RestartTests(Conversation):
 
 
 
+class RecoveryFollowUpTests(Conversation):
+    """FAA-163 and FAA-158: one capability's refusal never stops the others, a reconnect starts with no slot, a lapsed
+    slot holds no lease, the record is forgotten only after a DELETE Fabric answered, and a take-back is not undone."""
+
+    CAPS = ("video.render", "video.cut")
+
+    def record(self):
+        path = self.data / "board-checkpoint.json"
+        return json.loads(path.read_text()).get("slots", {}) if path.exists() else {}
+
+    def test_a_refused_first_capability_leaves_the_next_one_served(self):
+        self.board.refuse_always[("com.enroll", "video.render")] = "capacity_exceeded"
+        rid = self.board.queue("video.cut")
+        r = self.responder()
+        for _ in range(3):
+            r.step()
+            self.board.advance(1)
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.assertEqual(r.slots["video.render"]["state"], "retry")
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual([e[3]["data"]["value"] for e in self.events if e[0] == "board.slot.refused"],
+                         [{"capability": "video.render", "reason": "capacity_exceeded"}])
+
+    def test_a_refused_capability_asks_again_alone_with_a_growing_pause(self):
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        r = self.responder()
+        r.step()
+        first = r.slots["video.cut"]["retry_at"] - self.board.now
+        self.board.advance(first)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["tries"], 2)
+        self.assertEqual(r.slots["video.cut"]["retry_at"] - self.board.now, 2 * first)
+        del self.board.refuse_always[("com.enroll", "video.cut")]
+        self.board.advance(2 * first)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.assertEqual(r.slots["video.render"]["state"], "held")
+        self.assertEqual(len([e for e in self.events if e[0] == "board.slot.refused"]), 1)
+
+    def test_a_lost_enroll_while_another_slot_holds_is_asked_again(self):
+        """The session stays (video.render's lease holds) and video.cut, whose answer was lost, is enrolled next."""
+        call, once = self.board.call, []
+
+        def dropping(sid, caps, tool, args):
+            answer = call(sid, caps, tool, args)
+            if tool == "com.enroll" and args.get("capability") == "video.cut" and not once:
+                once.append(1)
+                self.board.drop_next["com.enroll"] = 1
+            return answer
+        self.board.call = dropping
+        r = self.responder()
+        r.step()
+        self.assertIsNotNone(r.session)
+        self.assertEqual(r.slots["video.cut"]["state"], "retry")
+        self.board.advance(r.slots["video.cut"]["retry_at"] - self.board.now)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.assertEqual([e for e in self.events if e[0] == "board.slot.moved"], [])
+        self.assertNotIn("board.slot.refused", self.kinds(), "a lost answer is the session's, not a refusal (unit r1)")
+
+    def test_a_board_wide_not_available_is_the_fault_not_a_refusal(self):
+        """0.56.0 seam r1: not_available on every enroll is the board down, never one refused capability."""
+        for capability in self.CAPS:
+            self.board.refuse_always[("com.enroll", capability)] = "not_available"
+        r = self.responder()
+        r.step()
+        self.assertEqual(r.state, "down")
+        self.assertIn("board.down", self.kinds())
+        self.assertNotIn("board.slot.refused", self.kinds())
+
+    def test_a_refusal_after_the_slot_was_held_is_said_again(self):
+        """0.56.0 seam r1: board.slot.refused is said once per episode, and a capability held between ends one."""
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        r = self.responder()
+        r.step()
+        del self.board.refuse_always[("com.enroll", "video.cut")]
+        self.board.advance(r.slots["video.cut"]["retry_at"] - self.board.now)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        self.hub.control({"op": "end-sessions"})
+        r.step()  # session-ended: dropped
+        self.board.advance(61)
+        r.step()  # reconnects; the enroll is refused again
+        self.assertEqual(self.kinds().count("board.slot.refused"), 2)
+
+    def test_two_refused_capabilities_are_each_said_once_across_reconnects(self):
+        """0.56.0 unit r2: one refusal episode per capability, so two refused together are not said again by turns."""
+        for capability in self.CAPS:
+            self.board.refuse_always[("com.enroll", capability)] = "capacity_exceeded"
+        r = self.responder()
+        r.step()
+        for _ in range(2):
+            self.hub.control({"op": "end-sessions"})
+            r.step()
+            self.board.advance(61)
+            r.step()
+        self.assertEqual(self.kinds().count("board.slot.refused"), len(self.CAPS))
+
+    def test_a_delete_answered_404_keeps_the_records(self):
+        """0.56.0 seam r1: a session already gone may hide a move the next status read would show."""
+        r = self.responder()
+        r.step()
+        self.hub.delete_status = 404
+        r.shutdown()
+        self.assertEqual(set(self.record()), {"video.render", "video.cut"})
+
+    def test_a_reconnect_starts_with_no_slot(self):
+        r = self.responder()
+        r.step()
+        self.hub.control({"op": "end-sessions"})
+        r.step()  # session-ended: dropped
+        self.board.fail_next["com.status"] = "capacity_exceeded"
+        self.board.advance(60)
+        r.step()
+        self.assertEqual(r.slots, {})
+        self.assertIsNone(r.session)  # refused with no slot held: reconnects, never skips recovery
+
+    def test_a_lapsed_slot_holds_no_lease(self):
+        r = self.responder()
+        r.step()
+        r.slots["video.render"]["renewed_at"] = float("-inf")
+        self.assertGreater(r._lease_left(), 0)
+
+    def test_the_record_is_forgotten_only_after_a_delete_fabric_answered(self):
+        r = self.responder()
+        r.step()
+        self.hub.delete_fails = True
+        r.shutdown()
+        self.assertEqual(set(self.record()), {"video.render", "video.cut"})
+        self.hub.delete_fails = False
+        second = self.responder()
+        self.board.advance(61)
+        second.step()
+        second._fault(fb.BoardError("schema-unsupported", "a test"))  # a dropped session whose DELETE was answered
+        self.assertEqual(self.record(), {})
+
+    def test_an_idle_stop_waits_three_seconds_for_the_delete(self):
+        """FAA-173: an idle responder's leave ends within LC-01's 5 s even when Fabric holds the DELETE."""
+        r = self.responder()
+        r.step()
+        self.hub.delete_delay = 6.0
+        started = time.monotonic()
+        r.shutdown()
+        self.assertLess(time.monotonic() - started, fb.IDLE_LEAVE_SECONDS + 1.5)
+        self.assertEqual(r.state, "stopped")
+        self.assertEqual(set(self.record()), {"video.render", "video.cut"})  # unanswered: the records stay
+
+    def test_a_take_back_during_a_move_check_is_kept(self):
+        r = self.responder()
+        r.step()
+        self.board.move("video.render")
+        status = r._status
+
+        def interleaved():
+            answer = status()
+            r.take_back("video.render")  # the operator's action thread, between the read and the lock
+            return answer
+        r._status = interleaved
+        self.assertFalse(r._gone("video.render"))
+        self.assertNotIn("video.render", self.record())
+        self.assertNotIn("board.slot.moved", self.kinds())
+
+
 class AuditFaultTests(Conversation):
     """FAA-77 (audit 2026-10-22, findings 35 to 39): faults the reviewer reproduced against this fake board."""
 
@@ -1021,7 +1186,13 @@ class AuditFaultTests(Conversation):
         self.outcome = slow
         r = self.threaded()
         r.step()
-        self.settle(r, rounds=4, seconds=5)
+        # Four ticks, as before (each idle tick takes the next transferred request, finding 39), but each waits in
+        # wall time for the work thread first: on a loaded runner one outlasted its 50 ms (hosted macOS on 111b4ae
+        # ended at ['completed', 'accepted']), and the clock must not move while it runs (seam r18).
+        for _ in range(4):
+            if r.current is not None:
+                self.assertTrue(r.current.done.wait(10))
+            self.settle(r, rounds=1, seconds=5)
         self.assertEqual([self.board.requests[x]["state"] for x in rids], ["completed", "completed"])
         self.assertEqual(self.checkpoint(), {})
 
@@ -1724,6 +1895,699 @@ class SampleWiringTests(unittest.TestCase):
             self.assertIn("board.request.refused", kinds)
             svc.board.shutdown(0.1)
 
+    def test_board_md_names_every_board_event_kind(self):
+        """0.56.0 product r32: board.md's list of the responder's events left out board.outcome.invalid, which this
+        release first delivers to the feed. Every board.* kind either twin emits is named in board.md."""
+        import re
+        scripts = Path(importlib.import_module("fabric_board").__file__).parent
+        board_md = (scripts.parent / "references" / "board.md").read_text(encoding="utf-8")
+        kinds = set()
+        for path in scripts.iterdir():
+            if path.name.startswith(("fabric_board", "fabric-board")) and path.suffix in (".py", ".mjs"):
+                kinds |= set(re.findall(r"[\"'](board\.[a-z_]+(?:\.[a-z_]+)*)[\"']", path.read_text(encoding="utf-8")))
+        self.assertIn("board.outcome.invalid", kinds)
+        self.assertEqual(sorted(k for k in kinds if "`%s`" % k not in board_md), [])
+
+    def test_every_board_notice_level_is_one_the_event_log_takes(self):
+        """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refuses, so a service with
+        emit=log.append (the reference service) never logged them. Every level both twins pass is one LEVELS holds."""
+        import re
+        fabric_events = importlib.import_module("fabric_events")
+        scripts = Path(importlib.import_module("fabric_board").__file__).parent
+        found = []
+        for name in ("fabric_board_session.py", "fabric_board_slots.py", "fabric-board-session.mjs", "fabric-board-slots.mjs"):
+            text = (scripts / name).read_text(encoding="utf-8")
+            found += [(name, level) for level in re.findall(r"emit\(\s*[\"']board\.[a-z._]+[\"']\s*,\s*[\"']([a-z]+)[\"']", text)]
+        self.assertGreater(len(found), 20)
+        self.assertEqual([f for f in found if f[1] not in fabric_events.LEVELS], [])
+        # Through the responder's own _emit into the log a service wires (emit=log.append): the level, notify, data and,
+        # since seam r30, a subject per request or capability, so a host's banners tell two episodes apart.
+        class SimpleNamespace:  # the three attributes Responder._emit reads
+            def __init__(self, **kw):
+                self.__dict__.update(kw)
+        session = importlib.import_module("fabric_board_session")
+        with tempfile.TemporaryDirectory() as tmp:
+            log = fabric_events.JsonlEventLog(Path(tmp) / "events.jsonl")
+            r = SimpleNamespace(_said={}, _emit_to=log.append, project=PROJECT)
+            for request in ("req-1", "req-2"):
+                session.Responder._emit(r, "board.reconcile.needed", "warning", "A request's outcome is unknown.", notify=True,
+                                        episode=request, request=request, capability="sample.echo")
+            session.Responder._emit(r, "board.down", "warning", "Fabric's board cannot be reached.", episode="down")
+            rows = log.fetch(None, 10)
+            self.assertEqual([(e["kind"], e["level"], e.get("notify")) for e in rows],
+                             [("board.reconcile.needed", "warning", True)] * 2 + [("board.down", "warning", None)])
+            self.assertEqual([e["subject"] for e in rows], [{"type": "request", "id": "req-1"}, {"type": "request", "id": "req-2"},
+                                                            {"type": "episode", "id": "down"}])
+            self.assertEqual(rows[0]["data"]["value"]["request"], "req-1")
+            said = []  # an emit written before 0.56.0, with no subject: the notice still goes
+            old = SimpleNamespace(_said={}, _emit_to=lambda kind, level, text, notify=False, data=None: said.append(kind),
+                                  project=PROJECT)
+            session.Responder._emit(old, "board.down", "warning", "Fabric's board cannot be reached.")
+            self.assertEqual(said, ["board.down"])
+            calls = []  # unit r31: a TypeError raised inside an emit that delivered the notice: never sent twice
+
+            def failing(kind, level, text, **extra):
+                calls.append(extra.get("subject"))
+                raise TypeError("the host's own bug")
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=failing, project=PROJECT), "board.down", "warning", "x")
+            self.assertEqual(calls, [None])  # only **extra: called as 0.55.0 called it, once, without a subject
+            import functools  # seam r31: a wrapped emit without subject still gets the notice, once
+
+            def inner(kind, level, text, notify=False, data=None):
+                said.append(kind)
+
+            @functools.wraps(inner)
+            def wrapped(*a, **kw):
+                return inner(*a, **kw)
+            said.clear()
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=wrapped, project=PROJECT), "board.blocked", "error", "x",
+                                    episode="no-epoch")
+            self.assertEqual(said, ["board.blocked"])
+            # seam r32: an emit that forwards **kwargs to a sink without subject (0.55.0's shape) still gets the notice,
+            # once, without a subject; a TypeError of the emit's own is still not said twice (above)
+            narrow_said = []
+
+            def narrow(kind, level, text, notify=False, data=None):
+                narrow_said.append(kind)
+
+            def forwarder(kind, level, text, **kw):
+                return narrow(kind, level, text, **kw)
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=forwarder, project=PROJECT), "board.down", "warning", "x")
+            self.assertEqual(narrow_said, ["board.down"])
+            # unit r33: an emit that forwards to a sink taking subject and sets its own keeps it, and the notice goes
+            # once; a subject bound with functools.partial stands too
+            with tempfile.TemporaryDirectory() as own:
+                own_log = fabric_events.JsonlEventLog(Path(own) / "events.jsonl")
+
+                def binder(kind, level, text, **kw):
+                    return own_log.append(kind, level, text, subject={"type": "service", "id": "me"}, **kw)
+                session.Responder._emit(SimpleNamespace(_said={}, _emit_to=binder, project=PROJECT), "board.down", "warning", "x")
+                bound = functools.partial(own_log.append, subject={"type": "service", "id": "bound"})
+                session.Responder._emit(SimpleNamespace(_said={}, _emit_to=bound, project=PROJECT), "board.down", "warning", "x")
+                self.assertEqual([e.get("subject") for e in own_log.fetch(None, 10)],
+                                 [{"type": "service", "id": "me"}, {"type": "service", "id": "bound"}])
+
+                @functools.wraps(own_log.append)  # unit r34: read as itself, not as the log it wraps
+                def wrapped_own(*a, **kw):
+                    return own_log.append(*a, subject={"type": "service", "id": "wrapped"}, **kw)
+                session.Responder._emit(SimpleNamespace(_said={}, _emit_to=wrapped_own, project=PROJECT), "board.down", "warning", "x")
+                self.assertEqual(own_log.fetch(None, 10)[-1].get("subject"), {"type": "service", "id": "wrapped"})
+
+            class Touchy:  # unit r34: a default that raises on == never stops the responder
+                def __eq__(self, other):
+                    raise RuntimeError("no")
+                __hash__ = object.__hash__
+            touched = []
+
+            def touchy(kind, level, text, subject=Touchy(), **kw):
+                touched.append(kind)
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=touchy, project=PROJECT), "board.down", "warning", "x")
+            self.assertEqual(touched, ["board.down"])
+            # two blocking causes are two subjects, so a host shows the second within the first's cooldown
+            subjects = [session._notice_subject({}, PROJECT, code) for code in ("no-epoch", "checkpoint")]
+            self.assertEqual(subjects, [{"type": "episode", "id": "no-epoch"}, {"type": "episode", "id": "checkpoint"}])
+        # The longest notice keeps its last instruction with the longest capability a Project accepts (128 characters).
+        slots = (scripts / "fabric_board_slots.py").read_text(encoding="utf-8")
+        start = slots.index('"The %s slot on this Project moved')
+        import ast
+        moved = ast.literal_eval("(" + slots[start:slots.index("% capability", start)] + ")")
+        self.assertLessEqual(len(moved % ("c" * 128)), 500)
+
+    def test_the_probe_passes_the_sample_with_its_board_on(self):
+        """0.56.0 product r28, seam r28: registered with the board, the take-back tool the well-known lists is in the
+        manifest and the kit's own probe passes; a serve whose board mode differs leaves the manifest as register wrote it
+        and says so in an event, and the probe fails until it is registered again."""
+        import socket
+        import urllib.request
+        sample = importlib.import_module("sample_service")
+        scripts = Path(sample.__file__).parent
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            env = dict(os.environ, HOME=str(tmp), XDG_DATA_HOME=str(tmp / "share"), LOCALAPPDATA=str(tmp / "local"))
+            hub = FakeHub(fh.fabric_root(env=env), capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            data, services = tmp / "data", tmp / "services"
+            data.mkdir(mode=0o700)
+            (data / "board.credential").write_text(hub.credential)
+            os.chmod(data / "board.credential", 0o600)
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            common = ["--port", str(port), "--data-dir", str(data)]
+
+            def names():
+                return [c["name"] for c in json.loads((data / "fabric-agent.json").read_text())["capabilities"]]
+
+            def probed(board):
+                proc = subprocess.Popen([sys.executable, sample.__file__, "serve", *common] + (["--board-project", PROJECT] if board else []),
+                                        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    deadline = time.monotonic() + 20
+                    while True:
+                        try:
+                            with urllib.request.urlopen("http://127.0.0.1:%d/.well-known/fabric-service" % port, timeout=0.5):
+                                break
+                        except OSError:
+                            self.assertLess(time.monotonic(), deadline, "the sample never answered")
+                            time.sleep(0.1)
+                    out = subprocess.run([sys.executable, str(scripts / "check_service.py"), "sample", "--services-dir", str(services),
+                                          "--json"], capture_output=True, text=True, env=env, timeout=60)
+                    return {r["rule"]: r["verdict"] for r in json.loads(out.stdout)["results"]}
+                finally:
+                    proc.terminate()
+                    proc.wait(timeout=10)
+
+            def register(board):
+                subprocess.run([sys.executable, sample.__file__, "register", *common, "--services-dir", str(services)]
+                               + (["--board-project", PROJECT] if board else []), env=env, check=True, capture_output=True)
+
+            def out_of_step():
+                return [e for e in map(json.loads, (data / "events.jsonl").read_text().splitlines())
+                        if e.get("kind") == "service.manifest.mismatch"]
+
+            register(board=True)
+            self.assertIn("board.take-back", names())
+            written = (data / "fabric-agent.json").read_bytes()
+            rules = probed(board=True)
+            self.assertEqual(rules["interop.well-known-capabilities"], "PASS")
+            self.assertEqual(rules["interop.tools-match"], "PASS")
+            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+            self.assertEqual(out_of_step(), [])
+            rules = probed(board=False)  # the board off: serve never writes the manifest, it says so
+            self.assertEqual((data / "fabric-agent.json").read_bytes(), written)
+            self.assertEqual(rules["interop.tools-match"], "FAIL")
+            self.assertEqual(len(out_of_step()), 1)
+            register(board=False)
+            rules = probed(board=False)
+            self.assertNotIn("board.take-back", names())
+            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+            self.assertEqual(len(out_of_step()), 1)
+            written = (data / "fabric-agent.json").read_bytes()
+            rules = probed(board=True)  # unit r29: the other way, registered without the board and served with it
+            self.assertEqual((data / "fabric-agent.json").read_bytes(), written)
+            self.assertEqual(rules["interop.well-known-capabilities"], "FAIL")
+            self.assertIn("lacks the take-back tool, which this run serves", out_of_step()[-1]["text"])
+
+    @unittest.skipIf(sys.platform == "win32", "Windows ends a process without a catchable SIGTERM (TerminateProcess)")
+    def test_a_stop_leaves_the_board_session_and_forgets_the_record(self):
+        """FAA-163: SIGTERM to the reference service with the board on sends the session's DELETE (the slot is free)
+        and forgets the slot record, within LC-01's 5 s idle."""
+        import signal
+        import socket
+        sample = importlib.import_module("sample_service")
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            env = dict(os.environ, HOME=str(tmp), XDG_DATA_HOME=str(tmp / "share"), LOCALAPPDATA=str(tmp / "local"))
+            hub = FakeHub(fh.fabric_root(env=env), capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            data = tmp / "data"
+            data.mkdir(mode=0o700)
+            (data / "board.credential").write_text(hub.credential)
+            os.chmod(data / "board.credential", 0o600)
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            proc = subprocess.Popen([sys.executable, sample.__file__, "serve", "--port", str(port), "--data-dir", str(data),
+                                     "--board-project", PROJECT], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            try:
+                deadline = time.monotonic() + 20
+
+                def recorded():  # the record is written after the enroll answer, so the hub's holder comes first
+                    try:
+                        slot = json.loads((data / "board-checkpoint.json").read_text()).get("slots", {}).get("sample.echo")
+                    except (OSError, ValueError):
+                        return False
+                    held = hub.board.slots.get("sample.echo") or {}
+                    return slot is not None and held.get("holder") is not None and slot.get("generation") == held.get("generation")
+                while not recorded():
+                    self.assertLess(time.monotonic(), deadline, "the service never enrolled and recorded the slot")
+                    self.assertIsNone(proc.poll(), proc.stderr.read() if proc.poll() is not None else "")
+                    time.sleep(0.05)
+                started = time.monotonic()
+                proc.send_signal(signal.SIGTERM)
+                self.assertEqual(proc.wait(timeout=10), 0)
+                self.assertLess(time.monotonic() - started, 5.0)
+                self.assertIsNone(hub.board.slots["sample.echo"]["holder"])  # the DELETE released it
+                self.assertEqual(hub.sessions, {})
+                self.assertEqual(json.loads((data / "board-checkpoint.json").read_text()).get("slots", {}), {})
+            finally:  # the child stops before its folder goes
+                if proc.poll() is None:
+                    proc.kill()
+                    proc.wait(timeout=10)
+                proc.stderr.close()
+
+    def test_the_operator_takes_a_moved_slot_back_from_the_dashboard(self):
+        """FAA-157: the page offers a moved slot's take-back; only the operator's signed-in session reaches it, and the
+        service enrolls again once the other session lets the slot go."""
+        import http.client
+        import socket
+        import threading
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            hub = FakeHub(tmp / "fabric", capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            (tmp / "data").mkdir(mode=0o700)
+            cred = tmp / "data" / "board.credential"
+            cred.write_text(hub.credential)
+            os.chmod(cred, 0o600)
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            sample = importlib.import_module("sample_service")
+            args = sample.build_parser().parse_args(["serve", "--port", str(port), "--data-dir", str(tmp / "data"),
+                                                     "--board-project", PROJECT])
+            svc = sample.Service(args)
+            svc.start()
+            self.addCleanup(svc.lock.release)
+            svc.board.hub = fh.HubClient(tmp / "fabric")
+            svc.board.now = lambda: hub.board.now
+            svc.board.spawn = lambda fn: fn()
+            server = sample.make_server(svc)
+            threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+            self.addCleanup(server.server_close)
+            self.addCleanup(server.shutdown)
+            svc.board.step()  # holds generation 1
+            hub.board.move("sample.echo")
+            hub.board.queue("sample.echo", text="hello")
+            hub.board.advance(15)
+            svc.board.step()  # the claim is fenced: com.status shows the move
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+
+            def request(method, path, headers=None, body=None):
+                conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+                conn.request(method, path, body=body, headers={"Host": "127.0.0.1:%d" % port, **(headers or {})})
+                res = conn.getresponse()
+                data = res.read()
+                conn.close()
+                return res.status, data, res.getheader("Set-Cookie") or ""
+            take = json.dumps({"capability": "sample.echo"})
+            token = {"Authorization": "Bearer " + svc.token, "X-Fabric-Request": "1", "Content-Type": "application/json"}
+            self.assertEqual(request("POST", "/api/board/take-back", token, take)[0], 401)  # a service token is not the operator
+            url = svc.codes.issue()["url"]
+            cookie = {"Cookie": request("GET", url)[2].split(";", 1)[0]}
+            status, page, _ = request("GET", "/", cookie)
+            self.assertEqual(status, 200)
+            self.assertIn(b'data-take-back="sample.echo"', page)
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            conn.request("GET", "/", headers={"Host": "127.0.0.1:%d" % port, **cookie})
+            res = conn.getresponse()
+            res.read()
+            conn.close()
+            self.assertIn("connect-src 'self'", res.getheader("Content-Security-Policy") or "",
+                          "the button's fetch is allowed by the page's own CSP (0.56.0 seam r5)")
+            self.assertEqual(request("GET", "/board.js")[0], 200)
+            self.assertEqual(request("POST", "/api/board/take-back", cookie, take)[0], 403)  # no X-Fabric-Request
+            self.assertEqual(request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"},
+                                     json.dumps({"capability": "other"}))[0], 400)
+            status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
+            self.assertEqual(status, 200, said)
+            self.assertEqual(svc.board_moved(), [])
+            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
+            self.assertIn("on this service's page", returned[-1]["text"], "the page's take-back names the route in words (seam r7)")
+            self.assertEqual({k: returned[-1]["data"]["value"][k] for k in ("by", "via")}, {"by": "operator", "via": "dashboard"})
+            self.assertEqual(returned[-1]["subject"], {"type": "capability", "id": "sample.echo"}, "the moved slot's subject (product r35)")
+            status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
+            self.assertEqual((status, json.loads(said)), (200, {"capability": "sample.echo", "moved": False}),
+                             "a retry after a lost answer is answered as the tool answers it (0.56.0 seam r6)")
+            self.assertNotIn(b"data-take-back", request("GET", "/", cookie)[1])
+            hub.board.advance(61)  # the other session lets the slot go: the next tick enrolls
+            svc.board.step()
+            self.assertEqual(svc.board.slots["sample.echo"]["state"], "held")
+            self.assertIn("board.slot.returned", [e["kind"] for e in svc.log.fetch(None, 100)])
+            svc.board.shutdown(0.1)
+
+    def test_the_take_back_button_has_a_relayed_tool(self):
+        """0.56.0 product r1: every button has a tool (DEC-0121); the operator's agent takes the slot back with their
+        relayed decision, and a call without one is refused."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            hub = FakeHub(tmp / "fabric", capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            (tmp / "data").mkdir(mode=0o700)
+            cred = tmp / "data" / "board.credential"
+            cred.write_text(hub.credential)
+            os.chmod(cred, 0o600)
+            sample = importlib.import_module("sample_service")
+            svc = sample.Service(sample.build_parser().parse_args(["serve", "--port", "1", "--data-dir", str(tmp / "data"),
+                                                                   "--board-project", PROJECT]))
+            svc.start()
+            self.addCleanup(svc.lock.release)
+            svc.board.hub = fh.HubClient(tmp / "fabric")
+            svc.board.now = lambda: hub.board.now
+            svc.board.spawn = lambda fn: fn()
+            wk = svc.well_known()
+            self.assertIn("board.take-back", wk["surfaces"]["mcp"]["capabilities"])
+            actions = wk["extensions"]["https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1"]["actions"]
+            self.assertEqual([(a["id"], a["tool"], a["gate"]) for a in actions], [("board.take-back", "board.take-back", "relayed")])
+            svc.board.step()
+            hub.board.move("sample.echo")
+            hub.board.queue("sample.echo", text="hello")
+            hub.board.advance(15)
+            svc.board.step()
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+
+            def call(meta):
+                params = {"name": "board.take-back", "arguments": {"capability": "sample.echo"}, "_meta": meta}
+                return svc.mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, {}, tier="T0")["result"]
+            refused = call({})
+            self.assertTrue(refused["isError"])
+            self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+            at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            done = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
+                                      "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
+            self.assertFalse(done["isError"], done)
+            self.assertEqual(svc.board_moved(), [])
+            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
+            self.assertIn("through an agent they told", returned[-1]["text"], "the audit names the route in words")
+            self.assertNotIn("relayed-instruction", returned[-1]["text"], "a token goes in data (product r35)")
+            self.assertEqual(returned[-1]["data"]["value"]["via"], "relayed-instruction")
+            self.assertNotIn("local:", returned[-1]["text"], "the caller is a machine id: in data, never the sentence (product r34)")
+            self.assertTrue(returned[-1]["data"]["value"]["caller"].startswith("local:"), returned[-1])
+            self.assertNotIn("take the slot back", json.dumps(returned[-1]), "never the decision's words")
+            # unit r34: a caller the feed refuses (too long, credential-shaped) drops the data, never the answer
+            with mock.patch.object(svc.board, "take_back"), mock.patch.object(svc, "board_moved", return_value=["sample.echo"]):
+                answer = svc.board_take_back("sample.echo", {"by": "operator", "via": "relayed-instruction", "caller": "x" * 501})
+            self.assertEqual(answer, {"capability": "sample.echo", "moved": False})
+            last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
+            self.assertNotIn("data", last)
+            self.assertIn("through an agent they told", last["text"])
+            again = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
+                                       "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
+            self.assertEqual(again["structuredContent"], {"capability": "sample.echo", "moved": False},
+                             "a repeat after a lost answer is answered the same way")
+            self.assertIn("operator-source/1", svc.well_known()["protocols"])
+            svc.board.shutdown(0.1)
+
+    def test_the_take_back_tool_answers_a_checkpoint_fault_as_a_tool_error(self):
+        """0.56.0 seam r4: a take-back whose checkpoint write fails is a tool error, as the page's route answers 400, never
+        an exception through /mcp."""
+        sample = importlib.import_module("sample_service")
+
+        class NS:
+            def __init__(self, **kw):
+                self.__dict__.update(kw)
+
+        class Board:
+            capabilities = ["video.render"]
+            slots = {"video.render": {"state": "moved"}}
+            checkpoint = NS(slots={})
+
+            def take_back(self, capability):
+                raise fb.BoardError("checkpoint", "The board checkpoint could not be written; nothing was sent.")
+        svc = NS(board=Board(), board_project=PROJECT, log=NS(append=lambda *a, **k: None))
+        svc.board_moved = lambda: sample.Service.board_moved(svc)
+        svc.board_take_back = lambda c, r=None: sample.Service.board_take_back(svc, c, r)
+        with self.assertRaises(sample.fi.InteropError):
+            sample.Service.board_take_back_tool(svc, {"capability": "video.render"}, NS(record=None))
+
+    def test_close_reads_an_answer_it_cannot_parse_as_no_release(self):
+        """0.56.0 seam r5: a post shim whose DELETE answer is not a status is no release, as the Node twin reads it."""
+        class Grant:
+            origin = "http://127.0.0.1:1"
+            capabilities = []
+
+            def bearer(self):
+                return "b" * 43
+        for answer in (None, (), ("200",), 200):
+            with self.subTest(answer=answer):
+                session = fb.BoardSession(Grant(), post=lambda *a, **k: answer)
+                session.mcp_session = "x"
+                self.assertFalse(session.close())
+                self.assertIsNone(session.mcp_session)
+
+    def test_take_back_reads_the_record_while_fabric_is_down(self):
+        """0.56.0 seam r3: after a restart, before the session reconnects, the checkpoint record alone knows the move;
+        the relayed take-back forgets it, never answers 'not moved' while it stays."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            hub = FakeHub(tmp / "fabric", capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            (tmp / "data").mkdir(mode=0o700)
+            cred = tmp / "data" / "board.credential"
+            cred.write_text(hub.credential)
+            os.chmod(cred, 0o600)
+            sample = importlib.import_module("sample_service")
+
+            def service():
+                svc = sample.Service(sample.build_parser().parse_args(["serve", "--port", "1", "--data-dir", str(tmp / "data"),
+                                                                       "--board-project", PROJECT]))
+                svc.start()
+                svc.board.hub = fh.HubClient(tmp / "fabric")
+                svc.board.now = lambda: hub.board.now
+                svc.board.spawn = lambda fn: fn()
+                return svc
+            svc = service()
+            svc.board.step()
+            hub.board.move("sample.echo")
+            hub.board.queue("sample.echo", text="hello")
+            hub.board.advance(15)
+            svc.board.step()
+            self.assertEqual(svc.board_moved(), ["sample.echo"])
+            svc.board.session = None  # the process dies
+            svc.lock.release()
+            svc2 = service()
+            self.addCleanup(svc2.lock.release)
+
+            def down(*args, **kw):
+                raise fh.HubError("not-running", "Fabric is not running.")
+            real, svc2.board.hub.join_board = svc2.board.hub.join_board, down
+            svc2.board.step()
+            self.assertEqual(svc2.board.slots, {})
+            self.assertEqual(svc2.board_moved(), ["sample.echo"], "the record knows the move")
+            at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            meta = {"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
+                                 "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}}
+            params = {"name": "board.take-back", "arguments": {"capability": "sample.echo"}, "_meta": meta}
+            done = svc2.mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, {}, tier="T0")["result"]
+            self.assertFalse(done["isError"], done)
+            self.assertNotIn("sample.echo", json.loads((tmp / "data" / "board-checkpoint.json").read_text()).get("slots", {}))
+            self.assertIn("board.slot.returned", [e["kind"] for e in svc2.log.fetch(None, 100)])
+            svc2.board.hub.join_board = real
+            hub.board.advance(61)
+            for _ in range(4):
+                svc2.board.wait_until = 0
+                svc2.board.step()
+                hub.board.advance(20)
+            self.assertEqual(svc2.board.slots["sample.echo"]["state"], "held")
+            svc2.board.shutdown(0.1)
+
+
+
+class MovesSurviveRecovery(Conversation):
+    """0.56.0 seam r2: a slot moved while the service was down is read as moved, even when recovery stopped early or the
+    session was dropped at connect, and is never taken back by the kit on its own."""
+    CAPS = ("a.one", "b.two", "c.three")
+
+    def test_a_moved_slot_skipped_by_recovery_is_not_enrolled_by_the_retry_tick(self):
+        r1 = self.responder()
+        r1.step()
+        self.assertTrue(all(r1.slots[c]["state"] == "held" for c in self.CAPS))
+        r1.session = None  # the process dies: no DELETE, the records stay
+        self.board.advance(61)
+        self.board.move("c.three")
+        call, once = self.board.call, []
+
+        def dropping(sid, caps, tool, args):
+            answer = call(sid, caps, tool, args)
+            if tool == "com.enroll" and args.get("capability") == "b.two" and not once:
+                once.append(1)
+                self.board.drop_next["com.enroll"] = 1  # b.two's enroll answer is lost: recovery stops there
+            return answer
+        self.board.call = dropping
+        r2 = self.responder()
+        r2.step()
+        self.board.advance(61)  # the new holder of c.three lets its lease lapse
+        for _ in range(12):
+            r2.step()
+            self.board.advance(20)
+        self.assertEqual(r2.slots["c.three"].get("state"), "moved")
+        self.assertEqual(self.kinds().count("board.slot.moved"), 1)
+
+
+class LeaveKeepsUnconfirmedRecords(Conversation):
+    """0.56.0 seam r2: a clean leave forgets only the records of slots this session holds now."""
+
+    def test_a_move_while_down_survives_a_fault_at_connect(self):
+        for code in ("capacity_exceeded", "no-epoch"):
+            with self.subTest(code=code):
+                self.setUp()
+                r1 = self.responder()
+                r1.step()
+                r1.session = None
+                self.board.advance(61)
+                self.board.move("video.render")
+                self.board.fail_next["com.status"] = code
+                r2 = self.responder()
+                r2.step()  # com.status refused while connecting: the session is dropped with a DELETE
+                record = json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {})
+                self.assertIn("video.render", record, "the unconfirmed record stays")
+                for _ in range(3):
+                    self.board.advance(r2.wait_until - self.board.now + 0.1 if r2.wait_until > self.board.now else 1)
+                    r2.step()
+                self.board.advance(61)
+                for _ in range(6):
+                    r2.step()
+                    self.board.advance(20)
+                self.assertEqual(r2.slots.get("video.render", {}).get("state"), "moved")
+
+    def test_a_slot_paused_under_a_hold_is_left_cleanly(self):
+        """0.56.0 seam r3: a slot paused under the operator's hold (DEC-0079) was held at its generation; its record is
+        forgotten at a clean leave, so a standby taking the free slot is no move at the next start."""
+        r = self.responder()
+        r.step()
+        self.board.holds = {"slots": [{"project": PROJECT, "capability": "video.render"}]}
+        self.board.advance(31)
+        r.wait_until = 0
+        r.step()  # the renewing enroll is refused `held`: paused
+        self.assertEqual(r.slots["video.render"]["state"], "paused")
+        r.shutdown(0.1)
+        record = json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {})
+        self.assertNotIn("video.render", record)
+        self.board.holds = {}
+        self.board.move("video.render")  # a standby takes the free slot
+        self.board.advance(61)  # and lets it lapse
+        r2 = self.responder()
+        r2.step()
+        self.assertEqual(r2.slots["video.render"]["state"], "held")
+        self.assertNotIn("board.slot.moved", self.kinds())
+
+    def test_a_suspect_slot_keeps_its_record_at_a_clean_stop(self):
+        """0.56.0 seam r4: a fenced accept puts the slot in doubt; a clean stop before the next tick keeps its record, so
+        the next start reads the move and never takes the slot back on its own."""
+        r = self.responder()
+        r.step()
+        self.board.advance(15)
+        self.board.queue("video.render")
+
+        def moving(request):
+            self.board.move("video.render")  # the operator moves the slot between the claim and the accept
+            return None
+        self.gate = moving
+        r.wait_until = 0
+        r.step()
+        self.gate = lambda request: None
+        self.assertIn("video.render", r._suspect)
+        r.shutdown(0.1)
+        self.assertIn("video.render", json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {}))
+        r2 = self.responder()
+        r2.step()
+        self.assertEqual(r2.slots["video.render"]["state"], "moved")
+
+    def test_a_move_during_a_hold_is_read_before_the_next_ask(self):
+        """0.56.0 seam r4: a paused slot reads com.status before each new ask, so a move made during the operator's hold
+        is said and its record survives a clean stop."""
+        r = self.responder()
+        r.step()
+        self.board.holds = {"slots": [{"project": PROJECT, "capability": "video.render"}]}
+        self.board.advance(31)
+        r.wait_until = 0
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "paused")
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.wait_until = 0
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertIn("board.slot.moved", self.kinds())
+        r.shutdown(0.1)
+        self.assertIn("moved", json.loads((self.data / "board-checkpoint.json").read_text())["slots"]["video.render"])
+
+    def test_a_hub_that_is_down_releases_nothing_at_a_stop(self):
+        """0.56.0 seam r5: with the hub down the DELETE gets no 2xx, so the records stay (the fake answers as Fabric)."""
+        r = self.responder()
+        r.step()
+        self.hub.down = True
+        r.shutdown(0.1)
+        self.assertIn("video.render", json.loads((self.data / "board-checkpoint.json").read_text()).get("slots", {}))
+
+    def test_leave_forgets_a_record_at_or_below_the_confirmed_generation(self):
+        """0.56.0 seam r3: a record whose write failed before the hold (lower than the confirmed generation) is forgotten
+        too; one above it, or one nothing confirmed, stays; `held` is required, as in the Node twin."""
+        cp = fb.Checkpoint(self.data / "leave.json")
+        for capability, generation in (("a", 1), ("b", 2), ("c", 3), ("d", 1)):
+            cp.slot(capability, {"project": PROJECT, "generation": generation})
+        cp.leave(PROJECT, {"a": 2, "b": 2, "c": 2})
+        self.assertEqual(sorted(cp.slots), ["c", "d"])
+        with self.assertRaises(TypeError):
+            cp.leave(PROJECT)
+
+
+class RetryReadsTheMove(Conversation):
+    """0.56.0 unit r6: a capability whose own enroll was refused at recovery waits in retry, not suspect; when its slot
+    moves meanwhile, the retry reads com.status first and never enrolls the slot back on its own (FAA-155)."""
+    CAPS = ("video.render", "video.cut")
+
+    def test_the_retry_branch_reads_a_move_first(self):
+        r1 = self.responder()
+        r1.step()
+        r1.session = None  # the process dies: no DELETE, the records stay
+        self.board.advance(61)
+        self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
+        r2 = self.responder()
+        r2.step()
+        self.assertEqual(r2.slots["video.cut"]["state"], "retry")
+        self.assertNotIn("video.cut", r2._suspect)
+        del self.board.refuse_always[("com.enroll", "video.cut")]
+        self.board.move("video.cut")
+        self.board.advance(61)  # the standby lets its lease lapse
+        for _ in range(8):
+            self.board.advance(max(1.0, r2.slots["video.cut"].get("retry_at", 0) - self.board.now))
+            r2.wait_until = 0
+            r2.step()
+        self.assertEqual(r2.slots["video.cut"].get("state"), "moved")
+        self.assertEqual(self.kinds().count("board.slot.moved"), 1)
+
+
+class CloseReadsAsNode(unittest.TestCase):
+    """0.56.0 unit r6: any failure of the DELETE is no release, as the Node twin reads it."""
+
+    def session(self, post):
+        link = fb.BoardSession.__new__(fb.BoardSession)
+        link.post, link.timeout, link.mcp_session, link.protocol_version = post, 15.0, "s-1", "2025-06-18"
+        link.grant = type("Grant", (), {"origin": "http://127.0.0.1:1", "bearer": staticmethod(lambda: "x")})()
+        link._lock, link._rpc = threading.Lock(), 0
+        return link
+
+    def test_an_unexpected_failure_is_no_release(self):
+        def post(*_a, **_k):
+            raise RuntimeError("a custom transport")
+        link = self.session(post)
+        self.assertFalse(link.close())
+        self.assertIsNone(link.mcp_session)
+
+    def test_a_constructor_timeout_not_above_zero_is_the_default(self):
+        """0.56.0 seam r8: the session's own timeout is never 0 either."""
+        for timeout in (0, -1, None):
+            self.assertEqual(fb.BoardSession(object(), timeout=timeout).timeout, 15.0)
+
+    def test_a_timeout_not_above_zero_is_the_sessions_own(self):
+        """0.56.0 seam r7: http.client reads 0 as non-blocking and Node's http as no bound, so neither is sent."""
+        sent = []
+        link = self.session(lambda *_a, **k: sent.append(k["timeout"]) or (200, {}, None))
+        for timeout in (0, -1, 2.5):
+            link.mcp_session = "s-1"
+            self.assertTrue(link.close(timeout))
+        self.assertEqual(sent, [15.0, 15.0, 2.5])
+
+
+class ContestedPerCapability(Conversation):
+    """0.56.0 seam r3: board.slot.contested is said once per capability, as board.slot.refused is."""
+    CAPS = ("video.render", "video.cut")
+
+    def test_two_contested_capabilities_are_each_said_once(self):
+        other_data = Path(self.tmp.name) / "other"
+        other_data.mkdir(mode=0o700)
+        other = self.responder(checkpoint_file=other_data / "board-checkpoint.json", emit=lambda *a, **k: None)
+        other.step()
+        me = self.responder()
+        me.step()
+        for _ in range(6):
+            self.board.advance(30)
+            other.wait_until = me.wait_until = 0
+            other.step()
+            me.step()
+        self.assertEqual(self.kinds().count("board.slot.contested"), 2)
 
 if __name__ == "__main__":
     unittest.main()

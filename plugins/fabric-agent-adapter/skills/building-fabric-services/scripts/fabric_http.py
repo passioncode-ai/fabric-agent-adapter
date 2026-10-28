@@ -113,24 +113,86 @@ def json_bytes(value: Any) -> bytes:
     return json_stringify(value).encode("utf-8")
 
 
+# What both urllib (str.strip when it builds a Request) and a WHATWG parser remove from a URL's ends. urllib also
+# strips a Unicode space there, which `new URL` keeps (and percent-encodes): such a URL is refused (0.56.0 seam r19).
+_URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
+
+
+def _sendable(url: str, parts: urllib.parse.SplitResult) -> bool:
+    """Whether urllib can send the URL as checked: no space or ASCII control character before its fragment (urlsplit
+    drops a tab or line break that urllib then sends), and nothing outside ASCII in the path or query, which
+    http.client cannot write in a request line (a host outside ASCII is sent in IDNA)."""
+    # The fragment is never sent: urllib_transport cuts the URL at its first `#`, as `new URL` does (urllib alone
+    # would cut at the last one), so only what precedes it is read (0.56.0 seam r18, r19).
+    return not re.search(r"[\x00-\x20\x7f]", url.partition("#")[0]) and (parts.path + parts.query).isascii()
+
+
+def _authority_ok(netloc: str) -> bool:
+    """The host and port of an authority as a WHATWG URL accepts them, where urlsplit is laxer: a port of ASCII digits
+    only (Python 3.9's int() also takes `1_2`, `+1`, ` 12` and other scripts' digits), a bracketed host that is an IPv6
+    address with no zone, and no backslash, space, control character (C0, DEL or C1) or `%` (0.56.0 unit r11, seam r12, seam r13, product r20:
+    urllib percent-decodes the host before it connects, so `h.example%3A8443` would reach port 8443 and `[::1%3A80]`
+    another address than the one checked; Node refuses a zone and every forbidden code point it decodes)."""
+    hostport = netloc.rpartition("@")[2]
+    if any(c in "\\%" or ord(c) <= 0x20 or 0x7f <= ord(c) <= 0x9f or c.isspace() for c in hostport):
+        return False
+    if hostport.startswith("["):
+        close = hostport.find("]")
+        try:
+            ipaddress.IPv6Address(hostport[1:close])
+        except ValueError:
+            return False
+        port = hostport[close + 1:]
+        return port == "" or (port[:1] == ":" and re.fullmatch(r"[0-9]*", port[1:]) is not None)
+    host, _, port = hostport.partition(":")
+    # No `[` in an unbracketed host: Python 3.9 reads the host after one (`https://]@h.example[evil.example/` as
+    # evil.example), where 3.14 and `new URL` refuse it (0.56.0 unit r15).
+    return not any(c in "[]:" for c in host + port) and re.fullmatch(r"[0-9]*", port) is not None
+
+
 def redact_url(url: str) -> str:
     """The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or
     fragment, which is where keys and tokens ride."""
-    try:
-        parts = urllib.parse.urlsplit(str(url))
-    except ValueError:
+    # What WHATWG URL parsing does first, as `new URL` does in the Node twin: trim C0 controls and space from the ends,
+    # then remove every tab, CR and LF, so ` https://u:pw@h` and `ht\ttps:u:pw@h` lose their password too (0.56.0
+    # seam r10; Python 3.9's urlsplit keeps a leading space in the scheme).
+    url = re.sub(r"[\t\n\r]", "", str(url).strip("".join(map(chr, range(0x21)))))
+    scheme, colon, rest = url.partition(":")
+    if colon and scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
+        # A special scheme as WHATWG reads it: the authority starts after every slash or backslash that follows the
+        # colon, and a backslash before the query reads as a slash, so `https:u:pw@h` loses its password too (0.56.0
+        # seam r9; the Node twin reads it through `new URL`).
+        cut = min([at for at in (rest.find("?"), rest.find("#")) if at >= 0] or [len(rest)])
+        url = scheme + "://" + (rest[:cut].replace("\\", "/") + rest[cut:]).lstrip("/")
+    if not colon or not re.fullmatch(r"[A-Za-z][A-Za-z0-9+.-]*", scheme):
+        # No scheme as WHATWG reads one (`ht tps:`, `1ttps:`, a relative string): `new URL` refuses it too. Read here,
+        # not by urlsplit, whose scheme rule differs between 3.9 patch releases (0.56.0 hosted floors on 10f6f9d).
         return "<unparseable url>"
-    host = parts.hostname or ""
+    if scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
+        # A special scheme's authority is checked first, its shape as `new URL` checks it (a host, a port of ASCII
+        # digits up to 65535), so `ftp://[` and `ws://h:99999` are unparseable in both twins rather than `<scheme>:
+        # <redacted>` in one (0.56.0 unit r12, r13); on 3.9 a lax port would read as the path. A host name `new URL`
+        # refuses for its structure is not checked (FAA-187 (14)).
+        try:
+            parts = urllib.parse.urlsplit(url)
+            parts.port  # noqa: B018 - raises on a port out of range
+        except ValueError:
+            return "<unparseable url>"
+        if not _authority_ok(parts.netloc) or not parts.hostname:
+            return "<unparseable url>"
+    if scheme.lower() not in ("http", "https"):
+        # Only http and https are sent; any other scheme (a misspelled `htps:` included) keeps no more than its name,
+        # since its user information may sit anywhere in the rest (0.56.0 product r10).
+        return scheme.lower() + ":<redacted>"
+    # The host and port were checked above (a password holding `/`, `https://u:pw/x@h`, reads as a bad port there).
+    host = parts.hostname
     if ":" in host:
         host = "[%s]" % host
-    try:
-        port = parts.port
-    except ValueError:
-        port = None
+    port = parts.port
     if port == {"http": 80, "https": 443}.get(parts.scheme.lower()):
         port = None  # as a WHATWG URL writes it, so both kits print one URL the same way
     netloc = host.lower() + (":%d" % port if port is not None else "")
-    path = parts.path or ("/" if parts.scheme.lower() in ("http", "https") else "")
+    path = parts.path or "/"
     return urllib.parse.urlunsplit((parts.scheme.lower(), netloc, path, "", ""))
 
 
@@ -157,11 +219,23 @@ def check_url(url: str, *, insecure: bool = False) -> None:
     """Refuse what this client never sends: a scheme other than http or https, no host, credentials in the URL, or
     plain http to a host that is not loopback (unless `insecure`)."""
     try:
-        parts = urllib.parse.urlsplit(url)
+        # The ends are trimmed as urllib trims what it sends (and `new URL` too); a URL ending in a line break, which
+        # 0.55.0 sent, still passes (0.56.0 product r17).
+        if not isinstance(url, str):
+            raise TypeError("not a string")
+        sent = url.strip(_URL_ENDS)
+        parts = urllib.parse.urlsplit(sent)
         host = parts.hostname
         parts.port  # noqa: B018 - raises on a bad port
+        if not _authority_ok(parts.netloc):
+            raise ValueError("authority")
     except (ValueError, TypeError):
         raise HttpError("the URL does not parse", url=redact_url(url), kind="refused")
+    if not _sendable(sent, parts):
+        # urllib would send it and http.client refuse every call, where the Node twin percent-encodes it (0.56.0
+        # product r16, r18, unit r16, r17); 0.55.0 retried and answered kind connection.
+        raise HttpError("the URL holds a space, an ASCII control character, or a character outside ASCII in its path "
+                        "or query", url=redact_url(url), kind="refused")
     if parts.scheme not in ("http", "https") or not host:
         raise HttpError("only http and https URLs with a host are sent", url=redact_url(url), kind="refused")
     if parts.username is not None or parts.password is not None:
@@ -275,7 +349,9 @@ def _opener(watchdog: _Watchdog) -> urllib.request.OpenerDirector:
 def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optional[bytes], timeout_s: float,
                      max_bytes: int) -> Tuple[int, Dict[str, str], bytes]:
     """The default transport: urllib, no redirects followed, the body read to one byte past `max_bytes`."""
-    req = urllib.request.Request(url, data=body, method=method, headers=headers)
+    # Cut at the first `#`, as `new URL` and check_url read the URL: urllib keeps everything before the LAST one in
+    # the request line, so `/x#a#b` went out as `/x#a` (0.56.0 seam r19).
+    req = urllib.request.Request(url.partition("#")[0], data=body, method=method, headers=headers)
     end = time.monotonic() + timeout_s  # one deadline from the first byte sent, headers and body included
     watchdog = _Watchdog(end)
     try:

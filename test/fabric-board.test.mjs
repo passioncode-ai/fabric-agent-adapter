@@ -898,7 +898,7 @@ test('FAA-77 39: every transferred request resumes, one per idle tick', async (t
 });
 
 // --- FAA-155: a slot the operator moves to another session stays moved (contract DEC-0140 PR-2; CT-174, CT-175) --------
-const record = (hub) => {
+const slotRecord = (hub) => {
   const file = path.join(hub.data, 'board-checkpoint.json');
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).slots ?? {} : {};
 };
@@ -1175,7 +1175,7 @@ test('FAA-155 seam 3: an idle renew writes nothing; a clean leave forgets the re
   assert.equal(writes, 0);
   assert.equal(fs.statSync(file).mtimeMs, before);
   await r.shutdown(0);
-  assert.ok(!('video.render' in record(hub)));
+  assert.ok(!('video.render' in slotRecord(hub)));
   await hub.control({ op: 'move', capability: 'video.render' }); // an older kit enrolls the free slot, then stops
   await h.advance(61);
   const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
@@ -1316,6 +1316,170 @@ test('FAA-155 seam 7: a capability refused at connect never stops the others', a
   }
 });
 
+// --- FAA-163 and FAA-158: one capability's refusal, a reconnect, a lapsed lease, the DELETE, a take-back ------------------
+const record = (hub) => {
+  const file = path.join(hub.data, 'board-checkpoint.json');
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')).slots ?? {} : {};
+};
+const TWO = ['video.render', 'video.cut'];
+
+test('FAA-163: a refused first capability leaves the next one served, and asks again alone with a growing pause', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  await hub.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.render', code: 'capacity_exceeded' });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.cut' });
+  const r = h.responder({ capabilities: TWO });
+  for (let i = 0; i < 3; i += 1) {
+    await r.step();
+    await h.advance(1);
+  }
+  assert.equal(r.slots['video.cut'].state, 'held');
+  assert.equal(r.slots['video.render'].state, 'retry');
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  const first = r.slots['video.render'].retryAt - h.clock.t + 3;
+  await h.advance(r.slots['video.render'].retryAt - h.clock.t);
+  await r.step();
+  assert.equal(r.slots['video.render'].tries, 2);
+  assert.equal(r.slots['video.render'].retryAt - h.clock.t, 2 * first);
+  await hub.control({ op: 'unrefuse', tool: 'com.enroll', capability: 'video.render' });
+  await h.advance(2 * first);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.deepEqual(h.events.filter((e) => e[0] === 'board.slot.refused').map((e) => e[3].data.value), [{ capability: 'video.render', reason: 'capacity_exceeded' }]);
+});
+
+test('FAA-163: a lost enroll while another slot holds is asked again; a reconnect starts with no slot', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  await hub.control({ op: 'drop', tool: 'com.enroll', capability: 'video.cut' });
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  assert.ok(r.session);
+  assert.equal(r.slots['video.cut'].state, 'retry');
+  await h.advance(r.slots['video.cut'].retryAt - h.clock.t);
+  await r.step();
+  assert.equal(r.slots['video.cut'].state, 'held');
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+  assert.ok(!h.kinds().includes('board.slot.refused'), 'a lost answer is the session\'s, not a refusal (unit r1)');
+  await hub.control({ op: 'end-sessions' });
+  await r.step(); // session-ended: dropped
+  await hub.control({ op: 'fail', tool: 'com.status', code: 'capacity_exceeded' });
+  await h.advance(60);
+  await r.step();
+  assert.deepEqual(r.slots, {});
+  assert.equal(r.session, null); // refused with no slot held: reconnects, never skips recovery
+});
+
+test('0.56.0 seam r1: a board-wide not_available is the fault, not a refusal; a refusal after a held slot is said again', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  for (const capability of TWO) await hub.control({ op: 'refuse', tool: 'com.enroll', capability, code: 'not_available' });
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  assert.equal(r.state, 'down');
+  assert.ok(h.kinds().includes('board.down'));
+  assert.ok(!h.kinds().includes('board.slot.refused'));
+  const hub2 = await fakeHub(t, TWO);
+  const h2 = harness(hub2);
+  await hub2.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.cut', code: 'capacity_exceeded' });
+  const r2 = h2.responder({ capabilities: TWO });
+  await r2.step();
+  await hub2.control({ op: 'unrefuse', tool: 'com.enroll', capability: 'video.cut' });
+  await h2.advance(r2.slots['video.cut'].retryAt - h2.clock.t);
+  await r2.step();
+  assert.equal(r2.slots['video.cut'].state, 'held');
+  await hub2.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.cut', code: 'capacity_exceeded' });
+  await hub2.control({ op: 'end-sessions' });
+  await r2.step(); // session-ended: dropped
+  await h2.advance(61);
+  await r2.step(); // reconnects; the enroll is refused again
+  assert.equal(h2.kinds().filter((k) => k === 'board.slot.refused').length, 2);
+});
+
+test('0.56.0 unit r2: two refused capabilities are each said once across reconnects', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  for (const capability of TWO) await hub.control({ op: 'refuse', tool: 'com.enroll', capability, code: 'capacity_exceeded' });
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  for (let i = 0; i < 2; i += 1) {
+    await hub.control({ op: 'end-sessions' });
+    await r.step();
+    await h.advance(61);
+    await r.step();
+  }
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.refused').length, TWO.length);
+});
+
+test('0.56.0 seam r1: a DELETE answered 404 keeps the slot records', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  await hub.control({ op: 'set', values: { delete_status: 404 } });
+  await r.shutdown();
+  assert.deepEqual(Object.keys(slotRecord(hub)).sort(), ['video.cut', 'video.render']);
+});
+
+test('FAA-163: a lapsed slot holds no lease; the record is forgotten only after a DELETE Fabric answered', async (t) => {
+  const hub = await fakeHub(t, TWO);
+  const h = harness(hub);
+  const r = h.responder({ capabilities: TWO });
+  await r.step();
+  r.slots['video.render'].renewedAt = -Infinity;
+  assert.ok(r.leaseLeft() > 0);
+  await hub.control({ op: 'set', values: { delete_fails: true } });
+  await r.shutdown();
+  assert.deepEqual(Object.keys(slotRecord(hub)).sort(), ['video.cut', 'video.render']);
+  await hub.control({ op: 'set', values: { delete_fails: false } });
+  const second = h.responder({ capabilities: TWO });
+  await h.advance(61);
+  await second.step();
+  await second.fault(new fb.BoardError('schema-unsupported', 'a test'));
+  assert.deepEqual(slotRecord(hub), {});
+});
+
+test('FAA-173: an idle stop waits three seconds for the DELETE, so it ends within LC-01\'s 5 s', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  await hub.control({ op: 'set', values: { delete_delay: 6 } });
+  const started = Date.now();
+  await r.shutdown();
+  assert.ok(Date.now() - started < (fb.IDLE_LEAVE_SECONDS + 1.5) * 1000, `${Date.now() - started} ms`);
+  assert.equal(r.state, 'stopped');
+  assert.ok('video.render' in slotRecord(hub)); // unanswered: the record stays
+});
+
+test('FAA-158: a take-back while a move is being read is kept; the move waits for a fenced call in flight', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.render' });
+  const status = r.status.bind(r);
+  r.status = async () => {
+    const answer = await status();
+    r.takeBack('video.render'); // the operator's action, between the read and the queue
+    return answer;
+  };
+  assert.equal(await r.gone('video.render'), false);
+  assert.ok(!('video.render' in slotRecord(hub)));
+  assert.ok(!h.kinds().includes('board.slot.moved'));
+  r.status = status;
+  r.heldAt('video.render', 1);
+  let release;
+  const inFlight = r.locked(() => new Promise((resolve) => { release = resolve; }));
+  const moved = r.gone('video.render');
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.notEqual(r.slots['video.render'].state, 'moved'); // queued behind the fenced call
+  release();
+  await inFlight;
+  assert.equal(await moved, true);
+  assert.equal(r.slots['video.render'].state, 'moved');
+});
+
 test('FAA-155: the Python and Node kits read each other\'s slot record', async () => {
   const dir = tempDir('faa155-cp-');
   const file = path.join(dir, 'cp.json');
@@ -1331,4 +1495,30 @@ c = fb.Checkpoint(${JSON.stringify(file)}); print(json.dumps(c.slots, sort_keys=
   assert.deepEqual(back.slots, { 'text.write': { generation: 1, project: 'p' }, 'video.render': { generation: 3, moved: 4, project: 'p' } });
   assert.deepEqual(Object.keys(back.entries), ['req_000000001']);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a board notice names its subject: its request, else its capability, else the Project (0.56.0 seam r30)', () => {
+  const rows = [];
+  const r = { said: {}, emitTo: (kind, level, text, extra) => rows.push([kind, level, extra]), project: 'p-1' };
+  for (const request of ['req-1', 'req-2']) {
+    fb.Responder.prototype.emit.call(r, 'board.reconcile.needed', 'warning', 'A request\'s outcome is unknown.',
+      { notify: true, episode: request, request, capability: 'sample.echo' });
+  }
+  fb.Responder.prototype.emit.call(r, 'board.slot.contested', 'warning', 'Another responder holds it.', { notify: true, episode: 'x', saidAs: 'c', capability: 'sample.echo' });
+  fb.Responder.prototype.emit.call(r, 'board.down', 'warning', 'Fabric\'s board cannot be reached.', { episode: 'down' });
+  assert.deepEqual(rows.map((x) => x[2].subject), [{ type: 'request', id: 'req-1' }, { type: 'request', id: 'req-2' },
+    { type: 'capability', id: 'sample.echo' }, { type: 'episode', id: 'down' }]);
+  assert.deepEqual(rows.map((x) => x[1]), ['warning', 'warning', 'warning', 'warning']);
+  const slots = fs.readFileSync(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board-slots.mjs'), 'utf8');
+  const moved = slots.match(/`(The \$\{capability\} slot on this Project moved(?:[^`\\]|\\.)*)`/)[1].replace(/\\`/g, '`');
+  assert.ok(moved.endsWith('ask its maintainer.'), moved); // the whole notice, read through its escaped backticks
+  assert.ok(moved.replace('${capability}', 'c'.repeat(128)).length <= 500, 'the moved notice keeps its last sentence');
+  const python = fs.readFileSync(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_board_slots.py'), 'utf8');
+  const py = [...python.slice(python.indexOf('"The %s slot on this Project moved')).split('% capability')[0].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+    .map((m) => m[1]).join('');
+  assert.equal(py.replace('%s', '${capability}'), moved, 'both twins say the same');
+  const astral = '\u{1F600}'.repeat(100); // 100 code points, 200 UTF-16 units: a request id within 128, as in Python
+  const rows2 = [];
+  fb.Responder.prototype.emit.call({ said: {}, emitTo: (k, l, t, x) => rows2.push(x), project: 'p-1' }, 'board.request.held', 'warning', 'x', { request: astral });
+  assert.equal(rows2[0].subject.type, 'request');
 });

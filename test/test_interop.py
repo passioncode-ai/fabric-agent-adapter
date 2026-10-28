@@ -811,6 +811,41 @@ class ActionGateMandateTests(unittest.TestCase):
             error = answer["result"]["structuredContent"]["error"]
             self.assertEqual((error["code"], error["data"]["detail"]), ("operator-decision-required", "outside-mandate: spend"))
 
+    def test_the_direct_gate_reads_spend_and_project_failing_closed(self):
+        """FAA-139: action_gate reads as McpToolServer does: a spend past the float range, NaN or infinite is none (a
+        ceiling refuses it, and no 5000-digit number reaches the refusal), a project that is no string is unreadable."""
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        for index, spend in enumerate((10 ** 5000, 10 ** 400, float("nan"), float("inf"), "0.5", True)):
+            with self.subTest(spend=index):
+                answer = self.gate(meta={"mandate": tight}, spend_usd=spend)
+                result = fd.refusal_tool_result(answer["refusal"])
+                json.dumps(result, allow_nan=False)
+                self.assertEqual(result["structuredContent"]["error"]["data"]["detail"], "outside-mandate: spend")
+        for project in (7, ["alpha"], {"id": "alpha"}):
+            with self.subTest(project=project):
+                answer = self.gate(meta={"mandate": scoped}, spend_usd=0.5, project=project)
+                self.assertEqual(fd.refusal_error(answer["refusal"])["error"]["data"]["detail"], "outside-mandate: project")
+        self.assertTrue(self.gate(meta={"mandate": scoped}, spend_usd=0.5, project="alpha")["ok"])
+        self.assertTrue(self.gate(meta={"mandate": tight}, spend_usd=1)["ok"])
+
+    def test_a_job_step_reads_spend_and_project_as_the_answer_does(self):
+        """0.56.0 seam r1: job_step (a job's start) and action_gate (its answer) read one step alike, failing closed."""
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        call = dict(tier="T0", now=NOW, self_id="example-agent", capability="reviews.approve", key="approve-reply",
+                    effect="reply")
+        for spend in (float("nan"), float("inf"), 10 ** 400, "0.5", True):
+            with self.subTest(spend=repr(spend)[:12]):
+                step = fi.job_step(tight, spend_usd=spend, **call)
+                self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: spend"))
+        for project in (7, ["alpha"]):
+            with self.subTest(project=project):
+                step = fi.job_step(scoped, spend_usd=0.5, project=project, **call)
+                self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: project"))
+        self.assertTrue(fi.job_step(scoped, spend_usd=0.5, project="alpha", **call)["covered"])
+        self.assertTrue(fi.job_step(tight, spend_usd=1, **call)["covered"])
+
     def test_a_huge_spend_and_a_raising_project_fail_closed(self):
         # Second seam reading of 0.51.0: an int past the float range never raises; a project function that raises
         # never reads as "no project", which a mandate limited to projects would cover.
@@ -1039,6 +1074,21 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertIn("outside-mandate: action", job["statusMessage"])
         self.assertEqual(list(job["inputRequests"]), ["approve-reply"])
 
+    def test_a_spend_that_is_not_finite_is_kept_as_no_estimate(self):
+        """0.56.0 seam r4: the kept step holds the spend as the gate read it, so the job file stays JSON a Node JobStore
+        reads (json.dumps would write a bare NaN or Infinity)."""
+        for spend in (float("nan"), float("inf")):
+            with self.subTest(spend=spend):
+                self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
+                job_id, record = self.step(spend_usd=spend)
+                self.assertIsNone(record)
+                for path in Path(self.temp.name, "jobs").rglob("*.json"):
+                    json.loads(path.read_text(), parse_constant=lambda c: self.fail("%s in %s" % (c, path.name)))
+        self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
+        self.step(project=float("nan"))  # 0.56.0 seam r5: a project that is no string is kept as the gate read it
+        for path in Path(self.temp.name, "jobs").rglob("*.json"):
+            json.loads(path.read_text(), parse_constant=lambda c: self.fail("%s in %s" % (c, path.name)))
+
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",
                                      expires_at="2026-10-24T09:20:00Z")
@@ -1046,6 +1096,18 @@ class JobApprovalStepTests(unittest.TestCase):
         job_id, record = self.step()
         self.assertIsNone(record)
         self.assertIn("expired", self.jobs.get(job_id)["statusMessage"])
+
+    def test_a_null_mandate_reads_as_malformed_at_the_start_as_at_the_answer(self):
+        """FAA-178: `_meta.mandate: null` is present, not absent: the step waits saying the mandate cannot be read, as
+        an answer carrying it is refused mandate-malformed."""
+        self.start({"mandate": None})
+        job_id, record = self.step(message="Publish it?")
+        self.assertIsNone(record)
+        self.assertIn("mandate-malformed", self.jobs.get(job_id)["statusMessage"])
+        answer = fi.action_gate({"id": "approve-reply", "title": "Answer", "tool": "fabric.job.get", "gate": "relayed"}, tier="T0",
+                                caller="local:T0", meta={"mandate": None}, now=NOW, self_id="example-agent", effect="reply",
+                                mandate_capability="reviews.approve")
+        self.assertEqual(fd.refusal_error(answer["refusal"])["error"]["data"]["detail"], "mandate-malformed")
 
     def test_without_a_mandate_or_an_agent_id_the_step_asks_as_before(self):
         self.start({})
@@ -1137,7 +1199,27 @@ class JobApprovalStepTests(unittest.TestCase):
             self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
             self.assertEqual(refused["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")
             self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
-            self.assertEqual(self.faults, [("fabric.job.get", "mandate-capability-missing")], "and the answer")
+            self.assertEqual(self.faults, [("reviewsApprove", "mandate-capability-missing")], "and the answer, by the same name")
+
+    def test_a_job_created_under_another_name_is_read_under_it_at_the_start_and_the_answer(self):
+        # FAA-179 (5): approval_step read self.tool while the answer read the job's stored capability.
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.jobs = fi.JobStore(Path(self.temp.name) / "jobs")
+        self.contexts, self.inputs, self.faults = [], [], []
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=self.jobs, clock=lambda: NOW_SECONDS, agent_id="example-agent",
+                                  input_actions=True, on_job_started=lambda job_id, ctx: self.contexts.append((job_id, ctx)),
+                                  on_fault=lambda tool, fault: self.faults.append((tool, fault)))
+
+        def handler(args, ctx):
+            handle = ctx.server.jobs.create("reviews.approve", args, ctx.traceparent, None, ctx.delegation)
+            ctx.server.job_started(handle["job"]["id"], ctx)
+            return handle
+        server.add_tool({"name": "reviewsApprove", "inputSchema": OBJECT}, handler)
+        self.start_camel(server, {"mandate": relayed_mandate()})
+        job_id, record = self.step()
+        self.assertEqual((record or {}).get("via"), "mandate", "the start reads the step under reviews.approve")
+        self.assertEqual(self.faults, [])
 
     def test_the_start_hands_any_job_step_fault_to_on_fault(self):
         # 0.54.0 readings 4 (unit, seam): approval_step reports every job_step fault, not only MJ-1's.

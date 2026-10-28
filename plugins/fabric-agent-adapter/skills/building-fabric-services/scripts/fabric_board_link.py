@@ -30,15 +30,18 @@ class BoardSession:
     DELETE, which releases every slot it holds (DEC-0073 §5). Thread-safe; the bearer never leaves the headers."""
 
     def __init__(self, grant: _hub.BoardGrant, *, timeout: float = 15.0, post: Callable[..., Any] = _hub.post_mcp):
-        self.grant, self.timeout, self.post = grant, timeout, post
+        # not above 0 is the default: the transports read 0 in opposite ways (seam r8)
+        self.grant, self.timeout, self.post = grant, timeout if timeout is not None and timeout > 0 else 15.0, post
         self.mcp_session: Optional[str] = None
         self.protocol_version = _hub.MCP_PROTOCOL_VERSION
         self._lock = threading.Lock()
         self._rpc = 0
 
-    def _send(self, body: Dict[str, Any], method: str = "POST"):
+    def _send(self, body: Dict[str, Any], method: str = "POST", timeout: Optional[float] = None):
         try:
-            return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session, timeout=self.timeout,
+            return self.post(self.grant.origin, body, self.grant.bearer(), session=self.mcp_session,
+                             # none or not above 0 is the session's own: the transports read 0 in opposite ways
+                             timeout=timeout if timeout is not None and timeout > 0 else self.timeout,
                              method=method, protocol_version=self.protocol_version if self.mcp_session else None)
         except _hub.HubError as exc:
             raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored, so send it again with "
@@ -83,15 +86,21 @@ class BoardSession:
             raise BoardError(e["code"], e["message"], e["retryable"], op=tool)
         return value
 
-    def close(self) -> None:
+    def close(self, timeout: Optional[float] = None) -> bool:
+        """Sends the DELETE (waiting `timeout` seconds at most when above 0, else the session's); True when Fabric answered it with a
+        2xx, so the slots are free now. False otherwise, a 404 (the session was already gone) included: a move made
+        before it ended may be read only at the next com.status, so the slot records stay; the lease lapses in 60 s."""
         with self._lock:
             if self.mcp_session is None:
-                return
+                return False
             try:
-                self._send({}, method="DELETE")
-            except BoardError:
-                pass  # best effort: the lease lapses in 60 s anyway
-            self.mcp_session = None
+                answer = self._send({}, method="DELETE", timeout=timeout)
+                status = answer[0] if isinstance(answer, (tuple, list)) and answer and isinstance(answer[0], int) else 0
+            except Exception:  # noqa: BLE001 - any failure is no release, as the Node twin's catch reads it
+                status = 0
+            finally:
+                self.mcp_session = None  # an answer it cannot read is no release, as the Node twin reads it
+            return 200 <= status < 300
 
 
 class Checkpoint:
@@ -158,18 +167,28 @@ class Checkpoint:
                 self.slots = slots
 
 
-    def leave(self, project: str) -> None:
-        """At a clean leave (the session's DELETE released the slots): forget the record of each slot this service held
-        for `project` with no request left in the checkpoint and not moved away. A later generation is then another
+    def leave(self, project: str, held: Dict[str, Any]) -> None:
+        """At a clean leave (the session's DELETE released the slots): forget the record of each slot this session
+        confirmed (`held`: capability to the generation it held, or com.status showed unmoved; required) at that
+        generation or below, for `project`, with no request left in the checkpoint and not moved away. A record no
+        confirmation covers (a slot that may have moved while the service was down, not yet compared with com.status)
+        stays (0.56.0 seam r2, r3). A later generation is then another
         session taking a free slot, not a move, and a kit that keeps no record (rolled back to before 0.53.0) leaves
         nothing behind that reads as one. A record that cannot be written stays."""
         busy = {e.get("capability") for e in list(self.entries.values())}
         for capability, record in list(self.slots.items()):
-            if isinstance(record, dict) and record.get("project") == project and "moved" not in record and capability not in busy:
+            if (isinstance(record, dict) and record.get("project") == project and "moved" not in record
+                    and capability not in busy and _covered(record.get("generation"), held.get(capability))):
                 try:
                     self.slot(capability, None)
                 except BoardError:
                     pass
+
+
+def _covered(recorded: Any, confirmed: Any) -> bool:
+    """A record at or below a generation this session confirmed: a lower one is a write that failed before the hold."""
+    whole = lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 1  # noqa: E731
+    return whole(recorded) and whole(confirmed) and recorded <= confirmed
 
 
 class BoardRequest:

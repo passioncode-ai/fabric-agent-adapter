@@ -624,9 +624,45 @@ def _loopback(host: str) -> bool:
     if host == "localhost":
         return True
     try:
-        return ipaddress.ip_address(host).is_loopback
+        address = ipaddress.ip_address(host)
     except ValueError:
         return False
+    # A zone (`::1%eth0`) is no loopback: urllib decodes `%3A80` in it into another address (0.56.0 seam r13).
+    # Nor an IPv4-mapped address, which Python 3.13+ counts as loopback and 3.9 and Node do not (0.56.0 seam r14).
+    return address.is_loopback and not getattr(address, "scope_id", None) and not getattr(address, "ipv4_mapped", None)
+
+
+# fabric_http._URL_ENDS (this module may not import fabric_http; test_fabric_delegation pins them equal).
+_URL_ENDS = "\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f "
+
+
+def _source_authority_ok(parts: urllib.parse.SplitResult) -> bool:
+    """A key set URL's host and port as urllib will dial them and `new URL` accepts them (fabric_http._authority_ok's
+    rule, which this module may not import): no `%` (urllib decodes it), backslash, space or C0, DEL or C1 control; a
+    bracketed host that is an IPv6 address; any other host without `:`, `[` or `]`; a port of ASCII digits up to
+    65535; a host at all. So `http://[::1]%2Eevil.example/` and `https://[1.2.3.4]/` (both read by Python 3.9's
+    urlsplit) are refused (0.56.0 unit r13, r14)."""
+    netloc = parts.netloc
+    if any(c in "\\%" or ord(c) <= 0x20 or 0x7f <= ord(c) <= 0x9f or c.isspace() for c in netloc):
+        return False
+    if netloc.startswith("["):
+        close = netloc.find("]")
+        try:
+            ipaddress.IPv6Address(netloc[1:close] if close > 0 else "")
+        except ValueError:
+            return False
+        port = netloc[close + 1:]
+        if port and not re.fullmatch(r":[0-9]*", port):
+            return False
+    else:
+        host, _, port = netloc.partition(":")
+        if not host or any(c in "[]:" for c in host + port) or not re.fullmatch(r"[0-9]*", port):
+            return False
+    try:
+        parts.port  # noqa: B018 - raises on a port above 65535
+    except ValueError:
+        return False
+    return bool(parts.hostname)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -669,7 +705,8 @@ def _opener(deadline: Dict[str, Any]) -> urllib.request.OpenerDirector:
 
 def _fetch(source: str) -> Any:
     if source.startswith(("https://", "http://")):
-        request = urllib.request.Request(source, headers={"Accept": "application/json"})
+        # Cut at the first `#`, as `new URL` and the check at construction read it (urllib cuts at the last one).
+        request = urllib.request.Request(source.partition("#")[0], headers={"Accept": "application/json"})
         deadline: Dict[str, Any] = {"end": time.monotonic() + JWKS_FETCH_SECONDS, "fired": False, "timer": None}
         try:
             with _opener(deadline).open(request, timeout=JWKS_FETCH_SECONDS) as response:  # https or loopback http only
@@ -702,9 +739,21 @@ class JwksCache:
         if not isinstance(source, str) or not source:
             raise ValueError("the key set needs a source")
         if source.startswith(("https://", "http://")):
-            parts = urllib.parse.urlsplit(source)
-            if parts.username or parts.password:
+            # The trailing end trimmed as urllib trims it when it reads (a leading one fails the scheme test above, as
+            # in 0.55.0 and in Node); inside, what urllib would send and http.client refuse on every read is refused
+            # (0.56.0 product r16, r17, r18, unit r16, r17). urlsplit's own refusals are said as the key set's.
+            sent = source.strip(_URL_ENDS)
+            try:
+                parts = urllib.parse.urlsplit(sent)
+            except ValueError:
+                raise ValueError("a key set URL's host does not parse") from None
+            if re.search(r"[\x00-\x20\x7f]", sent.partition("#")[0]) or not (parts.path + parts.query).isascii():
+                raise ValueError("a key set URL holds a space, an ASCII control character, or a character outside ASCII "
+                                 "in its path or query")
+            if "@" in parts.netloc:  # an empty one too: urllib would dial `@127.0.0.1` (0.56.0 unit r14)
                 raise ValueError("a key set URL carries no credentials")
+            if not _source_authority_ok(parts):
+                raise ValueError("a key set URL's host does not parse")
             if parts.scheme == "http" and not _loopback(parts.hostname or ""):
                 raise ValueError("a key set is read over https, or over http on loopback only")
         elif "://" in source:

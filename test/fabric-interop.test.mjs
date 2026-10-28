@@ -250,6 +250,38 @@ test('actionGate reads a mandate only for a service that names its agent id, and
   assert.equal(t2.refusal.code, 'approval-required');
 });
 
+test('FAA-139: actionGate reads spend and project failing closed, as the Python server does', () => {
+  const gate = (meta, extra) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta, target: 'reply-7', now: NOW, self: 'example-agent', effect: 'reply', ...extra });
+  const tight = { mandate: leadMandate({ ...REPLY_SCOPE, perCallMaxUsd: 1 }) };
+  const scoped = { mandate: leadMandate({ ...REPLY_SCOPE, projects: ['alpha'] }) };
+  for (const spendUsd of [Infinity, NaN, '0.5', true, 10n ** 400n]) {
+    const refusal = gate(tight, { spendUsd }).refusal;
+    assert.equal(refusalError(refusal).error.data.detail, 'outside-mandate: spend', String(spendUsd).slice(0, 12));
+    JSON.stringify(refusalError(refusal)); // nothing a JSON writer refuses
+  }
+  for (const project of [7, ['alpha'], { id: 'alpha' }]) {
+    assert.equal(refusalError(gate(scoped, { spendUsd: 0.5, project }).refusal).error.data.detail, 'outside-mandate: project');
+  }
+  assert.equal(gate(scoped, { spendUsd: 0.5, project: 'alpha' }).ok, true);
+  assert.equal(gate(tight, { spendUsd: 1 }).ok, true);
+});
+
+test('0.56.0 seam r1: jobStep reads spend and project as actionGate does, failing closed', () => {
+  const call = { tier: 'T0', now: NOW, self: 'example-agent', capability: 'reviews.approve', key: 'approve-reply', effect: 'reply' };
+  const tight = leadMandate({ ...REPLY_SCOPE, perCallMaxUsd: 1 });
+  const scoped = leadMandate({ ...REPLY_SCOPE, projects: ['alpha'] });
+  for (const spendUsd of [NaN, Infinity, '0.5', true]) {
+    const step = i.jobStep({ ...call, mandate: tight, spendUsd });
+    assert.deepEqual([step.covered, step.detail], [false, 'outside-mandate: spend'], String(spendUsd));
+  }
+  for (const project of [7, ['alpha']]) {
+    const step = i.jobStep({ ...call, mandate: scoped, spendUsd: 0.5, project });
+    assert.deepEqual([step.covered, step.detail], [false, 'outside-mandate: project']);
+  }
+  assert.equal(i.jobStep({ ...call, mandate: scoped, spendUsd: 0.5, project: 'alpha' }).covered, true);
+  assert.equal(i.jobStep({ ...call, mandate: tight, spendUsd: 1 }).covered, true);
+});
+
 test('an outside-mandate answer reaches the caller with the MD-4 wording (DEC-0125 MD-4)', async () => {
   const k = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-interop.mjs');
   const outside = k.actionRefusalToolResult({ ok: false, code: 'operator-decision-required', data: { detail: 'outside-mandate: spend', estimateUsd: 25, perCallMaxUsd: 1 } });

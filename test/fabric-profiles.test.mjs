@@ -21,6 +21,12 @@ test('the credential detector answers as the contract does', () => {
   for (const [name, cases] of Object.entries(V.secrets)) for (const c of cases) assert.deepEqual(fns[name](decode(c.inputHex)), c.expected, `${name}(${decode(c.inputHex).slice(0, 30)})`);
 });
 
+test('0.56.0 unit r1: a URL is trimmed only of U+0000 to U+0020, as the Python twin now does', () => {
+  for (const [value, expected] of [['\u00a0https://u:p@x.example/', false], ['\u0001https://u:p@x.example/', true],
+    [' https://u:p@x.example/', true], ['\u3000https://x.example/?token=abc', false],
+    ['ht\ttps://h.example/?token=abc', true]]) assert.equal(s.secretUrl(value), expected, JSON.stringify(value));
+});
+
 test('every resolution and every rule case answers as the contract does', () => {
   for (const c of V.resolutions) assert.deepEqual(plain(p.resolveModelProfile(c.input)), c.expected, c.name);
   for (const c of V.rules) assert.deepEqual(p.profileProblems(c.kind, JSON.parse(decode(c.valueHex))), c.expected, c.name);

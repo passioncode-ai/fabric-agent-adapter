@@ -915,6 +915,59 @@ class TurnNudges(Active):
         self.assertEqual(fs.take_nudges(directory), ["A"], "the pending one is back; only this turn's B is lost")
         self.assertIn("outcome=lost lost=1", said[0])
 
+    def test_lost_counts_this_turn_s_capped_lines_and_both_failed_writes(self):
+        """FAA-143: with five pending and the write failing, the turn's lines past the cap are lost too; when the
+        write-back fails as well, the pending ones are counted lost with them, and nothing is left behind."""
+        mcp = sys.modules["fabric_session_mcp"]
+        real = mcp._write_private
+        for fail_both, pending, expected in ((False, ["P%d" % i for i in range(fs.MAX_NUDGES)], 3),
+                                             (True, ["P1", "P2"], 5)):
+            with self.subTest(fail_both=fail_both):
+                directory = fs.session_dir(SID, self.env)
+                directory.mkdir(parents=True, exist_ok=True)
+                real(directory / fs.NUDGES_FILE, json.dumps(pending))
+                calls = []
+
+                def flaky(path, text):
+                    calls.append(text)
+                    if len(calls) == 1 or fail_both:
+                        raise PermissionError("denied")
+                    real(path, text)
+                mcp._write_private = flaky
+                said = []
+                try:
+                    mcp._keep_nudges(directory, [{"says": "T1"}, {"says": "T2"}, {"says": "T3"}], said.append, SID)
+                finally:
+                    mcp._write_private = real
+                self.assertIn("outcome=lost lost=%d" % expected, said[0])
+                self.assertEqual(fs.take_nudges(directory), [] if fail_both else pending)
+
+    def test_lost_counts_past_the_item_cap(self):
+        """0.56.0 unit r1: a full answer (MAX_NUDGE_ITEMS lines) and pending lines lost together are all counted."""
+        mcp = sys.modules["fabric_session_mcp"]
+        real = mcp._write_private
+        directory = fs.session_dir(SID, self.env)
+        directory.mkdir(parents=True, exist_ok=True)
+        real(directory / fs.NUDGES_FILE, json.dumps(["P1", "P2"]))
+
+        def broken(path, text):
+            raise PermissionError("denied")
+        mcp._write_private = broken
+        said = []
+        try:
+            mcp._keep_nudges(directory, [{"says": "line %d" % i} for i in range(fs.MAX_NUDGE_ITEMS)], said.append, SID)
+        finally:
+            mcp._write_private = real
+        self.assertIn("outcome=lost lost=%d" % (fs.MAX_NUDGE_ITEMS + 2), said[0])
+
+    def test_a_long_list_is_read_in_linear_time_up_to_its_cap(self):
+        """FAA-143: only the first MAX_NUDGE_ITEMS items are read, and repeats are found by a set."""
+        many = [{"says": "line %d" % i} for i in range(fs.MAX_NUDGE_ITEMS + 500)]
+        lines = fs.nudge_lines(many, limit=None)
+        self.assertEqual(len(lines), fs.MAX_NUDGE_ITEMS)
+        self.assertEqual(lines[-1], "line %d" % (fs.MAX_NUDGE_ITEMS - 1))
+        self.assertEqual(fs.nudge_lines([{"says": "a"}, {"says": "b"}, {"says": "a"}], limit=None), ["a", "b"])
+
     def test_an_empty_absent_or_odd_list_prints_nothing(self):
         for value in ({"nudges": []}, {"recorded": True}, {"nudges": "go"}, {"nudges": [1, None, "x", {"kind": "a"},
                       {"kind": "a", "says": 7}, {"kind": "a", "says": "   "}]}, "not json", [1, 2]):
@@ -1002,6 +1055,17 @@ class WatchMail(Active):
         self.assertEqual(code, 0)
         self.assertEqual(printed.count("Fabric reminder: Your claim lapsed."), 1)
         self.assertIsNone(fs.hook_user_prompt_submit({"session_id": SID}, self.env), "the prompt hook does not repeat it")
+
+    def test_watch_mail_prints_a_fabric_line_as_fabric_wrote_it(self):
+        """FAA-143: a reminder that starts `Fabric:` is printed untagged by watch-mail, as by the prompt hook."""
+        nudges = self.base / "nudges.json"
+        nudges.write_text(json.dumps({"nudges": [{"kind": "claim", "says": "Fabric: your claim lapsed."}]}))
+        self.env["FAKE_MCP_NUDGES"] = str(nudges)
+        fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn", self.env, spawn=lambda directory: None)
+        code, printed, _ = self.watch(1)
+        self.assertEqual(code, 0)
+        self.assertEqual(printed.count("Fabric: your claim lapsed."), 1)
+        self.assertFalse(any(fs.NUDGE_PREFIX in line for line in printed))
 
     def test_watch_mail_leaves_the_stop_worker_s_nudges_to_the_prompt(self):
         nudges = self.base / "nudges.json"
@@ -1177,36 +1241,142 @@ class OriginNames(unittest.TestCase):
                 self.assertIsNone(MCP.parse_origin(url))
 
 
-@unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
 class BashPaths(unittest.TestCase):
     def test_cd_to_an_absolute_path_and_git_dash_c(self):
         cwd = Path("/work/start")
         got = MCP.bash_paths("cd /a/b && git -C ../c -c core.x=y status; (cd /d) | git --no-pager -C /e log -C "
                              "&& cd relative && cd ~ && cd && /usr/bin/git -C '/f g' diff && echo git -C /not-git",
-                             cwd)
-        self.assertEqual(got, ["/a/b", os.path.normpath("/work/c"), "/d", "/e", "/f g"])
+                             cwd, windows=False)
+        self.assertEqual(got, ["/a/b", "/a/c", "/d", "/e", "/f g"])
+
+    def test_a_relative_dash_c_follows_the_last_absolute_cd(self):
+        """FAA-166: `-C ../x` after `cd /work/other` is /work/x, not a folder beside the start folder."""
+        self.assertEqual(MCP.bash_paths("cd /work/other && git -C ../sibling status", Path("/home/me/proj"),
+                                        windows=False), ["/work/other", "/work/sibling"])
+        self.assertEqual(MCP.bash_paths("git -C ../sibling status", Path("/home/me/proj"), windows=False),
+                         ["/home/me/sibling"])
+
+    def test_a_relative_dash_c_after_an_unknown_cd_names_nothing(self):
+        """FAA-166: after `cd relative`, `cd ~`, `cd -` or a bare `cd` the shell's folder is not known here."""
+        for cd in ("cd rel", "cd ~", "cd -", "cd", "cd $HOME"):
+            with self.subTest(cd=cd):
+                self.assertEqual(MCP.bash_paths(cd + " && git -C ../x status; git -C y log", Path("/w"),
+                                                windows=False), [])
+        self.assertEqual(MCP.bash_paths("cd rel && cd /a && git -C b log", Path("/w"), windows=False), ["/a", "/a/b"])
+
+    def test_windows_reads_git_bash_and_native_paths(self):
+        """FAA-175: Git Bash writes /c/..., /cygdrive/c/..., C:/... and C:\\...; the Stop hook reads them as drive
+        paths. Another /... (Git's own root) is not this host's and is left out."""
+        got = MCP.bash_paths(r'cd /c/Users/me/one && git -C ../two status; cd "C:\work\three"; git -C D:/four log; '
+                             r"cd 'C:\five'; cd C:\unquoted; cd /tmp; git -C x log; cd /cygdrive/e/six",
+                             Path(r"C:\Users\me\proj"), windows=True)
+        self.assertEqual(got, [r"C:\Users\me\one", r"C:\Users\me\two", r"C:\work\three", r"D:\four", r"C:\five",
+                               r"E:\six"])
+        self.assertEqual(MCP.bash_paths("git -C ../two log", Path(r"C:\Users\me\proj"), windows=True),
+                         [r"C:\Users\me\two"])
+        self.assertEqual(MCP.bash_paths("git.exe -C /d/x log", Path(r"C:\w"), windows=True), [r"D:\x"])
+        self.assertEqual(MCP.bash_paths("GIT.EXE -C /d/x log", Path(r"C:\w"), windows=True), [r"D:\x"],
+                         "Windows names are case-blind (0.56.0 unit r1)")
+        # Git Bash reads an unquoted backslash as an escape: `cd C:\work` goes to `C:work`, which is not named.
+        self.assertEqual(MCP.bash_paths(r"cd C:\work", Path(r"C:\w"), windows=True), [])
+        self.assertEqual(MCP.bash_paths(r"git -C C:\work st", r"D:\proj", windows=True), [],
+                         "a drive-relative C:work is not known here (0.56.0 unit r4)")
+
+    def test_a_subshell_or_pipe_cd_does_not_move_the_base(self):
+        """0.56.0 unit r1, r2: a cd in `( )`, in a pipeline's stage or in a list sent to the background moves only a
+        subshell, so a later relative -C is read against the folder before it; a pipe or `( )` with no cd changes
+        nothing, `||` keeps the folder as `&&` does, and a newline ends a command."""
+        cases = {
+            "(cd /a) && git -C b log": ["/a", "/w/b"],
+            "cd /a | git -C b log": ["/a", "/w/b"],
+            "cd /a & git -C b log": ["/a", "/w/b"],
+            "(cd /a && git -C b log)": ["/a", "/a/b"],
+            "cd /a && (cd /b) && git -C c log": ["/a", "/b", "/a/c"],
+            "ls | wc -l && git -C ../other commit": ["/other"],
+            "git -C ../one log | head; git -C ../two commit": ["/one", "/two"],
+            "(make) && git -C x commit": ["/w/x"],
+            "cd /a || exit 1; git -C sub commit": ["/a", "/a/sub"],
+            "cd /a\ngit -C sub log": ["/a", "/a/sub"],
+            "cd /a >/dev/null 2>&1; git -C sub log": ["/a", "/a/sub"],
+            # 0.56.0 product r3: a `#` comment ends at its line, and a `\` continuation joins two lines.
+            "git status  # note\ngit -C /x log": ["/x"],
+            "cd /a # go\ngit -C sub log": ["/a", "/a/sub"],
+            "ls # don't\ncd /y": ["/y"],
+            "git \\\n  -C /x log": ["/x"],
+            "cd /a # x\ncd /b\ngit -C sub status": ["/a", "/b", "/b/sub"],
+            # 0.56.0 unit r3: `&>` redirects, a here-document's body is text, reserved words and pushd are read.
+            "cd /a && make &>/dev/null && git -C sub status": ["/a", "/a/sub"],
+            "cd /a &>> log; git -C sub log": ["/a", "/a/sub"],
+            "cd /a >|/dev/null && git -C sub status": ["/a", "/a/sub"],
+            "cat > deploy.sh <<'EOF'\ncd /srv/app\ngit -C sub pull\nEOF": [],
+            "cat <<X\ncd /a\nX\ngit -C sub status": ["/w/sub"],
+            "cat <<-EOF\n\tcd /q\n\tEOF\ncd /r": ["/r"],
+            "cat <<<\"cd /z\"; git -C s log": ["/w/s"],
+            "{ cd /a; }; git -C sub status": ["/a", "/a/sub"],
+            "if true; then cd /a; fi; git -C sub status": ["/a", "/a/sub"],
+            "X=1 cd /a; git -C s log": ["/a", "/a/s"],
+            "cd /a && pushd /b && git -C sub status": ["/a", "/b", "/b/sub"],
+            "cd /a && popd && git -C sub status": ["/a"],
+            # 0.56.0 unit r4: a here-string has no body; a comment never hides a here-document's line ends; git reads a
+            # relative -C against the -C before it and runs in the last
+            'jq . <<< "$x"\ncd /b && git -C r status': ["/b", "/b/r"],
+            "cat > s.sh <<'EOF'  # c\ncd /srv/other\nEOF\ncd /b": ["/b"],
+            "cat > f <<'EOF'\nx\n# c\nEOF\ncd /b": ["/b"],
+            "cat > f <<'EOF'\nx # c\nEOF\ncd /b": ["/b"],
+            "git -C /a -C b status": ["/a/b"],
+        }
+        for command, expected in cases.items():
+            with self.subTest(command=command):
+                self.assertEqual(MCP.bash_paths(command, Path("/w"), windows=False), expected)
+
+    def test_cygwin_and_msys_read_posix_paths(self):
+        """FAA-177: a Cygwin or MSYS2 Python names its own /cygdrive/c/... paths; only native Windows translates."""
+        for platform in ("cygwin", "msys"):
+            with self.subTest(platform=platform), mock.patch.object(MCP.sys, "platform", platform):
+                self.assertEqual(MCP.bash_paths("cd /cygdrive/c/work && git -C ../x log", Path("/home/me")),
+                                 ["/cygdrive/c/work", "/cygdrive/c/x"])
+        with mock.patch.object(MCP.sys, "platform", "win32"):
+            self.assertEqual(MCP.bash_paths("cd /c/work", Path("C:\\w")), ["C:\\work"])
 
     def test_a_command_that_does_not_parse_names_nothing(self):
-        self.assertEqual(MCP.bash_paths("cd '/a/b", Path("/w")), [])
-        self.assertEqual(MCP.bash_paths("", Path("/w")), [])
+        for windows in (False, True):
+            self.assertEqual(MCP.bash_paths("cd '/a/b", Path("/w"), windows=windows), [])
+            self.assertEqual(MCP.bash_paths("", Path("/w"), windows=windows), [])
 
 
-WINDOWS_READS_NO_TRANSCRIPT = unittest.skipIf(sys.platform == "win32", "FAA-175: on Windows the Stop hook reads no transcript (a Bash command's paths are not this host's)")
+class TranscriptReadSwitch(unittest.TestCase):
+    """FAA-175 and FAA-160: the mark turns the transcript read on on every platform; the person turns it off."""
 
+    def env_with_mark(self, base):
+        env = {"XDG_CACHE_HOME": base, "LOCALAPPDATA": base, "HOME": base}
+        mark = fs.state_root(env=env) / fs.REPOSITORIES_MARK
+        mark.parent.mkdir(parents=True, exist_ok=True)
+        mark.write_text("")
+        return env
 
-class WindowsReadsNoTranscript(unittest.TestCase):
-    """FAA-175: on Windows the mark never turns the transcript read on."""
+    def test_the_mark_reads_on_windows_too(self):
+        with tempfile.TemporaryDirectory() as base:
+            env = self.env_with_mark(base)
+            for platform in ("win32", "linux", "darwin", "cygwin"):
+                with self.subTest(platform=platform), mock.patch.object(fs.sys, "platform", platform):
+                    self.assertTrue(fs.repositories_wanted(env))
 
-    def test_the_mark_reads_nothing_on_windows(self):
+    def test_the_person_turns_it_off(self):
+        with tempfile.TemporaryDirectory() as base:
+            env = self.env_with_mark(base)
+            for value, off in (("1", True), ("yes", True), ("0", False), ("", False)):
+                with self.subTest(value=value):
+                    self.assertEqual(fs.repositories_wanted(dict(env, **{fs.NO_REPOSITORIES_ENV: value})), not off)
+                    self.assertEqual(fs.repositories_off(dict(env, **{fs.NO_REPOSITORIES_ENV: value})), off)
+            (fs.state_root(env=env) / fs.NO_REPOSITORIES_MARK).write_text("")
+            self.assertTrue(fs.repositories_off(env))
+            self.assertFalse(fs.repositories_wanted(env))
+
+    def test_without_the_mark_nothing_is_read(self):
         with tempfile.TemporaryDirectory() as base:
             env = {"XDG_CACHE_HOME": base, "LOCALAPPDATA": base, "HOME": base}
-            mark = fs.state_root(env=env) / fs.REPOSITORIES_MARK
-            mark.parent.mkdir(parents=True, exist_ok=True)
-            mark.write_text("")
-            with mock.patch.object(fs.sys, "platform", "win32"):
-                self.assertFalse(fs.repositories_wanted(env))
-            with mock.patch.object(fs.sys, "platform", "linux"):
-                self.assertTrue(fs.repositories_wanted(env))
+            self.assertFalse(fs.repositories_wanted(env))
+            self.assertFalse(fs.repositories_off(env))
 
 
 class TurnRepositories(Base):
@@ -1246,17 +1416,21 @@ class TurnRepositories(Base):
         if transcript is not False:
             payload["transcript_path"] = str(transcript or self.transcript)
         spawned = []
-        said = fs.hook_spool(payload, "turn", self.env, spawn=spawned.append)
+        # These tests check what the turn names, not how fast: a loaded machine must not run out the 1.5 s budget
+        # (0.56.0 unit r7); the budget itself is tested with until= below.
+        with mock.patch.object(sys.modules["fabric_session_cli"], "FACTS_BUDGET_S", 60.0), \
+                mock.patch.object(MCP, "GIT_TIMEOUT_S", 30.0):
+            said = fs.hook_spool(payload, "turn", self.env, spawn=spawned.append)
         entry = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))[-1]
         return said, json.loads(entry.read_text())
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_the_turn_names_the_other_repositories_it_changed_and_no_path(self):
         one = self.git_repo("one", "https://user:TOKEN-SENTINEL@github.com/acme/one.git")
         two = self.git_repo("two", "git@bitbucket.org:team/two.git")
         three = self.git_repo("three", "ssh://git@github.com/acme/three")
         four = self.git_repo("four", "https://github.com/acme/four.git")
         seven = self.git_repo("seven", "https://github.com/acme/seven.git")
+        five = self.git_repo("five", "https://github.com/acme/five.git")  # a pushd alone (0.56.0 seam r5)
         bare = self.git_repo("no-origin")
         read_only = self.git_repo("read-only", "https://github.com/acme/read-only.git")
         earlier = self.git_repo("earlier", "https://github.com/acme/earlier.git")
@@ -1266,8 +1440,9 @@ class TurnRepositories(Base):
             prompt_entry("PROMPT-TEXT-SENTINEL"),
             tool_entry("Edit", file_path=str(one / "a.txt"), old_string="OLD-SENTINEL", new_string="b"), result_entry(),
             tool_entry("Write", file_path=str(two / "sub" / "new.txt"), content="CONTENT-SENTINEL"), result_entry(),
-            tool_entry("Bash", command="cd %s && make" % three), result_entry(),
+            tool_entry("Bash", command="cd '%s' && make" % three), result_entry(),
             tool_entry("Bash", command="git -C ../four status"), result_entry(),
+            tool_entry("Bash", command="pushd '%s' && make" % five), result_entry(),
             tool_entry("MultiEdit", file_path=str(one / "c.txt"), edits=[]), result_entry(),
             tool_entry("NotebookEdit", notebook_path=str(seven / "n.ipynb"), new_source="x"), result_entry(),
             tool_entry("Edit", file_path=str(bare / "a.txt")), result_entry(),
@@ -1283,6 +1458,7 @@ class TurnRepositories(Base):
             {"host": "bitbucket.org", "owner": "team", "name": "two"},
             {"host": "github.com", "owner": "acme", "name": "three"},
             {"host": "github.com", "owner": "acme", "name": "four"},
+            {"host": "github.com", "owner": "acme", "name": "five"},
             {"host": "github.com", "owner": "acme", "name": "seven"}])
         stored = json.dumps({k: v for k, v in entry.items() if k != "cwd"})
         for leaked in (str(self.base), "TOKEN-SENTINEL", "PROMPT-TEXT-SENTINEL", "CONTENT-SENTINEL", "OLD-SENTINEL",
@@ -1290,14 +1466,12 @@ class TurnRepositories(Base):
             self.assertNotIn(leaked, stored)
         self.assertNotIn(str(self.base), self.log_text())
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_at_most_ten_repositories(self):
         folders = [self.git_repo("r%02d" % i, "https://github.com/acme/r%02d.git" % i) for i in range(12)]
-        self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd %s" % f) for f in folders])
+        self.write_transcript([prompt_entry()] + [tool_entry("Bash", command="cd '%s'" % f) for f in folders])
         _, entry = self.spool_turn()
         self.assertEqual([r["name"] for r in entry["repositories"]], ["r%02d" % i for i in range(10)])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_two_checkouts_of_one_repository_are_named_once(self):
         a = self.git_repo("a", "https://github.com/acme/same.git")
         b = self.git_repo("b", "git@github.com:acme/same")
@@ -1306,7 +1480,6 @@ class TurnRepositories(Base):
         _, entry = self.spool_turn()
         self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "same"}])
 
-    @WINDOWS_READS_NO_TRANSCRIPT
     def test_another_checkout_of_the_start_repository_is_not_named(self):
         """A worktree or a second clone of the start folder's repository has another toplevel but the same origin: it
         is the start folder's repository, not another one."""
@@ -1356,6 +1529,14 @@ class TurnRepositories(Base):
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
         self.assertEqual(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic()), [])
         self.assertEqual(len(MCP.turn_repositories(str(self.transcript), self.repo, until=time.monotonic() + 5)), 1)
+
+    def test_the_prefilter_passes_git_in_any_case(self):
+        """0.56.0 seam r6: on Windows `GIT.EXE -C` runs git and bash_paths reads it, so the prefilter passes it too."""
+        seen = []
+        self.write_transcript([prompt_entry(), tool_entry("Bash", command=r"C:\Git\cmd\GIT.EXE -C C:\work status")])
+        with mock.patch.object(MCP, "bash_paths", side_effect=lambda command, cwd: seen.append(command) or []):
+            MCP.turn_paths(str(self.transcript), self.repo)
+        self.assertEqual(seen, [r"C:\Git\cmd\GIT.EXE -C C:\work status"])
 
     def test_a_subagent_entry_and_a_meta_prompt_do_not_end_the_turn(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
@@ -1908,9 +2089,38 @@ class Status(Base):
         self.assertEqual(done.returncode, 0)
         self.assertIn("Next: Call fabric_whoami.", done.stdout)
         self.assertNotIn("DOOR-TOKEN-SENTINEL", done.stdout)
+        self.assertIn("Repositories of a turn: not read until a running Fabric takes them", done.stdout)
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--json", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)
         self.assertEqual(json.loads(done.stdout)["hub"]["state"], "running")
+
+    def test_status_names_the_transcript_read_switch(self):
+        """FAA-160: status says whether the Stop hook reads the transcript and how to turn it off."""
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        mark = fs.state_root(env=self.env) / fs.REPOSITORIES_MARK
+        mark.parent.mkdir(parents=True, exist_ok=True)
+        mark.write_text("")
+        # 0.56.0 product r28: a mark left after Fabric quit, or a Fabric without the hooks, reads nothing.
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        self.hub(features=[])
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        self.hub(pid=self.dead_pid(), features=["session-hooks/1"])
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        self.hub(features=["session-hooks/1"])  # unit r28: and only with `fabric` registered, as hook_spool asks
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "unregistered")
+        done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
+                              capture_output=True, text=True, env=self.env, timeout=10)
+        self.assertIn("Repositories of a turn: not read: fabric is not registered for this folder\n", done.stdout)
+        self.register()
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "on")
+        mark.unlink()  # unit r30: active and registered, but Fabric has not taken the repositories yet
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        mark.write_text("")
+        self.assertEqual(fs.status(self.repo, dict(self.env, **{fs.NO_REPOSITORIES_ENV: "1"}))["transcriptRead"], "off")
+        done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
+                              capture_output=True, text=True, env=self.env, timeout=10)
+        self.assertIn("Repositories of a turn: read from the session's transcript, as this shell's environment has it (turn off: "
+                      "FABRIC_SESSION_NO_REPOSITORIES=1)", done.stdout)
 
 
 class PluginHooks(unittest.TestCase):

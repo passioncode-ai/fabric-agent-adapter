@@ -392,7 +392,7 @@ def _is_openrouter(url: Any) -> bool:
         if userinfo not in ("", ":"):
             return False
     host, _, port = authority.partition(":")
-    if port and not (port.isdigit() and int(port) == 443):
+    if port and not (re.fullmatch(r"[0-9]+", port) and int(port) == 443):  # ASCII digits, as `new URL` (seam r13)
         return False
     return host.lower() == "openrouter.ai"
 

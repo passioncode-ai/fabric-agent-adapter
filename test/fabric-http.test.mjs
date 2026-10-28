@@ -88,13 +88,17 @@ test('the default transport: answers, redirects and the cap', async () => {
     if (req.url === '/redirect') { res.writeHead(302, { Location: 'http://127.0.0.1:1/elsewhere' }); res.end(); return; }
     if (req.url === '/missing') { res.writeHead(404); res.end('no'); return; }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ auth: req.headers.authorization }));
+    res.end(JSON.stringify({ auth: req.headers.authorization, path: req.url }));
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     const ok = await fh.request('GET', `${base}/ok`, { headers: { Authorization: 'Bearer t' }, deadlineS: 10 });
-    assert.deepEqual(ok.json(), { auth: 'Bearer t' });
+    assert.deepEqual(ok.json(), { auth: 'Bearer t', path: '/ok' });
+    // 0.56.0 seam r20: the twin of test_a_url_is_sent_up_to_its_first_fragment_mark; both kits send `/ok`.
+    for (const tail of ['#a#b', '#a b#c', '#\n#c', '#caf\u00e9#c', '#?admin=1#c']) {
+      assert.equal((await fh.request('GET', `${base}/ok${tail}`, { deadlineS: 10, retries: 0 })).json().path, '/ok', tail);
+    }
     assert.equal((await fh.request('GET', `${base}/missing`, { deadlineS: 10 })).status, 404);
     assert.equal((await fh.request('GET', `${base}/redirect`, { deadlineS: 10, retries: 0 })).status, 302);
     await assert.rejects(fh.request('GET', `${base}/big`, { deadlineS: 10, maxBytes: 10 }), (e) => e.kind === 'too-large');

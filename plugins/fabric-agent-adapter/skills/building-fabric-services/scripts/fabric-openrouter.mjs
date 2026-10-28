@@ -100,11 +100,22 @@ export class Client {
     if (!Number.isInteger(retries) || retries < 0 || retries > 5) {
       throw new OpenRouterError('retries is an integer from 0 to 5', { kind: 'config' });
     }
+    // A query or fragment would take `/chat/completions` (0.56.0 unit r19, FAA-187 (17)); refused before checkUrl, as
+    // the Python twin does, so a base checkUrl would also refuse is kind config in both (unit r27).
+    if (typeof baseUrl !== 'string') { // as Python's check_url answers a base that is not a string (unit r28)
+      throw new http.HttpError('the URL does not parse', { url: '<unparseable url>', kind: 'refused' });
+    }
+    if (/[?#]/.test(baseUrl)) {
+      throw new OpenRouterError('the base URL holds no query or fragment', { kind: 'config' });
+    }
     http.checkUrl(baseUrl);
     checkAttribution(projectId, undefined);
     Object.assign(this, { ceilingUsd, ledger, keyEnv, window, attribution, projectId, unmeasuredCallUsd, deadlineS, retries });
     this.prices = Object.fromEntries(Object.entries(prices ?? {}).map(([k, v]) => [k, { ...v }]));
-    this.baseUrl = baseUrl.replace(/\/+$/, '');
+    // The base URL as checkUrl read it: `new URL` removes tabs and line breaks anywhere and trims C0 controls and
+    // spaces from its ends, so `.../v1/ ` and `.../v1\n/` are composed as `.../v1/chat/completions`, as `new URL`
+    // composed them in 0.55.0 (0.56.0 product r20, unit r22, seam r22; the Python twin refuses what urllib cannot send).
+    this.baseUrl = baseUrl.replace(/[\t\n\r]/g, '').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
     this.env = env;
     this.transport = transport;
     this.sleep = sleep ?? ((s) => new Promise((resolve) => setTimeout(resolve, s * 1000)));

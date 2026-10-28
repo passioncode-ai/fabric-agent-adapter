@@ -1,5 +1,201 @@
 # Changelog
 
+## 0.56.0 (2026-10-28)
+
+Stability and Windows: the debts of 0.53.0 to 0.55.0 that touch how the hooks, the board responder and the interop
+gate behave.
+
+### Fixed
+
+- The board responder's notices reach a service's event feed: they were sent at level `warn`, which
+  `JsonlEventLog.append` refuses (its levels are `info`, `notice`, `warning`, `error`), so `board.down`,
+  `board.access.needed`, `board.slot.moved`, `board.slot.contested`, `board.request.held`, `board.request.skipped`,
+  `board.reconcile.needed`, `board.attempt.lost` and `board.outcome.invalid` were dropped wherever `emit=log.append`
+  (the reference service included, since 0.28.0; `board.slot.moved` since 0.53.0). They are sent at `warning` now, in
+  both twins, as is the new `board.slot.refused` (FAA-163). Each notice names its `subject` (`{type, id}`: its request,
+  else its capability, else its episode, such as a block's cause, else the Project), so a host tells one request's,
+  capability's or cause's episode from another's. In Python the subject goes to an `emit` whose signature names a
+  `subject` parameter with no value bound (`JsonlEventLog.append` now names one); any other `emit` (only `**kwargs`, a
+  subject bound with `functools.partial`, a signature that cannot be read) is called as 0.55.0 called it, once, without
+  one. The Node responder always passes it in its options object, which an `emit` that does not read it ignores.
+- **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
+  Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
+  text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
+  pipeline's stage or a list sent to the background no longer moves the folder a later relative `-C` is read
+  against; a newline ends a command, a here-document's body is text (a `#` comment no longer hides its lines, and
+  `<<<` opens none), `&>` only redirects, `git -C /a -C b` runs in `/a/b`, and `pushd` and a `cd` after `{` or `then`
+  are read. Cygwin and MSYS Python read paths as POSIX. Before, the Stop hook did not read the
+  transcript on Windows at all, and a turn from Windows came without `repositories`. The hooks run `python3`, which
+  must name Python 3.9 or later in Git Bash there (session-hooks.md; FAA-183 makes the plugin find it itself).
+- **A relative `git -C` after `cd`** (FAA-166) is read against the folder the command last changed into with an
+  absolute `cd`; after a relative or unknown `cd` it is dropped, never read against the session's folder.
+- **The board responder's recovery** (FAA-163, FAA-158). A refused enroll of one capability no longer stops the
+  others: it is retried on its own, the pause doubling, and said once as `board.slot.refused`. A slot's move is written
+  under the responder's lock and only while its record is unchanged, so an operator's take-back at the same moment
+  wins. The slot code moved to its own twin modules, `fabric_board_slots.py` and `fabric-board-slots.mjs`.
+- **An idle stop leaves the board within 3 s** (FAA-173): a responder with no work in hand closes its session with a
+  confirmed `DELETE` inside the hard exit (`close(timeout)`: a timeout not above 0 is the session's own, and a session built
+  with one takes 15 s, in both twins),
+  instead of letting the slot lapse (a board call already in flight when the
+  stop comes runs first, and when the join ends before the DELETE the slot lapses as before). The slot records are forgotten only after
+  a 2xx: a 404 (the session already gone) keeps them, since a move made before it ended is read at the next
+  `com.status`. A refusal of the whole board session (`not_available` included) is the board down, never a refused
+  capability; a capability refused, or contested, again after it was held is said again, once per capability. A clean
+  leave forgets only the records this session confirmed (a slot it held, paused under the operator's hold included, or
+  one `com.status` showed unmoved) and no fenced call has put in doubt since, so a slot moved while the service was
+  down stays `moved` when the session is dropped at connect or recovery stops early, and is never enrolled again on
+  its own. A paused or retrying slot reads `com.status` before each new ask, so a move during the operator's hold is
+  said. `Checkpoint.leave(project, held)` takes `held` as a required argument in both twins.
+- **`action_gate` fails closed** (FAA-139): a spend that is not a finite number is read as no estimate, which a
+  mandate's `perCallMaxUsd` ceiling refuses (a mandate with no ceiling covers it; the question is with the contract,
+  FAA-185), and a project that cannot be read is never covered by a mandate limited to `projects`. A `null` mandate in
+  `_meta` reads as an unreadable one, not as none (FAA-178; Python's `approval_step`, while a Node service passes `{}`
+  to `jobStep` itself, interop.md). A job's start (`job_step`) reads spend and project as its answer does, and keeps
+  the spend as it read it (a NaN is no estimate, never a bare `NaN` in the job file).
+- **`fabric_secrets` matches the contract's ECMAScript reading** (FAA-136): `\s`, `.` and case folding as JavaScript
+  reads them, so both ports flag the same values. `secret_url` also reads a special scheme as `new URL` does: every
+  slash or backslash after `https:` (or `http`, `ftp`, `ws`, `wss`) is skipped and a backslash before the query reads
+  as a slash, so `https:u:p@host` and `https:\\u:p@host` carry a password in Python as in Node. Python splits the URL
+  by hand rather than with `urlsplit`, which refuses a `[` or `]` outside an IPv6 host (`https://u:p[w@h/`), and drops
+  one leading `?` from a parameter's name as `URLSearchParams` does. Where `new URL` refuses a host (none, a port over
+  65535), Python still reads the password and the parameters, so it can flag more than Node, never less. The
+  `source.repository` check of a descriptor and of a provider entry reads a special scheme's password the same way
+  (`https:bot:pw@host`), up to the user information's last `@` (`https://me@corp.example:pw@host`), and says so
+  before it judges the host. The query and the fragment are read percent-encoded, as `new URL` hands them over.
+  `fabric_http.redact_url` reads a special scheme the same way (below).
+- **What the kit sends, refuses and redacts as a URL** (FAA-136; the remaining differences are FAA-187):
+  - `redact_url`: the URL an `HttpError` carries for `https:u:pw@host` has no password, as in Node; a URL of any
+    other scheme (a misspelled `htps:` included) keeps only its scheme in both twins (`htps:<redacted>`), since its
+    user information may sit anywhere in the rest. It first trims C0 controls and space from the ends and removes
+    tabs and line breaks, as `new URL` does, so ` https://u:pw@host` keeps no password on Python 3.9 either. A
+    string with no scheme (`ht tps:`, `1ttps:`, a leading byte order mark or no-break space) and a URL whose host or
+    port `new URL` refuses (a password holding `/`, a port that is not ASCII digits such as `1_2` or `+1`, which
+    Python 3.9's `int()` takes, a bracketed host that is no IPv6 address, a `ws`, `wss` or `ftp` URL with no host or
+    a port above 65535) read as `<unparseable url>`; the scheme is read by the WHATWG rule, not by `urlsplit`, whose
+    rule differs between 3.9 patch releases. On Python a host holding `%` reads as `<unparseable url>` too, where
+    Node writes it decoded. The path is not redacted in either twin (Node writes it as `new URL` normalises it,
+    Python as given), so a key never belongs in it.
+  - `check_url` and `request`: the same ports and bracketed hosts (an IPv6 zone included) are refused. On Python a
+    backslash, `%`, space or control character in the host (a Unicode space and a C1 control included) is refused
+    too, since urllib would decode it or dial another host (`h.example%3A8443` reached port 8443), and so is a space
+    or ASCII control character before the URL's first `#`, or a character outside ASCII in its path or query, which
+    urllib would send and http.client refuse: such a URL is refused before it is sent (kind `refused`), where 0.55.0
+    retried it and answered kind `connection`. Python's `check_url` checks the host's shape, not its name (FAA-187
+    (14), (16)). The Node twin reads several of these as `new URL` does, among them a tab or line break removed, a
+    space or a character outside ASCII percent-encoded, a backslash as `/`, an extra slash before the host skipped
+    and a `%` host decoded (refused when the decoded host is not allowed, as `h.example%3A8443`).
+  - What is sent: the default transport sends a URL up to its first `#` in both twins (urllib alone kept everything
+    before the last one, so `/x#a#b` asked for `/x#a`); a transport you pass receives the URL as given. ASCII
+    whitespace at the ends, which urllib and `new URL` both trim, is trimmed, so a URL ending in a line break is still
+    sent, as in 0.55.0 (on Python 3.9 a URL with a leading space too, which 0.55.0 refused there). On Python a URL
+    whose part before its first `#` ends in a Unicode space (a no-break or ideographic space) is now refused; 0.55.0
+    sent it trimmed when the space ended the URL and failed every call when a fragment followed it. Node keeps it
+    percent-encoded.
+  - The OpenRouter clients trim a base URL's ends first: ASCII whitespace and trailing slashes in both, and on Node
+    every C0 control there and a tab or line break anywhere, as `new URL` reads them. So `.../v1\n`, `.../v1/ ` and,
+    on Node, `.../v1\n/` are sent to `.../v1/chat/completions`. Both then refuse, when they are built, a base URL
+    holding a query or a fragment (kind `config`, read before `check_url`; `/chat/completions` would land in it, so a path-routed endpoint
+    such as OpenRouter failed every call in 0.55.0). Python also refuses, through `check_url` (kind `refused`), a
+    base with a space, a control or a non-ASCII character in its path, which 0.55.0 accepted and then failed every
+    call with; Node sends such a path percent-encoded, as 0.55.0 did (FAA-187 (18)). Attribution answers `not-openrouter` for a port of other
+    digits (`:٤٤٣`), as `new URL` reads it.
+  - A JWKS source: the Python kit reads its host and port as urllib dials them, https included. It refuses a space
+    or ASCII control character before the URL's first `#` (it reads the URL up to there, as Node does), a character
+    outside ASCII in its path or query, a host holding `%`, a backslash, a Unicode space or a control character, a
+    bracketed host that is no IPv6 address, a port that is not ASCII digits or is above 65535, no host, and any `@`
+    (an empty userinfo dialled `@127.0.0.1`). A trailing ASCII space or line break is trimmed, as urllib reads it; a trailing Unicode space
+    before the first `#` is refused for the same reason as in `check_url`, though urllib would trim it and read the
+    keys when it ends the URL; a leading space is refused as not a URL, as in 0.55.0 and in Node. Neither `[::1%...]` nor
+    `http://[::1]%2Eevil.example/` (which Python 3.9's `urlsplit` reads as `::1`) nor a mapped `[::ffff:127.0.0.1]`
+    (loopback to Python 3.13+) counts as loopback. The Node kit accepts several of these as `new URL` reads them,
+    among them a `%` host decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped and an
+    extra slash before the host skipped (`https:///j` reads host `j`).
+- **A too-deep protocol value** is refused by name (FAA-122), in both twins.
+- **A job's approval step and its answer read the mandate under the same name** (FAA-179): the job's stored
+  capability, also when a handler created the job under another name; `on_fault` hears both under it, not the answer
+  under `fabric.job.get`.
+- **Nudges** (FAA-143): `lost=` counts every reminder that did not make it back to the file (this turn's capped lines,
+  and the pending ones when the write-back fails too); an answer's nudges are read up to 1,000 items, in linear time.
+
+### Added
+
+- `FABRIC_SESSION_NO_REPOSITORIES=1`, or a `no-repositories` file in the hooks' folder (which a cache cleaner may
+  remove), turns the transcript read off (FAA-160); `fabric_session.py status` says
+  whether it is on (only while a running Fabric advertises `session-hooks/1`, `fabric` is registered for the folder and
+  Fabric takes the repositories), off, waiting for Fabric, or not done because `fabric` is not registered. The repositories of a turn can miss one (FAA-174): a turn longer
+  than the transcript's last 512 KB names only what that tail shows; until FAA-184 they can also name a wrong one,
+  since a relative `git -C` in a later Bash call is read against the session's folder.
+- The reference service's dashboard shows a moved slot with a Take back button (`POST /api/board/take-back`, operator
+  only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action an agent whose client sets `_meta`
+  calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125).
+  The tool is a manifest capability too (effect `change-policy`, idempotency `required`), as every tool the well-known
+  lists must be: `register --board-project <uuid>` writes it into the manifest, so `check_service.py` passes the sample
+  with its board on. The manifest stays register's to write: a serve whose board mode differs from it at its start
+  logs `service.manifest.mismatch` (warning), and the probe fails until it is registered again. Its `/mcp` reads a loopback call the service token authenticated as T0. The
+  page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
+  before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
+  repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool, and each take-back is
+  a `board.slot.returned` event (the capability as its subject) whose sentence says the route in words and whose `data`
+  holds `by`, `via` and the `caller` (none when the feed refuses the caller), never the decision's words. The service installs its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
+  page's CSP allows the button's own `fetch` (`connect-src 'self'`), and a failed request says so on the button.
+- working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
+  by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
+
+### Changed
+
+- working-with-fabric names Fabric v0.3.5 as the release that brought `fabric-mcp` and the `fabric_work_*` tools, not
+  0.4.0 (the plan milestone), and goes by whether the tools are listed (FAA-170).
+- The `board.slot.moved` notice says the accepted work stays `accepted` (not "held", the operator's word) and that
+  after its take-back action a restart or reconnect while accepted work waits takes the slot back at once; a restart
+  alone does not (FAA-164, FAA-171);
+  project-board.md says the same to a requester. board.md says a take-back without the operator's relayed decision is
+  refused. session-hooks.md gives the Bash cap as 64 K characters and the downgrade window as until a worker next
+  reaches the running Fabric.
+
+### Upgrading
+
+- On Windows the Stop hook now reads the transcript's tail and the touched repositories' `origin` (FAA-175), once
+  Fabric takes `repositories`, as it does on macOS and Linux; `FABRIC_SESSION_NO_REPOSITORIES=1` (in Claude Code's
+  settings `env`, which reached hooks declared in settings and in a plugin's `hooks.json` in runs on macOS; Windows is
+  FAA-183's run) turns it off.
+- A Python `JwksCache` source is now refused when the cache is built, so a service that builds it at start stops
+  there, if it is any source the JWKS source item under Fixed lists. Among them, 0.55.0 read: a host holding `%` (an
+  IPv6 zone included, as in `http://[::1%25lo0]/`), which urllib decoded and dialled; a port that is not ASCII digits
+  (`:1_8080`); a bracketed IPv4 host (`[127.0.0.1]`, which Python 3.9 dialled as `127.0.0.1`); a mapped
+  `[::ffff:127.0.0.1]` loopback (on Python 3.13+); a Unicode space ending the URL. Write the host and port plainly
+  (`127.0.0.1:18080`) and trim the space. The other sources it lists 0.55.0 accepted and then answered every
+  delegated call `issuer-unavailable`.
+- On Python, `check_url` and `request` now refuse before sending (kind `refused`) a URL that 0.55.0 sent: a host
+  holding `%` (`h.example%3A8443` reached port 8443), a port that is not ASCII digits (`:1_2` reached port 12 on
+  3.9), a bracketed IPv4 host (`[127.0.0.1]`, dialled on 3.9), and a URL whose part before its first `#` ends in a Unicode space (sent trimmed). A URL with a space, a
+  control or a non-ASCII character in its path or query, which 0.55.0 retried and answered kind `connection`, is
+  refused the same way. Both OpenRouter clients refuse, when they are built, a base URL holding a query or a
+  fragment, and the Python client one with a space, a control or a non-ASCII character in its path, so a service
+  that builds its client at start stops there. Write the host and port plainly, trim the space, drop the query or fragment where the URL is
+  configured, and percent-encode a space, a control or a non-ASCII character in each path segment or query
+  value (`urllib.parse.quote(value, safe="")`, `urllib.parse.urlencode` for a query), never the whole URL.
+- A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
+  (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
+  happens only then. A service that stops without the join still works; its
+  slot lapses on the board's clock as before.
+- A service that calls `Checkpoint.leave` itself now passes the generations it confirmed (`held`, required in both
+  twins); the responder's own leave does this.
+- A service's own `emit` that matched the board responder's level `warn` now sees `warning`, with a `subject` when its
+  signature names one. A service with `emit=log.append` now logs the board's notices, and those with `notify` (access
+  needed, a contested or moved slot, a held request, a reconcile needed) reach the host's banners, without a link to
+  the page that resolves them (FAA-187 (21)). A Fabric outage's `board.down` (no notify) is now a row in the feed too,
+  said again after each recovery (FAA-187 (22)).
+- A reference service served with `--board-project` registers again with the same `--board-project`
+  (`sample_service.py register ... --board-project <uuid>`): a registration from 0.55.0 lacks `board.take-back`, so
+  `check_service.py` fails `interop.well-known-capabilities` and the log says `service.manifest.mismatch`. Register
+  before you serve: the service checks its manifest only when it starts, so a warning logged before the registration
+  stays in the log until the next start.
+- A service that calls `action_gate` (`actionGate`) itself passes a finite `spend_usd` and a string `project`, or
+  expects the operator's decision under a mandate with a `perCallMaxUsd` ceiling or a `projects` limit; an `on_fault`
+  that matched a job's answer under `fabric.job.get` now matches the job's capability; a descriptor's or provider
+  entry's `source.repository` names the repository without a password in its user information (`https:bot:pw@host`
+  is refused).
+
 ## 0.55.0 (2026-10-27)
 
 ### Added

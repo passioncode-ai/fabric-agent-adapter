@@ -42,7 +42,9 @@ operator gives in Fabric (Agents & access): callee `fabric`, capability `board.r
 
 The responder runs inside the service process, started after the instance lock like every other piece of state
 (SKILL.md, Step 3). [`sample_service.py`](../scripts/sample_service.py) does it behind `serve --board-project <uuid>`,
-off by default:
+off by default (register it with the same `--board-project`, so its manifest lists the take-back tool below; a serve
+whose board mode differs from the registered manifest at its start logs `service.manifest.mismatch` and leaves the
+manifest as it is):
 
 ```python
 import fabric_board as fbd, fabric_hub as fhb
@@ -53,12 +55,13 @@ responder = fbd.Responder(
     handler=render, admit=gate, observe=look_on_disk, emit=log.append, service="example-agent")
 board = threading.Thread(target=responder.run, args=(stop_event, 5.0), daemon=True)  # SIGTERM: set stop_event
 board.start()
-# ... at stop, after stop_event is set: wait for it to leave its board session (a clean leave forgets its slot
-# records, FAA-155), bounded inside the kit's hard exit, as scripts/sample_service.py does
+# ... at stop, after stop_event is set: wait for it to leave its board session (a clean leave forgets the slot
+# records it confirmed, FAA-155), bounded inside the kit's hard exit, as scripts/sample_service.py does
 board.join(timeout)
 ```
 
-Node: `new Responder({...same names in camelCase})`, then `responder.run({ signal, drain })`. A service that lists
+Node: `new Responder({...same names in camelCase})`, then `const running = responder.run({ signal, drain })`; at stop,
+abort the signal and `await running`, bounded inside the hard exit (the run leaves its board session before it settles). A service that lists
 `fabric-project-comms/0.1` in its well-known `protocols` (DEC-0067: only once its hosts are pinned at or after it)
 declares that it answers board requests; the probe checks that declaration.
 
@@ -144,6 +147,28 @@ answers `not_available` or `capacity_exceeded`, which do not say whether the rep
 in line and the next tick asks again, and a restart asks with the same old fence. A request leaves the resume queue only
 once it has resumed: when the `com.complete` that sends a known outcome loses its answer, the next tick sends the same
 key again in the same session (FAA-86). `shutdown()` drains, then leaves the session (its DELETE releases the slot).
+An idle responder waits 3 s at most for that DELETE (`IDLE_LEAVE_SECONDS`), so an idle stop ends within the org's 5 s
+(LC-01, FAA-173); one with work waits up to the session's 15 s client timeout. A board call already in flight when the
+stop comes (a poll against a slow hub) runs first; when the service's bounded join ends before the DELETE is sent, the
+slot lapses on the board's clock as before. The slot records are forgotten only after
+a DELETE Fabric answered with a 2xx (a 404, the session already gone, keeps them: a move made before it ended is read at the next `com.status`), also when a session is dropped on a live board (FAA-163): an unanswered one keeps
+them, and the slot lapses in 60 s.
+
+**One capability at a time (FAA-163).** At connect (and every reconnect) the responder starts with no slot. Each
+capability's enroll or replace is settled on its own: a refusal of that capability (`capacity_exceeded`,
+`invalid_arguments`, any code that is not about the board session) leaves it `retry`, asked again alone after 15 s,
+30 s, doubling to 15 minutes, with one `board.slot.refused` event (warning; said again if it is refused again after
+the slot was held); its accepted work waits `lapsed` and goes back
+by a transfer once the slot is held. The capabilities after it are recovered as before. A refusal of the board session
+(`unreachable`, `session-ended`, `not_available`, `not_authorized` and the other codes in `SESSION_CODES`) leaves the
+rest `retry` too, says no `board.slot.refused`, and goes to the responder's fault, which says it by code:
+`board.access.needed` for `not_authorized`, `authority_changed` and `credential` (the session is left),
+`board.blocked` for a defect (`no-epoch`, `schema-unsupported`, `checkpoint`, `receipt-shape`,
+`idempotency_conflict`), and `board.down` for the rest: `unreachable` keeps the session while a held slot's lease runs
+(so a lost enroll of one capability is asked again at its next retry), `not_available` keeps it except at connect or recovery with no slot held,
+and `session-ended`, `not-running` and the other hub codes drop it (as a fault during connect or recovery does) and
+reconnect. A slot whose lease lapsed (`lease_expired`) holds
+no lease for that decision.
 
 ## When the operator holds work (DEC-0079)
 
@@ -178,9 +203,16 @@ held and not transferred). The responder keeps that move instead of undoing it:
   {project, generation, moved?, asking?}}`). The record is written when a receipt's generation changes and before an
   enroll or a replace that can change it; a live holder's renew (about every 20 s) cannot, and writes nothing. At a
   clean leave (the service stopped; the session's DELETE released its slots) the record of a slot with no request left
-  in the checkpoint and not moved is forgotten (a moved slot's record stays, so a clean stop never undoes a move): the slot is free, and whoever takes it next is no move. A file without the record
-  reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, rolled back to 0.52 and up again starts as on a first
-  start. After a crash the record stays: if 0.52 then ran, enrolled the slot and
+  in the checkpoint and not moved is forgotten when this session confirmed its generation (held it, paused under the
+  operator's hold included, or read it unmoved in `com.status`) and no fenced call has put in doubt since: the slot is
+  free, and whoever takes it next is no move. An unconfirmed record stays, since the slot may have moved while the
+  service was down, and a move this session saw keeps its record, so a clean stop never undoes it. A paused or
+  retrying slot reads `com.status` before each new ask. A move made after the slot's last renew or check and before
+  the stop, with no call since, is not seen at the leave: its record is forgotten, and the next start reads the slot
+  as free and may enroll it once the other holder lets it go (FAA-187). A file without the record
+  reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, its DELETE answered 2xx and every slot confirmed
+  in that session, rolled back to 0.52 and up again starts as on a first start. Otherwise (a 404, the idle wait running
+  out, a slot this session never confirmed, one left retrying before `com.status` answered for it included) its records stay, and the case is the crash case below. After a crash the record stays: if 0.52 then ran, enrolled the slot and
   wrote nothing to the checkpoint, the next 0.53 start reads that enroll as a move; bring it back with the service's take-back action (below).
 - An enroll or a replace is written into that record with its key before it is sent (`asking`). When its answer is
   lost, the next connect (or the next enroll) sends the same call again under the same key; the board answers the
@@ -205,8 +237,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   holder, or the estate owner, reconciles it now). No `com.claim`, `com.renew`, `com.complete`, `com.enroll` or
   `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
   holder's lease lapses, nor when com.status later names no generation for the slot (a recorded move stays until
-  take-back). Accepted requests stay held on the board, unanswered, until the slot is taken back (CT-175
-  will hand them to the new holder). One `board.slot.moved` event (warn, notify) says so, once, also across restarts
+  take-back). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back (CT-175
+  will hand them to the new holder). One `board.slot.moved` event (warning, notify) says so, once, also across restarts
   (the record keeps `moved`).
 - A responder that never held the slot (a first start: no record, or a record of another Project), or whose record
   equals the current generation, behaves as before: it enrolls, recovers and replaces its own lapsed work. A recorded or
@@ -216,18 +248,28 @@ held and not transferred). The responder keeps that move instead of undoing it:
   records its own generation. Only a replay the board refuses, or one that ran for the first time (`repeated: false`)
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
-- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record; never edit the
+- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
+  being read at the same time: the move is written under the responder's lock (Node: on the fence queue, after any fenced
+  call in flight) and only while the record is unchanged (FAA-158). Never edit the
   checkpoint's `slots` record by hand to undo a move. In the same board
   session the next tick enrolls once the other session lets the slot go (a live holder is waited for) and takes the work
-  left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work held for the slot, takes it
+  left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work waiting for the slot, takes it
   back at once by `com.responder_replace`, as a restart did before 0.53.0: the operator asked for the slot back, so the
   other session is replaced. In recovery, a refusal that leaves no slot held reconnects; one that leaves some held keeps
-  the session and serves them. The kit gives it no route of its own (the reference service has none yet,
-  FAA-157): a service built on the kit declares it as an operator action, a button with its tool ([Every button has a
-  tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so no other
-  agent can call it on its own; on a server that reads mandates (`agent_id`) it also names its effect class, for example
-  `change-policy` (DEC-0125); until Fabric's hub forwards decisions (CT-125) the operator reaches it through the
-  service's page or its elicitation, and names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
+  the session and serves them. The kit gives it no route of its own. The reference service (`sample_service.py`) offers
+  it on its dashboard (FAA-157): a moved slot shows a Take back button that posts `POST /api/board/take-back` from the
+  operator's signed-in session with the `X-Fabric-Request` header; the service token alone is refused. Since 0.56.0 the
+  button has its tool, `board.take-back` with `{capability}`, declared under `extensions/actions/0.1` with gate
+  `relayed` and target `capability`, and a capability of the manifest like every tool the well-known lists
+  (`interop.well-known-capabilities`): an agent whose MCP client sets `_meta` calls it over `/mcp` with the operator's
+  decision in `_meta.decision` (a call without one is `operator-decision-required`); Claude Code and Codex send
+  arguments only, so until CT-125 they hand the operator the page as Fabric Dashboards' `open_link`. Either door records
+  the take-back as a `board.slot.returned` event (info, the capability as its subject) whose sentence says the route in
+  words and whose `data` holds `by`, `via` and the `caller` (none when the feed refuses the caller), never the decision's words; a repeat after a lost answer is answered `{capability, moved: false}`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
+  tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
+  without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
+  `change-policy` (DEC-0125); the operator reaches it through an agent that relays their decision in `_meta`, the
+  service's page or its elicitation (Claude Code and Codex, which cannot set `_meta`, wait for CT-125's forwarding), and the service names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
   detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
   surface.
 
@@ -251,11 +293,19 @@ raises `directory-invalid` rather than answering; an unlisted Project may still 
 
 ## Events, the probe and the live smoke
 
-Events go to `emit(kind, level, text, notify=…, data=…)` (`JsonlEventLog.append` fits) with `data {schema, value}`
+Events go to `emit(kind, level, text, notify=…, subject=…, data=…)` (`JsonlEventLog.append` fits: every level is one
+of its `info`, `notice`, `warning`, `error`; `subject` is `{type, id}`, the notice's request, else its capability, else
+its episode (such as a block's cause), else the Project; in Python it goes only to an `emit` whose signature names a `subject`
+parameter with no value bound, as `JsonlEventLog.append` does, and any other `emit`, one with only `**kwargs`, one with
+a subject bound by `functools.partial` (which then stands) or one whose signature cannot be read, is called once, without
+one, as before 0.56.0; the Node responder always passes it in its options, which an `emit` that does not read it ignores) with
+`data {schema, value}`
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
-`board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.access.needed`, `board.blocked`,
-`board.down`, each notifying episode said once.
+`board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,
+`board.down`, each notifying episode said once, and `board.outcome.invalid` (warning) when a handler's outcome fails
+its checks and is not sent. The operator's hold (below) adds `board.held`, `board.slot.held`,
+`board.slot.released` and `board.request.waiting`. The reference service adds `board.slot.returned` at a take-back.
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
 `NOT_RUN` when the well-known `protocols` names no `fabric-project-comms` revision; `FAIL` for a revision this kit does

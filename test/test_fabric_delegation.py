@@ -290,10 +290,36 @@ class JwksCacheTests(unittest.TestCase):
                                               now=1, capability="writer.write", effect="draft", issuer="urn:fabric:estate:example")["code"], "issuer-unavailable")
 
     def test_sources(self):
-        for bad in ("http://hub.example/jwks.json", "ftp://x/jwks.json", "https://user:pw@hub.example/j", ""):
+        # A zone is no loopback: urllib decodes `%3A80` into another address (0.56.0 seam r13).
+        for bad in ("http://hub.example/jwks.json", "ftp://x/jwks.json", "https://user:pw@hub.example/j", "",
+                    "http://[::1%3A80]/jwks.json", "http://[::1%25lo0]/jwks.json",
+                    # 0.56.0 unit r13: 3.9's urlsplit reads the host of the first as ::1 and urllib dials the DNS
+                    # name; seam r14: 3.13+ counts a mapped ::ffff:127.0.0.1 as loopback, 3.9 and Node do not.
+                    "http://[::1]%2Eevil.example/jwks.json", "http://[::1]x/jwks.json", "http://[::ffff:127.0.0.1]/j",
+                    # 0.56.0 unit r14: a port above 65535, no host, a bracketed host that is no IPv6 address (3.9
+                    # dialled 192.168.0.165 for one), and an empty userinfo (urllib dials `@127.0.0.1`).
+                    "https://hub.example:99999/j", "http://127.0.0.1:65536/j", "https://:443/j", "https://",
+                    "https://[1.2.3.4]/j", "http://[127.0.0.1]:7777/j", "http://@127.0.0.1:7777/j",
+                    "http://:@127.0.0.1:7777/j",
+                    # 0.56.0 product r16, unit r15: a tab or line break, which urlsplit drops and urllib sends.
+                    "http://127.0.0.1\r/j", "http://loc\talhost:7777/j", "https://hub.exa\nmple/j",
+                    "https://hub.example/a b", "https://hub.example/a\x00b", "https://hub.example/caf\u00e9",
+                    "https://hub.example\u3000/j",
+                    # 0.56.0 product r20: a C1 control in the host, which Node refuses.
+                    "https://hub\x80.example/j", "https://hub\x9f.example/j"):
             with self.subTest(bad), self.assertRaises(ValueError):
                 dl.JwksCache(bad)
+        with self.assertRaisesRegex(ValueError, "key set"):  # 3.14's urlsplit refuses it first, said as the key set's
+            dl.JwksCache("https://[1.2.3.4]/j")
+        with self.assertRaisesRegex(ValueError, "control character"):  # not blamed on a host that is fine
+            dl.JwksCache("https://hub.example/a\tb")
         dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json")
+        dl.JwksCache("http://127.0.0.1:7777/.well-known/jwks.json\n")  # urllib trims the ends: 0.55.0 read it (r17)
+        dl.JwksCache("https://\u4f8b.example/j")  # an IDN host is sent in IDNA
+        with self.assertRaisesRegex(ValueError, "https URL"):  # a leading space fails the scheme test, as in 0.55.0
+            dl.JwksCache(" https://hub.example/j")
+        # The two kits trim the same ends (fabric_delegation may not import fabric_http).
+        self.assertEqual(dl._URL_ENDS, load("fabric_http")._URL_ENDS)
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "jwks.json"
             path.write_text(json.dumps(VECTORS["jwks"]))
@@ -599,6 +625,28 @@ class ReviewRegressionTests(unittest.TestCase):
             self.assertIsNone(dl.JwksCache("http://127.0.0.1:%d/jwks" % server.server_address[1]).get("estate-new"))
         finally:
             server.shutdown()
+
+    def test_a_source_ending_in_a_line_break_is_read_as_in_0_55_0(self):
+        import http.server
+        class Keys(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                body = json.dumps(VECTORS["jwks"]).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *args):
+                pass
+        server = http.server.HTTPServer(("127.0.0.1", 0), Keys)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:  # 0.56.0 product r17, unit r17: urllib trims the ends of what it reads
+            for tail in ("#a b#c", "#\n#c", "#caf\u00e9#c"):  # seam r19: read up to the first `#`, as Node reads it
+                self.assertEqual(dl.JwksCache("http://127.0.0.1:%d/jwks%s" % (server.server_address[1], tail)).get(),
+                                 VECTORS["jwks"], tail)
+            self.assertEqual(dl.JwksCache("http://127.0.0.1:%d/jwks\n" % server.server_address[1]).get(), VECTORS["jwks"])
+        finally:
+            server.shutdown()
+            server.server_close()
 
     def test_a_failed_read_is_not_retried_on_every_call(self):
         now, calls = [1000.0], []
