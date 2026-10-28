@@ -86,6 +86,36 @@ function checkAttribution(projectId, taskRunId) {
   }
 }
 
+const CHAT_PATH = '/chat/completions';
+// A control, a space or a format character (Unicode Cc, Z, Cf), the combining grapheme joiner, the Hangul fillers
+// and the variation selectors: nothing an endpoint's path ends in.
+const BAD_PATH_END = /[\p{Cc}\p{Z}\p{Cf}\u034f\u115f\u1160\u3164\uffa0\ufe00-\ufe0f]/u;
+
+// Whether the base's path, as `new URL` sends `${base}/chat/completions`, ends in a space, a control (C0, DEL or C1)
+// or an invisible character (BAD_PATH_END): `new URL` percent-encodes it into the path and every call would fail. Read from the
+// URL as sent, so a backslash, a missing `//` or a dot segment cannot hide it (0.56.0 seam r20 to r23, unit r21,
+// r22, product r24); the Python twin refuses any such character in the path in check_url.
+function sentPathEndsBadly(base) {
+  let path;
+  try {
+    path = new URL(`${base}${CHAT_PATH}`).pathname;
+  } catch {
+    return true;
+  }
+  if (!path.endsWith(CHAT_PATH)) return false;
+  path = path.slice(0, -CHAT_PATH.length);
+  const encoded = /(?:%[0-9A-Fa-f]{2})+$/.exec(path)?.[0];
+  let last = path.slice(-1);
+  if (encoded) {
+    try {
+      last = [...decodeURIComponent(encoded)].pop();
+    } catch {
+      return true; // not UTF-8: no endpoint is named so
+    }
+  }
+  return last !== '' && BAD_PATH_END.test(last);
+}
+
 export class Client {
   constructor({ ceilingUsd, ledger, prices, keyEnv = 'OPENROUTER_API_KEY', window = 'day', baseUrl = BASE_URL,
     attribution = null, projectId, unmeasuredCallUsd = null, deadlineS = 120, retries = 1, env = process.env,
@@ -110,12 +140,8 @@ export class Client {
     // The base URL as checkUrl read it: `new URL` removes tabs and line breaks anywhere and trims C0 controls and
     // spaces from its ends, so `.../v1/ ` and `.../v1\n/` are composed as `.../v1/chat/completions`, as `new URL`
     // composed them in 0.55.0 (0.56.0 product r20, unit r22, seam r22; the Python twin refuses what urllib cannot send).
-    this.baseUrl = baseUrl.replace(/[\t\n\r]/g, '').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
-    // A space, a control or an invisible character ending the base's path as it is composed stays in that path, where
-    // `new URL` percent-encodes it, and every call would fail; the Python twin refuses it in check_url (0.56.0 seam
-    // r20 to r22, unit r21, r22). The host is checkUrl's, which reads it as `new URL` does.
-    const path = /^[a-z][a-z0-9+.-]*:\/\/[^/]*(\/.*)?$/isu.exec(this.baseUrl)?.[1] ?? '';
-    if (/[\x00-\x20\u0085\u00a0\u1680\u180e\u2000-\u200d\u2028\u2029\u202f\u205f\u2060\u3000\ufeff]$/u.test(path)) {
+    this.baseUrl = baseUrl.replace(/[\t\n\r]/g, '').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[/\\]+$/, '');
+    if (sentPathEndsBadly(this.baseUrl)) {
       throw new OpenRouterError("the base URL's path ends in a space, a control or an invisible character", { kind: 'config' });
     }
     this.env = env;
