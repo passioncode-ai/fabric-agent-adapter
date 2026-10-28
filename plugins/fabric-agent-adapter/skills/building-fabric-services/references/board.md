@@ -296,7 +296,8 @@ raises `directory-invalid` rather than answering; an unlisted Project may still 
 Events go to `emit(kind, level, text, notify=…, subject=…, data=…)` (`JsonlEventLog.append` fits: every level is one
 of its `info`, `notice`, `warning`, `error`; `subject` is `{type, id}`, the notice's request, else its capability, else
 its episode (such as a block's cause), else the Project, and an `emit` whose signature takes no `subject` (by name or
-`**kwargs`) gets the notice once, without one) with `data {schema, value}`
+`**kwargs`), or that passes `**kwargs` on to a sink refusing `subject`, gets the notice once, without one; a
+`subject` bound into the emit, as with `functools.partial(log.append, subject=...)`, is replaced by the notice's) with `data {schema, value}`
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,

@@ -1963,6 +1963,17 @@ class SampleWiringTests(unittest.TestCase):
             session.Responder._emit(SimpleNamespace(_said={}, _emit_to=wrapped, project=PROJECT), "board.blocked", "error", "x",
                                     episode="no-epoch")
             self.assertEqual(said, ["board.blocked"])
+            # seam r32: an emit that forwards **kwargs to a sink without subject (0.55.0's shape) still gets the notice,
+            # once, without a subject; a TypeError of the emit's own is still not said twice (above)
+            narrow_said = []
+
+            def narrow(kind, level, text, notify=False, data=None):
+                narrow_said.append(kind)
+
+            def forwarder(kind, level, text, **kw):
+                return narrow(kind, level, text, **kw)
+            session.Responder._emit(SimpleNamespace(_said={}, _emit_to=forwarder, project=PROJECT), "board.down", "warning", "x")
+            self.assertEqual(narrow_said, ["board.down"])
             # two blocking causes are two subjects, so a host shows the second within the first's cooldown
             subjects = [session._notice_subject({}, PROJECT, code) for code in ("no-epoch", "checkpoint")]
             self.assertEqual(subjects, [{"type": "episode", "id": "no-epoch"}, {"type": "episode", "id": "checkpoint"}])

@@ -15,7 +15,7 @@ gate behave.
   both twins, as is the new `board.slot.refused` (FAA-163). Each notice names its `subject` (`{type, id}`: its request,
   else its capability, else its episode, such as a block's cause, else the Project), so a host tells one request's,
   capability's or cause's episode from another's; a service's own `emit` whose signature takes no `subject` (by name or
-  `**kwargs`) still gets the notice, once, without one.
+  `**kwargs`), or one that passes `**kwargs` on to a sink without it, still gets the notice, once, without one.
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
   text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
@@ -143,9 +143,9 @@ gate behave.
 
 - working-with-fabric names Fabric v0.3.5 as the release that brought `fabric-mcp` and the `fabric_work_*` tools, not
   0.4.0 (the plan milestone), and goes by whether the tools are listed (FAA-170).
-- The `board.slot.moved` notice says the accepted work stays `accepted` and unanswered (not "held", the operator's
-  word) and that after its take-back action a restart or reconnect with accepted work for the slot takes it back at
-  once; a restart alone never does (FAA-164, FAA-171);
+- The `board.slot.moved` notice says the accepted work stays `accepted` (not "held", the operator's word) and that
+  after its take-back action a restart or reconnect while accepted work waits takes the slot back at once; a restart
+  alone does not (FAA-164, FAA-171);
   project-board.md says the same to a requester. board.md says a take-back without the operator's relayed decision is
   refused. session-hooks.md gives the Bash cap as 64 K characters and the downgrade window as until a worker next
   reaches the running Fabric.
@@ -190,7 +190,8 @@ gate behave.
 - A service that calls `action_gate` (`actionGate`) itself passes a finite `spend_usd` and a string `project`, or
   expects the operator's decision under a mandate with a `perCallMaxUsd` ceiling or a `projects` limit; an `on_fault`
   that matched a job's answer under `fabric.job.get` now matches the job's capability; a descriptor's or provider
-  entry's `source.repository` names the repository without user information (`https:bot:pw@host` is refused).
+  entry's `source.repository` names the repository without a password in its user information (`https:bot:pw@host`
+  is refused).
 
 ## 0.55.0 (2026-10-27)
 

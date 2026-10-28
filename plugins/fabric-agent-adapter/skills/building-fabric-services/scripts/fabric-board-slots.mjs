@@ -128,7 +128,7 @@ export class SlotKeeper {
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
     delete this.confirmed[capability];
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it there and left its accepted work \`accepted\` (work already begun is the new holder's to settle). Its take-back action brings the slot back once the other session lets it go, or at a restart or reconnect while it holds accepted work; without one, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it there and left its accepted work \`accepted\` (work begun is the new holder's to settle). Its take-back action brings the slot back once the other session lets it go, or at a later restart or reconnect while accepted work waits; a restart alone does not. Without it, ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written
     }
     return true;
