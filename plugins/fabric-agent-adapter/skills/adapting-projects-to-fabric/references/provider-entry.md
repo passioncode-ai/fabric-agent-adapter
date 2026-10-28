@@ -62,10 +62,10 @@ It refuses, with one sentence that never quotes a value:
 - a manifest whose name follows a backslash (`C:\Agents\example\fabric-agent.json`). The reader,
   `validate_provider_entry`, accepts it since DEC-0145 (`MANIFEST_PATTERN`, the schema's), but a reader that has not
   re-pinned to DEC-0145 refuses the entry, Fabric's registry among them (CT-192), so the writer does not emit it until
-  Fabric re-pins. Write the path with `/` before the name. A manifest under the home folder
+  the oldest Fabric release in use reads it (the release after v0.3.15, CO-479). Write the path with `/` before the name. A manifest under the home folder
   (`~/Agents/example/fabric-agent.json`) is read by every Fabric release; one with a drive letter
   (`C:/Agents/example/fabric-agent.json`) only by Fabric after v0.3.15, whose registry took the repin (CO-479): v0.3.15
-  and earlier read only a manifest under `~/` or `/`.
+  and earlier read only a manifest under `~/` or `/`, so not `~\` either.
 
 `validate` also checks that the file is named `<id>.json` (FAC-SEM-014, slug half): the stem is what follows the last
 `/` or `\`, on every platform (CT-193).

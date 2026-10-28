@@ -564,7 +564,8 @@
       "expected": [
         "a job's input request is an action (id its key, tool fabric.job.get, gate relayed) whose decision rides in the _meta of the fabric.job.get call that carries inputResponses, one call per key",
         "the kit gates them only with McpToolServer(input_actions=True), off by default in 0.50.0 because Fabric's hub forwards no decision before CT-125 (decision D8); turning it on is a later change",
-        "nothing is applied when the gate refuses an answer"
+        "nothing is applied when the gate refuses an answer",
+        "an action whose humanStep is comparison is declared only to readers at or after DEC-0142: a 0.56.0 or older kit and Fabric Dashboards before 0.8.9 refuse the whole declaration"
       ]
     },
     {

@@ -64,7 +64,8 @@
         "puts env values as secret-ref:<name> references, never the key itself",
         "refuses an id that is already a service (FAC-SEM-013) and says so",
         "points manifest at the agent's fabric-agent.json and removes the entry on uninstall",
-        "writes providerId equal to the manifest's provider.id, and refuses the entry when the manifest does not resolve or names another provider (FAC-SEM-014)"
+        "writes providerId equal to the manifest's provider.id, and refuses the entry when the manifest does not resolve or names another provider (FAC-SEM-014)",
+        "on Windows writes the manifest path with / before the name and under ~/ while Fabric v0.3.15 is in use, never C:\\ or ~\\"
       ]
     },
     {

@@ -7,10 +7,12 @@ The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA
 ### Added
 
 - **`comparison` as a human step** (DEC-0142, contract CT-186). `humanStep` in an action declaration may be
-  `comparison`: the person compares two codes shown on two screens. Both kits' action-declaration checks take it
-  (`fabric_actions.py`, `fabric-actions.mjs`, `actions-vectors.json` regenerated: 68 cases, 12 declarations), the probe
-  passes a declaration that uses it, and interop.md, delegation.md and working-with-fabric's human gates (OA-5), which its refusal table cites, name it.
-  A reader pinned before (a 0.56.0 kit, Fabric Dashboards before 0.8.9) refuses such a declaration, which Project Observatory declares on its share buttons from OBS-264.
+  `comparison`: the person compares two codes shown on two screens, or chooses to share without a comparison. Both
+  kits' action-declaration checks take it (`fabric_actions.py`, `fabric-actions.mjs`, `actions-vectors.json`
+  regenerated: 68 cases, 12 declarations), the probe passes a declaration that uses it, and interop.md, delegation.md
+  and working-with-fabric's human gates (OA-5), which its refusal table cites, name it. A reader pinned before (a 0.56.0
+  kit, Fabric Dashboards before 0.8.9) refuses such a declaration, which Project Observatory declares on its share
+  buttons from OBS-264.
 - **The protocol register** gains the six peer-share revisions (DEC-0142, `fabric-peer-share/1` and its parts) and
   `org-adaptation/1` and `org-adaptation-receipt/1` (DEC-0138) in both twins (`feed-protocols-vectors.json`), so a
   service's well-known that names one is read as a known revision.
@@ -22,7 +24,8 @@ The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA
 
 ### Changed
 
-- On Windows, `services_dir()` and `providers_dir()` read `%LOCALAPPDATA%\passioncode-fabric` (provider.md).
+- On Windows, `fabric_provider.py`'s `services_dir()` (its FAC-SEM-013 check that an id is not a service's) and
+  `providers_dir()` read `%LOCALAPPDATA%\passioncode-fabric` (provider.md), as the service kit's readers already did.
 - agents-that-answer-people.md (A5) names the contract's `support-quality-daily.schema.json`, says when a producer may
   carry `calibration` (CT-188) and that a reader validates against its own pinned copy (DEC-0144).
 - The hosted contract job runs `test_provider`, and `test/validate.py` fails a workflow whose contract job leaves out a
@@ -33,7 +36,9 @@ The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA
 - A bundle pinned to `00e050ba` or an earlier supported commit keeps working; `adapt_project.py`
   accepts it (`SUPPORTED_CONTRACT_COMMITS`). A new scaffold writes `3830a33`.
 - DEC-0139 (the machines' report) and DEC-0138's organization server route reach no kit code: the adapter registers
-  their protocol revisions and implements neither side.
+  their protocol revisions and implements neither side. DEC-0143 (`secret.prompt`, the local channel) and DEC-0142's
+  peer-share profile beyond its register entries reach no kit code either; Project Observatory implements them
+  (CT-186).
 - On Windows, a provider entry written by `fabric_provider.py` now goes to the folder Fabric reads
   (`%LOCALAPPDATA%\passioncode-fabric\providers`). Fabric v0.3.15 and earlier read a manifest path only under `~/` or
   `/`; a drive letter (`C:/.../fabric-agent.json`) is read by the Fabric release after v0.3.15 (CO-479). Until then
