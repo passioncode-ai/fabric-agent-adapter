@@ -184,7 +184,13 @@ gate behave.
   them (FAA-187 (21)).
 - A reference service served with `--board-project` registers again with the same `--board-project`
   (`sample_service.py register ... --board-project <uuid>`): a registration from 0.55.0 lacks `board.take-back`, so
-  `check_service.py` fails `interop.well-known-capabilities` and the log says `service.manifest.mismatch`.
+  `check_service.py` fails `interop.well-known-capabilities` and the log says `service.manifest.mismatch`. Register
+  before you serve: the service checks its manifest only when it starts, so a warning logged before the registration
+  stays in the log until the next start.
+- A service that calls `action_gate` (`actionGate`) itself passes a finite `spend_usd` and a string `project`, or
+  expects the operator's decision under a mandate with a `perCallMaxUsd` ceiling or a `projects` limit; an `on_fault`
+  that matched a job's answer under `fabric.job.get` now matches the job's capability; a descriptor's or provider
+  entry's `source.repository` names the repository without user information (`https:bot:pw@host` is refused).
 
 ## 0.55.0 (2026-10-27)
 

@@ -1895,6 +1895,19 @@ class SampleWiringTests(unittest.TestCase):
             self.assertIn("board.request.refused", kinds)
             svc.board.shutdown(0.1)
 
+    def test_board_md_names_every_board_event_kind(self):
+        """0.56.0 product r32: board.md's list of the responder's events left out board.outcome.invalid, which this
+        release first delivers to the feed. Every board.* kind either twin emits is named in board.md."""
+        import re
+        scripts = Path(importlib.import_module("fabric_board").__file__).parent
+        board_md = (scripts.parent / "references" / "board.md").read_text(encoding="utf-8")
+        kinds = set()
+        for path in scripts.iterdir():
+            if path.name.startswith(("fabric_board", "fabric-board")) and path.suffix in (".py", ".mjs"):
+                kinds |= set(re.findall(r"[\"'](board\.[a-z_]+(?:\.[a-z_]+)*)[\"']", path.read_text(encoding="utf-8")))
+        self.assertIn("board.outcome.invalid", kinds)
+        self.assertEqual(sorted(k for k in kinds if "`%s`" % k not in board_md), [])
+
     def test_every_board_notice_level_is_one_the_event_log_takes(self):
         """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refuses, so a service with
         emit=log.append (the reference service) never logged them. Every level both twins pass is one LEVELS holds."""

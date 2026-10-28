@@ -300,7 +300,8 @@ its episode (such as a block's cause), else the Project, and an `emit` whose sig
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,
-`board.down`, each notifying episode said once. The operator's hold (below) adds `board.held`, `board.slot.held`,
+`board.down`, each notifying episode said once, and `board.outcome.invalid` (warning) when a handler's outcome fails
+its checks and is not sent. The operator's hold (below) adds `board.held`, `board.slot.held`,
 `board.slot.released` and `board.request.waiting`. The reference service adds `board.slot.returned` at a take-back.
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
