@@ -92,6 +92,14 @@ Handler = Callable[[BoardRequest, WorkContext], Dict[str, Any]]
 
 
 
+def _notice_subject(value: Dict[str, Any], project: str) -> Dict[str, str]:
+    """A notice's subject (`{type, id}`): its request, else its capability, else the Project."""
+    for kind in ("request", "capability"):
+        if isinstance(value.get(kind), str) and 0 < len(value[kind]) <= 128:
+            return {"type": kind, "id": value[kind]}
+    return {"type": "project", "id": project}
+
+
 class Responder(SlotKeeper):
     """One service's responder for one Project and one or more capabilities, one request at a time.
 
@@ -153,8 +161,17 @@ class Responder(SlotKeeper):
             data = None
         if self._emit_to is None:
             return
+        # The thing the notice is about, so a host tells one request's or one capability's episode from another's
+        # (events-and-notifications.md, "Say who wants what"; 0.56.0 seam r30).
+        subject = _notice_subject(value, self.project)
+        extra = {"data": data} if data else {}
         try:
-            self._emit_to(kind, level, text, notify=notify, **({"data": data} if data else {}))
+            self._emit_to(kind, level, text, notify=notify, subject=subject, **extra)
+        except TypeError:  # an emit written before 0.56.0 may take no subject: the notice still goes, without one
+            try:
+                self._emit_to(kind, level, text, notify=notify, **extra)
+            except Exception:  # noqa: BLE001
+                pass
         except Exception:  # noqa: BLE001 - an event that cannot be written never stops the responder
             pass
 

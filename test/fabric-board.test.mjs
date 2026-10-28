@@ -1496,3 +1496,20 @@ c = fb.Checkpoint(${JSON.stringify(file)}); print(json.dumps(c.slots, sort_keys=
   assert.deepEqual(Object.keys(back.entries), ['req_000000001']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('a board notice names its subject: its request, else its capability, else the Project (0.56.0 seam r30)', () => {
+  const rows = [];
+  const r = { said: {}, emitTo: (kind, level, text, extra) => rows.push([kind, level, extra]), project: 'p-1' };
+  for (const request of ['req-1', 'req-2']) {
+    fb.Responder.prototype.emit.call(r, 'board.reconcile.needed', 'warning', 'A request\'s outcome is unknown.',
+      { notify: true, episode: request, request, capability: 'sample.echo' });
+  }
+  fb.Responder.prototype.emit.call(r, 'board.slot.contested', 'warning', 'Another responder holds it.', { notify: true, episode: 'x', saidAs: 'c', capability: 'sample.echo' });
+  fb.Responder.prototype.emit.call(r, 'board.down', 'warning', 'Fabric\'s board cannot be reached.', { episode: 'down' });
+  assert.deepEqual(rows.map((x) => x[2].subject), [{ type: 'request', id: 'req-1' }, { type: 'request', id: 'req-2' },
+    { type: 'capability', id: 'sample.echo' }, { type: 'project', id: 'p-1' }]);
+  assert.deepEqual(rows.map((x) => x[1]), ['warning', 'warning', 'warning', 'warning']);
+  const slots = fs.readFileSync(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board-slots.mjs'), 'utf8');
+  const moved = slots.match(/`(The \$\{capability\} slot on this Project moved[^`]*(?:\\`[^`]*)*)`/)[1].replace(/\\`/g, '`');
+  assert.ok(moved.replace('${capability}', 'c'.repeat(128)).length <= 500, 'the moved notice keeps its last sentence');
+});

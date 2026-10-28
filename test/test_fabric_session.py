@@ -2110,9 +2110,12 @@ class Status(Base):
         self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "unregistered")
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)
-        self.assertIn("Repositories of a turn: not read: fabric is not registered for this folder (see Next)", done.stdout)
+        self.assertIn("Repositories of a turn: not read: fabric is not registered for this folder\n", done.stdout)
         self.register()
         self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "on")
+        mark.unlink()  # unit r30: active and registered, but Fabric has not taken the repositories yet
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        mark.write_text("")
         self.assertEqual(fs.status(self.repo, dict(self.env, **{fs.NO_REPOSITORIES_ENV: "1"}))["transcriptRead"], "off")
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)

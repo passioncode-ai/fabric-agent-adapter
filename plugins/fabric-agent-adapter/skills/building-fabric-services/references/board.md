@@ -293,8 +293,9 @@ raises `directory-invalid` rather than answering; an unlisted Project may still 
 
 ## Events, the probe and the live smoke
 
-Events go to `emit(kind, level, text, notify=…, data=…)` (`JsonlEventLog.append` fits: every level is one of its
-`info`, `notice`, `warning`, `error`) with `data {schema, value}`
+Events go to `emit(kind, level, text, notify=…, subject=…, data=…)` (`JsonlEventLog.append` fits: every level is one
+of its `info`, `notice`, `warning`, `error`; `subject` is `{type, id}`, the notice's request, else its capability, else
+the Project, and an `emit` that takes no `subject` gets the notice without one) with `data {schema, value}`
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,

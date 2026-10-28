@@ -9,10 +9,12 @@ gate behave.
 
 - The board responder's notices reach a service's event feed: they were sent at level `warn`, which
   `JsonlEventLog.append` refuses (its levels are `info`, `notice`, `warning`, `error`), so `board.down`,
-  `board.access.needed`, `board.slot.moved`, `board.slot.refused`, `board.slot.contested`, `board.request.held`,
-  `board.request.skipped`, `board.reconcile.needed`, `board.attempt.lost` and `board.outcome.invalid` were dropped
-  wherever `emit=log.append` (the reference service included, since 0.28.0). They are sent at `warning` now, in both
-  twins.
+  `board.access.needed`, `board.slot.moved`, `board.slot.contested`, `board.request.held`, `board.request.skipped`,
+  `board.reconcile.needed`, `board.attempt.lost` and `board.outcome.invalid` were dropped wherever `emit=log.append`
+  (the reference service included, since 0.28.0; `board.slot.moved` since 0.53.0). They are sent at `warning` now, in
+  both twins, as is the new `board.slot.refused` (FAA-163). Each notice names its `subject` (`{type, id}`: its request,
+  else its capability, else the Project), so a host tells one request's or one capability's episode from another's; a
+  service's own `emit` that takes no `subject` still gets the notice, without one.
 - **working-with-fabric on Windows** (FAA-175, FAA-177). A turn names the repositories it touched on Windows too:
   Git Bash `/c/...` and `/cygdrive/c/...`, `C:/...` and quoted `C:\...` paths, and `git.exe -C` (any case); Bash
   text is split with Git Bash's own quoting, so an unquoted backslash is an escape there too. A `cd` inside `( )`, a
@@ -125,8 +127,8 @@ gate behave.
   calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125).
   The tool is a manifest capability too (effect `change-policy`, idempotency `required`), as every tool the well-known
   lists must be: `register --board-project <uuid>` writes it into the manifest, so `check_service.py` passes the sample
-  with its board on. The manifest stays register's to write: a serve whose board mode differs from it logs
-  `service.manifest.mismatch` (warning), and the probe fails until it is registered again. Its `/mcp` reads a loopback call the service token authenticated as T0. The
+  with its board on. The manifest stays register's to write: a serve whose board mode differs from it at its start
+  logs `service.manifest.mismatch` (warning), and the probe fails until it is registered again. Its `/mcp` reads a loopback call the service token authenticated as T0. The
   page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
   before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
   repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool, and each take-back is
@@ -175,7 +177,10 @@ gate behave.
   slot lapses on the board's clock as before.
 - A service that calls `Checkpoint.leave` itself now passes the generations it confirmed (`held`, required in both
   twins); the responder's own leave does this.
-- A service's own `emit` that matched the board responder's level `warn` now sees `warning`.
+- A service's own `emit` that matched the board responder's level `warn` now sees `warning`, with a `subject`. A
+  service with `emit=log.append` now logs the board's notices, and those with `notify` (access needed, a contested or
+  moved slot, a held request, a reconcile needed) reach the host's banners, without a link to the page that resolves
+  them (FAA-187 (21)).
 - A reference service served with `--board-project` registers again with the same `--board-project`
   (`sample_service.py register ... --board-project <uuid>`): a registration from 0.55.0 lacks `board.take-back`, so
   `check_service.py` fails `interop.well-known-capabilities` and the log says `service.manifest.mismatch`.

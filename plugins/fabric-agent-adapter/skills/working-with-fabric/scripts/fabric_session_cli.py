@@ -285,7 +285,7 @@ def print_status(report: Dict[str, Any]) -> None:
     print("Repositories of a turn: %s" % {
         "on": "read from the session's transcript, as this shell's environment has it (turn off: %s=1)" % NO_REPOSITORIES_ENV,
         "off": "off (%s or the file %s in the hooks' folder)" % (NO_REPOSITORIES_ENV, NO_REPOSITORIES_MARK),
-        "unregistered": "not read: fabric is not registered for this folder (see Next)",
+        "unregistered": "not read: fabric is not registered for this folder",
         "waiting": "not read until a running Fabric takes them"}[report["transcriptRead"]])
     print("Next: %s" % report["next"])
 

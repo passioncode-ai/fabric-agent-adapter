@@ -56,6 +56,14 @@ const clean = (text, max = SUMMARY_MAX) => String(text).split(/\s+/).filter(Bool
  * the outcome (may be async); admit(request) is the input gate; observe(entry) reads the world after a restart;
  * emit(kind, level, text, extra) receives events. run({signal}) ticks until aborted; step() is one tick.
  */
+/** A notice's subject ({type, id}): its request, else its capability, else the Project. */
+function noticeSubject(value, project) {
+  for (const kind of ['request', 'capability']) {
+    if (typeof value[kind] === 'string' && value[kind].length > 0 && value[kind].length <= 128) return { type: kind, id: value[kind] };
+  }
+  return { type: 'project', id: project };
+}
+
 export class Responder extends SlotKeeper {
   constructor({ hub, projectId, capabilities, credentialFile, checkpointFile, handler, admit, observe, emit, service = 'service',
     now = () => performance.now() / 1000, rand = Math.random, sessionFactory } = {}) {
@@ -113,8 +121,11 @@ export class Responder extends SlotKeeper {
     let data = { schema: EVENT_SCHEMA, value: Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined && v !== null)) };
     if (feedDataProblems(data).length) data = undefined; // FAC-SEM-101: drop the data, keep the sentence
     if (!this.emitTo) return;
+    // The thing the notice is about, so a host tells one request's or one capability's episode from another's
+    // (events-and-notifications.md, "Say who wants what"; 0.56.0 seam r30).
+    const subject = noticeSubject(value, this.project);
     try {
-      this.emitTo(kind, level, text, { notify, ...(data ? { data } : {}) });
+      this.emitTo(kind, level, text, { notify, subject, ...(data ? { data } : {}) });
     } catch {
       // an event that cannot be written never stops the responder
     }

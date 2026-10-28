@@ -1907,10 +1907,36 @@ class SampleWiringTests(unittest.TestCase):
             found += [(name, level) for level in re.findall(r"emit\(\s*[\"']board\.[a-z._]+[\"']\s*,\s*[\"']([a-z]+)[\"']", text)]
         self.assertGreater(len(found), 20)
         self.assertEqual([f for f in found if f[1] not in fabric_events.LEVELS], [])
-        with tempfile.TemporaryDirectory() as tmp:  # and a notice reaches the log
+        # Through the responder's own _emit into the log a service wires (emit=log.append): the level, notify, data and,
+        # since seam r30, a subject per request or capability, so a host's banners tell two episodes apart.
+        class SimpleNamespace:  # the three attributes Responder._emit reads
+            def __init__(self, **kw):
+                self.__dict__.update(kw)
+        session = importlib.import_module("fabric_board_session")
+        with tempfile.TemporaryDirectory() as tmp:
             log = fabric_events.JsonlEventLog(Path(tmp) / "events.jsonl")
-            log.append("board.down", "warning", "Fabric's board cannot be reached.", notify=True)
-            self.assertEqual([e["kind"] for e in log.fetch(None, 10)], ["board.down"])
+            r = SimpleNamespace(_said={}, _emit_to=log.append, project=PROJECT)
+            for request in ("req-1", "req-2"):
+                session.Responder._emit(r, "board.reconcile.needed", "warning", "A request's outcome is unknown.", notify=True,
+                                        episode=request, request=request, capability="sample.echo")
+            session.Responder._emit(r, "board.down", "warning", "Fabric's board cannot be reached.", episode="down")
+            rows = log.fetch(None, 10)
+            self.assertEqual([(e["kind"], e["level"], e.get("notify")) for e in rows],
+                             [("board.reconcile.needed", "warning", True)] * 2 + [("board.down", "warning", None)])
+            self.assertEqual([e["subject"] for e in rows], [{"type": "request", "id": "req-1"}, {"type": "request", "id": "req-2"},
+                                                            {"type": "project", "id": PROJECT}])
+            self.assertEqual(rows[0]["data"]["value"]["request"], "req-1")
+            said = []  # an emit written before 0.56.0, with no subject: the notice still goes
+            old = SimpleNamespace(_said={}, _emit_to=lambda kind, level, text, notify=False, data=None: said.append(kind),
+                                  project=PROJECT)
+            session.Responder._emit(old, "board.down", "warning", "Fabric's board cannot be reached.")
+            self.assertEqual(said, ["board.down"])
+        # The longest notice keeps its last instruction with the longest capability a Project accepts (128 characters).
+        slots = (scripts / "fabric_board_slots.py").read_text(encoding="utf-8")
+        start = slots.index('"The %s slot on this Project moved')
+        import ast
+        moved = ast.literal_eval("(" + slots[start:slots.index("% capability", start)] + ")")
+        self.assertLessEqual(len(moved % ("c" * 128)), 500)
 
     def test_the_probe_passes_the_sample_with_its_board_on(self):
         """0.56.0 product r28, seam r28: registered with the board, the take-back tool the well-known lists is in the
