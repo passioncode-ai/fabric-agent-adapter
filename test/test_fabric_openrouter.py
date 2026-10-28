@@ -142,6 +142,14 @@ class Rules(unittest.TestCase):
                     fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
                               environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
                 self.assertIn(getattr(caught.exception, "kind", None), ("config", "refused"))
+        # 0.56.0 product r27: a query is refused as a query (OpenRouterError config) even when it also holds a space
+        # or a character outside ASCII that check_url refuses, as on Node.
+        for base in ("https://openrouter.ai/api/v1?a b", "https://openrouter.ai/api/v1?caf\u00e9", "https://openrouter.ai/api/v1#a b"):
+            with self.subTest(base=base):
+                with self.assertRaises(fo.OpenRouterError) as caught:
+                    fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
+                              environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
+                self.assertEqual(caught.exception.kind, "config")
 
     def test_attribution_only_with_a_setting(self):
         seen = []

@@ -83,7 +83,7 @@ gate behave.
   - The OpenRouter clients trim a base URL's ends first: ASCII whitespace and trailing slashes in both, and on Node
     every C0 control there and a tab or line break anywhere, as `new URL` reads them. So `.../v1\n`, `.../v1/ ` and,
     on Node, `.../v1\n/` are sent to `.../v1/chat/completions`. Both then refuse, when they are built, a base URL
-    holding a query or a fragment (kind `config`; `/chat/completions` would land in it, so a path-routed endpoint
+    holding a query or a fragment (kind `config`, read before `check_url`; `/chat/completions` would land in it, so a path-routed endpoint
     such as OpenRouter failed every call in 0.55.0). Python also refuses, through `check_url` (kind `refused`), a
     base with a space, a control or a non-ASCII character in its path, which 0.55.0 accepted and then failed every
     call with; Node sends such a path percent-encoded, as 0.55.0 did (FAA-187 (18)). Attribution answers `not-openrouter` for a port of other
@@ -154,8 +154,9 @@ gate behave.
   control or a non-ASCII character in its path or query, which 0.55.0 retried and answered kind `connection`, is
   refused the same way. Both OpenRouter clients refuse, when they are built, a base URL holding a query or a
   fragment, and the Python client one with a space, a control or a non-ASCII character in its path, so a service
-  that builds its client at start stops there. Write the host and port plainly, trim the space, and drop the query or fragment where the URL is
-  configured.
+  that builds its client at start stops there. Write the host and port plainly, trim the space, drop the query or fragment where the URL is
+  configured, and percent-encode a space, a control or a non-ASCII character in a path or query
+  (`urllib.parse.quote`).
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
   happens only then. A service that stops without the join still works; its

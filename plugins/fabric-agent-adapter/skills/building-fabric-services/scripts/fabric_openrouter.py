@@ -164,9 +164,11 @@ class Client:
                                   kind="config")
         if not (isinstance(retries, int) and 0 <= retries <= 5) or isinstance(retries, bool):
             raise OpenRouterError("retries is an integer from 0 to 5", kind="config")
-        fabric_http.check_url(base_url)
-        if "?" in base_url or "#" in base_url:  # `/chat/completions` would land in it (0.56.0 unit r19, FAA-187 (17))
+        # A query or fragment would take `/chat/completions` (0.56.0 unit r19, FAA-187 (17)); refused before
+        # check_url, so a query that also holds a space is kind config here as on Node (product r27).
+        if isinstance(base_url, str) and ("?" in base_url or "#" in base_url):
             raise OpenRouterError("the base URL holds no query or fragment", kind="config")
+        fabric_http.check_url(base_url)
         _check_attribution(project_id, None)
         self.ceiling_usd = float(ceiling_usd)
         self.ledger = ledger
