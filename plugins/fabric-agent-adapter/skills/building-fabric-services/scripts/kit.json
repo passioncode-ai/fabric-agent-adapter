@@ -971,7 +971,7 @@
     "fabric-time",
     "fabric-usage"
    ],
-   "sha256": "0807a86d16a74ea47639eebc7fdfcfa7b88e07190d1c3aa82bf45efc73c04d9f"
+   "sha256": "da393957c7fc68684b93d5943817fd957411034fe119c7aea7f371fc024f1cbe"
   }
  ],
  "history": {
@@ -4225,7 +4225,7 @@
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
    "fabric-board.mjs": "0d75c3e27a0b791bdbc35b2e93b3299e5831d3ab3003ce441e6268397e32b448",
    "fabric-http.mjs": "9f899829073470b9c2b449605a9371b773848eec4e3a0122ed4ccde5eddcdb4b",
-   "fabric-openrouter.mjs": "0807a86d16a74ea47639eebc7fdfcfa7b88e07190d1c3aa82bf45efc73c04d9f",
+   "fabric-openrouter.mjs": "da393957c7fc68684b93d5943817fd957411034fe119c7aea7f371fc024f1cbe",
    "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
    "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0"
   }

@@ -155,8 +155,8 @@ gate behave.
   refused the same way. Both OpenRouter clients refuse, when they are built, a base URL holding a query or a
   fragment, and the Python client one with a space, a control or a non-ASCII character in its path, so a service
   that builds its client at start stops there. Write the host and port plainly, trim the space, drop the query or fragment where the URL is
-  configured, and percent-encode a space, a control or a non-ASCII character in a path or query
-  (`urllib.parse.quote`).
+  configured, and percent-encode a space, a control or a non-ASCII character in each path segment or query
+  value (`urllib.parse.quote(value, safe="")`, `urllib.parse.urlencode` for a query), never the whole URL.
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
   happens only then. A service that stops without the join still works; its

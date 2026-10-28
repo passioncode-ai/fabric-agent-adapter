@@ -100,10 +100,12 @@ export class Client {
     if (!Number.isInteger(retries) || retries < 0 || retries > 5) {
       throw new OpenRouterError('retries is an integer from 0 to 5', { kind: 'config' });
     }
-    http.checkUrl(baseUrl);
-    if (/[?#]/.test(baseUrl)) { // `/chat/completions` would land in it (0.56.0 unit r19, FAA-187 (17))
+    // A query or fragment would take `/chat/completions` (0.56.0 unit r19, FAA-187 (17)); refused before checkUrl, as
+    // the Python twin does, so a base checkUrl would also refuse is kind config in both (unit r27).
+    if (typeof baseUrl === 'string' && /[?#]/.test(baseUrl)) {
       throw new OpenRouterError('the base URL holds no query or fragment', { kind: 'config' });
     }
+    http.checkUrl(baseUrl);
     checkAttribution(projectId, undefined);
     Object.assign(this, { ceilingUsd, ledger, keyEnv, window, attribution, projectId, unmeasuredCallUsd, deadlineS, retries });
     this.prices = Object.fromEntries(Object.entries(prices ?? {}).map(([k, v]) => [k, { ...v }]));

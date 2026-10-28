@@ -106,6 +106,28 @@
    }
   }
  },
+ "baseUrls": {
+  "about": "0.56.0 readings 27: the base URLs both twins answer the same way when the client is built. config: OpenRouterError kind config (a query or a fragment, read before check_url). Any other string: accepted, and the client's base URL is that string. A base whose path holds a space, a control or a character outside ASCII is left out: Python refuses it and Node sends it percent-encoded (FAA-187 (18)).",
+  "cases": [
+   ["https://openrouter.ai/api/v1\n", "https://openrouter.ai/api/v1"],
+   ["https://openrouter.ai/api/v1/ ", "https://openrouter.ai/api/v1"],
+   ["https://openrouter.ai/api/v1/\r\n", "https://openrouter.ai/api/v1"],
+   ["https://gw.example/v1%20", "https://gw.example/v1%20"],
+   ["https://openrouter.ai/api/v1?x=1", "config"],
+   ["https://openrouter.ai/api/v1#f", "config"],
+   ["https://openrouter.ai/api/v1/#", "config"],
+   ["https://openrouter.ai/api/v1?a b", "config"],
+   ["https://openrouter.ai/api/v1?caf\u00e9", "config"],
+   ["https://openrouter.ai/api/v1#a b", "config"],
+   ["http://example.com/v1?x", "config"],
+   ["https://u:p@example.com/v1?x", "config"],
+   ["https://user@h.example/v1#f", "config"],
+   ["https://h.example:99999/v1?x", "config"],
+   ["ftp://example.com/v1#f", "config"],
+   ["?", "config"],
+   [" https://openrouter.ai/api/v1#x", "config"]
+  ]
+ },
  "scenarios": [
   {
    "name": "an answer with the provider's cost",

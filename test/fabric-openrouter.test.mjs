@@ -160,6 +160,15 @@ test('config refusals and totals', () => {
   assert.deepEqual(fo.totals([{ costUsd: 2, route: 'subscription' }, { costUsd: null }]), { calls: 2, spentUsd: null, unpricedCalls: 1 });
 });
 
+test('the shared base URL cases', () => {
+  // 0.56.0 seam r27: one table both twins read, so the order of the query check and checkUrl cannot drift.
+  for (const [baseUrl, want] of CASES.baseUrls.cases) {
+    const make = () => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
+    if (want === 'config') assert.throws(make, (e) => e instanceof fo.OpenRouterError && e.kind === 'config', JSON.stringify(baseUrl));
+    else assert.equal(make().baseUrl, want, JSON.stringify(baseUrl));
+  }
+});
+
 test('a base URL ending in a line break or a space is composed without it', () => {
   // 0.56.0 product r20: checkUrl reads the base with its ends trimmed, so the base composed must be that one.
   for (const baseUrl of ['https://openrouter.ai/api/v1\n', 'https://openrouter.ai/api/v1/ ', 'https://openrouter.ai/api/v1/\r\n',
@@ -171,7 +180,8 @@ test('a base URL ending in a line break or a space is composed without it', () =
   // built. A space, a control or a character outside ASCII in the path is Python's to refuse (check_url); Node sends
   // it percent-encoded, as in 0.55.0 (FAA-187 (18)).
   for (const baseUrl of ['https://openrouter.ai/api/v1?x=1', 'https://openrouter.ai/api/v1#f', 'https://openrouter.ai/api/v1/#',
-    'https://openrouter.ai/api/v1?a b', 'https://openrouter.ai/api/v1?caf\u00e9']) {
+    'https://openrouter.ai/api/v1?a b', 'https://openrouter.ai/api/v1?caf\u00e9', 'http://example.com/v1?x',
+    'https://u:p@example.com/v1?x', 'ftp://example.com/v1#f']) { // unit r27: before checkUrl, as in Python
     assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), (e) => e.kind === 'config', JSON.stringify(baseUrl));
   }
   for (const [baseUrl, sent] of [['https://openrouter.ai\u200b', 'https://openrouter.ai/chat/completions'],

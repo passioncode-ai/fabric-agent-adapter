@@ -125,6 +125,19 @@ class Rules(unittest.TestCase):
             self.assertNotIn(header.lower(), ("http-referer", "x-openrouter-title", "x-title"),
                              "attribution is off by default")
 
+    def test_the_shared_base_url_cases(self):
+        # 0.56.0 seam r27: one table both twins read, so the order of the query check and check_url cannot drift.
+        for base, want in CASES["baseUrls"]["cases"]:
+            with self.subTest(base=base):
+                make = lambda: fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
+                                         environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
+                if want == "config":
+                    with self.assertRaises(fo.OpenRouterError) as caught:
+                        make()
+                    self.assertEqual(caught.exception.kind, "config")
+                else:
+                    self.assertEqual(make().base_url, want)
+
     def test_a_base_url_ending_in_a_line_break_is_sent_without_it(self):
         # 0.56.0 seam r18: check_url trims the ends, so the base it passed must be the base composed and sent.
         for base in ("https://openrouter.ai/api/v1\n", "https://openrouter.ai/api/v1/ ", "https://openrouter.ai/api/v1/\r\n"):
@@ -144,7 +157,8 @@ class Rules(unittest.TestCase):
                 self.assertIn(getattr(caught.exception, "kind", None), ("config", "refused"))
         # 0.56.0 product r27: a query is refused as a query (OpenRouterError config) even when it also holds a space
         # or a character outside ASCII that check_url refuses, as on Node.
-        for base in ("https://openrouter.ai/api/v1?a b", "https://openrouter.ai/api/v1?caf\u00e9", "https://openrouter.ai/api/v1#a b"):
+        for base in ("https://openrouter.ai/api/v1?a b", "https://openrouter.ai/api/v1?caf\u00e9", "https://openrouter.ai/api/v1#a b",
+                     "http://example.com/v1?x", "https://u:p@example.com/v1?x", "ftp://example.com/v1#f"):
             with self.subTest(base=base):
                 with self.assertRaises(fo.OpenRouterError) as caught:
                     fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
