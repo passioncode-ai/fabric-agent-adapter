@@ -265,7 +265,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   decision in `_meta.decision` (a call without one is `operator-decision-required`); Claude Code and Codex send
   arguments only, so until CT-125 they hand the operator the page as Fabric Dashboards' `open_link`. Either door records
   the take-back as a `board.slot.returned` event (info, the capability as its subject) whose sentence says the route in
-  words and whose `data` holds `by`, `via` and the `caller`, never the decision's words; a repeat after a lost answer is answered `{capability, moved: false}`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
+  words and whose `data` holds `by`, `via` and the `caller` (none when the feed refuses the caller), never the decision's words; a repeat after a lost answer is answered `{capability, moved: false}`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
   `change-policy` (DEC-0125); the operator reaches it through an agent that relays their decision in `_meta`, the
@@ -297,8 +297,8 @@ Events go to `emit(kind, level, text, notify=…, subject=…, data=…)` (`Json
 of its `info`, `notice`, `warning`, `error`; `subject` is `{type, id}`, the notice's request, else its capability, else
 its episode (such as a block's cause), else the Project; in Python it goes only to an `emit` whose signature names a `subject`
 parameter with no value bound, as `JsonlEventLog.append` does, and any other `emit`, one with only `**kwargs`, one with
-a subject bound by `functools.partial` or one whose signature cannot be read, gets the notice once, without one, as
-before 0.56.0; the Node responder always passes it in its options, which an `emit` that does not read it ignores) with
+a subject bound by `functools.partial` (which then stands) or one whose signature cannot be read, is called once, without
+one, as before 0.56.0; the Node responder always passes it in its options, which an `emit` that does not read it ignores) with
 `data {schema, value}`
 checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `board.request.refused`,
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,

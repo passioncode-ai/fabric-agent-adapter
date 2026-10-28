@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.56.0 (2026-10-27)
+## 0.56.0 (2026-10-28)
 
 Stability and Windows: the debts of 0.53.0 to 0.55.0 that touch how the hooks, the board responder and the interop
 gate behave.
@@ -136,7 +136,7 @@ gate behave.
   before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
   repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool, and each take-back is
   a `board.slot.returned` event (the capability as its subject) whose sentence says the route in words and whose `data`
-  holds `by`, `via` and the `caller`, never the decision's words. The service installs its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
+  holds `by`, `via` and the `caller` (none when the feed refuses the caller), never the decision's words. The service installs its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
   page's CSP allows the button's own `fetch` (`connect-src 'self'`), and a failed request says so on the button.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.
