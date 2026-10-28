@@ -1899,7 +1899,7 @@ class SampleWiringTests(unittest.TestCase):
         """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refuses, so a service with
         emit=log.append (the reference service) never logged them. Every level both twins pass is one LEVELS holds."""
         import re
-        import fabric_events
+        fabric_events = importlib.import_module("fabric_events")
         scripts = Path(importlib.import_module("fabric_board").__file__).parent
         found = []
         for name in ("fabric_board_session.py", "fabric_board_slots.py", "fabric-board-session.mjs", "fabric-board-slots.mjs"):
