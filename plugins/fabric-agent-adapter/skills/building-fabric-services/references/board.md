@@ -42,7 +42,8 @@ operator gives in Fabric (Agents & access): callee `fabric`, capability `board.r
 
 The responder runs inside the service process, started after the instance lock like every other piece of state
 (SKILL.md, Step 3). [`sample_service.py`](../scripts/sample_service.py) does it behind `serve --board-project <uuid>`,
-off by default (register it with the same `--board-project`, so its manifest lists the take-back tool below):
+off by default (register it with the same `--board-project`, so its manifest lists the take-back tool below; a serve
+whose board mode differs from the registered manifest logs `service.manifest.mismatch` and leaves the manifest as it is):
 
 ```python
 import fabric_board as fbd, fabric_hub as fhb

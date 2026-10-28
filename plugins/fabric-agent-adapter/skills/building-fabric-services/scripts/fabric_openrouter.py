@@ -166,7 +166,9 @@ class Client:
             raise OpenRouterError("retries is an integer from 0 to 5", kind="config")
         # A query or fragment would take `/chat/completions` (0.56.0 unit r19, FAA-187 (17)); refused before
         # check_url, so a query that also holds a space is kind config here as on Node (product r27).
-        if isinstance(base_url, str) and ("?" in base_url or "#" in base_url):
+        if not isinstance(base_url, str):  # check_url's answer for a base that is not a string, as on Node (unit r28)
+            raise fabric_http.HttpError("the URL does not parse", url="<unparseable url>", kind="refused")
+        if "?" in base_url or "#" in base_url:
             raise OpenRouterError("the base URL holds no query or fragment", kind="config")
         fabric_http.check_url(base_url)
         _check_attribution(project_id, None)

@@ -102,7 +102,10 @@ export class Client {
     }
     // A query or fragment would take `/chat/completions` (0.56.0 unit r19, FAA-187 (17)); refused before checkUrl, as
     // the Python twin does, so a base checkUrl would also refuse is kind config in both (unit r27).
-    if (typeof baseUrl === 'string' && /[?#]/.test(baseUrl)) {
+    if (typeof baseUrl !== 'string') { // as Python's check_url answers a base that is not a string (unit r28)
+      throw new http.HttpError('the URL does not parse', { url: http.redactUrl(String(baseUrl)), kind: 'refused' });
+    }
+    if (/[?#]/.test(baseUrl)) {
       throw new OpenRouterError('the base URL holds no query or fragment', { kind: 'config' });
     }
     http.checkUrl(baseUrl);

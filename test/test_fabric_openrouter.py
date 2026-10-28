@@ -125,6 +125,15 @@ class Rules(unittest.TestCase):
             self.assertNotIn(header.lower(), ("http-referer", "x-openrouter-title", "x-title"),
                              "attribution is off by default")
 
+    def test_a_base_url_that_is_not_a_string_is_refused_as_check_url_refuses_it(self):
+        # 0.56.0 unit r28: the same class and kind in both twins, a query or not.
+        for base in (None, 5, b"https://openrouter.ai/api/v1?x=1", ["https://openrouter.ai/api/v1"]):
+            with self.subTest(base=base):
+                with self.assertRaises(fo.fabric_http.HttpError) as caught:
+                    fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
+                              environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
+                self.assertEqual(caught.exception.kind, "refused")
+
     def test_the_shared_base_url_cases(self):
         # 0.56.0 seam r27: one table both twins read, so the order of the query check and check_url cannot drift.
         for base, want in CASES["baseUrls"]["cases"]:

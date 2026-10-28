@@ -14,8 +14,8 @@ Opt-in, off by default: `serve --board-project <Project uuid>` also answers that
 Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Responder, from a board.respond grant whose
 credential is in `<data>/board.credential` (0600; `--board-credential` names another file). The request body is data:
 the gate admits plain text of at most 2,000 characters, and the answer is a reply carrying the same text. Its
-dashboard's Take back has the tool `board.take-back`, which the manifest lists while the board is on: register with the
-same `--board-project`, and a serve whose board mode differs from the registered manifest rewrites it to match.
+dashboard's Take back has the tool `board.take-back`, which the manifest lists when registered with the same
+`--board-project`; a serve whose board mode differs from the registered manifest logs `service.manifest.mismatch`.
 """
 
 from __future__ import annotations
@@ -96,10 +96,12 @@ CAPABILITIES = [
                                                  "properties": {"title": {"type": "string"}, "body": {"type": "string"}}, "required": ["title", "body"]})},
 ]
 #: The take-back tool as a manifest capability (0.56.0 product r28): every tool the well-known lists is in the
-#: manifest, so the service writes it there while it serves the board, and leaves it out while it does not.
-TAKE_BACK_CAPABILITY = {
+#: manifest, so `register --board-project` writes it there.
+TAKE_BACK_CAPABILITY: Dict[str, Any] = {
     "name": TAKE_BACK["tool"], "effect": "change-policy", "idempotency": "required", "job": False,
     "description": "Take back a board slot the operator moved away.",
+    # A relayed action: a probe call carries no operator decision, so it is refused and changes nothing (unit r28).
+    "probeAssertion": "is refused as operator-decision-required without the operator's decision in _meta",
     "input": _schema("board.take-back-input", TAKE_BACK_INPUT),
     "output": _schema("board.take-back-output", {"type": "object", "additionalProperties": False,
                                                   "properties": {"capability": {"type": "string"}, "moved": {"const": False}},
@@ -151,18 +153,22 @@ class Service:
             cap = TAKE_BACK_CAPABILITY
             self.mcp.add_tool(fi.tool_for_capability(cap, cap["input"], cap["output"]), self.board_take_back_tool,
                               action=TAKE_BACK, target="capability")
-        self.sync_manifest(self.args)
         self.log.append("service.started", "info", "%s started on build %s." % (self.name, self.build["commit"]))
+        self.check_manifest()
 
-    def sync_manifest(self, args: argparse.Namespace) -> None:
-        """A registered manifest lists the take-back tool exactly when this run serves it (0.56.0 product r28): rewritten
-        only when the board mode changed, so a restart in the same mode leaves it as it is."""
+    def check_manifest(self) -> None:
+        """The registered manifest is register's to write, never serve's (0.56.0 seam r28): a serve whose board mode
+        differs from it says so, and the probe's interop.well-known-capabilities fails until it is registered again."""
         try:
-            listed = {c.get("name") for c in json.loads((self.data / "fabric-agent.json").read_text(encoding="utf-8"))["capabilities"]}
+            listed = {c.get("name") for c in json.loads((self.data / "fabric-agent.json").read_text(encoding="utf-8"))["capabilities"]
+                      if isinstance(c, dict)}
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
-            return  # not registered here, or not a manifest this service wrote: nothing to keep in step
+            return  # not registered here, or not a manifest of this shape: nothing to compare
         if (TAKE_BACK["tool"] in listed) != (self.board is not None):
-            write_manifest(args, self.data, board=self.board is not None)
+            self.log.append("service.manifest.mismatch", "warning",
+                            "The registered manifest %s the take-back tool, which this run %s: register again %s --board-project."
+                            % ("lists" if TAKE_BACK["tool"] in listed else "lacks",
+                               "does not serve" if self.board is None else "serves", "without" if self.board is None else "with"))
 
     # --- the project board (opt-in): the input gate and the answer -------------------
     def board_moved(self) -> list:
@@ -503,7 +509,7 @@ def write_manifest(args: argparse.Namespace, data: Path, board: bool = False) ->
                         "requiredFeatures": ["tool:%s" % cap["name"]],
                         "probes": [{"id": "%s-shape" % cap["name"].replace(".", "-"), "inputFixture": "urn:fabric:fixture:%s" % cap["name"],
                                     "outputSchema": cap["output"]["$id"], "timeoutMs": 5000, "sideEffectCeiling": "none",
-                                    "assertions": ["returns a value valid against its output schema"]}]},
+                                    "assertions": [cap.get("probeAssertion", "returns a value valid against its output schema")]}]},
             "extensions": {fi.EXTENSION_KEY: {"job": cap["job"]}},
         })
     digest = hashlib.sha256(json.dumps(capabilities, sort_keys=True).encode()).hexdigest()

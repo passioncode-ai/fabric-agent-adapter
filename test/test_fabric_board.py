@@ -1896,8 +1896,9 @@ class SampleWiringTests(unittest.TestCase):
             svc.board.shutdown(0.1)
 
     def test_the_probe_passes_the_sample_with_its_board_on(self):
-        """0.56.0 product r28: the take-back tool the well-known lists is in the manifest (registered with the board, or
-        rewritten by a serve whose board mode differs), so the kit's own probe passes the sample either way."""
+        """0.56.0 product r28, seam r28: registered with the board, the take-back tool the well-known lists is in the
+        manifest and the kit's own probe passes; a serve whose board mode differs leaves the manifest as register wrote it
+        and says so in an event, and the probe fails until it is registered again."""
         import socket
         import urllib.request
         sample = importlib.import_module("sample_service")
@@ -1938,19 +1939,31 @@ class SampleWiringTests(unittest.TestCase):
                     proc.terminate()
                     proc.wait(timeout=10)
 
-            subprocess.run([sys.executable, sample.__file__, "register", *common, "--services-dir", str(services),
-                            "--board-project", PROJECT], env=env, check=True, capture_output=True)
+            def register(board):
+                subprocess.run([sys.executable, sample.__file__, "register", *common, "--services-dir", str(services)]
+                               + (["--board-project", PROJECT] if board else []), env=env, check=True, capture_output=True)
+
+            def out_of_step():
+                return [e for e in map(json.loads, (data / "events.jsonl").read_text().splitlines())
+                        if e.get("kind") == "service.manifest.mismatch"]
+
+            register(board=True)
             self.assertIn("board.take-back", names())
+            written = (data / "fabric-agent.json").read_bytes()
             rules = probed(board=True)
             self.assertEqual(rules["interop.well-known-capabilities"], "PASS")
             self.assertEqual(rules["interop.tools-match"], "PASS")
             self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
-            rules = probed(board=False)  # the board off: the manifest drops the tool it no longer serves
+            self.assertEqual(out_of_step(), [])
+            rules = probed(board=False)  # the board off: serve never writes the manifest, it says so
+            self.assertEqual((data / "fabric-agent.json").read_bytes(), written)
+            self.assertEqual(rules["interop.tools-match"], "FAIL")
+            self.assertEqual(len(out_of_step()), 1)
+            register(board=False)
+            rules = probed(board=False)
             self.assertNotIn("board.take-back", names())
             self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
-            rules = probed(board=True)  # and on again, though registered without it now
-            self.assertIn("board.take-back", names())
-            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+            self.assertEqual(len(out_of_step()), 1)
 
     @unittest.skipIf(sys.platform == "win32", "Windows ends a process without a catchable SIGTERM (TerminateProcess)")
     def test_a_stop_leaves_the_board_session_and_forgets_the_record(self):

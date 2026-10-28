@@ -160,6 +160,14 @@ test('config refusals and totals', () => {
   assert.deepEqual(fo.totals([{ costUsd: 2, route: 'subscription' }, { costUsd: null }]), { calls: 2, spentUsd: null, unpricedCalls: 1 });
 });
 
+test('a base URL that is not a string is refused as checkUrl refuses it', () => {
+  // 0.56.0 unit r28: the same class and kind as Python, a query or not.
+  for (const baseUrl of [null, 5, new URL('https://openrouter.ai/api/v1?x=1'), new URL('https://openrouter.ai/api/v1')]) {
+    assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }),
+      (e) => e.name === 'HttpError' && e.kind === 'refused', String(baseUrl));
+  }
+});
+
 test('the shared base URL cases', () => {
   // 0.56.0 seam r27: one table both twins read, so the order of the query check and checkUrl cannot drift.
   for (const [baseUrl, want] of CASES.baseUrls.cases) {
