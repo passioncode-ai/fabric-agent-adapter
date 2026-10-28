@@ -113,7 +113,7 @@
       "shouldTrigger": true
     },
     {
-      "query": "Check this agent's repository for my home paths and keys before I share it.",
+      "query": "Before adapting this agent to Fabric, check its repository for my home paths and keys so I can share it as source.",
       "shouldTrigger": true
     }
   ]

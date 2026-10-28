@@ -124,7 +124,10 @@ For provider bundles the adapting skill helps an agent author:
 - scaffold a version-pinned provider manifest, schemas, safe fixture, probes, and
   conformance report;
 - distinguish structural validation from live protocol negotiation, semantic
-  admission, and project binding.
+  admission, and project binding;
+- keep the agent's source apart from its instance data, with `scripts/fabric_source_check.py check`, which reports a
+  home path, a credential-shaped value or a string from the owner's list by path, line and kind and never repeats it
+  (FAA-188).
 
 The skill never treats generated files as admission. Fabric contract `0.1.0` does not
 yet ship the host registry/runtime needed to connect and authorize a live provider.

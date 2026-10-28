@@ -9,21 +9,27 @@ import wait for the contract's decision on CT-194 (part 2).
 ### Added
 
 - **`fabric_source_check.py check`** (adapting-projects-to-fabric) reads the files a source would carry (what Git would
-  commit) and reports, by path, line and kind, a path inside a person's home folder (`home-path`, macOS, Linux and
-  Windows forms), a value shaped like a credential by the contract's detector or a private key block (`secret`), and a
-  string from the owner's list of instance strings, kept outside the tree (`instance-string`). It never prints a value
-  it found, a line that holds one or an entry of the owner's list, and changes nothing: exit 0 with no finding, 1 with
-  one, 2 when it cannot run. `.fabric-source-ignore` and `--exclude` leave out folders of synthetic test values; a
-  neutral home and a value that says it is synthetic are not findings. Standard library only; the adapter's own tree
-  passes it (`test_source_check`).
+  commit; every file when Git lists none) and reports, by path, line and kind: a path inside a person's home folder
+  (`home-path`: macOS, Linux and Windows forms in any case, the dashed form of DEC-0105 and the URL-encoded one), a
+  value shaped like a credential by the contract's detector read line by line, a long random value under a
+  credential's name or a private key block (`secret`), and a string from the owner's list of instance strings, kept
+  outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
+  never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a path is
+  printed with an entry as `<entry N>` and a home name as `<home>`. It changes nothing: exit 0 with no finding and every
+  file read, 1 with a finding, 2 when it cannot run or a file could not be read. `.fabric-source-ignore` and
+  `--exclude` leave out named files of synthetic test values; a neutral home (including container and cloud users) and
+  a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
+  contract vectors and seven test files named in its `.fabric-source-ignore` (`test_source_check`).
 - **references/source-and-instance.md** (both skills): the layout (instance values in a configuration outside the
-  repository with a neutral default and a committed `*.example`, records and state documents in the instance folder,
-  keys by name, fixtures on neutral ids) and the check.
+  repository with a neutral default and a committed `*.example`, records and state documents in the kit's data folder,
+  keys by name, fixtures on neutral ids; the supervisor label and `createdBy` name the publisher until CT-194) and the
+  check. It is registered as a shared reference (`test_shared_references`).
 - creating-fabric-agents step 2 lays an agent out as source and instance and calls the skeleton done when the check
   exits 0; step 5 runs it again. adapting-projects-to-fabric step 4c runs the check first, moves each finding out and
   runs it again; a value already in Git history needs a fresh history, which stays the owner's act.
 - Trigger and scenario evals for both (`source-apart-from-instance`, `move-instance-data-out-of-an-existing-agent`);
-  the Windows CI job runs `test_source_check`.
+  the Windows CI job runs `test_source_check`; the release smoke checks the script is installed. README, AGENTS.md and
+  SKILL-CARD name it.
 
 ### Upgrading
 

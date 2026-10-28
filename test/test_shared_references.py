@@ -7,6 +7,7 @@ import unittest
 SKILLS = Path(__file__).resolve().parents[1] / "plugins/fabric-agent-adapter/skills"
 SHARED = {
     "references/operator-channel-and-repository.md": ("adapting-projects-to-fabric", "creating-fabric-agents"),
+    "references/source-and-instance.md": ("adapting-projects-to-fabric", "creating-fabric-agents"),  # FAA-188
 }
 
 

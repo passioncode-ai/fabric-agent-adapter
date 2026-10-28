@@ -6,9 +6,9 @@
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `3830a3353923e20f826d466610e1c479f120bec0` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
-| Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base |
-| Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`) |
-| Mutations | only the seven documented target-project paths; collisions refused by default, `scaffold --dry-run` shows each diff and writes nothing; `fabric_provider.py write` writes one entry in the providers directory |
+| Inputs | project root, capability, lifecycle owner, stable identifiers, schema publication base; for the source check, the owner's list of instance strings, kept outside the tree |
+| Outputs | provider manifest, lock, schemas, fixture, assertions, conformance report; a `fabric-provider/0.1` entry for an agent that is not a service (`fabric_provider.py`); the source check's report: path, line and kind of each finding, never its value; exit 0, 1 or 2 (`fabric_source_check.py`) |
+| Mutations | only the seven documented target-project paths; collisions refused by default, `scaffold --dry-run` shows each diff and writes nothing; `fabric_provider.py write` writes one entry in the providers directory; step 4c moves instance values out of the source (the files the check names, a `config/*.example`, `.gitignore`); the check itself writes nothing |
 | Network | none of its own: structural mode reads local files; exact schema validation runs a local contract checkout's own `tsx` (the checkout is a public repository, fetched by the person) |
 | Secrets | never accepted or emitted |
 
@@ -30,7 +30,7 @@ a provider because those actions require a real Fabric host/runtime.
 | Contract | Fabric Agent Contract `0.1.0` at `3830a3353923e20f826d466610e1c479f120bec0` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
 | Inputs | capability, named consumer, workflow-or-agent decision, profile, effect declarations, where it runs and in which contexts, models per lane, who pays, how it learns, knowledge sources, whether it writes text for people and whether it answers people |
-| Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton, provider bundle via the sibling scaffolder, conformance report with the canary expectation |
+| Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton laid out as source and instance, provider bundle via the sibling scaffolder, the sibling's source check report, conformance report with the canary expectation |
 | Mutations | new project files plus the sibling scaffolder's documented target paths; collisions refused by default |
 | Network | not required for structural mode; a contract checkout (public repository) required for exact schema validation |
 | Secrets | never accepted or emitted |

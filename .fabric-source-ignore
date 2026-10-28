@@ -1,2 +1,10 @@
-# Tests carry synthetic credential shapes and home paths on purpose: they are the vectors the kit is checked with.
-test/
+# The contract's vectors and the kit's fixtures carry synthetic credential shapes and home paths on purpose.
+test/fixtures/
+# Tests that write a synthetic credential or a home path inline, to check the kit refuses or redacts it.
+test/fabric-connections.test.mjs
+test/fabric-http.test.mjs
+test/test_dashboard_links.py
+test/test_fabric_connections.py
+test/test_fabric_http.py
+test/test_fabric_service_feed_protocols.py
+test/test_source_check.py

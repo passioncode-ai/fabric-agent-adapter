@@ -120,6 +120,7 @@ jobs:
           test -f "$HOME/.agents/skills/working-with-fabric/scripts/fabric_session.py"
           test -f "$HOME/.agents/skills/building-fabric-services/scripts/fabric_interop.py"
           test -f "$HOME/.agents/skills/adapting-projects-to-fabric/scripts/fabric_provider.py"
+          test -f "$HOME/.agents/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py"
           test ! -e "$HOME/.claude/skills"
           # The installed copies must survive a strict YAML reader, not only Claude Code.
           python3 "$REPO/test/validate.py" --frontmatter "$HOME"/.agents/skills/*/SKILL.md

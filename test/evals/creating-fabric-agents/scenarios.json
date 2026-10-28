@@ -203,14 +203,15 @@
     },
     {
       "id": "source-apart-from-instance",
-      "trap": "the agent writes the operator's home path, the service label, the repository address and a real account into the code, the fixtures and AGENTS.md of the first commit, so the agent cannot be handed over as source without rewriting its history",
+      "trap": "the agent writes the operator's home path, a service label on their own account, the repository address and a real account into the code, the fixtures and AGENTS.md of the first commit, so the agent cannot be handed over as source without rewriting its history",
       "request": "Create example-agent, a Fabric agent that keeps notes for its owner; the owner may later hand it to a colleague as source.",
       "expected": [
         "loads references/source-and-instance.md and lays the agent out as source and instance from its first commit",
-        "keeps instance values (the service label, the repository address, paths, the owner, accounts) in a configuration file outside the repository, read through a named variable with a neutral default, and commits only a *.example of it",
+        "keeps instance values (the repository address of the owner's account, paths, the owner, accounts) in a configuration file outside the repository, read through a named variable with a neutral default, and commits only a *.example of it",
         "writes fixtures and examples on neutral ids (example-agent) and keeps state documents (records, logs, journals) in the instance folder, not beside the source documentation",
         "names keys by name only and never writes a value",
         "runs fabric_source_check.py check on the tree before calling a step done, and reports its findings without repeating a value it found",
+        "names its supervisor label on the publisher's domain (LC-09), never the owner's account, and leaves createdBy as the publisher or the scaffold's sentinel",
         "does not create a remote, push or publish the source: handing it over stays the owner's act"
       ]
     }

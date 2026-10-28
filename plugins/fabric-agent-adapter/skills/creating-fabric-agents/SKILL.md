@@ -122,8 +122,8 @@ at start. Either way: no `.env` of its own, no key file beside its data, no valu
 configuration or a commit. A workflow names the keys it needs in its checkpoint (`credentials`),
 never their values.
 
-**The source stays apart from the instance**, from the first commit: instance values (the service label, the
-repository address, folders, the owner, accounts, hosts) live in a configuration outside the repository, read through a
+**The source stays apart from the instance**, from the first commit: instance values (the
+repository address of the owner's account, folders, the owner, accounts, hosts) live in a configuration outside the repository, read through a
 named variable with a neutral default and a committed `*.example`; records, logs and state documents live in the
 instance folder; fixtures use neutral ids. Load [the source and the instance](references/source-and-instance.md). The
 sibling's `scripts/fabric_source_check.py check <project-root>` finds instance data in the tree without repeating it;
