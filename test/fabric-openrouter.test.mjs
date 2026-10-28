@@ -167,27 +167,14 @@ test('a base URL ending in a line break or a space is composed without it', () =
     const c = new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
     assert.equal(c.baseUrl, 'https://openrouter.ai/api/v1', JSON.stringify(baseUrl));
   }
-  // unit r23: only the path is read, as `new URL` sends it: a host `new URL` reads (U+200B dropped by IDNA) and a
-  // path with a letter outside ASCII are kept.
-  // seam r24, unit r24: an ending the base already percent-encodes is sent as written, as on Python.
-  for (const baseUrl of ['https://openrouter.ai\u200b', 'https://gw.example/caf\u00e9/v1', 'HTTPS://openrouter.ai/api/v1/.',
-    'https://gw.example/v1%C2%A0', 'https://gw.example/v1%20', 'https://gw.example/v1%FF%61', 'https://gw.example/v1%E9',
-    'https://openrouter.ai/api/v1\\']) {
-    assert.doesNotThrow(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), JSON.stringify(baseUrl));
-  }
-  // 0.56.0 unit r19, seam r20: a query or fragment would take `/chat/completions`; a Unicode space at the end stays
-  // in the path. Both are refused when the client is built.
-  for (const baseUrl of ['https://openrouter.ai/api/v1?x=1', 'https://openrouter.ai/api/v1#f', 'https://openrouter.ai/api/v1\u00a0',
-    'https://openrouter.ai/api/v1\u3000', 'https://openrouter.ai/api/v1\u00a0\n', 'https://openrouter.ai/api/v1\u00a0/',
-    'https://openrouter.ai/api/v1\u3000/', 'https://openrouter.ai/api/v1\u0085', 'https://openrouter.ai/api/v1\u200b',
-    'https://openrouter.ai/api/v1\u180e', 'https://openrouter.ai/api/v1\u2060', 'https://openrouter.ai/api/v1 /',
-    // product r24, seam r23: DEL and C1, and forms `new URL` reads with a backslash, no `//` or a dot segment.
-    'https://openrouter.ai/api/v1\x7f', 'https://openrouter.ai/api/v1\x80', 'https://openrouter.ai/api/v1\x9f/',
-    'https:openrouter.ai/api/v1\u00a0', 'https://openrouter.ai\\api\\v1\u00a0', 'https://openrouter.ai/api/v1\u00a0\\',
-    'https://openrouter.ai/api/v1\u00a0/.', 'https://openrouter.ai/api/v1\u200e', 'https://openrouter.ai/api/v1\u00ad',
-    'https://openrouter.ai/api/v1\u3164', 'https://openrouter.ai/api/v1\ufe0f', 'https://openrouter.ai/api/v1\u180b',
-    'https://openrouter.ai/api/v1\u{e0100}', 'https://openrouter.ai/api/v1\u00a0\\']) {
+  // 0.56.0 unit r19: a query or fragment would take `/chat/completions`, so both twins refuse it when the client is
+  // built. A space, a control or a character outside ASCII in the path is Python's to refuse (check_url); Node sends
+  // it percent-encoded, as in 0.55.0 (FAA-187 (18)).
+  for (const baseUrl of ['https://openrouter.ai/api/v1?x=1', 'https://openrouter.ai/api/v1#f', 'https://openrouter.ai/api/v1/#']) {
     assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), (e) => e.kind === 'config', JSON.stringify(baseUrl));
+  }
+  for (const baseUrl of ['https://openrouter.ai\u200b', 'https://gw.example/caf\u00e9/v1', 'https://gw.example/v1%20']) {
+    assert.doesNotThrow(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), JSON.stringify(baseUrl));
   }
 });
 

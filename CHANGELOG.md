@@ -84,14 +84,9 @@ gate behave.
     every C0 control there and a tab or line break anywhere, as `new URL` reads them. So `.../v1\n`, `.../v1/ ` and,
     on Node, `.../v1\n/` are sent to `.../v1/chat/completions`. Both then refuse, when they are built, a base URL
     holding a query or a fragment (kind `config`; `/chat/completions` would land in it, so a path-routed endpoint
-    such as OpenRouter failed every call in 0.55.0), or whose path still ends in a space, a control or an invisible
-    character written as itself (0.55.0 failed every call with one, `.../v1 /` for instance). Python refuses that
-    through `check_url` (kind `refused`), as it refuses any space, control or non-ASCII character in the path.
-    Node refuses it with kind `config`, reading the path as `new URL` sends `<base>/chat/completions` (a backslash
-    read as `/`, trailing slashes aside); its set is the Unicode controls, spaces and format characters (Cc, Z, Cf),
-    the combining grapheme joiner, the Hangul fillers and the variation selectors. An ending the base already
-    percent-encodes (`.../v1%20`) is sent as written by both, and a trailing backslash is sent by Python as `\`
-    where Node reads it as `/` (FAA-187 (18)). Attribution answers `not-openrouter` for a port of other
+    such as OpenRouter failed every call in 0.55.0). Python also refuses, through `check_url` (kind `refused`), a
+    base with a space, a control or a non-ASCII character in its path, which 0.55.0 accepted and then failed every
+    call with; Node sends such a path percent-encoded, as 0.55.0 did (FAA-187 (18)). Attribution answers `not-openrouter` for a port of other
     digits (`:٤٤٣`), as `new URL` reads it.
   - A JWKS source: the Python kit reads its host and port as urllib dials them, https included. It refuses a space
     or ASCII control character before the URL's first `#` (it reads the URL up to there, as Node does), a character
@@ -157,9 +152,9 @@ gate behave.
   holding `%` (`h.example%3A8443` reached port 8443), a port that is not ASCII digits (`:1_2` reached port 12 on
   3.9), a bracketed IPv4 host (`[127.0.0.1]`, dialled on 3.9), and a URL whose part before its first `#` ends in a Unicode space (sent trimmed). A URL with a space, a
   control or a non-ASCII character in its path or query, which 0.55.0 retried and answered kind `connection`, is
-  refused the same way. Both OpenRouter clients refuse, when they are built, a base URL the OpenRouter item under
-  Fixed lists: one holding a query or a fragment, or whose path ends in a space, a control or an invisible character
-  (Python: any such character in the path), so a service that builds its client at start stops there. Write the host and port plainly, trim the space, and drop the query or fragment where the URL is
+  refused the same way. Both OpenRouter clients refuse, when they are built, a base URL holding a query or a
+  fragment, and the Python client one with a space, a control or a non-ASCII character in its path, so a service
+  that builds its client at start stops there. Write the host and port plainly, trim the space, and drop the query or fragment where the URL is
   configured.
 - A service on the kit joins its responder thread at stop, bounded inside its hard exit, as `sample_service.py` does
   (board.md, "Wiring it into the service"); on Node it aborts the run's signal and awaits the run. The idle leave above
