@@ -143,12 +143,15 @@ class DirectoryTests(unittest.TestCase):
 
     def test_the_writer_does_not_emit_a_manifest_named_after_a_backslash(self):
         # provider.md: a writer does not emit one until every reader accepts it; Fabric's registry has not re-pinned
-        # (CT-192). The refusal names the spelling every reader accepts.
+        # (CT-192). The refusal names the spelling every Fabric release reads.
         for manifest in ("C:\\Agents\\example\\fabric-agent.json", "~\\example\\fabric-agent.json"):
             with self.subTest(manifest), self.assertRaises(fp.ProviderError) as caught:
                 fp.write_provider_entry(entry(manifest=manifest), self.providers, self.services)
             self.assertIn("CT-192", str(caught.exception))
             self.assertIn("/fabric-agent.json", str(caught.exception))
+            # 0.57.0 seam r1: Fabric v0.3.15 reads only ~/ or / on Windows; a drive letter waits for its repin (CO-479)
+            self.assertIn("~/.../fabric-agent.json", str(caught.exception))
+            self.assertNotIn("every reader accepts", str(caught.exception))
             self.assertFalse(self.providers.exists() and any(self.providers.iterdir()))
 
     def test_on_windows_the_directory_is_under_local_app_data(self):

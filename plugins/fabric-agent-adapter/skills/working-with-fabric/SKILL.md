@@ -230,7 +230,7 @@ already approved.
   on it.
 - Human gates stay (OA-5): sign-in, a one-time code, consent, payment or top-up, a typed secret, spend above a limit
   (handed over with its link and amount, never asked in chat), a passkey, a comparison of codes with another person
-  (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
+  or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than
   the relayed one and his quoted words. You then lead your own part of the task.
@@ -316,7 +316,7 @@ work.
 | `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, call again within your own mandate if it covers the part, else pass the refusal to the agent that called you, and only the lead asks him, once, about that part alone; `mandate-capability-missing`: no mandate covers that step, only his decision |
 | `decision-invalid` | the decision names another action or object, is older than 24 hours, lies over 60 s ahead of the service's clock, or is malformed; or the mandate is (`data.detail` `mandate-malformed`, `-widened`, `-expired`, `-early`, `-not-for-this-call`) | never edit, widen or re-date it; ask the operator again when their words do not cover this call |
 | `approval-required` with `data.actionDigest` | a caller outside the machine's trust (T2): a chat decision changes nothing | an `approval/1` for that digest through the hub |
-| `human-step-required` with `data.humanStep` and `data.url` | a sign-in, one-time code, consent, payment or top-up, typed secret, spend above a limit, passkey or comparison of codes stays the person's | hand the person `data.url`: a path on the service's origin as Fabric Dashboards' `open_link` (`fallback=never`), an https URL as it is; never take the step or ask for the secret; continue other work |
+| `human-step-required` with `data.humanStep` and `data.url` | a human gate of OA-5 (above) stays the person's | hand the person `data.url`: a path on the service's origin as Fabric Dashboards' `open_link` (`fallback=never`), an https URL as it is; never take the step or ask for the secret; continue other work |
 
 Never tell the person a call failed or succeeded when its outcome is unknown.
 

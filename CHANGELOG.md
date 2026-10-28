@@ -30,10 +30,16 @@ The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA
 
 ### Upgrading
 
-- A bundle or provider entry pinned to `00e050ba` or an earlier supported commit keeps working; `adapt_project.py`
+- A bundle pinned to `00e050ba` or an earlier supported commit keeps working; `adapt_project.py`
   accepts it (`SUPPORTED_CONTRACT_COMMITS`). A new scaffold writes `3830a33`.
 - DEC-0139 (the machines' report) and DEC-0138's organization server route reach no kit code: the adapter registers
   their protocol revisions and implements neither side.
+- On Windows, a provider entry written by `fabric_provider.py` now goes to the folder Fabric reads
+  (`%LOCALAPPDATA%\passioncode-fabric\providers`). Fabric v0.3.15 and earlier read a manifest path only under `~/` or
+  `/`; a drive letter (`C:/.../fabric-agent.json`) is read by the Fabric release after v0.3.15 (CO-479). Until then
+  write the manifest path under `~/`. An entry an older kit wrote on Windows sits in
+  `%USERPROFILE%\.local\share\passioncode-fabric\providers`, which Fabric never read and `remove` no longer finds:
+  write it again and delete the old file.
 
 ## 0.56.0 (2026-10-28)
 

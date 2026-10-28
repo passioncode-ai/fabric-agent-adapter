@@ -142,20 +142,22 @@ class AComparisonOfCodesIsAHumanStep(unittest.TestCase):
         scenarios = {s["id"]: " ".join(s["expected"]) for s in json.loads(
             (ROOT / "test/evals/working-with-fabric/scenarios.json").read_text(encoding="utf-8"))["scenarios"]}
         for sid in ("human-step-required-hands-over-the-link", "operator-approval-binds-all-his-agents"):
-            self.assertIn("a comparison of codes", scenarios[sid], sid)
+            self.assertIn("or the choice to share without one", scenarios[sid], sid)
 
     def test_working_with_fabric_names_it_a_human_gate(self):  # operator-approval-binds-all-his-agents
         rule = section("working-with-fabric", "Step 5: while you work")
-        self.assertIn("a comparison of codes with another person (DEC-0142)", rule)
+        self.assertIn("a comparison of codes with another person or the choice to share without one (DEC-0142)", rule)
         refusals = section("working-with-fabric", "Refusals and lost answers")
         row = next(line for line in refusals.split("| `human-step-required`")[1:])
-        self.assertIn("comparison of codes stays the person's", row)
+        self.assertIn("a human gate of OA-5 (above) stays the person's", row)
 
     def test_the_service_references_list_seven_steps(self):  # service-reads-the-operators-mandate
         interop = flat("building-fabric-services/references/interop.md")
         self.assertIn("`passkey`, `comparison` (a comparison of codes between two people or the choice to share without one, DEC-0142)", interop)
+        self.assertIn("a reader pinned before it (a 0.56.0 or older kit, Fabric's node before CO-479) refuses the whole declaration", interop)
         delegation = flat("building-fabric-services/references/delegation.md")
         self.assertIn("`passkey`, and since DEC-0142 `comparison`: a comparison of codes between two people or the choice to share without one", delegation)
+        self.assertIn("a reader pinned before DEC-0142 refuses a whole declaration that names it", delegation)
 
 
 if __name__ == "__main__":
