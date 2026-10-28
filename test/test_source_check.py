@@ -140,7 +140,7 @@ class Findings(Tree):
         self.assertEqual(code, 1)
         rules = {(f["path"], f["line"]): f["rule"] for f in result["findings"]}
         self.assertIn("(line 2)", rules[("notes.md", 1)])
-        self.assertIn("(line 3)", rules[("data/<entry 3>.json", 0)])  # the path is printed with the entry masked
+        self.assertIn("(line 3)", rules[("data/<line 3>.json", 0)])  # the path is printed with the entry masked
         self.assertEqual(result["instanceStrings"], 2)  # the comment and the two-letter line are not entries
 
     def test_the_list_comes_from_the_environment_or_the_default(self):
@@ -170,8 +170,20 @@ class NeverRepeated(Tree):
             self.assertEqual(code, 1)
             for value in (HOME_NAME, OWNER, ACCOUNT, OWNER.casefold(), ACCOUNT.casefold(), FAKE_GITHUB):
                 self.assertNotIn(value, out + err, extra)
-        self.assertIn("data/<entry 2>.json", out)
+        self.assertIn("data/<line 2>.json", out)
         self.assertNotIn('"root"', out)
+
+    def test_a_secret_or_a_home_in_a_file_name_is_a_finding_and_masked(self):
+        self.write("cache_%s.json" % FAKE_GITHUB, "{}\n")
+        self.write("-" + "Users-" + HOME_NAME + "-proj/notes.md", "x\n")
+        for extra in ([], ["--json"]):
+            code, out, err = run(["check", str(self.root), *extra])
+            self.assertEqual(code, 1)
+            self.assertNotIn(FAKE_GITHUB, out + err)
+            self.assertNotIn(HOME_NAME, out + err)
+        text = run(["check", str(self.root)])[1]
+        self.assertIn("cache_<secret>.json:0: secret", text)
+        self.assertIn("-Users-<home>-proj/notes.md:0: home-path", text)
 
     def test_an_error_does_not_echo_the_root(self):
         code, out, err = run(["check", str(self.tmp / OWNER / "absent")])
@@ -237,12 +249,14 @@ class WhatIsRead(Tree):
         code, result, _ = self.json_check("--exclude", "vectors/*.json")
         self.assertEqual(code, 0, result["findings"])
 
-    def test_binary_files_are_counted_and_large_files_read(self):
-        self.write("img.bin", b"\x89PNG\0\0" + FAKE_GITHUB.encode(), mode="wb")
+    def test_binary_files_are_listed_and_large_files_read(self):
+        self.write("records.sqlite", b"SQLite format 3\0" + MAC_HOME.encode(), mode="wb")
         self.write("big.log", "a" * (2 << 20) + "\n" + MAC_HOME + "\n")
         code, result, _ = self.json_check()
         self.assertEqual(code, 1)
         self.assertEqual(result["skipped"]["binary"], 1)
+        self.assertEqual(result["notRead"], [{"path": "records.sqlite", "why": "binary"}])
+        self.assertIn("records.sqlite: not read (binary)", run(["check", str(self.root)])[1])
         self.assertEqual([(f["path"], f["line"]) for f in result["findings"]], [("big.log", 2)])
 
     def test_line_numbers_are_an_editors(self):
@@ -310,7 +324,12 @@ class Refusals(Tree):
     def test_a_named_list_that_is_missing_is_an_error(self):
         code, _, err = run(["check", str(self.root), "--instance-strings", str(self.outside / "absent.txt")])
         self.assertEqual(code, 2)
-        self.assertIn("cannot be read", err)
+        self.assertIn("does not exist", err)
+        bad = self.outside / "latin1.txt"
+        bad.write_bytes(b"caf\xe9\n")
+        code, _, err = run(["check", str(self.root), "--instance-strings", str(bad)])
+        self.assertEqual(code, 2)
+        self.assertIn("is not UTF-8", err)
 
     def test_a_root_that_is_not_a_folder(self):
         code, _, err = run(["check", str(self.root / "absent")])
@@ -357,7 +376,7 @@ class TheSkillsTeachIt(unittest.TestCase):
         for words in ("never repeats", "Exit `0`: no finding and every file read; `1`: at least one finding",
                       "a file could not be read", "A list inside the tree is refused", sc.IGNORE_FILE,
                       "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` or `~/.config`",
-                      "`<entry N>`", "`<home>`", "its line in the owner's list", "never followed", "Git was not used",
+                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used",
                       "`fabric_paths.service_dirs`", "`<id>.<instance>`", "(LC-09)", "FAA-188 part 2",
                       "private-terms.txt"):
             self.assertIn(words, ref)

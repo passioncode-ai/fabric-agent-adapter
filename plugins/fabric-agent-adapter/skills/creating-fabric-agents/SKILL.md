@@ -73,7 +73,8 @@ failures, a retro), distil it before writing code:
    failures and dead ends).
 3. **Convert every trap into a planted eval fixture.** The new agent is not done until
    it has been watched rejecting the exact defects its predecessors were burned by:
-   knowledge transfers as a check, not as prose.
+   knowledge transfers as a check, not as prose. A fixture carries the defect on neutral
+   ids, never the predecessor's owner, paths or accounts.
 4. Record the pack in the new project as `docs/knowledge-pack.md` with its sources, so
    the provenance of every borrowed decision survives the person who borrowed it.
 
@@ -127,7 +128,7 @@ repository address of the owner's account, folders, the owner, accounts, hosts) 
 named variable with a neutral default and a committed `*.example`; records, logs and state documents live in the
 instance folder; fixtures use neutral ids. Load [the source and the instance](references/source-and-instance.md). The
 sibling's `scripts/fabric_source_check.py check <project-root>` finds instance data in the tree without repeating it;
-the skeleton is done when it exits 0. Handing the source over stays the owner's act.
+run it with the owner's list of their own strings, or record that none was given; the skeleton is done when it exits 0. Handing the source over stays the owner's act.
 
 ## Step 3: scaffold the provider bundle
 

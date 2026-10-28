@@ -10,13 +10,15 @@ import wait for the contract's decision on CT-194 (part 2).
 
 - **`fabric_source_check.py check`** (adapting-projects-to-fabric) reads the files a source would carry (what Git would
   commit; every file when Git lists none) and reports, by path, line and kind: a path inside a person's home folder
-  (`home-path`: macOS, Linux and Windows forms in any case, the dashed form of DEC-0105 and the URL-encoded one), a
+  (`home-path`: macOS and Windows forms in any case, Linux `/home` and `/var/home`, the dashed form of DEC-0105 and the URL-encoded one), a
   value shaped like a credential by the contract's detector read line by line, a long random value under a
   credential's name or a private key block (`secret`), and a string from the owner's list of instance strings, kept
   outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
-  never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a path is
-  printed with an entry as `<entry N>` and a home name as `<home>`. It changes nothing: exit 0 with no finding and every
-  file read, 1 with a finding, 2 when it cannot run or a file could not be read. `.fabric-source-ignore` and
+  never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a file's
+  path is checked like its text and printed with an entry as `<line N>`, a home name as `<home>` and a credential-shaped
+  value as `<secret>`. Every text file is read whole; a binary or unreadable file is listed by its path as not read. It
+  changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file could
+  not be read. `.fabric-source-ignore` and
   `--exclude` leave out named files of synthetic test values; a neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors and seven test files named in its `.fabric-source-ignore` (`test_source_check`).

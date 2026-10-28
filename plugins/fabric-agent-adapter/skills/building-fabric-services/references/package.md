@@ -42,6 +42,9 @@ python3 scripts/fabric_package.py pack <folder>           # a dry run: the packa
 python3 scripts/fabric_package.py pack <folder> --apply   # writes fabric.package.json when nothing is wrong
 ```
 
+Run `adapting-projects-to-fabric/scripts/fabric_source_check.py check <folder>` first: a package carries the source,
+and the instance (the owner's paths, keys, strings) stays out of it (`references/source-and-instance.md` of that skill).
+
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
 `*.pyc`, and files that are credentials by name (`.env` and `.env.*` but `.env.example|sample|template`, `*.pem`, `*.key`,
 `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa`-style keys, `.npmrc`, `.netrc`, `.pypirc`). Remove them or pack a clean

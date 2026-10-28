@@ -17,18 +17,19 @@ the source would carry and reports, by path, line and kind, each place where the
   not a finding;
 - `instance-string`: a string from the owner's list of instance strings (names, accounts, hosts), kept outside the tree.
 
-It never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a
-finding names its path (an entry of the list or a home folder's name in the path is printed as `<entry N>` or
-`<home>`), line, kind and rule, and an instance string by its line in the owner's list. It changes nothing. Exit 0:
-every file was read and none holds a finding; 1: at least one finding; 2: the check could not run, or a file could not
-be read (the summary counts them).
+A file's path is read as a line is (line 0). It never prints a value it found, a line that holds one, an entry of the
+owner's list or the folder it checks: a finding names its path (an entry of the list, a home folder's name or a
+credential-shaped value in the path printed as `<line N>`, `<home>` or `<secret>`), line, kind and rule, and an
+instance string by its line in the owner's list. It changes nothing. Exit 0: every text file was read and none holds a
+finding; 1: at least one finding; 2: the check could not run, or a file could not be read. A binary or unreadable file
+is listed by its path, as `not read`.
 
   fabric_source_check.py check [ROOT] [--instance-strings FILE] [--exclude GLOB ...] [--json]
 
 The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), or, when ROOT is not
 in a Git checkout or Git lists nothing in it, every file outside `.git`, `node_modules`, `__pycache__` and virtual
 environments. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
-its first 8 KiB) is not read; the summary counts it. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
+its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
 (`$XDG_CONFIG_HOME` or `~/.config`; `%APPDATA%` on Windows) when it exists: one string per
@@ -150,10 +151,23 @@ def _instance_finding(text: str, entries: List[str]) -> Optional[str]:
     return "a string from the owner's list (line %d)" % spans[0][2] if spans else None
 
 
+def _secret_spans(text: str) -> List[Tuple[int, int]]:
+    """The spans of credential-shaped values in a text, as `_secret_finding` reads them."""
+    spans = [m.span() for m in _secrets.JWT_SHAPE.finditer(text) if _real(m.group(0))]
+    spans += [m.span() for m in PROVIDER_KEY.finditer(text)
+              if _real(m.group(0)) and (m.start() == 0 or not text[m.start() - 1].isalnum())]
+    spans += [m.span() for m in _secrets._BEARER_INSIDE.finditer(text) if _real(m.group(0))]
+    spans += [m.span(2) for m in ASSIGNED.finditer(text)
+              if _secrets.credential_name(m.group(1)) and _secrets._long_secret(m.group(2)) and _real(m.group(2))]
+    return spans
+
+
 def redact(path: str, entries: List[str]) -> str:
-    """A path as it may be printed: each owner's string as `<entry N>`, each real home folder's name as `<home>`."""
-    marks = [(s, e, "<entry %d>" % n) for s, e, n in _entry_spans(path, entries)]
+    """A path as it may be printed: an owner's string as `<line N>` (its line in the owner's list), a real home
+    folder's name as `<home>`, a credential-shaped value as `<secret>`."""
+    marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     marks += [(s, e, "<home>") for s, e in _home_names(path)]
+    marks += [(s, e, "<secret>") for s, e in _secret_spans(path)]
     out, last = [], 0
     for start, end, label in sorted(marks):
         if start < last:
@@ -228,6 +242,7 @@ def check(root: Path, entries: List[str], globs: List[str]) -> Dict[str, object]
     findings: List[Dict[str, object]] = []
     read = 0
     skipped = {"binary": 0, "unreadable": len(unreadable)}
+    not_read: List[Dict[str, str]] = []
 
     def add(path: str, line: int, kind: str, rule: str) -> None:
         findings.append({"path": redact(path, entries), "line": line, "kind": kind, "rule": rule})
@@ -235,9 +250,8 @@ def check(root: Path, entries: List[str], globs: List[str]) -> Dict[str, object]
     for path in files:
         if _ignored(path, globs):
             continue
-        rule = _instance_finding(path, entries)
-        if rule:
-            add(path, 0, "instance-string", rule + " in the file's path")
+        for kind, rule in _text_findings(path, entries):  # a name carries instance data as a line does
+            add(path, 0, kind, rule + " in the file's path")
         full = root / path
         try:
             if full.is_symlink():  # Git commits the path a link names: check it, never follow it
@@ -251,15 +265,17 @@ def check(root: Path, entries: List[str], globs: List[str]) -> Dict[str, object]
                 data = handle.read()
         except OSError:
             skipped["unreadable"] += 1
+            not_read.append({"path": redact(path, entries), "why": "unreadable"})
             continue
         if b"\0" in data[:8192]:
             skipped["binary"] += 1
+            not_read.append({"path": redact(path, entries), "why": "binary"})
             continue
         read += 1
         for number, line in _lines(data):
             for kind, rule in _text_findings(line, entries):
                 add(path, number, kind, rule)
-    return {"mode": mode, "files": read, "skipped": skipped, "findings": findings}
+    return {"mode": mode, "files": read, "skipped": skipped, "notRead": not_read, "findings": findings}
 
 
 def default_list(platform: Optional[str] = None, env: Optional[Dict[str, str]] = None) -> Path:
@@ -311,18 +327,21 @@ def run(argv: Optional[List[str]] = None) -> int:
         root = Path(args.root).expanduser().resolve()
         if not root.is_dir():
             raise CheckError("ROOT is not a folder")
-        list_path, named = _list_path(args.instance_strings)
+        list_path, _ = _list_path(args.instance_strings)
         entries: List[str] = []
         if list_path is not None:
             resolved = list_path.resolve()
             if resolved == root or root in resolved.parents:
                 raise CheckError("the owner's list is inside the tree it checks, where it would travel with the source; "
                                  "keep it in your configuration folder (passioncode-fabric/%s)" % LIST_NAME)
+            if not resolved.is_file():
+                raise CheckError("the owner's list named by --instance-strings or FABRIC_INSTANCE_STRINGS does not exist")
             try:
                 entries = read_list(resolved)
-            except (OSError, UnicodeDecodeError):
-                if named:
-                    raise CheckError("the owner's list cannot be read as UTF-8")
+            except UnicodeDecodeError:
+                raise CheckError("the owner's list is not UTF-8")
+            except OSError:
+                raise CheckError("the owner's list cannot be read")
         result = check(root, entries, ignore_globs(root, args.exclude))
     except CheckError as exc:
         print("fabric_source_check.py: %s" % exc, file=sys.stderr)
@@ -337,6 +356,8 @@ def run(argv: Optional[List[str]] = None) -> int:
     else:
         for f in findings:  # type: ignore[union-attr]
             _print("%s:%s: %s (%s)" % (f["path"], f["line"], f["kind"], f["rule"]))
+        for n in result["notRead"]:  # type: ignore[union-attr]
+            _print("%s: not read (%s)" % (n["path"], n["why"]))
         _print("%d file(s) read (%s), %d finding(s); not read: %d binary, %d unreadable; %d instance string(s) listed%s"
                % (result["files"], "what Git would commit" if result["mode"] == "git" else "every file, Git not used",
                   len(findings), skipped["binary"], skipped["unreadable"], listed,  # type: ignore[index]
