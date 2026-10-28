@@ -109,12 +109,16 @@ gate behave.
 ### Added
 
 - `FABRIC_SESSION_NO_REPOSITORIES=1` turns the transcript read off (FAA-160); `fabric_session.py status` says
-  whether it is on, off or waiting for Fabric. The repositories of a turn can miss one (FAA-174): a turn longer
+  whether it is on (only while a running Fabric advertises `session-hooks/1` and takes the repositories), off or
+  waiting for Fabric. The repositories of a turn can miss one (FAA-174): a turn longer
   than the transcript's last 512 KB names only what that tail shows; until FAA-184 they can also name a wrong one,
   since a relative `git -C` in a later Bash call is read against the session's folder.
 - The reference service's dashboard shows a moved slot with a Take back button (`POST /api/board/take-back`, operator
   only; FAA-157), and the button has its tool: `board.take-back`, a `relayed` action an agent whose client sets `_meta`
-  calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125). Its `/mcp` reads a loopback call the service token authenticated as T0. The
+  calls with the operator's decision (Claude Code and Codex reach the page until Fabric forwards decisions, CT-125).
+  The tool is a manifest capability too (effect `change-policy`, idempotency `required`), as every tool the well-known
+  lists must be: `register --board-project <uuid>` writes it into the manifest, and a serve whose board mode differs from
+  the registered manifest rewrites the manifest to match, so `check_service.py` passes the sample with its board on. Its `/mcp` reads a loopback call the service token authenticated as T0. The
   page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
   before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
   repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool, and each take-back is

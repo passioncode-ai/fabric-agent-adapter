@@ -13,7 +13,9 @@ once, and `sample.draft` is a job that stops for a titled choice before it compl
 Opt-in, off by default: `serve --board-project <Project uuid>` also answers that Project's `sample.echo` requests on
 Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Responder, from a board.respond grant whose
 credential is in `<data>/board.credential` (0600; `--board-credential` names another file). The request body is data:
-the gate admits plain text of at most 2,000 characters, and the answer is a reply carrying the same text.
+the gate admits plain text of at most 2,000 characters, and the answer is a reply carrying the same text. Its
+dashboard's Take back has the tool `board.take-back`, which the manifest lists while the board is on: register with the
+same `--board-project`, and a serve whose board mode differs from the registered manifest rewrites it to match.
 """
 
 from __future__ import annotations
@@ -93,10 +95,24 @@ CAPABILITIES = [
      "output": _schema("sample.draft-output", {"type": "object", "additionalProperties": False,
                                                  "properties": {"title": {"type": "string"}, "body": {"type": "string"}}, "required": ["title", "body"]})},
 ]
+#: The take-back tool as a manifest capability (0.56.0 product r28): every tool the well-known lists is in the
+#: manifest, so the service writes it there while it serves the board, and leaves it out while it does not.
+TAKE_BACK_CAPABILITY = {
+    "name": TAKE_BACK["tool"], "effect": "change-policy", "idempotency": "required", "job": False,
+    "description": "Take back a board slot the operator moved away.",
+    "input": _schema("board.take-back-input", TAKE_BACK_INPUT),
+    "output": _schema("board.take-back-output", {"type": "object", "additionalProperties": False,
+                                                  "properties": {"capability": {"type": "string"}, "moved": {"const": False}},
+                                                  "required": ["capability", "moved"]})}
+
+
+def served_capabilities(board: bool) -> list:
+    return CAPABILITIES + ([TAKE_BACK_CAPABILITY] if board else [])
 
 
 class Service:
     def __init__(self, args: argparse.Namespace):
+        self.args = args
         self.id = args.id
         self.instance = args.instance
         self.name = args.name
@@ -132,9 +148,21 @@ class Service:
                                        credential_file=self.board_credential, checkpoint_file=self.data / "board-checkpoint.json",
                                        handler=self.board_answer, admit=self.board_admit, emit=self.log.append, service=self.id)
             # Every button has a tool (DEC-0121): the page's Take back is this relayed action, the operator's decision.
-            self.mcp.add_tool({"name": TAKE_BACK["tool"], "description": "Take back a board slot the operator moved away.",
-                               "inputSchema": TAKE_BACK_INPUT}, self.board_take_back_tool, action=TAKE_BACK, target="capability")
+            cap = TAKE_BACK_CAPABILITY
+            self.mcp.add_tool(fi.tool_for_capability(cap, cap["input"], cap["output"]), self.board_take_back_tool,
+                              action=TAKE_BACK, target="capability")
+        self.sync_manifest(self.args)
         self.log.append("service.started", "info", "%s started on build %s." % (self.name, self.build["commit"]))
+
+    def sync_manifest(self, args: argparse.Namespace) -> None:
+        """A registered manifest lists the take-back tool exactly when this run serves it (0.56.0 product r28): rewritten
+        only when the board mode changed, so a restart in the same mode leaves it as it is."""
+        try:
+            listed = {c.get("name") for c in json.loads((self.data / "fabric-agent.json").read_text(encoding="utf-8"))["capabilities"]}
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return  # not registered here, or not a manifest this service wrote: nothing to keep in step
+        if (TAKE_BACK["tool"] in listed) != (self.board is not None):
+            write_manifest(args, self.data, board=self.board is not None)
 
     # --- the project board (opt-in): the input gate and the answer -------------------
     def board_moved(self) -> list:
@@ -455,16 +483,17 @@ def serve(args: argparse.Namespace) -> int:
     return 0
 
 
-def write_manifest(args: argparse.Namespace, data: Path) -> Path:
-    """The provider manifest for this service, naming its descriptor (G-07), with its schemas beside it."""
+def write_manifest(args: argparse.Namespace, data: Path, board: bool = False) -> Path:
+    """The provider manifest for this service, naming its descriptor (G-07), with its schemas beside it; with `board`,
+    the take-back tool too."""
     schemas = data / "fabric" / "schemas"
-    for cap in CAPABILITIES:
+    for cap in served_capabilities(board):
         for side in ("input", "output"):
             fs.atomic_write(schemas / ("%s-%s.schema.json" % (cap["name"], side)),
                             (json.dumps(cap[side], indent=2) + "\n").encode(), 0o600)
     origin = "http://127.0.0.1:%d" % args.port
     capabilities = []
-    for cap in CAPABILITIES:
+    for cap in served_capabilities(board):
         capabilities.append({
             "id": "urn:fabric:capability:%s" % cap["name"], "name": cap["name"], "description": cap["description"],
             "inputSchema": cap["input"]["$id"], "outputSchema": cap["output"]["$id"],
@@ -494,7 +523,7 @@ def write_manifest(args: argparse.Namespace, data: Path) -> Path:
 
 def register(args: argparse.Namespace) -> int:
     data = Path(args.data_dir)
-    manifest = write_manifest(args, data)
+    manifest = write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
     descriptor = {
         "protocol": fs.PROTOCOL, "id": args.id, "instance": args.instance, "name": args.name,
         "summary": "Sample fabric-service/0.1 service.",
@@ -535,6 +564,8 @@ def build_parser() -> argparse.ArgumentParser:
             p.add_argument("--board-capability", default="sample.echo")
             p.add_argument("--board-credential", help="the board.respond credential file (0600); default <data>/board.credential")
         else:
+            p.add_argument("--board-project", help="the Project the service will answer on the board: lists its take-back "
+                                                   "tool in the manifest (serve with the same --board-project)")
             p.add_argument("--services-dir")
             p.add_argument("--label")
             p.add_argument("--plist")

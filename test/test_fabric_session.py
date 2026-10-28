@@ -2089,7 +2089,7 @@ class Status(Base):
         self.assertEqual(done.returncode, 0)
         self.assertIn("Next: Call fabric_whoami.", done.stdout)
         self.assertNotIn("DOOR-TOKEN-SENTINEL", done.stdout)
-        self.assertIn("Repositories of a turn: not read until Fabric takes them", done.stdout)
+        self.assertIn("Repositories of a turn: not read until a running Fabric takes them", done.stdout)
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--json", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)
         self.assertEqual(json.loads(done.stdout)["hub"]["state"], "running")
@@ -2100,6 +2100,13 @@ class Status(Base):
         mark = fs.state_root(env=self.env) / fs.REPOSITORIES_MARK
         mark.parent.mkdir(parents=True, exist_ok=True)
         mark.write_text("")
+        # 0.56.0 product r28: a mark left after Fabric quit, or a Fabric without the hooks, reads nothing.
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        self.hub(features=[])
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        self.hub(pid=self.dead_pid(), features=["session-hooks/1"])
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        self.hub(features=["session-hooks/1"])
         self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "on")
         self.assertEqual(fs.status(self.repo, dict(self.env, **{fs.NO_REPOSITORIES_ENV: "1"}))["transcriptRead"], "off")
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],

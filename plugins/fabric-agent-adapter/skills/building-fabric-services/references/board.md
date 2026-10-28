@@ -42,7 +42,7 @@ operator gives in Fabric (Agents & access): callee `fabric`, capability `board.r
 
 The responder runs inside the service process, started after the instance lock like every other piece of state
 (SKILL.md, Step 3). [`sample_service.py`](../scripts/sample_service.py) does it behind `serve --board-project <uuid>`,
-off by default:
+off by default (register it with the same `--board-project`, so its manifest lists the take-back tool below):
 
 ```python
 import fabric_board as fbd, fabric_hub as fhb
@@ -258,7 +258,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   it on its dashboard (FAA-157): a moved slot shows a Take back button that posts `POST /api/board/take-back` from the
   operator's signed-in session with the `X-Fabric-Request` header; the service token alone is refused. Since 0.56.0 the
   button has its tool, `board.take-back` with `{capability}`, declared under `extensions/actions/0.1` with gate
-  `relayed` and target `capability`: an agent whose MCP client sets `_meta` calls it over `/mcp` with the operator's
+  `relayed` and target `capability`, and a capability of the manifest like every tool the well-known lists
+  (`interop.well-known-capabilities`): an agent whose MCP client sets `_meta` calls it over `/mcp` with the operator's
   decision in `_meta.decision` (a call without one is `operator-decision-required`); Claude Code and Codex send
   arguments only, so until CT-125 they hand the operator the page as Fabric Dashboards' `open_link`. Either door records
   the take-back as a `board.slot.returned` event (info) naming who decided it (`by`, `via`, `caller`), never the

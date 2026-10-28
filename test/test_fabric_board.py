@@ -1895,6 +1895,63 @@ class SampleWiringTests(unittest.TestCase):
             self.assertIn("board.request.refused", kinds)
             svc.board.shutdown(0.1)
 
+    def test_the_probe_passes_the_sample_with_its_board_on(self):
+        """0.56.0 product r28: the take-back tool the well-known lists is in the manifest (registered with the board, or
+        rewritten by a serve whose board mode differs), so the kit's own probe passes the sample either way."""
+        import socket
+        import urllib.request
+        sample = importlib.import_module("sample_service")
+        scripts = Path(sample.__file__).parent
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            env = dict(os.environ, HOME=str(tmp), XDG_DATA_HOME=str(tmp / "share"), LOCALAPPDATA=str(tmp / "local"))
+            hub = FakeHub(fh.fabric_root(env=env), capabilities=("sample.echo",))
+            self.addCleanup(hub.close)
+            data, services = tmp / "data", tmp / "services"
+            data.mkdir(mode=0o700)
+            (data / "board.credential").write_text(hub.credential)
+            os.chmod(data / "board.credential", 0o600)
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            common = ["--port", str(port), "--data-dir", str(data)]
+
+            def names():
+                return [c["name"] for c in json.loads((data / "fabric-agent.json").read_text())["capabilities"]]
+
+            def probed(board):
+                proc = subprocess.Popen([sys.executable, sample.__file__, "serve", *common] + (["--board-project", PROJECT] if board else []),
+                                        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    deadline = time.monotonic() + 20
+                    while True:
+                        try:
+                            with urllib.request.urlopen("http://127.0.0.1:%d/.well-known/fabric-service" % port, timeout=0.5):
+                                break
+                        except OSError:
+                            self.assertLess(time.monotonic(), deadline, "the sample never answered")
+                            time.sleep(0.1)
+                    out = subprocess.run([sys.executable, str(scripts / "check_service.py"), "sample", "--services-dir", str(services),
+                                          "--json"], capture_output=True, text=True, env=env, timeout=60)
+                    return {r["rule"]: r["verdict"] for r in json.loads(out.stdout)["results"]}
+                finally:
+                    proc.terminate()
+                    proc.wait(timeout=10)
+
+            subprocess.run([sys.executable, sample.__file__, "register", *common, "--services-dir", str(services),
+                            "--board-project", PROJECT], env=env, check=True, capture_output=True)
+            self.assertIn("board.take-back", names())
+            rules = probed(board=True)
+            self.assertEqual(rules["interop.well-known-capabilities"], "PASS")
+            self.assertEqual(rules["interop.tools-match"], "PASS")
+            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+            rules = probed(board=False)  # the board off: the manifest drops the tool it no longer serves
+            self.assertNotIn("board.take-back", names())
+            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+            rules = probed(board=True)  # and on again, though registered without it now
+            self.assertIn("board.take-back", names())
+            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+
     @unittest.skipIf(sys.platform == "win32", "Windows ends a process without a catchable SIGTERM (TerminateProcess)")
     def test_a_stop_leaves_the_board_session_and_forgets_the_record(self):
         """FAA-163: SIGTERM to the reference service with the board on sends the session's DELETE (the slot is free)

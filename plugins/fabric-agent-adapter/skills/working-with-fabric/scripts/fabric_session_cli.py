@@ -245,10 +245,13 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     binary = find_fabric_bin(platform, env)
     hub = locate_hub(root)
     claude = claude_registration(cwd, env)
+    active = hub["state"] == "running" and HOOK_FEATURE in hub.get("features", [])
+    # "on" only when the Stop hook would read it now: the hooks active and Fabric taking the repositories (a mark left
+    # after Fabric quit reads nothing, as hook_spool returns before the read; 0.56.0 product r28).
     report = {"fabricRoot": str(root), "hub": hub, "fabricMcp": str(binary) if binary else None,
               "claudeCode": claude, "codex": codex_registered(env),
-              "sessionHooks": "active" if HOOK_FEATURE in hub.get("features", []) else "inert",
-              "transcriptRead": "off" if repositories_off(env) else ("on" if repositories_wanted(env) else "waiting")}
+              "sessionHooks": "active" if active else "inert",
+              "transcriptRead": "off" if repositories_off(env) else ("on" if active and repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later; fabric-mcp is not at %s." % ", ".join(
@@ -280,7 +283,7 @@ def print_status(report: Dict[str, Any]) -> None:
     print("Repositories of a turn: %s" % {
         "on": "read from the session's transcript, as this shell's environment has it (turn off: %s=1)" % NO_REPOSITORIES_ENV,
         "off": "off (%s or the file %s in the hooks' folder)" % (NO_REPOSITORIES_ENV, NO_REPOSITORIES_MARK),
-        "waiting": "not read until Fabric takes them"}[report["transcriptRead"]])
+        "waiting": "not read until a running Fabric takes them"}[report["transcriptRead"]])
     print("Next: %s" % report["next"])
 
 
