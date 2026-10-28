@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.58.0 (2026-10-28)
+
+Portable agents, part 1 (FAA-188, RM-36): an agent keeps its source apart from its instance from its first commit, and
+a local check finds instance data in a source tree without repeating it. The manifest of a source, its export and
+import wait for the contract's decision on CT-194 (part 2).
+
+### Added
+
+- **`fabric_source_check.py check`** (adapting-projects-to-fabric) reads the files a source would carry (what Git would
+  commit) and reports, by path, line and kind, a path inside a person's home folder (`home-path`, macOS, Linux and
+  Windows forms), a value shaped like a credential by the contract's detector or a private key block (`secret`), and a
+  string from the owner's list of instance strings, kept outside the tree (`instance-string`). It never prints a value
+  it found, a line that holds one or an entry of the owner's list, and changes nothing: exit 0 with no finding, 1 with
+  one, 2 when it cannot run. `.fabric-source-ignore` and `--exclude` leave out folders of synthetic test values; a
+  neutral home and a value that says it is synthetic are not findings. Standard library only; the adapter's own tree
+  passes it (`test_source_check`).
+- **references/source-and-instance.md** (both skills): the layout (instance values in a configuration outside the
+  repository with a neutral default and a committed `*.example`, records and state documents in the instance folder,
+  keys by name, fixtures on neutral ids) and the check.
+- creating-fabric-agents step 2 lays an agent out as source and instance and calls the skeleton done when the check
+  exits 0; step 5 runs it again. adapting-projects-to-fabric step 4c runs the check first, moves each finding out and
+  runs it again; a value already in Git history needs a fresh history, which stays the owner's act.
+- Trigger and scenario evals for both (`source-apart-from-instance`, `move-instance-data-out-of-an-existing-agent`);
+  the Windows CI job runs `test_source_check`.
+
+### Upgrading
+
+- Nothing to change: the check is new and opt-in. Handing a source over (a new remote, a push, a change of
+  visibility) stays the owner's act each time; the check reads the tree, never Git history.
+
 ## 0.57.0 (2026-10-28)
 
 The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA-176).
