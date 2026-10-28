@@ -110,7 +110,9 @@ issuer's fault, `issuer-unavailable` (DEC-0045); a gate without a trusted issuer
 DEC-0121 adds three codes to the one set, each 403: `operator-decision-required` (a `relayed` action called without the
 operator's decision), `decision-invalid` (a decision for another action or object, outside its 24 hours, or malformed)
 and `human-step-required`, which carries `data.humanStep` (`sign-in`, `consent`, `payment`, `secret`,
-`spend-above-limit`, `passkey`) and `data.url` (an https URL or a path on the service's origin) beside `detail`.
+`spend-above-limit`, `passkey`, and since DEC-0142 `comparison`: a comparison of codes between two people or the choice
+to share without one; a reader pinned before DEC-0142 refuses a whole declaration that names it, and a caller that validates the refusal
+against a `delegation-refusal.schema.json` pinned before DEC-0142 refuses that refusal) and `data.url` (an https URL or a path on the service's origin) beside `detail`.
 `refusal_from_action` / `refusalFromAction` turn an action decision into that refusal; a service's own fault never
 reaches the caller and reads as `unknown-state`, but for `mandate-capability-missing` (DEC-0141 MJ-1): the caller
 reads `operator-decision-required` with that `data.detail`, since no mandate covers the step and only a decision does. Since 0.51.0 the `operator-decision-required` message (free text in

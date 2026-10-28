@@ -262,6 +262,15 @@ class ProbeActionsRuleTests(unittest.TestCase):
                 # Each finding is named at its place inside the declaration (the whole key for an invalid one).
                 self.assertIn(case["findings"][0].split("~10.1", 1)[1] or "extensions/actions/0.1", evidence, case["name"])
 
+    def test_a_human_comparison_of_codes_is_a_step_the_probe_accepts(self):
+        # DEC-0142 (CT-186): AP-4's steps gain `comparison`, a comparison of codes between two people.
+        doc = with_actions([{"id": "compare-codes", "title": "Compare the codes", "tool": "sample.echo", "gate": "human",
+                             "humanStep": "comparison"}])
+        verdict, evidence = self.rules.well_known_actions_verdict(doc)
+        self.assertEqual(verdict, "PASS", evidence)
+        doc["extensions"][ACTIONS_KEY]["actions"][0]["humanStep"] = "comparing"
+        self.assertEqual(self.rules.well_known_actions_verdict(doc)[0], "FAIL")
+
     def test_well_known_actions_is_not_run_without_a_declaration(self):
         verdict, evidence = self.rules.well_known_actions_verdict(with_actions(None))
         self.assertEqual(verdict, "NOT_RUN")

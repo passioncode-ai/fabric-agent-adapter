@@ -6,7 +6,8 @@
 // lockOutcomeRules), fixtures/vectors/windows-token.json (DEC-0057, windowsTokenAclProblem, FAC-SEM-079), and
 // DEC-0061/0069: fixtures/vectors/service-peer.json (peerRefusal), fixtures/vectors/app-descriptor.json
 // (appDescriptorAction, appDescriptorStale), every service descriptor fixture and the FAC-SEM-085/086 semantic ones;
-// DEC-0122: every service-well-known-a2a* fixture with its validity re-checked by the contract's validator.
+// DEC-0122: every service-well-known-a2a* fixture with its validity re-checked by the contract's validator; DEC-0145:
+// every provider.schema.json fixture, the same way (provider-fixtures.json).
 // Never written by hand.
 //
 //   node test/fixtures/contract/vendor_vectors.mjs --contract <a clean checkout of the contract at the pin>
@@ -392,3 +393,20 @@ if (a2aFixtures.length !== 3 || a2aFixtures.filter((f) => f.valid).length !== 1)
 write('a2a-vectors.json', { about: "DEC-0122 at the pin: every service-well-known-a2a fixture as fixtures/catalogue.json lists it, its validity re-checked by the contract's validator against service-well-known.schema.json, with the instance path and keyword of each schema error. Written by vendor_vectors.mjs, never by hand.",
   source: 'fixtures/catalogue.json, fixtures/*/service-well-known-a2a*.json, schemas/service-well-known.schema.json', fixtures: a2aFixtures });
 console.log(`${a2aFixtures.length} a2a well-known fixtures`);
+
+// DEC-0145 (CT-192, FAA-176): every provider.schema.json fixture as fixtures/catalogue.json lists it, its validity
+// re-checked by the contract's validator, with the instance path and keyword of each schema error. The adapter's
+// fabric_provider.validate_provider_entry (the reader) is held to these documents, ungated.
+const validateProvider = createValidatorSync().getSchema(`${SCHEMA_PREFIX}schemas/provider.schema.json`);
+const providerFixtures = catalogue.filter((e) => e.schema === 'provider.schema.json').map((e) => {
+  const document = read(`fixtures/${e.path}`);
+  const ok = validateProvider(document) === true;
+  if (ok !== e.valid) throw new Error(`${e.path} is not ${e.valid ? 'valid' : 'invalid'} as the catalogue says`);
+  const errors = ok ? [] : (validateProvider.errors ?? []).map((x) => ({ instancePath: x.instancePath, keyword: x.keyword }));
+  if (!ok && e.keyword !== undefined && !errors.some((x) => x.keyword === e.keyword)) throw new Error(`${e.path} does not fail on the catalogue's keyword ${e.keyword}`);
+  return { name: e.name, valid: e.valid, ...(e.keyword === undefined ? {} : { keyword: e.keyword }), errors, document };
+});
+if (!providerFixtures.some((f) => f.name === 'provider-entry-windows-path' && f.valid)) throw new Error('the DEC-0145 positive provider fixture is missing');
+write('provider-fixtures.json', { about: "DEC-0145 at the pin: every provider.schema.json fixture as fixtures/catalogue.json lists it, its validity re-checked by the contract's validator, with the instance path and keyword of each schema error. Written by vendor_vectors.mjs, never by hand.",
+  source: 'fixtures/catalogue.json, fixtures/*/provider-entry-*.json, schemas/provider.schema.json', fixtures: providerFixtures });
+console.log(`${providerFixtures.length} provider fixtures`);

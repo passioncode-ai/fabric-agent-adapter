@@ -42,12 +42,18 @@ to a person at the first refusal (the refused draft is not kept), where this pag
   (`/fabric/v1/events`; building-fabric-services, `references/events-and-notifications.md`): counts and codes only, the
   judge model and rubric version, and `notMeasured` naming every family not computed that day. A metric not measured is
   null and named, never 0. The day goes in the event's `data` (`{schema, value}`, as `fabric_events.py` writes it), at
-  level `info` and without a notification. Until the contract carries the schema (A7), the producer names and pins its
-  own: `data.schema` is the absolute URI of the payload schema the agent publishes, and `data.value` stays within
+  level `info` and without a notification. `data.value` is valid against the contract's
+  `support-quality-daily.schema.json` (`support-quality-daily/1`, DEC-0095), `data.schema` is the absolute URI of the
+  producer's published copy of it (the contract's conformance row for this producer), and the value stays within
   DEC-0070's bounds (at most 32 members, each a scalar, a list of scalars or a flat object; per-lane counts as objects
-  such as `laneFailures` and `laneRecovered`; building-fabric-services, `references/protocol.md`). Check: the producer's
-  day passes `make_event`; a planted day that writes 0 for a family not computed fails; and a test runs every
-  `notMeasured` name the producer can emit through the published name pattern, iterating the producer's own list.
+  such as `laneFailures` and `laneRecovered`; building-fabric-services, `references/protocol.md`). A judge's
+  calibration, `calibration {week, labelled, helped}` with `calibrationChecks` beside it (DEC-0144), goes in only once
+  every reader of the feed it knows of has adopted DEC-0144: the producer then re-publishes its copy from DEC-0144's
+  bytes (CT-188), and leaves the calibration out when the judge or the rubric changed after the labelled week. A
+  reader validates against its own pinned copy, never one fetched by `$id`: the bytes under the unchanged `$id`
+  widened. Check: the producer's day passes `make_event` and validates against the producer's pinned copy of the
+  schema; a planted day that writes 0 for a family not computed fails; and a test runs every `notMeasured` name the
+  producer can emit through the published name pattern, iterating the producer's own list.
 
 ## Model lanes
 

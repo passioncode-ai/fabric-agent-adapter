@@ -41,6 +41,9 @@ PROTOCOL = "fabric-provider/0.1"
 URL_PATTERN = r"^http://127\.0\.0\.1:([1-9][0-9]{2,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])/mcp$"
 LOCAL_PATH_PATTERN = "^(~[\\\\/]|/(?![\\\\/])|[A-Za-z]:[\\\\/])[^\\u0000]*$"
 LOCAL_PATH_MAX = 1024
+# DEC-0145 (CT-192): the manifest is named fabric-agent.json after either separator, so a Windows path names it too. The
+# schema's pattern is a search, not a whole-value match; it is applied with its `$` read as \Z (R1, below).
+MANIFEST_PATTERN = r"(^|[\\/])fabric-agent\.json$"
 ARGV_MAX_ITEMS = 32
 ARGV_MAX_ITEM = 1024
 ENV_MAX = 64
@@ -55,6 +58,9 @@ _URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt]
 _SECRET_REF = re.compile(r"^secret-ref:([A-Za-z0-9][A-Za-z0-9._/:@-]{0,255})\Z")
 _LOCAL_PATH = re.compile(LOCAL_PATH_PATTERN)
 _URL = re.compile(URL_PATTERN)
+_MANIFEST = re.compile(MANIFEST_PATTERN[:-1] + r"\Z")
+# The manifest's name after a backslash: valid since DEC-0145, but no writer emits it until every reader accepts it.
+_MANIFEST_AFTER_BACKSLASH = re.compile(r"\\fabric-agent\.json\Z")
 # format: uri (RFC 3986 absolute URI): a scheme, a colon, then no whitespace or control character.
 _URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+\Z")
 # format: date-time (RFC 3339).
@@ -89,6 +95,10 @@ def services_dir() -> Path:
     home = Path.home()
     if sys.platform == "darwin":
         return home / "Library/Application Support/ai.passioncode.fabric/services"
+    if sys.platform == "win32":
+        # provider.md "Where the directory is" (DEC-0032): LOCALAPPDATA, never the roaming APPDATA.
+        local = os.environ.get("LOCALAPPDATA")
+        return (Path(local) if local else home / "AppData" / "Local") / "passioncode-fabric" / "services"
     return Path(os.environ.get("XDG_DATA_HOME") or str(home / ".local/share")) / "passioncode-fabric/services"
 
 
@@ -128,8 +138,9 @@ def validate_provider_entry(entry: Any) -> List[str]:
         problems.append("summary is at most 200 characters")
     manifest = entry["manifest"]
     if (not isinstance(manifest, str) or len(manifest) > LOCAL_PATH_MAX or not _LOCAL_PATH.fullmatch(manifest)
-            or not re.search(r"(^|/)fabric-agent\.json\Z", manifest)):
-        problems.append("manifest is an absolute or ~/ path to fabric-agent.json, at most %d characters, never a network share" % LOCAL_PATH_MAX)
+            or not _MANIFEST.search(manifest)):
+        problems.append("manifest is an absolute, ~/ or ~\\ path to fabric-agent.json (the name after either separator), at most %d characters, "
+                        "never a network share" % LOCAL_PATH_MAX)
     if "source" in entry:
         source = entry["source"]
         if not isinstance(source, dict) or not set(source) <= {"repository"}:
@@ -237,8 +248,15 @@ def _service_ids(directory: Path) -> Dict[str, str]:
 def write_provider_entry(entry: Dict[str, Any], directory: Optional[Path] = None, services: Optional[Path] = None) -> Path:
     """Installer-only. Refuses an invalid entry and an id that is already a service (FAC-SEM-013)."""
     problems = validate_provider_entry(entry)
-    if not problems:
-        problems = manifest_problems(entry)
+    if problems:
+        raise ProviderError("Provider entry is invalid: %s." % "; ".join(problems))
+    if _MANIFEST_AFTER_BACKSLASH.search(entry["manifest"]):
+        # provider.md (DEC-0145): a reader before DEC-0145, Fabric's registry among them, refuses this entry until it
+        # re-pins (CT-192), so the writer does not emit it yet.
+        raise ProviderError("The manifest's name follows a backslash, which a reader that has not re-pinned to DEC-0145 refuses (CT-192). "
+                            "Write the path with / before the name: ~/.../fabric-agent.json, which every Fabric release reads, or "
+                            "C:/.../fabric-agent.json, which Fabric reads only after v0.3.15 (its repin, CO-479).")
+    problems = manifest_problems(entry)
     if problems:
         raise ProviderError("Provider entry is invalid: %s." % "; ".join(problems))
     clash = _service_ids(services or services_dir()).get(entry["id"])
@@ -301,7 +319,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "validate":
             entry = json.loads(args.path.read_text(encoding="utf-8"))
             problems = validate_provider_entry(entry)
-            if isinstance(entry, dict) and entry.get("id") != args.path.stem:
+            # CT-193 (FAC-SEM-014): the stem is what follows the last / or \ and loses .json, on every platform.
+            stem = re.sub(r"\.json\Z", "", re.sub(r"^.*[\\/]", "", str(args.path), flags=re.S))
+            if isinstance(entry, dict) and entry.get("id") != stem:
                 problems.append("the file name %s is not <id>.json for %s (FAC-SEM-014)" % (args.path.name, entry.get("id")))
             if not problems:
                 problems = manifest_problems(entry)

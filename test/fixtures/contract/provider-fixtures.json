@@ -1,0 +1,344 @@
+{
+  "about": "DEC-0145 at the pin: every provider.schema.json fixture as fixtures/catalogue.json lists it, its validity re-checked by the contract's validator, with the instance path and keyword of each schema error. Written by vendor_vectors.mjs, never by hand.",
+  "source": "fixtures/catalogue.json, fixtures/*/provider-entry-*.json, schemas/provider.schema.json",
+  "fixtures": [
+    {
+      "name": "provider-entry-stdio",
+      "valid": true,
+      "errors": [],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "providerId": "https://agents.example/providers/example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": [
+                "~/.local/bin/example-agent",
+                "mcp"
+              ],
+              "env": {
+                "EXAMPLE_API_KEY": "secret-ref:example-agent/EXAMPLE_API_KEY"
+              }
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0"
+      }
+    },
+    {
+      "name": "provider-entry-url",
+      "valid": true,
+      "errors": [],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-writer",
+        "providerId": "https://agents.example/providers/example-writer",
+        "name": "Example Writer",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "url": "http://127.0.0.1:47201/mcp"
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0",
+        "extensions": {
+          "https://example.com/fabric/ext/notes/1": {
+            "kept": true
+          }
+        }
+      }
+    },
+    {
+      "name": "provider-command-shell-string",
+      "valid": false,
+      "keyword": "type",
+      "errors": [
+        {
+          "instancePath": "/run/mcp/stdio/command",
+          "keyword": "type"
+        },
+        {
+          "instancePath": "/run/mcp",
+          "keyword": "if"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": "~/.local/bin/example-agent mcp"
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0",
+        "providerId": "https://agents.example/providers/example-agent"
+      }
+    },
+    {
+      "name": "provider-env-literal-value",
+      "valid": false,
+      "keyword": "pattern",
+      "errors": [
+        {
+          "instancePath": "/run/mcp/stdio/env/EXAMPLE_API_KEY",
+          "keyword": "pattern"
+        },
+        {
+          "instancePath": "/run/mcp",
+          "keyword": "if"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": [
+                "/usr/local/bin/example-agent"
+              ],
+              "env": {
+                "EXAMPLE_API_KEY": "abc123literal"
+              }
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0",
+        "providerId": "https://agents.example/providers/example-agent"
+      }
+    },
+    {
+      "name": "provider-url-not-loopback",
+      "valid": false,
+      "keyword": "pattern",
+      "errors": [
+        {
+          "instancePath": "/run/mcp/url",
+          "keyword": "pattern"
+        },
+        {
+          "instancePath": "/run/mcp",
+          "keyword": "if"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "url": "http://192.168.1.20:47201/mcp"
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0",
+        "providerId": "https://agents.example/providers/example-agent"
+      }
+    },
+    {
+      "name": "provider-id-not-a-slug",
+      "valid": false,
+      "keyword": "pattern",
+      "errors": [
+        {
+          "instancePath": "/id",
+          "keyword": "pattern"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "Example_Agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": [
+                "~/.local/bin/example-agent",
+                "mcp"
+              ],
+              "env": {
+                "EXAMPLE_API_KEY": "secret-ref:example-agent/EXAMPLE_API_KEY"
+              }
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0",
+        "providerId": "https://agents.example/providers/example-agent"
+      }
+    },
+    {
+      "name": "provider-entry-without-provider-id",
+      "valid": false,
+      "keyword": "required",
+      "errors": [
+        {
+          "instancePath": "",
+          "keyword": "required"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": [
+                "~/.local/bin/example-agent",
+                "mcp"
+              ],
+              "env": {
+                "EXAMPLE_API_KEY": "secret-ref:example-agent/EXAMPLE_API_KEY"
+              }
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0"
+      }
+    },
+    {
+      "name": "provider-entry-stdio-on-demand",
+      "valid": true,
+      "errors": [],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "providerId": "https://agents.example/providers/example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "~/.local/share/example-agent/fabric-agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": [
+                "~/.local/bin/example-agent",
+                "mcp"
+              ],
+              "env": {
+                "EXAMPLE_API_KEY": "secret-ref:example-agent/EXAMPLE_API_KEY"
+              },
+              "scope": "on-demand"
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0"
+      }
+    },
+    {
+      "name": "provider-entry-windows-path",
+      "valid": true,
+      "errors": [],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "providerId": "https://agents.example/providers/example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "C:\\Users\\ana\\AppData\\Local\\example-agent\\fabric-agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": [
+                "C:\\Users\\ana\\AppData\\Local\\example-agent\\example-agent.exe",
+                "mcp"
+              ],
+              "env": {
+                "EXAMPLE_API_KEY": "secret-ref:example-agent/EXAMPLE_API_KEY"
+              }
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0"
+      }
+    },
+    {
+      "name": "provider-entry-windows-path-other-file",
+      "valid": false,
+      "errors": [
+        {
+          "instancePath": "/manifest",
+          "keyword": "pattern"
+        }
+      ],
+      "document": {
+        "protocol": "fabric-provider/0.1",
+        "id": "example-agent",
+        "providerId": "https://agents.example/providers/example-agent",
+        "name": "Example Agent",
+        "summary": "Drafts reports on request; runs as a stdio MCP server.",
+        "manifest": "C:\\Users\\ana\\AppData\\Local\\example-agent\\agent.json",
+        "run": {
+          "mcp": {
+            "stdio": {
+              "command": [
+                "C:\\Users\\ana\\AppData\\Local\\example-agent\\example-agent.exe",
+                "mcp"
+              ],
+              "env": {
+                "EXAMPLE_API_KEY": "secret-ref:example-agent/EXAMPLE_API_KEY"
+              }
+            }
+          }
+        },
+        "source": {
+          "repository": "https://github.com/example/example-agent"
+        },
+        "installedAt": "2026-09-30T08:00:00Z",
+        "installedBy": "example-agent install 1.0.0"
+      }
+    }
+  ]
+}

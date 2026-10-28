@@ -90,6 +90,15 @@
     "fabric-package": [
       "1"
     ],
+    "fabric-peer-share": [
+      "1"
+    ],
+    "fabric-peer-share-envelope": [
+      "1"
+    ],
+    "fabric-peer-share-report": [
+      "1"
+    ],
     "fabric-project-comms": [
       "0.1"
     ],
@@ -132,6 +141,12 @@
     "operator-source": [
       "1"
     ],
+    "org-adaptation": [
+      "1"
+    ],
+    "org-adaptation-receipt": [
+      "1"
+    ],
     "org-authority": [
       "1"
     ],
@@ -151,6 +166,15 @@
       "1"
     ],
     "pairing-message": [
+      "1"
+    ],
+    "peer-share-deletion": [
+      "1"
+    ],
+    "peer-share-frame": [
+      "1"
+    ],
+    "peer-share-revocation": [
       "1"
     ],
     "pipeline": [

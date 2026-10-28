@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `00e050ba7429c0c60261cec871779e0fd6aeeb28`
+Pinned to `fabric-agent-contract` commit `3830a3353923e20f826d466610e1c479f120bec0`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -23,8 +23,10 @@ DEC-0124; the operator's mandate `mandate/1`, handed on narrowed with a task DEC
 operator's agents, its `source` on a mandate and a decision DEC-0126; context hub keys and the organizations an estate
 record pins DEC-0127 and DEC-0128; the family and the agent network named DEC-0130 and DEC-0137; a reply delivered to
 the sender it answers, or to whom it names DEC-0135; a hand-over adds no naming list the scope in force leaves out
-DEC-0136; a job's step under the mandate read under the job's own capability DEC-0141. The organization's member list, draft exchange, relay and the machines' report, DEC-0129, DEC-0131 to DEC-0134,
-reach the kit only as protocol register entries). The contract's schemas are normative;
+DEC-0136; a job's step under the mandate read under the job's own capability DEC-0141; a person's comparison of codes as a human
+step DEC-0142. The organization's member list, draft exchange, relay and the machines' report, DEC-0129, DEC-0131 to
+DEC-0134 and DEC-0139, an organization's adaptation DEC-0138 and the peer share DEC-0142, reach the kit only as
+protocol register entries). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 

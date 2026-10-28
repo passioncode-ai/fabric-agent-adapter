@@ -7,9 +7,10 @@ Contract DEC-0125 (`mandate/1`, docs/specification/delegation.md#the-operators-m
 job's step read under the job's capability) at the pin 00e050ba (`v0.1.0+2026-10-27.1`, 0.54.0, FAA-159); the operator's rule of 2026-10-26 (board thread 3e8f706c, request 519d7b21;
 fabric-workspace knowledge/agents-first.md) that DEC-0126 answers."""
 
+import json
 import unittest
 
-from test_action_and_dashboard_prose import body, flat, scenario_ids, section, text
+from test_action_and_dashboard_prose import ROOT, body, flat, scenario_ids, section, text
 
 
 class EvalsComeFirst(unittest.TestCase):
@@ -130,6 +131,35 @@ class BuildingFabricServicesReadsTheMandate(unittest.TestCase):
             shared = flat("%s/references/operator-channel-and-repository.md" % skill)
             for words in ("DEC-0126", "OA-2", "OA-7", "`operator-source/1`"):
                 self.assertIn(words, shared, words)
+
+
+
+class AComparisonOfCodesIsAHumanStep(unittest.TestCase):
+    """DEC-0142 (contract CT-186) at the pin 3830a33 (`v0.1.0+2026-10-27.6`, 0.57.0, FAA-176): AP-4's steps gain
+    `comparison`, a comparison of codes between two people or the choice to share without one; it stays the person's."""
+
+    def test_the_scenarios_ask_for_it(self):  # human-step-required-hands-over-the-link, operator-approval-binds-all-his-agents
+        scenarios = {s["id"]: " ".join(s["expected"]) for s in json.loads(
+            (ROOT / "test/evals/working-with-fabric/scenarios.json").read_text(encoding="utf-8"))["scenarios"]}
+        for sid in ("human-step-required-hands-over-the-link", "operator-approval-binds-all-his-agents"):
+            self.assertIn("or the choice to share without one", scenarios[sid], sid)
+
+    def test_working_with_fabric_names_it_a_human_gate(self):  # operator-approval-binds-all-his-agents
+        rule = section("working-with-fabric", "Step 5: while you work")
+        self.assertIn("a comparison of codes with another person or the choice to share without one (DEC-0142)", rule)
+        refusals = section("working-with-fabric", "Refusals and lost answers")
+        row = next(line for line in refusals.split("| `human-step-required`")[1:])
+        self.assertIn("a human gate of OA-5 (above) stays the person's", row)
+
+    def test_the_service_references_list_seven_steps(self):  # service-reads-the-operators-mandate
+        interop = flat("building-fabric-services/references/interop.md")
+        self.assertIn("`passkey`, `comparison` (a comparison of codes between two people or the choice to share without one, DEC-0142)", interop)
+        self.assertIn("a reader pinned before it (a 0.56.0 or older kit, Fabric Dashboards before 0.8.9) refuses the whole declaration", interop)
+        self.assertIn("Fabric's hub reads no declaration and forwards the step unchanged (CT-186)", interop)
+        delegation = flat("building-fabric-services/references/delegation.md")
+        self.assertIn("`passkey`, and since DEC-0142 `comparison`: a comparison of codes between two people or the choice to share without one", delegation)
+        self.assertIn("a reader pinned before DEC-0142 refuses a whole declaration that names it", delegation)
+        self.assertIn("a caller that validates the refusal against a `delegation-refusal.schema.json` pinned before DEC-0142 refuses that refusal", delegation)
 
 
 if __name__ == "__main__":

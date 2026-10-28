@@ -18,6 +18,9 @@ spec = importlib.util.spec_from_file_location("fabric_provider", SCRIPTS / "fabr
 fp = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fp)
 
+# The contract's provider.schema.json fixtures, each with the validity its own validator gives (vendor_vectors.mjs).
+PROVIDER_FIXTURES = json.loads((ROOT / "test/fixtures/contract/provider-fixtures.json").read_text(encoding="utf-8"))
+
 # Credential-shaped values are assembled at run time so none sits in the source as a literal.
 FAKE_GITHUB = "gh" + "p_" + "abcdefghijklmnopqrstuvwxyz0123456789"
 
@@ -138,6 +141,39 @@ class DirectoryTests(unittest.TestCase):
         self.assertEqual(out.returncode, 1)
         self.assertIn("file name", out.stdout)
 
+    def test_the_writer_does_not_emit_a_manifest_named_after_a_backslash(self):
+        # provider.md: a writer does not emit one until every reader accepts it; Fabric's registry has not re-pinned
+        # (CT-192). The refusal names the spelling every Fabric release reads.
+        for manifest in ("C:\\Agents\\example\\fabric-agent.json", "~\\example\\fabric-agent.json"):
+            with self.subTest(manifest), self.assertRaises(fp.ProviderError) as caught:
+                fp.write_provider_entry(entry(manifest=manifest), self.providers, self.services)
+            self.assertIn("CT-192", str(caught.exception))
+            self.assertIn("/fabric-agent.json", str(caught.exception))
+            # 0.57.0 seam r1: Fabric v0.3.15 reads only ~/ or / on Windows; a drive letter waits for its repin (CO-479)
+            self.assertIn("~/.../fabric-agent.json", str(caught.exception))
+            self.assertNotIn("every reader accepts", str(caught.exception))
+            self.assertFalse(self.providers.exists() and any(self.providers.iterdir()))
+
+    def test_on_windows_the_directory_is_under_local_app_data(self):
+        # provider.md "Where the directory is": Fabric reads %LOCALAPPDATA%\\passioncode-fabric\\providers\\ (DEC-0032).
+        base = Path(self.temp.name)
+        env = {k: v for k, v in os.environ.items() if k not in ("FABRIC_SERVICES_DIR", "FABRIC_PROVIDERS_DIR", "LOCALAPPDATA")}
+        with mock.patch.dict(os.environ, dict(env, LOCALAPPDATA=str(base / "Local")), clear=True), mock.patch.object(fp.sys, "platform", "win32"):
+            self.assertEqual(fp.services_dir(), base / "Local" / "passioncode-fabric" / "services")
+            self.assertEqual(fp.providers_dir(), base / "Local" / "passioncode-fabric" / "providers")
+        with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(fp.sys, "platform", "win32"), \
+                mock.patch.object(fp.Path, "home", return_value=base):
+            self.assertEqual(fp.providers_dir(), base / "AppData" / "Local" / "passioncode-fabric" / "providers")
+
+    @unittest.skipIf(sys.platform == "win32", "a file name holding a backslash exists only off Windows")
+    def test_validate_reads_the_stem_after_either_separator(self):
+        # CT-193 (FAC-SEM-014, registry-rules.ts): the stem is what follows the last / or \\, on every platform.
+        for name, misnamed in (("x\\example-agent.json", False), ("x\\example-writer.json", True)):
+            path = Path(self.temp.name) / name
+            path.write_text(json.dumps(entry()), encoding="utf-8")
+            out = subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "validate", str(path)], capture_output=True, text=True)
+            self.assertEqual("file name" in out.stdout, misnamed, out.stdout)
+
     def test_remove(self):
         fp.write_provider_entry(self.e(), self.providers, self.services)
         self.assertTrue(fp.remove_provider_entry("example-agent", self.providers))
@@ -207,6 +243,14 @@ class SchemaParityTests(unittest.TestCase):
         self.assertNotEqual(fp.validate_provider_entry(entry(manifest="/" + "a" * 1024 + "/fabric-agent.json")), [])
         self.assertEqual(fp.validate_provider_entry(entry(manifest="C:/Agents/example/fabric-agent.json")), [])
 
+    def test_a_windows_manifest_path_is_read_as_the_contract_reads_it(self):
+        # DEC-0145 (CT-192): the file is named fabric-agent.json after either separator.
+        for manifest in ("C:\\Agents\\example\\fabric-agent.json", "~\\example\\fabric-agent.json", "C:/Agents\\example/fabric-agent.json"):
+            self.assertEqual(fp.validate_provider_entry(entry(manifest=manifest)), [], manifest)
+        for manifest in ("C:\\Agents\\example\\agent.json", "C:\\Agents\\example\\xfabric-agent.json", "C:\\Agents\\fabric-agent.json\n"):
+            self.assertNotEqual(fp.validate_provider_entry(entry(manifest=manifest)), [], manifest)
+
+
     @unittest.skipUnless(os.environ.get("FABRIC_CONTRACT_NEW"), "NOT_RUN: set FABRIC_CONTRACT_NEW to a contract checkout at the pin")
     def test_the_url_pattern_is_the_pinned_schema_pattern(self):
         schema = json.loads((Path(os.environ["FABRIC_CONTRACT_NEW"]) / "schemas/provider.schema.json").read_text())
@@ -218,6 +262,21 @@ class SchemaParityTests(unittest.TestCase):
         common = json.loads((Path(os.environ["FABRIC_CONTRACT_NEW"]) / "schemas/service-common.schema.json").read_text())["$defs"]
         self.assertEqual(fp.LOCAL_PATH_PATTERN, common["localPath"]["pattern"])
         self.assertEqual(fp.ARGV_MAX_ITEM, common["argv"]["items"]["maxLength"])
+        # DEC-0145 (CT-192): the manifest's name after either separator.
+        self.assertEqual(fp.MANIFEST_PATTERN, schema["properties"]["manifest"]["allOf"][1]["pattern"])
+
+
+class ContractFixtureTests(unittest.TestCase):
+    """The contract's provider.schema.json fixtures at the pin (DEC-0145 added two), read by the reader as the schema reads
+    them. Ungated: the fixtures are vendored, so hosted CI runs this without a contract checkout."""
+
+    def test_every_provider_fixture_is_read_as_the_contract_reads_it(self):
+        self.assertEqual(len(PROVIDER_FIXTURES["fixtures"]), 10)
+        self.assertEqual(sum(1 for f in PROVIDER_FIXTURES["fixtures"] if f["valid"]), 4)
+        for fixture in PROVIDER_FIXTURES["fixtures"]:
+            with self.subTest(fixture["name"]):
+                problems = fp.validate_provider_entry(fixture["document"])
+                self.assertEqual(problems == [], fixture["valid"], problems)
 
 
 class CliRefusalTests(unittest.TestCase):

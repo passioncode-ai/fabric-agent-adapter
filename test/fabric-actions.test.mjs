@@ -25,7 +25,7 @@ const viewOf = (view) => Object.fromEntries(['declared', 'valid', 'actions'].fil
 const call = (extra = {}) => actionDecision({ action: RELAYED, tier: 'T0', caller: 'agent:claude-code', now: NOW, decision: DECISION, ...extra });
 
 test('every case answers as the contract does', () => {
-  assert.equal(V.cases.length, 67);
+  assert.equal(V.cases.length, 68);
   for (const c of V.cases) assert.deepEqual(actionDecision(c.input), c.expected, c.name);
 });
 
@@ -35,7 +35,7 @@ test('every job step answers as the contract does (DEC-0141 MJ-1)', () => {
 });
 
 test('every declaration is found where the contract finds it', () => {
-  assert.equal(V.declarations.length, 11);
+  assert.equal(V.declarations.length, 12);
   for (const c of V.declarations) {
     const findings = actionsExtensionRules(c.input);
     assert.deepEqual(paths(findings), c.findings, c.name);
