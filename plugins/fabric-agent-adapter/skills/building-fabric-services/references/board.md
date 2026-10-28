@@ -264,8 +264,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   (`interop.well-known-capabilities`): an agent whose MCP client sets `_meta` calls it over `/mcp` with the operator's
   decision in `_meta.decision` (a call without one is `operator-decision-required`); Claude Code and Codex send
   arguments only, so until CT-125 they hand the operator the page as Fabric Dashboards' `open_link`. Either door records
-  the take-back as a `board.slot.returned` event (info) naming who decided it (`by`, `via`, `caller`), never the
-  decision's words; a repeat after a lost answer is answered `{capability, moved: false}`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
+  the take-back as a `board.slot.returned` event (info) whose sentence names who decided it (`by`, `via`) and whose
+  `data` adds the `caller`, never the decision's words; a repeat after a lost answer is answered `{capability, moved: false}`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
   `change-policy` (DEC-0125); the operator reaches it through an agent that relays their decision in `_meta`, the

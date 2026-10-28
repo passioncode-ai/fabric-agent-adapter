@@ -134,8 +134,8 @@ gate behave.
   page, the route and the tool read a move from the checkpoint's record too, so a take-back made after a restart and
   before the session reconnects (or while Fabric is down) is kept; a checkpoint it cannot write is a tool error. A
   repeat after a lost answer is answered `{capability, moved: false}` by the route as by the tool, and each take-back is
-  a `board.slot.returned` event naming who decided it (`by`, `via`, `caller`), never the decision's words. The service installs
-  its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
+  a `board.slot.returned` event whose sentence names who decided it (`by`, `via`) and whose `data` adds the `caller`,
+  never the decision's words. The service installs its stop handler before its board thread starts, so a SIGTERM at any moment drains and leaves the board session. The
   page's CSP allows the button's own `fetch` (`connect-src 'self'`), and a failed request says so on the button.
 - working-with-fabric Step 4: a `fabric_task_create` that ended in an error may have filed the piece, so look for it
   by title in `fabric_work_list` before filing it again (FAA-168), with the eval `a-failed-create-may-have-filed`.

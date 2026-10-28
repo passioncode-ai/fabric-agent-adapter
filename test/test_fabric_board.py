@@ -2241,6 +2241,9 @@ class SampleWiringTests(unittest.TestCase):
             self.assertEqual(svc.board_moved(), [])
             returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
             self.assertIn("relayed-instruction", returned[-1]["text"], "the audit names the route")
+            self.assertNotIn("local:", returned[-1]["text"], "the caller is a machine id: in data, never the sentence (product r34)")
+            self.assertTrue(returned[-1]["data"]["value"]["caller"].startswith("local:"), returned[-1])
+            self.assertNotIn("take the slot back", json.dumps(returned[-1]), "never the decision's words")
             again = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
                                        "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
             self.assertEqual(again["structuredContent"], {"capability": "sample.echo", "moved": False},

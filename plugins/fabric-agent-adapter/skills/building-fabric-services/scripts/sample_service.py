@@ -196,10 +196,14 @@ class Service:
         if not isinstance(capability, str) or capability not in self.board_moved():
             raise fs.ServiceError("No slot of that capability has moved away from this service.")
         self.board.take_back(capability)
-        how = (" Decided by %s, %s, through %s." % (record.get("by"), record.get("via"), record.get("caller"))
-               if isinstance(record, dict) else "")
+        # Who decided and by which route are words in the sentence; the caller, a machine id, goes in data only
+        # (events-and-notifications.md, "Writing an event"; 0.56.0 product r34).
+        act = record if isinstance(record, dict) else {}
+        how = " Decided by %s, %s." % (act.get("by"), act.get("via")) if act else ""
+        value = {"capability": capability, **{k: act[k] for k in ("by", "via", "caller") if isinstance(act.get(k), str)}}
         self.log.append("board.slot.returned", "info", "The operator took the %s slot back; the service enrolls once the "
-                        "other session lets it go.%s" % (capability, how))
+                        "other session lets it go.%s" % (capability, how),
+                        data={"schema": fbd.EVENT_SCHEMA, "value": value})
         return {"capability": capability, "moved": False}
 
     def board_take_back_tool(self, args: Dict[str, Any], ctx: fi.CallContext) -> Dict[str, Any]:
