@@ -163,13 +163,16 @@ test('config refusals and totals', () => {
 test('a base URL ending in a line break or a space is composed without it', () => {
   // 0.56.0 product r20: checkUrl reads the base with its ends trimmed, so the base composed must be that one.
   for (const baseUrl of ['https://openrouter.ai/api/v1\n', 'https://openrouter.ai/api/v1/ ', 'https://openrouter.ai/api/v1/\r\n',
-    'https://openrouter.ai/api/v1\n/', 'https://openrouter.ai/api/v1\t/', 'https://openrouter.ai/api/v1\\']) { // `new URL` removes a tab or line break anywhere
+    'https://openrouter.ai/api/v1\n/', 'https://openrouter.ai/api/v1\t/']) { // `new URL` removes a tab or line break anywhere
     const c = new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl });
     assert.equal(c.baseUrl, 'https://openrouter.ai/api/v1', JSON.stringify(baseUrl));
   }
   // unit r23: only the path is read, as `new URL` sends it: a host `new URL` reads (U+200B dropped by IDNA) and a
   // path with a letter outside ASCII are kept.
-  for (const baseUrl of ['https://openrouter.ai\u200b', 'https://gw.example/caf\u00e9/v1', 'HTTPS://openrouter.ai/api/v1/.']) {
+  // seam r24, unit r24: an ending the base already percent-encodes is sent as written, as on Python.
+  for (const baseUrl of ['https://openrouter.ai\u200b', 'https://gw.example/caf\u00e9/v1', 'HTTPS://openrouter.ai/api/v1/.',
+    'https://gw.example/v1%C2%A0', 'https://gw.example/v1%20', 'https://gw.example/v1%FF%61', 'https://gw.example/v1%E9',
+    'https://openrouter.ai/api/v1\\']) {
     assert.doesNotThrow(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), JSON.stringify(baseUrl));
   }
   // 0.56.0 unit r19, seam r20: a query or fragment would take `/chat/completions`; a Unicode space at the end stays
@@ -182,7 +185,8 @@ test('a base URL ending in a line break or a space is composed without it', () =
     'https://openrouter.ai/api/v1\x7f', 'https://openrouter.ai/api/v1\x80', 'https://openrouter.ai/api/v1\x9f/',
     'https:openrouter.ai/api/v1\u00a0', 'https://openrouter.ai\\api\\v1\u00a0', 'https://openrouter.ai/api/v1\u00a0\\',
     'https://openrouter.ai/api/v1\u00a0/.', 'https://openrouter.ai/api/v1\u200e', 'https://openrouter.ai/api/v1\u00ad',
-    'https://openrouter.ai/api/v1\u3164', 'https://openrouter.ai/api/v1\ufe0f']) {
+    'https://openrouter.ai/api/v1\u3164', 'https://openrouter.ai/api/v1\ufe0f', 'https://openrouter.ai/api/v1\u180b',
+    'https://openrouter.ai/api/v1\u{e0100}', 'https://openrouter.ai/api/v1\u00a0\\']) {
     assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }), (e) => e.kind === 'config', JSON.stringify(baseUrl));
   }
 });

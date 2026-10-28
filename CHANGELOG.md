@@ -80,15 +80,18 @@ gate behave.
     whose part before its first `#` ends in a Unicode space (a no-break or ideographic space) is now refused; 0.55.0
     sent it trimmed when the space ended the URL and failed every call when a fragment followed it. Node keeps it
     percent-encoded.
-  - The OpenRouter clients: both send a base URL ending in a line break or a space without it, and both refuse, when
-    they are built, a base URL holding a query or a fragment (kind `config`; `/chat/completions` would land in it, so
-    a path-routed endpoint such as OpenRouter failed every call in 0.55.0) or whose path ends in a space, a control
-    or an invisible character (0.55.0 failed every call with one). Python refuses that through `check_url` (kind
-    `refused`), as it refuses any space, control or non-ASCII character in the path. Node refuses it with kind
-    `config`, reading the path as `new URL` sends `<base>/chat/completions` (a tab or line break removed anywhere,
-    so `.../v1\n/` is still sent to `.../v1/chat/completions`; a backslash read as `/`), percent-encoded or not; its
-    set is the Unicode controls, spaces and format characters (Cc, Z, Cf), the combining grapheme joiner, the Hangul
-    fillers and the variation selectors. Attribution answers `not-openrouter` for a port of other
+  - The OpenRouter clients trim a base URL's ends first: ASCII whitespace and trailing slashes in both, and on Node
+    every C0 control there and a tab or line break anywhere, as `new URL` reads them. So `.../v1\n`, `.../v1/ ` and,
+    on Node, `.../v1\n/` are sent to `.../v1/chat/completions`. Both then refuse, when they are built, a base URL
+    holding a query or a fragment (kind `config`; `/chat/completions` would land in it, so a path-routed endpoint
+    such as OpenRouter failed every call in 0.55.0), or whose path still ends in a space, a control or an invisible
+    character written as itself (0.55.0 failed every call with one, `.../v1 /` for instance). Python refuses that
+    through `check_url` (kind `refused`), as it refuses any space, control or non-ASCII character in the path.
+    Node refuses it with kind `config`, reading the path as `new URL` sends `<base>/chat/completions` (a backslash
+    read as `/`, trailing slashes aside); its set is the Unicode controls, spaces and format characters (Cc, Z, Cf),
+    the combining grapheme joiner, the Hangul fillers and the variation selectors. An ending the base already
+    percent-encodes (`.../v1%20`) is sent as written by both, and a trailing backslash is sent by Python as `\`
+    where Node reads it as `/` (FAA-187 (18)). Attribution answers `not-openrouter` for a port of other
     digits (`:٤٤٣`), as `new URL` reads it.
   - A JWKS source: the Python kit reads its host and port as urllib dials them, https included. It refuses a space
     or ASCII control character before the URL's first `#` (it reads the URL up to there, as Node does), a character

@@ -89,31 +89,25 @@ function checkAttribution(projectId, taskRunId) {
 const CHAT_PATH = '/chat/completions';
 // A control, a space or a format character (Unicode Cc, Z, Cf), the combining grapheme joiner, the Hangul fillers
 // and the variation selectors: nothing an endpoint's path ends in.
-const BAD_PATH_END = /[\p{Cc}\p{Z}\p{Cf}\u034f\u115f\u1160\u3164\uffa0\ufe00-\ufe0f]/u;
+const BAD_PATH_END = /[\p{Cc}\p{Z}\p{Cf}\p{Variation_Selector}\u034f\u115f\u1160\u3164\uffa0]/u;
 
-// Whether the base's path, as `new URL` sends `${base}/chat/completions`, ends in a space, a control (C0, DEL or C1)
-// or an invisible character (BAD_PATH_END): `new URL` percent-encodes it into the path and every call would fail. Read from the
-// URL as sent, so a backslash, a missing `//` or a dot segment cannot hide it (0.56.0 seam r20 to r23, unit r21,
-// r22, product r24); the Python twin refuses any such character in the path in check_url.
+// Whether the base's path, as `new URL` sends `${base}/chat/completions`, ends (trailing slashes aside) in such a
+// character written as itself: `new URL` percent-encodes it into the path and every call would fail. Read from the
+// URL as sent, so a backslash, a missing `//` or a dot segment cannot hide it; an ending the base already
+// percent-encodes is sent as written, as on Python (each `%` is read as `%25`, so only what `new URL` encoded is
+// decoded). 0.56.0 seam r20 to r24, unit r21 to r24, product r24; Python refuses such a character in check_url.
 function sentPathEndsBadly(base) {
   let path;
   try {
-    path = new URL(`${base}${CHAT_PATH}`).pathname;
+    path = new URL(`${base.replaceAll('%', '%25')}${CHAT_PATH}`).pathname;
   } catch {
     return true;
   }
-  if (!path.endsWith(CHAT_PATH)) return false;
-  path = path.slice(0, -CHAT_PATH.length);
+  if (!path.endsWith(CHAT_PATH)) return true; // not composed as chat() composes it: refuse rather than guess
+  path = path.slice(0, -CHAT_PATH.length).replace(/\/+$/, '');
   const encoded = /(?:%[0-9A-Fa-f]{2})+$/.exec(path)?.[0];
-  let last = path.slice(-1);
-  if (encoded) {
-    try {
-      last = [...decodeURIComponent(encoded)].pop();
-    } catch {
-      return true; // not UTF-8: no endpoint is named so
-    }
-  }
-  return last !== '' && BAD_PATH_END.test(last);
+  const last = encoded ? [...decodeURIComponent(encoded)].pop() : path.slice(-1); // `new URL` writes UTF-8
+  return last !== undefined && last !== '' && BAD_PATH_END.test(last);
 }
 
 export class Client {
@@ -140,7 +134,7 @@ export class Client {
     // The base URL as checkUrl read it: `new URL` removes tabs and line breaks anywhere and trims C0 controls and
     // spaces from its ends, so `.../v1/ ` and `.../v1\n/` are composed as `.../v1/chat/completions`, as `new URL`
     // composed them in 0.55.0 (0.56.0 product r20, unit r22, seam r22; the Python twin refuses what urllib cannot send).
-    this.baseUrl = baseUrl.replace(/[\t\n\r]/g, '').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[/\\]+$/, '');
+    this.baseUrl = baseUrl.replace(/[\t\n\r]/g, '').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
     if (sentPathEndsBadly(this.baseUrl)) {
       throw new OpenRouterError("the base URL's path ends in a space, a control or an invisible character", { kind: 'config' });
     }
