@@ -15,7 +15,8 @@ Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Res
 credential is in `<data>/board.credential` (0600; `--board-credential` names another file). The request body is data:
 the gate admits plain text of at most 2,000 characters, and the answer is a reply carrying the same text. Its
 dashboard's Take back has the tool `board.take-back`, which the manifest lists when registered with the same
-`--board-project`; a serve whose board mode differs from the registered manifest logs `service.manifest.mismatch`.
+`--board-project`; a serve whose board mode differs from the registered manifest at its start logs
+`service.manifest.mismatch`.
 """
 
 from __future__ import annotations
@@ -158,7 +159,9 @@ class Service:
 
     def check_manifest(self) -> None:
         """The registered manifest is register's to write, never serve's (0.56.0 seam r28): a serve whose board mode
-        differs from it says so, and the probe's interop.well-known-capabilities fails until it is registered again."""
+        differs from it at its start says so, and the probe fails until it is registered again (interop.tools-match when
+        the manifest lists a take-back this run does not serve, interop.well-known-capabilities when it lacks one this run
+        lists)."""
         try:
             listed = {c.get("name") for c in json.loads((self.data / "fabric-agent.json").read_text(encoding="utf-8"))["capabilities"]
                       if isinstance(c, dict)}

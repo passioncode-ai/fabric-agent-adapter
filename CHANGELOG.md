@@ -110,7 +110,7 @@ gate behave.
 
 - `FABRIC_SESSION_NO_REPOSITORIES=1` turns the transcript read off (FAA-160); `fabric_session.py status` says
   whether it is on (only while a running Fabric advertises `session-hooks/1`, `fabric` is registered for the folder and
-  Fabric takes the repositories), off or waiting for Fabric. The repositories of a turn can miss one (FAA-174): a turn longer
+  Fabric takes the repositories), off, waiting for Fabric, or not done because `fabric` is not registered. The repositories of a turn can miss one (FAA-174): a turn longer
   than the transcript's last 512 KB names only what that tail shows; until FAA-184 they can also name a wrong one,
   since a relative `git -C` in a later Bash call is read against the session's folder.
 - The reference service's dashboard shows a moved slot with a Take back button (`POST /api/board/take-back`, operator

@@ -164,7 +164,7 @@ test('a base URL that is not a string is refused as checkUrl refuses it', () => 
   // 0.56.0 unit r28: the same class and kind as Python, a query or not.
   for (const baseUrl of [null, 5, new URL('https://openrouter.ai/api/v1?x=1'), new URL('https://openrouter.ai/api/v1')]) {
     assert.throws(() => new fo.Client({ ceilingUsd: 1, ledger: new Ledger(), prices: {}, baseUrl }),
-      (e) => e.name === 'HttpError' && e.kind === 'refused', String(baseUrl));
+      (e) => e.name === 'HttpError' && e.kind === 'refused' && e.url === '<unparseable url>', String(baseUrl));
   }
 });
 

@@ -246,14 +246,14 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     hub = locate_hub(root)
     claude = claude_registration(cwd, env)
     active = hub["state"] == "running" and HOOK_FEATURE in hub.get("features", [])
-    # "on" only when the Stop hook would read it now: the hooks active, `fabric` registered for this folder and Fabric
-    # taking the repositories (a mark left after Fabric quit reads nothing, as hook_spool returns before the read;
-    # 0.56.0 product r28, unit r28).
+    # In hook_spool's order: the hooks active (a mark left after Fabric quit reads nothing), then `fabric` registered for
+    # this folder ("unregistered" otherwise), then Fabric taking the repositories; "on" only when the Stop hook would read
+    # the transcript now (0.56.0 product r28, unit r28, seam r29).
     report = {"fabricRoot": str(root), "hub": hub, "fabricMcp": str(binary) if binary else None,
               "claudeCode": claude, "codex": codex_registered(env),
               "sessionHooks": "active" if active else "inert",
-              "transcriptRead": "off" if repositories_off(env) else ("on" if active and claude is not None and repositories_wanted(env)
-                                                                    else "waiting")}
+              "transcriptRead": "off" if repositories_off(env) else ("waiting" if not active else "unregistered" if claude is None
+                                                                    else "on" if repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later; fabric-mcp is not at %s." % ", ".join(
@@ -285,6 +285,7 @@ def print_status(report: Dict[str, Any]) -> None:
     print("Repositories of a turn: %s" % {
         "on": "read from the session's transcript, as this shell's environment has it (turn off: %s=1)" % NO_REPOSITORIES_ENV,
         "off": "off (%s or the file %s in the hooks' folder)" % (NO_REPOSITORIES_ENV, NO_REPOSITORIES_MARK),
+        "unregistered": "not read: fabric is not registered for this folder (see Next)",
         "waiting": "not read until a running Fabric takes them"}[report["transcriptRead"]])
     print("Next: %s" % report["next"])
 

@@ -74,8 +74,9 @@ the turn's facts are still sent, without `repositories` (any value of the variab
 file sits in a cache folder a cleaner may empty, so the variable, set in Claude Code's settings `env`, is the lasting form:
 it reached hooks declared in settings and in a plugin's `hooks.json` in runs on macOS, recorded in the owning
 repository's `docs/evidence/runs/2026-10-27-settings-env-reaches-hooks.md`; Windows is FAA-183's run);
-`fabric_session.py status` says whether the read is on, off or waiting for Fabric, as the environment of the shell it
-runs in has it.
+`fabric_session.py status` says whether the read is on, off, waiting for Fabric (not running, without `session-hooks/1`,
+or not taking the repositories yet) or not done because `fabric` is not registered for the folder, as the environment
+of the shell it runs in has it; its "Session hooks" line describes Fabric alone.
 
 **A project that uses Fabric** (`project_uses_fabric`), cheapest sign first: `fabric` registered at local or project
 scope for the folder (user scope is every folder's, so it says nothing about this one); a `fabric-agent.json`,

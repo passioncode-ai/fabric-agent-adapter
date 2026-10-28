@@ -133,6 +133,7 @@ class Rules(unittest.TestCase):
                     fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"],
                               environ={"OPENROUTER_API_KEY": KEY}, base_url=base, now=lambda: NOW)
                 self.assertEqual(caught.exception.kind, "refused")
+                self.assertEqual(caught.exception.url, "<unparseable url>")
 
     def test_the_shared_base_url_cases(self):
         # 0.56.0 seam r27: one table both twins read, so the order of the query check and check_url cannot drift.

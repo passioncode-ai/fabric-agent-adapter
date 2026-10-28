@@ -1964,6 +1964,11 @@ class SampleWiringTests(unittest.TestCase):
             self.assertNotIn("board.take-back", names())
             self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
             self.assertEqual(len(out_of_step()), 1)
+            written = (data / "fabric-agent.json").read_bytes()
+            rules = probed(board=True)  # unit r29: the other way, registered without the board and served with it
+            self.assertEqual((data / "fabric-agent.json").read_bytes(), written)
+            self.assertEqual(rules["interop.well-known-capabilities"], "FAIL")
+            self.assertIn("lacks the take-back tool, which this run serves", out_of_step()[-1]["text"])
 
     @unittest.skipIf(sys.platform == "win32", "Windows ends a process without a catchable SIGTERM (TerminateProcess)")
     def test_a_stop_leaves_the_board_session_and_forgets_the_record(self):

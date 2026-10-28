@@ -2107,7 +2107,10 @@ class Status(Base):
         self.hub(pid=self.dead_pid(), features=["session-hooks/1"])
         self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
         self.hub(features=["session-hooks/1"])  # unit r28: and only with `fabric` registered, as hook_spool asks
-        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "waiting")
+        self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "unregistered")
+        done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
+                              capture_output=True, text=True, env=self.env, timeout=10)
+        self.assertIn("Repositories of a turn: not read: fabric is not registered for this folder (see Next)", done.stdout)
         self.register()
         self.assertEqual(fs.status(self.repo, self.env)["transcriptRead"], "on")
         self.assertEqual(fs.status(self.repo, dict(self.env, **{fs.NO_REPOSITORIES_ENV: "1"}))["transcriptRead"], "off")
