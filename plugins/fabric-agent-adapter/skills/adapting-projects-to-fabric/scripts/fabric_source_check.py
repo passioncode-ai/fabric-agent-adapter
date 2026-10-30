@@ -7,7 +7,8 @@ the source would carry and reports, by path, line and kind, each place where the
 
 - `home-path`: an absolute path inside a person's home folder whose name is ASCII: `/Users/<name>/`, `/home/<name>/`,
   `/var/home/<name>/`, `C:\\Users\\<name>\\` (any case, either separator, a JSON-escaped backslash), the dashed form a
-  tool makes of such a path (`-Users-<name>-`, DEC-0105, its name up to the next dash) and the URL-encoded one (`%2FUsers%2F<name>`); a neutral name (`example`, `user`,
+  tool makes of such a path (`-Users-<name>-`, `C--Users-<name>-`, DEC-0105, its name up to the next dash), Git Bash's
+  `/c/Users/<name>`, WSL's `/mnt/c/Users/<name>` and the URL-encoded ones (`%2FUsers%2F<name>`, `%5CUsers%5C<name>`); a neutral name (`example`, `user`,
   `runner`, a container's or a cloud machine's user such as `node` or `ubuntu`), a one-letter name or a placeholder
   (`<name>`, `$USER`) is not a finding;
 - `secret`: a value shaped like a credential by the contract's detector (fabric_secrets.py, DEC-0044), read line by
@@ -26,7 +27,8 @@ repository, or a binary one the ignore file does not name as source. A file not 
 
   fabric_source_check.py check [ROOT] [--instance-strings FILE] [--exclude GLOB ...] [--every-file] [--json]
 
-The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), or, with
+The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), as they are in the
+work tree (a staged copy that differs is not read), or, with
 `--every-file` (what `pack` reads) or when ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`, `node_modules`, `__pycache__` and virtual
 environments. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
@@ -71,10 +73,14 @@ HOME_PATHS = (
     re.compile(r"(?<![A-Za-z0-9_.-])(?:/var)?/home/([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),
     # macOS writes `/Users` capitalised; `/users/...` in code is a web route
     re.compile(r"(?<![A-Za-z0-9_.-])/Users/([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),
+    # Git Bash's `/c/Users/<name>` and WSL's `/mnt/c/Users/<name>`
+    re.compile(r"(?<![A-Za-z0-9_.-])(?:/mnt)?/[A-Za-z]/Users/([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),
     re.compile(r"(?<![A-Za-z0-9_.-])[A-Za-z]:%sUsers%s([A-Za-z0-9][A-Za-z0-9._-]*)" % (_SEP, _SEP), re.ASCII | re.IGNORECASE),
     # DEC-0105's dashed form starts a name; after a dash it is a flag or a CSS variable (`--home-dir`)
-    re.compile(r"(?:^|[^A-Za-z0-9-])-(?:Users|home)-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
-    re.compile(r"%2F(?:Users|home)%2F([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII | re.IGNORECASE),
+    # (on Windows a drive comes first: `C--Users-<name>-proj`)
+    re.compile(r"(?:^|[^A-Za-z0-9-]|(?<![A-Za-z0-9])[A-Za-z]-)-(?:Users|home)-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
+    re.compile(r"%2[Ff](?:Users|home)%2[Ff]([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),  # `%2Fusers%2F` is a route
+    re.compile(r"%5CUsers%5C([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII | re.IGNORECASE),
 )
 PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----")
 #: Words a documented or synthetic credential carries (AWS's `...EXAMPLE`, `sk-test-not-a-key`); a random key does not.
@@ -112,6 +118,14 @@ def _real(token: str) -> bool:
     return not any(word in lowered for word in SYNTHETIC)
 
 
+#: A signature is public: `sign` writes one into fabric.package.json (`"sig"`), and every signed record carries one.
+PUBLIC_NAMES = {"sig", "signature", "signatures"}
+
+
+def _credential(name: str) -> bool:
+    return name.lower() not in PUBLIC_NAMES and _secrets.credential_name(name)
+
+
 def _secret_finding(line: str) -> Optional[str]:
     if PRIVATE_KEY.search(line):
         return "a private key block"
@@ -124,7 +138,7 @@ def _secret_finding(line: str) -> Optional[str]:
     if any(_real(m.group(0)) for m in _secrets._BEARER_INSIDE.finditer(line)):
         return "a bearer token"
     for name, value in (ASSIGNED.findall(line) if ":" in line or "=" in line else ()):
-        if _secrets.credential_name(name) and _secrets._long_secret(value) and _real(value):
+        if _credential(name) and _secrets._long_secret(value) and _real(value):
             return "a long random value assigned to a credential's name"
     return None
 
@@ -164,7 +178,7 @@ def _secret_spans(text: str) -> List[Tuple[int, int]]:
               if _real(m.group(0)) and (m.start() == 0 or not text[m.start() - 1].isalnum())]
     spans += [m.span() for m in _secrets._BEARER_INSIDE.finditer(text) if _real(m.group(0))]
     spans += [m.span(2) for m in ASSIGNED.finditer(text)
-              if _secrets.credential_name(m.group(1)) and _secrets._long_secret(m.group(2)) and _real(m.group(2))]
+              if _credential(m.group(1)) and _secrets._long_secret(m.group(2)) and _real(m.group(2))]
     return spans
 
 
@@ -195,7 +209,9 @@ def _git_files(root: Path) -> Optional[List[str]]:
     return sorted({p for p in result.stdout.decode("utf-8", "surrogateescape").split("\0") if p})
 
 
-def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SKIP) -> List[str]:
+def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SKIP,
+                left: Optional[List[str]] = None) -> List[str]:
+    """Every file under root but the folders in skip; each folder skipped is named in left."""
     found = []
     skip = set(skip)
 
@@ -203,6 +219,8 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
         unreadable.append(Path(str(error.filename or root)).relative_to(root).as_posix())
 
     for folder, dirs, files in os.walk(root, onerror=failed):
+        if left is not None:
+            left += [Path(folder, d).relative_to(root).as_posix() for d in dirs if d in skip and d != ".git"]
         dirs[:] = [d for d in dirs if d not in skip]
         # os.walk lists a link to a folder with the folders and does not follow it: check it as Git would, by its target
         files = files + [d for d in dirs if os.path.islink(os.path.join(folder, d))]
@@ -255,13 +273,14 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
     unreadable: List[str] = []
     files = None if every_file else _git_files(root)
     mode = "git"
+    dependencies: List[str] = []  # dependency folders the walk leaves unread: named, so a clean result says so
     if every_file:  # what `pack` reads: every file, ignored or not; `.git` and `__pycache__` it refuses to pack
         files, mode = _walk_files(root, unreadable, PACK_REFUSES), "walk"
     elif not files:  # not a checkout, Git refused it, or a folder Git ignores or holds nothing of: read what is there
-        files, mode = _walk_files(root, unreadable), "walk"
+        files, mode = _walk_files(root, unreadable, WALK_SKIP, dependencies), "walk"
     findings: List[Dict[str, object]] = []
     read = 0
-    skipped = {"binary": 0, "unreadable": len(unreadable), "excluded": 0, "nested": 0}
+    skipped = {"binary": 0, "unreadable": len(unreadable), "excluded": 0, "nested": 0, "dependencies": len(dependencies)}
     not_read: List[Dict[str, str]] = [{"path": redact(p, entries), "why": "unreadable"} for p in unreadable]
 
     def add(path: str, line: int, kind: str, rule: str) -> None:
@@ -289,6 +308,10 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
                 continue
             with open(full, "rb") as handle:
                 data = handle.read()
+        except FileNotFoundError:  # deleted here, still in Git's index: `git rm --cached` it, or restore it
+            skipped["unreadable"] += 1
+            not_read.append({"path": redact(path, entries), "why": "deleted, still in Git's index"})
+            continue
         except OSError:
             skipped["unreadable"] += 1
             not_read.append({"path": redact(path, entries), "why": "unreadable"})
@@ -390,9 +413,13 @@ def run(argv: Optional[List[str]] = None) -> int:
             _print("%s:%s: %s (%s)" % (f["path"], f["line"], f["kind"], f["rule"]))
         for n in result["notRead"]:  # type: ignore[union-attr]
             _print("%s: not read (%s)" % (n["path"], n["why"]))
+        if skipped["dependencies"]:  # type: ignore[index]
+            _print("%d dependency folder(s) not read (node_modules, virtual environments, caches); --every-file reads "
+                   "them" % skipped["dependencies"])  # type: ignore[index]
         _print("%d file(s) read (%s), %d finding(s); not read: %d binary, %d unreadable, %d nested repository; "
                "%d left out by name; %d instance string(s) listed%s"
-               % (result["files"], "what Git would commit" if result["mode"] == "git" else "every file, Git not used",
+               % (result["files"], "what Git would commit" if result["mode"] == "git" else
+                  "every file, as pack reads them" if args.every_file else "every file but dependency folders, Git not used",
                   len(findings), skipped["binary"], skipped["unreadable"], skipped["nested"],  # type: ignore[index]
                   skipped["excluded"], listed,  # type: ignore[index]
                   "" if listed else " (no owner's list)"))

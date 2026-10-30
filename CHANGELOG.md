@@ -9,16 +9,17 @@ import wait for the contract's decision on CT-194 (part 2).
 ### Added
 
 - **`fabric_source_check.py check`** (adapting-projects-to-fabric) reads the files a source would carry (what Git would
-  commit; every file when Git lists none, or with `--every-file`, which reads what `pack` carries) and reports, by path, line and kind: a path inside a person's home folder
-  (`home-path`: an ASCII home name in the macOS, Linux (`/home`, `/var/home`) and Windows forms, the dashed form of
-  DEC-0105 and the URL-encoded one; a web route `/users/...`, a flag `--home-dir` or a CSS variable is not one), a
+  commit; every file but the dependency folders it names when Git lists none; or with `--every-file`, which reads
+  what `pack` carries) and reports, by path, line and kind: a path inside a person's home folder
+  (`home-path`: an ASCII home name in the macOS, Linux (`/home`, `/var/home`) and Windows forms (Git Bash's `/c/Users`
+  and WSL's `/mnt/c/Users` included), the dashed form of DEC-0105 (`C--Users-` on Windows) and the URL-encoded ones; a web route `/users/...`, a flag `--home-dir` or a CSS variable is not one), a
   value shaped like a credential by the contract's detector read line by line, a long random value under a
-  credential's name or a private key block (`secret`), and a string from the owner's list of instance strings, kept
+  credential's name (a signature, `sig`, is public and not one) or a private key block (`secret`), and a string from the owner's list of instance strings, kept
   outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
   never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a file's
   path is checked like its text and printed with an entry as `<line N>`, a home name as `<home>` and a credential-shaped
   value as `<secret>`. Every text file is read whole; a binary, unreadable or nested-repository path is listed as not
-  read. It changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file
+  read (check a nested repository in its own tree, then name it in the ignore file). It changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file
   was not read (a binary file counts unless the ignore file names it as source). `.fabric-source-ignore` and
   `--exclude` leave out named files of synthetic test values, and the summary counts them; a neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its

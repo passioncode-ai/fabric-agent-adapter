@@ -321,7 +321,7 @@ the well-known document must answer again with a new pid within about 15 seconds
 
 To hand an agent to another machine or an organization, pack it as one folder (contract DEC-0050, DEC-0051). Write the
 author's `fabric.package.json` (the descriptive fields; for an agent `resultSignal` and `evals` with the receipt of the
-suite as packed), then:
+suite as packed), run `fabric_source_check.py check <folder> --every-file` (adapting-projects-to-fabric, Python), then:
 
 ```bash
 python3 <skill-dir>/scripts/fabric_package.py pack <folder>            # or: node fabric-package.mjs, npx @passioncode-ai/fabric-agent-adapter pack

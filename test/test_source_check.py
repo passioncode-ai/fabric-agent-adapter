@@ -101,7 +101,9 @@ class Findings(Tree):
     def test_home_paths_on_every_platform(self):
         forms = (MAC_HOME, LINUX_HOME, WIN_HOME, WIN_HOME_JSON, WIN_HOME_SLASH, WIN_HOME.lower(),
                  "/var" + "/home/" + HOME_NAME + "/x", "cwd: -" + "Users-" + HOME_NAME + "-DATA-proj",
-                 "url=file:%2F" + "Users%2F" + HOME_NAME + "%2Fx")
+                 "url=file:%2F" + "Users%2F" + HOME_NAME + "%2Fx", "cwd: C--" + "Users-" + HOME_NAME + "-DATA-proj",
+                 "c--" + "Users-" + HOME_NAME + "-x", "/c/" + "Users/" + HOME_NAME + "/x", "/mnt/c/" + "Users/" + HOME_NAME,
+                 "C%3A%5C" + "Users%5C" + HOME_NAME + "%5Cx")
         for i, value in enumerate(forms):
             self.write("cfg%d.txt" % i, "path = %s\n" % value)
         code, result, _ = self.json_check()
@@ -124,7 +126,7 @@ class Findings(Tree):
         self.assertEqual(code, 0, result["findings"])
 
     def test_web_routes_flags_and_css_are_not_home_paths(self):
-        self.write("app.js", "\n".join(['fetch("/" + "users/profile")', "router.push('/" + "users/settings')",
+        self.write("app.js", "\n".join(['fetch("/" + "users/profile")', 'login("/login?next=%2F' + 'users%2Fsettings")', "router.push('/" + "users/settings')",
                                           "cli --" + "home-dir ./x", 'add_argument("--' + 'users-file")',
                                           "color: var(--" + "home-hero-bg);"]) + "\n")
         code, result, _ = self.json_check()
@@ -151,6 +153,19 @@ class Findings(Tree):
         self.assertEqual(code, 1)
         self.assertEqual(sorted(f["path"] for f in result["findings"] if f["kind"] == "secret"),
                          ["a.py", "b.env.txt", "c.json", "d.pem.txt", "e.sh", "f.md", "g.env"])
+
+    def test_a_package_signature_is_public(self):
+        sig = ("Ab3" * 29)[:86]  # an Ed25519 signature in base64url: 86 characters mixing cases and digits
+        self.write("fabric.package.json", '{"signatures": [{"kid": "publisher", "sig": "%s"}]}\n' % sig)
+        self.write("b.json", '{"signature": "%s"}\n' % sig)
+        self.assertEqual(self.json_check()[0], 0)
+        self.write("c.json", '{"api_key": "%s"}\n' % sig)
+        self.assertEqual([f["path"] for f in self.json_check()[1]["findings"]], ["c.json"])
+
+    def test_every_folder_the_check_skips_is_one_pack_refuses(self):
+        packer = _package_module()
+        for name in sc.PACK_REFUSES:
+            self.assertTrue(packer.JUNK.fullmatch(name), name)
 
     def test_prose_about_bearer_tokens_is_not_a_secret(self):
         self.write("doc.md", "Bearer tokens are never written to a file.\nbearer <token> goes in the header.\n"
@@ -276,9 +291,15 @@ class WhatIsRead(Tree):
         self.write("app.js", "ok\n")
         with mock.patch.object(sc, "_git_files", return_value=None):
             code, result, _ = self.json_check()
-            self.assertIn("Git not used", run(["check", str(self.root)])[1])
+            text = run(["check", str(self.root)])[1]
+        self.assertIn("Git not used", text)
+        self.assertIn("1 dependency folder(s) not read", text)  # named, never a silent `every file`
+        self.assertEqual(result["skipped"]["dependencies"], 1)
         self.assertEqual(code, 0, result["findings"])
         self.assertEqual(result["mode"], "walk")
+        code, result, _ = self.json_check("--every-file")
+        self.assertEqual(code, 1)  # what pack carries: node_modules read, `.git` still not
+        self.assertEqual([f["path"] for f in result["findings"]], ["node_modules/dep/index.js"])
 
     def test_ignore_file_and_exclude(self):
         self.write("fixtures/keys.txt", FAKE_GITHUB + "\n")
@@ -346,6 +367,17 @@ class WhatIsRead(Tree):
         code, result, _ = self.json_check()
         self.assertEqual(result["mode"], "walk")
         self.assertEqual([(f["path"], f["line"]) for f in result["findings"]], [("d", 0)])
+
+    def test_a_tracked_file_deleted_here_is_named_as_such(self):
+        if shutil.which("git") is None:
+            self.skipTest("git")
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write("old.txt", "x\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "old.txt"], check=True)
+        (self.root / "old.txt").unlink()
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 2)
+        self.assertEqual(result["notRead"], [{"path": "old.txt", "why": "deleted, still in Git's index"}])
 
     def test_line_numbers_are_an_editors(self):
         self.write("a.txt", "one\fstill one\r\ntwo %s\n" % MAC_HOME)
@@ -475,7 +507,7 @@ class TheSkillsTeachIt(unittest.TestCase):
         for words in ("never repeats", "Exit `0`: no finding and every file read; `1`: at least one finding",
                       "a file was not read", "a nested repository", "`--every-file`", "named in the ignore file", "A list inside the tree is refused", sc.IGNORE_FILE,
                       "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` or `~/.config`",
-                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used",
+                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "dependency folders", "check a nested repository in its own tree", "a web route under `/home/`",
                       "`fabric_paths.service_dirs`", "`<id>.<instance>`", "(LC-09)", "FAA-188 part 2",
                       "private-terms.txt"):
             self.assertIn(words, ref)

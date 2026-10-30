@@ -44,11 +44,11 @@ on it.
 ## The check
 
 `fabric_source_check.py check` reads the files the source would carry (what Git would commit: tracked files and
-untracked ones that are not ignored) and reports each place where the instance shows through, by path, line and kind:
+untracked ones that are not ignored, as they are in the work tree; a staged copy that differs is not read) and reports each place where the instance shows through, by path, line and kind:
 
 | Kind | Finds |
 |---|---|
-| `home-path` | an absolute path inside a person's home folder: `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, and the dashed (`-Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name is not ASCII or holds a dash puts it in the owner's list |
+| `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name is not ASCII or holds a dash puts it in the owner's list |
 | `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name; or a private key block |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
@@ -69,7 +69,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   records in the tree is instance data the check cannot read: move it to the instance folder. A binary that is source
   (an icon, a font) is named in the ignore file. `--every-file` reads every file, those Git ignores included: run it
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
-  not in a Git checkout, or Git lists nothing in it, every file is read, and the summary says Git was not used.
+  not in a Git checkout, or Git lists nothing in it, every file is read but the dependency folders (`node_modules`,
+  virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
+  A nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
+  the same check, then name its path in the ignore file, with that reason on the line above.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, `#` comments, at least three characters. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
