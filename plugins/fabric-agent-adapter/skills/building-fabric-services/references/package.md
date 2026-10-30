@@ -42,8 +42,10 @@ python3 scripts/fabric_package.py pack <folder>           # a dry run: the packa
 python3 scripts/fabric_package.py pack <folder> --apply   # writes fabric.package.json when nothing is wrong
 ```
 
-Run `adapting-projects-to-fabric/scripts/fabric_source_check.py check <folder>` first: a package carries the source,
-and the instance (the owner's paths, keys, strings) stays out of it (`references/source-and-instance.md` of that skill).
+Run `adapting-projects-to-fabric/scripts/fabric_source_check.py check <folder> --every-file` first: a package carries
+the source, and the instance (the owner's paths, keys, strings) stays out of it (`references/source-and-instance.md` of
+that skill). `--every-file` reads what `pack` reads, files Git ignores included; without it the check reads only what Git
+would commit.
 
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
 `*.pyc`, and files that are credentials by name (`.env` and `.env.*` but `.env.example|sample|template`, `*.pem`, `*.key`,

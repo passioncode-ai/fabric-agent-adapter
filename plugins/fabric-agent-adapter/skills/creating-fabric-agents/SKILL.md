@@ -75,7 +75,8 @@ failures, a retro), distil it before writing code:
    it has been watched rejecting the exact defects its predecessors were burned by:
    knowledge transfers as a check, not as prose. A fixture carries the defect on neutral
    ids, never the predecessor's owner, paths or accounts.
-4. Record the pack in the new project as `docs/knowledge-pack.md` with its sources, so
+4. Record the pack in the new project as `docs/knowledge-pack.md` with its sources (a public URL or commit, else a
+   neutral name, the private address kept in the instance), so
    the provenance of every borrowed decision survives the person who borrowed it.
 
 Skipping this step because there is no prior art is legal; skipping it because reading

@@ -48,7 +48,7 @@ untracked ones that are not ignored) and reports each place where the instance s
 
 | Kind | Finds |
 |---|---|
-| `home-path` | an absolute path inside a person's home folder: `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, and the dashed (`-Users-<name>-`) and URL-encoded forms a tool makes of one |
+| `home-path` | an absolute path inside a person's home folder: `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, and the dashed (`-Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name is not ASCII or holds a dash puts it in the owner's list |
 | `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name; or a private key block |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
@@ -62,10 +62,13 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   `<secret>`; an instance string is named by its line in the owner's list. The report can go in a commit
   message, an issue or a chat.
 - It **changes nothing.** Exit `0`: no finding and every file read; `1`: at least one finding (the step is not done);
-  `2`: the check could not run, or a file could not be read (the summary counts them).
+  `2`: the check could not run, or a file was not read: an unreadable file, a nested repository, or a binary file the
+  ignore file does not name as source (the summary counts each, and how many files were left out by name).
 - **What it reads.** A text file of any size is read whole, and the summary counts every text file read; a binary file (a NUL byte in its first 8 KiB) or one that
   cannot be read is listed by its path as not read, and the summary counts it. A database or another binary of
-  records in the tree is instance data the check cannot read: move it to the instance folder. A committed symbolic link is checked by the path it names, never followed. When the folder is
+  records in the tree is instance data the check cannot read: move it to the instance folder. A binary that is source
+  (an icon, a font) is named in the ignore file. `--every-file` reads every file, those Git ignores included: run it
+  on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
   not in a Git checkout, or Git lists nothing in it, every file is read, and the summary says Git was not used.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, `#` comments, at least three characters. It is `--instance-strings FILE`, else the file

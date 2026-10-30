@@ -8,3 +8,5 @@ test/test_fabric_connections.py
 test/test_fabric_http.py
 test/test_fabric_service_feed_protocols.py
 test/test_source_check.py
+# The plugin's icon: a binary image the check cannot read, source by its nature.
+assets/passioncode-icon-256.png

@@ -35,6 +35,18 @@ OWNER = "Acme" + "Holdings"
 ACCOUNT = "owner-" + "account-77"
 
 
+def _package_module():
+    """The kit's packer, to show the check reads every file `pack` carries."""
+    import sys
+    kit = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"
+    if str(kit) not in sys.path:
+        sys.path.insert(0, str(kit))  # its sibling modules import each other by name
+    found = importlib.util.spec_from_file_location("fabric_package", kit / "fabric_package.py")
+    module = importlib.util.module_from_spec(found)
+    found.loader.exec_module(module)
+    return module
+
+
 def run(argv):
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -111,6 +123,21 @@ class Findings(Tree):
         code, result, _ = self.json_check()
         self.assertEqual(code, 0, result["findings"])
 
+    def test_web_routes_flags_and_css_are_not_home_paths(self):
+        self.write("app.js", "\n".join(['fetch("/" + "users/profile")', "router.push('/" + "users/settings')",
+                                          "cli --" + "home-dir ./x", 'add_argument("--' + 'users-file")',
+                                          "color: var(--" + "home-hero-bg);"]) + "\n")
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 0, result["findings"])
+
+    def test_a_run_of_backslashes_is_read_in_linear_time(self):
+        import time
+        line = '{"p": "C:' + "\\" * 5000 + 'Program Files"}'
+        started = time.monotonic()
+        self.assertEqual(sc._home_names(line), [])
+        self.assertLess(time.monotonic() - started, 1.0)
+        self.assertTrue(sc._home_names(WIN_HOME_JSON))
+
     def test_secret_shapes(self):
         self.write("a.py", "TOKEN = '%s'\n" % FAKE_GITHUB)
         self.write("b.env.txt", "key=%s\n" % FAKE_OPENAI)
@@ -184,6 +211,18 @@ class NeverRepeated(Tree):
         text = run(["check", str(self.root)])[1]
         self.assertIn("cache_<secret>.json:0: secret", text)
         self.assertIn("-Users-<home>-proj/notes.md:0: home-path", text)
+
+    def test_overlapping_marks_print_no_part_of_either(self):
+        first = HOME_NAME[:5]
+        full = first + "-smith-" + "consulting"
+        listed = self.owner_list(first, full, HOME_NAME + "-acme" + "corp")
+        self.write(full + "-notes.md", "x\n")
+        self.write("-" + "Users-" + HOME_NAME + "-acme" + "corp/a.md", "x\n")
+        for argv in (["check", str(self.root), "--instance-strings", str(listed)],
+                     ["check", str(self.root), "--instance-strings", str(listed), "--json"]):
+            out = run(argv)[1]
+            for part in ("smith", "consulting", "acme", "corp", first):
+                self.assertNotIn(part, out, argv)
 
     def test_an_error_does_not_echo_the_root(self):
         code, out, err = run(["check", str(self.tmp / OWNER / "absent")])
@@ -259,6 +298,55 @@ class WhatIsRead(Tree):
         self.assertIn("records.sqlite: not read (binary)", run(["check", str(self.root)])[1])
         self.assertEqual([(f["path"], f["line"]) for f in result["findings"]], [("big.log", 2)])
 
+    def test_a_binary_file_not_named_as_source_makes_the_check_incomplete(self):
+        self.write("records.sqlite", b"SQLite format 3\0" + MAC_HOME.encode(), mode="wb")
+        self.write("utf16.txt", MAC_HOME.encode("utf-16"), mode="wb")
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 2)
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["skipped"]["binary"], 2)
+        self.write(sc.IGNORE_FILE, "# the icon is source\nicon.png\n")
+        self.write("icon.png", b"\x89PNG\0", mode="wb")
+        for name in ("records.sqlite", "utf16.txt"):
+            (self.root / name).unlink()
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["skipped"]["excluded"], 1)
+
+    def test_files_left_out_are_counted(self):
+        self.write("a.txt", "x\n")
+        self.write("b.txt", "x\n")
+        code, result, _ = self.json_check("--exclude", "*")
+        self.assertEqual((code, result["files"], result["skipped"]["excluded"]), (0, 0, 2))
+        self.assertIn("2 left out by name", run(["check", str(self.root), "--exclude", "*"])[1])
+
+    def test_every_file_reads_what_pack_carries(self):
+        if shutil.which("git") is None:
+            self.skipTest("git")
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write("pkg/.gitignore", "config/*.json\nnode_modules/\n")  # a package folder inside a checkout, its instance ignored
+        self.write("pkg/config/agent.json", '{"data": "%s"}\n' % MAC_HOME)
+        self.write("pkg/node_modules/x/index.js", MAC_HOME + "\n")
+        self.write("pkg/main.py", "pass\n")
+        pkg = str(self.root / "pkg")
+        self.assertEqual(run(["check", pkg])[0], 0)
+        code, out, _ = run(["check", pkg, "--every-file", "--json"])
+        result = json.loads(out)
+        self.assertEqual(code, 1)
+        found = sorted(f["path"] for f in result["findings"])
+        self.assertEqual(found, ["config/agent.json", "node_modules/x/index.js"])
+        packs = set(_package_module().read_folder(pkg))
+        self.assertLessEqual(packs, set(found) | {".gitignore", "main.py"})
+
+    @unittest.skipIf(os.name == "nt", "a symbolic link needs a privilege on Windows")
+    def test_a_link_to_a_folder_is_checked_without_git(self):
+        target = self.outside / ("-" + "Users-" + HOME_NAME + "-data")
+        target.mkdir()
+        os.symlink(str(target), str(self.root / "d"))
+        code, result, _ = self.json_check()
+        self.assertEqual(result["mode"], "walk")
+        self.assertEqual([(f["path"], f["line"]) for f in result["findings"]], [("d", 0)])
+
     def test_line_numbers_are_an_editors(self):
         self.write("a.txt", "one\fstill one\r\ntwo %s\n" % MAC_HOME)
         self.assertEqual([f["line"] for f in self.json_check()[1]["findings"]], [2])
@@ -331,6 +419,17 @@ class Refusals(Tree):
         self.assertEqual(code, 2)
         self.assertIn("is not UTF-8", err)
 
+    @unittest.skipIf(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), "permissions")
+    def test_a_root_it_cannot_read_is_an_error_without_its_path(self):
+        self.write("a.txt", "x\n")
+        self.root.chmod(0o600)
+        try:
+            code, out, err = run(["check", str(self.root)])
+        finally:
+            self.root.chmod(0o755)
+        self.assertEqual(code, 2, out + err)
+        self.assertNotIn(str(self.tmp), out + err)
+
     def test_a_root_that_is_not_a_folder(self):
         code, _, err = run(["check", str(self.root / "absent")])
         self.assertEqual(code, 2)
@@ -374,7 +473,7 @@ class TheSkillsTeachIt(unittest.TestCase):
     def test_the_reference_names_the_rules_the_script_keeps(self):
         ref = flat("creating-fabric-agents/references/source-and-instance.md")
         for words in ("never repeats", "Exit `0`: no finding and every file read; `1`: at least one finding",
-                      "a file could not be read", "A list inside the tree is refused", sc.IGNORE_FILE,
+                      "a file was not read", "a nested repository", "`--every-file`", "named in the ignore file", "A list inside the tree is refused", sc.IGNORE_FILE,
                       "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` or `~/.config`",
                       "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used",
                       "`fabric_paths.service_dirs`", "`<id>.<instance>`", "(LC-09)", "FAA-188 part 2",
