@@ -122,6 +122,11 @@ class Findings(Tree):
         code, result, _ = self.json_check()
         self.assertEqual(code, 0, result["findings"])
 
+    def test_dev_container_users_and_the_fixture_id_are_neutral_homes(self):
+        for name in ("vscode", "codespace", "circleci", "gitpod", "jovyan", "coder", "example-agent"):
+            self.assertFalse(sc._home_names("/" + "home/" + name + "/x"), name)
+            self.assertFalse(sc._home_names("/" + "Users/" + name + "/x"), name)
+
     def test_synthetic_values_and_one_letter_homes_are_not_findings(self):
         self.write("doc.md", "\n".join(["AKIA" + "IOSFODNN7" + "EXAMPLE", "sk" + "-or-v1-test-only-not-a-key",
                                          "sk" + "-fake0123456789abcdef", "/" + "Users/a/Library", "C:/" + "Users/b/x"]) + "\n")
@@ -1070,8 +1075,15 @@ class Refusals(Tree):
         env = {k: v for k, v in os.environ.items() if k != "PATH"}
         with mock.patch.dict(os.environ, env, clear=True):
             found = sc._git()
-        if any(os.path.isfile(os.path.join(d, "git")) for d in os.defpath.split(os.pathsep) if d):
-            self.assertTrue(found and os.path.isabs(found), found)  # the walk would skip dependency folders
+        if not any(os.path.isfile(os.path.join(d, "git")) for d in os.defpath.split(os.pathsep) if d):
+            self.skipTest("no git in the system's default folders")
+        self.assertTrue(found and os.path.isabs(found), found)  # the walk would skip dependency folders
+
+    def test_git_on_windows_with_path_unset_is_none_not_the_default_folder(self):
+        env = {k: v for k, v in os.environ.items() if k != "PATH"}
+        with mock.patch.object(sc.os, "name", "nt"), mock.patch.dict(os.environ, env, clear=True), \
+                mock.patch.object(sc.os.path, "isfile", return_value=True):
+            self.assertIsNone(sc._git())  # `C:\\bin`, Windows' default, is a folder any user may create
 
     def test_git_output_on_windows_is_read_back_as_the_walk_reads_a_name(self):
         name = "\udc80.txt"
@@ -1080,6 +1092,10 @@ class Refusals(Tree):
         with mock.patch.object(sc.os, "name", "nt"), mock.patch.object(sc, "_git", return_value="git.exe"), \
                 mock.patch.object(sc.subprocess, "run", return_value=done):
             self.assertEqual(sc._git_files(self.root), [name])
+        done = subprocess.CompletedProcess([], 0, b"\xff.txt\0" + listed, b"")  # one name that is not UTF-8
+        with mock.patch.object(sc.os, "name", "nt"), mock.patch.object(sc, "_git", return_value="git.exe"), \
+                mock.patch.object(sc.subprocess, "run", return_value=done):
+            self.assertIn(name, sc._git_files(self.root))
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):

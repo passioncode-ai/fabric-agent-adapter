@@ -33,7 +33,8 @@ The files read are those Git would commit (`git ls-files --cached --others --exc
 work tree (a staged copy that differs is not read). With `--every-file`, every file but `.git`, `__pycache__`,
 `.DS_Store` and `*.pyc`, which `pack` refuses as litter (what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
 `__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named (so too
-when no `git` is found in PATH's absolute folders). A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
+when no `git` is found in PATH's absolute folders, or with PATH unset in `/bin` and `/usr/bin`; on Windows with PATH
+unset the walk is used). A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
@@ -74,7 +75,9 @@ WALK_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", ".tox", ".m
 NEUTRAL_HOMES = {"example", "examples", "user", "username", "you", "me", "name", "someone", "runner", "shared", "public",
                  "default", "guest", "linuxbrew", "alice", "bob", "operator", "owner", "person", "your-name", "yourname",
                  # the users of container images, cloud machines and hosted CI
-                 "node", "ubuntu", "ec2-user", "runneradmin", "admin", "vagrant", "debian", "centos", "app", "builder"}
+                 "node", "ubuntu", "ec2-user", "runneradmin", "admin", "vagrant", "debian", "centos", "app", "builder",
+                 # dev containers and hosted workspaces, and the reference's own fixture id
+                 "vscode", "codespace", "circleci", "gitpod", "jovyan", "coder", "example-agent"}
 _SEP = r"(?:\\|/)+"  # one way to read a run: two alternatives that both take a `\\` backtrack exponentially
 HOME_PATHS = (
     re.compile(r"(?<![A-Za-z0-9_.-])(?:/var)?/home/([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),
@@ -454,7 +457,10 @@ def _git() -> Optional[str]:
     shutil.which there puts the current folder first too), and on POSIX an empty or relative PATH element (a trailing
     `:`) is the current folder: a tree checked from inside could run its own `git`."""
     name = "git.exe" if os.name == "nt" else "git"  # never a .cmd or .bat: cmd.exe would read the arguments
-    for folder in os.get_exec_path():  # with PATH unset, the system's default folders (`/bin`, `/usr/bin`)
+    # with PATH unset, POSIX's default folders (`/bin`, `/usr/bin`); Windows' default (`.;C:\\bin`) is a folder any
+    # user may create, so there no PATH means no git and the walk
+    folders = os.get_exec_path() if os.name != "nt" else os.environ.get("PATH", "").split(os.pathsep)
+    for folder in folders:
         if folder and os.path.isabs(folder):
             candidate = os.path.join(folder, name)
             if os.path.isfile(candidate) and (os.name == "nt" or os.access(candidate, os.X_OK)):
@@ -477,12 +483,16 @@ def _git_files(root: Path) -> Optional[List[str]]:
         return None
     # Git for Windows writes a lone surrogate in a name as WTF-8: read back as that character, it is the name os.walk
     # gives and `_as_bytes` turns into the bytes Git compares; elsewhere a name is bytes, kept by surrogateescape
-    out = result.stdout
-    try:
-        text = out.decode("utf-8", "surrogatepass") if os.name == "nt" else out.decode("utf-8", "surrogateescape")
-    except UnicodeDecodeError:
-        text = out.decode("utf-8", "surrogateescape")
-    return sorted({p for p in text.split("\0") if p})
+    names = set()
+    for raw in result.stdout.split(b"\0"):  # each name on its own: one name that is not UTF-8 changes no other
+        if not raw:
+            continue
+        try:
+            # POSIX: the file system's own encoding, so the name is the one os.walk and open() use in any locale
+            names.add(raw.decode("utf-8", "surrogatepass") if os.name == "nt" else os.fsdecode(raw))
+        except UnicodeDecodeError:
+            names.add(raw.decode("utf-8", "surrogateescape"))
+    return sorted(names)
 
 
 def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SKIP,
