@@ -282,7 +282,7 @@ python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/
 ```bash
 npx @passioncode-ai/fabric-agent-adapter pack ./example-agent-clean      # the clean copy: the digest, agentRef, every problem
 npx @passioncode-ai/fabric-agent-adapter pack ./example-agent-clean --apply
-npx @passioncode-ai/fabric-agent-adapter sign ./example-agent-clean --key ./publisher.jwk --apply
+npx @passioncode-ai/fabric-agent-adapter sign ./example-agent-clean --key ~/.config/example-publisher/publisher.jwk --apply   # a key outside any checkout
 npx @passioncode-ai/fabric-agent-adapter verify ./example-agent-clean --trust ./trust.json
 ```
 

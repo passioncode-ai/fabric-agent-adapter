@@ -28,8 +28,10 @@ import wait for the contract's decision on CT-194 (part 2).
   still refuses it, so the package is a copy without it), and the summary counts them; a neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).
-  `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`; SECURITY.md names what
-  it reads.
+  `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`, on a clean copy it
+  describes: what Git would commit and the nested trees checked on their own, each committed symbolic link replaced
+  by its committed target or removed and reviewed, shared source copied in and committed, dependency folders and
+  what `pack` refuses left out; SECURITY.md names what it reads.
 - **references/source-and-instance.md** (both skills): the layout (instance values in a configuration outside the
   repository with a neutral default and a committed `*.example`, records and state documents in the kit's data folder,
   keys by name, fixtures on neutral ids; the supervisor label and `createdBy` name the publisher until CT-194) and the
