@@ -32,8 +32,7 @@ repository, or a binary one the ignore file does not name as source. A file not 
 The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), as they are in the
 work tree (a staged copy that differs is not read). With `--every-file`, every file but `.git`, `__pycache__`,
 `.DS_Store` and `*.pyc`, which `pack` refuses as litter (what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
-`__pycache__`, `node_modules`, virtual environments and caches (and the litter files `.DS_Store` and `*.pyc`); the
-dependency folders it leaves are named. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
+`__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
@@ -217,7 +216,13 @@ def _secret_finding(line: str) -> Optional[str]:
     return found
 
 
+#: A whole Ed25519 signature as `sign` writes it: public, so no rule reads it (not even a provider key's shape in it).
+_PUBLIC_SIGNATURE = re.compile(r"\"(?:sig|signature|signatures)\"[ \t]*:[ \t]*\"[A-Za-z0-9_-]{86}\"", re.IGNORECASE)
+
+
 def _secret_in(line: str) -> Optional[str]:
+    if '"' in line:
+        line = _PUBLIC_SIGNATURE.sub('"sig": ""', line)
     if PRIVATE_KEY.search(line):
         return "a private key block"
     if any(_real(m.group(1)) for m in JWK_PRIVATE.finditer(line)):
@@ -232,11 +237,22 @@ def _secret_in(line: str) -> Optional[str]:
         return "a bearer token"
     if "://" in line and any(_url_secret(m.group(0)) for m in URL.finditer(line)):
         return "a URL that carries a credential"
-    for m in (ASSIGNED.finditer(line) if ":" in line or "=" in line else ()):
+    for m in (_assigned(line) if ":" in line or "=" in line else ()):
         name, value = m.group(1), m.group(2)
         if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(unquote(value)) and _real(unquote(value)):
             return "a long random value assigned to a credential's name"
     return None
+
+
+def _assigned(line: str) -> Iterable["re.Match[str]"]:
+    """ASSIGNED's matches, each search starting again inside the last value: `id=<run>/TOKEN=<value>` reads both."""
+    pos = 0
+    while True:
+        m = ASSIGNED.search(line, pos)
+        if m is None:
+            return
+        yield m
+        pos = m.start(2) if m.start(2) > pos else m.end()
 
 
 def read_list(path: Path) -> List[str]:
@@ -283,15 +299,27 @@ def _secret_spans(text: str) -> List[Tuple[int, int]]:
 
 def redact(path: str, entries: List[str]) -> str:
     """A path as it may be printed: an owner's string as `<line N>` (its line in the owner's list), a real home
-    folder's name as `<home>`, a credential-shaped value as `<secret>`, also one that shows only with JSON escapes
-    undone (`app:<pw>@db\\/`), its span mapped back onto the path."""
+    folder's name as `<home>`, and each segment in which `_secret_finding` finds a credential as `<secret>`, whole
+    (a span inside a segment can miss a second value the first one runs into). While the segments left still hold a
+    credential together (`https:\\/\\/app:<pw>@db/x`), they are masked from the last one back, so what is printed
+    holds no finding and its first folders still name the place."""
+    spans, offset = [], 0
+    for segment in path.split("/"):
+        spans.append((offset, offset + len(segment)))
+        offset += len(segment) + 1
+    masked = [bool(_secret_finding(path[a:b])) for a, b in spans]
+
+    def rest() -> str:
+        return "/".join(" " if m else path[a:b] for (a, b), m in zip(spans, masked))
+
+    for i in range(len(spans) - 1, -1, -1):
+        if not _secret_finding(rest()):
+            break
+        masked[i] = True
+    secret_segments = [span for span, m in zip(spans, masked) if m]
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     marks += [(s, e, "<home>") for s, e in _home_names(path)]
-    marks += [(s, e, "<secret>") for s, e in _secret_spans(path)]
-    if "\\" in path:  # a credential that shows only with JSON escapes undone: its spans mapped back onto the path
-        unescaped, origin = _unescaped_with_origin(path)
-        if unescaped != path:
-            marks += [(origin[s][0], origin[e - 1][1], "<secret>") for s, e in _secret_spans(unescaped) if e > s]
+    marks += [(s, e, "<secret>") for s, e in secret_segments]
     out, last = [], 0
     for start, end, label in sorted(marks):
         if start < last:  # overlapping marks: the first covers the union, so no part of either is printed
@@ -332,7 +360,7 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
         for name in files:
             if name in skip and name == ".git":  # a worktree's or a submodule's `.git` file: never carried, never source
                 continue
-            if _PACK_JUNK_FILE.fullmatch(name):  # what pack refuses as litter (.DS_Store, *.pyc): never source
+            if skip == PACK_REFUSES and _PACK_JUNK_FILE.fullmatch(name):  # --every-file: litter pack refuses, never carried
                 continue
             found.append(Path(folder, name).relative_to(root).as_posix())
     return sorted(found)

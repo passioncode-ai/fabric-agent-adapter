@@ -49,8 +49,9 @@ that skill). `--every-file` reads what `pack` reads, files Git ignores included;
 would commit. A path named in `.fabric-source-ignore` or `--exclude` is still carried by `pack`, unread, so name only synthetic files
 there, and check a nested repository named there with `--every-file` in its own tree. Keep the signing key file
 outside the folder. Pack a clean copy: what Git would commit (`git ls-files --cached --others --exclude-standard`) plus the nested
-trees checked on their own, copied without their `.git` and with each committed symbolic link replaced by its target
-or removed (`pack` refuses a link), without dependency folders (`node_modules`, virtual environments, which hold install paths and binaries) and
+trees checked on their own, copied without their `.git` and with a committed symbolic link whose target is inside the tree
+replaced by its target and one that leaves the tree removed (its target is the instance or another project, never
+source; `pack` refuses a link), without dependency folders (`node_modules`, virtual environments, which hold install paths and binaries) and
 without what `.gitignore` keeps out as instance (the real configuration, an instance folder in the checkout): `pack`
 does not read `.gitignore`, and an account id or a host is found only through the owner's list; and without the files
 `pack` refuses by name (a credential-free `.npmrc` that `.fabric-source-ignore` names for the check included). The check is Python only (3.9+); a Node-only machine packs without it, and `pack` itself carries the kit's token files

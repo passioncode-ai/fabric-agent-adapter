@@ -19,8 +19,8 @@ import wait for the contract's decision on CT-194 (part 2).
   `board.credential`) (`secret`), and a string from the owner's list of instance strings, kept
   outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
   never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a file's
-  path is checked like its text and printed with an entry as `<line N>`, a home name as `<home>` and a credential-shaped
-  value as `<secret>`. Every text file is read whole; a binary, unreadable or nested-repository path is listed as not
+  path is checked like its text and printed with an entry as `<line N>`, a home name as `<home>` and a segment holding a
+  credential-shaped value as `<secret>`. Every text file is read whole; a binary, unreadable or nested-repository path is listed as not
   read (check a nested repository in its own tree, then name it in the ignore file; before `pack`, check it with
   `--every-file` too). It changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file
   was not read (a binary file counts unless the ignore file names it as source). `.fabric-source-ignore` and

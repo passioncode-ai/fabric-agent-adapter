@@ -165,6 +165,10 @@ class Findings(Tree):
         self.write("d.env", "BLOB_URL=https://example.blob.core.windows.net/c?sv=2022&sig=%s%%3D\n" % LONG_RANDOM)
         self.assertEqual([f["path"] for f in self.json_check()[1]["findings"]], ["c.json", "d.env"])
 
+    def test_a_signature_that_holds_a_provider_keys_shape_is_public(self):
+        sig = ("Ab3" * 12 + "-sk-" + "Cd4" * 16)[:86]
+        self.assertIsNone(sc._secret_finding('{"signatures": [{"kid": "p", "sig": "%s"}]}' % sig))
+
     def test_a_signature_in_a_url_or_an_env_line_is_a_credential(self):
         sig = ("Ab3" * 29)[:86]  # the shape of a public signature, where only a JSON member is public
         self.write("a.env", "BLOB=https://example.blob.core.windows.net/c?sv=1&sig=%s\n" % sig)
@@ -272,7 +276,7 @@ class Findings(Tree):
         self.assertIsNone(sc._secret_finding("API_TOKEN=%s%%66ake" % LONG_RANDOM))
 
     @unittest.skipIf(os.name == "nt", "a backslash is a separator on Windows")
-    def test_a_path_found_only_with_escapes_undone_is_masked_whole(self):
+    def test_a_path_found_only_with_escapes_undone_is_masked_by_segment(self):
         pw = LONG_RANDOM[:15] + "7"
         self.write("d0/https:\\/\\/app:%s@db\\/x.txt" % pw, "x\n")
         self.write("d1/API_TOKEN=%s/https:\\/\\/app:%s@db\\/x.txt" % (LONG_RANDOM, pw), "x\n")  # a spanned one beside it
@@ -285,6 +289,9 @@ class Findings(Tree):
             self.assertNotIn(LONG_RANDOM, out + err, extra)
         found = sorted(f["path"] for f in self.json_check()[1]["findings"] if f["path"].startswith("d"))
         self.assertEqual([f[:3] for f in found], ["d0/", "d1/", "d2/"], found)  # each still names its folder
+
+    def test_a_credential_after_another_long_run_on_a_line(self):
+        self.assertIsNotNone(sc._secret_finding("build_id=%s/SESSION_TOKEN=%s" % ("a1b2" * 10, LONG_RANDOM)))
 
     def test_a_url_in_a_shell_default_value(self):
         pw = LONG_RANDOM[:12] + "7"
@@ -367,7 +374,7 @@ class NeverRepeated(Tree):
             self.assertNotIn(FAKE_GITHUB, out + err)
             self.assertNotIn(HOME_NAME, out + err)
         text = run(["check", str(self.root)])[1]
-        self.assertIn("cache_<secret>.json:0: secret", text)
+        self.assertIn("<secret>:0: secret", text)  # the segment that holds it, whole
         self.assertIn("-Users-<home>-proj/notes.md:0: home-path", text)
 
     def test_overlapping_marks_print_no_part_of_either(self):
@@ -381,6 +388,21 @@ class NeverRepeated(Tree):
             out = run(argv)[1]
             for part in ("smith", "consulting", "acme", "corp", first):
                 self.assertNotIn(part, out, argv)
+
+    @unittest.skipIf(os.name == "nt", "a backslash and a colon in a name need a POSIX file system")
+    def test_two_credentials_in_one_path_print_neither(self):
+        k1, k2 = LONG_RANDOM, ("Zq7" * 14)
+        key = PEM.replace("RSA ", "") + "MC4CAQAwBQYDK2VwBCIEI" + ("Ab3" * 10)
+        self.write("API_TOKEN=%s/SESSION_TOKEN=%s.txt" % (k1, k2), "x\n")
+        self.write("e/API_TOKEN\\u003d%s_SESSION_TOKEN\\u003d%s.txt" % (k1, k2), "x\n")
+        self.write("b/Bearer %s/Bearer %s.txt" % (k1 + "1", k2 + "2"), "x\n")
+        self.write("p/k\\x%s.txt" % key, "x\n")
+        self.write("q/%s.txt" % key, "x\n")
+        for extra in ([], ["--json"], ["--every-file"]):
+            code, out, err = run(["check", str(self.root), *extra])
+            self.assertEqual(code, 1, extra)
+            for value in (k1, k2, "MC4CAQAw"):
+                self.assertNotIn(value, out + err, (extra, value))
 
     def test_an_error_does_not_echo_the_root(self):
         code, out, err = run(["check", str(self.tmp / OWNER / "absent")])
@@ -555,12 +577,16 @@ class WhatIsRead(Tree):
         self.assertEqual(code, 2, out + err)
         self.assertNotIn(str(self.tmp), out + err)
 
-    def test_the_walk_leaves_out_litter_too(self):
-        self.write(".DS_Store", b"\0\0\0\1Bud1", mode="wb")
-        self.write("pkg/m.pyc", b"\x61\x0d\x0d\x0a\0", mode="wb")
+    def test_the_walk_reads_litter_git_would_commit(self):
+        """Without Git the walk stands in for what Git would commit: a .pyc is read (pack refuses it, but a source
+        handed over by Git carries it), so only --every-file leaves litter out."""
+        self.write("pkg/settings.pyc", b"\x61\x0d\x0d\x0a\0API_TOKEN", mode="wb")
+        self.write("pkg/notes.pyc", "API_TOKEN=%s\n" % LONG_RANDOM)
         self.write("main.py", "pass\n")
         with mock.patch.object(sc, "_git_files", return_value=None):
-            self.assertEqual(self.json_check()[0], 0)
+            code, result, _ = self.json_check()
+        self.assertEqual(code, 1, result)
+        self.assertEqual(result["notRead"], [{"path": "pkg/settings.pyc", "why": "binary"}])
 
     @unittest.skipIf(os.name == "nt", "a symbolic link needs a privilege on Windows")
     def test_a_dangling_link_anywhere_above_the_default_list(self):

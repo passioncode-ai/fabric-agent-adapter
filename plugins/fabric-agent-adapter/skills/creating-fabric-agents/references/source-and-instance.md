@@ -63,8 +63,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 
 - It **never repeats** a value it found: no value, no line holding one, no entry of the owner's list and not the
   folder it checks reaches its output. A file's path is checked like its text (line `0` of a finding), and printed
-  with an entry of the list as `<line N>`, a home folder's name as `<home>` and a credential-shaped value as
-  `<secret>`; an instance string is named by its line in the owner's list. The report can go in a commit
+  with an entry of the list as `<line N>`, a home folder's name as `<home>` and each segment holding a
+  credential-shaped value as `<secret>`; an instance string is named by its line in the owner's list. The report can go in a commit
   message, an issue or a chat.
 - It **changes nothing.** Exit `0`: no finding and every file read; `1`: at least one finding (the step is not done);
   `2`: the check could not run, or a file was not read: an unreadable file, a nested repository, or a binary file the
@@ -76,7 +76,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   (litter `pack` refuses): run it
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
   not in a Git checkout, or Git lists nothing in it, every file is read but the dependency folders (`node_modules`,
-  virtual environments, caches) and the litter `pack` refuses (`.DS_Store`, `*.pyc`), and the summary says Git was not used and how many dependency folders were not read.
+  virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
   A nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
   the same check (a submodule checked out first, `git submodule update --init`), then name its path in the ignore file,
   with that reason on the line above. That line serves the check of the outer tree only: before `pack`, check the
