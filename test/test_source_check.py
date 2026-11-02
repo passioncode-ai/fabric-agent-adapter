@@ -219,12 +219,14 @@ class Findings(Tree):
         self.write(".npmrc", "x\n")
         self.write("data/session.key", rnd.token_bytes(32), mode="wb")
         self.write("data/service.token", rnd.token_urlsafe(32))
+        self.write("data/board.credential", rnd.token_urlsafe(32))
         self.write(".env.example", "X=\n")
         for extra in ([], ["--every-file"]):
             code, result, _ = self.json_check(*extra)
             self.assertEqual(code, 1, result)
             named = sorted(f["path"] for f in result["findings"] if f["line"] == 0 and f["kind"] == "secret")
-            self.assertEqual(named, [".env", ".npmrc", "data/service.token", "data/session.key"], extra)
+            self.assertEqual(named, [".env", ".npmrc", "data/board.credential", "data/service.token", "data/session.key"],
+                             extra)
 
     def test_the_credential_file_rule_is_packs(self):
         packer = _package_module()
@@ -239,10 +241,25 @@ class Findings(Tree):
             sig = quote(base64.b64encode(rnd.token_bytes(32)).decode(), safe="")
         self.write("a.env", "BLOB_URL=https://a.blob.core.windows.net/c/f?sv=2022-11-02&sig=%s\n" % sig)
         self.write("b.env", "DATABASE_URL=postgres://app:%s@db.internal/app\n" % (LONG_RANDOM[:12] + "9"))
+        # what says it is synthetic is the value, never the host: a real signature on an `examples` container
+        self.write("c.env", "U=https://examples.blob.core.windows.net/c/f?sv=1&sig=x%%2F%s\n" % sig)
         self.write("doc.md", "See https://example.com/?token=abc and https://user:hunter2@host.example/x\n")
+        # outside a URL: a bare SAS token, a YAML key, a connection string, an HTML attribute
+        self.write("d.env", "AZURE_STORAGE_SAS_TOKEN=sv=2022-11-02&sig=%s\n" % sig)
+        self.write("e.yaml", "sas_token: sv=2022-11-02&sig=%s\n" % sig)
+        self.write("f.txt", "BlobEndpoint=https://a.blob.core.windows.net/;SharedAccessSignature=sv=1&sig=%s\n" % sig)
+        self.write("g.html", '<a href="https://a.blob.core.windows.net/c?sv=1&amp;sig=%s">x</a>\n' % sig)
         code, result, out = self.json_check()
-        self.assertEqual(sorted(f["path"] for f in result["findings"]), ["a.env", "b.env"])
+        self.assertEqual(sorted(f["path"] for f in result["findings"]),
+                         ["a.env", "b.env", "c.env", "d.env", "e.yaml", "f.txt", "g.html"])
         self.assertNotIn(sig, out)
+
+    def test_a_long_run_before_a_url_is_read_in_linear_time(self):
+        import time
+        line = "0x" + "ab" * 40000 + " bzz-raw://x"
+        started = time.monotonic()
+        sc._secret_finding(line)
+        self.assertLess(time.monotonic() - started, 1.0)
 
     def test_every_folder_the_check_skips_is_one_pack_refuses(self):
         packer = _package_module()
@@ -593,6 +610,33 @@ class Refusals(Tree):
             self.root.chmod(0o755)
         self.assertEqual(code, 2, out + err)
         self.assertNotIn(str(self.tmp), out + err)
+
+    @unittest.skipIf(os.name == "nt", "a symbolic link needs a privilege on Windows")
+    def test_a_root_that_is_a_symlink_loop(self):
+        loop = self.tmp / "loop"
+        os.symlink(str(loop), str(loop))
+        code, out, err = run(["check", str(loop)])
+        self.assertEqual(code, 2, out + err)
+        self.assertNotIn(str(self.tmp), out + err)
+
+    @unittest.skipIf(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), "permissions")
+    def test_a_default_list_it_cannot_reach_is_an_error(self):
+        folder = Path(os.environ["XDG_CONFIG_HOME"]) / "passioncode-fabric"
+        folder.mkdir(parents=True)
+        (folder / sc.LIST_NAME).write_text(OWNER + "\n", encoding="utf-8")
+        self.write("n.md", OWNER + "\n")
+        folder.chmod(0)
+        try:
+            code, out, err = run(["check", str(self.root)])
+        finally:
+            folder.chmod(0o755)
+        self.assertEqual(code, 2, out + err)  # never "no owner's list", which would pass the string
+        self.assertNotIn(str(self.tmp), out + err)
+
+    def test_a_list_with_no_usable_string_says_so(self):
+        listed = self.owner_list("ab")
+        out = run(["check", str(self.root), "--instance-strings", str(listed)])[1]
+        self.assertIn("the owner's list holds no string of three or more characters", out)
 
     def test_a_root_that_is_not_a_folder(self):
         code, _, err = run(["check", str(self.root / "absent")])

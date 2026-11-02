@@ -16,7 +16,7 @@ the source would carry and reports, by path, line and kind, each place where the
   assigned to a name that can only carry a credential (a bare long run, such as an integrity hash, is not; a whole
   Ed25519 signature under a JSON `"sig"`, as `sign` writes it, is public); or a private key: a PEM, OpenSSH or PGP
   block, or a JWK's `d`; a URL that carries a password or a credential in its query; a file that is a credential by
-  its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit token file (`*.token`). A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
+  its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit credential file (`*.token`, `board.credential`). A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
   not a finding;
 - `instance-string`: a string from the owner's list of instance strings (names, accounts, hosts), kept outside the tree.
 
@@ -99,18 +99,18 @@ if not _secrets.SECRET_VALUE.pattern.startswith(_BEARER_FIRST):  # not an assert
     raise ImportError("fabric_secrets.SECRET_VALUE changed its first branch; update fabric_source_check.py with it")
 PROVIDER_KEY = re.compile("(" + _secrets.SECRET_VALUE.pattern.split("|", 1)[1], _secrets.SECRET_VALUE.flags)
 #: Files that are credentials by their name: pack's own rule (fabric_package.SECRET_FILE and SECRET_FILE_OK, held
-#: equal by test_source_check), and the kit's token files (`service.token`, fabric_auth.ensure_token).
+#: equal by test_source_check), and the kit's token files (`service.token`, fabric_auth; `board.credential`, fabric_hub).
 _JS_DOT = "[^\n\r\u2028\u2029]"
 SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)"
                          % (_JS_DOT, _JS_DOT))
 SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
-TOKEN_FILE = re.compile(r".+\.token")
+TOKEN_FILE = re.compile(r".+\.(token|credential)")  # the kit's service.token and board.credential
 #: An absolute URL in a line, read whole by `_url_secret`: a password in it, a credential in its query.
-URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"'<>`]+")
+URL = re.compile(r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*://[^\s\"'<>`]+")  # a scheme starts a run: linear
 #: `NAME = value`, `NAME: value` or `"name": "value"`: the long-run rule applies only where the name carries a credential.
 #: The name is bounded and starts a word, so a long line is read in linear time.
 ASSIGNED = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]{0,63})[\"']?[ \t]{0,8}[:=][ \t]{0,8}[\"']?"
-                      r"([A-Za-z0-9+/_-]{40,}={0,2})")  # `=` only as padding: `q=sig=<value>` is read at `sig`
+                      r"((?:[A-Za-z0-9+/_-]|%[0-9A-Fa-f]{2}){40,}={0,2})")  # `=` only as padding; `%2B` read decoded
 
 
 class CheckError(Exception):
@@ -158,15 +158,18 @@ def _url_secret(url: str) -> bool:
     So: a password of 8 or more mixing letters and digits, or a query or fragment value that, percent-decoded, is shaped
     like a credential (a provider key, a JWT, a long random run under a credential's name)."""
     url = url.rstrip(".,;)]}")
-    if not _real(url) or not _secrets._SCHEME.match(url):
+    if not _secrets._SCHEME.match(url):
         return False
     password, query, fragment = _secrets._url_parts(url)
-    if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password):
+    # what says it is synthetic is the value, never the host or the path (`examples.blob.core.windows.net`)
+    if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password) and _real(password):
         return True
     for part in (query, fragment):
         for name, raws in _secrets.raw_values(part).items():
             for raw in raws:
                 value = unquote(raw)
+                if not _real(value):
+                    continue
                 if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
                         _secrets.JWT_SHAPE.search(value) or _secrets.SECRET_VALUE.search(value):
                     return True
@@ -190,7 +193,7 @@ def _secret_finding(line: str) -> Optional[str]:
         return "a URL that carries a credential"
     for m in (ASSIGNED.finditer(line) if ":" in line or "=" in line else ()):
         name, value = m.group(1), m.group(2)
-        if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(value) and _real(value):
+        if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(unquote(value)) and _real(value):
             return "a long random value assigned to a credential's name"
     return None
 
@@ -232,7 +235,7 @@ def _secret_spans(text: str) -> List[Tuple[int, int]]:
     spans += [m.span() for m in _secrets._BEARER_INSIDE.finditer(text) if _real(m.group(0))]
     spans += [m.span() for m in URL.finditer(text) if _url_secret(m.group(0))]
     spans += [m.span(2) for m in ASSIGNED.finditer(text)
-              if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(m.group(2))
+              if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(unquote(m.group(2)))
               and _real(m.group(2))]
     return spans
 
@@ -414,7 +417,13 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     if os.environ.get("FABRIC_INSTANCE_STRINGS"):
         return Path(os.environ["FABRIC_INSTANCE_STRINGS"]).expanduser(), True
     default = default_list()
-    return (default, True) if default.is_file() else (None, False)
+    try:
+        os.stat(str(default))
+    except (FileNotFoundError, NotADirectoryError):
+        return None, False
+    except OSError:  # a list that is there but cannot be reached is not "no list": that would fail open
+        raise CheckError("the owner's list cannot be read")
+    return default, True
 
 
 class _Parser(argparse.ArgumentParser):
@@ -446,14 +455,17 @@ def run(argv: Optional[List[str]] = None) -> int:
         try:
             root = Path(args.root).expanduser().resolve()
             is_folder = root.is_dir()
-        except OSError:  # Python 3.9 raises where a parent cannot be searched; never a traceback naming the path
+        except (OSError, RuntimeError):  # Python 3.9: a parent it cannot search, a symlink loop; never a traceback
             raise CheckError("the folder cannot be read")
         if not is_folder:
             raise CheckError("ROOT is not a folder")
-        list_path, _ = _list_path(args.instance_strings)
+        list_path, _ = _list_path(args.instance_strings)  # may raise CheckError
         entries: List[str] = []
         if list_path is not None:
-            resolved = list_path.resolve()
+            try:
+                resolved = list_path.resolve()
+            except (OSError, RuntimeError):  # RuntimeError: Python 3.9's symlink loop
+                raise CheckError("the owner's list cannot be read")
             if resolved == root or root in resolved.parents:
                 raise CheckError("the owner's list is inside the tree it checks, where it would travel with the source; "
                                  "keep it in your configuration folder (passioncode-fabric/%s)" % LIST_NAME)
@@ -497,7 +509,8 @@ def run(argv: Optional[List[str]] = None) -> int:
                   "every file, as pack reads them" if args.every_file else "every file but dependency folders, Git not used",
                   len(findings), skipped["binary"], skipped["unreadable"], skipped["nested"],  # type: ignore[index]
                   skipped["excluded"], listed,  # type: ignore[index]
-                  "" if listed else " (no owner's list)"))
+                  "" if listed else (" (the owner's list holds no string of three or more characters)" if list_path
+                                     else " (no owner's list)")))
     if findings:
         return 1
     return 0 if complete else 2

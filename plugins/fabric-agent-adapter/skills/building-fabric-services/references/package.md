@@ -45,10 +45,10 @@ python3 scripts/fabric_package.py pack <folder> --apply   # writes fabric.packag
 Run `adapting-projects-to-fabric/scripts/fabric_source_check.py check <folder> --every-file` first: a package carries
 the source, and the instance (the owner's paths, keys, strings) stays out of it (`references/source-and-instance.md` of
 that skill). `--every-file` reads what `pack` reads, files Git ignores included; without it the check reads only what Git
-would commit. A path named in `.fabric-source-ignore` is still carried by `pack`, unread, so name only synthetic files
+would commit. A path named in `.fabric-source-ignore` or `--exclude` is still carried by `pack`, unread, so name only synthetic files
 there, and check a nested repository named there with `--every-file` in its own tree. Keep the signing key file
-outside the folder. Pack a clean copy: what Git would commit (`git ls-files`) plus the nested trees checked on their
-own, without dependency folders (`node_modules`, virtual environments, which hold install paths and binaries) and
+outside the folder. Pack a clean copy: what Git would commit (`git ls-files --cached --others --exclude-standard`) plus the nested
+trees checked on their own, copied without their `.git`, without dependency folders (`node_modules`, virtual environments, which hold install paths and binaries) and
 without what `.gitignore` keeps out as instance (the real configuration, an instance folder in the checkout): `pack`
 does not read `.gitignore`, and an account id or a host is found only through the owner's list. The check is Python only (3.9+); a Node-only machine packs without it.
 
