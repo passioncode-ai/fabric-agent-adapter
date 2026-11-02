@@ -557,8 +557,6 @@ class WhatIsRead(Tree):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
 
     @unittest.skipIf(shutil.which("git") is None, "needs git")
-
-    @unittest.skipIf(shutil.which("git") is None, "needs git")
     def test_a_submodule_named_as_a_folder_in_the_ignore_file_is_left_out(self):
         self.git("init", "-q")
         self.write("src/app.py", "print('hi')\n")
@@ -577,9 +575,43 @@ class WhatIsRead(Tree):
         self.git("init", "-q")
         self.git("config", "core.fsmonitor", str(script))
         self.write("src/app.py", "print('hi')\n")
-        code, out, err = run(["check", str(self.root)])
+        bin_dir = self.tmp / "bin"  # Git before 2.36 reads `core.fsmonitor=false` as a hook named `false`
+        bin_dir.mkdir()
+        (bin_dir / "false").write_text("#!/bin/sh\necho ran >> '%s'\nexit 1\n" % marker)
+        (bin_dir / "false").chmod(0o755)
+        with mock.patch.dict(os.environ, {"PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", "")}):
+            code, out, err = run(["check", str(self.root)])
         self.assertEqual(code, 0, out[-300:])
         self.assertFalse(marker.exists())
+
+    @unittest.skipIf(os.name == "nt" or shutil.which("git") is None, "a symbolic link and git")
+    def test_a_folder_line_in_the_ignore_file_leaves_out_no_file_or_link_of_that_name(self):
+        self.git("init", "-q")
+        self.write("build", "path = %s\n" % MAC_HOME)
+        self.write("src/mycache", "path = %s\n" % MAC_HOME)
+        os.symlink(MAC_HOME, str(self.root / "vendor"))
+        self.write(sc.IGNORE_FILE, "build/\nvendor/\n*cache/\n")
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 1, out[-300:])
+        for path in ("build:1", "src/mycache:1", "vendor:0"):
+            self.assertIn(path + ": home-path", out)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_folder_glob_in_the_ignore_file_leaves_out_no_file(self):
+        key = "sk" + "-" + "Zq7Wm4" * 5
+        for glob, source in (("src/*/", "src/app.py"), ("*/", "app.py"), ("test/fixtures*/", "test/fixtures.json")):
+            with self.subTest(glob=glob):  # a glob that names folders reaches no file beside them
+                shutil.rmtree(self.root)
+                self.root.mkdir()
+                self.git("init", "-q")
+                self.write("src/vectors/v.txt", "synthetic\n")
+                self.write(source, "token = %s\n" % key)
+                self.write(sc.IGNORE_FILE, glob + "\n")
+                code, out, err = run(["check", str(self.root)])
+                self.assertEqual(code, 1, glob)
+                self.assertIn(source + ":1: secret", out)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
@@ -823,6 +855,15 @@ class Refusals(Tree):
             self.assertEqual(code, 2, (argv, err[-200:]))
             self.assertIn("owner's list cannot be read", err)
             self.assertNotIn("Traceback", err)
+    @unittest.skipIf(os.name == "nt", "a POSIX account database")
+    def test_no_home_at_all_is_an_error_not_a_traceback(self):
+        env = {k: v for k, v in os.environ.items() if k not in ("HOME", "XDG_CONFIG_HOME", "FABRIC_INSTANCE_STRINGS")}
+        for argv in ([str(self.root)], [str(self.root), "--instance-strings", "~/l.txt"], ["~/r"]):
+            with mock.patch.dict(os.environ, env, clear=True), mock.patch("pwd.getpwuid", side_effect=KeyError("uid")):
+                code, out, err = run(["check", *argv])
+            self.assertEqual(code, 2, (argv, err[-200:]))
+            self.assertNotIn("Traceback", err)
+
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")
         code, out, err = run(["check", str(self.root), "--instance-strings", str(inside)])

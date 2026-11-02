@@ -438,8 +438,9 @@ def redact(path: str, entries: List[str]) -> str:
 
 def _git_files(root: Path) -> Optional[List[str]]:
     try:
-        # `core.fsmonitor` off: `--others` would run a command the checked tree's own configuration names
-        result = subprocess.run(["git", "-c", "core.fsmonitor=false", "-C", str(root), "ls-files", "-z", "--cached",
+        # `core.fsmonitor` off: `--others` would run a command the checked tree's own configuration names. Empty, not
+        # `false`: Git before 2.36 reads the value as a hook and would run a program named `false` from PATH
+        result = subprocess.run(["git", "-c", "core.fsmonitor=", "-C", str(root), "ls-files", "-z", "--cached",
                                  "--others", "--exclude-standard"], capture_output=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -489,10 +490,13 @@ def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
     return globs
 
 
-def _ignored(path: str, globs: List[str]) -> bool:
-    # `vendor/sub/` names a folder; Git lists a submodule there as `vendor/sub`, with no slash
-    return any(fnmatch.fnmatchcase(path, g) or fnmatch.fnmatchcase(path, g.rstrip("/") + "/*")
-               or (g.endswith("/") and fnmatch.fnmatchcase(path, g.rstrip("/"))) for g in globs)
+def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
+    if any(fnmatch.fnmatchcase(path, g) or fnmatch.fnmatchcase(path, g.rstrip("/") + "/*") for g in globs):
+        return True
+    # `vendor/sub/` names a folder, and Git lists a submodule there as `vendor/sub`, with no slash: only a path that
+    # is a folder on disk (never a file a wildcard such as `src/*/` would also reach) is left out by it
+    return root is not None and any(g.endswith("/") and fnmatch.fnmatchcase(path, g.rstrip("/")) for g in globs) \
+        and os.path.isdir(str(root / path)) and not os.path.islink(str(root / path))
 
 
 def _lines(data: bytes) -> Iterable[Tuple[int, str]]:
@@ -537,7 +541,7 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         findings.append({"path": printed[path], "line": line, "kind": kind, "rule": rule})
 
     for path in files:
-        if _ignored(path, globs):
+        if _ignored(path, globs, root):
             skipped["excluded"] += 1
             continue
         for kind, rule in _text_findings(path, entries):  # a name carries instance data as a line does
@@ -605,9 +609,12 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     if named:
         try:
             return Path(named).expanduser(), True
-        except RuntimeError:  # `~user` with no such user: the list cannot be read, never "no finding"
+        except (RuntimeError, KeyError):  # `~user` with no such user (KeyError on 3.9): never "no finding"
             raise CheckError("the owner's list cannot be read")
-    default = default_list()
+    try:
+        default = default_list()
+    except (RuntimeError, KeyError):  # no HOME and no account entry (a container's arbitrary user)
+        raise CheckError("the owner's list in your configuration folder cannot be read")
     try:
         os.stat(str(default))
     except (FileNotFoundError, NotADirectoryError):
@@ -649,7 +656,7 @@ def run(argv: Optional[List[str]] = None) -> int:
         try:
             root = Path(args.root).expanduser().resolve()
             is_folder = root.is_dir()
-        except (OSError, RuntimeError):  # Python 3.9: a parent it cannot search, a symlink loop; never a traceback
+        except (OSError, RuntimeError, KeyError):  # a parent it cannot search, a symlink loop, `~` with no home
             raise CheckError("the folder cannot be read")
         if not is_folder:
             raise CheckError("ROOT is not a folder")
