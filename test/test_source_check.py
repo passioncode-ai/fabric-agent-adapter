@@ -404,6 +404,26 @@ class NeverRepeated(Tree):
             for value in (k1, k2, "MC4CAQAw"):
                 self.assertNotIn(value, out + err, (extra, value))
 
+    @unittest.skipIf(os.name == "nt", "a backslash and a colon in a name need a POSIX file system")
+    def test_a_value_that_runs_across_a_folder_prints_no_part(self):
+        a, b = ("Ab3" * 12), ("Zq7" * 6)
+        pw = LONG_RANDOM[:15] + "7"
+        self.write("SESSION_TOKEN=%s/config.json" % a, "x\n")
+        self.write("c/API_TOKEN=%s/%s.txt" % (a[:32], b), "x\n")
+        self.write("d/Bearer %s/%s.txt" % (a[:32] + "1", b[:17]), "x\n")
+        self.write("e/https:\\/\\/h\\/x?access_token=%s/%s" % (a[:32], b), "x\n")
+        self.write("f/sk-%s_https:\\/\\/app:%s@db\\/x.txt" % (a[:24], pw), "x\n")
+        for extra in ([], ["--json"], ["--every-file"]):
+            code, out, err = run(["check", str(self.root), *extra])
+            self.assertEqual(code, 1, extra)
+            for value in (a, b, pw):
+                for i in range(0, len(value) - 8):
+                    self.assertNotIn(value[i:i + 8], out + err, (extra, value[:3], i))
+
+    def test_every_occurrence_of_a_found_home_name_is_masked(self):
+        path = "-" + "Users-" + HOME_NAME + "-proj/x_/" + "Users/" + HOME_NAME + "/p"
+        self.assertNotIn(HOME_NAME, sc.redact(path, []))
+
     def test_an_error_does_not_echo_the_root(self):
         code, out, err = run(["check", str(self.tmp / OWNER / "absent")])
         self.assertEqual(code, 2)

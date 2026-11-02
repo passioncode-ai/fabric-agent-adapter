@@ -284,14 +284,20 @@ def _instance_finding(text: str, entries: List[str]) -> Optional[str]:
 
 
 def _secret_spans(text: str) -> List[Tuple[int, int]]:
-    """The spans of credential-shaped values in a text, as `_secret_finding` reads them."""
-    spans = [m.span() for m in _secrets.JWT_SHAPE.finditer(text) if _real(m.group(0))]
+    """The spans of credential-shaped values in a text, as `_secret_in` reads them (a public signature is no span)."""
+    public = [m.span() for m in _PUBLIC_SIGNATURE.finditer(text)] if '"' in text else []
+    return [(a, b) for a, b in _raw_secret_spans(text) if not any(p <= a and b <= q for p, q in public)]
+
+
+def _raw_secret_spans(text: str) -> List[Tuple[int, int]]:
+    spans = [m.span() for m in PRIVATE_KEY.finditer(text)]
+    spans += [m.span() for m in _secrets.JWT_SHAPE.finditer(text) if _real(m.group(0))]
     spans += [m.span(1) for m in JWK_PRIVATE.finditer(text) if _real(m.group(1))]
     spans += [m.span() for m in PROVIDER_KEY.finditer(text)
               if _real(m.group(0)) and (m.start() == 0 or not text[m.start() - 1].isalnum())]
     spans += [m.span() for m in _secrets._BEARER_INSIDE.finditer(text) if _real(m.group(0))]
     spans += [m.span() for m in URL.finditer(text) if _url_secret(m.group(0))]
-    spans += [m.span(2) for m in ASSIGNED.finditer(text)
+    spans += [m.span(2) for m in _assigned(text)
               if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(unquote(m.group(2)))
               and _real(unquote(m.group(2)))]
     return spans
@@ -308,6 +314,17 @@ def redact(path: str, entries: List[str]) -> str:
         spans.append((offset, offset + len(segment)))
         offset += len(segment) + 1
     masked = [bool(_secret_finding(path[a:b])) for a, b in spans]
+    # every segment a found value's span touches, on the path and with JSON escapes undone (mapped back), so a value
+    # that runs across a `/` prints no part of itself
+    touched = list(_secret_spans(path))
+    if "\\" in path:
+        unescaped, origin = _unescaped_with_origin(path)
+        if unescaped != path:
+            touched += [(origin[a][0], origin[b - 1][1]) for a, b in _secret_spans(unescaped) if b > a]
+    for a, b in touched:
+        for i, (s, e) in enumerate(spans):
+            if s < b and a < e:
+                masked[i] = True
 
     def rest() -> str:
         return "/".join(" " if m else path[a:b] for (a, b), m in zip(spans, masked))
@@ -318,7 +335,9 @@ def redact(path: str, entries: List[str]) -> str:
         masked[i] = True
     secret_segments = [span for span, m in zip(spans, masked) if m]
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
-    marks += [(s, e, "<home>") for s, e in _home_names(path)]
+    homes = {path[s:e].lower() for s, e in _home_names(path)}  # every occurrence of a found name, not only the matched
+    lowered = path.lower()
+    marks += [(m.start(), m.end(), "<home>") for name in homes for m in re.finditer(re.escape(name), lowered)]
     marks += [(s, e, "<secret>") for s, e in secret_segments]
     out, last = [], 0
     for start, end, label in sorted(marks):
@@ -420,8 +439,12 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
     skipped = {"binary": 0, "unreadable": len(unreadable), "excluded": 0, "nested": 0, "dependencies": len(dependencies)}
     not_read: List[Dict[str, str]] = [{"path": redact(p, entries), "why": "unreadable"} for p in unreadable]
 
+    printed: Dict[str, str] = {}  # one redaction per path, however many findings it has
+
     def add(path: str, line: int, kind: str, rule: str) -> None:
-        findings.append({"path": redact(path, entries), "line": line, "kind": kind, "rule": rule})
+        if path not in printed:
+            printed[path] = redact(path, entries)
+        findings.append({"path": printed[path], "line": line, "kind": kind, "rule": rule})
 
     for path in files:
         if _ignored(path, globs):
