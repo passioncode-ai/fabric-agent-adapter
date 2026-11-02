@@ -71,7 +71,7 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 | Kind | Finds |
 |---|---|
 | `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name is not ASCII or holds a dash puts it in the owner's list |
-| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password (8 or more, letters and digits) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
+| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (one of letters only or digits only is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
 ```bash
@@ -101,7 +101,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   with that reason on the line above. That line serves the check of the outer tree only: before `pack`, check the
   nested repository with `--every-file` in its own tree too, because `pack` carries its files, ignored ones included.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
-  per line, `#` comments, at least three characters. It is `--instance-strings FILE`, else the file
+  per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
   (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
   travel with the source. A person who already keeps private terms for org-index's `check_private.py`
@@ -127,7 +127,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   holding a credential moves to the instance, never into the ignore file.
 - A neutral home (`example`, `user`, `runner`, a container's, a cloud machine's or a dev container's user such as `node`, `ubuntu` or `vscode`, the fixture id
   `example-agent`, a
-  one-letter name, a placeholder) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
+  one-letter name, a placeholder; the whole set is `NEUTRAL_HOMES` in the script, and an owner whose home name is in it,
+  a first name such as `alice` or an `admin` account, puts that name in the owner's list) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
   not findings.
 
 The check finds the forms the table names, and only those: a credential in another shape (a bare token with no name

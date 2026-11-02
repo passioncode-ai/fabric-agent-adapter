@@ -482,7 +482,7 @@ def _git_files(root: Path) -> Optional[List[str]]:
     if result.returncode != 0:
         return None
     # Git for Windows writes a lone surrogate in a name as WTF-8: read back as that character, it is the name os.walk
-    # gives and `_as_bytes` turns into the bytes Git compares; elsewhere a name is bytes, kept by surrogateescape
+    # gives; elsewhere a name is bytes, decoded as os.walk decodes it. `_name_bytes` turns either back into Git's bytes
     names = set()
     for raw in result.stdout.split(b"\0"):  # each name on its own: one name that is not UTF-8 changes no other
         if not raw:
@@ -532,6 +532,18 @@ def _as_bytes(text: str) -> str:
         return text.encode("utf-8", "surrogateescape").decode("latin-1")
     except UnicodeEncodeError:
         return text.encode("utf-8", "surrogatepass").decode("latin-1")
+
+
+def _name_bytes(name: str) -> str:
+    """A file name as Git compares it, one byte each: on POSIX the bytes on disk, encoded back with the file system's
+    own codec (os.walk and `_git_files` decoded it with that codec, so a name in any locale comes back exact); on
+    Windows its UTF-8 (WTF-8) bytes, as `_as_bytes` writes them. The ignore file is read as UTF-8 and stays `_as_bytes`."""
+    if os.name == "nt":
+        return _as_bytes(name)
+    try:
+        return os.fsencode(name).decode("latin-1")
+    except UnicodeEncodeError:  # not a name os.walk or Git gave (a surrogate outside the escapes): read as `_as_bytes`
+        return _as_bytes(name)
 
 
 def _glob(glob: str) -> "re.Pattern[str]":
@@ -653,7 +665,7 @@ def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
     without the `/` takes files, so `vendor/*` reports a nested repository until it is checked in its own tree and
     named. A line ending in `/` never takes a file of that name."""
     on_disk = path.rstrip("/")
-    name = _as_bytes(on_disk)  # matched as Git matches: byte by byte
+    name = _name_bytes(on_disk)  # matched as Git matches: byte by byte, the bytes on disk
     known: List[bool] = []
 
     def folder() -> bool:
