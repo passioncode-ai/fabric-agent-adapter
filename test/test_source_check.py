@@ -483,6 +483,13 @@ class NeverRepeated(Tree):
         for value in (key, pw):
             for i in range(0, len(value) - 7):
                 self.assertNotIn(value[i:i + 8], out, (value[:3], i))
+        path = head + "x/" * ((4096 - len(head)) // 2)  # one-letter folders: the guard once masked one a pass
+        start = time.perf_counter()
+        out = sc.redact(path, [])
+        self.assertLess(time.perf_counter() - start, 1)  # 2 s when the guard read only the raw spans
+        for value in (key, pw):
+            for i in range(0, len(value) - 7):
+                self.assertNotIn(value[i:i + 8], out, (value[:3], i))
 
     def test_an_error_does_not_echo_the_root(self):
         code, out, err = run(["check", str(self.tmp / OWNER / "absent")])

@@ -373,6 +373,10 @@ def redact(path: str, entries: List[str]) -> str:
         if not _secret_finding(left):
             break
         in_left = _secret_spans(left)  # once a pass: read per segment, a long path cost the cube of its folders
+        if "\\" in left:  # a finding only the unescaped reading sees has its spans there, mapped back
+            unescaped, origin = _unescaped_with_origin(left)
+            if unescaped != left:
+                in_left += [(origin[a][0], origin[b - 1][1]) for a, b in _secret_spans(unescaped) if b > a]
         hit = [i for i, (s, e) in enumerate(spans) if not masked[i] and any(s < b and a < e for a, b in in_left)]
         if not hit:
             hit = [max(i for i, m in enumerate(masked) if not m)]

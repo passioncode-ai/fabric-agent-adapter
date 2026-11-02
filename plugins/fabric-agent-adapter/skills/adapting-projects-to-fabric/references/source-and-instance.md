@@ -65,8 +65,9 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 - It **never repeats** a value it found: no value, no line holding one, no entry of the owner's list and not the
   folder it checks reaches its output. A file's path is checked like its text (line `0` of a finding), and printed
   with an entry of the list as `<line N>`, a home folder's name as `<home>` and each segment holding a
-  credential-shaped value as `<secret>` (two files can then print the same, and the segments after a credential split
-  across folders are masked too: find them by the folder the finding names); an instance string is named by its line in the owner's list. The report can go in a commit
+  credential-shaped value as `<secret>` (two files can then print the same; the segments a found value runs across, an
+  assigned value, a bearer run or a URL, are masked too, while a key, a JWT or a JWK `d` is read up to the `/` that
+  cuts it, so the rest of a cut one can print in the next folder: find the file by the folder the finding names); an instance string is named by its line in the owner's list. The report can go in a commit
   message, an issue or a chat.
 - It **changes nothing.** Exit `0`: no finding and every file read; `1`: at least one finding (the step is not done);
   `2`: the check could not run, or a file was not read: an unreadable file, a nested repository, or a binary file the
