@@ -48,9 +48,11 @@ that skill). `--every-file` reads what `pack` reads, files Git ignores included;
 would commit. A path named in `.fabric-source-ignore` or `--exclude` is still carried by `pack`, unread, so name only synthetic files
 there, and check a nested repository named there with `--every-file` in its own tree. Keep the signing key file
 outside the folder. Pack a clean copy: what Git would commit (`git ls-files --cached --others --exclude-standard`) plus the nested
-trees checked on their own, copied without their `.git`, without dependency folders (`node_modules`, virtual environments, which hold install paths and binaries) and
+trees checked on their own, copied without their `.git` and with each committed symbolic link replaced by its target
+or removed (`pack` refuses a link), without dependency folders (`node_modules`, virtual environments, which hold install paths and binaries) and
 without what `.gitignore` keeps out as instance (the real configuration, an instance folder in the checkout): `pack`
-does not read `.gitignore`, and an account id or a host is found only through the owner's list. The check is Python only (3.9+); a Node-only machine packs without it.
+does not read `.gitignore`, and an account id or a host is found only through the owner's list. The check is Python only (3.9+); a Node-only machine packs without it, and `pack` itself carries the kit's token files
+and a private `*.jwk` by their names: keep them in the instance.
 
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
 `*.pyc`, and files that are credentials by name (`.env` and `.env.*` but `.env.example|sample|template`, `*.pem`, `*.key`,

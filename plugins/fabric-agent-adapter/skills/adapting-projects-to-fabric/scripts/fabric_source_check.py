@@ -65,6 +65,7 @@ IGNORE_FILE = ".fabric-source-ignore"
 LIST_NAME = "instance-strings.txt"
 #: The folders `pack` refuses to carry (fabric_package.JUNK), the only ones --every-file leaves unread.
 PACK_REFUSES = {".git", "__pycache__"}
+_PACK_JUNK_FILE = re.compile(r"\.DS_Store|.*\.pyc")  # the files of fabric_package.JUNK
 WALK_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache"}
 #: Names that stand for nobody in a home path: placeholders, CI runners and the system's shared folders.
 NEUTRAL_HOMES = {"example", "examples", "user", "username", "you", "me", "name", "someone", "runner", "shared", "public",
@@ -106,7 +107,7 @@ SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore)|id_
 SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
 TOKEN_FILE = re.compile(r".+\.(token|credential)")  # the kit's service.token and board.credential
 #: An absolute URL in a line, read whole by `_url_secret`: a password in it, a credential in its query.
-URL = re.compile(r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*://[^\s\"'<>`]+")  # a scheme starts a run: linear
+URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]{0,63}://[^\s\"'<>`]+")  # a bounded scheme: linear, and `${X:-pg://..}`
 #: `NAME = value`, `NAME: value` or `"name": "value"`: the long-run rule applies only where the name carries a credential.
 #: The name is bounded and starts a word, so a long line is read in linear time.
 ASSIGNED = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]{0,63})[\"']?[ \t]{0,8}[:=][ \t]{0,8}[\"']?"
@@ -152,7 +153,7 @@ def _quoted(text: str, match: "re.Match[str]") -> bool:
     return start > 0 and text[start - 1] == '"' and text[end:end + 1] == '"' and text[end + 1:].lstrip(" \t")[:1] == ":"
 
 
-def _url_secret(url: str) -> bool:
+def _url_secret(url: str, depth: int = 0) -> bool:
     """A URL that carries a credential, as a source tree holds one. The contract's URL rule (LC-21) reads one value a
     launch names, where any `token=` is one; across a tree it would read every documented `?token=abc` and `user:pw@`.
     So: a password of 8 or more mixing letters and digits, or a query or fragment value that, percent-decoded, is shaped
@@ -162,7 +163,7 @@ def _url_secret(url: str) -> bool:
         return False
     password, query, fragment = _secrets._url_parts(url)
     # what says it is synthetic is the value, never the host or the path (`examples.blob.core.windows.net`)
-    if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password) and _real(password):
+    if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password) and _real(unquote(password)):
         return True
     for part in (query, fragment):
         for name, raws in _secrets.raw_values(part).items():
@@ -170,13 +171,33 @@ def _url_secret(url: str) -> bool:
                 value = unquote(raw)
                 if not _real(value):
                     continue
+                if depth < 2 and "://" in value and _url_secret(value, depth + 1):  # `?next=https%3A%2F%2F...sig%3D`
+                    return True
                 if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
                         _secrets.JWT_SHAPE.search(value) or _secrets.SECRET_VALUE.search(value):
                     return True
     return False
 
 
+#: The JSON escapes tools write for `&`, `=` and `/` (Go's encoding/json writes `\u0026`, PHP's json_encode `\/`).
+_JSON_ESCAPES = re.compile(r"\\(?:u0026|u003[dD]|/)")
+
+
+def _json_unescaped(line: str) -> str:
+    return _JSON_ESCAPES.sub(lambda m: {"u0026": "&", "u003d": "=", "u003D": "=", "/": "/"}[m.group(0)[1:]], line)
+
+
 def _secret_finding(line: str) -> Optional[str]:
+    """`_secret_in`, on the line as written and, when it holds a JSON escape of `&`, `=` or `/`, as JSON reads it."""
+    found = _secret_in(line)
+    if found is None and "\\" in line:
+        unescaped = _json_unescaped(line)
+        if unescaped != line:
+            found = _secret_in(unescaped)
+    return found
+
+
+def _secret_in(line: str) -> Optional[str]:
     if PRIVATE_KEY.search(line):
         return "a private key block"
     if any(_real(m.group(1)) for m in JWK_PRIVATE.finditer(line)):
@@ -193,7 +214,7 @@ def _secret_finding(line: str) -> Optional[str]:
         return "a URL that carries a credential"
     for m in (ASSIGNED.finditer(line) if ":" in line or "=" in line else ()):
         name, value = m.group(1), m.group(2)
-        if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(unquote(value)) and _real(value):
+        if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(unquote(value)) and _real(unquote(value)):
             return "a long random value assigned to a credential's name"
     return None
 
@@ -236,7 +257,7 @@ def _secret_spans(text: str) -> List[Tuple[int, int]]:
     spans += [m.span() for m in URL.finditer(text) if _url_secret(m.group(0))]
     spans += [m.span(2) for m in ASSIGNED.finditer(text)
               if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(unquote(m.group(2)))
-              and _real(m.group(2))]
+              and _real(unquote(m.group(2)))]
     return spans
 
 
@@ -285,6 +306,8 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
         files = files + [d for d in dirs if os.path.islink(os.path.join(folder, d))]
         for name in files:
             if name in skip and name == ".git":  # a worktree's or a submodule's `.git` file: never carried, never source
+                continue
+            if skip == PACK_REFUSES and _PACK_JUNK_FILE.fullmatch(name):  # what pack refuses as litter (.DS_Store)
                 continue
             found.append(Path(folder, name).relative_to(root).as_posix())
     return sorted(found)
@@ -420,6 +443,8 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     try:
         os.stat(str(default))
     except (FileNotFoundError, NotADirectoryError):
+        if os.path.lexists(str(default)):  # a link to a list on a volume not mounted: there, but not reachable
+            raise CheckError("the owner's list in your configuration folder cannot be read")
         return None, False
     except OSError:  # a list that is there but cannot be reached is not "no list": that would fail open
         raise CheckError("the owner's list cannot be read")
@@ -474,7 +499,9 @@ def run(argv: Optional[List[str]] = None) -> int:
             except OSError:
                 raise CheckError("the owner's list cannot be read")
             if not present:
-                raise CheckError("the owner's list named by --instance-strings or FABRIC_INSTANCE_STRINGS does not exist")
+                raise CheckError("the owner's list named by --instance-strings or FABRIC_INSTANCE_STRINGS does not exist"
+                                 if args.instance_strings or os.environ.get("FABRIC_INSTANCE_STRINGS")
+                                 else "the owner's list in your configuration folder is not a file")
             try:
                 entries = read_list(resolved)
             except UnicodeDecodeError:
@@ -490,7 +517,8 @@ def run(argv: Optional[List[str]] = None) -> int:
     listed = sum(1 for e in entries if e)
     # a binary file is not read either: it is complete only when every one is named as source in the ignore file
     complete = not (skipped["unreadable"] or skipped["binary"] or skipped["nested"])  # type: ignore[index]
-    result.update({"instanceStrings": listed, "blocking": bool(findings), "complete": complete})
+    result.update({"instanceStrings": listed, "instanceList": list_path is not None, "blocking": bool(findings),
+                   "complete": complete})
     if args.json:
         _print(json.dumps(result, indent=2))
     else:

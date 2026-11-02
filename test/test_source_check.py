@@ -254,6 +254,24 @@ class Findings(Tree):
                          ["a.env", "b.env", "c.env", "d.env", "e.yaml", "f.txt", "g.html"])
         self.assertNotIn(sig, out)
 
+    def test_json_escapes_and_a_nested_url_do_not_hide_a_credential(self):
+        import base64, secrets as rnd
+        from urllib.parse import quote
+        sig = quote(base64.b64encode(rnd.token_bytes(32)).decode(), safe="")
+        pw = LONG_RANDOM[:15] + "7"
+        lines = ('{"sas": "?sv=1\\u0026sig=%s"}' % sig,  # Go's encoding/json writes & as \u0026
+                 '{"u": "https://a.blob.core.windows.net/c?sv=1\\u0026sig=%s"}' % sig,
+                 '{"db": "postgres:\\/\\/app:%s@h\\/app"}' % pw,  # PHP's json_encode writes / as \/
+                 "https://login.example.org/cb?next=" + quote("https://a.blob.core.windows.net/c?sv=1&sig=" + sig, safe=""))
+        for line in lines:
+            self.assertIsNotNone(sc._secret_finding(line), line)
+
+    def test_a_url_in_a_shell_default_value(self):
+        pw = LONG_RANDOM[:12] + "7"
+        for line in ("X=${DATABASE_URL:-postgres://app:%s@db:5432/app}" % pw, "${A:+amqp://guest:%s@mq/}" % pw,
+                     "see ...https://u:%s@h.internal/x" % pw):
+            self.assertEqual(sc._secret_finding(line), "a URL that carries a credential", line)
+
     def test_a_long_run_before_a_url_is_read_in_linear_time(self):
         import time
         line = "0x" + "ab" * 40000 + " bzz-raw://x"
@@ -501,6 +519,14 @@ class WhatIsRead(Tree):
         self.write("main.py", "pass\n")
         self.assertEqual(self.json_check("--every-file")[0], 0)
 
+    def test_every_file_leaves_out_what_pack_refuses_as_litter(self):
+        self.write(".DS_Store", b"\0\0\0\1Bud1", mode="wb")
+        self.write("pkg/m.cpython-39.pyc", b"\x61\x0d\x0d\x0a\0", mode="wb")
+        self.write("main.py", "pass\n")
+        code, result, _ = self.json_check("--every-file")
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["notRead"], [])
+
     def test_line_numbers_are_an_editors(self):
         self.write("a.txt", "one\fstill one\r\ntwo %s\n" % MAC_HOME)
         self.assertEqual([f["line"] for f in self.json_check()[1]["findings"]], [2])
@@ -637,6 +663,22 @@ class Refusals(Tree):
         listed = self.owner_list("ab")
         out = run(["check", str(self.root), "--instance-strings", str(listed)])[1]
         self.assertIn("the owner's list holds no string of three or more characters", out)
+        self.assertTrue(self.json_check("--instance-strings", str(listed))[1]["instanceList"])
+        self.assertFalse(self.json_check()[1]["instanceList"])
+
+    @unittest.skipIf(os.name == "nt", "a symbolic link needs a privilege on Windows")
+    def test_a_list_that_is_a_symlink_loop_or_a_dangling_default(self):
+        loop = self.outside / "loop.txt"
+        os.symlink(str(loop), str(loop))
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(loop)])
+        self.assertEqual(code, 2, out + err)
+        self.assertNotIn(str(self.tmp), out + err)
+        folder = Path(os.environ["XDG_CONFIG_HOME"]) / "passioncode-fabric"
+        folder.mkdir(parents=True)
+        os.symlink(str(self.tmp / "absent" / "list.txt"), str(folder / sc.LIST_NAME))  # a volume not mounted
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 2, out + err)  # never "no owner's list"
+        self.assertNotIn(str(self.tmp), out + err)
 
     def test_a_root_that_is_not_a_folder(self):
         code, _, err = run(["check", str(self.root / "absent")])
