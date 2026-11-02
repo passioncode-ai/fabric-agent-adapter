@@ -59,5 +59,6 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   `node_modules/.bin/tsx` and installs nothing. `fabric_provider.py write` writes one
   entry (0600) in the providers directory. `fabric_source_check.py check` reads the files of a
   tree (credential values included, in memory only), the owner's list from the user's
-  configuration folder, and runs `git ls-files` and nothing else; it writes nothing and
-  prints no value it finds.
+  configuration folder, and runs `git ls-files` and nothing else, except that under a locale whose
+  file-system encoding is not UTF-8 it restarts itself once with the same interpreter in Python's
+  UTF-8 mode; it writes nothing and prints no value it finds.

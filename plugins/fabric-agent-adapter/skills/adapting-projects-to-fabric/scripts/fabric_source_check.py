@@ -39,7 +39,8 @@ its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-igno
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
 (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows) when it exists: one string per
-line, a line starting with `#` a comment, strings shorter than three characters ignored, matched without regard to case. A list inside ROOT
+line, a line starting with `#` a comment, `home: <name>` declaring the owner's home name (never neutral), strings
+shorter than three characters ignored, matched without regard to case. A list inside ROOT
 is refused: it would travel with the source. The summary says whether Git chose the files or every file was read.
 Under a locale whose file-system encoding is not UTF-8 the check restarts itself in Python's UTF-8 mode, so a name,
 an argument and a file are read in one encoding. Standard library only.
@@ -66,9 +67,11 @@ from typing import Dict, Iterable, List, NoReturn, Optional, Set, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 _WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the checked tree adds no .pyc
 import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
+from fabric_source_ignore import (  # noqa: E402 - how the ignore lines are read, beside this file
+    IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _name_bytes, _readable_glob, _takes_folder, _under,
+    ignore_globs)
 sys.dont_write_bytecode = _WROTE_BYTECODE
 
-IGNORE_FILE = ".fabric-source-ignore"
 LIST_NAME = "instance-strings.txt"
 #: The folders `pack` refuses to carry (fabric_package.JUNK); --every-file leaves them and the files below unread.
 PACK_REFUSES = {".git", "__pycache__"}
@@ -125,17 +128,20 @@ ASSIGNED = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]{0,63})[\"']?
                       r"((?:[A-Za-z0-9+/_-]|%[0-9A-Fa-f]{2}){40,}={0,2})")  # `=` only as padding; `%2B` read decoded
 
 
-class CheckError(Exception):
-    pass
+def _owner_homes(entries: List[str]) -> Set[str]:
+    """The home names the owner's list declares (`home: <name>`), which are never neutral."""
+    return {e[1:] for e in entries if e.startswith(HOME_ENTRY)}
 
 
-def _home_names(text: str) -> List[Tuple[int, int]]:
-    """The spans of the names of real people's home folders in a text (neutral and one-letter names left out)."""
+def _home_names(text: str, owner: Iterable[str] = ()) -> List[Tuple[int, int]]:
+    """The spans of the names of real people's home folders in a text (neutral and one-letter names left out, unless
+    the owner's list declares the name as the owner's home)."""
+    owner = set(owner)
     spans = []
     for pattern in HOME_PATHS:
         for match in pattern.finditer(text):
             name = match.group(1).lower()
-            if len(name) > 1 and name not in NEUTRAL_HOMES:  # a one-letter home (`/Users/a`) is a test's placeholder
+            if name in owner or (len(name) > 1 and name not in NEUTRAL_HOMES):  # one letter (`/Users/a`): a placeholder
                 spans.append(match.span(1))
     return spans
 
@@ -272,32 +278,57 @@ def _assigned(line: str) -> Iterable["re.Match[str]"]:
         pos = m.start(2) if m.start(2) > pos else m.end()
 
 
+def _fold_map(text: str) -> Tuple[str, List[int], List[int]]:
+    """Text as an entry is compared, with where each of its characters came from: each letter with the marks after it
+    is casefolded, then composed (NFC), so `é` typed in the list finds a name a file system stored decomposed (macOS
+    names made through its file-system representation are) and `ß` finds `ss`. Folding changes lengths both ways, so a
+    match is mapped back to the original characters through the starts and ends, never by its offsets."""
+    out: List[str] = []
+    starts: List[int] = []
+    ends: List[int] = []
+    run = 0
+    for k in range(1, len(text) + 1):
+        if k == len(text) or not unicodedata.combining(text[k]):
+            piece = unicodedata.normalize("NFC", text[run:k].casefold())
+            out.append(piece)
+            starts += [run] * len(piece)
+            ends += [k] * len(piece)
+            run = k
+    return "".join(out), starts, ends
+
+
 def _fold(text: str) -> str:
-    """Text as an entry is compared: casefolded, then composed (NFC), so `é` typed in the list finds a name a file
-    system stored decomposed (macOS names made through its file-system representation are)."""
-    return unicodedata.normalize("NFC", text.casefold())
+    return _fold_map(text)[0]
+
+
+#: How a `home: <name>` line of the owner's list is kept among the entries: a character no line can hold.
+HOME_ENTRY = "\0"
+_HOME_LINE = re.compile(r"home:[ \t]*([A-Za-z0-9._-]+)[ \t]*", re.IGNORECASE)
 
 
 def read_list(path: Path) -> List[str]:
-    """The owner's list, one item per line: an entry casefolded, or '' for a comment, a blank or too short a line."""
+    """The owner's list, one item per line: an entry casefolded, a declared home (`home: <name>`) as HOME_ENTRY and the
+    name lowered, or '' for a comment, a blank or too short a line."""
     entries = []
     # at CRLF, CR or LF: a list saved with CR alone keeps its lines, and a FF or U+2028 starts none
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
-        text = raw.strip()
+        text = raw.strip().replace(HOME_ENTRY, "")
+        home = _HOME_LINE.fullmatch(text)
+        if home:
+            entries.append(HOME_ENTRY + home.group(1).lower())
+            continue
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
 
 def _entry_spans(text: str, entries: List[str]) -> List[Tuple[int, int, int]]:
-    folded = _fold(text)
+    folded, starts, ends = _fold_map(text)
     spans = []
-    if len(folded) != len(text):  # folding changed the length (ß, ﬁ, a decomposed letter): match, mask the whole text
-        return [(0, len(text), n) for n, e in enumerate(entries, 1) if e and e in folded][:1]
     for number, entry in enumerate(entries, 1):
-        if entry:
+        if entry and not entry.startswith(HOME_ENTRY):
             start = folded.find(entry)
-            while start != -1:
-                spans.append((start, start + len(entry), number))
+            while start != -1:  # back to the original characters: every one a matched character came from
+                spans.append((starts[start], ends[start + len(entry) - 1], number))
                 start = folded.find(entry, start + 1)
     return spans
 
@@ -440,7 +471,7 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
                         masked[i] = True
     secret_segments = [span for span, m in zip(spans, masked) if m]
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
-    found = _home_names(path)
+    found = _home_names(path, _owner_homes(entries))
     marks += [(s, e, "<home>") for s, e in found]
     # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130),
     # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`); the names
@@ -528,171 +559,6 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
     return sorted(found)
 
 
-_GLOBS: Dict[str, "re.Pattern[str]"] = {}
-
-
-def _as_bytes(text: str) -> str:
-    """A path or a line as Git compares it: its UTF-8 bytes, one character each. An unpaired surrogate (a Windows file
-    name may hold one) is written as Git for Windows writes it (WTF-8), never a crash."""
-    if os.name == "nt":  # Windows names are UTF-16: every surrogate in one is a character of the name, as WTF-8
-        return text.encode("utf-8", "surrogatepass").decode("latin-1")
-    try:  # POSIX names are bytes: a surrogate here is one Python escaped, and surrogateescape gives that byte back
-        return text.encode("utf-8", "surrogateescape").decode("latin-1")
-    except UnicodeEncodeError:
-        return text.encode("utf-8", "surrogatepass").decode("latin-1")
-
-
-def _name_bytes(name: str) -> str:
-    """A file name as Git compares it, one byte each: on POSIX the bytes on disk, encoded back with the file system's
-    own codec (os.walk and `_git_files` decoded it with that codec, so a name in any locale comes back exact); on
-    Windows its UTF-8 (WTF-8) bytes, as `_as_bytes` writes them. The ignore file is read as UTF-8 and stays `_as_bytes`."""
-    if os.name == "nt":
-        return _as_bytes(name)
-    try:
-        return os.fsencode(name).decode("latin-1")
-    except UnicodeEncodeError:  # not a name os.walk or Git gave (a surrogate outside the escapes): read as `_as_bytes`
-        return _as_bytes(name)
-
-
-def _glob(glob: str) -> "re.Pattern[str]":
-    """A line of the ignore file read from the tree's root: `*`, `?` and `[...]` stay inside one folder, and `**` as a
-    whole segment crosses folders (`**/` also matches none); any other run of stars is one `*`. Not a `.gitignore`
-    line: a line with no `/` matches at the root only, and `\\` or `//` is refused (`_line`).
-    fnmatch's `*` would cross `/`, so `vectors/*.json` would leave out `vectors/private/live.json`. Raises re.error
-    for a class Python cannot read (`[9-0]`)."""
-    key = glob
-    if key not in _GLOBS:
-        glob = _as_bytes(glob)  # Git matches bytes: `?` and a class read one byte of a UTF-8 name, never a letter
-        out, i = [], 0
-        while i < len(glob):
-            c = glob[i]
-            if c == "*":
-                end = i
-                while end < len(glob) and glob[end] == "*":
-                    end += 1
-                whole = end - i >= 2 and (i == 0 or glob[i - 1] == "/") and (end == len(glob) or glob[end] == "/")
-                if whole and end < len(glob):
-                    out.append("(?:.*/)?")
-                    end += 1
-                else:
-                    out.append(".*" if whole else "[^/]*")
-                i = end
-                continue
-            elif c == "?":
-                out.append("[^/]")
-            elif c == "[":
-                j = i + 1 + (glob[i + 1:i + 2] in ("!", "^"))
-                j += glob[j:j + 1] == "]"
-                end = glob.find("]", j)
-                if end < 0 or "[:" in glob[i + 1:end + 1]:
-                    # Git matches nothing for an unclosed `[` and reads `[:digit:]` as a POSIX class: refused
-                    raise re.error("a class Git reads otherwise")
-                else:
-                    inner = glob[i + 1:end].replace("\\", "\\\\")
-                    negated = inner[:1] in ("!", "^")  # Git reads both as a negated class
-                    body = inner[negated:]
-                    if body[:1] in ("^", "["):  # a literal right after the negation
-                        body = "\\" + body
-                    for mark in "&~|":  # literals, never the set operations a later Python may read there
-                        body = body.replace(mark, "\\" + mark)
-                    out.append("(?!/)[%s%s]" % ("^" if negated else "", body))
-                    i = end
-            else:
-                out.append(re.escape(c))
-            i += 1
-        with warnings.catch_warnings():  # a FutureWarning (`--` in a class) would print the script's own path
-            warnings.simplefilter("error")
-            try:
-                _GLOBS[key] = re.compile("(?s:%s)\\Z" % "".join(out))
-            except Warning:
-                raise re.error("a class Python may read as a set operation")
-    return _GLOBS[key]
-
-
-def _readable_glob(glob: str) -> bool:
-    """Whether every form `_ignored` tries can be read: a reversed range (`[9-0]`) is refused on every Python."""
-    try:
-        for form in (glob, glob.rstrip("/")):
-            _glob(form)  # every form, whether `_ignored` tries it for this line or not
-    except re.error:
-        return False
-    return True
-
-
-def _line(glob: str, where: str) -> str:
-    """An ignore line as it is matched: a leading `/` is the root (it changes nothing); a `!` exception is refused, since a
-    file it would bring back is left out here (it fails open), and so is a glob that cannot be read."""
-    if glob.startswith("!"):
-        raise CheckError("%s is an exception (`!`), which the check does not read: name the files to leave out" % where)
-    # `//` and `\` mean something else to Git (no match, an escape): refused, never read as a wider line
-    if "//" in glob or "\\" in glob:
-        raise CheckError("%s holds `\\` or `//`: write the path from the root with single `/`" % where)
-    glob = glob[1:] if glob.startswith("/") else glob
-    if not glob or not _readable_glob(glob):
-        raise CheckError("%s is not a glob it can read" % where)
-    return glob
-
-
-def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
-    globs = [_line(g.rstrip(" "), "an --exclude glob") for g in extra]
-    ignore = root / IGNORE_FILE
-    try:
-        present = ignore.is_file()
-    except OSError:
-        raise CheckError("the folder cannot be read")
-    if present:
-        try:
-            data = ignore.read_bytes().decode("utf-8-sig")
-        except (OSError, UnicodeDecodeError):
-            raise CheckError("%s cannot be read as UTF-8" % IGNORE_FILE)
-        # as Git splits it: at LF, a trailing CR dropped, trailing spaces trimmed; a tab or a leading space is the line's
-        for number, line in enumerate(data.split("\n"), 1):
-            glob = (line[:-1] if line.endswith("\r") else line).rstrip(" ")
-            if glob and not glob.startswith("#"):
-                globs.append(_line(glob, "line %d of %s" % (number, IGNORE_FILE)))
-    return globs
-
-
-def _takes_folder(glob: str) -> bool:
-    """A line that names a folder takes all it holds: one ending in `/`, or a path with no wildcard (`vendor/lib`). A
-    wildcard line takes only what it matches: `vectors/*` the files in `vectors`, never `vectors/live/config.json`."""
-    return glob.endswith("/") or not any(c in glob for c in "*?[")
-
-
-def _under(path: str, glob: str) -> bool:
-    """Whether a folder above the path matches the line, read as a folder: `src/**/` takes `src/pkg/x`, never
-    `src/main.py` (joining the line with `/**` would read `**/` as no folder at all)."""
-    folder = _glob(glob.rstrip("/"))
-    return any(folder.match(path[:i]) for i, c in enumerate(path) if c == "/")
-
-
-def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
-    """Whether a line leaves the path out. A folder (a nested repository, which Git lists as `vendor/sub/`, or a
-    submodule, listed as `vendor/sub`) is left out only by a line that names it as a folder (`vendor/sub/`,
-    `vendor/sub`, or a wildcard folder line such as `vendor/*/`, which takes every one it reaches): a wildcard line
-    without the `/` takes files, so `vendor/*` reports a nested repository until it is checked in its own tree and
-    named. A line ending in `/` never takes a file of that name."""
-    on_disk = path.rstrip("/")
-    name = _name_bytes(on_disk)  # matched as Git matches: byte by byte, the bytes on disk
-    known: List[bool] = []
-
-    def folder() -> bool:
-        if not known:
-            known.append(path.endswith("/") or (root is not None and os.path.isdir(str(root / on_disk))
-                                                and not os.path.islink(str(root / on_disk))))
-        return known[0]
-
-    for g in globs:
-        if _takes_folder(g):
-            if _under(name, g):
-                return True
-            if _glob(g.rstrip("/")).match(name) and (not g.endswith("/") or folder()):
-                return True
-        elif _glob(g).match(name) and not folder():
-            return True
-    return False
-
-
 def _lines(data: bytes) -> Iterable[Tuple[int, str]]:
     """Lines as an editor numbers them: split at LF, a trailing CR dropped (str.splitlines also splits at FF, VT...)."""
     for number, line in enumerate(data.decode("utf-8", "replace").split("\n"), 1):
@@ -701,7 +567,7 @@ def _lines(data: bytes) -> Iterable[Tuple[int, str]]:
 
 def _text_findings(text: str, entries: List[str], seen: Optional["_Seen"] = None) -> List[Tuple[str, str]]:
     found = []
-    homes = _home_names(text)
+    homes = _home_names(text, _owner_homes(entries))
     if homes:
         found.append(("home-path", "a path inside a person's home folder"))
         if seen is not None:
@@ -928,7 +794,8 @@ def run(argv: Optional[List[str]] = None) -> int:
             except OSError:
                 raise CheckError("the owner's list cannot be read")
             if not present:
-                raise CheckError("the owner's list named by --instance-strings or FABRIC_INSTANCE_STRINGS does not exist"
+                raise CheckError("the owner's list named by --instance-strings or FABRIC_INSTANCE_STRINGS does not exist or is "
+                                 "not a regular file"
                                  if args.instance_strings or os.environ.get("FABRIC_INSTANCE_STRINGS")
                                  else "the owner's list in your configuration folder is not a file")
             try:
@@ -943,10 +810,11 @@ def run(argv: Optional[List[str]] = None) -> int:
         return 2
     findings = result["findings"]
     skipped = result["skipped"]
-    listed = sum(1 for e in entries if e)
+    listed = sum(1 for e in entries if e and not e.startswith(HOME_ENTRY))
+    homes = sum(1 for e in entries if e.startswith(HOME_ENTRY))
     # a binary file is not read either: it is complete only when every one is named as source in the ignore file
     complete = not (skipped["unreadable"] or skipped["binary"] or skipped["nested"])  # type: ignore[index]
-    result.update({"instanceStrings": listed, "instanceList": list_path is not None, "blocking": bool(findings),
+    result.update({"instanceStrings": listed, "ownerHomes": homes, "instanceList": list_path is not None, "blocking": bool(findings),
                    "complete": complete})
     if args.json:
         _print(json.dumps(result, indent=2))
@@ -961,13 +829,14 @@ def run(argv: Optional[List[str]] = None) -> int:
             _print("%d dependency folder(s) not read (node_modules, virtual environments, caches); --every-file reads "
                    "them" % skipped["dependencies"])  # type: ignore[index]
         _print("%d file(s) read (%s), %d finding(s); not read: %d binary, %d unreadable, %d nested repository; "
-               "%d left out by name; %d instance string(s) listed%s"
+               "%d left out by name; %d instance string(s) listed%s%s"
                % (result["files"], "what Git would commit" if result["mode"] == "git" else
                   "every file, as pack reads them" if args.every_file else "every file but dependency folders, Git not used",
                   len(findings), skipped["binary"], skipped["unreadable"], skipped["nested"],  # type: ignore[index]
                   skipped["excluded"], listed,  # type: ignore[index]
                   "" if listed else (" (the owner's list holds no string of three or more characters)" if list_path
-                                     else " (no owner's list)")))
+                                     else " (no owner's list)"),
+                  "; %d home name(s) declared" % homes if homes else ""))
     if findings:
         return 1
     return 0 if complete else 2
@@ -977,20 +846,55 @@ def _utf8_restart(encoding: str, utf8_mode: int, executable: str, argv: List[str
     """The command that restarts the check in Python's UTF-8 mode, or None when it needs none. Under a locale whose
     file-system encoding is not UTF-8 (ISO-8859-1, KOI8-R, a C locale with UTF-8 mode off), a name, an argument and a
     file's text would each be read in its own encoding; in UTF-8 mode all three are, and a byte that is not UTF-8 stays
-    that byte. Windows names are UTF-16 and need none. The arguments go back as the bytes they came in."""
-    if os.name == "nt" or utf8_mode or encoding.lower().replace("_", "-") in ("utf-8", "utf8") or not executable:
+    that byte. Windows names are UTF-16 and need none. The arguments go back as the bytes they came in. An empty list:
+    a restart is needed and no interpreter is known (the caller exits 2 rather than read in two encodings)."""
+    if os.name == "nt" or utf8_mode or encoding.lower().replace("_", "-") in ("utf-8", "utf8"):
         return None
+    if not executable:
+        return []
     return [os.fsencode(executable), b"-X", b"utf8"] + [os.fsencode(a) for a in argv]
 
 
+def _interpreter() -> str:
+    """The running interpreter: Linux's `/proc/self/exe`, which no PATH or working folder can stand in for (Python 3.9
+    may take a `./python3` of the working folder as sys.executable), else sys.executable, which may be empty."""
+    try:
+        return os.readlink("/proc/self/exe")
+    except (OSError, AttributeError):
+        return sys.executable or ""
+
+
+def _interpreter_flags(flags: object, xoptions: Dict[str, object]) -> List[str]:
+    """The interpreter's own options, rebuilt where sys.orig_argv is missing (Python 3.9), so a restart keeps `-I`."""
+    out: List[str] = []
+    if getattr(flags, "isolated", 0):
+        out.append("-I")
+    else:
+        out += ["-E"] * bool(getattr(flags, "ignore_environment", 0)) + ["-s"] * bool(getattr(flags, "no_user_site", 0))
+    out += ["-S"] * bool(getattr(flags, "no_site", 0)) + ["-B"] * bool(getattr(flags, "dont_write_bytecode", 0))
+    if getattr(flags, "optimize", 0):
+        out.append("-" + "O" * int(getattr(flags, "optimize")))
+    for key, value in xoptions.items():
+        if key != "utf8":
+            out += ["-X", key if value is True else "%s=%s" % (key, value)]
+    return out
+
+
 if __name__ == "__main__":
-    _restart = _utf8_restart(sys.getfilesystemencoding(), sys.flags.utf8_mode, sys.executable,
-                             list(getattr(sys, "orig_argv", [""] + sys.argv)[1:]))
-    if _restart:
+    _argv = (list(sys.orig_argv[1:]) if hasattr(sys, "orig_argv")
+             else _interpreter_flags(sys.flags, getattr(sys, "_xoptions", {})) + sys.argv)
+    _restart = _utf8_restart(sys.getfilesystemencoding(), sys.flags.utf8_mode, _interpreter(), _argv)
+    if _restart is not None:
         try:
-            os.execv(_restart[0], _restart)
+            if not _restart:
+                raise OSError("no interpreter")
+            # the output keeps the console's encoding, as before the restart: a reader of the text sees the same bytes
+            _env = dict(os.environ)
+            _console = getattr(sys.stdout, "encoding", None) or "ascii"
+            _env.setdefault("PYTHONIOENCODING", "%s:backslashreplace" % _console)
+            os.execve(_restart[0], _restart, _env)
         except OSError:
-            sys.stderr.write("fabric_source_check: could not restart in Python's UTF-8 mode under this locale; run it "
+            sys.stderr.write("fabric_source_check.py: could not restart in Python's UTF-8 mode under this locale; run it "
                              "as `python3 -X utf8 fabric_source_check.py ...`\n")
             sys.exit(2)
     sys.exit(run())

@@ -32,7 +32,7 @@ import wait for the contract's decision on CT-194 (part 2).
   never by `vendor/*`, and a wildcard folder line (`vendor/*/`) takes every one it reaches, checked or not, so name
   each by its path; an exception line (`!`), a line holding `\`, `//`, an unclosed `[` or a POSIX class, and a
   glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off, taken only from PATH's
-  absolute folders (with PATH unset, `/bin` and `/usr/bin`; on Windows only a `git.exe`, and none with PATH unset). Under a locale whose file-system encoding is not UTF-8 it restarts itself in Python's UTF-8 mode, so names, arguments and text are read in one encoding; an owner's entry is compared composed (NFC), so it finds a name macOS stored decomposed. A neutral home (including container and cloud users) and
+  absolute folders (with PATH unset, `/bin` and `/usr/bin`; on Windows only a `git.exe`, and none with PATH unset). Under a locale whose file-system encoding is not UTF-8 it restarts itself in Python's UTF-8 mode, so names, arguments and text are read in one encoding; an owner's entry is compared composed (NFC), so it finds a name macOS stored decomposed. A neutral home (including container and cloud users, first names such as `alice` and accounts such as `admin`; an owner whose home is one of them writes `home: <name>` in the owner's list) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).
   `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`, on a clean copy it
