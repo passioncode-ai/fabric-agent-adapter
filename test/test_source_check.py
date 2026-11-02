@@ -179,12 +179,13 @@ class Findings(Tree):
         folder = self.root / "inbox-digest"
         for path, text in vectors["folder"]["files"].items():
             (folder / path).parent.mkdir(parents=True, exist_ok=True)
-            (folder / path).write_text(text)
+            (folder / path).write_bytes(text.encode("utf-8"))  # bytes: text mode writes CRLF on Windows
         draft = dict(vectors["digest"]["package"])
         for key in ("agentRef", "files", "digest", "signatures"):
             draft.pop(key, None)
-        (folder / packer.PACKAGE_FILE).write_text(json.dumps(draft, indent=2) + "\n")
-        self.assertTrue(packer.pack(folder, apply=True)["ok"])
+        (folder / packer.PACKAGE_FILE).write_bytes((json.dumps(draft, indent=2) + "\n").encode("utf-8"))
+        packed = packer.pack(folder, apply=True)
+        self.assertTrue(packed["ok"], packed["problems"])
         for role in ("publisher", "organization"):
             k = vectors["keys"][role]
             jwk = dict(k["jwk"], d=base64.urlsafe_b64encode(bytes.fromhex(k["seed"])).decode().rstrip("="))
