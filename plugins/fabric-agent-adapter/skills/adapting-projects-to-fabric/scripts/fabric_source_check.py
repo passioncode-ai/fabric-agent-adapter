@@ -14,7 +14,7 @@ the source would carry and reports, by path, line and kind, each place where the
 - `secret`: a value shaped like a credential by the contract's detector (fabric_secrets.py, DEC-0044), read line by
   line: a provider key starting a word, a JWT, a bearer token, or a long run mixing upper case, lower case and digits
   assigned to a name that can only carry a credential (a bare long run, such as an integrity hash, is not; a whole
-  Ed25519 signature under a JSON `"sig"`, as `sign` writes it, is public); or a private key: a PEM, OpenSSH or PGP
+  Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, is public); or a private key: a PEM, OpenSSH or PGP
   block, or a JWK's `d`; a URL that carries a password or a credential in its query; a file that is a credential by
   its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit credential file (`*.token`, `board.credential`). A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
   not a finding;
@@ -335,9 +335,11 @@ def redact(path: str, entries: List[str]) -> str:
         masked[i] = True
     secret_segments = [span for span, m in zip(spans, masked) if m]
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
-    homes = {path[s:e].lower() for s, e in _home_names(path)}  # every occurrence of a found name, not only the matched
-    lowered = path.lower()
-    marks += [(m.start(), m.end(), "<home>") for name in homes for m in re.finditer(re.escape(name), lowered)]
+    found = _home_names(path)
+    marks += [(s, e, "<home>") for s, e in found]
+    # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130)
+    for name in {path[s:e] for s, e in found}:
+        marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE | re.ASCII)]
     marks += [(s, e, "<secret>") for s, e in secret_segments]
     out, last = [], 0
     for start, end, label in sorted(marks):

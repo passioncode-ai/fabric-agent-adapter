@@ -423,6 +423,11 @@ class NeverRepeated(Tree):
     def test_every_occurrence_of_a_found_home_name_is_masked(self):
         path = "-" + "Users-" + HOME_NAME + "-proj/x_/" + "Users/" + HOME_NAME + "/p"
         self.assertNotIn(HOME_NAME, sc.redact(path, []))
+        self.assertNotIn(HOME_NAME, sc.redact("\u0130" * 8 + "/" + "Users/" + HOME_NAME + "/x", []))  # İ lowers to two
+        self.write("\u0130" * 10 + "-" + "Users-" + HOME_NAME + "-proj/notes.md", "x\n")
+        for extra in ([], ["--json"], ["--every-file"]):
+            out = run(["check", str(self.root), *extra])[1]
+            self.assertNotIn(HOME_NAME, out, extra)
 
     def test_an_error_does_not_echo_the_root(self):
         code, out, err = run(["check", str(self.tmp / OWNER / "absent")])
