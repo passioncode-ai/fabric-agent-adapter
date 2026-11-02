@@ -1056,10 +1056,30 @@ class Refusals(Tree):
         fake.write_text("#!/bin/sh\nexit 1\n")
         fake.chmod(0o755)
         real = shutil.which("git")
-        with mock.patch.dict(os.environ, {"PATH": os.pathsep.join(["", ".", "relative"] + ([os.path.dirname(real)] if real else []))}):
+        here = os.getcwd()
+        os.chdir(str(self.root))  # a relative PATH element would find the tree's own `git` here
+        try:
+            with mock.patch.dict(os.environ, {"PATH": os.pathsep.join(["", ".", "relative"] + ([os.path.dirname(real)] if real else []))}):
+                found = sc._git()
+        finally:
+            os.chdir(here)
+        self.assertEqual(found, os.path.join(os.path.dirname(real), "git") if real else None)
+
+    @unittest.skipIf(os.name == "nt" or shutil.which("git") is None, "a POSIX default path holding git")
+    def test_git_is_found_with_path_unset(self):
+        env = {k: v for k, v in os.environ.items() if k != "PATH"}
+        with mock.patch.dict(os.environ, env, clear=True):
             found = sc._git()
-        self.assertNotEqual(found, "git")
-        self.assertTrue(found is None or os.path.isabs(found))
+        if any(os.path.isfile(os.path.join(d, "git")) for d in os.defpath.split(os.pathsep) if d):
+            self.assertTrue(found and os.path.isabs(found), found)  # the walk would skip dependency folders
+
+    def test_git_output_on_windows_is_read_back_as_the_walk_reads_a_name(self):
+        name = "\udc80.txt"
+        listed = name.encode("utf-8", "surrogatepass") + b"\0"
+        done = subprocess.CompletedProcess([], 0, listed, b"")
+        with mock.patch.object(sc.os, "name", "nt"), mock.patch.object(sc, "_git", return_value="git.exe"), \
+                mock.patch.object(sc.subprocess, "run", return_value=done):
+            self.assertEqual(sc._git_files(self.root), [name])
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):

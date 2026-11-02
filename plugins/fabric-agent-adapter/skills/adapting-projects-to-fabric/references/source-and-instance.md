@@ -78,7 +78,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   (an icon, a font) is named in the ignore file. `--every-file` reads every file, those Git ignores included, but `.git`, `__pycache__`, `.DS_Store` and `*.pyc`
   (litter `pack` refuses): run it
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
-  not in a Git checkout, or Git lists nothing in it, every file is read but `__pycache__` (uncounted) and the dependency
+  not in a Git checkout, Git lists nothing in it, or no `git` is found in PATH's absolute folders, every file is read but `__pycache__` (uncounted) and the dependency
   folders (`node_modules`, virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
   In Git mode a nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
   the same check (a submodule checked out first, `git submodule update --init`), then name its path in the ignore file,

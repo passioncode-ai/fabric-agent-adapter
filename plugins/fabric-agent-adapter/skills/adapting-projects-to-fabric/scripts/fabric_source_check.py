@@ -32,11 +32,12 @@ repository, or a binary one the ignore file does not name as source. A file not 
 The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), as they are in the
 work tree (a staged copy that differs is not read). With `--every-file`, every file but `.git`, `__pycache__`,
 `.DS_Store` and `*.pyc`, which `pack` refuses as litter (what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
-`__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
+`__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named (so too
+when no `git` is found in PATH's absolute folders). A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
-(`$XDG_CONFIG_HOME` or `~/.config`; `%APPDATA%` on Windows) when it exists: one string per
+(`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows) when it exists: one string per
 line, `#` comments, strings shorter than three characters ignored, matched without regard to case. A list inside ROOT
 is refused: it would travel with the source. The summary says whether Git chose the files or every file was read.
 Standard library only.
@@ -453,7 +454,7 @@ def _git() -> Optional[str]:
     shutil.which there puts the current folder first too), and on POSIX an empty or relative PATH element (a trailing
     `:`) is the current folder: a tree checked from inside could run its own `git`."""
     name = "git.exe" if os.name == "nt" else "git"  # never a .cmd or .bat: cmd.exe would read the arguments
-    for folder in os.environ.get("PATH", "").split(os.pathsep):
+    for folder in os.get_exec_path():  # with PATH unset, the system's default folders (`/bin`, `/usr/bin`)
         if folder and os.path.isabs(folder):
             candidate = os.path.join(folder, name)
             if os.path.isfile(candidate) and (os.name == "nt" or os.access(candidate, os.X_OK)):
@@ -474,7 +475,14 @@ def _git_files(root: Path) -> Optional[List[str]]:
         return None
     if result.returncode != 0:
         return None
-    return sorted({p for p in result.stdout.decode("utf-8", "surrogateescape").split("\0") if p})
+    # Git for Windows writes a lone surrogate in a name as WTF-8: read back as that character, it is the name os.walk
+    # gives and `_as_bytes` turns into the bytes Git compares; elsewhere a name is bytes, kept by surrogateescape
+    out = result.stdout
+    try:
+        text = out.decode("utf-8", "surrogatepass") if os.name == "nt" else out.decode("utf-8", "surrogateescape")
+    except UnicodeDecodeError:
+        text = out.decode("utf-8", "surrogateescape")
+    return sorted({p for p in text.split("\0") if p})
 
 
 def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SKIP,
@@ -828,7 +836,7 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     try:
         default = default_list()
     except (RuntimeError, KeyError):  # no HOME and no account entry (a container's arbitrary user)
-        raise CheckError("there is no home folder to find the owner's list in: set XDG_CONFIG_HOME (APPDATA on "
+        raise CheckError("there is no home folder to find the owner's list in: set an absolute XDG_CONFIG_HOME (APPDATA on "
                          "Windows) or name the list with --instance-strings")
     try:
         os.stat(str(default))
