@@ -233,7 +233,7 @@ def _secret_in(line: str) -> Optional[str]:
     # with a segment ending in `sk` (`task-management-service`) would read as a key.
     if any(_real(m.group(0)) and (m.start() == 0 or not line[m.start() - 1].isalnum()) for m in PROVIDER_KEY.finditer(line)):
         return "a value shaped like a provider key"
-    if any(_real(m.group(0)) for m in _secrets._BEARER_INSIDE.finditer(line)):
+    if any(_real(m.group(0)) for m in _overlapping(_secrets._BEARER_INSIDE, line)):
         return "a bearer token"
     if "://" in line and any(_url_secret(m.group(0)) for m in URL.finditer(line)):
         return "a URL that carries a credential"
@@ -318,8 +318,8 @@ def redact(path: str, entries: List[str]) -> str:
     """A path as it may be printed: an owner's string as `<line N>` (its line in the owner's list), a real home
     folder's name as `<home>`, and each segment in which `_secret_finding` finds a credential as `<secret>`, whole
     (a span inside a segment can miss a second value the first one runs into). While the segments left still hold a
-    credential together (`https:\\/\\/app:<pw>@db/x`), they are masked from the last one back, so what is printed
-    holds no finding and its first folders still name the place."""
+    credential together (`https:\\/\\/app:<pw>@db/x`), the segments that finding's spans touch are masked, else the
+    last one left, so what is printed holds no finding and its first folders still name the place."""
     spans, offset = [], 0
     for segment in path.split("/"):
         spans.append((offset, offset + len(segment)))
@@ -338,15 +338,16 @@ def redact(path: str, entries: List[str]) -> str:
                 masked[i] = True
 
     def rest() -> str:
-        return "/".join(" " if m else path[a:b] for (a, b), m in zip(spans, masked))
+        # a masked segment keeps its length, so the spans read in what is left are offsets in the path
+        return "/".join(" " * (b - a) if m else path[a:b] for (a, b), m in zip(spans, masked))
 
     # the guard: while what is left still holds a credential, mask the segments its spans touch, else the last one left
     for _ in range(len(spans)):
         left = rest()
         if not _secret_finding(left):
             break
-        hit = [i for i, (s, e) in enumerate(spans) if not masked[i]
-               and any(s < b and a < e for a, b in _secret_spans(left))]
+        in_left = _secret_spans(left)  # once a pass: read per segment, a long path cost the cube of its folders
+        hit = [i for i, (s, e) in enumerate(spans) if not masked[i] and any(s < b and a < e for a, b in in_left)]
         if not hit:
             hit = [max(i for i, m in enumerate(masked) if not m)]
         for i in hit:
@@ -355,9 +356,10 @@ def redact(path: str, entries: List[str]) -> str:
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     found = _home_names(path)
     marks += [(s, e, "<home>") for s, e in found]
-    # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130)
+    # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130),
+    # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`)
     for name in {path[s:e] for s, e in found}:
-        marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE | re.ASCII)]
+        marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]
     marks += [(s, e, "<secret>") for s, e in secret_segments]
     out, last = [], 0
     for start, end, label in sorted(marks):

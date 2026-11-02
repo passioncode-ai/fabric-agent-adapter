@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -429,6 +430,45 @@ class NeverRepeated(Tree):
         for extra in ([], ["--json"], ["--every-file"]):
             out = run(["check", str(self.root), *extra])[1]
             self.assertNotIn(HOME_NAME, out, extra)
+
+    def test_a_home_name_spelled_with_a_letter_that_folds_to_ascii_is_masked(self):
+        other = HOME_NAME.replace("s", "\u017f")  # LATIN SMALL LETTER LONG S folds to `s`, as U+212A folds to `k`
+        self.assertNotIn(other, sc.redact("/" + "Users/" + HOME_NAME + "/x/" + other, []))
+        self.write("-" + "Users-" + HOME_NAME + "-proj/" + other + ".md", "x\n")
+        for extra in ([], ["--json"], ["--every-file"]):
+            out = run(["check", str(self.root), *extra])[1]
+            self.assertNotIn(other, out, extra)
+            self.assertNotIn(HOME_NAME, out, extra)
+
+    def test_a_bearer_token_inside_a_synthetic_token_run_is_found(self):
+        real = LONG_RANDOM[:20] + "9"
+        line = "Authorization: Bearer fake-token-1234/Bearer " + real
+        self.assertIsNotNone(sc._secret_finding(line))
+        self.write("a.sh", "curl -H '%s' x\n" % line)
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 1)
+        self.assertIn("a bearer token", out)
+        self.assertNotIn(real[:8], out + err)
+
+    def test_the_guard_masks_what_the_rest_still_holds(self):
+        key, pw = "sk-" + ("Zq7" * 10), LONG_RANDOM[:15] + "7"
+        # the span branch: what is left after the first masks still holds the password, folders after it
+        out = sc.redact("docs/place/https://proxy/%s/https://app:%s@db/x/y/z" % (key, pw), [])
+        self.assertTrue(out.startswith("docs/place/"), out)
+        for value in (key, pw):
+            for i in range(0, len(value) - 7):
+                self.assertNotIn(value[i:i + 8], out, (value[:3], i))
+
+    def test_a_long_path_through_the_guard_stays_fast(self):
+        key, pw = "sk-" + ("Zq7" * 10), LONG_RANDOM[:15] + "7"
+        head = "https:\\/\\/proxy\\/%s\\/https:\\/\\/app:%s@db\\/" % (key, pw)
+        path = head + "folder-abc/" * ((4096 - len(head)) // 11)  # an escaped nested URL, then folders: 4 KB
+        start = time.perf_counter()
+        out = sc.redact(path, [])
+        self.assertLess(time.perf_counter() - start, 5)  # quadratic at worst; read per folder it took 18 s
+        for value in (key, pw):
+            for i in range(0, len(value) - 7):
+                self.assertNotIn(value[i:i + 8], out, (value[:3], i))
 
     def test_an_error_does_not_echo_the_root(self):
         code, out, err = run(["check", str(self.tmp / OWNER / "absent")])
