@@ -28,7 +28,9 @@ import wait for the contract's decision on CT-194 (part 2).
   still refuses it, so the package is a copy without it), and the summary counts them. A line is a path from the
   root, not as `.gitignore` reads one: a line with no `/` matches at the root only, a wildcard line takes only what
   it matches (`*` stays in a folder, `**` crosses folders), and a line ending in `/`, or a path with no wildcard,
-  takes the folder; an exception line (`!`) and a glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off, and
+  takes the folder; a nested repository or a submodule is left out only by a line naming its folder (`vendor/sub/`),
+  never by `vendor/*`; an exception line (`!`), a line holding `\`, `//`, an unclosed `[` or a POSIX class, and a
+  glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off, and
   on Windows only a `git.exe` from PATH's absolute folders. A neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).

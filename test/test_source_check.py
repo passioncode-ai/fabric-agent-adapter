@@ -723,6 +723,10 @@ class WhatIsRead(Tree):
             self.assertFalse(sc._ignored(path, [sc._line(glob, "a line")]), (glob, path))  # two bytes in UTF-8
         self.assertTrue(sc._ignored("vectors/a.json", [sc._line("vectors/?.json", "a line")]))
         self.assertTrue(sc._ignored("vectors/\u00e9.json", [sc._line("vectors/??.json", "a line")]))
+        self.assertTrue(sc._ignored("caf\u00e9/x.json", [sc._line("caf\u00e9/", "a line")]))  # a literal, as bytes
+        self.assertTrue(sc._ignored("b\ud800.txt", [sc._line("*.txt", "a line")]))  # a Windows name: no crash
+        self.write("docs", "x\n")
+        self.assertFalse(sc._ignored("docs", ["docs/"], self.root))  # a line ending in `/` takes no file
 
     def test_an_exception_line_is_refused_not_dropped(self):
         self.write("test/vectors/live.json", "path = %s\n" % MAC_HOME)
@@ -1047,6 +1051,11 @@ class Refusals(Tree):
         self.assertEqual(code, 1)
         self.assertIn("(line 2)", out)
         self.assertIn("1 instance string(s) listed", out)
+        listing.write_bytes(b"zqcorpa\rzqcorpx\r")  # CR alone ends a line too
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertEqual(code, 1)
+        self.assertIn("(line 2)", out)
+        self.assertIn("2 instance string(s) listed", out)
 
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")

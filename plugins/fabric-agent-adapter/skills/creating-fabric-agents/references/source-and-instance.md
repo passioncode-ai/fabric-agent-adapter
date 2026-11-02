@@ -97,7 +97,9 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   otherwise): `*`, `?` and `[...]` stay inside one folder and `**` as a whole segment crosses
   folders, so `vectors/*` takes the files in `vectors` and none in its subfolders. A line ending in `/`, or a path
   with no wildcard, takes that folder and all it holds; only such a line leaves out a nested repository or a
-  submodule (`vendor/sub/`), never a wildcard line. An exception line (`!`) is refused, since what it would
+  submodule (`vendor/sub/`), never a wildcard line without the `/` (`vendor/*`). A wildcard folder line (`vendor/*/`)
+  takes every nested repository it reaches, checked or not, so name each one by its path. In Git mode a nested
+  repository is not read; `--every-file` and a folder outside Git read its files, its `.git` left out. An exception line (`!`) is refused, since what it would
   bring back would go unread. Name the files, or a folder that holds
   only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
   exception), and say why on the line above. A file `pack` refuses by its name cannot ship in a package: a public

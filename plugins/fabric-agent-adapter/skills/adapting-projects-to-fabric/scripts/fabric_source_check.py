@@ -269,7 +269,8 @@ def _assigned(line: str) -> Iterable["re.Match[str]"]:
 def read_list(path: Path) -> List[str]:
     """The owner's list, one item per line: an entry casefolded, or '' for a comment, a blank or too short a line."""
     entries = []
-    for raw in path.read_bytes().decode("utf-8-sig").split("\n"):  # at LF only, as `_lines`: a FF is not a line
+    # at CRLF, CR or LF: a list saved with CR alone keeps its lines, and a FF or U+2028 starts none
+    for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         text = raw.strip()
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else text.casefold())
     return entries
@@ -505,8 +506,12 @@ _GLOBS: Dict[str, "re.Pattern[str]"] = {}
 
 
 def _as_bytes(text: str) -> str:
-    """A path or a line as Git compares it: its UTF-8 bytes, one character each."""
-    return text.encode("utf-8", "surrogateescape").decode("latin-1")
+    """A path or a line as Git compares it: its UTF-8 bytes, one character each. An unpaired surrogate (a Windows file
+    name may hold one) is written as Git for Windows writes it (WTF-8), never a crash."""
+    try:
+        return text.encode("utf-8", "surrogateescape").decode("latin-1")
+    except UnicodeEncodeError:
+        return text.encode("utf-8", "surrogatepass").decode("latin-1")
 
 
 def _glob(glob: str) -> "re.Pattern[str]":
@@ -624,8 +629,9 @@ def _under(path: str, glob: str) -> bool:
 def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
     """Whether a line leaves the path out. A folder (a nested repository, which Git lists as `vendor/sub/`, or a
     submodule, listed as `vendor/sub`) is left out only by a line that names it as a folder (`vendor/sub/`,
-    `vendor/sub`): a wildcard line takes files, so `vendor/*` reports a nested repository until it is checked in its
-    own tree and named. A line ending in `/` never takes a file of that name."""
+    `vendor/sub`, or a wildcard folder line such as `vendor/*/`, which takes every one it reaches): a wildcard line
+    without the `/` takes files, so `vendor/*` reports a nested repository until it is checked in its own tree and
+    named. A line ending in `/` never takes a file of that name."""
     on_disk = path.rstrip("/")
     name = _as_bytes(on_disk)  # matched as Git matches: byte by byte
     known: List[bool] = []
