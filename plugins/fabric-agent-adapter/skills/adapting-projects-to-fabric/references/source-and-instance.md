@@ -10,6 +10,11 @@ agent stays private until its owner says so about that act).
 The format of a source manifest, export and import is the contract's to decide (CT-194). What follows does not depend
 on it.
 
+## Contents
+
+- [The layout](#the-layout)
+- [The check](#the-check)
+
 ## The layout
 
 | Where | What | In Git |
@@ -92,6 +97,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 - A neutral home (`example`, `user`, `runner`, a container's or a cloud machine's user such as `node` or `ubuntu`, a
   one-letter name, a placeholder) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
   not findings.
+
+The check finds the forms the table names, and only those: a credential in another shape (a bare token with no name
+before it, a provider's key the contract's names do not cover) passes it. It is a floor under the owner's review and a
+secret scanner, never a replacement for either.
 
 The check reads the tree, not Git history. A value that was committed once is still in the history after the tree is
 clean: handing such a source over needs a fresh history, which is the owner's act, never the agent's (no history

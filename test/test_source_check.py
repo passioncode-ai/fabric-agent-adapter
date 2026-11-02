@@ -725,7 +725,7 @@ class TheSkillsTeachIt(unittest.TestCase):
         for words in ("never repeats", "Exit `0`: no finding and every file read; `1`: at least one finding",
                       "a file was not read", "a nested repository", "`--every-file`", "named in the ignore file", "A list inside the tree is refused", sc.IGNORE_FILE,
                       "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` or `~/.config`",
-                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "dependency folders", "check a nested repository in its own tree", "a web route under `/home/`",
+                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "The check finds the forms the table names, and only those", "dependency folders", "check a nested repository in its own tree", "a web route under `/home/`",
                       "`fabric_paths.service_dirs`", "`<id>.<instance>`", "(LC-09)", "FAA-188 part 2",
                       "private-terms.txt"):
             self.assertIn(words, ref)
