@@ -55,6 +55,7 @@ import re
 import stat
 import subprocess
 import sys
+import warnings
 from urllib.parse import unquote
 from typing import Dict, Iterable, List, NoReturn, Optional, Set, Tuple
 
@@ -434,7 +435,7 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     for name in {path[s:e] for s, e in found}:
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]
     if seen is not None and seen.names:
-        marks += [(m.start(), m.end(), "<home>") for m in seen.names_pattern().finditer(path)]
+        marks += [(m.start(1), m.end(1), "<home>") for m in seen.names_pattern().finditer(path)]
     marks += [(s, e, "<secret>") for s, e in secret_segments]
     out, last = [], 0
     for start, end, label in sorted(marks):
@@ -505,7 +506,8 @@ _GLOBS: Dict[str, "re.Pattern[str]"] = {}
 
 def _glob(glob: str) -> "re.Pattern[str]":
     """A line of the ignore file read from the tree's root: `*`, `?` and `[...]` stay inside one folder, and `**` as a
-    whole segment crosses folders (`**/` also matches none), as Git reads it; any other run of stars is one `*`.
+    whole segment crosses folders (`**/` also matches none); any other run of stars is one `*`. Not a `.gitignore`
+    line: a line with no `/` matches at the root only, and `\\` or `//` is refused (`_line`).
     fnmatch's `*` would cross `/`, so `vectors/*.json` would leave out `vectors/private/live.json`. Raises re.error
     for a class Python cannot read (`[9-0]`)."""
     if glob not in _GLOBS:
@@ -527,7 +529,7 @@ def _glob(glob: str) -> "re.Pattern[str]":
             elif c == "?":
                 out.append("[^/]")
             elif c == "[":
-                j = i + 1 + (glob[i + 1:i + 2] == "!")
+                j = i + 1 + (glob[i + 1:i + 2] in ("!", "^"))
                 j += glob[j:j + 1] == "]"
                 end = glob.find("]", j)
                 if end < 0:
@@ -545,7 +547,12 @@ def _glob(glob: str) -> "re.Pattern[str]":
             else:
                 out.append(re.escape(c))
             i += 1
-        _GLOBS[glob] = re.compile("(?s:%s)\\Z" % "".join(out))
+        with warnings.catch_warnings():  # a FutureWarning (`--` in a class) would print the script's own path
+            warnings.simplefilter("error")
+            try:
+                _GLOBS[glob] = re.compile("(?s:%s)\\Z" % "".join(out))
+            except Warning:
+                raise re.error("a class Python may read as a set operation")
     return _GLOBS[glob]
 
 
@@ -560,18 +567,21 @@ def _readable_glob(glob: str) -> bool:
 
 
 def _line(glob: str, where: str) -> str:
-    """An ignore line as it is matched: a leading `/` is the root, as Git reads it; a `!` exception is refused, since a
+    """An ignore line as it is matched: a leading `/` is the root (it changes nothing); a `!` exception is refused, since a
     file it would bring back is left out here (it fails open), and so is a glob that cannot be read."""
     if glob.startswith("!"):
         raise CheckError("%s is an exception (`!`), which the check does not read: name the files to leave out" % where)
-    glob = glob.lstrip("/")
+    # `//` and `\` mean something else to Git (no match, an escape): refused, never read as a wider line
+    if "//" in glob or "\\" in glob:
+        raise CheckError("%s is not a glob it can read" % where)
+    glob = glob[1:] if glob.startswith("/") else glob
     if not glob or not _readable_glob(glob):
         raise CheckError("%s is not a glob it can read" % where)
     return glob
 
 
 def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
-    globs = [_line(g, "an --exclude glob") for g in extra]
+    globs = [_line(g.rstrip(" "), "an --exclude glob") for g in extra]
     ignore = root / IGNORE_FILE
     try:
         present = ignore.is_file()
@@ -579,11 +589,12 @@ def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
         raise CheckError("the folder cannot be read")
     if present:
         try:
-            lines = ignore.read_text(encoding="utf-8-sig").splitlines()
+            data = ignore.read_bytes().decode("utf-8-sig")
         except (OSError, UnicodeDecodeError):
             raise CheckError("%s cannot be read as UTF-8" % IGNORE_FILE)
-        for number, line in enumerate(lines, 1):
-            glob = line.strip()
+        # as Git splits it: at LF, a trailing CR dropped, trailing spaces trimmed; a tab or a leading space is the line's
+        for number, line in enumerate(data.split("\n"), 1):
+            glob = (line[:-1] if line.endswith("\r") else line).rstrip(" ")
             if glob and not glob.startswith("#"):
                 globs.append(_line(glob, "line %d of %s" % (number, IGNORE_FILE)))
     return globs
@@ -603,7 +614,9 @@ def _under(path: str, glob: str) -> bool:
 
 
 def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
-    if any(_glob(g).match(path) or (_takes_folder(g) and _under(path, g)) for g in globs):
+    # Git lists an untracked nested repository as `vendor/sub/`: a line matches it by the folder's name too
+    names = (path, path.rstrip("/")) if path.endswith("/") else (path,)
+    if any(_glob(g).match(n) or (_takes_folder(g) and _under(n, g)) for g in globs for n in names):
         return True
     # `vendor/sub/` names a folder, and Git lists a submodule there as `vendor/sub`, with no slash: only a path that
     # is a folder on disk (never a file a wildcard such as `src/*/` would also reach) is left out by it
@@ -657,7 +670,8 @@ class _Seen:
         """Every name found, longest first, as one pattern: read once the tree is read, when no name is added."""
         if self._names_pattern is None:
             alternatives = sorted(self.names, key=len, reverse=True)
-            self._names_pattern = re.compile("|".join(re.escape(n) for n in alternatives), re.IGNORECASE)
+            # a lookahead reads every start, so two names that overlap in a path are both marked
+            self._names_pattern = re.compile("(?=(%s))" % "|".join(re.escape(n) for n in alternatives), re.IGNORECASE)
         return self._names_pattern
 
 

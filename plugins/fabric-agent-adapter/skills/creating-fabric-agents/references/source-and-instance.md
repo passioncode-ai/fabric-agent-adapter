@@ -92,8 +92,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   (`~/.config/passioncode/private-terms.txt`) passes that file with `--instance-strings`; this check matches a term
   anywhere in a word, and it does not look for e-mail addresses or account ids by their shape.
 - **Leaving paths out.** `.fabric-source-ignore` at the root (globs, one per line, `#` comments) or `--exclude GLOB`
-  leaves out files that hold synthetic values on purpose, such as test vectors. A line is a path from the root (a
-  leading `/` changes nothing): `*`, `?` and `[...]` stay inside one folder and `**` as a whole segment crosses
+  leaves out files that hold synthetic values on purpose, such as test vectors. A line is a path from the root, not a
+  `.gitignore` line (a leading `/` changes nothing, a line with no `/` matches at the root only, and a line holding `\` or `//` is refused): `*`, `?` and `[...]` stay inside one folder and `**` as a whole segment crosses
   folders, so `vectors/*` takes the files in `vectors` and none in its subfolders. A line ending in `/`, or a path
   with no wildcard, takes that folder and all it holds. An exception line (`!`) is refused, since what it would
   bring back would go unread. Name the files, or a folder that holds

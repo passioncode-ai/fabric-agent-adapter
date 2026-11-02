@@ -646,7 +646,7 @@ class WhatIsRead(Tree):
             self.assertIn("test/vectors/private/live.json:1: secret", out)
             self.assertIn("2 left out by name", out)
 
-    def test_an_ignore_line_takes_only_what_it_matches_as_git_reads_it(self):
+    def test_an_ignore_line_takes_only_what_it_matches(self):
         cases = (("test/vectors/*", "test/vectors/v1.json", "test/vectors/live/config.json"),
                  ("test/**.json", "test/a.json", "test/b/c.json"), ("foo**/bar", "foo1/bar", "foobar"),
                  ("test/[^z]*.json", "test/a.json", "test/za.json"), ("/vec.json", "vec.json", "test/vec.json"),
@@ -667,7 +667,49 @@ class WhatIsRead(Tree):
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # a FutureWarning names the script's path, which can be under a home folder
             pattern = sc._glob("[a&&b]x")
+            for glob in ("[+--]x", "x[a-z--]y"):  # `--` warns as a set difference: refused, so nothing prints
+                self.assertFalse(sc._readable_glob(glob), glob)
         self.assertTrue(pattern.match("&x"))
+
+    def test_a_line_git_reads_otherwise_is_refused_or_read_narrowly(self):
+        for glob in ("//top.txt", "vendor//", "a\\*b", "[a--b]x", "x[a-z--]y"):
+            with self.assertRaises(sc.CheckError, msg=glob):
+                sc._line(glob, "a line")
+        self.assertTrue(sc._ignored("t/bx", [sc._line("t/[^]a]x", "l")]))
+        self.assertFalse(sc._ignored("t/ax", [sc._line("t/[^]a]x", "l")]))
+        self.write("top.txt", "path = %s\n" % MAC_HOME)
+        for line in ("\ttop.txt", "top.txt\t", "top.txt\x0cbar", "top.txt\u2028bar"):
+            self.write(sc.IGNORE_FILE, line + "\n")
+            code, out, err = run(["check", str(self.root)])
+            self.assertEqual(code, 1, repr(line))  # Git reads each as a name no file has
+        self.write(sc.IGNORE_FILE, "top.txt  \r\n")  # trailing spaces and a CR: Git trims them
+        self.assertEqual(run(["check", str(self.root)])[0], 0)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_wildcard_line_leaves_out_an_untracked_nested_repository_it_names(self):
+        self.git("init", "-q")
+        self.write("src/app.py", "print('hi')\n")
+        nested = self.root / "vendor" / "sub"
+        nested.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q", str(nested)], check=True)
+        (nested / "x.txt").write_text("x\n")
+        for line in ("vendor/*", "**/sub"):
+            self.write(sc.IGNORE_FILE, line + "\n")
+            code, out, err = run(["check", str(self.root)])
+            self.assertEqual(code, 0, (line, out[-200:]))
+
+    def test_two_names_that_overlap_in_a_path_are_both_masked(self):
+        first, second = "ann" + "bob", "bbel" + "lequinn"  # the second starts with the first's last letter
+        self.write("one.txt", "cd /" + "Users/" + first + "/x\n")
+        self.write("two.txt", "cd /" + "home/" + second + "/x\n")
+        (self.root / "notes").mkdir()
+        (self.root / "notes" / (first + second[1:] + ".bin")).write_bytes(b"\0binary")
+        for extra in ([], ["--json"]):
+            out = run(["check", str(self.root), *extra])[1]
+            for name in (first, second):
+                for i in range(0, len(name) - 7):
+                    self.assertNotIn(name[i:i + 8], out, (extra, name[:3], i))
+            self.assertNotIn(second[1:], out, extra)
 
     def test_an_exception_line_is_refused_not_dropped(self):
         self.write("test/vectors/live.json", "path = %s\n" % MAC_HOME)
