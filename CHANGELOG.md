@@ -45,7 +45,7 @@ import wait for the contract's decision on CT-194 (part 2).
   (`home-path`: an ASCII home name in the macOS, Linux (`/home`, `/var/home`) and Windows forms (Git Bash's `/c/Users`
   and WSL's `/mnt/c/Users` included), the dashed form of DEC-0105 (`C--Users-` on Windows) and the URL-encoded ones; a web route `/users/...`, a flag `--home-dir` or a CSS variable is not one), a
   value shaped like a credential by the contract's detector read line by line, a long random value under a
-  credential's name (a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, is public and not one; a storage URL's `sig=` is) or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` (JSON, escaped JSON or a Python dict), a URL carrying a password (8 or more characters mixing letters and digits) or a credential in its query (percent-encoded, JSON-escaped or nested), and a
+  credential's name (a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, is public and not one; a storage URL's `sig=` is) or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` (JSON, escaped JSON or a Python dict), a URL carrying a password (8 or more characters with at least one letter and one digit) or a credential in its query (percent-encoded, JSON-escaped or nested), and a
   file that is a credential by its name as `pack` refuses it, or a kit credential file (`*.token`,
   `board.credential`) (`secret`), and a string from the owner's list of instance strings, kept
   outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
@@ -63,7 +63,7 @@ import wait for the contract's decision on CT-194 (part 2).
   never by `vendor/*`, and a wildcard folder line (`vendor/*/`) takes every one it reaches, checked or not, so name
   each by its path; an exception line (`!`), a line holding `\`, `//`, an unclosed `[` or a POSIX class, and a
   glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off, taken only from PATH's
-  absolute folders (with PATH unset, `/bin` and `/usr/bin`; on Windows only a `git.exe`, and none with PATH unset). A neutral home (including container and cloud users) and
+  absolute folders (with PATH unset, `/bin` and `/usr/bin`; on Windows only a `git.exe`, and none with PATH unset). Under a locale whose file-system encoding is not UTF-8 it restarts itself in Python's UTF-8 mode, so names, arguments and text are read in one encoding; an owner's entry is compared composed (NFC), so it finds a name macOS stored decomposed. A neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).
   `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`, on a clean copy it

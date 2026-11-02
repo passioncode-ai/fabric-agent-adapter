@@ -39,9 +39,10 @@ its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-igno
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
 (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows) when it exists: one string per
-line, `#` comments, strings shorter than three characters ignored, matched without regard to case. A list inside ROOT
+line, a line starting with `#` a comment, strings shorter than three characters ignored, matched without regard to case. A list inside ROOT
 is refused: it would travel with the source. The summary says whether Git chose the files or every file was read.
-Standard library only.
+Under a locale whose file-system encoding is not UTF-8 the check restarts itself in Python's UTF-8 mode, so a name,
+an argument and a file are read in one encoding. Standard library only.
 """
 
 # #region source-check — docs: plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/source-and-instance.md#the-check
@@ -57,6 +58,7 @@ import re
 import stat
 import subprocess
 import sys
+import unicodedata
 import warnings
 from urllib.parse import unquote
 from typing import Dict, Iterable, List, NoReturn, Optional, Set, Tuple
@@ -270,20 +272,26 @@ def _assigned(line: str) -> Iterable["re.Match[str]"]:
         pos = m.start(2) if m.start(2) > pos else m.end()
 
 
+def _fold(text: str) -> str:
+    """Text as an entry is compared: casefolded, then composed (NFC), so `é` typed in the list finds a name a file
+    system stored decomposed (macOS names made through its file-system representation are)."""
+    return unicodedata.normalize("NFC", text.casefold())
+
+
 def read_list(path: Path) -> List[str]:
     """The owner's list, one item per line: an entry casefolded, or '' for a comment, a blank or too short a line."""
     entries = []
     # at CRLF, CR or LF: a list saved with CR alone keeps its lines, and a FF or U+2028 starts none
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         text = raw.strip()
-        entries.append("" if not text or text.startswith("#") or len(text) < 3 else text.casefold())
+        entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
 
 def _entry_spans(text: str, entries: List[str]) -> List[Tuple[int, int, int]]:
-    folded = text.casefold()
+    folded = _fold(text)
     spans = []
-    if len(folded) != len(text):  # casefolding changed the length (ß, ﬁ): match, but mask the whole text
+    if len(folded) != len(text):  # folding changed the length (ß, ﬁ, a decomposed letter): match, mask the whole text
         return [(0, len(text), n) for n, e in enumerate(entries, 1) if e and e in folded][:1]
     for number, entry in enumerate(entries, 1):
         if entry:
@@ -965,7 +973,26 @@ def run(argv: Optional[List[str]] = None) -> int:
     return 0 if complete else 2
 
 
+def _utf8_restart(encoding: str, utf8_mode: int, executable: str, argv: List[str]) -> Optional[List[bytes]]:
+    """The command that restarts the check in Python's UTF-8 mode, or None when it needs none. Under a locale whose
+    file-system encoding is not UTF-8 (ISO-8859-1, KOI8-R, a C locale with UTF-8 mode off), a name, an argument and a
+    file's text would each be read in its own encoding; in UTF-8 mode all three are, and a byte that is not UTF-8 stays
+    that byte. Windows names are UTF-16 and need none. The arguments go back as the bytes they came in."""
+    if os.name == "nt" or utf8_mode or encoding.lower().replace("_", "-") in ("utf-8", "utf8") or not executable:
+        return None
+    return [os.fsencode(executable), b"-X", b"utf8"] + [os.fsencode(a) for a in argv]
+
+
 if __name__ == "__main__":
+    _restart = _utf8_restart(sys.getfilesystemencoding(), sys.flags.utf8_mode, sys.executable,
+                             list(getattr(sys, "orig_argv", [""] + sys.argv)[1:]))
+    if _restart:
+        try:
+            os.execv(_restart[0], _restart)
+        except OSError:
+            sys.stderr.write("fabric_source_check: could not restart in Python's UTF-8 mode under this locale; run it "
+                             "as `python3 -X utf8 fabric_source_check.py ...`\n")
+            sys.exit(2)
     sys.exit(run())
 
 # #endregion source-check
