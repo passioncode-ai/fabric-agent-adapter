@@ -50,6 +50,11 @@ import wait for the contract's decision on CT-194 (part 2).
   the Windows CI job runs `test_source_check`; the release smoke checks the script is installed. README, AGENTS.md and
   SKILL-CARD name it.
 
+### Changed
+
+- `COMMERCIAL-LICENSE.md` is the knowledge base template as of fabric-workspace `875faae2` (line 5 now uses a comma
+  where it had a dash); the hash `test/validate.py` pins moved with it. The licence terms are unchanged.
+
 ### Upgrading
 
 - Nothing to change: the check is new and opt-in. Handing a source over (a new remote, a push, a change of
