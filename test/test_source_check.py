@@ -672,7 +672,8 @@ class WhatIsRead(Tree):
         self.assertTrue(pattern.match("&x"))
 
     def test_a_line_git_reads_otherwise_is_refused_or_read_narrowly(self):
-        for glob in ("//top.txt", "vendor//", "a\\*b", "[a--b]x", "x[a-z--]y"):
+        for glob in ("//top.txt", "vendor//", "a\\*b", "[a--b]x", "x[a-z--]y", "notes[draft.md", "[/",
+                     "v/[[:digit:]].json"):  # Git: no match, an escape, no match, a POSIX class
             with self.assertRaises(sc.CheckError, msg=glob):
                 sc._line(glob, "a line")
         self.assertTrue(sc._ignored("t/bx", [sc._line("t/[^]a]x", "l")]))
@@ -682,21 +683,27 @@ class WhatIsRead(Tree):
             self.write(sc.IGNORE_FILE, line + "\n")
             code, out, err = run(["check", str(self.root)])
             self.assertEqual(code, 1, repr(line))  # Git reads each as a name no file has
-        self.write(sc.IGNORE_FILE, "top.txt  \r\n")  # trailing spaces and a CR: Git trims them
+        (self.root / sc.IGNORE_FILE).write_bytes(b"top.txt  \r\n")  # trailing spaces and a CR: Git trims them
         self.assertEqual(run(["check", str(self.root)])[0], 0)
 
     @unittest.skipIf(shutil.which("git") is None, "needs git")
-    def test_a_wildcard_line_leaves_out_an_untracked_nested_repository_it_names(self):
+    def test_a_nested_repository_is_left_out_only_by_a_line_naming_its_folder(self):
         self.git("init", "-q")
         self.write("src/app.py", "print('hi')\n")
         nested = self.root / "vendor" / "sub"
         nested.mkdir(parents=True)
         subprocess.run(["git", "init", "-q", str(nested)], check=True)
         (nested / "x.txt").write_text("x\n")
-        for line in ("vendor/*", "**/sub"):
+        for line, expected in (("vendor/*", 2), ("**/sub", 2), ("vendor/*/", 0), ("vendor/sub", 0), ("**/sub/", 0)):
             self.write(sc.IGNORE_FILE, line + "\n")
             code, out, err = run(["check", str(self.root)])
-            self.assertEqual(code, 0, (line, out[-200:]))
+            self.assertEqual(code, expected, (line, out[-200:]))
+            if expected:  # a wildcard takes files: the repository is reported until it is checked and named
+                self.assertIn("vendor/sub/: not read (a nested repository)", out)
+        self.write(sc.IGNORE_FILE, "vendor/sub/*\n")  # names the files inside it, never the repository itself
+        self.assertEqual(run(["check", str(self.root)])[0], 2)
+        self.assertFalse(sc._ignored("vendor/sub", ["vendor/*"], self.root))  # a submodule, as Git lists it
+        self.assertTrue(sc._ignored("vendor/sub", ["vendor/sub/"], self.root))
 
     def test_two_names_that_overlap_in_a_path_are_both_masked(self):
         first, second = "ann" + "bob", "bbel" + "lequinn"  # the second starts with the first's last letter
@@ -710,6 +717,12 @@ class WhatIsRead(Tree):
                 for i in range(0, len(name) - 7):
                     self.assertNotIn(name[i:i + 8], out, (extra, name[:3], i))
             self.assertNotIn(second[1:], out, extra)
+
+    def test_a_wildcard_reads_one_byte_of_a_name_as_git_does(self):
+        for glob, path in (("vectors/?.json", "vectors/\u00e9.json"), ("vectors/[!b].json", "vectors/\u00f1.json")):
+            self.assertFalse(sc._ignored(path, [sc._line(glob, "a line")]), (glob, path))  # two bytes in UTF-8
+        self.assertTrue(sc._ignored("vectors/a.json", [sc._line("vectors/?.json", "a line")]))
+        self.assertTrue(sc._ignored("vectors/\u00e9.json", [sc._line("vectors/??.json", "a line")]))
 
     def test_an_exception_line_is_refused_not_dropped(self):
         self.write("test/vectors/live.json", "path = %s\n" % MAC_HOME)
@@ -1024,6 +1037,16 @@ class Refusals(Tree):
             (here / "git.cmd").write_text("")
             with mock.patch.dict(os.environ, {"PATH": os.pathsep.join([str(here), str(there)])}):
                 self.assertEqual(sc._git(), os.path.join(str(there), "git.exe"))  # a .cmd would run through cmd.exe
+
+    def test_the_owners_list_is_split_at_line_feeds_only(self):
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        listing.write_bytes(b"# owner terms\x0c page two\nzqcorpx\n")
+        self.write("a.txt", "zqcorpx\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertEqual(code, 1)
+        self.assertIn("(line 2)", out)
+        self.assertIn("1 instance string(s) listed", out)
 
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")

@@ -269,7 +269,7 @@ def _assigned(line: str) -> Iterable["re.Match[str]"]:
 def read_list(path: Path) -> List[str]:
     """The owner's list, one item per line: an entry casefolded, or '' for a comment, a blank or too short a line."""
     entries = []
-    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+    for raw in path.read_bytes().decode("utf-8-sig").split("\n"):  # at LF only, as `_lines`: a FF is not a line
         text = raw.strip()
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else text.casefold())
     return entries
@@ -504,13 +504,20 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
 _GLOBS: Dict[str, "re.Pattern[str]"] = {}
 
 
+def _as_bytes(text: str) -> str:
+    """A path or a line as Git compares it: its UTF-8 bytes, one character each."""
+    return text.encode("utf-8", "surrogateescape").decode("latin-1")
+
+
 def _glob(glob: str) -> "re.Pattern[str]":
     """A line of the ignore file read from the tree's root: `*`, `?` and `[...]` stay inside one folder, and `**` as a
     whole segment crosses folders (`**/` also matches none); any other run of stars is one `*`. Not a `.gitignore`
     line: a line with no `/` matches at the root only, and `\\` or `//` is refused (`_line`).
     fnmatch's `*` would cross `/`, so `vectors/*.json` would leave out `vectors/private/live.json`. Raises re.error
     for a class Python cannot read (`[9-0]`)."""
-    if glob not in _GLOBS:
+    key = glob
+    if key not in _GLOBS:
+        glob = _as_bytes(glob)  # Git matches bytes: `?` and a class read one byte of a UTF-8 name, never a letter
         out, i = [], 0
         while i < len(glob):
             c = glob[i]
@@ -532,8 +539,9 @@ def _glob(glob: str) -> "re.Pattern[str]":
                 j = i + 1 + (glob[i + 1:i + 2] in ("!", "^"))
                 j += glob[j:j + 1] == "]"
                 end = glob.find("]", j)
-                if end < 0:
-                    out.append(re.escape(c))
+                if end < 0 or "[:" in glob[i + 1:end + 1]:
+                    # Git matches nothing for an unclosed `[` and reads `[:digit:]` as a POSIX class: refused
+                    raise re.error("a class Git reads otherwise")
                 else:
                     inner = glob[i + 1:end].replace("\\", "\\\\")
                     negated = inner[:1] in ("!", "^")  # Git reads both as a negated class
@@ -550,10 +558,10 @@ def _glob(glob: str) -> "re.Pattern[str]":
         with warnings.catch_warnings():  # a FutureWarning (`--` in a class) would print the script's own path
             warnings.simplefilter("error")
             try:
-                _GLOBS[glob] = re.compile("(?s:%s)\\Z" % "".join(out))
+                _GLOBS[key] = re.compile("(?s:%s)\\Z" % "".join(out))
             except Warning:
                 raise re.error("a class Python may read as a set operation")
-    return _GLOBS[glob]
+    return _GLOBS[key]
 
 
 def _readable_glob(glob: str) -> bool:
@@ -573,7 +581,7 @@ def _line(glob: str, where: str) -> str:
         raise CheckError("%s is an exception (`!`), which the check does not read: name the files to leave out" % where)
     # `//` and `\` mean something else to Git (no match, an escape): refused, never read as a wider line
     if "//" in glob or "\\" in glob:
-        raise CheckError("%s is not a glob it can read" % where)
+        raise CheckError("%s holds `\\` or `//`: write the path from the root with single `/`" % where)
     glob = glob[1:] if glob.startswith("/") else glob
     if not glob or not _readable_glob(glob):
         raise CheckError("%s is not a glob it can read" % where)
@@ -614,14 +622,29 @@ def _under(path: str, glob: str) -> bool:
 
 
 def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
-    # Git lists an untracked nested repository as `vendor/sub/`: a line matches it by the folder's name too
-    names = (path, path.rstrip("/")) if path.endswith("/") else (path,)
-    if any(_glob(g).match(n) or (_takes_folder(g) and _under(n, g)) for g in globs for n in names):
-        return True
-    # `vendor/sub/` names a folder, and Git lists a submodule there as `vendor/sub`, with no slash: only a path that
-    # is a folder on disk (never a file a wildcard such as `src/*/` would also reach) is left out by it
-    return root is not None and any(g.endswith("/") and _glob(g.rstrip("/")).match(path) for g in globs) \
-        and os.path.isdir(str(root / path)) and not os.path.islink(str(root / path))
+    """Whether a line leaves the path out. A folder (a nested repository, which Git lists as `vendor/sub/`, or a
+    submodule, listed as `vendor/sub`) is left out only by a line that names it as a folder (`vendor/sub/`,
+    `vendor/sub`): a wildcard line takes files, so `vendor/*` reports a nested repository until it is checked in its
+    own tree and named. A line ending in `/` never takes a file of that name."""
+    on_disk = path.rstrip("/")
+    name = _as_bytes(on_disk)  # matched as Git matches: byte by byte
+    known: List[bool] = []
+
+    def folder() -> bool:
+        if not known:
+            known.append(path.endswith("/") or (root is not None and os.path.isdir(str(root / on_disk))
+                                                and not os.path.islink(str(root / on_disk))))
+        return known[0]
+
+    for g in globs:
+        if _takes_folder(g):
+            if _under(name, g):
+                return True
+            if _glob(g.rstrip("/")).match(name) and (not g.endswith("/") or folder()):
+                return True
+        elif _glob(g).match(name) and not folder():
+            return True
+    return False
 
 
 def _lines(data: bytes) -> Iterable[Tuple[int, str]]:
