@@ -450,13 +450,13 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
 
 def _git() -> Optional[str]:
     """`git` from PATH's absolute folders only. On Windows CreateProcess looks in the current folder first (and
-    shutil.which there puts the current folder first too), so a tree checked from inside could run its own git.exe."""
-    if os.name != "nt":
-        return "git"
+    shutil.which there puts the current folder first too), and on POSIX an empty or relative PATH element (a trailing
+    `:`) is the current folder: a tree checked from inside could run its own `git`."""
+    name = "git.exe" if os.name == "nt" else "git"  # never a .cmd or .bat: cmd.exe would read the arguments
     for folder in os.environ.get("PATH", "").split(os.pathsep):
         if folder and os.path.isabs(folder):
-            candidate = os.path.join(folder, "git.exe")  # never a .cmd or .bat: cmd.exe would read the arguments
-            if os.path.isfile(candidate):
+            candidate = os.path.join(folder, name)
+            if os.path.isfile(candidate) and (os.name == "nt" or os.access(candidate, os.X_OK)):
                 return candidate
     return None
 
@@ -508,7 +508,9 @@ _GLOBS: Dict[str, "re.Pattern[str]"] = {}
 def _as_bytes(text: str) -> str:
     """A path or a line as Git compares it: its UTF-8 bytes, one character each. An unpaired surrogate (a Windows file
     name may hold one) is written as Git for Windows writes it (WTF-8), never a crash."""
-    try:
+    if os.name == "nt":  # Windows names are UTF-16: every surrogate in one is a character of the name, as WTF-8
+        return text.encode("utf-8", "surrogatepass").decode("latin-1")
+    try:  # POSIX names are bytes: a surrogate here is one Python escaped, and surrogateescape gives that byte back
         return text.encode("utf-8", "surrogateescape").decode("latin-1")
     except UnicodeEncodeError:
         return text.encode("utf-8", "surrogatepass").decode("latin-1")
@@ -687,13 +689,23 @@ class _Seen:
         self._names_pattern: Optional["re.Pattern[str]"] = None
 
     def add_values(self, text: str) -> None:
-        values = [text[a:b] for a, b in _secret_spans(text)]
+        sources = [(text, _secret_spans(text))]
         if "\\" in text:
             unescaped = _json_unescaped(text)
             if unescaped != text:
-                values += [unescaped[a:b] for a, b in _secret_spans(unescaped)]
-        for value in values:
-            self.grams.update(value[i:i + 8] for i in range(max(0, len(value) - 7)))
+                sources.append((unescaped, _secret_spans(unescaped)))
+        for source, spans in sources:
+            # overlapping spans (each start of `sk-sk-sk-...` runs to the end) merged first: their runs are the same,
+            # and reading each span apart cost the square of the line
+            merged: List[List[int]] = []
+            for a, b in sorted(spans):
+                if merged and a <= merged[-1][1]:
+                    merged[-1][1] = max(merged[-1][1], b)
+                else:
+                    merged.append([a, b])
+            for a, b in merged:
+                value = source[a:b]
+                self.grams.update(value[i:i + 8] for i in range(max(0, len(value) - 7)))
 
     def names_pattern(self) -> "re.Pattern[str]":
         """Every name found, longest first, as one pattern: read once the tree is read, when no name is added."""
@@ -787,14 +799,21 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
             "dependencies": [shown(d) for d in dependencies]}
 
 
+def _absolute(path: str, platform: str) -> bool:
+    return bool(re.match(r"[A-Za-z]:[\\/]|[\\/]{2}", path)) if platform == "win32" else path.startswith("/")
+
+
 def default_list(platform: Optional[str] = None, env: Optional[Dict[str, str]] = None) -> Path:
     """Where the owner's list is kept when none is named: the user's configuration folder, never a project's."""
     platform = platform or sys.platform
     env = os.environ if env is None else env
+    # a relative value is ignored, as the XDG spec says (a quoted `~/.config` is relative too): never "no list"
     if platform == "win32":
-        base = Path(env["APPDATA"]) if env.get("APPDATA") else Path.home() / "AppData" / "Roaming"
+        appdata = env.get("APPDATA", "")
+        base = Path(appdata) if appdata and _absolute(appdata, platform) else Path.home() / "AppData" / "Roaming"
     else:
-        base = Path(env["XDG_CONFIG_HOME"]) if env.get("XDG_CONFIG_HOME") else Path.home() / ".config"
+        xdg = env.get("XDG_CONFIG_HOME", "")
+        base = Path(xdg) if xdg.startswith("/") else Path.home() / ".config"
     return base / "passioncode-fabric" / LIST_NAME
 
 

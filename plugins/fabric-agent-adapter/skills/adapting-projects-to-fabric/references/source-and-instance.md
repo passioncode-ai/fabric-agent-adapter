@@ -80,14 +80,14 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
   not in a Git checkout, or Git lists nothing in it, every file is read but `__pycache__` (uncounted) and the dependency
   folders (`node_modules`, virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
-  A nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
+  In Git mode a nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
   the same check (a submodule checked out first, `git submodule update --init`), then name its path in the ignore file,
   with that reason on the line above. That line serves the check of the outer tree only: before `pack`, check the
   nested repository with `--every-file` in its own tree too, because `pack` carries its files, ignored ones included.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, `#` comments, at least three characters. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
-  (`$XDG_CONFIG_HOME` or `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
+  (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
   travel with the source. A person who already keeps private terms for org-index's `check_private.py`
   (`~/.config/passioncode/private-terms.txt`) passes that file with `--instance-strings`; this check matches a term
   anywhere in a word, and it does not look for e-mail addresses or account ids by their shape.

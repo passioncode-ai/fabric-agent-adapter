@@ -20,7 +20,7 @@ import wait for the contract's decision on CT-194 (part 2).
   outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
   never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a file's
   path is checked like its text and printed with an entry as `<line N>`, a home name as `<home>` and a segment holding a
-  credential-shaped value as `<secret>`. Every text file is read whole; a binary, unreadable or nested-repository path is listed as not
+  credential-shaped value as `<secret>`. Every text file is read whole; a binary, unreadable or (in Git mode) nested-repository path is listed as not
   read (check a nested repository in its own tree, then name it in the ignore file; before `pack`, check it with
   `--every-file` too). It changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file
   was not read (a binary file counts unless the ignore file names it as source). `.fabric-source-ignore` and
@@ -29,9 +29,10 @@ import wait for the contract's decision on CT-194 (part 2).
   root, not as `.gitignore` reads one: a line with no `/` matches at the root only, a wildcard line takes only what
   it matches (`*` stays in a folder, `**` crosses folders), and a line ending in `/`, or a path with no wildcard,
   takes the folder; a nested repository or a submodule is left out only by a line naming its folder (`vendor/sub/`),
-  never by `vendor/*`; an exception line (`!`), a line holding `\`, `//`, an unclosed `[` or a POSIX class, and a
-  glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off, and
-  on Windows only a `git.exe` from PATH's absolute folders. A neutral home (including container and cloud users) and
+  never by `vendor/*`, and a wildcard folder line (`vendor/*/`) takes every one it reaches, checked or not, so name
+  each by its path; an exception line (`!`), a line holding `\`, `//`, an unclosed `[` or a POSIX class, and a
+  glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off, taken only from PATH's
+  absolute folders (on Windows only a `git.exe`). A neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).
   `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`, on a clean copy it

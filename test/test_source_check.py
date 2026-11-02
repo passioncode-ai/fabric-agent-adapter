@@ -496,6 +496,14 @@ class NeverRepeated(Tree):
             self.assertNotIn(jwt[5000:5040], out + err, extra)
             self.assertNotIn(token[:14], out + err, extra)
 
+    def test_a_line_of_overlapping_key_starts_is_remembered_in_linear_time(self):
+        seen = sc._Seen()
+        line = "sk" + "-" + ("sk" + "-") * 13333
+        start = time.perf_counter()
+        seen.add_values(line)
+        self.assertLess(time.perf_counter() - start, 3)  # 14 s when each overlapping span was read apart
+        self.assertEqual(seen.grams, {line[i:i + 8] for i in range(len(line) - 7)})
+
     def test_names_found_across_a_large_tree_cost_one_pass_a_path(self):
         for i in range(1500):
             self.write("records/r%04d.txt" % i, "home: /" + "home/u%05dname/x\n" % i)
@@ -1042,6 +1050,23 @@ class Refusals(Tree):
             with mock.patch.dict(os.environ, {"PATH": os.pathsep.join([str(here), str(there)])}):
                 self.assertEqual(sc._git(), os.path.join(str(there), "git.exe"))  # a .cmd would run through cmd.exe
 
+    @unittest.skipIf(os.name == "nt", "a POSIX executable")
+    def test_git_on_posix_is_taken_from_an_absolute_folder_of_path_only(self):
+        fake = self.root / "git"
+        fake.write_text("#!/bin/sh\nexit 1\n")
+        fake.chmod(0o755)
+        real = shutil.which("git")
+        with mock.patch.dict(os.environ, {"PATH": os.pathsep.join(["", ".", "relative"] + ([os.path.dirname(real)] if real else []))}):
+            found = sc._git()
+        self.assertNotEqual(found, "git")
+        self.assertTrue(found is None or os.path.isabs(found))
+
+    def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
+        with mock.patch.object(sc.os, "name", "nt"):
+            self.assertEqual(sc._as_bytes("\udc80.txt"), sc._as_bytes("\udc80") + ".txt")
+            self.assertEqual(len(sc._as_bytes("\udc80")), 3)  # WTF-8, as Git for Windows writes it
+            self.assertFalse(sc._ignored("\udc80.txt", [sc._line("?.txt", "a line")]))
+
     def test_the_owners_list_is_split_at_line_feeds_only(self):
         listing = self.tmp / "cfg" / "list.txt"
         listing.parent.mkdir()
@@ -1180,7 +1205,11 @@ class TheSkillsTeachIt(unittest.TestCase):
         home = Path.home()
         self.assertEqual(sc.default_list("linux", {"XDG_CONFIG_HOME": "/cfg"}), Path("/cfg/passioncode-fabric/instance-strings.txt"))
         self.assertEqual(sc.default_list("darwin", {}), home / ".config/passioncode-fabric/instance-strings.txt")
-        self.assertEqual(sc.default_list("win32", {"APPDATA": "R"}), Path("R") / "passioncode-fabric" / "instance-strings.txt")
+        self.assertEqual(sc.default_list("win32", {"APPDATA": "C:\\R"}), Path("C:\\R") / "passioncode-fabric" / "instance-strings.txt")
+        # a relative value is ignored, as the XDG spec says: the list in the home folder is still read
+        self.assertEqual(sc.default_list("linux", {"XDG_CONFIG_HOME": "rel/cfg"}), home / ".config/passioncode-fabric/instance-strings.txt")
+        self.assertEqual(sc.default_list("linux", {"XDG_CONFIG_HOME": "~/.config"}), home / ".config/passioncode-fabric/instance-strings.txt")
+        self.assertEqual(sc.default_list("win32", {"APPDATA": "R"}), home / "AppData" / "Roaming" / "passioncode-fabric" / "instance-strings.txt")
         self.assertEqual(sc.default_list("win32", {}), home / "AppData" / "Roaming" / "passioncode-fabric" / "instance-strings.txt")
 
     def test_creating_lays_out_source_and_instance_from_the_first_commit(self):  # source-apart-from-instance
@@ -1199,7 +1228,7 @@ class TheSkillsTeachIt(unittest.TestCase):
         ref = flat("creating-fabric-agents/references/source-and-instance.md")
         for words in ("never repeats", "Exit `0`: no finding and every file read; `1`: at least one finding",
                       "a file was not read", "a nested repository", "`--every-file`", "named in the ignore file", "A list inside the tree is refused", sc.IGNORE_FILE,
-                      "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` or `~/.config`",
+                      "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`",
                       "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "but `.git`, `__pycache__`, `.DS_Store` and `*.pyc`", "The check finds the forms the table names, and only those", "dependency folders", "check a nested repository in its own tree", "a web route under `/home/`",
                       "`fabric_paths.service_dirs`", "`<id>.<instance>`", "(LC-09)", "FAA-188 part 2",
                       "private-terms.txt"):
