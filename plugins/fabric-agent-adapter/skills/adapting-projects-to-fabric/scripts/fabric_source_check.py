@@ -13,8 +13,10 @@ the source would carry and reports, by path, line and kind, each place where the
   (`<name>`, `$USER`) is not a finding;
 - `secret`: a value shaped like a credential by the contract's detector (fabric_secrets.py, DEC-0044), read line by
   line: a provider key starting a word, a JWT, a bearer token, or a long run mixing upper case, lower case and digits
-  assigned to a name that can only carry a credential (a bare long run, such as an integrity hash, is not); or a
-  private key block. A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
+  assigned to a name that can only carry a credential (a bare long run, such as an integrity hash, is not; a whole
+  Ed25519 signature under a JSON `"sig"`, as `sign` writes it, is public); or a private key: a PEM, OpenSSH or PGP
+  block, or a JWK's `d`; a URL that carries a password or a credential in its query; a file that is a credential by
+  its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit token file (`*.token`). A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
   not a finding;
 - `instance-string`: a string from the owner's list of instance strings (names, accounts, hosts), kept outside the tree.
 
@@ -53,6 +55,7 @@ import re
 import stat
 import subprocess
 import sys
+from urllib.parse import unquote
 from typing import Dict, Iterable, List, NoReturn, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -79,13 +82,13 @@ HOME_PATHS = (
     # DEC-0105's dashed form starts a name; after a dash it is a flag or a CSS variable (`--home-dir`)
     # (on Windows a drive comes first: `C--Users-<name>-proj`)
     re.compile(r"(?:^|[^A-Za-z0-9-])-(?:Users|home)-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
-    re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
+    re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII | re.IGNORECASE),
     re.compile(r"%2[Ff](?:Users|home)%2[Ff]([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),  # `%2Fusers%2F` is a route
     re.compile(r"%5CUsers%5C([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII | re.IGNORECASE),
 )
 PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----")  # PEM, OpenSSH, PGP
 #: A private JWK's `d` (`sign --key` takes an Ed25519 one): 32 bytes or more in base64url.
-JWK_PRIVATE = re.compile(r"\"d\"[ \t]*:[ \t]*\"([A-Za-z0-9_-]{43,})\"")
+JWK_PRIVATE = re.compile(r"\\?[\"']d\\?[\"'][ \t]*:[ \t]*\\?[\"']([A-Za-z0-9_-]{43,})")  # JSON, escaped, Python
 #: Words a documented or synthetic credential carries (AWS's `...EXAMPLE`, `sk-test-not-a-key`); a random key does not.
 SYNTHETIC = ("example", "not-a-key", "notakey", "fake", "dummy", "placeholder", "redacted")
 # The detector's provider-key shapes without its first alternative, `^bearer\s.+`, which reads a whole header value: in
@@ -95,10 +98,19 @@ _BEARER_FIRST = "(^bearer["
 if not _secrets.SECRET_VALUE.pattern.startswith(_BEARER_FIRST):  # not an assert: `python -O` would drop it
     raise ImportError("fabric_secrets.SECRET_VALUE changed its first branch; update fabric_source_check.py with it")
 PROVIDER_KEY = re.compile("(" + _secrets.SECRET_VALUE.pattern.split("|", 1)[1], _secrets.SECRET_VALUE.flags)
+#: Files that are credentials by their name: pack's own rule (fabric_package.SECRET_FILE and SECRET_FILE_OK, held
+#: equal by test_source_check), and the kit's token files (`service.token`, fabric_auth.ensure_token).
+_JS_DOT = "[^\n\r\u2028\u2029]"
+SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)"
+                         % (_JS_DOT, _JS_DOT))
+SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
+TOKEN_FILE = re.compile(r".+\.token")
+#: An absolute URL in a line, read whole by `_url_secret`: a password in it, a credential in its query.
+URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"'<>`]+")
 #: `NAME = value`, `NAME: value` or `"name": "value"`: the long-run rule applies only where the name carries a credential.
 #: The name is bounded and starts a word, so a long line is read in linear time.
 ASSIGNED = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]{0,63})[\"']?[ \t]{0,8}[:=][ \t]{0,8}[\"']?"
-                      r"([A-Za-z0-9+/=_-]{40,})")
+                      r"([A-Za-z0-9+/_-]{40,}={0,2})")  # `=` only as padding: `q=sig=<value>` is read at `sig`
 
 
 class CheckError(Exception):
@@ -135,7 +147,30 @@ def _credential(name: str, value: str, quoted: bool) -> bool:
 
 
 def _quoted(text: str, match: "re.Match[str]") -> bool:
-    return match.start(1) > 0 and text[match.start(1) - 1] == '"'
+    """`"name": value`: a JSON member, the name quoted on both sides and `:` after it (never `"sig=...`)."""
+    start, end = match.start(1), match.end(1)
+    return start > 0 and text[start - 1] == '"' and text[end:end + 1] == '"' and text[end + 1:].lstrip(" \t")[:1] == ":"
+
+
+def _url_secret(url: str) -> bool:
+    """A URL that carries a credential, as a source tree holds one. The contract's URL rule (LC-21) reads one value a
+    launch names, where any `token=` is one; across a tree it would read every documented `?token=abc` and `user:pw@`.
+    So: a password of 8 or more mixing letters and digits, or a query or fragment value that, percent-decoded, is shaped
+    like a credential (a provider key, a JWT, a long random run under a credential's name)."""
+    url = url.rstrip(".,;)]}")
+    if not _real(url) or not _secrets._SCHEME.match(url):
+        return False
+    password, query, fragment = _secrets._url_parts(url)
+    if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password):
+        return True
+    for part in (query, fragment):
+        for name, raws in _secrets.raw_values(part).items():
+            for raw in raws:
+                value = unquote(raw)
+                if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
+                        _secrets.JWT_SHAPE.search(value) or _secrets.SECRET_VALUE.search(value):
+                    return True
+    return False
 
 
 def _secret_finding(line: str) -> Optional[str]:
@@ -151,6 +186,8 @@ def _secret_finding(line: str) -> Optional[str]:
         return "a value shaped like a provider key"
     if any(_real(m.group(0)) for m in _secrets._BEARER_INSIDE.finditer(line)):
         return "a bearer token"
+    if "://" in line and any(_url_secret(m.group(0)) for m in URL.finditer(line)):
+        return "a URL that carries a credential"
     for m in (ASSIGNED.finditer(line) if ":" in line or "=" in line else ()):
         name, value = m.group(1), m.group(2)
         if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(value) and _real(value):
@@ -193,6 +230,7 @@ def _secret_spans(text: str) -> List[Tuple[int, int]]:
     spans += [m.span() for m in PROVIDER_KEY.finditer(text)
               if _real(m.group(0)) and (m.start() == 0 or not text[m.start() - 1].isalnum())]
     spans += [m.span() for m in _secrets._BEARER_INSIDE.finditer(text) if _real(m.group(0))]
+    spans += [m.span() for m in URL.finditer(text) if _url_secret(m.group(0))]
     spans += [m.span(2) for m in ASSIGNED.finditer(text)
               if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(m.group(2))
               and _real(m.group(2))]
@@ -312,8 +350,12 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
             continue
         for kind, rule in _text_findings(path, entries):  # a name carries instance data as a line does
             add(path, 0, kind, rule + " in the file's path")
+        name = path.rsplit("/", 1)[-1]
+        if (SECRET_FILE.fullmatch(name) and not SECRET_FILE_OK.fullmatch(name)) or TOKEN_FILE.fullmatch(name):
+            add(path, 0, "secret", "a file that is a credential by its name")
         full = root / path
-        if any((root / parent).is_symlink() for parent in Path(path).parents if str(parent) != "."):
+        # os.path.islink, not Path.is_symlink: on Python 3.9 the latter raises on a folder it cannot search
+        if any(os.path.islink(str(root / parent)) for parent in Path(path).parents if str(parent) != "."):
             # a tracked folder replaced by a link: the file Git lists is not here, and the link is never followed
             skipped["unreadable"] += 1
             not_read.append({"path": redact(path, entries), "why": "under a symbolic link"})
@@ -401,8 +443,12 @@ def run(argv: Optional[List[str]] = None) -> int:
     except SystemExit as exc:  # --help, or arguments argparse refused: the exit code, as the command line gives it
         return exc.code if isinstance(exc.code, int) else 2
     try:
-        root = Path(args.root).expanduser().resolve()
-        if not root.is_dir():
+        try:
+            root = Path(args.root).expanduser().resolve()
+            is_folder = root.is_dir()
+        except OSError:  # Python 3.9 raises where a parent cannot be searched; never a traceback naming the path
+            raise CheckError("the folder cannot be read")
+        if not is_folder:
             raise CheckError("ROOT is not a folder")
         list_path, _ = _list_path(args.instance_strings)
         entries: List[str] = []

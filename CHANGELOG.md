@@ -14,7 +14,8 @@ import wait for the contract's decision on CT-194 (part 2).
   (`home-path`: an ASCII home name in the macOS, Linux (`/home`, `/var/home`) and Windows forms (Git Bash's `/c/Users`
   and WSL's `/mnt/c/Users` included), the dashed form of DEC-0105 (`C--Users-` on Windows) and the URL-encoded ones; a web route `/users/...`, a flag `--home-dir` or a CSS variable is not one), a
   value shaped like a credential by the contract's detector read line by line, a long random value under a
-  credential's name (a whole Ed25519 signature under a JSON `"sig"`, as `sign` writes it, is public and not one; a storage URL's `sig=` is) or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` (`secret`), and a string from the owner's list of instance strings, kept
+  credential's name (a whole Ed25519 signature under a JSON `"sig"`, as `sign` writes it, is public and not one; a storage URL's `sig=` is) or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` (JSON, escaped JSON or a Python dict), a URL carrying a password or a credential in its query, and a
+  file that is a credential by its name as `pack` refuses it, or a kit token file (`secret`), and a string from the owner's list of instance strings, kept
   outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
   never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a file's
   path is checked like its text and printed with an entry as `<line N>`, a home name as `<home>` and a credential-shaped

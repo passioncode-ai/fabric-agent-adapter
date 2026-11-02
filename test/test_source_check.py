@@ -102,7 +102,7 @@ class Findings(Tree):
         forms = (MAC_HOME, LINUX_HOME, WIN_HOME, WIN_HOME_JSON, WIN_HOME_SLASH, WIN_HOME.lower(),
                  "/var" + "/home/" + HOME_NAME + "/x", "cwd: -" + "Users-" + HOME_NAME + "-DATA-proj",
                  "url=file:%2F" + "Users%2F" + HOME_NAME + "%2Fx", "cwd: C--" + "Users-" + HOME_NAME + "-DATA-proj",
-                 "c--" + "Users-" + HOME_NAME + "-x", "/c/" + "Users/" + HOME_NAME + "/x", "/mnt/c/" + "Users/" + HOME_NAME,
+                 "c--" + "Users-" + HOME_NAME + "-x", "c--" + "users-" + HOME_NAME + "-x", "/c/" + "Users/" + HOME_NAME + "/x", "/mnt/c/" + "Users/" + HOME_NAME,
                  "C%3A%5C" + "Users%5C" + HOME_NAME + "%5Cx")
         for i, value in enumerate(forms):
             self.write("cfg%d.txt" % i, "path = %s\n" % value)
@@ -169,7 +169,9 @@ class Findings(Tree):
         sig = ("Ab3" * 29)[:86]  # the shape of a public signature, where only a JSON member is public
         self.write("a.env", "BLOB=https://example.blob.core.windows.net/c?sv=1&sig=%s\n" % sig)
         self.write("b.env", "SIG=%s\n" % sig)
-        self.assertEqual(sorted(f["path"] for f in self.json_check()[1]["findings"]), ["a.env", "b.env"])
+        self.write("c.sh", 'curl -d "sig=%s" https://example.com\n' % sig)  # quoted before, but not a JSON member
+        self.write("d.json", '{"query": "signature=%s&sv=1"}\n' % sig)
+        self.assertEqual(sorted(f["path"] for f in self.json_check()[1]["findings"]), ["a.env", "b.env", "c.sh", "d.json"])
 
     def test_a_package_the_kit_signed_passes(self):
         """The seam with `sign`: the vector agent packed and signed by the kit itself, its signatures public."""
@@ -201,10 +203,46 @@ class Findings(Tree):
     def test_private_keys_in_every_form(self):
         self.write("a.asc", "-----BEGIN PGP " + "PRIVATE KEY BLOCK-----\n")
         self.write("publisher.jwk", '{"kty": "OKP", "crv": "Ed25519", "x": "%s", "d": "%s"}\n' % (LONG_RANDOM, LONG_RANDOM + "Xy9"))  # `d`: 32 bytes, 43 characters
+        self.write("env.json", '{"PRIVATE_JWK": "{\\"kty\\":\\"OKP\\",\\"d\\":\\"%s\\"}"}\n' % (LONG_RANDOM + "Xy9"))
+        self.write("key.py", "KEY = {'kty': 'OKP', 'd': '%s'}\n" % (LONG_RANDOM + "Xy9"))
         self.write("public.jwk", '{"kty": "OKP", "crv": "Ed25519", "x": "%s"}\n' % LONG_RANDOM)
         code, result, out = self.json_check("--every-file")
-        self.assertEqual(sorted(f["path"] for f in result["findings"]), ["a.asc", "publisher.jwk"])
+        self.assertEqual(sorted(f["path"] for f in result["findings"]), ["a.asc", "env.json", "key.py", "publisher.jwk"])
         self.assertNotIn(LONG_RANDOM, out)
+
+    def test_credential_files_by_name_as_pack_refuses_them(self):
+        import secrets as rnd
+        if shutil.which("git") is None:
+            self.skipTest("git")
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write(".env", "X=1\n")
+        self.write(".npmrc", "x\n")
+        self.write("data/session.key", rnd.token_bytes(32), mode="wb")
+        self.write("data/service.token", rnd.token_urlsafe(32))
+        self.write(".env.example", "X=\n")
+        for extra in ([], ["--every-file"]):
+            code, result, _ = self.json_check(*extra)
+            self.assertEqual(code, 1, result)
+            named = sorted(f["path"] for f in result["findings"] if f["line"] == 0 and f["kind"] == "secret")
+            self.assertEqual(named, [".env", ".npmrc", "data/service.token", "data/session.key"], extra)
+
+    def test_the_credential_file_rule_is_packs(self):
+        packer = _package_module()
+        self.assertEqual(sc.SECRET_FILE.pattern, packer.SECRET_FILE.pattern)
+        self.assertEqual(sc.SECRET_FILE_OK.pattern, packer.SECRET_FILE_OK.pattern)
+
+    def test_a_url_that_carries_a_credential(self):
+        import base64, secrets as rnd
+        from urllib.parse import quote
+        sig = ""
+        while "%2B" not in sig and "%2F" not in sig:  # Azure writes a SAS signature percent-encoded
+            sig = quote(base64.b64encode(rnd.token_bytes(32)).decode(), safe="")
+        self.write("a.env", "BLOB_URL=https://a.blob.core.windows.net/c/f?sv=2022-11-02&sig=%s\n" % sig)
+        self.write("b.env", "DATABASE_URL=postgres://app:%s@db.internal/app\n" % (LONG_RANDOM[:12] + "9"))
+        self.write("doc.md", "See https://example.com/?token=abc and https://user:hunter2@host.example/x\n")
+        code, result, out = self.json_check()
+        self.assertEqual(sorted(f["path"] for f in result["findings"]), ["a.env", "b.env"])
+        self.assertNotIn(sig, out)
 
     def test_every_folder_the_check_skips_is_one_pack_refuses(self):
         packer = _package_module()
@@ -517,6 +555,33 @@ class Refusals(Tree):
         code, _, err = run(["check", str(self.root), "--instance-strings", str(bad)])
         self.assertEqual(code, 2)
         self.assertIn("is not UTF-8", err)
+
+    @unittest.skipIf(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), "permissions")
+    def test_a_tracked_file_below_a_folder_it_cannot_search(self):
+        if shutil.which("git") is None:
+            self.skipTest("git")
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write("locked/sub/a.txt", "x\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "."], check=True)
+        (self.root / "locked").chmod(0o600)
+        try:
+            code, out, err = run(["check", str(self.root)])
+        finally:
+            (self.root / "locked").chmod(0o755)
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("locked/sub/a.txt: not read (unreadable)", out)
+        self.assertNotIn(str(self.tmp), out + err)
+
+    @unittest.skipIf(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), "permissions")
+    def test_a_root_below_a_folder_it_cannot_search(self):
+        self.write("a.txt", "x\n")
+        self.tmp.chmod(0o600)
+        try:
+            code, out, err = run(["check", str(self.root)])
+        finally:
+            self.tmp.chmod(0o755)
+        self.assertEqual(code, 2, out + err)
+        self.assertNotIn(str(self.tmp), out + err)
 
     @unittest.skipIf(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0), "permissions")
     def test_a_root_it_cannot_read_is_an_error_without_its_path(self):
