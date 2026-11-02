@@ -1097,6 +1097,27 @@ class Refusals(Tree):
                 mock.patch.object(sc.subprocess, "run", return_value=done):
             self.assertIn(name, sc._git_files(self.root))
 
+    def test_a_name_in_a_latin_1_file_system_is_matched_as_the_bytes_on_disk(self):
+        # Linux under an ISO-8859-1 locale: os.walk and `_git_files` decode a name with Latin-1, so a line is matched
+        # against the bytes Git compares, never the name's UTF-8 re-encoding (reading 28, unit and seam)
+        def decode(raw):
+            return raw.decode("latin-1") if isinstance(raw, bytes) else raw
+
+        def encode(name):
+            return name.encode("latin-1") if isinstance(name, str) else name
+
+        listing = b"v/\xfc.json\0vecteurs/cl\xc3\xa9.txt\0"
+        done = subprocess.CompletedProcess([], 0, listing, b"")
+        with mock.patch.object(sc.os, "name", "posix"), mock.patch.object(sc.os, "fsdecode", decode), \
+                mock.patch.object(sc.os, "fsencode", encode), mock.patch.object(sc, "_git", return_value="git"), \
+                mock.patch.object(sc.subprocess, "run", return_value=done):
+            latin, utf8 = sorted(sc._git_files(self.root), key=len)
+            self.assertTrue(sc._ignored(latin, [sc._line("v/?.json", "a line")]))  # one byte on disk: one `?`
+            self.assertFalse(sc._ignored(latin, [sc._line("v/??.json", "a line")]))
+            self.assertTrue(sc._ignored(utf8, [sc._line("vecteurs/cl\u00e9.txt", "a line")]))  # the UTF-8 line names it
+            self.assertTrue(sc._ignored(utf8, [sc._line("vecteurs/cl??.txt", "a line")]))  # two bytes on disk
+            self.assertFalse(sc._ignored(utf8, [sc._line("vecteurs/cl????.txt", "a line")]))
+
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):
             self.assertEqual(sc._as_bytes("\udc80.txt"), sc._as_bytes("\udc80") + ".txt")
