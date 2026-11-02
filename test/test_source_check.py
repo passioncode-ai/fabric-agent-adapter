@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -168,7 +169,24 @@ class Findings(Tree):
         self.assertNotIn(key[3:11], out + err)
         start = time.perf_counter()  # a long run of dropped starts is read once, not once a start
         self.assertIsNone(sc._secret_finding(("sk" + "-not-a-key-") * 200000))
+        crafted = "a" + "xo" + "xb-" + ("sk" + "-") * 300000 + "_fa" + "ke"  # each inner start ran to the end once
+        self.assertIsNone(sc._secret_finding(crafted))
+        self.assertEqual(sc._secret_spans(crafted), [])
         self.assertLess(time.perf_counter() - start, 5)
+
+    def test_a_narrow_key_before_a_synthetic_word_is_found(self):
+        # a key whose class ends before the synthetic word (ghp_, AKIA, xox) is read by its own end
+        for line in ("sk" + "-" + "Zq7W" * 4 + "_" + "gh" + "p_" + "Zq7W" * 9 + "_fa" + "ke",
+                     "sk" + "-cfg-" + "AK" + "IA" + "ZQ7WM4ZQ7WM4ZQ7W" + "-fa" + "ke",
+                     "sk" + "-" + "Zq7W" * 4 + "_" + "xo" + "xb-" + "Zq7W" * 5 + "_fa" + "ke"):
+            self.assertEqual(sc._secret_finding(line), "a value shaped like a provider key", line[:24].count("_"))
+            self.assertTrue(sc._secret_spans(line))
+
+    def test_a_provider_key_in_a_query_value_is_judged_by_its_own_word(self):
+        key = "sk" + "-" + "Zq7Wm4" * 5
+        for url in ("https://h.example/v?keys=%s%%2C%s" % ("sk" + "-test-not-a-key", key),
+                    "https://h.example/v?note=fa%ske%%20%s" % ("", key)):
+            self.assertEqual(sc._secret_finding(url), "a URL that carries a credential", url[:20])
 
     def test_a_package_signature_is_public(self):
         sig = ("Ab3" * 29)[:86]  # an Ed25519 signature in base64url: 86 characters mixing cases and digits
@@ -523,6 +541,20 @@ class NeverRepeated(Tree):
 class WhatIsRead(Tree):
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
+        tools = self.root / "tools"
+        tools.mkdir()
+        for name in ("fabric_source_check.py", "fabric_secrets.py"):
+            shutil.copy(SCRIPTS / name, tools / name)
+        self.git("init", "-q")
+        self.git("add", "-A")
+        env = {k: v for k, v in os.environ.items() if k not in ("PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX")}
+        done = subprocess.run([sys.executable, str(tools / "fabric_source_check.py"), "check", str(self.root)],
+                              capture_output=True, text=True, env=env)
+        self.assertEqual(done.returncode, 0, done.stdout[-300:])
+        self.assertFalse((tools / "__pycache__").exists())
 
     def test_git_ignored_files_are_not_read(self):
         if not shutil.which("git"):

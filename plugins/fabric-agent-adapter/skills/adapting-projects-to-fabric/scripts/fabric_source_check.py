@@ -47,6 +47,7 @@ Standard library only.
 from __future__ import annotations
 
 import argparse
+import bisect
 import fnmatch
 import json
 import os
@@ -59,7 +60,9 @@ from urllib.parse import unquote
 from typing import Dict, Iterable, List, NoReturn, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+_WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the checked tree adds no .pyc
 import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
+sys.dont_write_bytecode = _WROTE_BYTECODE
 
 IGNORE_FILE = ".fabric-source-ignore"
 LIST_NAME = "instance-strings.txt"
@@ -171,6 +174,8 @@ def _url_secret(url: str, depth: int = 0) -> bool:
                 value = unquote(raw)
                 if depth < 2 and "://" in value and _url_secret(value, depth + 1):  # `?next=https%3A%2F%2F...sig%3D`
                     return True  # read before the synthetic filter: an inner URL is judged by its own values
+                if any(True for _ in _provider_keys(value)):  # each key by its own word, as on a line
+                    return True
                 if not _real(value):
                     continue
                 if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
@@ -283,31 +288,55 @@ def _instance_finding(text: str, entries: List[str]) -> Optional[str]:
     return "a string from the owner's list (line %d)" % spans[0][2] if spans else None
 
 
-_WORD_BREAK = re.compile(r"[_-]")  # inside a provider key's run, a word starts only after one of these
+def _alternatives(pattern: "re.Pattern[str]") -> List[Tuple["re.Pattern[str]", ...]]:
+    """Each provider-key alternative of the contract's pattern as (its starts, its prefix, a run of its class, least
+    length, open-ended, the whole alternative), so a key is read where its own class ends, not where another's does."""
+    found = []
+    for alt in pattern.pattern[1:-1].split("|"):
+        part = re.fullmatch(r"(.+?)(\[[^\]]+\])\{(\d+)(,?)\}", alt)
+        if part is None:  # not an assert: `python -O` would drop it
+            raise ImportError("fabric_secrets.SECRET_VALUE has a key shape this check cannot read: %s" % alt[:12])
+        prefix, cls, least, open_ended = part.groups()
+        found.append((re.compile("(?=%s)" % prefix, pattern.flags), re.compile(prefix, pattern.flags),
+                      re.compile(cls + "+", pattern.flags), int(least), bool(open_ended), re.compile(alt, pattern.flags)))
+    return found
 
 
-def _starts(a: int, after: int, breaks: Iterable["re.Match[str]"]) -> Iterable[int]:
-    if a > after:
-        yield a
-    for w in breaks:
-        yield w.end()
+_KEY_SHAPES = _alternatives(PROVIDER_KEY)
+_ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 
 
 def _provider_keys(text: str) -> Iterable[Tuple[int, int]]:
-    """The spans of provider keys that start a word and do not say they are synthetic, a key inside a run a dropped
-    match swallowed included (`task-runner-sk-<key>`, `sk-test-...-sk-<key>`). One pass over each run: a synthetic
-    word rules out every start before it, so the first word start after the last one is the only one to try."""
-    for m in PROVIDER_KEY.finditer(text):
-        a, b = m.span()
-        lowered = text[a:b].lower()
-        after = max((a + lowered.rfind(word) for word in SYNTHETIC if word in lowered), default=a - 1)
-        for p in _starts(a, after, _WORD_BREAK.finditer(text, max(a, after), b)):
+    """The spans of provider keys that start a word and do not say they are synthetic, each read where it starts, so a
+    key a dropped run swallowed is found too (`task-runner-sk-<key>`, `sk-<16>_ghp_<key>_fake`). Every start is read
+    once, by its own class's run end and the next synthetic word in the line: O(n log n) on any line."""
+    if not PROVIDER_KEY.search(text):
+        return
+    lowered = text.translate(_ASCII_LOWER)  # a key's characters are ASCII, and this keeps every offset
+    synthetic = [(len(word), [m.start() for m in re.finditer("(?=%s)" % re.escape(word), lowered)]) for word in SYNTHETIC]
+    for starts, prefix, run, least, open_ended, whole in _KEY_SHAPES:
+        runs = None
+        for m in starts.finditer(text):
+            p = m.start()
             if p and text[p - 1].isalnum():
                 continue
-            key = PROVIDER_KEY.match(text, p)
-            if key and _real(key.group(0)):
-                yield key.span()
-                break
+            if open_ended:
+                if runs is None:
+                    runs = [r.span() for r in run.finditer(text)]
+                    run_starts = [a for a, _ in runs]
+                q = p + len(prefix.match(text, p).group(0))
+                i = bisect.bisect_right(run_starts, q) - 1
+                if i < 0 or runs[i][1] - q < least:
+                    continue
+                end = runs[i][1]
+            else:
+                key = whole.match(text, p)
+                if key is None:
+                    continue
+                end = key.end()
+            if not any(k < len(at) and at[k] + n <= end
+                       for n, at in synthetic for k in (bisect.bisect_left(at, p),)):
+                yield p, end
 
 
 def _overlapping(pattern: "re.Pattern[str]", text: str) -> Iterable["re.Match[str]"]:
