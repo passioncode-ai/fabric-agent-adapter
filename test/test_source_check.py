@@ -274,13 +274,17 @@ class Findings(Tree):
     @unittest.skipIf(os.name == "nt", "a backslash is a separator on Windows")
     def test_a_path_found_only_with_escapes_undone_is_masked_whole(self):
         pw = LONG_RANDOM[:15] + "7"
-        self.write("https:\\/\\/app:%s@db\\/x.txt" % pw, "x\n")
+        self.write("d0/https:\\/\\/app:%s@db\\/x.txt" % pw, "x\n")
+        self.write("d1/API_TOKEN=%s/https:\\/\\/app:%s@db\\/x.txt" % (LONG_RANDOM, pw), "x\n")  # a spanned one beside it
+        self.write("d2/https:\\/\\/app:%s@db/y.txt" % pw, "x\n")  # the password's own segment holds no escape
         self.write("-" + "Users-" + HOME_NAME + "-x/API_TOKEN\\u003d" + LONG_RANDOM, "x\n")  # a home mark beside it
         for extra in ([], ["--json"], ["--every-file"]):
             code, out, err = run(["check", str(self.root), *extra])
             self.assertEqual(code, 1, extra)
             self.assertNotIn(pw, out + err, extra)
             self.assertNotIn(LONG_RANDOM, out + err, extra)
+        found = sorted(f["path"] for f in self.json_check()[1]["findings"] if f["path"].startswith("d"))
+        self.assertEqual([f[:3] for f in found], ["d0/", "d1/", "d2/"], found)  # each still names its folder
 
     def test_a_url_in_a_shell_default_value(self):
         pw = LONG_RANDOM[:12] + "7"
@@ -297,6 +301,7 @@ class Findings(Tree):
 
     def test_the_litter_files_the_check_skips_are_packs(self):
         packer = _package_module()
+        self.assertTrue(packer.JUNK.pattern.endswith("|" + sc._PACK_JUNK_FILE.pattern), packer.JUNK.pattern)
         for name in (".DS_Store", "m.pyc", "a\r.pyc", "a\u2028.pyc", "a\n.pyc", "x.pyc.txt", "DS_Store"):
             self.assertEqual(bool(sc._PACK_JUNK_FILE.fullmatch(name)), bool(packer.JUNK.fullmatch(name)), repr(name))
 
@@ -549,6 +554,20 @@ class WhatIsRead(Tree):
         code, out, err = run(["check", str(self.root)])
         self.assertEqual(code, 2, out + err)
         self.assertNotIn(str(self.tmp), out + err)
+
+    def test_the_walk_leaves_out_litter_too(self):
+        self.write(".DS_Store", b"\0\0\0\1Bud1", mode="wb")
+        self.write("pkg/m.pyc", b"\x61\x0d\x0d\x0a\0", mode="wb")
+        self.write("main.py", "pass\n")
+        with mock.patch.object(sc, "_git_files", return_value=None):
+            self.assertEqual(self.json_check()[0], 0)
+
+    @unittest.skipIf(os.name == "nt", "a symbolic link needs a privilege on Windows")
+    def test_a_dangling_link_anywhere_above_the_default_list(self):
+        os.symlink(str(self.tmp / "unmounted"), str(self.tmp / "vol"))
+        with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.tmp / "vol" / "cfg")}):
+            code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 2, out + err)
 
     def test_every_file_leaves_out_what_pack_refuses_as_litter(self):
         self.write(".DS_Store", b"\0\0\0\1Bud1", mode="wb")

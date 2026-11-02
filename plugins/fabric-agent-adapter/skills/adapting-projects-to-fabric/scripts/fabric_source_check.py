@@ -32,7 +32,8 @@ repository, or a binary one the ignore file does not name as source. A file not 
 The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), as they are in the
 work tree (a staged copy that differs is not read). With `--every-file`, every file but `.git`, `__pycache__`,
 `.DS_Store` and `*.pyc`, which `pack` refuses as litter (what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
-`__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
+`__pycache__`, `node_modules`, virtual environments and caches (and the litter files `.DS_Store` and `*.pyc`); the
+dependency folders it leaves are named. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
@@ -183,8 +184,27 @@ def _url_secret(url: str, depth: int = 0) -> bool:
 _JSON_ESCAPES = re.compile(r"\\(?:u0026|u003[dD]|/)")
 
 
+_UNESCAPED = {"u0026": "&", "u003d": "=", "u003D": "=", "/": "/"}
+
+
 def _json_unescaped(line: str) -> str:
-    return _JSON_ESCAPES.sub(lambda m: {"u0026": "&", "u003d": "=", "u003D": "=", "/": "/"}[m.group(0)[1:]], line)
+    return _JSON_ESCAPES.sub(lambda m: _UNESCAPED[m.group(0)[1:]], line)
+
+
+def _unescaped_with_origin(line: str) -> Tuple[str, List[Tuple[int, int]]]:
+    """The line with JSON escapes undone, and for each of its characters the raw span it came from."""
+    out: List[str] = []
+    origin: List[Tuple[int, int]] = []
+    last = 0
+    for m in _JSON_ESCAPES.finditer(line):
+        out.extend(line[last:m.start()])
+        origin.extend((i, i + 1) for i in range(last, m.start()))
+        out.append(_UNESCAPED[m.group(0)[1:]])
+        origin.append(m.span())
+        last = m.end()
+    out.extend(line[last:])
+    origin.extend((i, i + 1) for i in range(last, len(line)))
+    return "".join(out), origin
 
 
 def _secret_finding(line: str) -> Optional[str]:
@@ -263,13 +283,15 @@ def _secret_spans(text: str) -> List[Tuple[int, int]]:
 
 def redact(path: str, entries: List[str]) -> str:
     """A path as it may be printed: an owner's string as `<line N>` (its line in the owner's list), a real home
-    folder's name as `<home>`, a credential-shaped value as `<secret>`."""
+    folder's name as `<home>`, a credential-shaped value as `<secret>`, also one that shows only with JSON escapes
+    undone (`app:<pw>@db\\/`), its span mapped back onto the path."""
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     marks += [(s, e, "<home>") for s, e in _home_names(path)]
-    secrets = _secret_spans(path)
-    if not secrets and "\\" in path and _secret_finding(path):  # found only with JSON escapes undone: no span to mask
-        return "<secret>"
-    marks += [(s, e, "<secret>") for s, e in secrets]
+    marks += [(s, e, "<secret>") for s, e in _secret_spans(path)]
+    if "\\" in path:  # a credential that shows only with JSON escapes undone: its spans mapped back onto the path
+        unescaped, origin = _unescaped_with_origin(path)
+        if unescaped != path:
+            marks += [(origin[s][0], origin[e - 1][1], "<secret>") for s, e in _secret_spans(unescaped) if e > s]
     out, last = [], 0
     for start, end, label in sorted(marks):
         if start < last:  # overlapping marks: the first covers the union, so no part of either is printed
@@ -310,7 +332,7 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
         for name in files:
             if name in skip and name == ".git":  # a worktree's or a submodule's `.git` file: never carried, never source
                 continue
-            if skip == PACK_REFUSES and _PACK_JUNK_FILE.fullmatch(name):  # what pack refuses as litter (.DS_Store)
+            if _PACK_JUNK_FILE.fullmatch(name):  # what pack refuses as litter (.DS_Store, *.pyc): never source
                 continue
             found.append(Path(folder, name).relative_to(root).as_posix())
     return sorted(found)
@@ -447,7 +469,7 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
         os.stat(str(default))
     except (FileNotFoundError, NotADirectoryError):
         # a link to a list, its folder or the configuration folder on a volume not mounted: there, but not reachable
-        if any(os.path.lexists(str(p)) and not os.path.exists(str(p)) for p in (default, default.parent, default.parent.parent)):
+        if any(os.path.lexists(str(p)) and not os.path.exists(str(p)) for p in (default, *default.parents)):
             raise CheckError("the owner's list in your configuration folder cannot be read")
         return None, False
     except OSError:  # a list that is there but cannot be reached is not "no list": that would fail open

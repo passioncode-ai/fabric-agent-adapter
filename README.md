@@ -269,11 +269,15 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
 ```
 
 Pack, sign and verify an agent as a `fabric-package/1` folder (contract DEC-0050, DEC-0051; nothing is written without
-`--apply`, and the key file is the person's, never made or kept here). Run
-`python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check ./example-agent --every-file`
-first, then check and pack a clean copy as [the package reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/package.md)
-says (a path named in `.fabric-source-ignore` or `--exclude` is carried unread; a nested repository is checked in
-its own tree with `--every-file`):
+`--apply`, and the key file is the person's, never made or kept here). First check the checkout, then make the clean
+copy [the package reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/package.md)
+describes and check that with `--every-file`, since it is what `pack` carries (a path named in `.fabric-source-ignore`
+or `--exclude` is carried unread; a nested repository is checked in its own tree with `--every-file`):
+
+```bash
+python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check ./example-agent
+python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check ./example-agent-clean --every-file
+```
 
 ```bash
 npx @passioncode-ai/fabric-agent-adapter pack ./example-agent-clean      # the clean copy: the digest, agentRef, every problem

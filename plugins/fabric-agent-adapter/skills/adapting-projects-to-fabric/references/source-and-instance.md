@@ -54,7 +54,7 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 | Kind | Finds |
 |---|---|
 | `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name is not ASCII or holds a dash puts it in the owner's list |
-| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password (8 or more, letters and digits) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter; a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
+| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password (8 or more, letters and digits) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
 ```bash
@@ -76,7 +76,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   (litter `pack` refuses): run it
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
   not in a Git checkout, or Git lists nothing in it, every file is read but the dependency folders (`node_modules`,
-  virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
+  virtual environments, caches) and the litter `pack` refuses (`.DS_Store`, `*.pyc`), and the summary says Git was not used and how many dependency folders were not read.
   A nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
   the same check (a submodule checked out first, `git submodule update --init`), then name its path in the ignore file,
   with that reason on the line above. That line serves the check of the outer tree only: before `pack`, check the
@@ -93,7 +93,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
   exception), and say why on the line above. A file `pack` refuses by its name cannot ship in a package: a public
   certificate is renamed `*.crt`; a project `.npmrc` that holds no credential may be named in the ignore file, with
-  that reason, for the source check, and `pack` still refuses it, so a package is made from a copy without it (its
+  that reason, for the source check (the line then hides whatever is added to it later, so keep it credential-free),
+  and `pack` still refuses it, so a package is made from a copy without it (its
   settings then apply only where the owner sets them: `~/.npmrc` reaches every project of the owner, and
   `package.json`'s `publishConfig` carries publish-time settings such as `registry`, `tag` and `access`). A file
   holding a credential moves to the instance, never into the ignore file.

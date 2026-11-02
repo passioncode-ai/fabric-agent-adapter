@@ -24,7 +24,8 @@ import wait for the contract's decision on CT-194 (part 2).
   read (check a nested repository in its own tree, then name it in the ignore file; before `pack`, check it with
   `--every-file` too). It changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file
   was not read (a binary file counts unless the ignore file names it as source). `.fabric-source-ignore` and
-  `--exclude` leave out named files of synthetic test values, and the summary counts them; a neutral home (including container and cloud users) and
+  `--exclude` leave out named files of synthetic test values (and a project `.npmrc` that holds no credential: `pack`
+  still refuses it, so the package is a copy without it), and the summary counts them; a neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).
   `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`; SECURITY.md names what
@@ -33,7 +34,7 @@ import wait for the contract's decision on CT-194 (part 2).
   repository with a neutral default and a committed `*.example`, records and state documents in the kit's data folder,
   keys by name, fixtures on neutral ids; the supervisor label and `createdBy` name the publisher until CT-194) and the
   check. It is registered as a shared reference (`test_shared_references`).
-- creating-fabric-agents step 2 lays an agent out as source and instance and calls the skeleton done when the check
+- creating-fabric-agents step 2 lays an agent out as source and instance and calls the skeleton done, once the owner has reviewed it (a floor, not a secret scanner), when the check
   exits 0; step 5 runs it again. adapting-projects-to-fabric step 4c runs the check first, moves each finding out and
   runs it again; a value already in Git history needs a fresh history, which stays the owner's act.
 - Trigger and scenario evals for both (`source-apart-from-instance`, `move-instance-data-out-of-an-existing-agent`);
