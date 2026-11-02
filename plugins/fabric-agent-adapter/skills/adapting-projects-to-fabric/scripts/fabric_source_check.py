@@ -83,8 +83,10 @@ HOME_PATHS = (
     re.compile(r"(?<![A-Za-z0-9_.-])(?:/mnt)?/[A-Za-z]/Users/([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),
     re.compile(r"(?<![A-Za-z0-9_.-])[A-Za-z]:%sUsers%s([A-Za-z0-9][A-Za-z0-9._-]*)" % (_SEP, _SEP), re.ASCII | re.IGNORECASE),
     # DEC-0105's dashed form starts a name; after a dash it is a flag or a CSS variable (`--home-dir`)
-    # (on Windows a drive comes first: `C--Users-<name>-proj`)
-    re.compile(r"(?:^|[^A-Za-z0-9-])-(?:Users|home)-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
+    # (on Windows a drive comes first: `C--Users-<name>-proj`; Silverblue's, WSL's and Git Bash's homes dash to
+    # `-var-home-<name>`, `-mnt-c-Users-<name>` and `-c-Users-<name>`)
+    re.compile(r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-Za-z]-Users)-([A-Za-z0-9][A-Za-z0-9._]*)",
+               re.ASCII),
     re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII | re.IGNORECASE),
     re.compile(r"%2[Ff](?:Users|home)%2[Ff]([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),  # `%2Fusers%2F` is a route
     re.compile(r"%5CUsers%5C([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII | re.IGNORECASE),
@@ -150,10 +152,14 @@ def _credential(name: str, value: str, quoted: bool) -> bool:
     return _secrets.credential_name(name)
 
 
+_COLON_AFTER = re.compile(r"[ \t]*:")
+
+
 def _quoted(text: str, match: "re.Match[str]") -> bool:
     """`"name": value`: a JSON member, the name quoted on both sides and `:` after it (never `"sig=...`)."""
     start, end = match.start(1), match.end(1)
-    return start > 0 and text[start - 1] == '"' and text[end:end + 1] == '"' and text[end + 1:].lstrip(" \t")[:1] == ":"
+    # matched in place: a copy of the rest of the line for each member made a minified JSON line quadratic
+    return start > 0 and text[start - 1] == '"' and text[end:end + 1] == '"' and _COLON_AFTER.match(text, end + 1) is not None
 
 
 def _url_secret(url: str, depth: int = 0) -> bool:
@@ -432,8 +438,9 @@ def redact(path: str, entries: List[str]) -> str:
 
 def _git_files(root: Path) -> Optional[List[str]]:
     try:
-        result = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                                capture_output=True, timeout=60)
+        # `core.fsmonitor` off: `--others` would run a command the checked tree's own configuration names
+        result = subprocess.run(["git", "-c", "core.fsmonitor=false", "-C", str(root), "ls-files", "-z", "--cached",
+                                 "--others", "--exclude-standard"], capture_output=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
     if result.returncode != 0:
@@ -483,7 +490,9 @@ def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
 
 
 def _ignored(path: str, globs: List[str]) -> bool:
-    return any(fnmatch.fnmatchcase(path, g) or fnmatch.fnmatchcase(path, g.rstrip("/") + "/*") for g in globs)
+    # `vendor/sub/` names a folder; Git lists a submodule there as `vendor/sub`, with no slash
+    return any(fnmatch.fnmatchcase(path, g) or fnmatch.fnmatchcase(path, g.rstrip("/") + "/*")
+               or (g.endswith("/") and fnmatch.fnmatchcase(path, g.rstrip("/"))) for g in globs)
 
 
 def _lines(data: bytes) -> Iterable[Tuple[int, str]]:
@@ -592,10 +601,12 @@ def default_list(platform: Optional[str] = None, env: Optional[Dict[str, str]] =
 
 def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     """The owner's list and whether it must be read (a named or an existing default list; else no list)."""
-    if given:
-        return Path(given).expanduser(), True
-    if os.environ.get("FABRIC_INSTANCE_STRINGS"):
-        return Path(os.environ["FABRIC_INSTANCE_STRINGS"]).expanduser(), True
+    named = given or os.environ.get("FABRIC_INSTANCE_STRINGS")
+    if named:
+        try:
+            return Path(named).expanduser(), True
+        except RuntimeError:  # `~user` with no such user: the list cannot be read, never "no finding"
+            raise CheckError("the owner's list cannot be read")
     default = default_list()
     try:
         os.stat(str(default))

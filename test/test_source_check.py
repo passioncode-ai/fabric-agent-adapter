@@ -105,7 +105,8 @@ class Findings(Tree):
                  "/var" + "/home/" + HOME_NAME + "/x", "cwd: -" + "Users-" + HOME_NAME + "-DATA-proj",
                  "url=file:%2F" + "Users%2F" + HOME_NAME + "%2Fx", "cwd: C--" + "Users-" + HOME_NAME + "-DATA-proj",
                  "c--" + "Users-" + HOME_NAME + "-x", "c--" + "users-" + HOME_NAME + "-x", "/c/" + "Users/" + HOME_NAME + "/x", "/mnt/c/" + "Users/" + HOME_NAME,
-                 "C%3A%5C" + "Users%5C" + HOME_NAME + "%5Cx")
+                 "C%3A%5C" + "Users%5C" + HOME_NAME + "%5Cx", "cwd: -var-" + "home-" + HOME_NAME + "-proj",
+                 "x -mnt-c-" + "Users-" + HOME_NAME + "-proj", "x -c-" + "Users-" + HOME_NAME + "-proj")
         for i, value in enumerate(forms):
             self.write("cfg%d.txt" % i, "path = %s\n" % value)
         code, result, _ = self.json_check()
@@ -339,6 +340,19 @@ class Findings(Tree):
         sc._secret_finding(line)
         self.assertLess(time.monotonic() - started, 1.0)
 
+    def test_a_minified_json_line_of_quoted_members_is_read_in_linear_time(self):
+        def cost(members):
+            line = "{" + ",".join('"f%d":"%s"' % (i, "0123456789abcdef" * 4) for i in range(members)) + "}"
+            best = None
+            for _ in range(2):
+                started = time.perf_counter()
+                self.assertIsNone(sc._secret_finding(line))
+                took = time.perf_counter() - started
+                best = took if best is None else min(best, took)
+            return best
+        # four times the line costs about four times as much; copying the rest of the line per member cost nine
+        self.assertLess(cost(56000) / cost(14000), 6.5)
+
     def test_the_litter_files_the_check_skips_are_packs(self):
         packer = _package_module()
         self.assertTrue(packer.JUNK.pattern.endswith("|" + sc._PACK_JUNK_FILE.pattern), packer.JUNK.pattern)
@@ -543,6 +557,29 @@ class WhatIsRead(Tree):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
 
     @unittest.skipIf(shutil.which("git") is None, "needs git")
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_submodule_named_as_a_folder_in_the_ignore_file_is_left_out(self):
+        self.git("init", "-q")
+        self.write("src/app.py", "print('hi')\n")
+        (self.root / "vendor" / "sub").mkdir(parents=True)
+        self.git("update-index", "--add", "--cacheinfo", "160000,%s,vendor/sub" % ("1" * 40))
+        self.write(sc.IGNORE_FILE, "vendor/sub/\n")
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 0, out[-300:])
+
+    @unittest.skipIf(os.name == "nt" or shutil.which("git") is None, "a POSIX script as Git's fsmonitor")
+    def test_git_runs_no_command_the_checked_tree_configures(self):
+        marker = self.tmp / "fsmonitor-ran"
+        script = self.tmp / "fsmonitor.sh"
+        script.write_text("#!/bin/sh\necho ran >> '%s'\n" % marker)
+        script.chmod(0o755)
+        self.git("init", "-q")
+        self.git("config", "core.fsmonitor", str(script))
+        self.write("src/app.py", "print('hi')\n")
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 0, out[-300:])
+        self.assertFalse(marker.exists())
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
@@ -777,6 +814,15 @@ class WhatIsRead(Tree):
 
 
 class Refusals(Tree):
+
+    def test_a_list_under_a_user_with_no_home_is_an_error(self):
+        for argv, env in ((["--instance-strings", "~nosuchuser" + "4242/l.txt"], {}),
+                          ([], {"FABRIC_INSTANCE_STRINGS": "~nosuchuser" + "4242/l.txt"})):
+            with mock.patch.dict(os.environ, env):
+                code, out, err = run(["check", str(self.root), *argv])
+            self.assertEqual(code, 2, (argv, err[-200:]))
+            self.assertIn("owner's list cannot be read", err)
+            self.assertNotIn("Traceback", err)
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")
         code, out, err = run(["check", str(self.root), "--instance-strings", str(inside)])
