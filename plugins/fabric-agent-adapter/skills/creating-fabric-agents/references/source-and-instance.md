@@ -49,7 +49,7 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 | Kind | Finds |
 |---|---|
 | `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name is not ASCII or holds a dash puts it in the owner's list |
-| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name; or a private key block |
+| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
 ```bash
@@ -72,7 +72,9 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   not in a Git checkout, or Git lists nothing in it, every file is read but the dependency folders (`node_modules`,
   virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
   A nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
-  the same check, then name its path in the ignore file, with that reason on the line above.
+  the same check (a submodule checked out first, `git submodule update --init`), then name its path in the ignore file,
+  with that reason on the line above. That line serves the check of the outer tree only: before `pack`, check the
+  nested repository with `--every-file` in its own tree too, because `pack` carries its files, ignored ones included.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, `#` comments, at least three characters. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
@@ -82,7 +84,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   anywhere in a word, and it does not look for e-mail addresses or account ids by their shape.
 - **Leaving paths out.** `.fabric-source-ignore` at the root (globs, one per line, `#` comments) or `--exclude GLOB`
   leaves out files that hold synthetic values on purpose, such as test vectors. Name the files, or a folder that holds
-  only synthetic vectors, never a whole source folder, and say why on the line above.
+  only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
+  exception), and say why on the line above.
 - A neutral home (`example`, `user`, `runner`, a container's or a cloud machine's user such as `node` or `ubuntu`, a
   one-letter name, a placeholder) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
   not findings.

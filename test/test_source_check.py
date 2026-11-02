@@ -128,7 +128,8 @@ class Findings(Tree):
     def test_web_routes_flags_and_css_are_not_home_paths(self):
         self.write("app.js", "\n".join(['fetch("/" + "users/profile")', 'login("/login?next=%2F' + 'users%2Fsettings")', "router.push('/" + "users/settings')",
                                           "cli --" + "home-dir ./x", 'add_argument("--' + 'users-file")',
-                                          "color: var(--" + "home-hero-bg);"]) + "\n")
+                                          "color: var(--" + "home-hero-bg);", "Option B--" + "home-grown",
+                                          ".a--" + "home-hero {}", "-x--" + "home-dir"]) + "\n")
         code, result, _ = self.json_check()
         self.assertEqual(code, 0, result["findings"])
 
@@ -160,7 +161,49 @@ class Findings(Tree):
         self.write("b.json", '{"signature": "%s"}\n' % sig)
         self.assertEqual(self.json_check()[0], 0)
         self.write("c.json", '{"api_key": "%s"}\n' % sig)
-        self.assertEqual([f["path"] for f in self.json_check()[1]["findings"]], ["c.json"])
+        # a storage URL's `sig=` is an HMAC that grants access, not a public signature
+        self.write("d.env", "BLOB_URL=https://example.blob.core.windows.net/c?sv=2022&sig=%s%%3D\n" % LONG_RANDOM)
+        self.assertEqual([f["path"] for f in self.json_check()[1]["findings"]], ["c.json", "d.env"])
+
+    def test_a_signature_in_a_url_or_an_env_line_is_a_credential(self):
+        sig = ("Ab3" * 29)[:86]  # the shape of a public signature, where only a JSON member is public
+        self.write("a.env", "BLOB=https://example.blob.core.windows.net/c?sv=1&sig=%s\n" % sig)
+        self.write("b.env", "SIG=%s\n" % sig)
+        self.assertEqual(sorted(f["path"] for f in self.json_check()[1]["findings"]), ["a.env", "b.env"])
+
+    def test_a_package_the_kit_signed_passes(self):
+        """The seam with `sign`: the vector agent packed and signed by the kit itself, its signatures public."""
+        import base64
+        packer = _package_module()
+        vectors = json.loads((ROOT / "test/fixtures/contract/package-vectors.json").read_text())["vectors"]
+        folder = self.root / "inbox-digest"
+        for path, text in vectors["folder"]["files"].items():
+            (folder / path).parent.mkdir(parents=True, exist_ok=True)
+            (folder / path).write_text(text)
+        draft = dict(vectors["digest"]["package"])
+        for key in ("agentRef", "files", "digest", "signatures"):
+            draft.pop(key, None)
+        (folder / packer.PACKAGE_FILE).write_text(json.dumps(draft, indent=2) + "\n")
+        self.assertTrue(packer.pack(folder, apply=True)["ok"])
+        for role in ("publisher", "organization"):
+            k = vectors["keys"][role]
+            jwk = dict(k["jwk"], d=base64.urlsafe_b64encode(bytes.fromhex(k["seed"])).decode().rstrip("="))
+            key = self.outside / ("%s.jwk" % role)  # the key stays outside the folder, as package.md says
+            key.write_text(json.dumps(jwk))
+            key.chmod(0o600)
+            self.assertTrue(packer.sign(folder, key, role=role, apply=True)["ok"], role)
+        self.assertIn('"sig"', (folder / packer.PACKAGE_FILE).read_text())
+        for extra in ([], ["--every-file"]):
+            code, out, err = run(["check", str(folder), *extra])
+            self.assertEqual(code, 0, out + err)
+
+    def test_private_keys_in_every_form(self):
+        self.write("a.asc", "-----BEGIN PGP " + "PRIVATE KEY BLOCK-----\n")
+        self.write("publisher.jwk", '{"kty": "OKP", "crv": "Ed25519", "x": "%s", "d": "%s"}\n' % (LONG_RANDOM, LONG_RANDOM + "Xy9"))  # `d`: 32 bytes, 43 characters
+        self.write("public.jwk", '{"kty": "OKP", "crv": "Ed25519", "x": "%s"}\n' % LONG_RANDOM)
+        code, result, out = self.json_check("--every-file")
+        self.assertEqual(sorted(f["path"] for f in result["findings"]), ["a.asc", "publisher.jwk"])
+        self.assertNotIn(LONG_RANDOM, out)
 
     def test_every_folder_the_check_skips_is_one_pack_refuses(self):
         packer = _package_module()
@@ -287,6 +330,7 @@ class WhatIsRead(Tree):
 
     def test_without_git_the_walk_skips_dependency_folders(self):
         self.write("node_modules/dep/index.js", "x = '%s'\n" % MAC_HOME)
+        self.write("__pycache__/m.txt", "x\n")
         self.write(".git/config", "url = %s\n" % MAC_HOME)
         self.write("app.js", "ok\n")
         with mock.patch.object(sc, "_git_files", return_value=None):
@@ -294,6 +338,8 @@ class WhatIsRead(Tree):
             text = run(["check", str(self.root)])[1]
         self.assertIn("Git not used", text)
         self.assertIn("1 dependency folder(s) not read", text)  # named, never a silent `every file`
+        self.assertIn("node_modules: not read (a dependency folder", text)
+        self.assertEqual(result["dependencies"], ["node_modules"])  # never `__pycache__`, which --every-file leaves too
         self.assertEqual(result["skipped"]["dependencies"], 1)
         self.assertEqual(code, 0, result["findings"])
         self.assertEqual(result["mode"], "walk")
@@ -377,7 +423,27 @@ class WhatIsRead(Tree):
         (self.root / "old.txt").unlink()
         code, result, _ = self.json_check()
         self.assertEqual(code, 2)
-        self.assertEqual(result["notRead"], [{"path": "old.txt", "why": "deleted, still in Git's index"}])
+        self.assertEqual(result["notRead"], [{"path": "old.txt", "why": "not in the work tree"}])
+
+    @unittest.skipIf(os.name == "nt", "a symbolic link needs a privilege on Windows")
+    def test_a_tracked_folder_replaced_by_a_link_is_not_followed(self):
+        if shutil.which("git") is None:
+            self.skipTest("git")
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
+        self.write("dir/a.txt", "x\n")
+        subprocess.run(["git", "-C", str(self.root), "add", "dir/a.txt"], check=True)
+        shutil.rmtree(str(self.root / "dir"))
+        (self.outside / "a.txt").write_text(MAC_HOME + "\n", encoding="utf-8")
+        os.symlink(str(self.outside), str(self.root / "dir"))
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 2)
+        self.assertNotIn(("dir/a.txt", 1), [(f["path"], f["line"]) for f in result["findings"]])
+        self.assertIn({"path": "dir/a.txt", "why": "under a symbolic link"}, result["notRead"])
+
+    def test_every_file_leaves_out_a_worktrees_git_file(self):
+        self.write(".git", "gitdir: %s/.git/worktrees/x\n" % MAC_HOME)
+        self.write("main.py", "pass\n")
+        self.assertEqual(self.json_check("--every-file")[0], 0)
 
     def test_line_numbers_are_an_editors(self):
         self.write("a.txt", "one\fstill one\r\ntwo %s\n" % MAC_HOME)

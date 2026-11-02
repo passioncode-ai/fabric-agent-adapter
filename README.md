@@ -269,7 +269,9 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
 ```
 
 Pack, sign and verify an agent as a `fabric-package/1` folder (contract DEC-0050, DEC-0051; nothing is written without
-`--apply`, and the key file is the person's, never made or kept here):
+`--apply`, and the key file is the person's, never made or kept here). Run
+`python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check ./example-agent --every-file`
+first, so the instance stays out of the package:
 
 ```bash
 npx @passioncode-ai/fabric-agent-adapter pack ./example-agent            # the digest, agentRef and every problem

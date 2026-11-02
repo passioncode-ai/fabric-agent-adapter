@@ -28,9 +28,9 @@ repository, or a binary one the ignore file does not name as source. A file not 
   fabric_source_check.py check [ROOT] [--instance-strings FILE] [--exclude GLOB ...] [--every-file] [--json]
 
 The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), as they are in the
-work tree (a staged copy that differs is not read), or, with
-`--every-file` (what `pack` reads) or when ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`, `node_modules`, `__pycache__` and virtual
-environments. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
+work tree (a staged copy that differs is not read). With `--every-file`, every file outside `.git` and `__pycache__`
+(what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
+`__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
@@ -78,11 +78,14 @@ HOME_PATHS = (
     re.compile(r"(?<![A-Za-z0-9_.-])[A-Za-z]:%sUsers%s([A-Za-z0-9][A-Za-z0-9._-]*)" % (_SEP, _SEP), re.ASCII | re.IGNORECASE),
     # DEC-0105's dashed form starts a name; after a dash it is a flag or a CSS variable (`--home-dir`)
     # (on Windows a drive comes first: `C--Users-<name>-proj`)
-    re.compile(r"(?:^|[^A-Za-z0-9-]|(?<![A-Za-z0-9])[A-Za-z]-)-(?:Users|home)-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
+    re.compile(r"(?:^|[^A-Za-z0-9-])-(?:Users|home)-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
+    re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-([A-Za-z0-9][A-Za-z0-9._]*)", re.ASCII),
     re.compile(r"%2[Ff](?:Users|home)%2[Ff]([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),  # `%2Fusers%2F` is a route
     re.compile(r"%5CUsers%5C([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII | re.IGNORECASE),
 )
-PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----")
+PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----")  # PEM, OpenSSH, PGP
+#: A private JWK's `d` (`sign --key` takes an Ed25519 one): 32 bytes or more in base64url.
+JWK_PRIVATE = re.compile(r"\"d\"[ \t]*:[ \t]*\"([A-Za-z0-9_-]{43,})\"")
 #: Words a documented or synthetic credential carries (AWS's `...EXAMPLE`, `sk-test-not-a-key`); a random key does not.
 SYNTHETIC = ("example", "not-a-key", "notakey", "fake", "dummy", "placeholder", "redacted")
 # The detector's provider-key shapes without its first alternative, `^bearer\s.+`, which reads a whole header value: in
@@ -118,17 +121,28 @@ def _real(token: str) -> bool:
     return not any(word in lowered for word in SYNTHETIC)
 
 
-#: A signature is public: `sign` writes one into fabric.package.json (`"sig"`), and every signed record carries one.
+#: An Ed25519 signature is public: `sign` writes one into fabric.package.json (`"sig"`), and every signed record carries
+#: one. Only a whole one (64 bytes, 86 base64url characters) is: a storage URL's `sig=` (an HMAC) grants access.
 PUBLIC_NAMES = {"sig", "signature", "signatures"}
+_ED25519_SIGNATURE = re.compile(r"[A-Za-z0-9_-]{86}")
 
 
-def _credential(name: str) -> bool:
-    return name.lower() not in PUBLIC_NAMES and _secrets.credential_name(name)
+def _credential(name: str, value: str, quoted: bool) -> bool:
+    """A credential's name, but a whole Ed25519 signature as a JSON member (`"sig": "..."`, as `sign` writes it)."""
+    if quoted and name.lower() in PUBLIC_NAMES and _ED25519_SIGNATURE.fullmatch(value):
+        return False
+    return _secrets.credential_name(name)
+
+
+def _quoted(text: str, match: "re.Match[str]") -> bool:
+    return match.start(1) > 0 and text[match.start(1) - 1] == '"'
 
 
 def _secret_finding(line: str) -> Optional[str]:
     if PRIVATE_KEY.search(line):
         return "a private key block"
+    if any(_real(m.group(1)) for m in JWK_PRIVATE.finditer(line)):
+        return "a private key (a JWK's `d`)"
     if any(_real(m.group(0)) for m in _secrets.JWT_SHAPE.finditer(line)):
         return "a token shaped like a JWT"
     # The detector reads one configuration value; across a line, `sk-` needs a word start of its own, or every name
@@ -137,8 +151,9 @@ def _secret_finding(line: str) -> Optional[str]:
         return "a value shaped like a provider key"
     if any(_real(m.group(0)) for m in _secrets._BEARER_INSIDE.finditer(line)):
         return "a bearer token"
-    for name, value in (ASSIGNED.findall(line) if ":" in line or "=" in line else ()):
-        if _credential(name) and _secrets._long_secret(value) and _real(value):
+    for m in (ASSIGNED.finditer(line) if ":" in line or "=" in line else ()):
+        name, value = m.group(1), m.group(2)
+        if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(value) and _real(value):
             return "a long random value assigned to a credential's name"
     return None
 
@@ -174,11 +189,13 @@ def _instance_finding(text: str, entries: List[str]) -> Optional[str]:
 def _secret_spans(text: str) -> List[Tuple[int, int]]:
     """The spans of credential-shaped values in a text, as `_secret_finding` reads them."""
     spans = [m.span() for m in _secrets.JWT_SHAPE.finditer(text) if _real(m.group(0))]
+    spans += [m.span(1) for m in JWK_PRIVATE.finditer(text) if _real(m.group(1))]
     spans += [m.span() for m in PROVIDER_KEY.finditer(text)
               if _real(m.group(0)) and (m.start() == 0 or not text[m.start() - 1].isalnum())]
     spans += [m.span() for m in _secrets._BEARER_INSIDE.finditer(text) if _real(m.group(0))]
     spans += [m.span(2) for m in ASSIGNED.finditer(text)
-              if _credential(m.group(1)) and _secrets._long_secret(m.group(2)) and _real(m.group(2))]
+              if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(m.group(2))
+              and _real(m.group(2))]
     return spans
 
 
@@ -220,11 +237,14 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
 
     for folder, dirs, files in os.walk(root, onerror=failed):
         if left is not None:
-            left += [Path(folder, d).relative_to(root).as_posix() for d in dirs if d in skip and d != ".git"]
+            left += [Path(folder, d).relative_to(root).as_posix() for d in dirs
+                     if d in skip and d not in PACK_REFUSES]  # `.git` and `__pycache__`: --every-file leaves them too
         dirs[:] = [d for d in dirs if d not in skip]
         # os.walk lists a link to a folder with the folders and does not follow it: check it as Git would, by its target
         files = files + [d for d in dirs if os.path.islink(os.path.join(folder, d))]
         for name in files:
+            if name in skip and name == ".git":  # a worktree's or a submodule's `.git` file: never carried, never source
+                continue
             found.append(Path(folder, name).relative_to(root).as_posix())
     return sorted(found)
 
@@ -293,6 +313,11 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         for kind, rule in _text_findings(path, entries):  # a name carries instance data as a line does
             add(path, 0, kind, rule + " in the file's path")
         full = root / path
+        if any((root / parent).is_symlink() for parent in Path(path).parents if str(parent) != "."):
+            # a tracked folder replaced by a link: the file Git lists is not here, and the link is never followed
+            skipped["unreadable"] += 1
+            not_read.append({"path": redact(path, entries), "why": "under a symbolic link"})
+            continue
         try:
             if full.is_symlink():  # Git commits the path a link names: check it, never follow it
                 read += 1
@@ -308,9 +333,10 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
                 continue
             with open(full, "rb") as handle:
                 data = handle.read()
-        except FileNotFoundError:  # deleted here, still in Git's index: `git rm --cached` it, or restore it
+        except FileNotFoundError:  # Git lists it and the work tree lacks it: deleted, or outside a sparse checkout
             skipped["unreadable"] += 1
-            not_read.append({"path": redact(path, entries), "why": "deleted, still in Git's index"})
+            not_read.append({"path": redact(path, entries),
+                             "why": "not in the work tree" if mode == "git" else "unreadable"})
             continue
         except OSError:
             skipped["unreadable"] += 1
@@ -324,7 +350,8 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         for number, line in _lines(data):
             for kind, rule in _text_findings(line, entries):
                 add(path, number, kind, rule)
-    return {"mode": mode, "files": read, "skipped": skipped, "notRead": not_read, "findings": findings}
+    return {"mode": mode, "files": read, "skipped": skipped, "notRead": not_read, "findings": findings,
+            "dependencies": [redact(d, entries) for d in dependencies]}
 
 
 def default_list(platform: Optional[str] = None, env: Optional[Dict[str, str]] = None) -> Path:
@@ -413,6 +440,8 @@ def run(argv: Optional[List[str]] = None) -> int:
             _print("%s:%s: %s (%s)" % (f["path"], f["line"], f["kind"], f["rule"]))
         for n in result["notRead"]:  # type: ignore[union-attr]
             _print("%s: not read (%s)" % (n["path"], n["why"]))
+        for folder in result["dependencies"]:  # type: ignore[union-attr]
+            _print("%s: not read (a dependency folder; --every-file reads it)" % folder)
         if skipped["dependencies"]:  # type: ignore[index]
             _print("%d dependency folder(s) not read (node_modules, virtual environments, caches); --every-file reads "
                    "them" % skipped["dependencies"])  # type: ignore[index]

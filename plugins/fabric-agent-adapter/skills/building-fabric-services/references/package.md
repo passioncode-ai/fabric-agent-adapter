@@ -46,7 +46,8 @@ Run `adapting-projects-to-fabric/scripts/fabric_source_check.py check <folder> -
 the source, and the instance (the owner's paths, keys, strings) stays out of it (`references/source-and-instance.md` of
 that skill). `--every-file` reads what `pack` reads, files Git ignores included; without it the check reads only what Git
 would commit. A path named in `.fabric-source-ignore` is still carried by `pack`, unread, so name only synthetic files
-there. Pack a clean copy without dependency folders (`node_modules`, virtual environments): they hold install paths and
+there, and check a nested repository named there with `--every-file` in its own tree. Keep the signing key file
+outside the folder. Pack a clean copy without dependency folders (`node_modules`, virtual environments): they hold install paths and
 binaries the check reports. The check is Python only (3.9+); a Node-only machine packs without it.
 
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
