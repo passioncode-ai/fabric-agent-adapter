@@ -30,8 +30,8 @@ repository, or a binary one the ignore file does not name as source. A file not 
   fabric_source_check.py check [ROOT] [--instance-strings FILE] [--exclude GLOB ...] [--every-file] [--json]
 
 The files read are those Git would commit (`git ls-files --cached --others --exclude-standard`), as they are in the
-work tree (a staged copy that differs is not read). With `--every-file`, every file outside `.git` and `__pycache__`
-(what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
+work tree (a staged copy that differs is not read). With `--every-file`, every file but `.git`, `__pycache__`,
+`.DS_Store` and `*.pyc`, which `pack` refuses as litter (what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
 `__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named. A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
@@ -63,9 +63,8 @@ import fabric_secrets as _secrets  # noqa: E402 - the contract's credential dete
 
 IGNORE_FILE = ".fabric-source-ignore"
 LIST_NAME = "instance-strings.txt"
-#: The folders `pack` refuses to carry (fabric_package.JUNK), the only ones --every-file leaves unread.
+#: The folders `pack` refuses to carry (fabric_package.JUNK); --every-file leaves them and the files below unread.
 PACK_REFUSES = {".git", "__pycache__"}
-_PACK_JUNK_FILE = re.compile(r"\.DS_Store|.*\.pyc")  # the files of fabric_package.JUNK
 WALK_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache"}
 #: Names that stand for nobody in a home path: placeholders, CI runners and the system's shared folders.
 NEUTRAL_HOMES = {"example", "examples", "user", "username", "you", "me", "name", "someone", "runner", "shared", "public",
@@ -105,6 +104,7 @@ _JS_DOT = "[^\n\r\u2028\u2029]"
 SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)"
                          % (_JS_DOT, _JS_DOT))
 SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
+_PACK_JUNK_FILE = re.compile(r"\.DS_Store|%s*\.pyc" % _JS_DOT)  # held to fabric_package.JUNK by test_source_check
 TOKEN_FILE = re.compile(r".+\.(token|credential)")  # the kit's service.token and board.credential
 #: An absolute URL in a line, read whole by `_url_secret`: a password in it, a credential in its query.
 URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]{0,63}://[^\s\"'<>`]+")  # a bounded scheme: linear, and `${X:-pg://..}`
@@ -169,10 +169,10 @@ def _url_secret(url: str, depth: int = 0) -> bool:
         for name, raws in _secrets.raw_values(part).items():
             for raw in raws:
                 value = unquote(raw)
+                if depth < 2 and "://" in value and _url_secret(value, depth + 1):  # `?next=https%3A%2F%2F...sig%3D`
+                    return True  # read before the synthetic filter: an inner URL is judged by its own values
                 if not _real(value):
                     continue
-                if depth < 2 and "://" in value and _url_secret(value, depth + 1):  # `?next=https%3A%2F%2F...sig%3D`
-                    return True
                 if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
                         _secrets.JWT_SHAPE.search(value) or _secrets.SECRET_VALUE.search(value):
                     return True
@@ -266,7 +266,10 @@ def redact(path: str, entries: List[str]) -> str:
     folder's name as `<home>`, a credential-shaped value as `<secret>`."""
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     marks += [(s, e, "<home>") for s, e in _home_names(path)]
-    marks += [(s, e, "<secret>") for s, e in _secret_spans(path)]
+    secrets = _secret_spans(path)
+    if not secrets and "\\" in path and _secret_finding(path):  # found only with JSON escapes undone: no span to mask
+        return "<secret>"
+    marks += [(s, e, "<secret>") for s, e in secrets]
     out, last = [], 0
     for start, end, label in sorted(marks):
         if start < last:  # overlapping marks: the first covers the union, so no part of either is printed
@@ -443,7 +446,8 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     try:
         os.stat(str(default))
     except (FileNotFoundError, NotADirectoryError):
-        if os.path.lexists(str(default)):  # a link to a list on a volume not mounted: there, but not reachable
+        # a link to a list, its folder or the configuration folder on a volume not mounted: there, but not reachable
+        if any(os.path.lexists(str(p)) and not os.path.exists(str(p)) for p in (default, default.parent, default.parent.parent)):
             raise CheckError("the owner's list in your configuration folder cannot be read")
         return None, False
     except OSError:  # a list that is there but cannot be reached is not "no list": that would fail open

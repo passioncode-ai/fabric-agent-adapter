@@ -263,8 +263,24 @@ class Findings(Tree):
                  '{"u": "https://a.blob.core.windows.net/c?sv=1\\u0026sig=%s"}' % sig,
                  '{"db": "postgres:\\/\\/app:%s@h\\/app"}' % pw,  # PHP's json_encode writes / as \/
                  "https://login.example.org/cb?next=" + quote("https://a.blob.core.windows.net/c?sv=1&sig=" + sig, safe=""))
+        lines += ('{"u": "https://a.blob.core.windows.net/c?sv=1\\u0026sig\\u003d%s"}' % sig,
+                  "https://login.example.org/cb?next=" + quote("https://examples.blob.core.windows.net/c?sig=" + sig, safe=""))
         for line in lines:
             self.assertIsNotNone(sc._secret_finding(line), line)
+        # a word that says it is synthetic is read decoded
+        self.assertIsNone(sc._secret_finding("postgres://app:not%2Da%2Dkey9x@h/db"))
+        self.assertIsNone(sc._secret_finding("API_TOKEN=%s%%66ake" % LONG_RANDOM))
+
+    @unittest.skipIf(os.name == "nt", "a backslash is a separator on Windows")
+    def test_a_path_found_only_with_escapes_undone_is_masked_whole(self):
+        pw = LONG_RANDOM[:15] + "7"
+        self.write("https:\\/\\/app:%s@db\\/x.txt" % pw, "x\n")
+        self.write("-" + "Users-" + HOME_NAME + "-x/API_TOKEN\\u003d" + LONG_RANDOM, "x\n")  # a home mark beside it
+        for extra in ([], ["--json"], ["--every-file"]):
+            code, out, err = run(["check", str(self.root), *extra])
+            self.assertEqual(code, 1, extra)
+            self.assertNotIn(pw, out + err, extra)
+            self.assertNotIn(LONG_RANDOM, out + err, extra)
 
     def test_a_url_in_a_shell_default_value(self):
         pw = LONG_RANDOM[:12] + "7"
@@ -278,6 +294,11 @@ class Findings(Tree):
         started = time.monotonic()
         sc._secret_finding(line)
         self.assertLess(time.monotonic() - started, 1.0)
+
+    def test_the_litter_files_the_check_skips_are_packs(self):
+        packer = _package_module()
+        for name in (".DS_Store", "m.pyc", "a\r.pyc", "a\u2028.pyc", "a\n.pyc", "x.pyc.txt", "DS_Store"):
+            self.assertEqual(bool(sc._PACK_JUNK_FILE.fullmatch(name)), bool(packer.JUNK.fullmatch(name)), repr(name))
 
     def test_every_folder_the_check_skips_is_one_pack_refuses(self):
         packer = _package_module()
@@ -519,6 +540,16 @@ class WhatIsRead(Tree):
         self.write("main.py", "pass\n")
         self.assertEqual(self.json_check("--every-file")[0], 0)
 
+    @unittest.skipIf(os.name == "nt", "a symbolic link needs a privilege on Windows")
+    def test_a_dangling_link_above_the_default_list_is_an_error(self):
+        cfg = Path(os.environ["XDG_CONFIG_HOME"])
+        cfg.mkdir(parents=True)
+        os.symlink(str(self.tmp / "absent"), str(cfg / "passioncode-fabric"))
+        self.write("a.txt", "x\n")
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 2, out + err)
+        self.assertNotIn(str(self.tmp), out + err)
+
     def test_every_file_leaves_out_what_pack_refuses_as_litter(self):
         self.write(".DS_Store", b"\0\0\0\1Bud1", mode="wb")
         self.write("pkg/m.cpython-39.pyc", b"\x61\x0d\x0d\x0a\0", mode="wb")
@@ -725,7 +756,7 @@ class TheSkillsTeachIt(unittest.TestCase):
         for words in ("never repeats", "Exit `0`: no finding and every file read; `1`: at least one finding",
                       "a file was not read", "a nested repository", "`--every-file`", "named in the ignore file", "A list inside the tree is refused", sc.IGNORE_FILE,
                       "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` or `~/.config`",
-                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "The check finds the forms the table names, and only those", "dependency folders", "check a nested repository in its own tree", "a web route under `/home/`",
+                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "but `.git`, `__pycache__`, `.DS_Store` and `*.pyc`", "The check finds the forms the table names, and only those", "dependency folders", "check a nested repository in its own tree", "a web route under `/home/`",
                       "`fabric_paths.service_dirs`", "`<id>.<instance>`", "(LC-09)", "FAA-188 part 2",
                       "private-terms.txt"):
             self.assertIn(words, ref)

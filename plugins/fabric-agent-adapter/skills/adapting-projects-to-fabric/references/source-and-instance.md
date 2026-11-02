@@ -72,7 +72,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 - **What it reads.** A text file of any size is read whole, and the summary counts every text file read; a binary file (a NUL byte in its first 8 KiB) or one that
   cannot be read is listed by its path as not read, and the summary counts it. A database or another binary of
   records in the tree is instance data the check cannot read: move it to the instance folder. A binary that is source
-  (an icon, a font) is named in the ignore file. `--every-file` reads every file, those Git ignores included: run it
+  (an icon, a font) is named in the ignore file. `--every-file` reads every file, those Git ignores included, but `.git`, `__pycache__`, `.DS_Store` and `*.pyc`
+  (litter `pack` refuses): run it
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
   not in a Git checkout, or Git lists nothing in it, every file is read but the dependency folders (`node_modules`,
   virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
@@ -90,10 +91,12 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 - **Leaving paths out.** `.fabric-source-ignore` at the root (globs, one per line, `#` comments) or `--exclude GLOB`
   leaves out files that hold synthetic values on purpose, such as test vectors. Name the files, or a folder that holds
   only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
-  exception), and say why on the line above. A file `pack` refuses by its name cannot ship in a package either: it
-  moves to the instance or is renamed (a public certificate as `*.crt`; a project `.npmrc`'s settings to the owner's
-  `~/.npmrc`, publish-time keys to `package.json`'s `publishConfig`, since npm reads no other setting from
-  `package.json`), never into the ignore file. A project that needs a committed `.npmrc` cannot be packed as it is.
+  exception), and say why on the line above. A file `pack` refuses by its name cannot ship in a package: a public
+  certificate is renamed `*.crt`; a project `.npmrc` that holds no credential may be named in the ignore file, with
+  that reason, for the source check, and `pack` still refuses it, so a package is made from a copy without it (its
+  settings then apply only where the owner sets them: `~/.npmrc` reaches every project of the owner, and
+  `package.json`'s `publishConfig` carries publish-time settings such as `registry`, `tag` and `access`). A file
+  holding a credential moves to the instance, never into the ignore file.
 - A neutral home (`example`, `user`, `runner`, a container's or a cloud machine's user such as `node` or `ubuntu`, a
   one-letter name, a placeholder) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
   not findings.

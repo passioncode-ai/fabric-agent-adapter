@@ -276,10 +276,10 @@ says (a path named in `.fabric-source-ignore` or `--exclude` is carried unread; 
 its own tree with `--every-file`):
 
 ```bash
-npx @passioncode-ai/fabric-agent-adapter pack ./example-agent            # the digest, agentRef and every problem
-npx @passioncode-ai/fabric-agent-adapter pack ./example-agent --apply
-npx @passioncode-ai/fabric-agent-adapter sign ./example-agent --key ./publisher.jwk --apply
-npx @passioncode-ai/fabric-agent-adapter verify ./example-agent --trust ./trust.json
+npx @passioncode-ai/fabric-agent-adapter pack ./example-agent-clean      # the clean copy: the digest, agentRef, every problem
+npx @passioncode-ai/fabric-agent-adapter pack ./example-agent-clean --apply
+npx @passioncode-ai/fabric-agent-adapter sign ./example-agent-clean --key ./publisher.jwk --apply
+npx @passioncode-ai/fabric-agent-adapter verify ./example-agent-clean --trust ./trust.json
 ```
 
 See [the package reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/package.md).

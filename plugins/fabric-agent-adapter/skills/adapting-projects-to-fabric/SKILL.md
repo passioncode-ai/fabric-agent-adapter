@@ -167,7 +167,7 @@ its configuration) are kept apart; load [the source and the instance](references
 their own strings or a note that none was given: it reports instance data by
 path, line and kind, never repeating a value, and changes nothing. Then move each finding out in the source: an
 instance value into the instance configuration outside the repository, read through a named variable with a neutral
-default and a committed `*.example`; a key into the secret store, named only. Run the check again until it exits 0.
+default and a committed `*.example`; a key into the secret store, named only. Run the check again until it exits 0; it is a floor under the owner's review, not a secret scanner.
 A value already committed stays in Git history: say so; a fresh history is the owner's act (no history rewrite, no
 force-push).
 
