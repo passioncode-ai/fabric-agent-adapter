@@ -106,7 +106,9 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   nested repository with `--every-file` in its own tree too, because `pack` carries its files, ignored ones included.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`, and a `#` after a string is
-  part of that string. It is `--instance-strings FILE`, else the file
+  part of that string. An entry matches in any case and inside any word. A line `home: <name>` declares the owner's home
+  name instead: the check then finds that home in every form the table names (it is never neutral, even with one or two
+  letters), and the bare name is not looked for anywhere else. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
   (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
   travel with the source. A person who already keeps private terms for org-index's `check_private.py`
@@ -133,10 +135,9 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   holding a credential moves to the instance, never into the ignore file.
 - A neutral home (`example`, `user`, `runner`, a container's, a cloud machine's or a dev container's user such as `node`, `ubuntu` or `vscode`, the fixture id
   `example-agent`, a
-  one-letter name, a placeholder; the whole set is `NEUTRAL_HOMES` in the script. An owner whose home name is in it, a first name
-  such as `alice` or an `admin` account, lists the home path in each form the tree may hold (`/Users/admin/`,
-  `/home/admin/`, `-Users-admin-`, `C:\\Users\\admin\\`), never the bare name when it is a common word, since a
-  listed string matches inside any word; a home name of one or two characters cannot be listed) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
+  one-letter name, a placeholder; the whole set is `NEUTRAL_HOMES` in the script. An owner whose home name is in it, a
+  first name such as `alice` or an `admin` account, or has one or two letters, writes `home: <name>` in the owner's
+  list) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
   not findings.
 
 The check finds the forms the table names, and only those: a credential in another shape (a bare token with no name

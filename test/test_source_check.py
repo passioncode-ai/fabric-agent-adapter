@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
 import unicodedata
 import unittest
 from unittest import mock
@@ -780,7 +781,7 @@ class WhatIsRead(Tree):
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
-        for name in ("fabric_source_check.py", "fabric_secrets.py"):
+        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_secrets.py"):
             shutil.copy(SCRIPTS / name, tools / name)
         self.git("init", "-q")
         self.git("add", "-A")
@@ -1131,7 +1132,7 @@ class Refusals(Tree):
             self.assertIsNone(sc._utf8_restart("utf-8", 0, "/usr/bin/python3", argv))
             self.assertIsNone(sc._utf8_restart("UTF_8", 0, "/usr/bin/python3", argv))
             self.assertIsNone(sc._utf8_restart("iso8859-1", 1, "/usr/bin/python3", argv))  # already in UTF-8 mode
-            self.assertIsNone(sc._utf8_restart("iso8859-1", 0, "", argv))  # no interpreter to restart
+            self.assertEqual(sc._utf8_restart("iso8859-1", 0, "", argv), [])  # needed, no interpreter: the caller exits 2
         with mock.patch.object(sc.os, "name", "nt"):
             self.assertIsNone(sc._utf8_restart("mbcs", 0, "python.exe", argv))
 
@@ -1158,6 +1159,18 @@ class Refusals(Tree):
         self.assertIn(b"1 left out by name", done.stdout)
         self.assertIn(b"instance-string", done.stdout)  # the listed name is found in the path
         self.assertNotIn(b"M\xc3\xbcller", done.stdout + done.stderr)
+        # reading 30, unit: with PATH unset and a bare argv[0] sys.executable is empty; the restart still runs
+        bare = {k: v for k, v in env.items() if k != "PATH"}
+        again = subprocess.run([b"python3", os.fsencode(str(SCRIPTS / "fabric_source_check.py")), b"check",
+                                os.fsencode(str(self.root)), b"--instance-strings", os.fsencode(str(listing)),
+                                b"--exclude", b"x/v\xc3\xbc.json"], executable=sys.executable, env=bare,
+                               capture_output=True)
+        self.assertIn(again.returncode, (1, 2), again.stderr)
+        if again.returncode == 1:
+            self.assertEqual(again.stdout, done.stdout)
+        else:
+            self.assertIn(b"could not restart in Python's UTF-8 mode", again.stderr)
+        self.assertNotIn(b"M\xc3\xbcller", again.stdout + again.stderr)
 
     def test_an_entry_typed_composed_finds_a_name_or_a_line_stored_decomposed(self):
         # reading 29, unit: macOS keeps a name in the form the writing app gave it, often NFD; the list is typed NFC
@@ -1178,6 +1191,75 @@ class Refusals(Tree):
                          [(0, "instance-string"), (1, "instance-string")])
         shown = unicodedata.normalize("NFC", out + err).casefold()
         self.assertNotIn(unicodedata.normalize("NFC", entry).casefold(), shown)
+
+    def test_a_declared_home_is_found_in_every_form_and_the_bare_name_nowhere(self):
+        # reading 30, product: listing a neutral home's paths missed forms and flagged `/users/admin/` routes; a
+        # `home: <name>` line hands the name to the home-path detector, which knows every form
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        bs = chr(92)
+        forms = ["/Users/admin/p", "/home/admin/p", "/var/home/admin/p", "C:" + bs + "Users" + bs + "admin" + bs + "p",
+                 "C:/Users/admin/p", "C:" + bs * 2 + "Users" + bs * 2 + "admin" + bs * 2 + "p", "/c/Users/admin/p",
+                 "/mnt/c/Users/admin/p", "-Users-admin-p", "C--Users-admin-p", "%2FUsers%2Fadmin%2Fp", "HOME=/Users/admin"]
+        for n, form in enumerate(forms):
+            self.write("f%02d.txt" % n, "x " + form + "\n")
+        self.write("app/views/users/admin/index.txt", "GET /users/admin/roles and the admin role, list-users-admin-row\n")
+        code, out, err = run(["check", str(self.root), "--json"])
+        self.assertEqual(code, 0, out)  # neutral without the line
+        listing.write_text("home: admin\n", encoding="utf-8")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing), "--json"])
+        self.assertEqual(code, 1)
+        result = json.loads(out)
+        found = sorted(f["path"] for f in result["findings"])
+        self.assertEqual(found, ["f%02d.txt" % n for n in range(len(forms))])
+        self.assertEqual((result["ownerHomes"], result["instanceStrings"]), (1, 0))
+        listing.write_text("home: me\nhome: s\n", encoding="utf-8")  # one or two letters: declared, never neutral
+        self.write("g.txt", "/Users/me/p /home/s/p\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertEqual(code, 1)
+        self.assertIn("g.txt:1: home-path", out)
+        self.assertIn("2 home name(s) declared", out)
+
+    @unittest.skipUnless(os.path.exists(os.devnull) and os.name != "nt", "a POSIX device file")
+    def test_a_named_list_that_is_not_a_regular_file_says_so(self):
+        code, out, err = run(["check", str(self.root), "--instance-strings", os.devnull])
+        self.assertEqual(code, 2)
+        self.assertIn("does not exist or is not a regular file", err)
+
+    def test_folding_that_shortens_and_lengthens_a_path_masks_the_entry_itself(self):
+        # reading 30, unit: NFC shortens, casefold lengthens; equal lengths hid shifted offsets and printed the entry
+        entry = "zq" + "orbitwerk"
+        for before, after in (("e\u0301" * 8, "\u00df" * 8), ("\u00df" * 8, "e\u0301" * 8)):
+            path = "docs/" + before + "/" + entry.upper() + after + "/x.md"
+            shown = sc.redact(path, ["", sc._fold(entry)])
+            folded = sc._fold(shown)
+            self.assertFalse(any(entry[i:i + 8] in folded for i in range(len(entry) - 7)), shown)
+            self.assertTrue(shown.startswith("docs/" + before + "/<line 2>"), shown)  # the folders stay to find it by
+
+    def test_a_restart_on_python_3_9_keeps_the_interpreters_options(self):
+        flags = types.SimpleNamespace(isolated=1, ignore_environment=1, no_user_site=1, no_site=1,
+                                      dont_write_bytecode=1, optimize=2)
+        self.assertEqual(sc._interpreter_flags(flags, {"dev": True, "utf8": "0", "frozen_modules": "off"}),
+                         ["-I", "-S", "-B", "-OO", "-X", "dev", "-X", "frozen_modules=off"])
+        plain = types.SimpleNamespace(isolated=0, ignore_environment=1, no_user_site=0, no_site=0,
+                                      dont_write_bytecode=0, optimize=0)
+        self.assertEqual(sc._interpreter_flags(plain, {}), ["-E"])
+
+    def test_a_restart_under_an_ascii_locale_keeps_the_text_output_ascii(self):
+        # reading 30, seam: after the restart stdout was UTF-8, so a reader decoding the locale's ASCII raised
+        env = dict(os.environ, PYTHONUTF8="0", PYTHONCOERCECLOCALE="0", LC_ALL="C")
+        env.pop("PYTHONIOENCODING", None)
+        probe = subprocess.run([sys.executable, "-c", "import sys; print(sys.getfilesystemencoding())"], env=env,
+                               capture_output=True, text=True).stdout.strip().lower()
+        if os.name == "nt" or probe.replace("_", "-") in ("utf-8", "utf8"):
+            self.skipTest("the C locale reads names as UTF-8 here")
+        with open(os.path.join(os.fsencode(str(self.root)), b"caf\xc3\xa9.txt"), "wb") as f:
+            f.write(("/Users/" + "zqowner" + "/x\n").encode())
+        done = subprocess.run([sys.executable, str(SCRIPTS / "fabric_source_check.py"), "check", str(self.root)],
+                              env=env, capture_output=True)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        done.stdout.decode("ascii")  # the reader's codec: no byte above 127
+        self.assertIn(b"home-path", done.stdout)
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):
