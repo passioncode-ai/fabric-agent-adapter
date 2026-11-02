@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 import unittest
 from unittest import mock
 
@@ -1117,6 +1118,66 @@ class Refusals(Tree):
             self.assertTrue(sc._ignored(utf8, [sc._line("vecteurs/cl\u00e9.txt", "a line")]))  # the UTF-8 line names it
             self.assertTrue(sc._ignored(utf8, [sc._line("vecteurs/cl??.txt", "a line")]))  # two bytes on disk
             self.assertFalse(sc._ignored(utf8, [sc._line("vecteurs/cl????.txt", "a line")]))
+
+    def test_a_non_utf8_locale_restarts_the_check_in_utf8_mode(self):
+        # reading 29, seam: under ISO-8859-1 an `--exclude` argument, a name and a file's text were each read in their
+        # own encoding; the check now restarts in Python's UTF-8 mode, the arguments passed back as the bytes they were
+        script = str(SCRIPTS / "fabric_source_check.py")
+        argv = [script, "check", "r", "--exclude", "v/\u00fc.json"]
+        with mock.patch.object(sc.os, "name", "posix"):
+            self.assertEqual(sc._utf8_restart("iso8859-1", 0, "/usr/bin/python3", argv),
+                             [b"/usr/bin/python3", b"-X", b"utf8"] + [os.fsencode(a) for a in argv])
+            self.assertIsNotNone(sc._utf8_restart("ANSI_X3.4-1968", 0, "/usr/bin/python3", argv))  # C, UTF-8 mode off
+            self.assertIsNone(sc._utf8_restart("utf-8", 0, "/usr/bin/python3", argv))
+            self.assertIsNone(sc._utf8_restart("UTF_8", 0, "/usr/bin/python3", argv))
+            self.assertIsNone(sc._utf8_restart("iso8859-1", 1, "/usr/bin/python3", argv))  # already in UTF-8 mode
+            self.assertIsNone(sc._utf8_restart("iso8859-1", 0, "", argv))  # no interpreter to restart
+        with mock.patch.object(sc.os, "name", "nt"):
+            self.assertIsNone(sc._utf8_restart("mbcs", 0, "python.exe", argv))
+
+    def test_under_a_latin_1_locale_an_exclude_and_a_listed_name_match_as_in_utf8(self):
+        found = subprocess.run(["locale", "-a"], capture_output=True, text=True).stdout.split() if shutil.which("locale") else []
+        names = [n for n in found if n.lower().replace("-", "").endswith(("iso88591", "iso885915"))]
+        env = dict(os.environ, PYTHONUTF8="0", PYTHONCOERCECLOCALE="0", LC_ALL=names[0] if names else "C")
+        probe = subprocess.run([sys.executable, "-c", "import sys; print(sys.getfilesystemencoding())"], env=env,
+                               capture_output=True, text=True).stdout.strip().lower()
+        if not names or probe.replace("_", "-") in ("utf-8", "utf8"):
+            self.skipTest("no ISO-8859-1 locale whose file-system encoding is not UTF-8 here")
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        listing.write_bytes("M\u00fcller\n".encode("utf-8"))
+        os.makedirs(os.fsencode(str(self.root / "x")), exist_ok=True)
+        with open(os.path.join(os.fsencode(str(self.root)), b"x", b"M\xc3\xbcller.txt"), "wb") as f:
+            f.write(b"plain\n")
+        with open(os.path.join(os.fsencode(str(self.root)), b"x", b"v\xc3\xbc.json"), "wb") as f:
+            f.write(("/Users/" + "zqowner" + "/x\n").encode())
+        done = subprocess.run([os.fsencode(sys.executable), os.fsencode(str(SCRIPTS / "fabric_source_check.py")), b"check",
+                               os.fsencode(str(self.root)), b"--instance-strings", os.fsencode(str(listing)),
+                               b"--exclude", b"x/v\xc3\xbc.json"], env=env, capture_output=True)
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertIn(b"1 left out by name", done.stdout)
+        self.assertIn(b"instance-string", done.stdout)  # the listed name is found in the path
+        self.assertNotIn(b"M\xc3\xbcller", done.stdout + done.stderr)
+
+    def test_an_entry_typed_composed_finds_a_name_or_a_line_stored_decomposed(self):
+        # reading 29, unit: macOS keeps a name in the form the writing app gave it, often NFD; the list is typed NFC
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        entry = "Zq" + "M\u00fcller"
+        listing.write_text(entry + "\n", encoding="utf-8")
+        decomposed = "Zq" + "Mu\u0308ller"
+        try:
+            (self.root / (decomposed + ".bin")).write_bytes(b"\0binary")
+        except OSError:
+            self.skipTest("this file system refuses the name")
+        self.write("notes.txt", "by " + decomposed + "\n")
+        code, out, err = run(["check", str(self.root), "--every-file", "--instance-strings", str(listing), "--json"])
+        self.assertEqual(code, 1)
+        found = json.loads(out)["findings"]
+        self.assertEqual(sorted((f["line"], f["kind"]) for f in found if f["kind"] == "instance-string"),
+                         [(0, "instance-string"), (1, "instance-string")])
+        shown = unicodedata.normalize("NFC", out + err).casefold()
+        self.assertNotIn(unicodedata.normalize("NFC", entry).casefold(), shown)
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):

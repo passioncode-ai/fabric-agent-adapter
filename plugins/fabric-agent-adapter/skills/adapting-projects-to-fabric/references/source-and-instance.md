@@ -55,7 +55,7 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 | Kind | Finds |
 |---|---|
 | `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name is not ASCII or holds a dash puts it in the owner's list |
-| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (one of letters only or digits only is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
+| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
 ```bash
@@ -80,12 +80,17 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
   not in a Git checkout, Git lists nothing in it, or no `git` is found in PATH's absolute folders (with PATH unset, in `/bin` and `/usr/bin`; on Windows, nowhere), every file is read but `.git` and `__pycache__` (uncounted) and the dependency
   folders (`node_modules`, virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
+  Under a locale whose file-system encoding is not UTF-8 (ISO-8859-1, KOI8-R) the check restarts itself in Python's UTF-8
+  mode, so a file name, an argument and a file's text are read in one encoding; a name that is not UTF-8 is matched as its bytes.
+  A file's text is read as UTF-8, so an entry of the owner's list with a letter outside ASCII is found in a UTF-8 file
+  (composed or decomposed, as macOS may store a name), not in one saved as Latin-1 or CP1252.
   In Git mode a nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
   the same check (a submodule checked out first, `git submodule update --init`), then name its path in the ignore file,
   with that reason on the line above. That line serves the check of the outer tree only: before `pack`, check the
   nested repository with `--every-file` in its own tree too, because `pack` carries its files, ignored ones included.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
-  per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`. It is `--instance-strings FILE`, else the file
+  per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`, and a `#` after a string is
+  part of that string. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
   (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
   travel with the source. A person who already keeps private terms for org-index's `check_private.py`
@@ -94,7 +99,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 - **Leaving paths out.** `.fabric-source-ignore` at the root (globs, one per line, `#` comments) or `--exclude GLOB`
   leaves out files that hold synthetic values on purpose, such as test vectors. A line is a path from the root, not a
   `.gitignore` line (a leading `/` changes nothing, a line with no `/` matches at the root only, and a line holding `\`, `//`, an unclosed `[` or a class such as `[[:digit:]]` is refused, as Git reads each
-  otherwise): `*`, `?` and `[...]` stay inside one folder and `**` as a whole segment crosses
+  otherwise): `*`, `?` and `[...]` stay inside one folder (`?` and `[...]` match one byte, as Git's do, so a letter
+  outside ASCII takes two or more) and `**` as a whole segment crosses
   folders, so `vectors/*` takes the files in `vectors` and none in its subfolders. A line ending in `/`, or a path
   with no wildcard, takes that folder and all it holds; only such a line leaves out a nested repository or a
   submodule (`vendor/sub/`), never a wildcard line without the `/` (`vendor/*`). A wildcard folder line (`vendor/*/`)
@@ -111,8 +117,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   holding a credential moves to the instance, never into the ignore file.
 - A neutral home (`example`, `user`, `runner`, a container's, a cloud machine's or a dev container's user such as `node`, `ubuntu` or `vscode`, the fixture id
   `example-agent`, a
-  one-letter name, a placeholder; the whole set is `NEUTRAL_HOMES` in the script, and an owner whose home name is in it,
-  a first name such as `alice` or an `admin` account, puts that name in the owner's list) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
+  one-letter name, a placeholder; the whole set is `NEUTRAL_HOMES` in the script. An owner whose home name is in it, a first name
+  such as `alice` or an `admin` account, lists the home path in each form the tree may hold (`/Users/admin/`,
+  `/home/admin/`, `-Users-admin-`, `C:\\Users\\admin\\`), never the bare name when it is a common word, since a
+  listed string matches inside any word; a home name of one or two characters cannot be listed) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
   not findings.
 
 The check finds the forms the table names, and only those: a credential in another shape (a bare token with no name
