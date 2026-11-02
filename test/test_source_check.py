@@ -468,6 +468,20 @@ class NeverRepeated(Tree):
                 for i in range(0, len(value) - 7):
                     self.assertNotIn(value[i:i + 8], out + err, (extra, value[:3], i))
 
+    @unittest.skipIf(os.name == "nt", "a symbolic link")
+    def test_a_path_never_repeats_a_value_found_elsewhere_in_the_tree(self):
+        key = "Zq7Wm4" * 5
+        self.write("notes/%s-todo.md" % HOME_NAME, "see %s\n" % MAC_HOME)
+        (self.root / "people").mkdir()
+        (self.root / "people" / (HOME_NAME + ".md")).write_bytes(b"\0binary")
+        os.symlink("/" + "Users/" + HOME_NAME + "/.config/x", str(self.root / ("cfg-" + HOME_NAME)))
+        self.write("cache/%s.json" % key, "token = sk" + "-" + key + "\n")
+        for extra in ([], ["--json"], ["--every-file"]):
+            code, out, err = run(["check", str(self.root), *extra])
+            self.assertNotIn(HOME_NAME, out + err, extra)
+            for i in range(0, len(key) - 7):
+                self.assertNotIn(key[i:i + 8], out + err, (extra, i))
+
     def test_every_occurrence_of_a_found_home_name_is_masked(self):
         path = "-" + "Users-" + HOME_NAME + "-proj/x_/" + "Users/" + HOME_NAME + "/p"
         self.assertNotIn(HOME_NAME, sc.redact(path, []))
@@ -595,6 +609,20 @@ class WhatIsRead(Tree):
         self.assertEqual(code, 1, out[-300:])
         for path in ("build:1", "src/mycache:1", "vendor:0"):
             self.assertIn(path + ": home-path", out)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_star_in_an_ignore_line_stays_in_its_folder(self):
+        key = "sk" + "-" + "Zq7Wm4" * 5
+        self.git("init", "-q")
+        self.write("test/vectors/v1.json", "{}\n")
+        self.write("test/vectors/private/live.json", '{"token": "%s"}\n' % key)
+        self.write("test/deep/a/b.json", "{}\n")
+        self.write(sc.IGNORE_FILE, "test/vectors/*.json\ntest/deep/**/*.json\n")
+        for extra in ([], ["--every-file"]):
+            code, out, err = run(["check", str(self.root), *extra])
+            self.assertEqual(code, 1, (extra, out[-300:]))
+            self.assertIn("test/vectors/private/live.json:1: secret", out)
+            self.assertIn("2 left out by name", out)
 
     @unittest.skipIf(shutil.which("git") is None, "needs git")
     def test_a_folder_glob_in_the_ignore_file_leaves_out_no_file(self):
@@ -855,6 +883,15 @@ class Refusals(Tree):
             self.assertEqual(code, 2, (argv, err[-200:]))
             self.assertIn("owner's list cannot be read", err)
             self.assertNotIn("Traceback", err)
+    def test_a_glob_it_cannot_read_is_an_error_not_a_traceback(self):
+        expected = 2  # a reversed range: Python 3.9's fnmatch raised, 3.14's read it as empty; refused on both
+        self.write("a.txt", "x\n")
+        for argv, ignore in ((["check", str(self.root)], "[9-0]*.txt\n"), (["check", str(self.root), "--exclude", "x/[9-0]*"], "")):
+            self.write(sc.IGNORE_FILE, ignore)
+            code, out, err = run(argv)
+            self.assertEqual(code, expected, err[-200:])
+            self.assertNotIn("Traceback", err)
+
     @unittest.skipIf(os.name == "nt", "a POSIX account database")
     def test_no_home_at_all_is_an_error_not_a_traceback(self):
         env = {k: v for k, v in os.environ.items() if k not in ("HOME", "XDG_CONFIG_HOME", "FABRIC_INSTANCE_STRINGS")}
@@ -863,6 +900,20 @@ class Refusals(Tree):
                 code, out, err = run(["check", *argv])
             self.assertEqual(code, 2, (argv, err[-200:]))
             self.assertNotIn("Traceback", err)
+        with mock.patch.dict(os.environ, env, clear=True), mock.patch("pwd.getpwuid", side_effect=KeyError("uid")):
+            err = run(["check", str(self.root)])[2]
+        self.assertIn("XDG_CONFIG_HOME", err)  # the way through, named
+
+    def test_git_on_windows_is_taken_from_an_absolute_folder_of_path_only(self):
+        here, there = self.tmp / "here", self.tmp / "there"
+        for folder in (here, there):
+            folder.mkdir()
+            (folder / "git.exe").write_text("")
+        with mock.patch.object(sc.os, "name", "nt"):
+            with mock.patch.dict(os.environ, {"PATH": os.pathsep.join([".", "relative", str(there)])}):
+                self.assertEqual(sc._git(), os.path.join(str(there), "git.exe"))
+            with mock.patch.dict(os.environ, {"PATH": "."}):
+                self.assertIsNone(sc._git())  # never the current folder's
 
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")

@@ -48,7 +48,6 @@ from __future__ import annotations
 
 import argparse
 import bisect
-import fnmatch
 import json
 import os
 from pathlib import Path
@@ -57,7 +56,7 @@ import stat
 import subprocess
 import sys
 from urllib.parse import unquote
-from typing import Dict, Iterable, List, NoReturn, Optional, Tuple
+from typing import Dict, Iterable, List, NoReturn, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 _WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the checked tree adds no .pyc
@@ -375,12 +374,14 @@ def _raw_secret_spans(text: str) -> List[Tuple[int, int]]:
     return spans
 
 
-def redact(path: str, entries: List[str]) -> str:
+def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str:
     """A path as it may be printed: an owner's string as `<line N>` (its line in the owner's list), a real home
     folder's name as `<home>`, and each segment in which `_secret_finding` finds a credential as `<secret>`, whole
     (a span inside a segment can miss a second value the first one runs into). While the segments left still hold a
     credential together (`https:\\/\\/app:<pw>@db/x`), the segments that finding's spans touch are masked, else the
-    last one left, so what is printed holds no finding and its first folders still name the place."""
+    last one left, so what is printed holds no finding and its first folders still name the place. With `seen`, what the
+    check found elsewhere in the tree is masked too: a home name at every occurrence, and a segment holding a run of 8
+    characters of a found value as `<secret>`."""
     spans, offset = [], 0
     for segment in path.split("/"):
         spans.append((offset, offset + len(segment)))
@@ -417,13 +418,18 @@ def redact(path: str, entries: List[str]) -> str:
             hit = [max(i for i, m in enumerate(masked) if not m)]
         for i in hit:
             masked[i] = True
+    if seen is not None and seen.grams:  # a segment holding a run of a value found elsewhere in the tree
+        for i, (a, b) in enumerate(spans):
+            if not masked[i] and any(path[k:k + 8] in seen.grams for k in range(a, b - 7)):
+                masked[i] = True
     secret_segments = [span for span, m in zip(spans, masked) if m]
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     found = _home_names(path)
     marks += [(s, e, "<home>") for s, e in found]
+    names = {path[s:e] for s, e in found} | (seen.names if seen is not None else set())
     # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130),
     # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`)
-    for name in {path[s:e] for s, e in found}:
+    for name in names:
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]
     marks += [(s, e, "<secret>") for s, e in secret_segments]
     out, last = [], 0
@@ -436,11 +442,28 @@ def redact(path: str, entries: List[str]) -> str:
     return "".join(out) + path[last:]
 
 
+def _git() -> Optional[str]:
+    """`git` from PATH's absolute folders only. On Windows CreateProcess looks in the current folder first (and
+    shutil.which there puts the current folder first too), so a tree checked from inside could run its own git.exe."""
+    if os.name != "nt":
+        return "git"
+    for folder in os.environ.get("PATH", "").split(os.pathsep):
+        if folder and os.path.isabs(folder):
+            for name in ("git.exe", "git.cmd", "git.bat"):
+                candidate = os.path.join(folder, name)
+                if os.path.isfile(candidate):
+                    return candidate
+    return None
+
+
 def _git_files(root: Path) -> Optional[List[str]]:
+    git = _git()
+    if git is None:
+        return None
     try:
         # `core.fsmonitor` off: `--others` would run a command the checked tree's own configuration names. Empty, not
         # `false`: Git before 2.36 reads the value as a hook and would run a program named `false` from PATH
-        result = subprocess.run(["git", "-c", "core.fsmonitor=", "-C", str(root), "ls-files", "-z", "--cached",
+        result = subprocess.run([git, "-c", "core.fsmonitor=", "-C", str(root), "ls-files", "-z", "--cached",
                                  "--others", "--exclude-standard"], capture_output=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -474,8 +497,63 @@ def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SK
     return sorted(found)
 
 
+_GLOBS: Dict[str, "re.Pattern[str]"] = {}
+
+
+def _glob(glob: str) -> "re.Pattern[str]":
+    """A line of the ignore file read from the tree's root: `*`, `?` and `[...]` stay inside one folder, `**` crosses
+    folders (`**/` also matches none). fnmatch's `*` would cross `/`, so `vectors/*.json` would leave out
+    `vectors/private/live.json`. Raises re.error for a class Python cannot read (`[9-0]`)."""
+    if glob not in _GLOBS:
+        out, i = [], 0
+        while i < len(glob):
+            c = glob[i]
+            if glob.startswith("**/", i):
+                out.append("(?:.*/)?")
+                i += 3
+                continue
+            if glob.startswith("**", i):
+                out.append(".*")
+                i += 2
+                continue
+            if c == "*":
+                out.append("[^/]*")
+            elif c == "?":
+                out.append("[^/]")
+            elif c == "[":
+                j = i + 1 + (glob[i + 1:i + 2] == "!")
+                j += glob[j:j + 1] == "]"
+                end = glob.find("]", j)
+                if end < 0:
+                    out.append(re.escape(c))
+                else:
+                    inner = glob[i + 1:end].replace("\\", "\\\\")
+                    negated, body = inner.startswith("!"), inner[inner.startswith("!"):]
+                    if body[:1] in ("^", "["):  # a literal there, as fnmatch reads it
+                        body = "\\" + body
+                    out.append("(?!/)[%s%s]" % ("^" if negated else "", body))
+                    i = end
+            else:
+                out.append(re.escape(c))
+            i += 1
+        _GLOBS[glob] = re.compile("(?s:%s)\\Z" % "".join(out))
+    return _GLOBS[glob]
+
+
+def _readable_glob(glob: str) -> bool:
+    """Whether every form `_ignored` tries can be read: a reversed range (`[9-0]`) is refused on every Python."""
+    try:
+        for form in (glob, glob.rstrip("/") + "/**", glob.rstrip("/")):
+            _glob(form)
+    except re.error:
+        return False
+    return True
+
+
 def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
     globs = list(extra)
+    if not all(_readable_glob(g) for g in globs):
+        raise CheckError("an --exclude glob cannot be read")
     ignore = root / IGNORE_FILE
     try:
         present = ignore.is_file()
@@ -486,16 +564,21 @@ def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
             lines = ignore.read_text(encoding="utf-8-sig").splitlines()
         except (OSError, UnicodeDecodeError):
             raise CheckError("%s cannot be read as UTF-8" % IGNORE_FILE)
-        globs += [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
+        for number, line in enumerate(lines, 1):
+            glob = line.strip()
+            if glob and not glob.startswith("#"):
+                if not _readable_glob(glob):
+                    raise CheckError("line %d of %s is not a glob it can read" % (number, IGNORE_FILE))
+                globs.append(glob)
     return globs
 
 
 def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
-    if any(fnmatch.fnmatchcase(path, g) or fnmatch.fnmatchcase(path, g.rstrip("/") + "/*") for g in globs):
+    if any(_glob(g).match(path) or _glob(g.rstrip("/") + "/**").match(path) for g in globs):
         return True
     # `vendor/sub/` names a folder, and Git lists a submodule there as `vendor/sub`, with no slash: only a path that
     # is a folder on disk (never a file a wildcard such as `src/*/` would also reach) is left out by it
-    return root is not None and any(g.endswith("/") and fnmatch.fnmatchcase(path, g.rstrip("/")) for g in globs) \
+    return root is not None and any(g.endswith("/") and _glob(g.rstrip("/")).match(path) for g in globs) \
         and os.path.isdir(str(root / path)) and not os.path.islink(str(root / path))
 
 
@@ -505,17 +588,41 @@ def _lines(data: bytes) -> Iterable[Tuple[int, str]]:
         yield number, line[:-1] if line.endswith("\r") else line
 
 
-def _text_findings(text: str, entries: List[str]) -> List[Tuple[str, str]]:
+def _text_findings(text: str, entries: List[str], seen: Optional["_Seen"] = None) -> List[Tuple[str, str]]:
     found = []
-    if _home_names(text):
+    homes = _home_names(text)
+    if homes:
         found.append(("home-path", "a path inside a person's home folder"))
+        if seen is not None:
+            seen.names.update(text[a:b] for a, b in homes)
     secret = _secret_finding(text)
     if secret:
         found.append(("secret", secret))
+        if seen is not None:
+            seen.add_values(text)
     rule = _instance_finding(text, entries)
     if rule:
         found.append(("instance-string", rule))
     return found
+
+
+class _Seen:
+    """What the check found anywhere in the tree, so that no printed path repeats it: a file named after its owner, or
+    after the key it holds, prints with the name as `<home>` and the segment as `<secret>`."""
+
+    def __init__(self) -> None:
+        self.names: Set[str] = set()
+        self.grams: Set[str] = set()  # every 8-character run of a found value
+
+    def add_values(self, text: str) -> None:
+        values = [text[a:b] for a, b in _secret_spans(text)]
+        if "\\" in text:
+            unescaped, _ = _unescaped_with_origin(text)
+            if unescaped != text:
+                values += [unescaped[a:b] for a, b in _secret_spans(unescaped)]
+        for value in values:
+            value = value[:4096]  # a path segment is at most 255 characters
+            self.grams.update(value[i:i + 8] for i in range(max(0, len(value) - 7)))
 
 
 def check(root: Path, entries: List[str], globs: List[str], every_file: bool = False) -> Dict[str, object]:
@@ -531,20 +638,18 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
     findings: List[Dict[str, object]] = []
     read = 0
     skipped = {"binary": 0, "unreadable": len(unreadable), "excluded": 0, "nested": 0, "dependencies": len(dependencies)}
-    not_read: List[Dict[str, str]] = [{"path": redact(p, entries), "why": "unreadable"} for p in unreadable]
-
-    printed: Dict[str, str] = {}  # one redaction per path, however many findings it has
+    # paths are redacted once the whole tree is read, with what was found anywhere in it (`_Seen`)
+    not_read: List[Dict[str, str]] = [{"path": p, "why": "unreadable"} for p in unreadable]
+    seen = _Seen()
 
     def add(path: str, line: int, kind: str, rule: str) -> None:
-        if path not in printed:
-            printed[path] = redact(path, entries)
-        findings.append({"path": printed[path], "line": line, "kind": kind, "rule": rule})
+        findings.append({"path": path, "line": line, "kind": kind, "rule": rule})
 
     for path in files:
         if _ignored(path, globs, root):
             skipped["excluded"] += 1
             continue
-        for kind, rule in _text_findings(path, entries):  # a name carries instance data as a line does
+        for kind, rule in _text_findings(path, entries, seen):  # a name carries instance data as a line does
             add(path, 0, kind, rule + " in the file's path")
         name = path.rsplit("/", 1)[-1]
         if (SECRET_FILE.fullmatch(name) and not SECRET_FILE_OK.fullmatch(name)) or TOKEN_FILE.fullmatch(name):
@@ -559,7 +664,7 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         try:
             if full.is_symlink():  # Git commits the path a link names: check it, never follow it
                 read += 1
-                for kind, rule in _text_findings(os.readlink(full), entries):
+                for kind, rule in _text_findings(os.readlink(full), entries, seen):
                     add(path, 0, kind, rule + " in the link's target")
                 continue
             kind = os.lstat(str(full)).st_mode
@@ -586,10 +691,21 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
             continue
         read += 1
         for number, line in _lines(data):
-            for kind, rule in _text_findings(line, entries):
+            for kind, rule in _text_findings(line, entries, seen):
                 add(path, number, kind, rule)
+    printed: Dict[str, str] = {}  # one redaction per path, however many findings it has
+
+    def shown(path: str) -> str:
+        if path not in printed:
+            printed[path] = redact(path, entries, seen)
+        return printed[path]
+
+    for entry in findings:
+        entry["path"] = shown(str(entry["path"]))
+    for entry in not_read:
+        entry["path"] = shown(entry["path"])
     return {"mode": mode, "files": read, "skipped": skipped, "notRead": not_read, "findings": findings,
-            "dependencies": [redact(d, entries) for d in dependencies]}
+            "dependencies": [shown(d) for d in dependencies]}
 
 
 def default_list(platform: Optional[str] = None, env: Optional[Dict[str, str]] = None) -> Path:
@@ -614,7 +730,8 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     try:
         default = default_list()
     except (RuntimeError, KeyError):  # no HOME and no account entry (a container's arbitrary user)
-        raise CheckError("the owner's list in your configuration folder cannot be read")
+        raise CheckError("there is no home folder to find the owner's list in: set XDG_CONFIG_HOME (APPDATA on "
+                         "Windows) or name the list with --instance-strings")
     try:
         os.stat(str(default))
     except (FileNotFoundError, NotADirectoryError):
