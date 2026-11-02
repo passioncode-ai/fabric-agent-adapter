@@ -482,6 +482,28 @@ class NeverRepeated(Tree):
             for i in range(0, len(key) - 7):
                 self.assertNotIn(key[i:i + 8], out + err, (extra, i))
 
+    def test_a_path_repeats_no_run_of_a_long_value_or_one_cut_across_folders(self):
+        jwt = "ey" + "J" + ("Zq7Wm4" * 900) + "." + "eyJ" + ("Ab3Xy9" * 50) + "." + ("Qw8Er2" * 10)  # over 4096
+        token = "Zq7W/" + "m4Zq/" + "7Wm4/" + "Rt5Yu6" * 7  # a value under a credential's name may hold a `/`
+        self.write("conf.txt", "auth = %s\nAPI_TOKEN=%s\n" % (jwt, token))
+        (self.root / "notes").mkdir()
+        (self.root / "notes" / (jwt[5000:5040] + ".md")).write_bytes(b"\0binary")
+        cut = self.root / "x" / token[:4] / token[5:9] / token[10:14]
+        cut.mkdir(parents=True)
+        (cut / "y.md").write_bytes(b"\0binary")
+        for extra in ([], ["--json"], ["--every-file"]):
+            code, out, err = run(["check", str(self.root), *extra])
+            self.assertNotIn(jwt[5000:5040], out + err, extra)
+            self.assertNotIn(token[:14], out + err, extra)
+
+    def test_names_found_across_a_large_tree_cost_one_pass_a_path(self):
+        for i in range(1500):
+            self.write("records/r%04d.txt" % i, "home: /" + "home/u%05dname/x\n" % i)
+        start = time.perf_counter()
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 1)
+        self.assertLess(time.perf_counter() - start, 20)  # 37 s for 2000 when each name was searched in each path
+
     def test_every_occurrence_of_a_found_home_name_is_masked(self):
         path = "-" + "Users-" + HOME_NAME + "-proj/x_/" + "Users/" + HOME_NAME + "/p"
         self.assertNotIn(HOME_NAME, sc.redact(path, []))
@@ -623,6 +645,48 @@ class WhatIsRead(Tree):
             self.assertEqual(code, 1, (extra, out[-300:]))
             self.assertIn("test/vectors/private/live.json:1: secret", out)
             self.assertIn("2 left out by name", out)
+
+    def test_an_ignore_line_takes_only_what_it_matches_as_git_reads_it(self):
+        cases = (("test/vectors/*", "test/vectors/v1.json", "test/vectors/live/config.json"),
+                 ("test/**.json", "test/a.json", "test/b/c.json"), ("foo**/bar", "foo1/bar", "foobar"),
+                 ("test/[^z]*.json", "test/a.json", "test/za.json"), ("/vec.json", "vec.json", "test/vec.json"),
+                 ("vectors", "vectors/a/b.json", "other/vectors/x.json"), ("a/**/d.json", "a/d.json", "a/d.jsonx"))
+        for glob, left_out, kept in cases:
+            line = sc._line(glob, "a line")
+            self.assertTrue(sc._ignored(left_out, [line]), (glob, left_out))
+            self.assertFalse(sc._ignored(kept, [line]), (glob, kept))
+
+    def test_a_folder_line_takes_what_its_folders_hold_never_a_file_beside_them(self):
+        for glob, path, left_out in (("src/**/", "src/main.py", False), ("src/**/", "src/pkg/x.py", True),
+                                     ("**/", "main.py", False), ("**/", "a/b.py", True), ("a**/b", "ab", False),
+                                     ("a**/b", "ax/b", True), ("test/fixtures/", "test/fixtures/a/b", True)):
+            self.assertEqual(sc._ignored(path, [sc._line(glob, "a line")]), left_out, (glob, path))
+
+    def test_a_class_holding_set_operators_reads_them_as_letters(self):
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # a FutureWarning names the script's path, which can be under a home folder
+            pattern = sc._glob("[a&&b]x")
+        self.assertTrue(pattern.match("&x"))
+
+    def test_an_exception_line_is_refused_not_dropped(self):
+        self.write("test/vectors/live.json", "path = %s\n" % MAC_HOME)
+        self.write(sc.IGNORE_FILE, "test/vectors/*\n!test/vectors/live.json\n")
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 2, err[-200:])
+        self.assertIn("line 2 of %s is an exception" % sc.IGNORE_FILE, err)
+
+    def test_a_file_prints_under_one_name_for_its_finding_and_its_not_read_line(self):
+        key = "Zq7Wm4" * 5
+        (self.root / "cache").mkdir()
+        (self.root / "cache" / ("sk" + "-" + key + ".bin")).write_bytes(b"\0binary")
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        listing.write_text("secret\nhome\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing), "--json"])
+        result = json.loads(out)
+        printed = {e["path"] for e in result["notRead"]} | {f["path"] for f in result["findings"]}
+        self.assertEqual(printed, {"cache/<secret>"})
 
     @unittest.skipIf(shutil.which("git") is None, "needs git")
     def test_a_folder_glob_in_the_ignore_file_leaves_out_no_file(self):
@@ -914,6 +978,10 @@ class Refusals(Tree):
                 self.assertEqual(sc._git(), os.path.join(str(there), "git.exe"))
             with mock.patch.dict(os.environ, {"PATH": "."}):
                 self.assertIsNone(sc._git())  # never the current folder's
+            (here / "git.exe").unlink()
+            (here / "git.cmd").write_text("")
+            with mock.patch.dict(os.environ, {"PATH": os.pathsep.join([str(here), str(there)])}):
+                self.assertEqual(sc._git(), os.path.join(str(there), "git.exe"))  # a .cmd would run through cmd.exe
 
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")

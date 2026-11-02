@@ -25,7 +25,10 @@ import wait for the contract's decision on CT-194 (part 2).
   `--every-file` too). It changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file
   was not read (a binary file counts unless the ignore file names it as source). `.fabric-source-ignore` and
   `--exclude` leave out named files of synthetic test values (and a project `.npmrc` that holds no credential: `pack`
-  still refuses it, so the package is a copy without it), and the summary counts them; a neutral home (including container and cloud users) and
+  still refuses it, so the package is a copy without it), and the summary counts them. A line is a path from the
+  root read as Git reads it (`*` stays in a folder, `**` crosses folders, a line ending in `/` takes the folder); an
+  exception line (`!`) and a glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off, and
+  on Windows only a `git.exe` from PATH's absolute folders. A neutral home (including container and cloud users) and
   a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
   contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).
   `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`, on a clean copy it

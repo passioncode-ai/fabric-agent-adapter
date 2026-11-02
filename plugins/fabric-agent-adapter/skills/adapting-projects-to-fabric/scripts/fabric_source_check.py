@@ -418,19 +418,23 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
             hit = [max(i for i, m in enumerate(masked) if not m)]
         for i in hit:
             masked[i] = True
-    if seen is not None and seen.grams:  # a segment holding a run of a value found elsewhere in the tree
-        for i, (a, b) in enumerate(spans):
-            if not masked[i] and any(path[k:k + 8] in seen.grams for k in range(a, b - 7)):
-                masked[i] = True
+    if seen is not None and seen.grams:  # a run of a value found elsewhere in the tree, across a `/` too
+        for k in range(len(path) - 7):
+            if path[k:k + 8] in seen.grams:
+                for i, (a, b) in enumerate(spans):
+                    if a < k + 8 and k < b:
+                        masked[i] = True
     secret_segments = [span for span, m in zip(spans, masked) if m]
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     found = _home_names(path)
     marks += [(s, e, "<home>") for s, e in found]
-    names = {path[s:e] for s, e in found} | (seen.names if seen is not None else set())
     # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130),
-    # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`)
-    for name in names:
+    # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`); the names
+    # found elsewhere in the tree are one compiled pattern, so the cost does not grow with names times paths
+    for name in {path[s:e] for s, e in found}:
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]
+    if seen is not None and seen.names:
+        marks += [(m.start(), m.end(), "<home>") for m in seen.names_pattern().finditer(path)]
     marks += [(s, e, "<secret>") for s, e in secret_segments]
     out, last = [], 0
     for start, end, label in sorted(marks):
@@ -449,10 +453,9 @@ def _git() -> Optional[str]:
         return "git"
     for folder in os.environ.get("PATH", "").split(os.pathsep):
         if folder and os.path.isabs(folder):
-            for name in ("git.exe", "git.cmd", "git.bat"):
-                candidate = os.path.join(folder, name)
-                if os.path.isfile(candidate):
-                    return candidate
+            candidate = os.path.join(folder, "git.exe")  # never a .cmd or .bat: cmd.exe would read the arguments
+            if os.path.isfile(candidate):
+                return candidate
     return None
 
 
@@ -501,23 +504,26 @@ _GLOBS: Dict[str, "re.Pattern[str]"] = {}
 
 
 def _glob(glob: str) -> "re.Pattern[str]":
-    """A line of the ignore file read from the tree's root: `*`, `?` and `[...]` stay inside one folder, `**` crosses
-    folders (`**/` also matches none). fnmatch's `*` would cross `/`, so `vectors/*.json` would leave out
-    `vectors/private/live.json`. Raises re.error for a class Python cannot read (`[9-0]`)."""
+    """A line of the ignore file read from the tree's root: `*`, `?` and `[...]` stay inside one folder, and `**` as a
+    whole segment crosses folders (`**/` also matches none), as Git reads it; any other run of stars is one `*`.
+    fnmatch's `*` would cross `/`, so `vectors/*.json` would leave out `vectors/private/live.json`. Raises re.error
+    for a class Python cannot read (`[9-0]`)."""
     if glob not in _GLOBS:
         out, i = [], 0
         while i < len(glob):
             c = glob[i]
-            if glob.startswith("**/", i):
-                out.append("(?:.*/)?")
-                i += 3
-                continue
-            if glob.startswith("**", i):
-                out.append(".*")
-                i += 2
-                continue
             if c == "*":
-                out.append("[^/]*")
+                end = i
+                while end < len(glob) and glob[end] == "*":
+                    end += 1
+                whole = end - i >= 2 and (i == 0 or glob[i - 1] == "/") and (end == len(glob) or glob[end] == "/")
+                if whole and end < len(glob):
+                    out.append("(?:.*/)?")
+                    end += 1
+                else:
+                    out.append(".*" if whole else "[^/]*")
+                i = end
+                continue
             elif c == "?":
                 out.append("[^/]")
             elif c == "[":
@@ -528,9 +534,12 @@ def _glob(glob: str) -> "re.Pattern[str]":
                     out.append(re.escape(c))
                 else:
                     inner = glob[i + 1:end].replace("\\", "\\\\")
-                    negated, body = inner.startswith("!"), inner[inner.startswith("!"):]
-                    if body[:1] in ("^", "["):  # a literal there, as fnmatch reads it
+                    negated = inner[:1] in ("!", "^")  # Git reads both as a negated class
+                    body = inner[negated:]
+                    if body[:1] in ("^", "["):  # a literal right after the negation
                         body = "\\" + body
+                    for mark in "&~|":  # literals, never the set operations a later Python may read there
+                        body = body.replace(mark, "\\" + mark)
                     out.append("(?!/)[%s%s]" % ("^" if negated else "", body))
                     i = end
             else:
@@ -543,17 +552,26 @@ def _glob(glob: str) -> "re.Pattern[str]":
 def _readable_glob(glob: str) -> bool:
     """Whether every form `_ignored` tries can be read: a reversed range (`[9-0]`) is refused on every Python."""
     try:
-        for form in (glob, glob.rstrip("/") + "/**", glob.rstrip("/")):
-            _glob(form)
+        for form in (glob, glob.rstrip("/")):
+            _glob(form)  # every form, whether `_ignored` tries it for this line or not
     except re.error:
         return False
     return True
 
 
+def _line(glob: str, where: str) -> str:
+    """An ignore line as it is matched: a leading `/` is the root, as Git reads it; a `!` exception is refused, since a
+    file it would bring back is left out here (it fails open), and so is a glob that cannot be read."""
+    if glob.startswith("!"):
+        raise CheckError("%s is an exception (`!`), which the check does not read: name the files to leave out" % where)
+    glob = glob.lstrip("/")
+    if not glob or not _readable_glob(glob):
+        raise CheckError("%s is not a glob it can read" % where)
+    return glob
+
+
 def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
-    globs = list(extra)
-    if not all(_readable_glob(g) for g in globs):
-        raise CheckError("an --exclude glob cannot be read")
+    globs = [_line(g, "an --exclude glob") for g in extra]
     ignore = root / IGNORE_FILE
     try:
         present = ignore.is_file()
@@ -567,14 +585,25 @@ def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
         for number, line in enumerate(lines, 1):
             glob = line.strip()
             if glob and not glob.startswith("#"):
-                if not _readable_glob(glob):
-                    raise CheckError("line %d of %s is not a glob it can read" % (number, IGNORE_FILE))
-                globs.append(glob)
+                globs.append(_line(glob, "line %d of %s" % (number, IGNORE_FILE)))
     return globs
 
 
+def _takes_folder(glob: str) -> bool:
+    """A line that names a folder takes all it holds: one ending in `/`, or a path with no wildcard (`vendor/lib`). A
+    wildcard line takes only what it matches: `vectors/*` the files in `vectors`, never `vectors/live/config.json`."""
+    return glob.endswith("/") or not any(c in glob for c in "*?[")
+
+
+def _under(path: str, glob: str) -> bool:
+    """Whether a folder above the path matches the line, read as a folder: `src/**/` takes `src/pkg/x`, never
+    `src/main.py` (joining the line with `/**` would read `**/` as no folder at all)."""
+    folder = _glob(glob.rstrip("/"))
+    return any(folder.match(path[:i]) for i, c in enumerate(path) if c == "/")
+
+
 def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
-    if any(_glob(g).match(path) or _glob(g.rstrip("/") + "/**").match(path) for g in globs):
+    if any(_glob(g).match(path) or (_takes_folder(g) and _under(path, g)) for g in globs):
         return True
     # `vendor/sub/` names a folder, and Git lists a submodule there as `vendor/sub`, with no slash: only a path that
     # is a folder on disk (never a file a wildcard such as `src/*/` would also reach) is left out by it
@@ -612,17 +641,24 @@ class _Seen:
 
     def __init__(self) -> None:
         self.names: Set[str] = set()
-        self.grams: Set[str] = set()  # every 8-character run of a found value
+        self.grams: Set[str] = set()  # every 8-character run of a found value, the whole of it
+        self._names_pattern: Optional["re.Pattern[str]"] = None
 
     def add_values(self, text: str) -> None:
         values = [text[a:b] for a, b in _secret_spans(text)]
         if "\\" in text:
-            unescaped, _ = _unescaped_with_origin(text)
+            unescaped = _json_unescaped(text)
             if unescaped != text:
                 values += [unescaped[a:b] for a, b in _secret_spans(unescaped)]
         for value in values:
-            value = value[:4096]  # a path segment is at most 255 characters
             self.grams.update(value[i:i + 8] for i in range(max(0, len(value) - 7)))
+
+    def names_pattern(self) -> "re.Pattern[str]":
+        """Every name found, longest first, as one pattern: read once the tree is read, when no name is added."""
+        if self._names_pattern is None:
+            alternatives = sorted(self.names, key=len, reverse=True)
+            self._names_pattern = re.compile("|".join(re.escape(n) for n in alternatives), re.IGNORECASE)
+        return self._names_pattern
 
 
 def check(root: Path, entries: List[str], globs: List[str], every_file: bool = False) -> Dict[str, object]:
@@ -659,7 +695,7 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         if any(os.path.islink(str(root / parent)) for parent in Path(path).parents if str(parent) != "."):
             # a tracked folder replaced by a link: the file Git lists is not here, and the link is never followed
             skipped["unreadable"] += 1
-            not_read.append({"path": redact(path, entries), "why": "under a symbolic link"})
+            not_read.append({"path": path, "why": "under a symbolic link"})
             continue
         try:
             if full.is_symlink():  # Git commits the path a link names: check it, never follow it
@@ -670,7 +706,7 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
             kind = os.lstat(str(full)).st_mode
             if stat.S_ISDIR(kind):  # Git lists a submodule or a nested repository as one path: its files are not read
                 skipped["nested"] += 1
-                not_read.append({"path": redact(path, entries), "why": "a nested repository"})
+                not_read.append({"path": path, "why": "a nested repository"})
                 continue
             if not stat.S_ISREG(kind):  # a socket, a pipe: nothing a source carries
                 continue
@@ -678,16 +714,16 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
                 data = handle.read()
         except FileNotFoundError:  # Git lists it and the work tree lacks it: deleted, or outside a sparse checkout
             skipped["unreadable"] += 1
-            not_read.append({"path": redact(path, entries),
+            not_read.append({"path": path,
                              "why": "not in the work tree" if mode == "git" else "unreadable"})
             continue
         except OSError:
             skipped["unreadable"] += 1
-            not_read.append({"path": redact(path, entries), "why": "unreadable"})
+            not_read.append({"path": path, "why": "unreadable"})
             continue
         if b"\0" in data[:8192]:
             skipped["binary"] += 1
-            not_read.append({"path": redact(path, entries), "why": "binary"})
+            not_read.append({"path": path, "why": "binary"})
             continue
         read += 1
         for number, line in _lines(data):

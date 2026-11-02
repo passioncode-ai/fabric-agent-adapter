@@ -58,7 +58,7 @@ STDLIB_IMPORTS = {
     "os", "pathlib", "re", "subprocess", "sys", "tempfile", "typing", "unittest",
     "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets", "socketserver",
     "shutil", "signal", "socket", "ssl", "stat", "threading", "time",
-    "random", "bisect", "io", "contextlib", "textwrap", "traceback", "difflib",
+    "random", "bisect", "warnings", "io", "contextlib", "textwrap", "traceback", "difflib",
     "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
     "email",  # email.utils: the probe reads a cookie's Expires date (DEC-0039)
     "xml",  # the supervisor tests read the Task Scheduler XML back (FAA-21)
@@ -67,7 +67,6 @@ STDLIB_IMPORTS = {
     "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
     "collections", "queue",  # native bridge mappings and isolated no-model host probes (FAA-48)
     "inspect", "functools",  # the board responder reads whether a service's emit takes a subject (0.56.0 seam r31)
-    "fnmatch",  # the source check leaves out the globs of .fabric-source-ignore (FAA-188)
     "unicodedata",  # the page-link port maps a host that is not ASCII as UTS 46 does (DEC-0123, FAA-132)
 }
 RECIPES = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes"
