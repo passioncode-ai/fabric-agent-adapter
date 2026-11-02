@@ -231,7 +231,7 @@ def _secret_in(line: str) -> Optional[str]:
         return "a token shaped like a JWT"
     # The detector reads one configuration value; across a line, `sk-` needs a word start of its own, or every name
     # with a segment ending in `sk` (`task-management-service`) would read as a key.
-    if any(_real(m.group(0)) and (m.start() == 0 or not line[m.start() - 1].isalnum()) for m in PROVIDER_KEY.finditer(line)):
+    if any(True for _ in _provider_keys(line)):
         return "a value shaped like a provider key"
     if any(_real(m.group(0)) for m in _overlapping(_secrets._BEARER_INSIDE, line)):
         return "a bearer token"
@@ -283,6 +283,33 @@ def _instance_finding(text: str, entries: List[str]) -> Optional[str]:
     return "a string from the owner's list (line %d)" % spans[0][2] if spans else None
 
 
+_WORD_BREAK = re.compile(r"[_-]")  # inside a provider key's run, a word starts only after one of these
+
+
+def _starts(a: int, after: int, breaks: Iterable["re.Match[str]"]) -> Iterable[int]:
+    if a > after:
+        yield a
+    for w in breaks:
+        yield w.end()
+
+
+def _provider_keys(text: str) -> Iterable[Tuple[int, int]]:
+    """The spans of provider keys that start a word and do not say they are synthetic, a key inside a run a dropped
+    match swallowed included (`task-runner-sk-<key>`, `sk-test-...-sk-<key>`). One pass over each run: a synthetic
+    word rules out every start before it, so the first word start after the last one is the only one to try."""
+    for m in PROVIDER_KEY.finditer(text):
+        a, b = m.span()
+        lowered = text[a:b].lower()
+        after = max((a + lowered.rfind(word) for word in SYNTHETIC if word in lowered), default=a - 1)
+        for p in _starts(a, after, _WORD_BREAK.finditer(text, max(a, after), b)):
+            if p and text[p - 1].isalnum():
+                continue
+            key = PROVIDER_KEY.match(text, p)
+            if key and _real(key.group(0)):
+                yield key.span()
+                break
+
+
 def _overlapping(pattern: "re.Pattern[str]", text: str) -> Iterable["re.Match[str]"]:
     """Matches that may start inside the last one (a second `Bearer` inside the first token's run gets its own span)."""
     pos = 0
@@ -304,8 +331,7 @@ def _raw_secret_spans(text: str) -> List[Tuple[int, int]]:
     spans = [m.span() for m in PRIVATE_KEY.finditer(text)]
     spans += [m.span() for m in _secrets.JWT_SHAPE.finditer(text) if _real(m.group(0))]
     spans += [m.span(1) for m in JWK_PRIVATE.finditer(text) if _real(m.group(1))]
-    spans += [m.span() for m in PROVIDER_KEY.finditer(text)
-              if _real(m.group(0)) and (m.start() == 0 or not text[m.start() - 1].isalnum())]
+    spans += list(_provider_keys(text))
     spans += [m.span() for m in _overlapping(_secrets._BEARER_INSIDE, text) if _real(m.group(0))]
     spans += [m.span() for m in URL.finditer(text) if _url_secret(m.group(0))]
     spans += [m.span(2) for m in _assigned(text)

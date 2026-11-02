@@ -31,7 +31,8 @@ on it.
   (an organization's) is a sibling instance, `<id>.<instance>`, never a folder inside the personal one
   (`references/estate-record.md` of that skill).
 - **Ignore the instance in the source**: `.gitignore` names the real configuration (`config/*.json` with
-  `!config/*.example.json`), and an instance folder that sits inside the checkout during development.
+  `!config/*.example.json`), an instance folder that sits inside the checkout during development, and what running
+  the agent leaves (`__pycache__/`, `*.pyc`), which the check would otherwise report as binary in Git mode.
 - **State documents are instance data.** A handoff, a decision log or a backlog about this codebase is source
   documentation; a record of what this installation did (runs, conversations, the owner's notes, a journal) lives in
   the instance folder.

@@ -156,6 +156,20 @@ class Findings(Tree):
         self.assertEqual(sorted(f["path"] for f in result["findings"] if f["kind"] == "secret"),
                          ["a.py", "b.env.txt", "c.json", "d.pem.txt", "e.sh", "f.md", "g.env"])
 
+    def test_a_provider_key_a_dropped_run_swallowed_is_found(self):
+        key = "sk" + "-" + "Zq7Wm4" * 4
+        for line in ("runner: task-runner-" + key, "risk-" + key, "sk" + "-test-not-a-key-" + key):
+            self.assertEqual(sc._secret_finding(line), "a value shaped like a provider key", line[:8])
+            self.assertTrue(sc._secret_spans(line), line[:8])
+        self.assertIsNone(sc._secret_finding("task-management-service"))
+        self.write("a.yaml", "runner: task-runner-%s\n" % key)
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 1)
+        self.assertNotIn(key[3:11], out + err)
+        start = time.perf_counter()  # a long run of dropped starts is read once, not once a start
+        self.assertIsNone(sc._secret_finding(("sk" + "-not-a-key-") * 200000))
+        self.assertLess(time.perf_counter() - start, 5)
+
     def test_a_package_signature_is_public(self):
         sig = ("Ab3" * 29)[:86]  # an Ed25519 signature in base64url: 86 characters mixing cases and digits
         self.write("fabric.package.json", '{"signatures": [{"kid": "publisher", "sig": "%s"}]}\n' % sig)
