@@ -413,11 +413,12 @@ class NeverRepeated(Tree):
         self.write("d/Bearer %s/%s.txt" % (a[:32] + "1", b[:17]), "x\n")
         self.write("e/https:\\/\\/h\\/x?access_token=%s/%s" % (a[:32], b), "x\n")
         self.write("f/sk-%s_https:\\/\\/app:%s@db\\/x.txt" % (a[:24], pw), "x\n")
+        self.write("g/Bearer %s/Bearer x/%s/notes.md" % (b + "1", a[:24] + "9"), "x\n")  # a second token in the first
         for extra in ([], ["--json"], ["--every-file"]):
             code, out, err = run(["check", str(self.root), *extra])
             self.assertEqual(code, 1, extra)
             for value in (a, b, pw):
-                for i in range(0, len(value) - 8):
+                for i in range(0, len(value) - 7):
                     self.assertNotIn(value[i:i + 8], out + err, (extra, value[:3], i))
 
     def test_every_occurrence_of_a_found_home_name_is_masked(self):

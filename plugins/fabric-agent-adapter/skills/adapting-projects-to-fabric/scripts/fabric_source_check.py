@@ -283,6 +283,17 @@ def _instance_finding(text: str, entries: List[str]) -> Optional[str]:
     return "a string from the owner's list (line %d)" % spans[0][2] if spans else None
 
 
+def _overlapping(pattern: "re.Pattern[str]", text: str) -> Iterable["re.Match[str]"]:
+    """Matches that may start inside the last one (a second `Bearer` inside the first token's run gets its own span)."""
+    pos = 0
+    while pos <= len(text):
+        m = pattern.search(text, pos)
+        if m is None:
+            return
+        yield m
+        pos = m.start() + 1
+
+
 def _secret_spans(text: str) -> List[Tuple[int, int]]:
     """The spans of credential-shaped values in a text, as `_secret_in` reads them (a public signature is no span)."""
     public = [m.span() for m in _PUBLIC_SIGNATURE.finditer(text)] if '"' in text else []
@@ -295,7 +306,7 @@ def _raw_secret_spans(text: str) -> List[Tuple[int, int]]:
     spans += [m.span(1) for m in JWK_PRIVATE.finditer(text) if _real(m.group(1))]
     spans += [m.span() for m in PROVIDER_KEY.finditer(text)
               if _real(m.group(0)) and (m.start() == 0 or not text[m.start() - 1].isalnum())]
-    spans += [m.span() for m in _secrets._BEARER_INSIDE.finditer(text) if _real(m.group(0))]
+    spans += [m.span() for m in _overlapping(_secrets._BEARER_INSIDE, text) if _real(m.group(0))]
     spans += [m.span() for m in URL.finditer(text) if _url_secret(m.group(0))]
     spans += [m.span(2) for m in _assigned(text)
               if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(unquote(m.group(2)))
@@ -329,10 +340,17 @@ def redact(path: str, entries: List[str]) -> str:
     def rest() -> str:
         return "/".join(" " if m else path[a:b] for (a, b), m in zip(spans, masked))
 
-    for i in range(len(spans) - 1, -1, -1):
-        if not _secret_finding(rest()):
+    # the guard: while what is left still holds a credential, mask the segments its spans touch, else the last one left
+    for _ in range(len(spans)):
+        left = rest()
+        if not _secret_finding(left):
             break
-        masked[i] = True
+        hit = [i for i, (s, e) in enumerate(spans) if not masked[i]
+               and any(s < b and a < e for a, b in _secret_spans(left))]
+        if not hit:
+            hit = [max(i for i, m in enumerate(masked) if not m)]
+        for i in hit:
+            masked[i] = True
     secret_segments = [span for span, m in zip(spans, masked) if m]
     marks = [(s, e, "<line %d>" % n) for s, e, n in _entry_spans(path, entries)]
     found = _home_names(path)
