@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.59.0 (2026-11-06)
+
+Portable from day 0 (FAA-191, RM-36): on top of 0.58.0's source and instance, every new agent gets a data home and a
+data kind, an uptime category and a `LICENSE` naming its copyright holder from its first commit, and runs the transfer
+audit at every release until the contract's export (CT-194) replaces it.
+
+### Added
+
+- creating-fabric-agents' intake grill asks three more rows: **Does it run around the clock?** (uptime category A, a
+  cloud host from the first release, Heroku unless a reason names another, from the cloud Fabric-server template once
+  its repository exists; or B, a local service only), **Whose data does it keep?** (kind U, data of people outside the
+  owner's team, never in the source, a copy or its tests; or O; in doubt U) and **Who holds the copyright?**
+- Step 2 gives the data a home of its own, `<agent>-data` (a folder beside the checkout or a private repository of
+  that name), and the README names the data kind and the uptime category; an agent someone builds for themselves gets
+  a `LICENSE` naming the holder (all rights reserved unless the owner gives other terms).
+- Step 5: every release runs `fabric_source_check.py check` in Git mode and with `--every-file` as the transfer audit.
+- references/source-and-instance.md (both skills): *The data home and its kind*; references/where-agents-run.md:
+  *Uptime: A or B* and a checklist line. building-fabric-services' Step 0 answers carry the same (data kind, data
+  home, uptime, holder, the audit per release).
+- Scenario evals `portable-from-day-zero` (creating-fabric-agents) and `new-service-names-data-and-uptime`
+  (building-fabric-services), a trigger, and `test/test_portable_from_day_zero_prose.py` pinning the prose to them.
+
+### Changed
+
+- The eval `own-agent-licence-is-the-owners-choice` expects a `LICENSE` naming the holder; still no AGPL or
+  commercial licence files unasked.
+
+### Upgrading
+
+- Nothing to change for an existing agent. A new one answers the three grill rows before its first commit.
+
 ## 0.58.0 (2026-10-28)
 
 Portable agents, part 1 (FAA-188, RM-36): an agent keeps its source apart from its instance from its first commit, and

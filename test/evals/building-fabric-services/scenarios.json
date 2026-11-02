@@ -632,6 +632,15 @@
         "gives the operator an action that calls Responder.take_back(capability) (Node takeBack), declared as a button with its tool under fabric-actions/0.1 with gate relayed (the operator's decision, never none) and, on a server that reads mandates, its effect class, so the operator's own agent can call it with their decision, as the reference service's board.take-back does, and names it in the service's docs",
         "does not edit the checkpoint by hand to undo a move"
       ]
+    },
+    {
+      "id": "new-service-names-data-and-uptime",
+      "request": "Make example-agent a local Fabric service; it keeps only the owner's own run reports and nobody calls it while the laptop sleeps.",
+      "expected": [
+        "records in the Step 0 answers the data kind O, the data home (the kit's folders; a private repository of the data is <id>-data), uptime category B (local only, no cloud) and the LICENSE holder",
+        "runs the transfer audit (fabric_source_check.py check in Git mode and with --every-file) at each release",
+        "adds no cloud host for a category B service"
+      ]
     }
   ]
 }

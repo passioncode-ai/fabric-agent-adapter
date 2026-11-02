@@ -16,6 +16,7 @@ The normative rules are the Fabric Agent Contract's, at the commit this plugin p
 - [Connecting a machine or a cloud to the estate](#connecting-a-machine-or-a-cloud-to-the-estate)
 - [Sharing an agent into an organization](#sharing-an-agent-into-an-organization)
 - [Running while the laptop is closed](#running-while-the-laptop-is-closed)
+- [Uptime: A or B](#uptime-a-or-b)
 - [Selling an agent](#selling-an-agent)
 - [The checklist](#the-checklist)
 
@@ -92,6 +93,21 @@ secrets, its data, and a hub that can admit calls. The local Fabric hub is not a
 - Never charge for work it cannot deliver on the promised terms.
 - A test that passed on fixtures says nothing about uptime; measure the installed agent in its cloud.
 
+## Uptime: A or B
+
+Every new agent is given an uptime category on its first day, and the README names it:
+
+- **A, around the clock.** A capability must answer while the owner's machine is off or asleep: a schedule, a chat,
+  callers outside the machine. A cloud host is required from the first release; Heroku is the default, another host
+  only when a reason names it. The agent is an online service (building-fabric-services, the remote placement), often
+  alongside its local instance, and starts from the cloud Fabric-server template once that template's repository
+  exists. Its data lives where the cloud reaches it.
+- **B, local only.** Nothing needs it while the machine sleeps: a local service and no cloud. It reads an A agent's
+  data through that agent's MCP or API, never from its store.
+
+A B agent that gains a capability that must answer around the clock becomes A for that capability; record the change
+and move only that capability to the cloud.
+
 ## Selling an agent
 
 - **A paid agent** runs in PassionCode's cloud inside its developer's organization (`org:<developer>`); each customer
@@ -108,6 +124,7 @@ secrets, its data, and a hub that can admit calls. The local Fabric hub is not a
 - Where does each instance run, and in which context? Write it in the knowledge pack.
 - Does any state, secret, log line or cache key cross contexts? It must not.
 - Which capabilities need the person's machine, and what do they answer when it is off?
+- Which uptime category is it, A (a cloud host from the first release) or B (local only)? The README names it.
 - Who pays for each call (which grant, which key)? The person's personal key never pays for an organization.
 - If it joins machines or applies the estate record: tokens from stdin or a 0600 file only, revisions verified with
   their parent.

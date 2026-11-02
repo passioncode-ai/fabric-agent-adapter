@@ -13,6 +13,7 @@ on it.
 ## Contents
 
 - [The layout](#the-layout)
+- [The data home and its kind](#the-data-home-and-its-kind)
 - [The check](#the-check)
 
 ## The layout
@@ -46,6 +47,21 @@ on it.
   never the owner's account or name. A provider's `createdBy` names the publisher; until one is chosen it
   keeps the scaffold's sentinel, and a person's name or account is never written there. The adapter moves both when the
   contract decides how an instance renames them (FAA-188 part 2).
+
+## The data home and its kind
+
+- **The data has a home of its own from the first commit: `<agent>-data`.** For an agent that is not a kit service it
+  is a folder beside the checkout, never inside it, and `<AGENT>_DATA_DIR` names it (its default is
+  `../<agent>-data`); a kit service keeps the kit's folders above. When the owner keeps the data in Git, it goes to a
+  separate private repository named `<agent>-data`, never to the source's repository. A copy of the agent starts with
+  an empty home of its own and never connects to the original's.
+- **The README names the kind of the data.** **U**: the agent keeps data of people outside the owner's team
+  (messages, support requests, reviews, customers' answers); it never enters the source, a copy or its tests, and the
+  source holds only the schema and synthetic fixtures. **O**: it keeps none (a tool or service for other agents, the
+  owner's reports, runs and media); its working data still goes to the data home. When in doubt, the kind is U.
+- **Every release runs the transfer audit.** `fabric_source_check.py check <project-root>` in Git mode and again with
+  `--every-file`, each exit 0, with the owner's list or its absence recorded, until the contract's export (CT-194)
+  replaces it.
 
 ## The check
 

@@ -2,6 +2,7 @@
   "skill": "creating-fabric-agents",
   "queries": [
     {"query": "Create a new agent that is compatible with the Passion Code fabric from day one.", "shouldTrigger": true},
+    {"query": "Новый агент под Fabric, переносимый с первого дня: папка данных отдельно, категория аптайма и лицензия.", "shouldTrigger": true},
     {"query": "Build a fabric-ready SEO agent from scratch for the estate.", "shouldTrigger": true},
     {"query": "Создай агента, совместимого с фабрикой Passion Code.", "shouldTrigger": true},
     {"query": "Новый агент под Fabric: исследователь трендов, профиль MCP.", "shouldTrigger": true},
