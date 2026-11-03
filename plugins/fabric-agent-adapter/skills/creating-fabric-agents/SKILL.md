@@ -129,7 +129,7 @@ repository address of the owner's account, folders, the owner, accounts, hosts) 
 named variable with a neutral default and a committed `*.example`; records, logs and state documents live in the
 instance folder; fixtures use neutral ids. Load [the source and the instance](references/source-and-instance.md). The
 sibling's `scripts/fabric_source_check.py check <project-root>` finds instance data in the tree without repeating it;
-run it with the owner's list of their own strings, or record that none was given; the skeleton is done when it exits 0 and the owner has reviewed it (a floor, not a secret scanner; without the sibling or Python 3.9+, record the check as NOT_RUN, as in step 3). Handing the source over stays the owner's act.
+run it with the owner's list of their own strings, or record that none was given (a home name that is neutral, has one or two letters, or holds a space, `.`, `_`, `-` or `'` is declared there with `home: <name>` first); the skeleton is done when it exits 0 and the owner has reviewed it (a floor, not a secret scanner; without the sibling or Python 3.9+, record the check as NOT_RUN, as in step 3). Handing the source over stays the owner's act.
 
 ## Step 3: scaffold the provider bundle
 

@@ -97,8 +97,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   that starts with `home` and a colon and holds anything else is refused, exit 2; such a line is never a string
   entry, so list a string like `home: page` by a part of it, `ome: page`): the check then finds that home in every form the table names (it is never neutral, even with one or two
   letters), and the bare name is not looked for anywhere else, though a declared name of three or more letters and digits is
-  masked wherever a printed path holds it, its parts joined by none or any run of a space, `.`, `_`, `-`, `+`, `'` or their
-  percent-encodings; a home that is also your name goes in the list
+  masked wherever a printed path holds it as a word, its parts joined by none or any run of a space, `.`, `_`, `-`, `+`, `'`, their
+  percent-encodings or an escaped apostrophe (`\'`, `\u0027`, `&#39;`, `&#x27;`), the same separators it is found with in every form; a home that is also your name goes in the list
   as a plain string too, to be found in text. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
   (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
