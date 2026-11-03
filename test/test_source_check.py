@@ -1295,9 +1295,13 @@ class Refusals(Tree):
         self.assertNotIn("longername", sc.redact("-Users-a-b-longername-x/f_a.b-longername.txt",
                                                  [sc.HOME_ENTRY + "a.b-longername"]))
         self.assertNotIn("j.doe", sc.redact("-Users-j-doe-proj/j.doe.md", [sc.HOME_ENTRY + "j.doe"]))
+        # reading 34, seam: a spelling found in one file's text reaches another file's printed path through seen
+        seen = sc._Seen()
+        sc._text_findings("see /Users/j.doe/x", [sc.HOME_ENTRY + "j.doe"], seen)
+        self.assertNotIn("doe", sc.redact("q/j-doe-cache/f.bin", [""], seen))
         # reading 32, product: the reference sends a dotted or underscored home to `home:` too
         reference = (SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8")
-        self.assertIn("holds a dash, a dot or an underscore (each a dash in the dashed form)", reference)
+        self.assertIn("holds a space, a dash, a dot or an underscore (each a dash in the dashed form", reference)
         # reading 31, unit: a `.` is dashed too, and the whole name is masked in a printed path
         listing.write_text("home: j.doe\nhome: bob-smith\n", encoding="utf-8")
         self.write("-Users-bob-smith-proj/.env", "X=1\n")
@@ -1312,12 +1316,14 @@ class Refusals(Tree):
         listing = self.tmp / "cfg" / "list.txt"
         listing.parent.mkdir()
         for line in ("home: \u042f\u043d", "home: jo # mine", "home: /Users/jo", "home: _svc", "home: \u017fam",
-                     "home\u00a0: jos\u00e9", "home:", "home: jo, al"):
+                     "home\u00a0: jos\u00e9", "home:", "home: jo, al", "home: O'Br" + "ien",
+                     # reading 34, unit: a control or a separator around the colon is no space
+                     "home:\x0czq", "home:\u2028zq", "home\x1c: zq", "home:\x85zq", "home\u2029:zq"):
             listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 2, line)
             self.assertIn("line 2 of the owner's list", err)
-            self.assertIn("list a name outside ASCII as a plain string", err)
+            self.assertIn("list a name outside ASCII, or one holding another character such as an apostrophe", err)
         listing.write_text("home: admin\n", encoding="utf-8")  # only homes: the summary does not call the list empty
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
         self.assertNotIn("holds no string", out)
@@ -1343,7 +1349,11 @@ class Refusals(Tree):
         surname = "Zq" + "dovski"
         forms = ["C:" + bs + "Users" + bs + "Jane " + surname + bs + "p", "C:/Users/Jane " + surname + "/p",
                  "/Users/Jane " + surname + "/p", "-Users-Jane-" + surname + "-proj", "C--Users-Jane-" + surname + "-p",
-                 "%2FUsers%2FJane%20" + surname + "%2Fp", "/home/jane " + surname + "/x"]
+                 "%2FUsers%2FJane%20" + surname + "%2Fp", "/home/jane " + surname + "/x",
+                 # reading 34, seam: every other form the table names, so a dropped prefix fails here
+                 "/var/home/Jane " + surname + "/p", "/c/Users/Jane " + surname + "/p", "/mnt/c/Users/Jane " + surname + "/p",
+                 "%5CUsers%5CJane%20" + surname + "%5Cp", "-home-Jane-" + surname + "-p", "-var-home-Jane-" + surname + "-p",
+                 "-mnt-c-Users-Jane-" + surname + "-p", "%2Fhome%2FJane%20" + surname + "%2Fp"]
         for n, form in enumerate(forms):
             self.write("f%d.txt" % n, "x " + form + "\n")
             self.write("p%d/x%s/a.env" % (n, form.replace("/", "_").replace(bs, "_").replace(":", "")), "K=1\n")
@@ -1354,8 +1364,54 @@ class Refusals(Tree):
             result = json.loads(out)
             self.assertEqual(result["ownerHomes"], 1, line)
             self.assertEqual(sorted(f["path"] for f in result["findings"] if f["path"].startswith("f")),
-                             ["f%d.txt" % n for n in range(len(forms))], line)
+                             sorted("f%d.txt" % n for n in range(len(forms))), line)
             self.assertNotIn(surname.lower(), out.lower(), line)
+        # reading 34, product: a declared name is masked in a printed path even where it is no home form, in any
+        # separator a tool writes, and a `+` for a space (form encoding) is read too
+        listing.write_text("home: Jane " + surname + "\n", encoding="utf-8")
+        for n, name in enumerate(("photo of Jane " + surname + ".png", "Jane." + surname + ".png", "Jane_" + surname + ".png")):
+            (self.root / ("q%d" % n)).mkdir()
+            (self.root / ("q%d" % n) / name).write_bytes(b"\0binary")
+        self.write("u.txt", "?p=%2FUsers%2FJane+" + surname + "%2Fp\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing), "--every-file"])
+        self.assertEqual(code, 1)  # the findings first; the binaries are listed as not read
+        self.assertIn("u.txt:1: home-path", out)
+        self.assertEqual(out.count("not read (binary)"), 3)
+        self.assertNotIn(surname.lower(), out.lower())
+
+    def test_a_declared_home_with_a_neutral_first_part_is_found_by_its_own_patterns_in_each_form(self):
+        # reading 34, unit: with a neutral or one-letter first part the generic forms find nothing, so each declared
+        # form and spelling stands alone; one tree per form
+        bs = chr(92)
+        for first in ("alice", "j"):
+            name = first + " Zqdovski"
+            forms = ["/Users/%s/p", "/home/%s/p", "/var/home/%s/p", "C:" + bs + "Users" + bs + "%s" + bs + "p",
+                     "C:/Users/%s/p", "/c/Users/%s/p", "/mnt/c/Users/%s/p", "%%2FUsers%%2F%s%%2Fp", "%%5CUsers%%5C%s%%5Cp",
+                     "%%2Fhome%%2F%s%%2Fp", "-Users-%s-p", "-home-%s-p", "C--Users-%s-p", "-mnt-c-Users-%s-p"]
+            for form in forms:
+                spelled = name.replace(" ", "-") if form.count("-") >= 2 else (
+                    name.replace(" ", "%20") if "%" in form else name)
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp) / "t"
+                    root.mkdir()
+                    (root / "a.txt").write_text("x " + (form % spelled) + "\n", encoding="utf-8")
+                    listing = Path(tmp) / "l.txt"
+                    listing.write_text("home: " + name + "\n", encoding="utf-8")
+                    code, out, err = run(["check", str(root), "--instance-strings", str(listing)])
+                    self.assertEqual(code, 1, (first, form))
+                    self.assertIn("a.txt:1: home-path", out, (first, form))
+                    self.assertNotIn("zqdovski", out.lower(), (first, form))
+        # the dashed spelling only in a line, the written one only in a printed path: masked through seen
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "t"
+            (root / "alice Zqdovski").mkdir(parents=True)
+            (root / "alice Zqdovski" / "k.bin").write_bytes(b"\0")
+            (root / "a.txt").write_text("~/.claude/projects/-Users-alice-Zqdovski-p\n", encoding="utf-8")
+            listing = Path(tmp) / "l.txt"
+            listing.write_text("home: alice Zqdovski\n", encoding="utf-8")
+            code, out, err = run(["check", str(root), "--instance-strings", str(listing), "--every-file"])
+            self.assertEqual(code, 1)
+            self.assertNotIn("zqdovski", out.lower())
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):
