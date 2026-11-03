@@ -44,7 +44,7 @@ names why a provider manifest is refused (FAA-193).
   `fabric-board-slots.mjs` and their callers). Only the running session hears a move back: a slot moved back to a
   session that has since ended needs take-back, since the session's end released the slot and the operator cannot move
   a slot no session holds (a move is possible only once another session holds it). A kit older than 0.60.0 never hears
-  a move back: install the 0.60.0 modules and use take-back.
+  a move back: it needs take-back (any kit from 0.53.0), or the 0.60.0 modules and then a move to the new session.
 
 ## 0.59.0 (2026-11-03)
 

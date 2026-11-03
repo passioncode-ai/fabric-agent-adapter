@@ -152,7 +152,10 @@ export class SlotKeeper {
     if (this.slots[capability]) this.slots[capability].renewedAt = this.now();
     const now = ((await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if (!isInt(now, 1) || now <= held.moved) return;
-    if (!this.probing.has(capability) || !this.claimKeys[capability]) this.claimKeys[capability] = this.key('claim'); // a fresh key: one from before the move may hold a dead receipt
+    if (!this.probing.has(capability) || !this.claimKeys[capability]) { // a fresh key: one from before the move may hold a dead receipt
+      this.claimKeys[capability] = this.key('claim');
+      if (this.slots[capability]) delete this.slots[capability].probeAt; // and a send time of its own
+    }
     let answer;
     const sent = this.now();
     try {

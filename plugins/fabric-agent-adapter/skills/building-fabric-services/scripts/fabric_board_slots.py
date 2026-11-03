@@ -151,6 +151,7 @@ class SlotKeeper:
             return
         if capability not in self._probing or capability not in self.claim_keys:
             self.claim_keys[capability] = self._key("claim")  # a fresh key: one from before the move may hold a dead receipt
+            (self.slots.get(capability) or {}).pop("probe_at", None)  # and a send time of its own
         key, sent = self.claim_keys[capability], self.now()
         try:
             answer = self._receipt("com.claim", self._call("com.claim", {"idempotency": self._idem(key), "capability": capability}))

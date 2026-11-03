@@ -181,7 +181,7 @@ contract's matrix, held to its vectors (`test/fixtures/contract/comms-hold-vecto
 | Refused `held` | What the kit does |
 |---|---|
 | `com.status` names the slot `held: true` at connect | the slot is not enrolled; it pauses |
-| `com.enroll`, `com.claim`, `com.responder_replace` | the slot pauses: asked again after 15 s, then 30 s, doubling to 15 minutes; one `board.slot.held` event per capability, and `board.slot.released` when an enroll succeeds again |
+| `com.enroll`, `com.claim`, `com.responder_replace` | the slot pauses: asked again after 15 s, then 30 s, doubling to 15 minutes; one `board.slot.held` event per capability, and `board.slot.released` when an enroll succeeds again (except the move-back claim of a moved slot, which asks again at the next renewal with no `board.slot.held`, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)) |
 | `com.accept` (the hold came after the claim) | nothing was done: the entry is dropped, the claim lapses and the request waits on the board (`board.request.waiting`); the slot pauses |
 | `com.effect_begin` | the effect has not begun: the handler waits (same idempotency key, the pause doubling) while the tick keeps renewing the lease, then begins once the hold is lifted; `ctx.stopped` ends the wait |
 | accepted work at restart under a hold | kept as `lapsed`, then taken back with `com.responder_replace` and a transfer once the hold is lifted, never claimed back |
@@ -260,9 +260,10 @@ held and not transferred). The responder keeps that move instead of undoing it:
   fresh key, recording nothing. `fenced`, or any other refusal that is not the board session's (`not_authorized` counted with them, since a
   non-holder's claim may be refused so), is another session's slot:
   recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
-  landed is not stranded; until then it counts as a lease from its send, so a second lost answer keeps the session
-  (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
-  dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
+  landed is not stranded; until then it counts as at most a lease from that key's first send (a fresh key starts
+  its own), so a second lost answer keeps the session (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
+  dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
+  it waits for its attempt's lease (60 s) before it is claimed again. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
   while other work runs: a move back during a job longer than the lease (60 s) may lapse and be lost to another
   session, after which take-back, or another move back to this session, brings it back.
 - Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move

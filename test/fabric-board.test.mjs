@@ -1138,6 +1138,28 @@ test('FAA-165: an empty move-back claim enrolls at once', async (t) => {
   assert.ok(tail.slice(tail.indexOf('com.claim')).includes('com.enroll'), tail.join());
 });
 
+test('FAA-165: a later generation\'s lost probe counts its own send (0.60.0 product reading 4)', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.render' });
+  for (let i = 0; i < 11; i += 1) {
+    await h.advance(20);
+    await r.step();
+  }
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step();
+  await hub.control({ op: 'drop', tool: 'com.status' });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.session);
+});
+
 test('FAA-165: two lost answers after a move-back claim keep the session (0.60.0 seam reading 3)', async (t) => {
   const { hub, h, r, mine } = await movedOff(t);
   await hub.control({ op: 'move', capability: 'video.render', to: mine });

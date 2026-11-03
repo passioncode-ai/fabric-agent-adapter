@@ -1640,6 +1640,30 @@ class MovedSlotTests(Conversation):
         tail = self.tools()[seen:]
         self.assertIn("com.enroll", tail[tail.index("com.claim"):])  # in the same step, after the probe's claim
 
+    def test_a_later_generations_lost_probe_counts_its_own_send(self):
+        """0.60.0 product reading 4: an earlier lost probe's send time stayed on the slot, so a later generation's lost
+        probe counted a lease long gone and a second lost answer dropped the session."""
+        r, mine = self._moved_off()  # 2
+        self.board.move("video.render", to=mine)  # 3
+        self.board.drop_next["com.claim"] = 1
+        self.board.advance(20)
+        r.step()  # lost
+        self.board.move("video.render")  # 4, another session's
+        self.board.advance(20)
+        r.step()  # the replay is dead: asked again fresh
+        for _ in range(10):
+            self.board.advance(20)
+            r.step()
+        self.board.move("video.render", to=mine)  # 5
+        self.board.queue("video.render")
+        self.board.drop_next["com.claim"] = 1
+        self.board.advance(20)
+        r.step()
+        self.board.drop_next["com.status"] = 1
+        self.board.advance(20)
+        r.step()
+        self.assertIsNotNone(r.session)
+
     def test_two_lost_answers_after_a_move_back_claim_keep_the_session(self):
         """0.60.0 seam reading 3: the probe's claim holds a lease from its send, so a second lost answer at the next
         renewal is kept by finding 38's guard, as on the claim loop's path."""

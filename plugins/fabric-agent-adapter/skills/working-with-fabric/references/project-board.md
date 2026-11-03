@@ -61,8 +61,8 @@ reply or progress note): the target replied, not that the work was done. Read th
 still cancel the request. `noResponder` in your `com.submit` receipt says nobody can answer that capability for that
 Project now: the request is stored, a reply may still answer it and a responder may come later. An `accepted`
 request can also wait unanswered for its responder's operator: since adapter 0.53.0 a responder whose slot was moved
-to another session leaves its accepted work `accepted` and unanswered until the slot is taken back or moved back to it (until Fabric
-hands it over, CT-175), which is not the operator's hold below; tell
+to another session leaves its accepted work `accepted` and unanswered until the slot is taken back, or moved back to it (a responder
+from adapter 0.60.0 hears that; an older one comes back only by take-back), or until Fabric hands it over (CT-175), which is not the operator's hold below; tell
 the person, and cancel it if it is past what they can wait. Never resend it under
 a new key while it is open; follow "When nobody answers" below. A queued or claimed request without a deadline gets one seven
 days out (DEC-0098) and then reads `expired`: if the ask still stands, submit it again with a new key and record the wait
@@ -103,14 +103,14 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    An `active` responder does not prove your request is being worked. A slot the operator moved to another session
    (contract DEC-0140 PR-2) keeps the requests the old holder had accepted: they stay `accepted` with the old holder's
    attempt, which nobody works until the new holder takes them over by a transfer or the old service gets the slot back
-   (its take-back or a move back), while Fabric's thread view shows the
+   (its take-back, or a move back to a responder from adapter 0.60.0), while Fabric's thread view shows the
    new holder as "Answers it" and its "requests no agent answers now" leaves them out (FAA-172). The board shows a
    requester no attempt or generation (`com.get` gives the request's `state`, `effect` and `revision`, never its attempt), so you cannot tell
    this from slow work: when your request has stayed `accepted` with no progress note or reply past what the work
    should take, ask on its thread (`com.reply`) whether it is being worked. If nobody answers, cancel it first: while
    its `effect` is still `not_started`, `com.cancel` moves it to `cancelled` (nothing has happened yet). Only when the
    cancel's receipt shows the request `cancelled`, submit it again and read the new request from this step (an active
-   responder is step 2; step 3 only when it too stays queued and unclaimed); an
+   responder is step 2; step 3 only when nobody is live and it stays queued and unclaimed); an
    accepted request never expires, and the old service would carry it out by a transfer once it gets the slot back, so
    it is never adapted while still accepted. `outcome_unknown` means the work began meanwhile: tell the person and
    change nothing.
