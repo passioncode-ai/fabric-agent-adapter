@@ -408,6 +408,9 @@ class BoardMandateTests(Conversation):
             tracemalloc.stop()
         self.assertLess(peak, 8 * 1024 * 1024, "the join is never built (it would be 256 MB)")
         self.assertLess(time.monotonic() - started, 0.5)
+        for spend in ([[100, 100]], [True], [[True]], [{}]):  # Number(list): two items NaN, one read as String() reads it
+            self.assertTrue(math.isnan(fm._spend_number(spend)), spend)
+        self.assertEqual((fm._spend_number([]), fm._spend_number([[None]]), fm._spend_number(["7"])), (0.0, 0.0, 7.0))
         for text, want in ((".", None), ("+", None), ("-", None), ("e5", None), (".e1", None), ("1e", None), (".5", 0.5), ("5.", 5.0)):
             got = jsv.js_to_number(text)  # the pattern needs a digit (unit reading 23)
             self.assertTrue(math.isnan(got) if want is None else got == want, text)
