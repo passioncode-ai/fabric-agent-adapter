@@ -202,7 +202,8 @@ def set_has(items: List[Any], value: Any) -> bool:
 _JS_SPACE = "\t\n\v\f\r                  　﻿"
 
 
-_JS_DECIMAL = re.compile(r"[+-]?(?:(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|Infinity)", re.ASCII)
+# One way to split the digits, so a long string that fails to match costs its length (0.61.0 seam reading 22).
+_JS_DECIMAL = re.compile(r"[+-]?(?:(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|Infinity)", re.ASCII)
 
 
 _JS_RADIX = re.compile(r"0(?:[xX](?P<x>[0-9a-fA-F]+)|[oO](?P<o>[0-7]+)|[bB](?P<b>[01]+))", re.ASCII)

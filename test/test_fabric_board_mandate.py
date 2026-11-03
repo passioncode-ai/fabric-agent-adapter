@@ -6,6 +6,7 @@ from __future__ import annotations
 import collections.abc
 import importlib
 import json
+import math
 import sys
 import time
 import types
@@ -373,15 +374,26 @@ class BoardMandateTests(Conversation):
         cyclic = []
         cyclic.append(cyclic)
         self.assertEqual(at_depth(0, cyclic)["data"]["detail"], "outside-mandate: spend", "a cycle is answered, never a raise")
+        cyclic_dict = {}
+        cyclic_dict["a"] = cyclic_dict
+        self.assertEqual(at_depth(0, cyclic_dict)["data"]["detail"], "outside-mandate: spend", "json.loads never gives a cycle")
         shared = [3]
-        for _ in range(40):  # 41 objects, 2**40 paths: read once each (unit reading 21)
+        for _ in range(22):  # 23 objects, 2**22 paths: json.loads never shares, so it is no estimate (seam reading 22)
             shared = [shared, shared]
         started = time.monotonic()
         free = mandate(scope={"capabilities": ["video.render"], "effects": ["draft"]})
         self.assertTrue(fm.mandate_covers({"mandate": free, "tier": "T1", "now": AT, "self": "example-agent",
                                            "call": {"capability": "video.render", "effect": "draft", "spendUsd": shared}})["ok"])
-        self.assertTrue(fm._json_data(shared))
-        self.assertLess(time.monotonic() - started, 1.0, "no ceiling, no walk; a shared structure walked once")
+        self.assertFalse(fm._json_data(shared))
+        got = at_depth(0, shared)
+        self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
+        self.assertLess(time.monotonic() - started, 1.0, "no ceiling, no walk; under one, a shared structure refused at once")
+        with mock.patch.object(fm, "js_to_number", side_effect=RecursionError):  # the guard, on every Python (seam reading 22)
+            got = at_depth(0, [3])
+        self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
+        started = time.monotonic()
+        self.assertTrue(math.isnan(jsv.js_to_number("1" * 200000 + "x")))  # the decimal pattern costs its length
+        self.assertLess(time.monotonic() - started, 0.5)
         limit = sys.getrecursionlimit()
         for depth in range(max(1, limit // 3 - 60), limit + 20, 3):  # never raises, whatever the nesting and the stack
             for frames in (0, 5, 11):

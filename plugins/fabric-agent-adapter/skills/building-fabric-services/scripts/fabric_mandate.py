@@ -240,8 +240,9 @@ def _member_of(items: Any, value: Any) -> bool:
 
 def _json_data(value: Any) -> bool:
     """Whether a value is JSON data as json.loads gives it, by exact type all the way down (never `==` or isinstance,
-    which a metaclass or `__class__` can answer). Walked without recursion, each list or dict once (a shared or cyclic
-    structure costs its size, never more; 0.61.0 unit reading 21)."""
+    which a metaclass or `__class__` can answer), walked without recursion in one pass. json.loads never shares a list
+    or dict, so a structure that meets one twice (shared or cyclic) is not JSON data (0.61.0 unit reading 21, seam
+    reading 22)."""
     stack, seen = [value], set()
     while stack:
         item = stack.pop()
@@ -251,7 +252,7 @@ def _json_data(value: Any) -> bool:
         if kind is not list and kind is not dict:
             return False
         if id(item) in seen:
-            continue
+            return False
         seen.add(id(item))
         if kind is list:
             stack.extend(item)
