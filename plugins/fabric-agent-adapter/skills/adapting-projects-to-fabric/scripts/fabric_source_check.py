@@ -163,32 +163,37 @@ _DECLARED_DASHED = (r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-
                     r"(?<![A-Za-z0-9])(?i:[A-Za-z]--Users-)")
 
 
+#: One separator between the parts of a declared home name, in any spelling a tool or a language writes: a space, `.`,
+#: `_`, `-`, `+`, `'`, an escaped `\'` or `\u0027`, an HTML `&#39;` or `&#x27;`, or a percent-encoding of one of them.
+_NAME_JOIN = r"(?:[ ._+'-]|\\'|\\u0027|&#0?39;|&#[xX]27;|%2[07BbDdEe]|%5[Ff])"
+
+
+def _name_parts(name: str) -> List[str]:
+    return [part for part in re.split(r"[ ._'-]+", name) if part]
+
+
 def _spellings(found: Iterable[str], owner: Iterable[str]) -> Set[str]:
-    """The names found, and every spelling of a declared home one of them spells (as written, dashed, `%20`), so a
-    printed path masks the other spellings of that home too."""
+    """The names found, and every spelling of a declared home one of them spells (its parts joined by each separator
+    a tool writes), so a printed path masks the other spellings of that home too."""
     names = set(found)
     for name in owner:
-        encoded = name.replace("'", "%27")
-        spelled = {name, encoded.replace(" ", "%20"), encoded.replace(" ", "+"), re.sub(r"[ ._']", "-", name)}
-        if {n.lower() for n in names} & spelled:
-            names |= spelled
+        parts = _name_parts(name)
+        body = re.compile(r"(?i:%s)" % (_NAME_JOIN + "+").join(re.escape(part) for part in parts), re.ASCII)
+        if parts and any(body.fullmatch(n) for n in names):
+            names |= {name} | {sep.join(parts) for sep in (" ", ".", "_", "-", "+", "'", "%20", "%27")}
     return names
 
 
 def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
-    """A declared home name in every form, read whole: as written (a space, a `.` or `_` kept; a space also as `%20`)
-    and, in the dashed forms, as a tool dashes it (a space, `.` and `_` become `-`), since the generic forms end a
-    name at a dash or a space, so `-Users-j-doe-proj` would read `j`. It ends only where a letter or digit would
-    continue it: a `.` or `_` after it (an extension, a sentence's end) is read as the declared home, failing closed."""
+    """A declared home name in every form, read whole, its parts joined by any run of the separators a tool or a
+    language writes (`_NAME_JOIN`: a space, `.`, `_`, `-`, `+`, `'` and their escapes and percent-encodings), since
+    the generic forms end a name at a dash or a space, so `-Users-j-doe-proj` would read `j`. It ends only where a
+    letter or digit would continue it: a `.` or `_` after it (an extension, a sentence's end) is read as the declared
+    home, failing closed."""
     if name not in _DASHED:
-        def whole(spelling: str) -> str:
-            return r"((?i:%s))(?![A-Za-z0-9])" % re.escape(spelling)
-        encoded = name.replace("'", "%27")
-        patterns = [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_SLASHED
-                    for spelling in sorted({name, encoded.replace(" ", "%20"), encoded.replace(" ", "+")})]
-        patterns += [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_DASHED
-                     for spelling in sorted({re.sub(r"[ ._']", "-", name), name})]
-        _DASHED[name] = tuple(patterns)
+        body = (_NAME_JOIN + "+").join(re.escape(part) for part in _name_parts(name)) or re.escape(name)
+        whole = r"((?i:%s))(?![A-Za-z0-9])" % body
+        _DASHED[name] = tuple(re.compile(prefix + whole, re.ASCII) for prefix in _DECLARED_SLASHED + _DECLARED_DASHED)
     return _DASHED[name]
 
 
@@ -371,7 +376,7 @@ def read_list(path: Path) -> List[str]:
     # at CRLF, CR or LF: a list saved with CR alone keeps its lines, and a FF or U+2028 starts none
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         # a byte-order mark or a zero-width character at a line's start (two lists joined) is no part of the line
-        text = raw.strip().lstrip("\ufeff\u200b\u200c\u200d\u2060").strip().replace(HOME_ENTRY, "")
+        text = raw.strip().lstrip("\ufeff\u200b\u2060").strip().replace(HOME_ENTRY, "")  # no meaning at a start
         home = _HOME_LINE.fullmatch(text)
         if home and home.group(1).isascii():
             entries.append(HOME_ENTRY + home.group(1).lower())
@@ -551,9 +556,10 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     # it, its parts joined by none or any run of the separators a tool writes (a space, `.`, `_`, `-`, `+`, and their
     # percent-encodings), found or not
     for declared in _owner_homes(entries):
-        parts = [part for part in re.split(r"[ ._'-]+", declared) if part]
+        parts = _name_parts(declared)
         if sum(len(part) for part in parts) >= 3:
-            joined = r"(?:[ ._+'-]|%2[07BbDdEe]|%5[Ff])*".join(re.escape(part) for part in parts)
+            # a whole word only: an unfound `home: app` leaves `mapping` and `app.json`'s neighbours readable
+            joined = r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % (_NAME_JOIN + "*").join(re.escape(part) for part in parts)
             marks += [(m.start(), m.end(), "<home>") for m in re.finditer(joined, path, re.IGNORECASE)]
     for name in _spellings({path[s:e] for s, e in found}, _owner_homes(entries)):
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]

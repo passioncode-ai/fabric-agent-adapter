@@ -1310,6 +1310,25 @@ class Refusals(Tree):
         self.assertEqual(sorted(f["path"] for f in json.loads(out)["findings"] if f["path"].startswith("ap")),
                          ["ap0.txt", "ap1.txt", "ap2.txt", "ap3.txt"])
         self.assertNotIn("zqdovski", out.lower())
+        # reading 36, unit: a space and an apostrophe each in its own spelling (encodeURIComponent and file URLs keep
+        # the apostrophe and encode the space), an escaped apostrophe in code, and a short dotted name in another spelling
+        mixed = "o'nq" + "zl family"
+        for text in ("file:///Users/" + mixed.replace(" ", "%20") + "/x", "%2FUsers%2F" + mixed.replace(" ", "%20") + "%2Fp",
+                     "/Users/" + mixed.replace("'", "%27") + "/q", "p='/Users/" + mixed.replace("'", "\\'") + "/x'",
+                     "/Users/" + mixed.replace("'", "&#39;") + "/x"):
+            self.assertTrue(sc._home_names(text, {mixed}), text)
+        for text, name in (("file:///C:/Users/Alice%20O'zq/x.mjs", "alice o'zq"), ("%2FUsers%2Fo'b%20zq%2Fp", "o'b zq"),
+                           ("%5CUsers%5Co'b%20zq%5Cp", "o'b zq"), ("/Users/O" + "\\u0027zq ab/x", "o'zq ab"),
+                           ("/Users/O&#x27;zq ab/x", "o'zq ab")):
+            self.assertTrue(sc._home_names(text, {name}), text)
+        seen = sc._Seen()
+        sc._text_findings("/Users/o'b zq/x", [sc.HOME_ENTRY + "o'b zq"], seen)
+        self.assertNotIn("zq", sc.redact("q/o'b%20zq.bin", [sc.HOME_ENTRY + "o'b zq"], seen))
+        # reading 36, product: an unfound declared neutral name is masked as a word only
+        self.assertEqual(sc.redact("src/mapping/app.json", [sc.HOME_ENTRY + "app"]), "src/mapping/<home>.json")
+        seen = sc._Seen()
+        sc._text_findings("see /Users/a.b/x", [sc.HOME_ENTRY + "a.b"], seen)
+        self.assertEqual(sc.redact("q/a_b/.env", [sc.HOME_ENTRY + "a.b"], seen), "q/<home>/.env")
         # reading 35, unit: a doubled or encoded separator, or none, still joins the parts of a declared name; and
         # three characters of separators around one or two letters mask nothing
         s = "zq" + "dovski"
