@@ -476,6 +476,20 @@ class BoardMandateTests(Conversation):
                 return float
         self.assertEqual((jsv.real_number(ClaimsFloat(7)), type(jsv.real_number(ClaimsFloat(7)))), (7, int))
 
+        class ClaimsBool(int):  # an int whose __class__ says bool: read as 500, never as True (unit reading 30)
+            @property
+            def __class__(self):
+                return bool
+
+        class ClassRaises(float):  # a float whose __class__ raises: answered, never a raise
+            @property
+            def __class__(self):
+                raise RuntimeError("__class__ ran")
+        for spend in (ClaimsBool(500), ClassRaises(500.0), [ClaimsBool(500)][0]):
+            got = at_depth(0, spend)
+            self.assertEqual((got["data"]["detail"], got["data"]["estimateUsd"]), ("outside-mandate: spend", 500), type(spend))
+        self.assertEqual((jsv.js_to_number(ClaimsBool(500)), jsv.js_to_number(True)), (500.0, 1.0))
+
         class Text(str):
             pass
 

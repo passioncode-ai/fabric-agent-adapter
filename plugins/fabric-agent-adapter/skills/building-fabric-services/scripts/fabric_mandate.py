@@ -21,7 +21,8 @@ the task, narrowed at each hand-over. Part of the service kit (layer L2); the tw
   ``instruction`` it stays in the receiver's own record: never an event, a usage report, a log line or a page.
 
 The kit has no JSON Schema validator: the shape is written here from the schema, lengths in code points and patterns
-over the whole string, as the contract's validator reads them. Never raises on what it reads. Standard library only.
+over the whole string, as the contract's validator reads them. Never raises on JSON as json.loads gives it (a direct
+caller's key with its own __eq__ in a mandate or scope is compared as given: FAA-196 (22)). Standard library only.
 """
 from __future__ import annotations
 
@@ -245,9 +246,9 @@ def _member_of(items: Any, value: Any) -> bool:
 #: nesting is what JavaScript's String() of a list recurses through (Node and the contract throw RangeError a few
 #: thousand deep, 0.60.0 raised RecursionError a few hundred deep), and the spend a refusal carries as estimateUsd is
 #: then one a serialiser writes. Under a dict there is no bound: Number() never descends a dict, which is NaN at any
-#: depth in 0.60.0, Node and the contract alike, but for one with an own toString at the top or through lists alone,
-#: on which Number() throws (see _json_data). Stricter than all three between 100 and their limit: FAA-196 (22); no
-#: JSON reader of the kit reaches it (0.61.0 readings 25 to 27).
+#: depth in all three, but for one with an own toString at the top or through lists alone, on which Node and the
+#: contract throw (0.60.0 read it as NaN; the core refuses it, see _json_data). Stricter than all three between 100
+#: and their limit: FAA-196 (22); no JSON reader of the kit reaches it (0.61.0 readings 25 to 30).
 MAX_SPEND_DEPTH = 100
 
 

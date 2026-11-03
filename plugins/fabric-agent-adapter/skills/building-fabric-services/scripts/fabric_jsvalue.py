@@ -215,7 +215,7 @@ def js_to_number(value: Any) -> float:
         return math.nan
     if value is None:
         return 0.0
-    if isinstance(value, bool):
+    if value is True or value is False:  # by identity: isinstance asks a number subclass's own __class__ (unit reading 30)
         return 1.0 if value else 0.0
     if is_number(value):
         value = held(value)  # by the number it holds: a subclass's own float() or comparison is never asked
