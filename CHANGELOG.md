@@ -15,7 +15,8 @@ names why a provider manifest is refused (FAA-193).
   holds the slot again (the record loses `moved`, the request it handed out is worked, or its own enroll renews the
   lease at once; a later move is said again); `lease_expired` enrolls again; `held` asks at the next renewal; `fenced`
   or another refusal that is not the board session's records the new generation, so the same move is not asked about
-  twice. A recorded move drops the capability's claim key, so a claim answer lost before the move is never replayed. It never enrolls or replaces a
+  twice. A recorded move drops the capability's claim key, so a claim answer lost before the move is never replayed, and a
+  lost answer to the move-back claim itself is asked again under its key (`not_authorized` counts as another session's). It never enrolls or replaces a
   slot another session holds, and waits while other work runs. Both kits (`fabric_board_slots.py`,
   `fabric-board-slots.mjs`). The `board.slot.moved` notice and references/board.md say so (FAA-165).
 - `pack` refused a provider manifest whose `costPresets` differ from the package's with only `provider-manifest`; the
@@ -37,8 +38,8 @@ names why a provider manifest is refused (FAA-193).
 
 - A kit service gets the move back once it installs the 0.60.0 kit modules (`fabric_board_slots.py`,
   `fabric-board-slots.mjs` and their callers). Only the running session hears a move back: a slot moved back to a
-  session that has since ended, or to a service still on an older kit, still needs take-back or a new move to the
-  running session.
+  session that has since ended needs take-back or a new move to the running session. A kit older than 0.60.0 never
+  hears a move back: it needs take-back, or the 0.60.0 modules and then a move.
 
 ## 0.59.0 (2026-11-03)
 

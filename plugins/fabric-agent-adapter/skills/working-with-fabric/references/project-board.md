@@ -107,10 +107,12 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    new holder as "Answers it" and its "requests no agent answers now" leaves them out (FAA-172). The board shows a
    requester no attempt or generation (`com.get` gives the request's `state`, `effect` and `revision`, never its attempt), so you cannot tell
    this from slow work: when your request has stayed `accepted` with no progress note or reply past what the work
-   should take, ask on its thread (`com.reply`) whether it is being worked, and if nobody answers, treat it as nobody
-   live for that request (step 3 or 4) and tell the person. While its `effect` is still `not_started`, `com.cancel`
-   moves it to `cancelled` (nothing has happened yet): submit it again only when the cancel's receipt shows the
-   request `cancelled`; `outcome_unknown` means the work began meanwhile, so tell the person and do not resubmit.
+   should take, ask on its thread (`com.reply`) whether it is being worked. If nobody answers, cancel it first: while
+   its `effect` is still `not_started`, `com.cancel` moves it to `cancelled` (nothing has happened yet). Only when the
+   cancel's receipt shows the request `cancelled`, submit it again or go on to step 3 or 4 with the new request; an
+   accepted request never expires, and the old service would carry it out by a transfer once it gets the slot back, so
+   it is never adapted while still accepted. `outcome_unknown` means the work began meanwhile: tell the person and
+   change nothing.
 2. **Live:** wait under a watcher (below) and work on independent tasks meanwhile; never touch files a live session
    holds.
 3. **Nobody live, and the change is small.** Small means all three:
@@ -125,8 +127,8 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    allow. Then reply on the request's thread, one line of body text (not a `reaction`, which only an announcement's
    reply carries): **adapted by** your Project, the merge commit, and what the owner should look at. The owner's next
    session reads it and may revert it. One such change per target repository at a time. Your own reply does not answer
-   your own request: it stays on the board, on its thread and on Fabric's home ("requests no agent answers now"), for
-   the owner to see until its deadline; do not cancel it.
+   your own request: a queued one stays on the board, on its thread and on Fabric's home ("requests no agent answers
+   now"), for the owner to see until its deadline; do not cancel it.
 4. **Not small** (a decision, a contract, a release, a large change): the request stays queued for its owner until its
    deadline (seven days by default); never take a decision that is the owner's, record the wait in one line (what it
    waits on, which watcher acts) and go on with your own work. An expiry posts no message, so the mail watcher does

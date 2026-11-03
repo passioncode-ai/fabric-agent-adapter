@@ -480,6 +480,16 @@
         "reads fabric_task_create's answer as Step 4 item 2 says: created false with a code filed nothing, proposed true filed nothing and waits for the operator, spawned_from names the parent Fabric chose",
         "says that while a claim is held Fabric 0.3.14 links the new task as spawned from it, so it files the unrelated row after releasing its claim or tells the person the row is linked to the request"
       ]
+    },
+    {
+      "id": "an-accepted-request-left-behind-by-a-move",
+      "trap": "the agent waits for an accepted request to expire, or adapts the change by hand while the request is still accepted, so the old service carries it out a second time once it gets its slot back",
+      "request": "Your request to another Project has been `accepted` for two days with no progress note or reply, though com.directory shows its responder active. What do you do?",
+      "expected": [
+        "says an active responder does not prove the request is worked: a slot moved to another session leaves the old holder's accepted requests with nobody on them, and the requester sees no attempt or generation (com.get shows state, effect and revision)",
+        "asks on the request's thread first, and with no answer cancels it while its effect is not_started, going on (resubmit, or the small change by hand) only when the cancel's receipt shows cancelled",
+        "with outcome_unknown in the receipt tells the person and changes nothing, and never waits for an accepted request to expire, since accepted work does not expire"
+      ]
     }
   ]
 }

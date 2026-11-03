@@ -120,7 +120,7 @@ once the kit reads it (FAA-135).
 |---|---|
 | `fenced` | the attempt is another responder's: stop the handler, drop the entry (nothing outside had begun); accepted work on a slot this responder recorded holding stays as `lapsed`, and the next tick asks `com.status` whether the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155) |
 | `lease_expired` on accepted work | stop the handler; the board holds the request, and the kit takes it back with `com.responder_replace` and a transfer |
-| `authority_changed`, `not_authorized` | stop claiming; one `board.access.needed` event (notify) saying what to ask for |
+| `authority_changed`, `not_authorized` | stop claiming; one `board.access.needed` event (notify) saying what to ask for (except `not_authorized` on the move-back claim of a moved slot, read as another session's slot, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)) |
 | `fenced` on enroll or claim | another live holder: wait for it to lapse; never replace it on its own initiative. When this responder recorded holding the slot, it first reads `com.status`: a newer generation means the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155), and it is not taken again even after that holder lapses |
 | lost after an effect began | keep the entry as `unknown`; `observe(entry)` is asked to settle it with `com.reconcile` |
 | Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning |
@@ -194,7 +194,7 @@ whose responder was gone. Read it as the owner's attestation, not the responder'
 
 ## When the operator moves a slot to another session (FAA-155)
 
-The contract's DEC-0140 PR-2 (proposed, after this kit's pin; Fabric plans it for 0.3.15) lets the operator move a
+The contract's DEC-0140 PR-2 (accepted 2026-10-30, after this kit's pin) lets the operator move a
 (Project, capability) slot to another live session of the Project: one transition, as `com.responder_replace` would make
 it for the receiving session (generation up, `claimed` back to `queued`, `in_progress` to `outcome_unknown`, `accepted`
 held and not transferred). The responder keeps that move instead of undoing it:
@@ -256,10 +256,12 @@ held and not transferred). The responder keeps that move instead of undoing it:
   lands is the slot held again: the record loses `moved`, the request it handed out is worked (with none, its own
   enroll renews the lease at once), accepted work left `lapsed` comes back with a transfer, and a later move is said
   again. `lease_expired` (the move reached this session and its lease lapsed first) enrolls again. `held` asks again
-  at the next renewal. `fenced`, or any other refusal that is not the board session's, is another session's slot:
-  recorded as `moved` at that generation, so it is not asked about twice. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
+  at the next renewal. `fenced`, or any other refusal that is not the board session's (`not_authorized` counted with them, since a
+  non-holder's claim may be refused so), is another session's slot:
+  recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
+  landed is not stranded. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
   while other work runs: a move back during a job longer than the lease (60 s) may lapse and be lost to another
-  session, after which only take-back brings it back.
+  session, after which take-back, or another move back to this session, brings it back.
 - Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
   being read at the same time: the move is written under the responder's lock (Node: on the fence queue, after any fenced
   call in flight) and only while the record is unchanged (FAA-158). Never edit the

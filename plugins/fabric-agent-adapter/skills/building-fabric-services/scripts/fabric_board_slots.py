@@ -149,10 +149,16 @@ class SlotKeeper:
         now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
         if not _is_int(now, 1) or now <= seen:
             return
-        key = self.claim_keys[capability] = self._key("claim")  # a fresh key: one from before the move may hold a dead receipt
+        if capability not in self._probing or capability not in self.claim_keys:
+            self.claim_keys[capability] = self._key("claim")  # a fresh key: one from before the move may hold a dead receipt
+        key = self.claim_keys[capability]
         try:
             answer = self._receipt("com.claim", self._call("com.claim", {"idempotency": self._idem(key), "capability": capability}))
         except BoardError as exc:
+            if exc.code == "unreachable":  # the claim may have landed: asked again under this key, never left to the fault
+                self._probing.add(capability)
+                return
+            self._probing.discard(capability)
             if exc.code == "held":
                 return  # the operator's hold: asked again at the next renewal
             if exc.code in ("idempotency_window_expired", "capacity_exceeded"):
@@ -169,12 +175,14 @@ class SlotKeeper:
                 if self.checkpoint.slots.get(capability) == held:  # take_back meanwhile wins (FAA-158)
                     self._note(capability, dict(held, moved=now))
             return
+        self._probing.discard(capability)
         attempt = answer.get("attempt") if isinstance(answer.get("attempt"), dict) else {}
         generation = _whole(attempt.get("generation"))
         if not self._back(capability, held, generation if _is_int(generation, 1) else now):
             return
         if "request" in answer:
             self.claim_keys.pop(capability, None)
+            self.slots[capability]["renewed_at"] = self.now()  # the claim just landed: its lease runs (finding 38)
             self._start(capability, answer)
         else:
             self._enroll(capability)  # renewed now: whether an empty com.claim renews the lease is not the contract's to say

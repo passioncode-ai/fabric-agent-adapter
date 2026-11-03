@@ -155,6 +155,7 @@ class Responder(SlotKeeper):
         self.wait_until = 0.0
         self.stopping = False
         self.claim_keys: Dict[str, str] = {}
+        self._probing: set = set()  # moved slots whose move-back claim lost its answer: asked again under the same key
         self._said: Dict[str, str] = {}
         self._rr = 0
         #: The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS.

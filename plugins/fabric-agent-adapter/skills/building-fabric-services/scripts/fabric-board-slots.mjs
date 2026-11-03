@@ -152,11 +152,16 @@ export class SlotKeeper {
     if (this.slots[capability]) this.slots[capability].renewedAt = this.now();
     const now = ((await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if (!isInt(now, 1) || now <= held.moved) return;
-    this.claimKeys[capability] = this.key('claim'); // a fresh key: one from before the move may hold a dead receipt
+    if (!this.probing.has(capability) || !this.claimKeys[capability]) this.claimKeys[capability] = this.key('claim'); // a fresh key: one from before the move may hold a dead receipt
     let answer;
     try {
       answer = this.receipt('com.claim', await this.call('com.claim', { idempotency: this.idem(this.claimKeys[capability]), capability }));
     } catch (e) {
+      if (e.code === 'unreachable') { // the claim may have landed: asked again under this key, never left to the fault
+        this.probing.add(capability);
+        return;
+      }
+      this.probing.delete(capability);
       if (e.code === 'held') return; // the operator's hold: asked again at the next renewal
       if (e.code === 'idempotency_window_expired' || e.code === 'capacity_exceeded') {
         delete this.claimKeys[capability];
@@ -174,10 +179,12 @@ export class SlotKeeper {
       await this.locked(() => { if (sameRecord(this.checkpoint.slots[capability], held)) this.note(capability, { ...held, moved: now }); });
       return;
     }
+    this.probing.delete(capability);
     const generation = isObj(answer.attempt) && isInt(answer.attempt.generation, 1) ? answer.attempt.generation : now;
     if (!(await this.back(capability, held, generation))) return;
     if ('request' in answer) {
       delete this.claimKeys[capability];
+      this.slots[capability].renewedAt = this.now(); // the claim just landed: its lease runs (finding 38)
       await this.start(capability, answer);
     } else await this.enroll(capability); // renewed now: whether an empty com.claim renews the lease is not the contract's to say
   }

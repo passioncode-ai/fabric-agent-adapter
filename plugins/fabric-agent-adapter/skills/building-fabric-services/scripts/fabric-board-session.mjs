@@ -88,6 +88,7 @@ export class Responder extends SlotKeeper {
     this.waitUntil = 0;
     this.stopping = false;
     this.claimKeys = {};
+    this.probing = new Set(); // moved slots whose move-back claim lost its answer: asked again under the same key
     this.said = {};
     this.rr = 0;
     this.reconcileAt = 0;

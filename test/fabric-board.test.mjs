@@ -1093,6 +1093,93 @@ test('FAA-165: a claim answer lost before the move is not replayed after a move 
   assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
 });
 
+test('FAA-165: a lost answer to the move-back claim is asked again under its key (0.60.0 seam reading 2)', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step(); // the claim commits, its answer is lost
+  assert.ok(r.session);
+  for (let i = 0; i < 4; i += 1) {
+    await h.advance(20);
+    await r.step();
+  }
+  const s = await h.state();
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.equal(s.slots['video.render'].holder, mine);
+  assert.equal(s.requests[rid].state, 'completed');
+});
+
+test('FAA-165: a lost answer right after a move-back claim keeps the session (0.60.0 seam reading 2)', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.accept' });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.session); // as on the claim loop's path
+  assert.ok(r.leaseLeft() > 0);
+  const s = await h.state();
+  assert.equal(s.slots['video.render'].holder, mine);
+  assert.notEqual(s.requests[rid].state, 'queued');
+});
+
+test('FAA-165: a stopping responder does not ask about a move back', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await h.advance(20);
+  r.stopping = true;
+  const seen = (await h.tools()).length;
+  await r.movedBack('video.render');
+  assert.ok(!(await h.tools()).slice(seen).includes('com.claim'));
+});
+
+test('FAA-165: a moved slot reads com.status at most once a renewal', async (t) => {
+  const { h, r } = await movedOff(t);
+  const seen = (await h.tools()).length;
+  for (let i = 0; i < 8; i += 1) { // 80 s at 10 s ticks
+    await h.advance(10);
+    await r.step();
+  }
+  assert.ok((await h.tools()).slice(seen).filter((c) => c === 'com.status').length <= 4);
+});
+
+test('FAA-165: a take-back does not replay a claim answer lost before the move (0.60.0 unit reading 2)', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(15);
+  await r.step(); // the claim commits, its answer is lost
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(r.waitUntil - h.clock.t + 0.01);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  r.takeBack('video.render'); // the other session's lease lapses within the ticks below
+  const seen = h.events.length;
+  for (let i = 0; i < 4; i += 1) {
+    await h.advance(20);
+    await r.step();
+  }
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  assert.ok(!h.events.slice(seen).some((e) => e[0] === 'board.attempt.lost'));
+});
+
+test('FAA-165: a not_authorized move-back claim reads as another session\'s slot', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'fail', tool: 'com.claim', code: 'not_authorized' });
+  const seen = h.events.length;
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.equal(record(hub)['video.render'].moved, 3);
+  assert.deepEqual(h.events.slice(seen), []);
+});
+
 test('FAA-155: work running when the slot moves stops, stays held, and is never completed or transferred', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

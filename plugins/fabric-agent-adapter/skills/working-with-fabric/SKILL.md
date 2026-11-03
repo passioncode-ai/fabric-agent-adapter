@@ -289,9 +289,9 @@ A repository's backlog row stays the status source. File the Fabric task that ru
 {"title": "…", "source": {"repository": "passioncode-ai/fabric-agent-adapter", "path": "docs/backlog.md", "id": "FAA-18"}}
 ```
 
-through `fabric_task_create` (or `fabric_work_claim`, which files one when none exists), and read its answer as in Step 4
-item 2: while you hold a claim, Fabric 0.3.14 links the row from it, so file an unrelated row after your release or
-say it is linked. Do not paste the row's text or status into the task; edit it in its repository.
+through `fabric_task_create` (or `fabric_work_claim`, which files one when none exists); read its answer as Step 4
+item 2 says. A claim you hold links the row (Fabric 0.3.14): file an unrelated row after your release, never linked
+by hand, or say it is linked. Do not paste the row's text or status into the task; edit it in its repository.
 
 ## Step 7: at the end
 
