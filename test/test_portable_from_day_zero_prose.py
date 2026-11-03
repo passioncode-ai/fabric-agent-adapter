@@ -47,7 +47,8 @@ class PortableFromDayZero(unittest.TestCase):
                       "apart from the source, from the first commit"):
             self.assertIn(words, data, words)
         holder = one_row("creating-fabric-agents/SKILL.md", "**Who holds the copyright?**")
-        for words in ("gets a `LICENSE` naming that holder in its first commit",
+        for words in ("a new private agent (built for its owner or for a client) gets a `LICENSE` naming that holder in "
+                      "its first commit",
                       "all rights reserved unless the owner gives other terms", "a public product keeps its own licence"):
             self.assertIn(words, holder, words)
         self.assertLess(grill.index("**Where does it run, for whom?**"), grill.index("**Does it run around the clock?**"))
@@ -57,8 +58,9 @@ class PortableFromDayZero(unittest.TestCase):
 
     def test_the_skeleton_gives_the_data_a_home_and_a_licence(self):
         step_2 = " ".join(section("creating-fabric-agents", "Step 2: the project skeleton").split())
-        for words in ("Its data has a home of its own from the same commit, `<agent>-data` (a folder beside the checkout, "
-                      "or a private repository of that name)",
+        for words in ("Its data has a home of its own from the same commit, the one the grill recorded: `<agent>-data` "
+                      "(a folder beside the checkout, or a private repository of that name; a kit service: the kit's "
+                      "folders; on a cloud host: a durable store)",
                       "the README names the data kind (U or O) and the uptime category (A or B)",
                       "its first commit carries a `LICENSE` naming the copyright holder the grill recorded"):
             self.assertIn(words, step_2, words)
@@ -83,12 +85,17 @@ class PortableFromDayZero(unittest.TestCase):
                           "never the checkout itself, whose ignored configuration and dependency folders",
                           # 0.59.0 product r1: the holder's LICENSE meets the owner's list
                           "The `LICENSE` is the other: its copyright line names the holder, which is authorship and "
-                          "travels with the source",
+                          "travels with the source", "no other file of the owner's is",
                           "its real-trace corpus and replay samples live in the data home",
                           # 0.59.0 seam r2: a host that does not keep its disk
                           "the data home is a durable store the same variable names",
                           "as building-fabric-services' `references/package.md` makes it"):
                 self.assertIn(words, reference, (skill, words))
+
+    def test_step_4_builds_an_uptime_a_agent_online(self):
+        # 0.59.0 seam and product r4: the grill sends an A agent to the remote placement; step 4 hands it over there
+        step_4 = " ".join(section("creating-fabric-agents", "Step 4: implement against the observables").split())
+        self.assertIn("An uptime A agent is built with the same skill as an online service (its remote placement", step_4)
 
     def test_the_uptime_reference_and_its_checklist(self):
         where = flat("creating-fabric-agents/references/where-agents-run.md")
@@ -100,6 +107,7 @@ class PortableFromDayZero(unittest.TestCase):
                       "an instance in the person's PassionCode cloud or an organization's cloud runs there",
                       "a paid agent stays in PassionCode's cloud",
                       "On a host with no Fabric hub it answers what reaches its own origin",
+                      "a call Fabric admits needs a cloud hub",
                       "never the host's own folder, which a platform such as Heroku does not keep across a restart"):
             self.assertIn(words, where, words)
 
@@ -126,7 +134,7 @@ class PortableFromDayZero(unittest.TestCase):
                       "LicenseRef-PassionCode-Commercial)",
                       " ".join(section("creating-fabric-agents", "Step 2: the project skeleton").split()))
         # 0.59.0 seam and product r3: scoped to a service built new, as the CHANGELOG says
-        self.assertIn("one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep theirs)",
+        self.assertIn("of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep theirs)",
                       flat("building-fabric-services/SKILL.md"))
 
 

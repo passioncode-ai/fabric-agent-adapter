@@ -2,8 +2,8 @@
 
 ## 0.59.0 (2026-11-06)
 
-Portable from day 0 (FAA-191, RM-36): on top of 0.58.0's source and instance, every new agent gets a data home and a
-data kind, an uptime category and a `LICENSE` naming its copyright holder from its first commit, and runs the transfer
+Portable from day 0 (FAA-191, RM-36): on top of 0.58.0's source and instance, every new agent gets a data home, a
+data kind and an uptime category, and a new private agent a `LICENSE` naming its copyright holder, from its first commit, and runs the transfer
 audit at every release until the contract's export (CT-194) replaces it.
 
 ### Added
@@ -16,8 +16,9 @@ audit at every release until the contract's export (CT-194) replaces it.
   that name), and the README names the data kind and the uptime category; an agent someone builds for themselves gets
   a `LICENSE` naming the holder (all rights reserved unless the owner gives other terms).
 - Step 5: every release runs `fabric_source_check.py check` as the transfer audit, in Git mode on the checkout and
-  with `--every-file` on a clean copy of what Git would commit (never the checkout, whose ignored configuration and
-  dependency folders `--every-file` reads too). A `LICENSE` whose holder is on the owner's list is named in
+  with `--every-file` on a clean copy of what Git would commit (building-fabric-services' `references/package.md`).
+  references/source-and-instance.md adds why never the checkout (its ignored configuration and dependency folders
+  `--every-file` reads too), and that a `LICENSE` whose holder is on the owner's list is named in
   `.fabric-source-ignore`, since authorship travels with the source.
 - references/source-and-instance.md (both skills): *The data home and its kind*; references/where-agents-run.md:
   *Uptime: A or B* and a checklist line. building-fabric-services' Step 0 answers carry the same (data kind, data

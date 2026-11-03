@@ -147,8 +147,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   bring back would go unread. Name the files, or a folder that holds
   only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
   exception), and say why on the line above. The `LICENSE` is the other: its copyright line names the holder, which is
-  authorship and travels with the source, so when the holder is on the owner's list `LICENSE` is named in the ignore
-  file with that reason (`# the copyright holder is authorship and travels with the source`); no other file of the
+  authorship and travels with the source, so when the holder is on the owner's list the licence file is named in the ignore
+  file by its own path (`LICENSE`, `LICENSE.md`) with that reason (`# the copyright holder is authorship and travels with the source`); no other file of the
   owner's is. A file `pack` refuses by its name cannot ship in a package: a public
   certificate is renamed `*.crt`; a project `.npmrc` that holds no credential may be named in the ignore file, with
   that reason, for the source check (the line then hides whatever is added to it later, so keep it credential-free),

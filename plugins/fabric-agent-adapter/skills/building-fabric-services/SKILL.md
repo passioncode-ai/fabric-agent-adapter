@@ -355,7 +355,7 @@ first commit:
 Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
 (below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's choice, the organization
-lists nothing about it, one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep
+publishes and lists nothing about it, of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep
 theirs), and the verified MCP quick start teaches anyone to drive it.
 
 ## Online services: the remote placement
@@ -427,7 +427,7 @@ this estate needs.
 - A plist pointing at a worktree or checkout breaks when it moves: point it at a release.
 - `http.server.HTTPServer` resolves its FQDN between `bind()` and `listen()`: with a slow
   resolver (a macOS CI runner, a Mac offline) the port is bound but silent. Use `fs.LoopbackHTTPServer`.
-- `logging.basicConfig` called twice: the second is a no-op and the server's log file
+- `logging.basicConfig` called twice: the second is a no-op, the server's log file
   stays empty. Configure logging once, in the entry point.
 - Hand-made `.plist.bak` files in `~/Library/LaunchAgents` are never cleaned up; keep
   backups elsewhere.

@@ -86,7 +86,7 @@ checked, and removes the instance from the next revision.
 ## Running while the laptop is closed
 
 A cloud agent keeps working with the laptop closed only if everything it needs is in the cloud: its worker, its
-secrets, its data, and a hub that can admit calls. The local Fabric hub is not a cloud hub. Design for it:
+secrets, its data, and, for the calls Fabric admits, a hub that can admit them. The local Fabric hub is not a cloud hub. Design for it:
 
 - Declare what each capability needs and where it is; a capability that needs the person's machine reports
   `pending` or `unavailable` instead of pretending, and queues within a deadline or declines.
