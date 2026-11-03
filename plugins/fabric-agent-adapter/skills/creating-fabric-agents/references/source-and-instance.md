@@ -107,10 +107,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`, and a `#` after a string is
   part of that string. An entry matches in any case and inside any word. A line `home: <name>` declares the owner's home
-  name instead (ASCII letters, digits, `.`, `_` and `-`, starting with a letter or a digit; a line that starts with
-  `home` and a colon (`home:`, `Home :`) and holds anything else is refused, exit 2; a home name holding a space, as a Windows profile may, is
-  declared by its part before the space; such a line is never a string entry, so list a string like
-  `home: page` by a part of it, `ome: page`): the check then finds that home in every form the table names (it is never neutral, even with one or two
+  name instead (ASCII letters, digits, `.`, `_`, `-` and spaces, starting with a letter or a digit; a name holding a
+  space, as a Windows profile may, is written whole, `home: Jane Doe`; any space may stand around the colon; a line
+  that starts with `home` and a colon and holds anything else is refused, exit 2; such a line is never a string
+  entry, so list a string like `home: page` by a part of it, `ome: page`): the check then finds that home in every form the table names (it is never neutral, even with one or two
   letters), and the bare name is not looked for anywhere else. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
   (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
