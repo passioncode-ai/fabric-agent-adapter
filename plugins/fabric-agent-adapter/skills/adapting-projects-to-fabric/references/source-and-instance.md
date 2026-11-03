@@ -107,7 +107,9 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   nested repository with `--every-file` in its own tree too, because `pack` carries its files, ignored ones included.
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`, and a `#` after a string is
-  part of that string. An entry matches in any case and inside any word. A line `home: <name>` declares the owner's home
+  part of that string. An entry matches in any case and inside any word; an invisible format character (a direction mark, a
+  soft hyphen, a joiner) at either end of a string is dropped and does not count toward the three, and one inside it is
+  kept, so a string copied with a soft hyphen in it matches only text that holds one. A line `home: <name>` declares the owner's home
   name instead (ASCII letters, digits, `.`, `_`, `-`, `'` and spaces, starting with a letter or a digit; a name holding a
   space, as a Windows profile may, is written whole, `home: Jane Doe`, and everything after the colon is the name, so
   a note goes on a line of its own (`# laptop`); spaces and tabs may stand around the colon; a line

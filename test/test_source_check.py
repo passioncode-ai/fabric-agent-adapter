@@ -1394,7 +1394,7 @@ class Refusals(Tree):
         for line in ("home: \u042f\u043d", "home: jo # mine", "home: /Users/jo", "home: _svc", "home: \u017fam",
                      "home\u00a0: jos\u00e9", "home:", "home: jo, al", "home: jo (work)",
                      # reading 40, unit: a format character inside the name changes it, so the line is refused
-                     "home: a\u00adlice", "home: ad\u200bmin",
+                     "home: a\u00adlice", "home: ad\u200bmin", "home: m\u00ade", "home: h\u200bome", "home: o\u00adme", "home: o\u200bm", "Home: h\u200bo",
                      # reading 34, unit: a control or a separator around the colon is no space
                      "home:\x0czq", "home:\u2028zq", "home\x1c: zq", "home:\x85zq", "home\u2029:zq"):
             listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
@@ -1411,7 +1411,7 @@ class Refusals(Tree):
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 1, repr(mark))
             self.assertIn("adm.txt:1: home-path", out)
-        listing.write_text("\u200e# laptop\n\u200b\u200e\u2066\n", encoding="utf-8")  # reading 40, seam: invisible comments
+        listing.write_text("\u200e# laptop\n\u200b\u200e\u2066\n\u200czq\n", encoding="utf-8")  # r40 seam, r41 product
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
         self.assertIn("0 instance string(s) listed", out)
         listing.write_text("zqcorpx\nhome\u200b: admin\n", encoding="utf-8")  # inside the key too
@@ -1448,6 +1448,33 @@ class Refusals(Tree):
             self.assertEqual(done.returncode, 2, done.stderr)
             self.assertIn(name + " beside this file is from another version", done.stderr)
             self.assertNotIn("Traceback", done.stderr)
+        if os.name == "posix" and os.geteuid() != 0:  # reading 41, seam: a sibling that cannot be read
+            tools = self.tmp / "unreadable"
+            tools.mkdir()
+            for sibling in ("fabric_source_check.py",) + siblings:
+                shutil.copy(SCRIPTS / sibling, tools / sibling)
+            (tools / "fabric_source_homes.py").chmod(0)
+            try:
+                done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check",
+                                       str(self.root)], capture_output=True, text=True)
+            finally:
+                (tools / "fabric_source_homes.py").chmod(0o644)
+            self.assertEqual(done.returncode, 2, done.stderr)
+            self.assertIn("fabric_source_homes.py beside this file cannot be read", done.stderr)
+            self.assertNotIn("Traceback", done.stderr)
+        # reading 41, unit: a sibling that raises its own ImportError names no module; the refusal quotes it
+        tools = self.tmp / "raising"
+        tools.mkdir()
+        for sibling in ("fabric_source_check.py",) + siblings:
+            shutil.copy(SCRIPTS / sibling, tools / sibling)
+        with (tools / "fabric_secrets.py").open("a", encoding="utf-8") as f:
+            f.write('\nraise ImportError("needs a newer contract")\n')
+        done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
+                              capture_output=True, text=True)
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("refused to load (needs a newer contract)", done.stderr)
+        self.assertNotIn("a module.py", done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
 
     def test_a_declared_home_with_a_space_is_found_whole_in_every_form(self):
         # reading 33, product: the part before the space left the surname in printed paths; a `home:` line now takes
@@ -1554,6 +1581,16 @@ class Refusals(Tree):
         self.assertEqual(code, 1)
         self.assertIn("(line 2)", out)
         self.assertIn("2 instance string(s) listed", out)
+        # reading 41, seam: a direction mark, an isolate or a soft hyphen at a string's ends belongs to no string
+        for mark in ("\u200e", "\u200f", "\u2066", "\u202a", "\u00ad", "\ufeff\u200e"):
+            listing.write_text(mark + "zqcorpx" + ("\u2069" if mark == "\u2066" else "") + "\n", encoding="utf-8")
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+            self.assertEqual(code, 1, repr(mark) + out)
+            self.assertIn("a.txt:1: instance-string", out)
+        listing.write_text("zq\u200dcx\u200d\n", encoding="utf-8")  # a joiner inside stays, one at the end goes
+        self.write("a.txt", "zq\u200dcx\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertIn("a.txt:1: instance-string", out)
 
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")
