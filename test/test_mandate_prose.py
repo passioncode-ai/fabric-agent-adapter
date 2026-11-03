@@ -84,14 +84,14 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         board = flat("working-with-fabric/references/project-board.md")
         for words in ("`mandate-not-for-this-call` means you handed it on to the wrong agent id", "never asking him",
                       "`mandate-expired` means your lead asks him once for a new one (MD-1)", "`-widened`",
-                      "the scope in force, `effective_scope`, never wider"):
+                      "no machine\nhand-over is left".replace("\n", " "), "never for a task it already leads"):
             self.assertIn(words, board, words)
-        for words in ("restates its own mandate", "`task`, `instruction`, `at`, `expiresAt` and the scope in force unchanged",
-                      "chain starting with it"):
+        for words in ("A link holding a four-agent chain hands on no mandate", "from his own Project on the board (OA-3)",
+                      "whose receiver states its own (OA-2)"):
             self.assertIn(words, flat_rule, words)
         interop = flat("building-fabric-services/references/interop.md")
-        for words in ("is restated instead of handed on", "the scope in force (`effective_scope` / `effectiveScope`, never wider)",
-                      "keep the held mandate in your own record (OA-6)"):
+        for words in ("takes no fifth (MD-2)", "never restate a held mandate to start a new chain",
+                      "has no route past four agents until the contract's CT-205"):
             self.assertIn(words, interop, words)
 
     def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)

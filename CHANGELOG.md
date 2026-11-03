@@ -13,7 +13,8 @@ says that his approval holds for the whole task, at every link (FAA-195).
   ` ```json `, each fence at the start of its own line with no indent, in its body (contract project-comms.md, DEC-0125 MD-3). The handler gets it as `ctx.mandate`, and
   `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1, the responder's wall clock (`wall=`,
   `time.time` by default; Node `Date.now`, milliseconds) and the sender Project as the `caller` of a covered answer's
-  `recordAs`; None when no mandate travelled, and `{"fault": "now-unreadable"}` when the clock does not read. A `source` in the block is dropped (OA-7). Two blocks, or one naming
+  `recordAs`; None when no mandate travelled, and `{"fault": "now-unreadable"}` when the clock returns a value that is not a finite instant (one that raises passes its
+  error to the handler). A `source` in the block is dropped (OA-7). Two blocks, or one naming
   `mandate/1` that is not JSON (an integer longer than 4300 digits included, on every Python), read as none, with a `board.request.mandate_unread` warning carrying only its `reason`.
   Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
   mandate. Both kits (FAA-135).
@@ -37,9 +38,9 @@ says that his approval holds for the whole task, at every link (FAA-195).
   mandate, never the task; a mandate lapses within seven days of his words, and a task still open asks him once for a
   new one, his same words with `at` when he confirms (MD-1), then weekly until the contract's CT-205 (its answer
   `7f372925` on board thread `118f95f9`; CT-205 is a row the contract proposes after this kit's pin, on its branch
-  `agent/template-parity-20261103`); a link whose chain already holds four agents restates its own mandate, keeping
-  `task`, `instruction`, `at`, `expiresAt` and the scope in force (its `source` in its own record), and hands that on (OA-2, the contract's answer `7f372925`),
-  since a service reads no prose; references/interop.md gives a service at a full chain the same route. `expiresAt` is counted from `at` and
+  `agent/template-parity-20261103`); a link whose chain already holds four agents hands on no mandate and never restates its own: the four
+  parts go as a relay from his own Project on the board (OA-3), whose receiver states its own (OA-2), as the contract
+  confirmed on board thread `118f95f9`; references/interop.md says a service has no route past four agents until CT-205. `expiresAt` is counted from `at` and
   covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
   source and spend sentences are reworded with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
 - working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`
