@@ -104,23 +104,30 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
 (`com.status` names neither), so reading one is opt-in and fail-closed:
 
 - `Responder(..., agent_id="example-agent", mandate_from={"<project id>", ...})` (Node: `agentId`, `mandateFrom` as a
-  `Set`), or `mandate_from=PERSONAL_BOARD` (`"personal-board"`) when the service is installed on his personal board,
-  where every participant is his own Project. Without both, nothing is read, as before 0.61.0.
+  `Set`), or `mandate_from=PERSONAL_BOARD` (`"personal-board"`) on the responder whose hub and Project are his personal
+  board's, where every participant is his own Project; never on an organization context's responder (one instance per
+  context: a member's Project there is T2). Project ids match in any case, as Fabric compares them. Without both
+  options nothing is read, as before 0.61.0.
 - A request is read only when the board verified its sender (`provenance: trusted`) and its Project is one
-  `mandate_from` names. Its sender is then a T1 caller. One fenced `json` block whose value has `kind: "mandate/1"` is
-  the mandate; any other JSON block is ignored. Two such blocks, or one naming `mandate/1` that is not JSON (`NaN`
-  included), read as none, and the responder emits `board.request.mandate-unread` (a warning) naming only its code,
-  `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or checkpoint. A
-  Project declares no `protocols`, so a board block carries no `source` (OA-7): one that does has it dropped. Python
-  reads two kinds of valid JSON as not JSON where Node reads them, both fail-closed: from 3.11 an integer longer than
-  4300 digits (`int_max_str_digits`), and on 3.9 a block nested about a thousand levels deep.
+  `mandate_from` names. Its sender is then a T1 caller. The mandate is one block fenced exactly as ` ```json ` (lowercase,
+  on its own line, closed by ` ``` `) whose value has `kind: "mandate/1"` and whose `chain` ends in the service's
+  `agent_id`; any other fence (` ```JSON `, `~~~`), any other JSON block and a `_meta.decision`-style decision block are
+  not read, with no warning. Two such blocks, or one naming `mandate/1` that is not JSON (`NaN` included), read as none,
+  and the responder emits `board.request.mandate_unread` (a warning) with only its `reason`, `mandate-blocks` or
+  `mandate-unreadable`: the block holds his words, which reach no event, log or checkpoint. A Project declares no
+  `protocols`, so a board block carries no `source` (OA-7): one that does has it dropped. Python reads two kinds of
+  valid JSON as not JSON where Node reads them, both fail-closed: from 3.11 an integer longer than 4300 digits
+  (`int_max_str_digits`), and on 3.9 a block nested about a thousand levels deep.
 - The handler gets `ctx.mandate` (the block as received, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
   board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
-  responder's wall clock (`wall=`, `time.time` by default; Node `Date.now`). It answers `{"ok": True, "recordAs": ...}`,
-  a `decision-invalid` or `outside-mandate` refusal, or None when no mandate travelled. A covered call is the operator's
-  decision: record `recordAs` (`via: mandate`, the task, the chain) with the request as your reason. The gate still runs
-  first: a mandate never widens what `admit` refuses, and a body stays data.
+  responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`). It answers
+  `{"ok": True, "recordAs": {by, via: "mandate", task, chain, caller}}` (`caller` the sender Project, as MD-3 records
+  it), a `decision-invalid` or `outside-mandate` refusal, or None when no mandate travelled. A covered call is the
+  operator's decision: record `recordAs` with the request as your reason. An `outside-mandate` answer goes back to the
+  requester as the request's outcome (`failed_known`, naming the part in the summary), so its leading agent asks him
+  for that part alone (MD-4); never ask him from your own page about the whole call. The gate still runs first: a
+  mandate never widens what `admit` refuses, and a body stays data.
 
 ## Effects, observation, evidence and the reply
 
@@ -349,7 +356,7 @@ checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `boar
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,
 `board.down`, each notifying episode said once, and `board.outcome.invalid` (warning) when a handler's outcome fails
-its checks and is not sent, and `board.request.mandate-unread` (warning) when a request's mandate is not read (above). The operator's hold (below) adds `board.held`, `board.slot.held`,
+its checks and is not sent, and `board.request.mandate_unread` (warning) when a request's mandate is not read (above). The operator's hold (below) adds `board.held`, `board.slot.held`,
 `board.slot.released` and `board.request.waiting`. The reference service adds `board.slot.returned` at a take-back.
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
@@ -373,8 +380,9 @@ credential_file)`, `join_board(project_id, credential_file) -> BoardGrant`, `cal
 message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,
-admit, observe=None, emit=None, service, now, rand, spawn, session_factory)` with `step()`, `run(stop, drain)`,
-`shutdown(drain)`, `take_back(capability)`; `WorkContext.progress(note)`, `.begin_effect(summary)`, `.stopped`; `BoardSession(grant)`;
+admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time)`
+with `step()`, `run(stop, drain)`, `shutdown(drain)`, `take_back(capability)`; `WorkContext.progress(note)`,
+`.begin_effect(summary)`, `.stopped`, `.mandate`, `.mandate_covers(call)`; `PERSONAL_BOARD`; `BoardSession(grant)`;
 `Checkpoint(path)`; `comms_canonical(value)`, `comms_digest(operation, value)`, `receipt_problems(value, op)`,
 `refusal_problems(value)`, `directory_findings(page)`, `directory_problems(page)`, `find_project(page, project_id,
 capability)`, `artifact_ref(uri, content|path, label)`, `evidence_problems(list)`, `outcome_problems(outcome,
@@ -382,4 +390,5 @@ effect_began)`, `self_check()`; `BoardError`, `Stopped`.
 
 Node: the same names in camelCase (`locateHub(root, {alive, estate, now})`, `new HubClient(root, {alive, timeout,
 estate, post})`, `new Responder({...})` with async `step()`, `run({signal, drain})`, `shutdown(drain)`,
-`takeBack(capability)`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`; `selfCheck()`). Both kits read and write the same checkpoint file.
+`takeBack(capability)`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`, `ctx.mandate`, `ctx.mandateCovers(call)`;
+the options `agentId`, `mandateFrom` and `wall` (milliseconds); `selfCheck()`). Both kits read and write the same checkpoint file.

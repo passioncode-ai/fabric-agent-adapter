@@ -18,8 +18,9 @@ class EvalsComeFirst(unittest.TestCase):
         wanted = {
             "working-with-fabric": {"operator-approval-binds-all-his-agents", "board-relay-from-a-trusted-project",
                                     "lead-hands-on-a-narrowed-mandate", "outside-mandate-asks-once-for-that-part",
-                                    "relay-source-goes-only-where-it-is-read", "lead-covers-a-job-step-by-its-capability"},
-            "building-fabric-services": {"service-reads-the-operators-mandate"},
+                                    "relay-source-goes-only-where-it-is-read", "lead-covers-a-job-step-by-its-capability",
+                                    "an-approval-holds-for-the-whole-task"},
+            "building-fabric-services": {"service-reads-the-operators-mandate", "board-request-carries-the-operators-mandate"},
         }
         for skill, ids in wanted.items():
             self.assertEqual(ids - scenario_ids(skill), set(), skill)
@@ -74,6 +75,12 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         self.assertNotIn("ahead of the pinned contract", board)
         for words in ("OA-2", "OA-7", "without `source`"):
             self.assertIn(words, board, words)
+
+    def test_an_approval_holds_for_the_whole_task(self):  # an-approval-holds-for-the-whole-task (FAA-195)
+        flat_rule = " ".join(self.rule.split())
+        for words in ("holds for the whole task, at every link", "`118f95f9`", "narrowing only", "never the task",
+                      "asks him once for a new one (MD-1)", "`at` when he confirms", "CT-205", "`7f372925`"):
+            self.assertIn(words, flat_rule, words)
 
     def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)
         self.assertIn("pass the refusal to the agent that called you", self.rule)

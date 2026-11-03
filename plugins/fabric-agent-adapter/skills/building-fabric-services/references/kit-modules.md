@@ -86,7 +86,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools; re-exports the rule layer ([interop](interop.md)) |
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
-| L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data |
+| L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data, and the operator's mandate a request carries (FAA-135, imports `fabric_mandate`) |
 | L4 | `fabric_board_slots` | the responder's slot records: the generation held, a move, its take-back and a move back (FAA-165), one capability's refusal retried alone (FAA-163) |
 | L4 | `fabric_board_session` | the board responder: the work context, the fenced request, transfer and recovery |
 | L4 | `fabric_board_fixture` | the scripted board the probe runs a responder against |

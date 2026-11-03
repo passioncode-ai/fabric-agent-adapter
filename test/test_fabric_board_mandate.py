@@ -11,6 +11,7 @@ from test_fabric_board import Conversation, fb  # noqa: F401 - the shared conver
 from fake_fabric_hub import OTHER_PROJECT
 
 fm = importlib.import_module("fabric_mandate")  # on the path test_fabric_board set
+fe = importlib.import_module("fabric_events")
 
 WALL = 1_793_700_000.0  # the responder's wall clock, in seconds
 AT = fm.format_rfc3339(WALL * 1000)
@@ -52,7 +53,7 @@ class BoardMandateTests(Conversation):
         got, covered, outside = self.run_one(body(json.dumps(m)))
         self.assertEqual(got, m)
         self.assertEqual(covered, {"ok": True, "recordAs": {"by": "operator", "via": "mandate", "task": "task-teaser",
-                                                            "chain": ["lead-agent", "example-agent"]}})
+                                                            "chain": ["lead-agent", "example-agent"], "caller": OTHER_PROJECT}})
         self.assertFalse(outside["ok"])
         self.assertEqual(outside["data"]["detail"], "outside-mandate: capability")
 
@@ -85,14 +86,16 @@ class BoardMandateTests(Conversation):
                 got, covered, _ = self.run_one(text)
                 self.assertIsNone(got)
                 self.assertIsNone(covered)
-                said = [e for e in self.events if e[0] == "board.request.mandate-unread"]
+                said = [e for e in self.events if e[0] == "board.request.mandate_unread"]
                 self.assertEqual(len(said), 1)
                 self.assertIn(code, said[0][2])
+                self.assertEqual(said[0][3]["data"]["value"], {"request": said[0][3]["data"]["value"]["request"], "reason": code},
+                                 "the data survives FAC-SEM-101: its reason is under `reason`, never `code`")
 
     def test_a_json_block_that_is_no_mandate_is_ignored(self):
         got, covered, _ = self.run_one(body('{"frames": 24}'))
         self.assertIsNone(got)
-        self.assertEqual([e for e in self.events if e[0] == "board.request.mandate-unread"], [])
+        self.assertEqual([e for e in self.events if e[0] == "board.request.mandate_unread"], [])
 
     def test_a_chain_that_does_not_end_here_is_not_for_this_call(self):
         got, covered, _ = self.run_one(body(json.dumps(mandate(callee="other-agent"))))
@@ -125,6 +128,24 @@ class BoardMandateTests(Conversation):
         got, covered, _ = self.run_one(body(json.dumps(mandate(source={"project": "example-site", "session": "sess-1"}))))
         self.assertNotIn("source", got)
         self.assertNotIn("source", covered["recordAs"])
+
+    def test_the_warning_reaches_the_real_event_log(self):
+        """0.61.0 seam reading 1: a kind with a hyphen is refused by make_event, so the warning never reached a feed."""
+        log = fe.JsonlEventLog(self.data / "events.jsonl")
+        self.run_one(body(json.dumps(mandate()), json.dumps(mandate())), emit=log.append)
+        kinds = [e["kind"] for e in log.fetch(None, 50)]
+        self.assertIn("board.request.mandate_unread", kinds)
+
+    def test_a_declared_project_matches_in_any_case(self):
+        got, covered, _ = self.run_one(body(json.dumps(mandate())), mandate_from={OTHER_PROJECT.upper()})
+        self.assertTrue(covered["ok"])
+
+    def test_a_read_mandate_reaches_no_event_and_no_checkpoint(self):
+        log = fe.JsonlEventLog(self.data / "events.jsonl")
+        self.run_one(body(json.dumps(mandate())), emit=log.append)
+        self.assertNotIn(WORDS, (self.data / "events.jsonl").read_text())
+        path = self.data / "board-checkpoint.json"
+        self.assertNotIn(WORDS, path.read_text() if path.exists() else "")
 
     def test_a_responder_refuses_a_bad_agent_id_or_mandate_from(self):
         for kw in ({"agent_id": "Not An Id"}, {"mandate_from": "everyone"}, {"mandate_from": [42]}, {"mandate_from": 42},

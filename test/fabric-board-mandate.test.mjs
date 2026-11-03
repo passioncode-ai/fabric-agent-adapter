@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import * as fb from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board.mjs';
 import * as fh from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs';
 import { handOn, operatorMandate } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-mandate.mjs';
+import { makeEvent } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-events.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,7 @@ async function fakeHub(t) {
   const events = [];
   const seen = [];
   const handler = async (request, ctx) => {
+    seen.ctx = JSON.stringify(ctx);
     seen.push([ctx.mandate, ctx.mandateCovers({ capability: 'video.render', effect: 'draft' }), ctx.mandateCovers({ capability: 'video.cut', effect: 'draft' })]);
     return { state: 'completed', summary: 'Rendered.' };
   };
@@ -55,7 +57,7 @@ async function fakeHub(t) {
     assert.equal(seen.length, 1, 'the handler ran once');
     return seen[0];
   };
-  return { data, events, runOne, options };
+  return { data, events, runOne, options, seen };
 }
 
 test('FAA-135: a trusted request from a declared Project carries its mandate', async (t) => {
@@ -63,7 +65,7 @@ test('FAA-135: a trusted request from a declared Project carries its mandate', a
   const m = mandate();
   const [got, covered, outside] = await h.runOne(body(JSON.stringify(m)));
   assert.deepEqual(got, m);
-  assert.deepEqual(covered, { ok: true, recordAs: { by: 'operator', via: 'mandate', task: 'task-teaser', chain: ['lead-agent', 'example-agent'] } });
+  assert.deepEqual(covered, { ok: true, recordAs: { by: 'operator', via: 'mandate', task: 'task-teaser', chain: ['lead-agent', 'example-agent'], caller: OTHER_PROJECT } });
   assert.equal(outside.ok, false);
   assert.equal(outside.data.detail, 'outside-mandate: capability');
 });
@@ -93,9 +95,10 @@ for (const [name, text, code] of [['two blocks', body(JSON.stringify(mandate()),
     const [got, covered] = await h.runOne(text);
     assert.equal(got, null);
     assert.equal(covered, null);
-    const said = h.events.filter((e) => e[0] === 'board.request.mandate-unread');
+    const said = h.events.filter((e) => e[0] === 'board.request.mandate_unread');
     assert.equal(said.length, 1);
     assert.ok(said[0][2].includes(code));
+    assert.equal(said[0][3].data.value.reason, code, 'the data survives FAC-SEM-101: its reason is under `reason`');
     assert.ok(!JSON.stringify(h.events.map((e) => e.slice(2))).includes(WORDS), 'the operator\'s words reach no event');
   });
 }
@@ -104,7 +107,7 @@ test('FAA-135: a JSON block that is no mandate is ignored', async (t) => {
   const h = await fakeHub(t);
   const [got] = await h.runOne(body('{"frames": 24}'));
   assert.equal(got, null);
-  assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate-unread'), []);
+  assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread'), []);
 });
 
 test('FAA-135: a chain that does not end here is not for this call', async (t) => {
@@ -146,4 +149,18 @@ test('FAA-135: a board block carries no source (OA-7): one that does has it drop
   const [got, covered] = await h.runOne(body(JSON.stringify(mandate('example-agent', { project: 'example-site', session: 'sess-1' }))));
   assert.equal('source' in got, false);
   assert.equal('source' in covered.recordAs, false);
+});
+
+test('FAA-135: the warning is a kind the event feed takes (0.61.0 seam reading 1)', async (t) => {
+  const h = await fakeHub(t);
+  await h.runOne(body(JSON.stringify(mandate()), JSON.stringify(mandate())));
+  const said = h.events.find((e) => e[0] === 'board.request.mandate_unread');
+  assert.doesNotThrow(() => makeEvent(1, AT, said[0], said[1], said[2], { data: said[3].data }));
+});
+
+test('FAA-135: a declared Project matches in any case; a read mandate reaches no context JSON', async (t) => {
+  const h = await fakeHub(t);
+  const [, covered] = await h.runOne(body(JSON.stringify(mandate())), { mandateFrom: new Set([OTHER_PROJECT.toUpperCase()]) });
+  assert.equal(covered.ok, true);
+  assert.ok(!h.seen.ctx.includes(WORDS), 'JSON.stringify(ctx) never carries the operator\'s words');
 });

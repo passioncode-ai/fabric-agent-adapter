@@ -211,8 +211,7 @@ route below that carries it. Hand them the page only when no route does, and say
 
 The operator's rule (2026-10-26, board thread `3e8f706c`, request `519d7b21`; fabric-workspace
 `knowledge/agents-first.md`), which the pinned contract states as DEC-0126 (OA-1 to OA-7): one approval he gives in the
-chat of any of his agents binds all his agents (OA-1). He told one, so he told all: never ask him twice for what he
-already approved.
+chat of any of his agents binds all his agents (OA-1).
 
 - A relay is his approval when it carries his words verbatim, the date, the source (the project, session or thread
   where he said them) and the approved scope (OA-2), and comes from one of his own projects on his personal board (a
@@ -253,11 +252,12 @@ already approved.
   naming in the text where he said the words. Keep `source` in your own record; like his words, it goes
   never to an events feed, a usage report, a log or a page another party reads.
 - His approval holds for the whole task, at every link (operator, 2026-11-03, board thread `118f95f9`): every hand-over
-  within it carries the four parts, in `_meta.mandate` or, where your client cannot set `_meta`, in your message, and
-  each receiver acts on them as above, narrowing only; the human gates stay (MD-6). `at` never moves: a task open at the
-  expiry, at most seven days after his words, asks him once to confirm the same words (MD-1), then weekly until the
-  contract's CT-205. Until Fabric's hub forwards decisions (CT-125), such a client reaches a service's relayed action
-  only through its elicitation or its page: report that gap.
+  within it carries the four parts (`source` only where OA-7 lets it, else named in your text), in `_meta.mandate` or,
+  where your client cannot set `_meta`, in your message; each receiver acts on them, narrowing only; the human
+  gates stay (MD-6). `at` never moves, so a mandate lapses within seven days of his words: a task still open asks
+  him once for a new one (MD-1), the same words, `at` when he confirms, and weekly until the
+  contract's CT-205 (answer `7f372925`). Until Fabric's hub forwards decisions (CT-125), such a client reaches a
+  service's relayed action only through its elicitation or page: report that gap.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,

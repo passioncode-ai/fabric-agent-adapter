@@ -202,7 +202,7 @@ export function readMandate(request, mandateFrom, agentId) {
   const sender = isObj(request.sender) ? request.sender : {};
   const principal = isObj(sender.principal) ? sender.principal : {};
   if (principal.provenance !== 'trusted') return none;
-  if (mandateFrom !== PERSONAL_BOARD && !mandateFrom.has(sender.project)) return none;
+  if (mandateFrom !== PERSONAL_BOARD && !(typeof sender.project === 'string' && mandateFrom.has(sender.project.toLowerCase()))) return none;
   const found = [];
   for (const [, block] of request.body.matchAll(JSON_BLOCK)) {
     let value;
@@ -223,11 +223,13 @@ export function readMandate(request, mandateFrom, agentId) {
 
 /**
  * `mandateCovers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
- * chain's end alone binds it, MD-3). `wall` answers milliseconds. Null when no mandate travelled.
+ * chain's end alone binds it, MD-3). A covered answer's `recordAs` names `caller`, the sender Project the board
+ * verified (MD-3 records the caller). `wall` answers milliseconds. Null when no mandate travelled.
  */
-export function covers(mandate, call, agentId, wall) {
+export function covers(mandate, call, agentId, wall, caller = null) {
   if (mandate == null || agentId == null) return null;
-  return mandateCovers({ mandate, tier: 'T1', now: formatRfc3339(wall()), self: agentId, call });
+  const answer = mandateCovers({ mandate, tier: 'T1', now: formatRfc3339(wall()), self: agentId, call });
+  return answer.recordAs ? { ok: true, recordAs: { ...answer.recordAs, caller } } : answer;
 }
 
 /** The responder's opt-in, checked: answers `mandateFrom` as the responder keeps it (a Set or the string). */
@@ -238,6 +240,6 @@ export function mandateOptions(agentId, mandateFrom) {
   if (projects === null || !projects.every((p) => typeof p === 'string' && p)) {
     throw new BoardError('invalid_arguments', `mandateFrom is '${PERSONAL_BOARD}' or a collection of Project ids.`);
   }
-  return new Set(projects);
+  return new Set(projects.map((p) => p.toLowerCase())); // Fabric compares Project uuids lower-cased, as normalProject
 }
 

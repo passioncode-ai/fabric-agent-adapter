@@ -8,20 +8,27 @@ says that his approval holds for the whole task, at every link (FAA-195).
 ### Added
 
 - `Responder(..., agent_id=, mandate_from=)`: with both set, a request whose sender the board verified
-  (`provenance: trusted`) and whose Project `mandate_from` names (or every such sender, `mandate_from="personal-board"`)
-  is read for one `mandate/1` JSON block in its body (contract project-comms.md, DEC-0125 MD-3). The handler gets it as
-  `ctx.mandate`, and `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1 and the
-  responder's wall clock (`wall=`, `time.time` by default); None when no mandate travelled. Two blocks, or one naming
-  `mandate/1` that is not JSON, read as none, with a `board.request.mandate-unread` warning naming only its code. Off by
-  default: a responder that names neither reads nothing, as before. Both kits (FAA-135).
+  (`provenance: trusted`) and whose Project `mandate_from` names, in any case (or every such sender,
+  `mandate_from="personal-board"`, only on the personal board's responder) is read for one `mandate/1` block fenced
+  ` ```json ` in its body (contract project-comms.md, DEC-0125 MD-3). The handler gets it as `ctx.mandate`, and
+  `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1, the responder's wall clock (`wall=`,
+  `time.time` by default; Node `Date.now`, milliseconds) and the sender Project as the `caller` of a covered answer's
+  `recordAs`; None when no mandate travelled. A `source` in the block is dropped (OA-7). Two blocks, or one naming
+  `mandate/1` that is not JSON, read as none, with a `board.request.mandate_unread` warning carrying only its `reason`.
+  Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
+  mandate. Both kits (FAA-135).
 
 ### Changed
 
 - working-with-fabric's mandate section: every hand-over within a task carries the four parts of the operator's
-  approval, and each receiver acts on them without asking him again, narrowing only (human gates stay, MD-6); a relayed
-  receiver's chain starts with it (OA-2), so the four-agent bound limits one mandate, never the task; a task open at the
-  expiry, at most seven days after his words, asks him once to confirm the same words (MD-1), then weekly until the
-  contract's CT-205. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
+  approval (`source` only where OA-7 lets it), and each receiver acts on them without asking him again, narrowing only
+  (human gates stay, MD-6); a relayed receiver's chain starts with it (OA-2), so the four-agent bound limits one
+  mandate, never the task; a mandate lapses within seven days of his words, and a task still open asks him once for a
+  new one, his same words with `at` when he confirms (MD-1), then weekly until the contract's CT-205 (its answer
+  `7f372925` on board thread `118f95f9`). `expiresAt` is counted from `at`; the source and spend sentences are reworded
+  with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
+- working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`
+  block fenced ` ```json `, its chain ending in the service's registry agent id, never a decision block.
 
 ## 0.60.0 (2026-11-03)
 

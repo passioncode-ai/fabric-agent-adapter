@@ -239,7 +239,7 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
     principal = sender.get("principal") if isinstance(sender.get("principal"), dict) else {}
     if principal.get("provenance") != "trusted":
         return None, None
-    if mandate_from != PERSONAL_BOARD and not (isinstance(sender.get("project"), str) and sender["project"] in mandate_from):
+    if mandate_from != PERSONAL_BOARD and not (isinstance(sender.get("project"), str) and sender["project"].lower() in mandate_from):
         return None, None
     found = []
     for block in _JSON_BLOCK.findall(request.body):
@@ -257,14 +257,19 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
     return (found[0], None) if found else (None, None)
 
 
-def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str], wall: Callable[[], float]) -> Optional[Dict[str, Any]]:
+def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str], wall: Callable[[], float],
+           caller: Any = None) -> Optional[Dict[str, Any]]:
     """`mandate_covers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
-    board names a Project's principal, not an agent the chain can bind; the chain's end alone binds it, MD-3). None
-    when no mandate travelled: the handler asks the operator as it would without one."""
+    board names a Project's principal, not an agent the chain can bind; the chain's end alone binds it, MD-3). A covered
+    answer's `recordAs` names `caller`, the sender Project the board verified (MD-3 records the caller, as the action
+    path does). None when no mandate travelled: the handler asks the operator as it would without one."""
     if mandate is None or agent_id is None:
         return None
-    return _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": _mandate.format_rfc3339(wall() * 1000),
-                                    "self": agent_id, "call": call})
+    answer = _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": _mandate.format_rfc3339(wall() * 1000),
+                                      "self": agent_id, "call": call})
+    if "recordAs" in answer:
+        answer = {"ok": True, "recordAs": dict(answer["recordAs"], caller=caller)}
+    return answer
 
 
 def mandate_options(agent_id: Any, mandate_from: Any) -> Any:
@@ -280,4 +285,4 @@ def mandate_options(agent_id: Any, mandate_from: Any) -> Any:
         projects = None
     if projects is None or not all(isinstance(p, str) and p for p in projects):
         raise BoardError("invalid_arguments", "mandate_from is %r or a collection of Project ids." % PERSONAL_BOARD)
-    return frozenset(projects)
+    return frozenset(p.lower() for p in projects)  # Fabric compares Project uuids lower-cased, as _hub._project

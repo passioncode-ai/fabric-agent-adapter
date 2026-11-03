@@ -69,12 +69,13 @@ class WorkContext:
     `mandate` is the operator's mandate the request carried, when the responder reads one (FAA-135), and
     `mandate_covers(call)` whether it covers a call (`mandate_covers`' answer), None when none travelled."""
 
-    def __init__(self, responder: "Responder", entry: Dict[str, Any], mandate: Optional[Dict[str, Any]] = None):
-        self._responder, self._entry, self.mandate = responder, entry, mandate
+    def __init__(self, responder: "Responder", entry: Dict[str, Any], mandate: Optional[Dict[str, Any]] = None,
+                 caller: Optional[str] = None):
+        self._responder, self._entry, self.mandate, self._caller = responder, entry, mandate, caller
         self.stopped = threading.Event()
 
     def mandate_covers(self, call: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        return _link.covers(self.mandate, call, self._responder.agent_id, self._responder.wall)
+        return _link.covers(self.mandate, call, self._responder.agent_id, self._responder.wall, self._caller)
 
     def progress(self, note: Optional[str] = None) -> None:
         if self.stopped.is_set():
@@ -747,9 +748,9 @@ class Responder(SlotKeeper):
     def _run(self, entry: Dict[str, Any], request: BoardRequest) -> None:
         mandate, unread = _link.read_mandate(request, self.mandate_from, self.agent_id)
         if unread:  # by its code alone: the block holds the operator's words
-            self._emit("board.request.mandate-unread", "warning", "Request %s carries a mandate the kit does not read (%s); "
-                       "it is worked without one." % (entry["request"], unread), request=entry["request"], code=unread)
-        ctx = WorkContext(self, entry, mandate)
+            self._emit("board.request.mandate_unread", "warning", "Request %s carries a mandate the kit does not read (%s); "
+                       "it is worked without one." % (entry["request"], unread), request=entry["request"], reason=unread)
+        ctx = WorkContext(self, entry, mandate, request.sender.get("project") if isinstance(request.sender, dict) else None)
         work = _Work(entry, request, ctx)
         work.renewed_at = self.now()
         self.current = work

@@ -34,15 +34,20 @@ const NOT_OURS = new Set(['queued', 'claimed', 'answered']);
 export class WorkContext {
   #responder;
   #entry;
-  constructor(responder, entry, mandate = null) {
+  #caller;
+  constructor(responder, entry, mandate = null, caller = null) {
     this.#responder = responder;
     this.#entry = entry;
+    this.#caller = caller;
     this.stopped = false;
     this.mandate = mandate; // the operator's mandate the request carried, when the responder reads one (FAA-135)
   }
   /** Whether the request's mandate covers `call` (`mandateCovers`' answer); null when none travelled. */
   mandateCovers(call) {
-    return covers(this.mandate, call, this.#responder.agentId, this.#responder.wall);
+    return covers(this.mandate, call, this.#responder.agentId, this.#responder.wall, this.#caller);
+  }
+  toJSON() {
+    return { stopped: this.stopped }; // never the mandate: it holds the operator's words
   }
   async progress(note) {
     if (this.stopped) throw new Stopped();
@@ -688,9 +693,9 @@ export class Responder extends SlotKeeper {
   async runWork(entry, request) {
     const { mandate, unread } = readMandate(request, this.mandateFrom, this.agentId);
     if (unread) { // by its code alone: the block holds the operator's words
-      this.emit('board.request.mandate-unread', 'warning', `Request ${entry.request} carries a mandate the kit does not read (${unread}); it is worked without one.`, { request: entry.request, code: unread });
+      this.emit('board.request.mandate_unread', 'warning', `Request ${entry.request} carries a mandate the kit does not read (${unread}); it is worked without one.`, { request: entry.request, reason: unread });
     }
-    const ctx = new WorkContext(this, entry, mandate);
+    const ctx = new WorkContext(this, entry, mandate, isObj(request.sender) ? request.sender.project ?? null : null);
     const work = { entry, request, ctx, done: false, outcome: null, failure: null, renewedAt: this.now() };
     this.current = work;
     work.promise = Promise.resolve().then(() => this.handler(request, ctx)).then((outcome) => { work.outcome = outcome; }, (e) => { work.failure = e; }).finally(() => { work.done = true; });
