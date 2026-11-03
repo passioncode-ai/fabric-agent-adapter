@@ -31,7 +31,7 @@ audit at every release until the contract's export (CT-194) replaces it.
 
 - Nothing to change for an existing agent. A new one answers the three grill rows before its first commit.
 
-## 0.58.0 (2026-10-28)
+## 0.58.0 (2026-11-03)
 
 Portable agents, part 1 (FAA-188, RM-36): an agent keeps its source apart from its instance from its first commit, and
 a local check finds instance data in a source tree without repeating it. The manifest of a source, its export and
