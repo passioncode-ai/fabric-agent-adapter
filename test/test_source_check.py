@@ -1376,7 +1376,8 @@ class Refusals(Tree):
                               for s in ("creating-fabric-agents", "adapting-projects-to-fabric")]:
             self.assertNotIn("a cloud machine's or a CI runner's user", text)
             self.assertIn("a cloud image's or a CI runner's user that only the image uses", text)
-        self.assertIn("written through `$HOME` or a build argument", flat)
+        self.assertIn("written through a build argument that names the user", flat)  # reading 40: `$HOME` is empty in WORKDIR
+        self.assertNotIn("WORKDIR $HOME/app", flat)
         # reading 31, unit: a `.` is dashed too, and the whole name is masked in a printed path
         listing.write_text("home: j.doe\nhome: bob-smith\n", encoding="utf-8")
         self.write("-Users-bob-smith-proj/.env", "X=1\n")
@@ -1392,6 +1393,8 @@ class Refusals(Tree):
         listing.parent.mkdir()
         for line in ("home: \u042f\u043d", "home: jo # mine", "home: /Users/jo", "home: _svc", "home: \u017fam",
                      "home\u00a0: jos\u00e9", "home:", "home: jo, al", "home: jo (work)",
+                     # reading 40, unit: a format character inside the name changes it, so the line is refused
+                     "home: a\u00adlice", "home: ad\u200bmin",
                      # reading 34, unit: a control or a separator around the colon is no space
                      "home:\x0czq", "home:\u2028zq", "home\x1c: zq", "home:\x85zq", "home\u2029:zq"):
             listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
@@ -1399,6 +1402,7 @@ class Refusals(Tree):
             self.assertEqual(code, 2, line)
             self.assertIn("line 2 of the owner's list", err)
             self.assertIn("a note goes on a line of its own, a path is written as its home name only", err)
+            self.assertIn("declared too with `home:` written with '", err)  # reading 40, product
         # reading 35, seam: a byte-order mark or a zero-width space before `home:` (two lists joined) is dropped
         self.write("adm.txt", "/Users/admin/p\n")
         for mark in ("\ufeff", "\u200b", "\u200c", "\u200d", "\u200c\u200b", "\u200d\u2060", "\u200c\ufeff",
@@ -1407,6 +1411,9 @@ class Refusals(Tree):
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 1, repr(mark))
             self.assertIn("adm.txt:1: home-path", out)
+        listing.write_text("\u200e# laptop\n\u200b\u200e\u2066\n", encoding="utf-8")  # reading 40, seam: invisible comments
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertIn("0 instance string(s) listed", out)
         listing.write_text("zqcorpx\nhome\u200b: admin\n", encoding="utf-8")  # inside the key too
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
         self.assertEqual(code, 1)
@@ -1427,6 +1434,19 @@ class Refusals(Tree):
                                   capture_output=True, text=True)
             self.assertEqual(done.returncode, 2, done.stderr)
             self.assertIn(missing + " must sit beside this file", done.stderr)
+            self.assertNotIn("Traceback", done.stderr)
+        # reading 40, unit: a sibling from another version (a missing name, a syntax error) is named as such
+        for name, broken in (("fabric_source_homes.py", lambda s: s.replace("def _spellings(", "def _spelled(")),
+                             ("fabric_source_ignore.py", lambda s: s + "\ndef broken(:\n")):
+            tools = self.tmp / ("mixed-" + name)
+            tools.mkdir()
+            for sibling in ("fabric_source_check.py",) + siblings:
+                shutil.copy(SCRIPTS / sibling, tools / sibling)
+            (tools / name).write_text(broken((SCRIPTS / name).read_text(encoding="utf-8")), encoding="utf-8")
+            done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
+                                  capture_output=True, text=True)
+            self.assertEqual(done.returncode, 2, done.stderr)
+            self.assertIn(name + " beside this file is from another version", done.stderr)
             self.assertNotIn("Traceback", done.stderr)
 
     def test_a_declared_home_with_a_space_is_found_whole_in_every_form(self):

@@ -71,8 +71,8 @@ try:
         IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _readable_glob, ignore_globs)
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
-except ImportError as _missing:  # a copy without its siblings: say so, as a refusal, never a finding's exit 1
-    _sibling = (_missing.name or "a module") + ".py"
+except (ImportError, SyntaxError) as _missing:  # a copy without its siblings: say so, as a refusal, never a finding's exit 1
+    _sibling = (getattr(_missing, "name", None) or (Path(getattr(_missing, "filename", None) or "a module").stem)) + ".py"
     sys.stderr.write("fabric_source_check.py: %s\n" % (
         "%s beside this file is from another version: copy it with this one" % _sibling
         if (Path(__file__).resolve().parent / _sibling).is_file() else "%s must sit beside this file" % _sibling))
@@ -332,7 +332,8 @@ def read_list(path: Path) -> List[str]:
         # format character (Unicode Cf: a joiner, a direction mark, a soft hyphen) taken out, wherever it stands
         bare = "".join(c for c in text if unicodedata.category(c) != "Cf").strip()
         home = _HOME_LINE.fullmatch(bare)
-        if home and home.group(1).isascii():
+        # the name as written: a format character inside it changes the name, so that line is refused, not read as another
+        if home and home.group(1).isascii() and home.group(1) in text:
             entries.append(HOME_ENTRY + home.group(1).lower())
             continue
         if _HOME_KEY.match(bare):  # meant as a home and not one: never kept as a string that cannot match
@@ -340,9 +341,11 @@ def read_list(path: Path) -> List[str]:
                              "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`, "
                              "`'`): a note goes on a line of its own, a path is written as its home name only, and a name "
                              "outside ASCII, or holding another character, is listed as a plain string (a typographic "
-                             "apostrophe the folder's name does not hold is written as ', one it holds stays in the plain "
-                             "string)" % (len(entries) + 1))
-        entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
+                             "apostrophe the folder's name does not hold is written as '; a folder whose name holds one is "
+                             "listed as a plain string with it kept and declared too with `home:` written with ')"
+                             % (len(entries) + 1))
+        # a comment or a blank is judged without its invisible characters too, as a home line is (one rule per line)
+        entries.append("" if not bare or bare.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
 
