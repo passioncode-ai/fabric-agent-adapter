@@ -61,7 +61,7 @@ reply or progress note): the target replied, not that the work was done. Read th
 still cancel the request. `noResponder` in your `com.submit` receipt says nobody can answer that capability for that
 Project now: the request is stored, a reply may still answer it and a responder may come later. An `accepted`
 request can also wait unanswered for its responder's operator: since adapter 0.53.0 a responder whose slot was moved
-to another session leaves its accepted work `accepted` and unanswered until the slot is taken back (until Fabric
+to another session leaves its accepted work `accepted` and unanswered until the slot is taken back or moved back to it (until Fabric
 hands it over, CT-175), which is not the operator's hold below; tell
 the person, and cancel it if it is past what they can wait. Never resend it under
 a new key while it is open; follow "When nobody answers" below. A request without a deadline gets one seven days out
@@ -102,13 +102,15 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    not "nobody live": wait, and make no change there.
    An `active` responder does not prove your request is being worked. A slot the operator moved to another session
    (contract DEC-0140 PR-2) keeps the requests the old holder had accepted: they stay `accepted` with the old holder's
-   attempt, which nobody works until the new holder takes them over by a transfer, while Fabric's thread view shows the
+   attempt, which nobody works until the new holder takes them over by a transfer or the old service gets the slot back
+   (its take-back or a move back), while Fabric's thread view shows the
    new holder as "Answers it" and its "requests no agent answers now" leaves them out (FAA-172). The board shows a
-   requester no attempt or generation (`com.get` gives the request's `state` and `revision` only), so you cannot tell
+   requester no attempt or generation (`com.get` gives the request's `state`, `effect` and `revision`, never its attempt), so you cannot tell
    this from slow work: when your request has stayed `accepted` with no progress note or reply past what the work
    should take, ask on its thread (`com.reply`) whether it is being worked, and if nobody answers, treat it as nobody
    live for that request (step 3 or 4) and tell the person. While its `effect` is still `not_started`, `com.cancel`
-   moves it to `cancelled` (nothing has happened yet), so cancelling and submitting it again is safe.
+   moves it to `cancelled` (nothing has happened yet): submit it again only when the cancel's receipt shows the
+   request `cancelled`; `outcome_unknown` means the work began meanwhile, so tell the person and do not resubmit.
 2. **Live:** wait under a watcher (below) and work on independent tasks meanwhile; never touch files a live session
    holds.
 3. **Nobody live, and the change is small.** Small means all three:

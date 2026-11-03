@@ -1043,6 +1043,56 @@ test('FAA-165: a takeBack meanwhile wins over a move back', async (t) => {
   assert.equal(record(hub)['video.render'], undefined);
 });
 
+test('FAA-165: a move back keeps the lost-answer guard of every held slot (0.60.0 seam reading 1)', async (t) => {
+  const hub = await fakeHub(t, ['video.render', 'video.cut']);
+  const h = harness(hub);
+  const r = h.responder({ capabilities: ['video.render', 'video.cut'] });
+  await h.advance(100000); // a clock far from 0, where a slot held with no lease time reads as long lapsed
+  await r.step();
+  const mine = (await h.state()).slots['video.render'].holder;
+  await hub.control({ op: 'move', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.cut', to: mine });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.leaseLeft() > 0, String(r.leaseLeft()));
+  await hub.control({ op: 'drop', tool: 'com.enroll' });
+  await h.advance(15);
+  await r.step();
+  assert.ok(r.session);
+  const s = await h.state();
+  assert.deepEqual(Object.fromEntries(Object.entries(s.slots).map(([c, v]) => [c, v.holder])), { 'video.render': mine, 'video.cut': mine });
+});
+
+test('FAA-165: a claim answer lost before the move is not replayed after a move back (0.60.0 seam reading 1)', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await h.advance(100000);
+  await r.step();
+  const mine = (await h.state()).slots['video.render'].holder;
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(15);
+  await r.step(); // the claim commits, its answer is lost
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(r.waitUntil - h.clock.t + 0.01);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  for (let i = 0; i < 5; i += 1) {
+    await h.advance(20);
+    await r.step();
+  }
+  const s = await h.state();
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.ok(!('moved' in record(hub)['video.render']));
+  assert.equal(s.slots['video.render'].holder, mine);
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+});
+
 test('FAA-155: work running when the slot moves stops, stays held, and is never completed or transferred', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

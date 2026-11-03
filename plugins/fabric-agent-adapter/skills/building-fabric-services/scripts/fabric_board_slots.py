@@ -120,13 +120,14 @@ class SlotKeeper:
             self._to_resume = [r for r in self._to_resume if (self.checkpoint.entries.get(r) or {}).get("capability") != capability]
             self.slots[capability] = {"state": "moved", "generation": now, "renewed_at": self.now()}
             self._confirmed.pop(capability, None)
+            self.claim_keys.pop(capability, None)  # the move returned that claim to the queue: its receipt is dead
             if "moved" not in held:
                 self._note(capability, dict(held, moved=now))  # said again at the next start if it cannot be written
         if "moved" not in held:  # once, even across restarts
             self._emit("board.slot.moved", "warning", "The %s slot on this Project moved to another session. This service stopped answering it; its accepted "
-                       "work stays `accepted` (work begun is the new holder's to settle). It is back once the operator moves it back "
-                       "here, takes it back after the other session lets it go, or a reconnect or restart finds accepted work "
-                       "waiting. Else ask its maintainer." % capability,
+                       "work stays `accepted` (work begun is the new holder's to settle). It is back when the operator moves it back "
+                       "here, or takes it back: once the other session lets it go, or at once at a restart with accepted work waiting. "
+                       "A restart alone does not. Else ask its maintainer." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
         return True
 
@@ -137,8 +138,8 @@ class SlotKeeper:
         out; a `lease_expired` one (the move reached this session but its lease lapsed) enrolls again; a fenced one is
         another session's, recorded so the same generation is not asked about twice. Never an enroll or a replace on a
         slot another session holds: a slot moved off stays off unless it is handed back."""
-        if self.current is not None:
-            return  # a claim now could hand out a second request
+        if self.current is not None or self.stopping:
+            return  # a claim now could hand out a second request, or start work while the responder stops
         held = self.checkpoint.slots.get(capability) or {}
         seen = held.get("moved")
         if held.get("project") != self.project or not _is_int(seen, 1):
@@ -148,22 +149,25 @@ class SlotKeeper:
         now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
         if not _is_int(now, 1) or now <= seen:
             return
-        key = self.claim_keys.setdefault(capability, self._key("claim"))
+        key = self.claim_keys[capability] = self._key("claim")  # a fresh key: one from before the move may hold a dead receipt
         try:
             answer = self._receipt("com.claim", self._call("com.claim", {"idempotency": self._idem(key), "capability": capability}))
         except BoardError as exc:
-            if exc.code == "fenced":
-                with self._lock:
-                    if self.checkpoint.slots.get(capability) == held:  # take_back meanwhile wins (FAA-158)
-                        self._note(capability, dict(held, moved=now))
-            elif exc.code == "lease_expired":
+            if exc.code == "held":
+                return  # the operator's hold: asked again at the next renewal
+            if exc.code in ("idempotency_window_expired", "capacity_exceeded"):
+                self.claim_keys.pop(capability, None)
+                return
+            if exc.code == "lease_expired":
                 if self._back(capability, held, now):
                     self.slots[capability]["renewed_at"] = float("-inf")  # lapsed: the enroll below is recorded first
                     self._enroll(capability)
-            elif exc.code in ("idempotency_window_expired", "capacity_exceeded"):
-                self.claim_keys.pop(capability, None)
-            elif exc.code != "held":  # held: asked again at the next renewal
-                raise
+                return
+            if exc.code in SESSION_CODES and exc.code != "not_authorized":
+                raise  # the board session's fault, not this slot's
+            with self._lock:  # fenced, or another refusal of this claim: not this session's slot at this generation
+                if self.checkpoint.slots.get(capability) == held:  # take_back meanwhile wins (FAA-158)
+                    self._note(capability, dict(held, moved=now))
             return
         attempt = answer.get("attempt") if isinstance(answer.get("attempt"), dict) else {}
         generation = _whole(attempt.get("generation"))
@@ -172,13 +176,15 @@ class SlotKeeper:
         if "request" in answer:
             self.claim_keys.pop(capability, None)
             self._start(capability, answer)
+        else:
+            self._enroll(capability)  # renewed now: whether an empty com.claim renews the lease is not the contract's to say
 
     def _back(self, capability: str, held: Dict[str, Any], generation: int) -> bool:
         """The slot is this session's again at `generation`: held, its record rewritten without the move (FAA-165)."""
         with self._lock:
             if self.checkpoint.slots.get(capability) != held:
                 return False  # take_back (an action thread) forgot the record meanwhile; its own next tick enrolls
-            self.slots[capability] = {"state": "held", "generation": generation, "renewed_at": 0.0}
+            self.slots[capability] = {"state": "held", "generation": generation, "renewed_at": float("-inf")}  # no lease yet
             self._held_at(capability, generation)
             self._said.pop("board.slot.moved", None)  # a later move is said again
         return True

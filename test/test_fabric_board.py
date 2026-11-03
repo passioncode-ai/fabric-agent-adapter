@@ -1354,6 +1354,66 @@ class HoldTests(Conversation):
 _KEEP, _ABSENT = object(), object()
 
 
+class MovedBackTwoCapabilitiesTests(Conversation):
+    """FAA-165 with two capabilities: a move back neither costs the other slot its lease guard nor starts over work."""
+
+    CAPS = ("video.render", "video.cut")
+
+    def test_a_move_back_keeps_the_lost_answer_guard(self):
+        """0.60.0 seam reading 1: the slot taken back was held with no lease time, so one lost answer dropped the
+        session and every slot; it now holds `-inf` until its own enroll, as a lapsed slot does."""
+        r = self.responder()
+        r.step()
+        mine = self.board.slots["video.render"]["holder"]
+        self.board.move("video.cut")
+        self.board.advance(20)
+        r.step()
+        self.board.move("video.cut", to=mine)
+        self.board.advance(20)
+        r.step()
+        self.assertGreater(r._lease_left(), 0)
+        self.board.drop_next["com.enroll"] = 1
+        self.board.advance(15)
+        r.step()
+        self.assertIsNotNone(r.session)
+        self.assertEqual({c: s["holder"] for c, s in self.board.slots.items()}, {"video.render": mine, "video.cut": mine})
+
+    def test_a_move_back_waits_while_other_work_runs(self):
+        import time
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def slow(request, ctx):
+            if request.capability == "video.cut":
+                release.wait(10)
+            return {"state": "completed"}
+        self.outcome = slow
+        r = self.responder(spawn=lambda fn: threading.Thread(target=fn, daemon=True).start())
+        r.step()
+        mine = self.board.slots["video.render"]["holder"]
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()
+        cut = self.board.queue("video.cut")
+        self.board.advance(20)
+        r.step()  # video.cut is claimed and runs
+        self.assertIsNotNone(r.current)
+        self.board.move("video.render", to=mine)
+        render = self.board.queue("video.render")
+        seen = len(self.board.calls)
+        self.board.advance(20)
+        r.step()
+        self.assertNotIn("com.claim", [t for t, a in self.board.calls[seen:] if a.get("capability") == "video.render"])
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        release.set()
+        for _ in range(4):
+            time.sleep(0.1)
+            self.board.advance(20)
+            r.step()
+        self.assertEqual(self.board.requests[cut]["state"], "completed")
+        self.assertEqual(self.board.requests[render]["state"], "completed")
+
+
 class MovedSlotTests(Conversation):
     """FAA-155 (contract DEC-0140 PR-2; CT-174, CT-175): a slot the operator moves to another session stays moved. The
     responder records the generation it held; once com.status shows it moved past, it ends its claims there, leaves its
@@ -1488,6 +1548,50 @@ class MovedSlotTests(Conversation):
         r.take_back("video.render")
         self.assertFalse(r._back("video.render", held, 3))  # the record changed: nothing is rewritten
         self.assertNotIn("video.render", self.record())
+
+    def test_a_claim_answer_lost_before_the_move_is_not_replayed_after_a_move_back(self):
+        """0.60.0 seam reading 1: the claim key shared with the claim loop held a dead receipt across the move; the move
+        back asks with a fresh key, so the slot is held at the generation the board shows and stays held."""
+        r = self.responder()
+        r.step()
+        mine = self.board.slots["video.render"]["holder"]
+        rid = self.board.queue("video.render")
+        self.board.drop_next["com.claim"] = 1
+        self.board.advance(15)
+        r.step()  # the claim commits, its answer is lost
+        self.board.move("video.render")
+        self.board.advance(r.wait_until - self.board.now + 0.01)
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.board.move("video.render", to=mine)
+        self.board.advance(20)
+        r.step()
+        for _ in range(4):
+            self.board.advance(20)
+            r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "held")
+        self.assertNotIn("moved", self.record()["video.render"])
+        self.assertEqual(self.board.slots["video.render"]["holder"], mine)
+        self.assertGreater(self.board.slots["video.render"]["lease"], self.board.now)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(len(self.moved()), 1)
+
+    def test_a_stopping_responder_does_not_ask_about_a_move_back(self):
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)
+        self.board.advance(20)
+        r.stopping = True
+        seen = len(self.tools())
+        r._moved_back("video.render")
+        self.assertNotIn("com.claim", self.tools()[seen:])
+
+    def test_a_moved_slot_reads_com_status_at_most_once_a_renewal(self):
+        r, _ = self._moved_off()
+        seen = len(self.tools())
+        for _ in range(8):  # 80 s at 10 s ticks
+            self.board.advance(10)
+            r.step()
+        self.assertLessEqual(self.tools()[seen:].count("com.status"), 4)
 
     def test_work_running_when_the_slot_moves_stops_and_stays_held(self):
         import time

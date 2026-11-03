@@ -129,8 +129,9 @@ export class SlotKeeper {
     this.toResume = this.toResume.filter((r) => this.checkpoint.entries[r]?.capability !== capability);
     this.slots[capability] = { state: 'moved', generation: now, renewedAt: this.now() };
     delete this.confirmed[capability];
+    delete this.claimKeys[capability]; // the move returned that claim to the queue: its receipt is dead
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it; its accepted work stays \`accepted\` (work begun is the new holder's to settle). It is back once the operator moves it back here, takes it back after the other session lets it go, or a reconnect or restart finds accepted work waiting. Else ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it; its accepted work stays \`accepted\` (work begun is the new holder's to settle). It is back when the operator moves it back here, or takes it back: once the other session lets it go, or at once at a restart with accepted work waiting. A restart alone does not. Else ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written
     }
     return true;
@@ -145,26 +146,32 @@ export class SlotKeeper {
    * session holds: a slot moved off stays off unless it is handed back.
    */
   async movedBack(capability) {
-    if (this.current) return; // a claim now could hand out a second request
+    if (this.current || this.stopping) return; // a claim now could hand out a second request, or start work while the responder stops
     const held = this.checkpoint.slots[capability] ?? {};
     if (held.project !== this.project || !isInt(held.moved, 1)) return;
     if (this.slots[capability]) this.slots[capability].renewedAt = this.now();
     const now = ((await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if (!isInt(now, 1) || now <= held.moved) return;
-    this.claimKeys[capability] ??= this.key('claim');
+    this.claimKeys[capability] = this.key('claim'); // a fresh key: one from before the move may hold a dead receipt
     let answer;
     try {
       answer = this.receipt('com.claim', await this.call('com.claim', { idempotency: this.idem(this.claimKeys[capability]), capability }));
     } catch (e) {
-      if (e.code === 'fenced') {
-        await this.locked(() => { if (sameRecord(this.checkpoint.slots[capability], held)) this.note(capability, { ...held, moved: now }); }); // a takeBack meanwhile wins (FAA-158)
-      } else if (e.code === 'lease_expired') {
+      if (e.code === 'held') return; // the operator's hold: asked again at the next renewal
+      if (e.code === 'idempotency_window_expired' || e.code === 'capacity_exceeded') {
+        delete this.claimKeys[capability];
+        return;
+      }
+      if (e.code === 'lease_expired') {
         if (await this.back(capability, held, now)) {
           this.slots[capability].renewedAt = -Infinity; // lapsed: the enroll below is recorded first
           await this.enroll(capability);
         }
-      } else if (e.code === 'idempotency_window_expired' || e.code === 'capacity_exceeded') delete this.claimKeys[capability];
-      else if (e.code !== 'held') throw e; // held: asked again at the next renewal
+        return;
+      }
+      if (SESSION_CODES.has(e.code) && e.code !== 'not_authorized') throw e; // the board session's fault, not this slot's
+      // fenced, or another refusal of this claim: not this session's slot at this generation; a takeBack meanwhile wins (FAA-158)
+      await this.locked(() => { if (sameRecord(this.checkpoint.slots[capability], held)) this.note(capability, { ...held, moved: now }); });
       return;
     }
     const generation = isObj(answer.attempt) && isInt(answer.attempt.generation, 1) ? answer.attempt.generation : now;
@@ -172,14 +179,14 @@ export class SlotKeeper {
     if ('request' in answer) {
       delete this.claimKeys[capability];
       await this.start(capability, answer);
-    }
+    } else await this.enroll(capability); // renewed now: whether an empty com.claim renews the lease is not the contract's to say
   }
 
   /** The slot is this session's again at `generation`: held, its record rewritten without the move (FAA-165). */
   back(capability, held, generation) {
     return this.locked(() => {
       if (!sameRecord(this.checkpoint.slots[capability], held)) return false; // a takeBack forgot it; its own next tick enrolls
-      this.slots[capability] = { state: 'held', generation, renewedAt: 0 };
+      this.slots[capability] = { state: 'held', generation, renewedAt: -Infinity }; // no lease yet
       this.heldAt(capability, generation);
       delete this.said['board.slot.moved']; // a later move is said again
       return true;
