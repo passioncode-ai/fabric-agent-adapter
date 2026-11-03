@@ -250,6 +250,14 @@ def _no_constant(name: str) -> Any:
     raise ValueError(name)  # NaN and Infinity are not JSON
 
 
+def _bounded_int(literal: str) -> int:
+    """An integer of at most 4300 digits on every Python: 3.9 without int_max_str_digits converts a longer one in
+    quadratic time, and later ones refuse it, so all of them now refuse it alike."""
+    if len(literal) - literal.startswith("-") > 4300:
+        raise ValueError("an integer longer than 4300 digits")
+    return int(literal)
+
+
 def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """The mandate a request carries, read only when the service opted in (`agent_id` and `mandate_from` set), the board
     verified the sender (`provenance: trusted`) and its Project is one `mandate_from` names (or `PERSONAL_BOARD`): a T1
@@ -270,7 +278,7 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
     found = []
     for block in _json_blocks(request.body):
         try:
-            value = json.loads(block, parse_constant=_no_constant)
+            value = json.loads(block, parse_constant=_no_constant, parse_int=_bounded_int)
         except (ValueError, RecursionError):
             if "mandate/1" in block:
                 return None, "mandate-unreadable"

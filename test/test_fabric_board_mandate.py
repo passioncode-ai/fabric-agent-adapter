@@ -169,12 +169,19 @@ class BoardMandateTests(Conversation):
         """0.61.0 unit and product readings 2: an opener mid-line or a four-backtick fence is no mandate block."""
         m = json.dumps(mandate())
         for text in ("Here it is: ```json\n%s\n```\n" % m, "````json\n%s\n````\n" % m, "```json\n%s```\n" % m,
-                     "```json\n%s\n```x\n" % m, "x\r```json\n%s\n```\n" % m, "x\u2028```json\n%s\n```\n" % m):
+                     "```json\n%s\n```x\n" % m, "x\r```json\n%s\n```\n" % m, "x\u2028```json\n%s\n```\n" % m,
+                     "```jsonc\n%s\n```\n" % m, "```json x\n%s\n```\n" % m):
             with self.subTest(text=text[:20]):
                 self.tearDown()
                 self.setUp()
                 got, covered, _ = self.run_one(text)
                 self.assertIsNone(got)
+
+    def test_an_integer_over_4300_digits_reads_as_unreadable_on_every_python(self):
+        link = importlib.import_module("fabric_board_link")
+        request = fb.BoardRequest({"body": {"text": body('{"kind": "mandate/1", "n": %s}' % ("7" * 4301))}, "request": {"id": "r"},
+                                   "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
+        self.assertEqual(link.read_mandate(request, link.PERSONAL_BOARD, "example-agent"), (None, "mandate-unreadable"))
 
     def test_a_closing_fence_may_carry_trailing_spaces(self):
         got, covered, _ = self.run_one("```json  \n%s\n```  \t\n" % json.dumps(mandate()))
@@ -184,8 +191,9 @@ class BoardMandateTests(Conversation):
         """0.61.0 unit and seam readings 3: an anchored regex rescanned to the end from every unclosed opener."""
         link = importlib.import_module("fabric_board_link")
 
-        def cost(size: int) -> float:
-            request = fb.BoardRequest({"body": {"text": ("```json\n```x\n" * size)[:size]}, "request": {"id": "r"},
+        def cost(size: int, shape: str) -> float:
+            text = ("```json\n```x\n" * size)[:size] if shape == "unclosed" else "```json\n" * (size // 8) + "```\n"
+            request = fb.BoardRequest({"body": {"text": text}, "request": {"id": "r"},
                                        "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
             best = float("inf")
             for _ in range(5):
@@ -194,8 +202,9 @@ class BoardMandateTests(Conversation):
                 best = min(best, time.perf_counter() - start)
             return best
 
-        small, large = cost(65536), cost(4 * 65536)
-        self.assertLess(large / max(small, 1e-6), 10, "linear is about 4, quadratic about 16")
+        for shape in ("unclosed", "nested"):  # nested: every inner opener closed by the same fence (unit reading 4)
+            small, large = cost(65536, shape), cost(4 * 65536, shape)
+            self.assertLess(large / max(small, 1e-6), 10, "%s: linear is about 4, quadratic about 16" % shape)
 
     def test_a_uuid_matches_in_any_case_and_any_other_id_as_written(self):
         link = fb._link if hasattr(fb, "_link") else importlib.import_module("fabric_board_link")

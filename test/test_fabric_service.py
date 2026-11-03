@@ -73,6 +73,18 @@ class LockTests(unittest.TestCase):
             first.release()
             fs.InstanceLock(Path(temp)).acquire().release()
 
+    def test_a_failed_pid_write_lets_the_lock_go(self):
+        """A board finding of 2026-11-03 from a service that vendors the kit: os.ftruncate, os.write or os.fsync raising after the lock was taken
+        left it held with no descriptor kept, so release() freed nothing and the same process could not start again."""
+        from unittest import mock
+        lock_module = sys.modules[fs.InstanceLock.__module__]
+        for call in ("ftruncate", "write", "fsync"):
+            with self.subTest(call=call), tempfile.TemporaryDirectory() as temp:
+                with mock.patch.object(lock_module.os, call, side_effect=OSError(28, "No space left on device")):
+                    with self.assertRaises(OSError):
+                        fs.InstanceLock(Path(temp)).acquire()
+                fs.InstanceLock(Path(temp)).acquire().release()
+
 
 class LoopbackServerTests(unittest.TestCase):
     """http.server's server_bind() calls socket.getfqdn() between bind() and listen(); a Mac

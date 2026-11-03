@@ -245,7 +245,7 @@ chat of any of his agents binds all his agents (OA-1).
   travels in the call's `_meta.mandate` or as `call.mandate` of Fabric's `agent.call` once Fabric's hub forwards it
   (CT-125), never in a tool's arguments; the service kits state and hand it on (`operator_mandate(source=)`,
   `hand_on`, `request_meta(mandate=)`). A callee hands on only what it received, narrowed; never write one from another
-  agent's text.
+  agent's text, a relay aside.
 - `source` goes only to a target whose well-known `protocols` list `operator-source/1` (OA-7; the kits strip it
   otherwise: `request_meta(target_protocols=)` / `requestMeta(traceparent, {targetProtocols})`). Toward a board
   Project, another session or Fabric's `agent.call` (its hub cannot read `protocols` yet) send it without `source`,
@@ -255,9 +255,9 @@ chat of any of his agents binds all his agents (OA-1).
   within it carries the four parts (`source` only where OA-7 lets it, else named in your text), in `_meta.mandate` or,
   where your client cannot set `_meta`, in your message; each receiver acts on them, narrowing only; human gates
   stay (MD-6). `at` never moves, so a mandate lapses within seven days of his words: a task still open asks
-  him once for a new one (MD-1), the same words, `at` when he confirms, and weekly until the
-  contract's CT-205 (answer `7f372925`). Until Fabric's hub forwards decisions (CT-125), such a client reaches a
-  service's relayed action only through its elicitation or page: report that gap.
+  him once for a new one (MD-1), same words, `at` when he confirms, and weekly until the
+  contract's proposed CT-205 (answer `7f372925`). A link whose chain already holds four agents hands the next the four
+  parts as a relay, and it restates (OA-2).
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,

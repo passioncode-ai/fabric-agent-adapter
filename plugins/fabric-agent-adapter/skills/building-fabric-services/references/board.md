@@ -110,8 +110,8 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   options nothing is read, as before 0.61.0.
 - A request is read only when the board verified its sender (`provenance: trusted`) and its Project is one
   `mandate_from` names. Its sender is then a T1 caller. Project ids match as Fabric compares them: a uuid in any case,
-  any other id as written. The mandate is a block fenced ` ```json `, the opening and the closing fence each on its own
-  line (lowercase; ` ````json `, ` ```JSON ` and `~~~` are not read), whose value has `kind: "mandate/1"`; any other JSON
+  any other id as written. The mandate is a block fenced ` ```json `, the opening and the closing fence each at the start
+  of its own line, with no indent (lowercase; an indented fence, as inside a list item, is not read either; ` ````json `, ` ```JSON ` and `~~~` are not read), whose value has `kind: "mandate/1"`; any other JSON
   block, a decision block included, is not read, with no warning. A fence quoted inside another fenced block is still
   read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one that is
   not JSON (`NaN` included), read as none, and the responder emits `board.request.mandate_unread` (a warning) with only
@@ -119,8 +119,7 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   checkpoint. A Project declares no `protocols`, so a board block carries no `source` (OA-7): any `source` in it is
   dropped unread. Python reads two kinds of valid JSON as not JSON where Node reads them, both fail-closed: a block nested
   about 1,000 levels deep on Python 3.9 to 3.11 and about 10,000 on 3.12 and 3.13 (none on 3.14), and an integer longer
-  than 4300 digits on a Python with the `int_max_str_digits` limit (3.11 and later, and the 3.8.14, 3.9.14 and 3.10.7
-  security releases).
+  than 4300 digits on every Python (the kit refuses it there, as `int_max_str_digits` does from 3.11).
 - The handler gets `ctx.mandate` (the one block without `source`, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
   acts in one, since a call naming none is not limited by the mandate's `projects`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the

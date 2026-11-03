@@ -97,9 +97,16 @@ class InstanceLock:
         except BaseException:
             os.close(fd)
             raise
-        os.ftruncate(fd, 0)
-        os.write(fd, str(os.getpid()).encode())
-        os.fsync(fd)
+        try:
+            os.ftruncate(fd, 0)
+            os.write(fd, str(os.getpid()).encode())
+            os.fsync(fd)
+        except BaseException:  # a full disk or an I/O error: let the lock go, or release() frees nothing
+            os.close(fd)
+            if self._name is not None:
+                _drop_lock_name(self._name)
+                self._name = None
+            raise
         self._fd = fd
         return self
 

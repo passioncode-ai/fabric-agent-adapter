@@ -14,9 +14,16 @@ says that his approval holds for the whole task, at every link (FAA-195).
   `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1, the responder's wall clock (`wall=`,
   `time.time` by default; Node `Date.now`, milliseconds) and the sender Project as the `caller` of a covered answer's
   `recordAs`; None when no mandate travelled, and `{"fault": "now-unreadable"}` when the clock does not read. A `source` in the block is dropped (OA-7). Two blocks, or one naming
-  `mandate/1` that is not JSON, read as none, with a `board.request.mandate_unread` warning carrying only its `reason`.
+  `mandate/1` that is not JSON (an integer longer than 4300 digits included, on every Python), read as none, with a `board.request.mandate_unread` warning carrying only its `reason`.
   Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
   mandate. Both kits (FAA-135).
+
+### Fixed
+
+- `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
+  I/O error, an interrupt), the descriptor and the lock name stayed held while `release()` freed nothing, so the same
+  process could not start the service again. The lock now lets both go and re-raises. The Node twin keeps its
+  descriptor and frees it. Found by a service that vendors the kit, on the board.
 
 ### Changed
 
@@ -25,11 +32,15 @@ says that his approval holds for the whole task, at every link (FAA-195).
   (human gates stay, MD-6); a relayed receiver's chain starts with it (OA-2), so the four-agent bound limits one
   mandate, never the task; a mandate lapses within seven days of his words, and a task still open asks him once for a
   new one, his same words with `at` when he confirms (MD-1), then weekly until the contract's CT-205 (its answer
-  `7f372925` on board thread `118f95f9`; CT-205 is a row after this kit's pin). `expiresAt` is counted from `at` and
+  `7f372925` on board thread `118f95f9`; CT-205 is a row the contract proposes after this kit's pin, on its branch
+  `agent/template-parity-20261103`); a link whose chain already holds four agents hands the next one the four parts as a
+  relay, which it restates (OA-2). `expiresAt` is counted from `at` and
   covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
   source and spend sentences are reworded with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
 - working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`
-  block fenced ` ```json `, its chain ending in the service's registry agent id, never a decision block.
+  block fenced ` ```json ` at the start of its own lines, its chain ending in the service's registry agent id, never a
+  decision block; and what comes back: `mandate-not-for-this-call` is handed on again to the right id without asking
+  him, `mandate-expired` asks him once for a new one.
 
 ## 0.60.0 (2026-11-03)
 

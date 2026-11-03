@@ -170,7 +170,8 @@ test('FAA-135: a declared Project matches in any case; a read mandate reaches no
 for (const [name, text] of [['an opener mid-line', (m) => `Here it is: \`\`\`json\n${m}\n\`\`\`\n`],
   ['a four-backtick fence', (m) => `\`\`\`\`json\n${m}\n\`\`\`\`\n`], ['a closer on the content line', (m) => `\`\`\`json\n${m}\`\`\`\n`],
   ['text after the closer', (m) => `\`\`\`json\n${m}\n\`\`\`x\n`], ['a lone CR before the opener', (m) => `x\r\`\`\`json\n${m}\n\`\`\`\n`],
-  ['U+2028 before the opener', (m) => `x\u2028\`\`\`json\n${m}\n\`\`\`\n`], ['U+2029 after the closer', (m) => `\`\`\`json\n${m}\n\`\`\`\u2029\n`]]) {
+  ['U+2028 before the opener', (m) => `x\u2028\`\`\`json\n${m}\n\`\`\`\n`], ['U+2029 after the closer', (m) => `\`\`\`json\n${m}\n\`\`\`\u2029\n`],
+  ['an opener with a suffix', (m) => `\`\`\`jsonc\n${m}\n\`\`\`\n`], ['an opener with a word after it', (m) => `\`\`\`json x\n${m}\n\`\`\`\n`]]) {
   test(`FAA-135: ${name} is no mandate block (0.61.0 readings 2)`, () => {
     const request = new BoardRequest({ body: { text: text(JSON.stringify(mandate())) }, request: { id: 'r' },
       sender: { project: OTHER_PROJECT, principal: { provenance: 'trusted' } } }, 'video.render');
@@ -207,8 +208,9 @@ test('FAA-135: a closing fence may carry trailing spaces', () => {
 });
 
 test('FAA-135: reading is linear in the body (0.61.0 readings 3)', () => {
-  const cost = (size) => {
-    const request = new BoardRequest({ body: { text: '```json\n```x\n'.repeat(size).slice(0, size) }, request: { id: 'r' },
+  const cost = (size, shape) => {
+    const text = shape === 'unclosed' ? '```json\n```x\n'.repeat(size).slice(0, size) : `${'```json\n'.repeat(size / 8)}\`\`\`\n`;
+    const request = new BoardRequest({ body: { text }, request: { id: 'r' },
       sender: { project: OTHER_PROJECT, principal: { provenance: 'trusted' } } }, 'video.render');
     let best = Infinity;
     for (let k = 0; k < 5; k += 1) {
@@ -218,9 +220,11 @@ test('FAA-135: reading is linear in the body (0.61.0 readings 3)', () => {
     }
     return best;
   };
-  const small = cost(65536);
-  const large = cost(4 * 65536);
-  assert.ok(large / Math.max(small, 0.001) < 10, `linear is about 4, quadratic about 16 (${small} ms, ${large} ms)`);
+  for (const shape of ['unclosed', 'nested']) { // nested: every inner opener closed by the same fence (unit reading 4)
+    const small = cost(65536, shape);
+    const large = cost(4 * 65536, shape);
+    assert.ok(large / Math.max(small, 0.001) < 10, `${shape}: linear is about 4, quadratic about 16 (${small} ms, ${large} ms)`);
+  }
 });
 
 test('FAA-135: util.inspect of a context or a request prints no mandate and no body', () => {
