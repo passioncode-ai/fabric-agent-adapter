@@ -353,6 +353,36 @@ class BoardMandateTests(Conversation):
                 self.assertEqual(got.get("data", {}).get("detail"), "outside-mandate: spend")
                 self.assertNotIn("estimateUsd", got["data"])
         self.assertFalse(jsv.is_number(spoof), "a value that only claims a number is none")
+        self.assertEqual((jsv.double(Lying(100)), jsv.double(Big(10 ** 400))), (100.0, float("inf")), "double reads what it stores")
+        self.assertTrue(jsv.same(Lying(100), 100.0))
+        got = fm.mandate_covers({"mandate": m, "tier": "T1", "now": AT, "self": "example-agent",
+                                 "call": {"capability": "video.render", "effect": "draft", "spendUsd": Lying(100), "project": "site-a"}})
+        self.assertIs(type(got["data"]["estimateUsd"]), float, "the estimate travels as the plain number it stores")
+
+        class ClaimsFloat(int):  # an int whose __class__ says float: read as the int it is (unit reading 20)
+            @property
+            def __class__(self):
+                return float
+        self.assertEqual((jsv.real_number(ClaimsFloat(7)), type(jsv.real_number(ClaimsFloat(7)))), (7, int))
+
+        class Text(str):
+            pass
+
+        class Meta(type):  # a type that answers == for every type: never mistaken for a JSON one (seam reading 20)
+            def __eq__(cls, other):
+                return True
+            __hash__ = type.__hash__
+
+        class Evil(metaclass=Meta):
+            pass
+        # Only JSON data by exact type, or a number, is an estimate in the core (seam readings 19 and 20).
+        for honest, want in (("1", "ok"), ([3], "ok"), (Text("1"), "outside-mandate: spend"), ((1,), "outside-mandate: spend"),
+                             ([Usd(100)], "outside-mandate: spend"), ([Lying(100)], "outside-mandate: spend"),
+                             ([spoof], "outside-mandate: spend"), (Evil(), "outside-mandate: spend")):
+            with self.subTest(honest=repr(honest)):
+                got = fm.mandate_covers({"mandate": m, "tier": "T1", "now": AT, "self": "example-agent",
+                                         "call": {"capability": "video.render", "effect": "draft", "spendUsd": honest, "project": "site-a"}})
+                self.assertEqual("ok" if got.get("recordAs") else got.get("data", {}).get("detail"), want)
         self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": spoof, "project": "site-a"}),
                          "outside-mandate: spend")
         self.assertEqual((jsv.js_to_number(Lying(100)), jsv.js_to_number(LyingInt(100)), jsv.js_to_number(Usd(3))), (100.0, 100.0, 3.0))

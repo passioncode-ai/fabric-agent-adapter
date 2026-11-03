@@ -36,10 +36,12 @@ says that his approval holds for the whole task, at every link (FAA-195).
   (`real_number`: `float.__float__`, `int.__int__`), in `mandate_spend`, `js_to_number`, `double` and McpToolServer's
   estimate: an honest subclass such as `numpy.float64` keeps its number, a lying one is read as what it holds. A value
   that only claims a number through `__class__` (a mock with `spec=float`, a lazy proxy), a `Decimal` or a
-  `numpy.int64` is no estimate: the call is answered and a `perCallMaxUsd` refuses it, in every reader, the core
-  `mandate_covers` included. A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
+  `numpy.int64` is no estimate: the call is answered and a `perCallMaxUsd` refuses it, in every reader. The core
+  `mandate_covers` reads a spend only when it is a number or JSON data as `json.loads` gives it, by exact type all the
+  way down, so for its direct callers a tuple, bytes, a `str`, `list` or `dict` subclass, or a list holding a number
+  subclass is no estimate either, a stricter reading than 0.60.0's. A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
   the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
-  seam readings 17 to 19, product readings 18 and 19, unit reading 19).
+  seam readings 17 to 20, product readings 18 to 20, unit reading 19).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
   I/O error, an interrupt), the descriptor stayed held, and the lock name too, since the caller drops the object
   (`release()` would have freed only the name, on Linux and Windows), so the same process could not start the service

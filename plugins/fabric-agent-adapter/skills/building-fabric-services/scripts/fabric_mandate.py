@@ -238,6 +238,22 @@ def _member_of(items: Any, value: Any) -> bool:
     return set_has(items, value)
 
 
+def _json_data(value: Any) -> bool:
+    """Whether a value is JSON data as json.loads gives it, by exact type all the way down (never `==` or isinstance,
+    which a metaclass or `__class__` can answer); a structure too deep to walk is not."""
+    try:
+        kind = type(value)
+        if value is None or kind is bool or kind is str or kind is int or kind is float:
+            return True
+        if kind is list:
+            return all(_json_data(item) for item in value)
+        if kind is dict:
+            return all(type(key) is str and _json_data(item) for key, item in value.items())
+    except RecursionError:
+        pass
+    return False
+
+
 def mandate_covers(inputs: Any) -> Dict[str, Any]:
     """Whether a callee takes one call as the operator's decision under a mandate (DEC-0125 MD-3 to MD-5), after it has
     placed the caller's tier (DL-25), as the contract's mandateCovers answers.
@@ -290,9 +306,11 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     if not set_has(list(_READS_AND_DRAFTS), effect) and capabilities is MISSING and (action is MISSING or actions is MISSING):
         return _outside("outside-mandate: capability")
     ceiling, spend = get(scope, "perCallMaxUsd"), get(call, "spendUsd")
-    # A spend that is no JSON value (a mock, a proxy, a Decimal, a numpy.int64) is no estimate, which a ceiling refuses
-    # (0.61.0 seam reading 19); a JSON value is read as the contract reads it.
-    readable = spend is None or type(spend) in (bool, str, list, dict) or is_number(spend)
+    # A spend is read as the contract reads it only when it is JSON data as json.loads gives it, by exact type all the
+    # way down, or an int or float (a subclass read by the number it stores); anything else (a mock or proxy, a
+    # Decimal, a numpy.int64, a tuple, bytes, a str, list or dict subclass, a list holding one) is no estimate, which a
+    # ceiling refuses (0.61.0 seam readings 19 and 20).
+    readable = is_number(spend) or _json_data(spend)
     if ceiling is not MISSING and (spend is MISSING or not readable or js_to_number(spend) > ceiling):
         data: Dict[str, Any] = {"detail": "outside-mandate: spend"}
         if spend is not MISSING and readable:
