@@ -443,6 +443,13 @@ class BoardMandateTests(Conversation):
             got = at_depth(0, spend)
             self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
         self.assertTrue(at_depth(0, [1, nested(fm.MAX_SPEND_DEPTH - 2)])["ok"], "100 lists deep is read")
+        # A dict with an own toString that Number() reaches (at the top, or through lists alone) throws in JavaScript:
+        # no estimate; under another dict Number() never reaches it (seam reading 28).
+        for spend in ({"toString": 1}, [{"toString": "7"}], [1, {"toString": None}], [[{"a": 1, "toString": {}}]]):
+            got = at_depth(0, spend)
+            self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
+        for spend in ({"a": {"toString": 1}}, [{"a": {"toString": 1}}], {"valueOf": 1}, [{"tostring": 1}]):
+            self.assertTrue(at_depth(0, spend)["ok"], spend)
         for spend in (nested_dicts(fm.MAX_SPEND_DEPTH), nested_dicts(100000), {"a": nested(5000)}, [{"a": nested(5000)}],
                       [1, {"a": nested(5000)}], json.loads('{"a":' * 150 + "1" + "}" * 150)):
             self.assertTrue(at_depth(0, spend)["ok"], "Number() never descends a dict: NaN at any depth, as 0.60.0 read it")

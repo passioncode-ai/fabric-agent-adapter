@@ -3,8 +3,9 @@ the task, narrowed at each hand-over. Part of the service kit (layer L2); the tw
 
 - ``mandate_covers(inputs)``: whether a callee takes one call as the operator's decision under a mandate (MD-3 to
   MD-5), as the contract's ``mandateCovers`` answers, but for a spend that is no JSON data a ``json.loads`` gives
-  (shared or cyclic), or whose lists nest in lists more than MAX_SPEND_DEPTH deep, which ``json.loads`` can give: the
-  core refuses both, where the contract reads the first and reads or throws on the second (FAA-196 (22)). ``inputs`` holds ``mandate``, ``tier``, ``now``,
+  (shared or cyclic), whose lists nest in lists more than MAX_SPEND_DEPTH deep, or that holds a dict with an own
+  ``toString`` at its top or through lists alone: the core refuses all three, where the contract reads the first,
+  reads or throws on the second and throws on the third (FAA-196 (22)). ``inputs`` holds ``mandate``, ``tier``, ``now``,
   ``self`` (the callee's own agent id), ``callerAgent`` (only when the callee authenticated one) and ``call`` ({capability,
   action?, effect, spendUsd?, project?}).
 - ``mandate_problem(mandate)``: ``mandate-malformed``, ``mandate-widened`` or None (FAC-SEM-144);
@@ -252,9 +253,10 @@ MAX_SPEND_DEPTH = 100
 def _json_data(value: Any) -> bool:
     """Whether a value is JSON data as json.loads gives it, by exact type all the way down (never `==` or isinstance,
     which a metaclass or `__class__` can answer), walked without recursion in one pass, its lists nested in lists at
-    most MAX_SPEND_DEPTH deep (a dict ends the count: its members are walked at any depth). json.loads never shares a
-    list or dict, so a structure that meets one twice (shared or cyclic) is not JSON data (0.61.0 unit reading 21,
-    seam reading 22, readings 25 to 27)."""
+    most MAX_SPEND_DEPTH deep (a dict ends the count: its members are walked at any depth), and no dict at its top or
+    reached through lists alone with an own toString, on which Number() throws, as strict_string reads it (0.61.0 seam
+    reading 28). json.loads never shares a list or dict, so a structure that meets one twice (shared or cyclic) is not
+    JSON data (0.61.0 unit reading 21, seam reading 22, readings 25 to 27)."""
     stack, seen = [(value, 0)], set()
     while stack:
         item, depth = stack.pop()
@@ -273,6 +275,8 @@ def _json_data(value: Any) -> bool:
                     return False
             stack.extend((sub, depth) for sub in item)
             continue
+        if depth is not None and "toString" in item:  # Number() reaches it: a member of data is never callable
+            return False
         for key, sub in item.items():
             if type(key) is not str:
                 return False
@@ -351,7 +355,8 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     # A spend is read as the contract reads it only when it is JSON data as json.loads gives it, by exact type all the
     # way down, or an int or float (a subclass read by the number it stores); anything else (a mock or proxy, a
     # Decimal, a numpy.int64, a tuple, bytes, a str, list or dict subclass, a list holding one) is no estimate, which a
-    # ceiling refuses (0.61.0 seam readings 19 and 20).
+    # ceiling refuses (0.61.0 seam readings 19 and 20), as is JSON data Number() cannot read: lists nested more than
+    # MAX_SPEND_DEPTH deep, or a dict with an own toString it reaches (readings 25 to 28).
     readable = over = False
     if ceiling is not MISSING and spend is not MISSING:  # read only when a ceiling asks (no walk without one)
         readable = is_number(spend) or _json_data(spend)

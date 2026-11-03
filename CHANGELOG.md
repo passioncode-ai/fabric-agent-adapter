@@ -48,9 +48,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
   `mandateCovers` and the contract throw RangeError a few thousand deep, and between 100 and those depths the core is
   stricter than all three, a fail-closed twin split that no board, MCP or job reader reaches, since they take no list
   or dict spend; under a dict there is no bound, since `Number()` never descends a dict, NaN at any depth in all of
-  them). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
+  them; a dict with an own `toString`, at the top or reached through lists alone, is no estimate too, where 0.60.0
+  read it as NaN and Node and the contract throw TypeError). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
   the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
-  seam readings 17 to 22, 24, 26 and 27, product readings 18 to 20 and 22 to 27, unit readings 19, 21, 24 and 26). `js_to_number`'s decimal
+  seam readings 17 to 22, 24 and 26 to 28, product readings 18 to 20 and 22 to 27, unit readings 19, 21, 24 and 26). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
   (0.61.0 seam reading 22).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
