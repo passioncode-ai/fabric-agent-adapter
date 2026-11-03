@@ -27,7 +27,7 @@ names why a provider manifest is refused (FAA-193).
 
 ### Changed
 
-- working-with-fabric Step 6 reads `fabric_task_create`'s answer as Step 4 item 2 does: while a claim is held, Fabric
+- working-with-fabric Step 6 reads `fabric_task_create`'s answer as Step 4 item 2 does: while your single live claim is held, Fabric
   0.3.14 links what is filed as spawned from it, so an unrelated row is filed after the release, or the person is told
   it is linked (FAA-169). A scenario eval `a-backlog-row-filed-while-a-claim-is-held`.
 - working-with-fabric references/project-board.md, "When nobody answers": an `active` responder does not prove a request
@@ -36,10 +36,12 @@ names why a provider manifest is refused (FAA-193).
   its `effect` is `not_started` and goes on only once the cancel's receipt shows `cancelled`. An accepted request is
   never adapted by hand and never expires (FAA-172; question to Fabric and the contract on board thread `ab12642e`). A
   scenario eval `an-accepted-request-left-behind-by-a-move`.
-- building-fabric-services SKILL.md: a moved slot stays moved until `take_back` or a move back to its session.
+- building-fabric-services SKILL.md: a moved slot stays moved until `take_back` or a move back once Fabric offers one.
 
 ### Upgrading
 
+- No Fabric release offers the operator's move of a slot yet (Fabric 0.3.15 has none): today a moved slot is
+  another session's taking it, and take-back is the way back; the move-back check is ready for when Fabric ships it.
 - A kit service gets the move back once it installs the 0.60.0 kit modules (`fabric_board_slots.py`,
   `fabric-board-slots.mjs` and their callers). Only the running session hears a move back: a slot moved back to a
   session that has since ended needs take-back, since the session's end released the slot and the operator cannot move

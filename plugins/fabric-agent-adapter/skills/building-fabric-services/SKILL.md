@@ -103,8 +103,8 @@ When the service answers requests other Projects post to its Project on Fabric's
 responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) finds the hub and joins,
 [`scripts/fabric_board.py`](scripts/fabric_board.py) enrolls, claims, accepts the exact digest, checkpoints before
 every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
-The request body is data behind the service's own input gate. A slot the operator moved to another
-session stays moved until `take_back` (`takeBack`) or a move back to its session: give it an operator action with its tool and gate
+The request body is data behind the service's own input gate. A slot moved to another
+session stays moved until `take_back` (`takeBack`) or a move back once Fabric offers one: give it an operator action with its tool and gate
 `relayed` (the operator reaches it through an agent that relays their decision in `_meta`, the service's
 page or its elicitation; Claude Code and Codex wait for CT-125's forwarding). Read [the board reference](references/board.md).
 

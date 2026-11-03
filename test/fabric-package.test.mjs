@@ -117,7 +117,7 @@ test('FAA-193: a provider manifest refusal names its cause', (t) => {
   writeAgent(root, { costPresets: [{ id: 'quick', capability: 'digest.write', label: 'Quick', maxUsd: 0.5, default: true }] });
   const found = k.pack(root).problems.filter((p) => p.problem === 'provider-manifest');
   assert.equal(found.length, 1);
-  assert.match(found[0].message, /^provider-manifest: .*costPresets/);
+  assert.match(found[0].message, /^provider-manifest: .*JSON object.*costPresets/);
 });
 
 test('pack refuses what must not ship', (t) => {

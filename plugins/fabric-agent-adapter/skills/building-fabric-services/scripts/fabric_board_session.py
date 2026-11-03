@@ -238,6 +238,7 @@ class Responder(SlotKeeper):
         self.state = "connecting"
         self.slots = {}  # the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
         self._confirmed = {}  # nor its confirmations: a slot may have moved between the two sessions
+        self._probing = set()  # nor its lost move-back claims
         grant = self.hub.join_board(self.project, self.credential_file)
         missing = [c for c in self.capabilities if c not in grant.capabilities]
         session = self.session_factory(grant)
@@ -518,8 +519,10 @@ class Responder(SlotKeeper):
         renewed = [self.current.renewed_at or 0.0] if self.current is not None else \
             [s.get("renewed_at", 0.0) for s in self.slots.values() if s.get("state") == "held"
              and s.get("renewed_at", 0.0) != float("-inf")] + \
-            [s["probe_at"] for c, s in self.slots.items() if c in self._probing and "probe_at" in s]
-        # a lapsed slot holds no lease (FAA-163); a move-back claim whose answer was lost holds one from its send (FAA-165)
+            [s["probe_at"] for c, s in self.slots.items() if c in self._probing and "probe_at" in s
+             and self.now() - s["probe_at"] < LEASE_SECONDS]
+        # a lapsed slot holds no lease (FAA-163); a move-back claim whose answer was lost holds one from its send, until
+        # that lease would have run out (FAA-165)
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:

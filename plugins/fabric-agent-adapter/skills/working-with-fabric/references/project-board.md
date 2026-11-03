@@ -100,8 +100,8 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    the files you would touch (`git ls-remote origin 'refs/agent-sync/leases/*'` in its repository). `noResponder` in
    the receipt says nobody serves the capability now. A capability or Project that is `held` is the operator's stop,
    not "nobody live": wait, and make no change there.
-   An `active` responder does not prove your request is being worked. A slot the operator moved to another session
-   (contract DEC-0140 PR-2) keeps the requests the old holder had accepted: they stay `accepted` with the old holder's
+   An `active` responder does not prove your request is being worked. A slot moved to another session (the operator's move,
+   contract DEC-0140 PR-2, once Fabric offers it, or another session's replacement) keeps the requests the old holder had accepted: they stay `accepted` with the old holder's
    attempt, which nobody works until the new holder takes them over by a transfer or the old service gets the slot back
    (its take-back, or a move back to a responder from adapter 0.60.0), while Fabric's thread view shows the
    new holder as "Answers it" and its "requests no agent answers now" leaves them out (FAA-172). The board shows a

@@ -1379,6 +1379,30 @@ class MovedBackTwoCapabilitiesTests(Conversation):
         self.assertIsNotNone(r.session)
         self.assertEqual({c: s["holder"] for c, s in self.board.slots.items()}, {"video.render": mine, "video.cut": mine})
 
+    def test_a_lost_probe_outlived_by_its_lease_no_longer_counts(self):
+        """0.60.0 seam reading 5: a lost probe whose resend is postponed (here com.status names no generation) kept its
+        send time past its lease, so one lost answer on the other, freshly renewed capability dropped the session."""
+        r = self.responder()
+        r.step()
+        mine = self.board.slots["video.render"]["holder"]
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()
+        self.board.move("video.render", to=mine)
+        self.board.drop_next["com.claim"] = 1
+        self.board.advance(20)
+        r.step()  # the probe's answer is lost
+        self.board.status_generation = "absent"
+        for _ in range(10):
+            self.board.advance(20)
+            r.step()
+        generation = self.board.slots["video.cut"]["generation"]
+        self.board.drop_next[("com.enroll", "video.cut")] = 1
+        self.board.advance(20)
+        r.step()
+        self.assertIsNotNone(r.session)
+        self.assertEqual(self.board.slots["video.cut"]["generation"], generation)
+
     def test_a_move_back_waits_while_other_work_runs(self):
         import time
         release = threading.Event()

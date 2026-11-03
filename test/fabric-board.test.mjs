@@ -1160,6 +1160,32 @@ test('FAA-165: a later generation\'s lost probe counts its own send (0.60.0 prod
   assert.ok(r.session);
 });
 
+test('FAA-165: a lost probe outlived by its lease no longer counts (0.60.0 seam reading 5)', async (t) => {
+  const hub = await fakeHub(t, ['video.render', 'video.cut']);
+  const h = harness(hub);
+  const r = h.responder({ capabilities: ['video.render', 'video.cut'] });
+  await r.step();
+  const mine = (await h.state()).slots['video.render'].holder;
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step(); // the probe's answer is lost
+  await hub.control({ op: 'set', values: { status_generation: 'absent' } });
+  for (let i = 0; i < 10; i += 1) {
+    await h.advance(20);
+    await r.step();
+  }
+  const generation = (await h.state()).slots['video.cut'].generation;
+  await hub.control({ op: 'drop', tool: 'com.enroll', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.session);
+  assert.equal((await h.state()).slots['video.cut'].generation, generation);
+});
+
 test('FAA-165: two lost answers after a move-back claim keep the session (0.60.0 seam reading 3)', async (t) => {
   const { hub, h, r, mine } = await movedOff(t);
   await hub.control({ op: 'move', capability: 'video.render', to: mine });

@@ -124,10 +124,10 @@ class SlotKeeper:
             if "moved" not in held:
                 self._note(capability, dict(held, moved=now))  # said again at the next start if it cannot be written
         if "moved" not in held:  # once, even across restarts
-            self._emit("board.slot.moved", "warning", "The %s slot on this Project moved to another session. This service stopped answering it; its accepted "
-                       "work stays `accepted` (work begun is the new holder's to settle). It is back when the operator moves it back "
-                       "here, or takes it back: once the other session lets it go, or at once at a restart with accepted work waiting. "
-                       "A restart alone does not. Else ask its maintainer." % capability,
+            self._emit("board.slot.moved", "warning", "The %s slot on this Project moved to another session. This service stopped answering it; accepted "
+                       "work stays `accepted` (work begun is the new holder's). The operator brings it back by take-back (once the "
+                       "other session lets it go, or at a restart with accepted work waiting; a restart alone does not) or, where "
+                       "Fabric offers it, a move back here. Else ask its maintainer." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
         return True
 

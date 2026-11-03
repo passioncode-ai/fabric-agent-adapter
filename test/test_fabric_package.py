@@ -200,6 +200,7 @@ class PackTests(unittest.TestCase):
         found = [p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]
         self.assertEqual(len(found), 1)
         self.assertIn("costPresets", found[0]["message"])
+        self.assertIn("JSON object", found[0]["message"])
         self.assertTrue(found[0]["message"].startswith("provider-manifest: "))
 
     def test_pack_refuses_a_chosen_agent_ref_and_a_stale_receipt(self):

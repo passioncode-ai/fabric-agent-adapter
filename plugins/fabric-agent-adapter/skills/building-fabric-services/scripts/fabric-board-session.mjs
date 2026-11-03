@@ -173,6 +173,7 @@ export class Responder extends SlotKeeper {
     this.state = 'connecting';
     this.slots = {}; // the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
     this.confirmed = {}; // nor its confirmations: a slot may have moved between the two sessions
+    this.probing = new Set(); // nor its lost move-back claims
     const grant = await this.hub.joinBoard(this.project, this.credentialFile);
     const missing = this.capabilities.filter((c) => !grant.capabilities.includes(c));
     const session = this.sessionFactory(grant);
@@ -464,7 +465,8 @@ export class Responder extends SlotKeeper {
   leaseLeft() {
     const renewed = this.current ? [this.current.renewedAt ?? 0]
       : [...Object.values(this.slots).filter((s) => s.state === 'held' && s.renewedAt !== -Infinity).map((s) => s.renewedAt ?? 0), // a lapsed slot holds no lease (FAA-163)
-        ...Object.entries(this.slots).filter(([c, s]) => this.probing.has(c) && 'probeAt' in s).map(([, s]) => s.probeAt)]; // a move-back claim whose answer was lost holds one from its send (FAA-165)
+        ...Object.entries(this.slots).filter(([c, s]) => this.probing.has(c) && 'probeAt' in s && this.now() - s.probeAt < LEASE_SECONDS)
+          .map(([, s]) => s.probeAt)]; // a move-back claim whose answer was lost holds one from its send, until that lease would have run out (FAA-165)
     return renewed.length && this.session ? Math.min(...renewed) + LEASE_SECONDS - this.now() : 0;
   }
 
