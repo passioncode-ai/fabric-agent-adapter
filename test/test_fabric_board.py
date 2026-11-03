@@ -1831,6 +1831,7 @@ class MovedSlotTests(Conversation):
                 return dict.get(self, k, d)
         r.slots = Slots(r.slots)
         r.step()  # returns, never raises
+        self.assertFalse(r.slots.armed)  # the take_back did land inside the check
         self.assertNotIn("moved", self.record().get("video.render") or {})
 
     def test_a_stopping_responder_does_not_ask_about_a_move_back(self):

@@ -79,8 +79,10 @@ digest, each path once, every named file listed with the same SHA-256), `FAC-SEM
 or `costPresets` that differ from the package's, FAA-193) and `path` (a listed or folder path holding a control character, U+2028 or
 U+2029, a `..` segment, a backslash, `//` or a colon, refused by the kit itself whatever the schema's pattern lets
 through, FAA-78). `fabric.package.json` and the trust file are read as strict UTF-8 and nested at most 256 levels; the plugin and
-provider manifests the folder check reads are parsed as the contract's `checkPackageFolder` does, with no depth limit
-of their own (Python 3.9's own recursion limit reads one nested about 990 levels deep as no manifest, FAA-194 (27)); a folder entry the kit cannot
+provider manifests the folder check reads are strict UTF-8 too (the contract's `checkPackageFolder` decodes them with
+replacement characters, so an invalid byte is no manifest here and is accepted there, FAA-194 (29)) and have no depth
+limit of their own, as the contract's reference has none (Python 3.9's own recursion limit reads one nested about 990
+levels deep as no manifest, FAA-194 (27)); a folder entry the kit cannot
 read is refused as `Cannot read <path>`, and a link, FIFO or other non-regular file is never followed. With a problem,
 `--apply` writes nothing. Repacking drops old signatures and
 says so: a changed package is signed again.
