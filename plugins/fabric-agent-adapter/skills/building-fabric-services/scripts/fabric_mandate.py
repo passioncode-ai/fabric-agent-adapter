@@ -275,10 +275,10 @@ def _json_data(value: Any) -> bool:
                     return False
             stack.extend((sub, depth) for sub in item)
             continue
-        if depth is not None and "toString" in item:  # Number() reaches it: a member of data is never callable
-            return False
         for key, sub in item.items():
-            if type(key) is not str:
+            if type(key) is not str:  # before any comparison: a key's own __eq__ never runs (unit reading 29)
+                return False
+            if depth is not None and key == "toString":  # Number() reaches it: a member of data is never callable
                 return False
             stack.append((sub, None))
     return True

@@ -453,6 +453,19 @@ class BoardMandateTests(Conversation):
             self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
         for spend in ({"a": {"toString": 1}}, [{"a": {"toString": 1}}], {"valueOf": 1}, [{"tostring": 1}]):
             self.assertTrue(at_depth(0, spend)["ok"], spend)
+
+        class Hostile(str):  # hashes as "toString" and raises on comparison: refused before it is compared (unit reading 29)
+            def __hash__(self):
+                return hash("toString")
+
+            def __eq__(self, other):
+                raise RuntimeError("compared")
+        class HostileKey:  # the same, not a str at all
+            __hash__, __eq__ = Hostile.__hash__, Hostile.__eq__
+        for key in (Hostile("x"), HostileKey()):
+            for spend in ({key: 1}, [{key: 1}], [1, {key: 1}]):
+                got = at_depth(0, spend)
+                self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
         for spend in (nested_dicts(fm.MAX_SPEND_DEPTH), nested_dicts(100000), {"a": nested(5000)}, [{"a": nested(5000)}],
                       [1, {"a": nested(5000)}], json.loads('{"a":' * 150 + "1" + "}" * 150)):
             self.assertTrue(at_depth(0, spend)["ok"], "Number() never descends a dict: NaN at any depth, as 0.60.0 read it")
