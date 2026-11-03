@@ -168,7 +168,8 @@ def _spellings(found: Iterable[str], owner: Iterable[str]) -> Set[str]:
     printed path masks the other spellings of that home too."""
     names = set(found)
     for name in owner:
-        spelled = {name, name.replace(" ", "%20"), name.replace(" ", "+"), re.sub(r"[ ._]", "-", name)}
+        encoded = name.replace("'", "%27")
+        spelled = {name, encoded.replace(" ", "%20"), encoded.replace(" ", "+"), re.sub(r"[ ._']", "-", name)}
         if {n.lower() for n in names} & spelled:
             names |= spelled
     return names
@@ -182,10 +183,11 @@ def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
     if name not in _DASHED:
         def whole(spelling: str) -> str:
             return r"((?i:%s))(?![A-Za-z0-9])" % re.escape(spelling)
+        encoded = name.replace("'", "%27")
         patterns = [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_SLASHED
-                    for spelling in sorted({name, name.replace(" ", "%20"), name.replace(" ", "+")})]
+                    for spelling in sorted({name, encoded.replace(" ", "%20"), encoded.replace(" ", "+")})]
         patterns += [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_DASHED
-                     for spelling in sorted({re.sub(r"[ ._]", "-", name), name})]
+                     for spelling in sorted({re.sub(r"[ ._']", "-", name), name})]
         _DASHED[name] = tuple(patterns)
     return _DASHED[name]
 
@@ -353,11 +355,12 @@ def _fold(text: str) -> str:
 
 #: How a `home: <name>` line of the owner's list is kept among the entries: a character no line can hold.
 HOME_ENTRY = "\0"
-#: `home: <name>`: one ASCII name (a letter or digit first; letters, digits, `.`, `_`, `-` and spaces inside, as a
-#: Windows profile may hold), any space around the colon. The name is checked as ASCII apart: IGNORECASE alone would
+#: `home: <name>`: one ASCII name (a letter or digit first; letters, digits, `.`, `_`, `-`, `'` and spaces inside, as
+#: a Windows profile may hold), a horizontal space (a space, a tab, a Unicode space) around the colon; any other white
+#: space there is refused. The name is checked as ASCII apart: IGNORECASE alone would
 #: let `[A-Za-z]` take U+017F and U+212A.
 _GAP = "[ \t\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]*"  # a horizontal space only: never a control or a separator
-_HOME_LINE = re.compile(r"home%s:%s([A-Za-z0-9](?:[A-Za-z0-9._ -]*[A-Za-z0-9._-])?)" % (_GAP, _GAP), re.IGNORECASE)
+_HOME_LINE = re.compile(r"home%s:%s([A-Za-z0-9](?:[A-Za-z0-9._' -]*[A-Za-z0-9._'-])?)" % (_GAP, _GAP), re.IGNORECASE)
 _HOME_KEY = re.compile(r"home\s*:", re.IGNORECASE)  # any white space, so a control or a separator is refused
 
 
@@ -367,16 +370,17 @@ def read_list(path: Path) -> List[str]:
     entries = []
     # at CRLF, CR or LF: a list saved with CR alone keeps its lines, and a FF or U+2028 starts none
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
-        text = raw.strip().replace(HOME_ENTRY, "")
+        # a byte-order mark or a zero-width character at a line's start (two lists joined) is no part of the line
+        text = raw.strip().lstrip("\ufeff\u200b\u200c\u200d\u2060").strip().replace(HOME_ENTRY, "")
         home = _HOME_LINE.fullmatch(text)
         if home and home.group(1).isascii():
             entries.append(HOME_ENTRY + home.group(1).lower())
             continue
         if _HOME_KEY.match(text):  # meant as a home and not one: never kept as a string that cannot match
             raise CheckError("line %d of the owner's list starts with `home` and a colon but is not one ASCII home name "
-                             "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`): "
-                             "list a name outside ASCII, or one holding another character such as an apostrophe, as a plain "
-                             "string" % (len(entries) + 1))
+                             "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`, "
+                             "`'`): a note goes on a line of its own, a path is written as its home name only, and a name "
+                             "outside ASCII, or holding another character, is listed as a plain string" % (len(entries) + 1))
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
@@ -543,11 +547,13 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130),
     # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`); the names
     # found elsewhere in the tree are one compiled pattern, so the cost does not grow with names times paths
-    # a declared home of three or more characters is the owner's own name: masked wherever a printed path holds it,
-    # its parts joined by any separator a tool writes (a space, `.`, `_`, `-`, `+`, `%20`), found or not
+    # a declared home of three or more letters and digits is the owner's own name: masked wherever a printed path holds
+    # it, its parts joined by none or any run of the separators a tool writes (a space, `.`, `_`, `-`, `+`, and their
+    # percent-encodings), found or not
     for declared in _owner_homes(entries):
-        if len(declared) >= 3:
-            joined = r"(?:[ ._+-]|%20)".join(re.escape(part) for part in re.split(r"[ ._-]+", declared) if part)
+        parts = [part for part in re.split(r"[ ._'-]+", declared) if part]
+        if sum(len(part) for part in parts) >= 3:
+            joined = r"(?:[ ._+'-]|%2[07BbDdEe]|%5[Ff])*".join(re.escape(part) for part in parts)
             marks += [(m.start(), m.end(), "<home>") for m in re.finditer(joined, path, re.IGNORECASE)]
     for name in _spellings({path[s:e] for s, e in found}, _owner_homes(entries)):
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]

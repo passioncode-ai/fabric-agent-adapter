@@ -1295,13 +1295,36 @@ class Refusals(Tree):
         self.assertNotIn("longername", sc.redact("-Users-a-b-longername-x/f_a.b-longername.txt",
                                                  [sc.HOME_ENTRY + "a.b-longername"]))
         self.assertNotIn("j.doe", sc.redact("-Users-j-doe-proj/j.doe.md", [sc.HOME_ENTRY + "j.doe"]))
+        # reading 35, product: an apostrophe is declared like a space, a dash in the dashed form and `%27` encoded
+        apos = "o'zq" + "dovski"
+        listing = self.tmp / "cfg" / "apos.txt"
+        listing.parent.mkdir(exist_ok=True)
+        listing.write_text("home: " + apos + "\n", encoding="utf-8")
+        dashed = apos.replace("'", "-")
+        for n, form in enumerate(("/Users/%s/p" % apos, "~/.claude/projects/-Users-%s-web/a.jsonl" % dashed,
+                                  "C--Users-%s-p" % dashed, "%%2FUsers%%2F%s%%2Fp" % apos.replace("'", "%27"))):
+            self.write("ap%d.txt" % n, form + "\n")
+        (self.root / ("pic-" + dashed + ".png")).write_bytes(b"\0")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing), "--every-file", "--json"])
+        self.assertEqual(code, 1)
+        self.assertEqual(sorted(f["path"] for f in json.loads(out)["findings"] if f["path"].startswith("ap")),
+                         ["ap0.txt", "ap1.txt", "ap2.txt", "ap3.txt"])
+        self.assertNotIn("zqdovski", out.lower())
+        # reading 35, unit: a doubled or encoded separator, or none, still joins the parts of a declared name; and
+        # three characters of separators around one or two letters mask nothing
+        s = "zq" + "dovski"
+        for declared, path in (("jane  " + s, "q/jane  " + s + ".png"), ("j._" + s, "q/j._" + s + ".png"),
+                               ("jane " + s, "q/jane__" + s + ".png"), ("jane " + s, "q/jane%5F" + s + ".png"),
+                               ("jane " + s, "q/jane" + s + ".png")):
+            self.assertNotIn(s, sc.redact(path, [sc.HOME_ENTRY + declared]).lower(), (declared, path))
+        self.assertEqual(sc.redact("q/abc/data.txt", [sc.HOME_ENTRY + "a.."]), "q/abc/data.txt")
         # reading 34, seam: a spelling found in one file's text reaches another file's printed path through seen
         seen = sc._Seen()
         sc._text_findings("see /Users/j.doe/x", [sc.HOME_ENTRY + "j.doe"], seen)
         self.assertNotIn("doe", sc.redact("q/j-doe-cache/f.bin", [""], seen))
         # reading 32, product: the reference sends a dotted or underscored home to `home:` too
         reference = (SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8")
-        self.assertIn("holds a space, a dash, a dot or an underscore (each a dash in the dashed form", reference)
+        self.assertIn("holds a space, a dash, a dot, an underscore or an apostrophe (each a dash in the dashed form", reference)
         # reading 31, unit: a `.` is dashed too, and the whole name is masked in a printed path
         listing.write_text("home: j.doe\nhome: bob-smith\n", encoding="utf-8")
         self.write("-Users-bob-smith-proj/.env", "X=1\n")
@@ -1316,14 +1339,22 @@ class Refusals(Tree):
         listing = self.tmp / "cfg" / "list.txt"
         listing.parent.mkdir()
         for line in ("home: \u042f\u043d", "home: jo # mine", "home: /Users/jo", "home: _svc", "home: \u017fam",
-                     "home\u00a0: jos\u00e9", "home:", "home: jo, al", "home: O'Br" + "ien",
+                     "home\u00a0: jos\u00e9", "home:", "home: jo, al", "home: jo (work)",
                      # reading 34, unit: a control or a separator around the colon is no space
                      "home:\x0czq", "home:\u2028zq", "home\x1c: zq", "home:\x85zq", "home\u2029:zq"):
             listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 2, line)
             self.assertIn("line 2 of the owner's list", err)
-            self.assertIn("list a name outside ASCII, or one holding another character such as an apostrophe", err)
+            self.assertIn("a note goes on a line of its own, a path is written as its home name only", err)
+        # reading 35, seam: a byte-order mark or a zero-width space before `home:` (two lists joined) is dropped
+        self.write("adm.txt", "/Users/admin/p\n")
+        for mark in ("\ufeff", "\u200b"):
+            listing.write_text("zqcorpx\n" + mark + "home: admin\n", encoding="utf-8")
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+            self.assertEqual(code, 1, repr(mark))
+            self.assertIn("adm.txt:1: home-path", out)
+        (self.root / "adm.txt").unlink()
         listing.write_text("home: admin\n", encoding="utf-8")  # only homes: the summary does not call the list empty
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
         self.assertNotIn("holds no string", out)
