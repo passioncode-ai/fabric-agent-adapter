@@ -158,10 +158,15 @@ def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
     """A declared home name in the dashed forms, read whole and spelled as a tool dashes it (`.` and `_` become `-`):
     the generic dashed form ends a name at its first dash, so `-Users-j-doe-proj` would read `j`."""
     if name not in _DASHED:
-        whole = r"((?i:%s))(?![A-Za-z0-9._])" % re.escape(re.sub(r"[._]", "-", name))
-        _DASHED[name] = (
-            re.compile(r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-Za-z]-Users)-" + whole, re.ASCII),
-            re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-" + whole, re.ASCII | re.IGNORECASE))
+        patterns: List["re.Pattern[str]"] = []
+        for spelling in sorted({re.sub(r"[._]", "-", name), name}):  # dashed by a tool, or kept as written
+            # ends only where a letter or digit would continue it: a `.` or `_` after it (an extension, a
+            # sentence's end) is read as the declared home, failing closed
+            whole = r"((?i:%s))(?![A-Za-z0-9])" % re.escape(spelling)
+            patterns += [
+                re.compile(r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-Za-z]-Users)-" + whole, re.ASCII),
+                re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-" + whole, re.ASCII | re.IGNORECASE)]
+        _DASHED[name] = tuple(patterns)
     return _DASHED[name]
 
 
@@ -344,8 +349,9 @@ def read_list(path: Path) -> List[str]:
             entries.append(HOME_ENTRY + home.group(1).lower())
             continue
         if _HOME_KEY.match(text):  # meant as a home and not one: never kept as a string that cannot match
-            raise CheckError("line %d of the owner's list starts with `home:` but holds no one ASCII home name "
-                             "(a letter or digit, then letters, digits, `.`, `_`, `-`); list a name outside ASCII as a plain string"
+            raise CheckError("line %d of the owner's list starts with `home` and a colon but is not one ASCII home name and nothing "
+                             "after it (a letter or digit, then letters, digits, `.`, `_`, `-`): declare a name holding a "
+                             "space by its part before the space, and list a name outside ASCII as a plain string"
                              % (len(entries) + 1))
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries

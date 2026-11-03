@@ -1283,6 +1283,17 @@ class Refusals(Tree):
         self.assertEqual(code, 1)
         self.assertEqual(sorted(f["line"] for f in json.loads(out)["findings"]), [1, 2, 3])
         self.assertNotIn("j-doe", out + err)
+        # reading 32, seam: a `.` after the dashed name starts an extension, never a longer name
+        self.assertTrue(sc._home_names("x/-Users-j-doe.json", {"j.doe"}))
+        self.assertFalse(sc._home_names("x/-Users-j-doer.json", {"j.doe"}))
+        # reading 32, unit: a `.` or `_` right after it (a sentence's end, an extension) reads as the declared home,
+        # and a name that keeps its `.` in the dashed form is read whole too
+        for text in ("~/.claude/projects/-Users-j-doe.", "-Users-j-doe_", "C--Users-j-doe."):
+            self.assertTrue(sc._home_names(text, {"j-doe"}), text)
+        self.assertNotIn("longername", sc.redact("-Users-a.b-longername-x/f", [sc.HOME_ENTRY + "a.b-longername"]))
+        # reading 32, product: the reference sends a dotted or underscored home to `home:` too
+        reference = (SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8")
+        self.assertIn("holds a dash, a dot or an underscore (each a dash in the dashed form)", reference)
         # reading 31, unit: a `.` is dashed too, and the whole name is masked in a printed path
         listing.write_text("home: j.doe\nhome: bob-smith\n", encoding="utf-8")
         self.write("-Users-bob-smith-proj/.env", "X=1\n")
@@ -1302,6 +1313,7 @@ class Refusals(Tree):
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 2, line)
             self.assertIn("line 2 of the owner's list", err)
+            self.assertIn("by its part before the space", err)  # reading 32: the remedy names each cause
         listing.write_text("home: admin\n", encoding="utf-8")  # only homes: the summary does not call the list empty
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
         self.assertNotIn("holds no string", out)
