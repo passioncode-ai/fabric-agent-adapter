@@ -80,9 +80,12 @@ class LockTests(unittest.TestCase):
         lock_module = sys.modules[fs.InstanceLock.__module__]
         for call in ("ftruncate", "write", "fsync"):
             with self.subTest(call=call), tempfile.TemporaryDirectory() as temp:
+                failed = fs.InstanceLock(Path(temp))
                 with mock.patch.object(lock_module.os, call, side_effect=OSError(28, "No space left on device")):
                     with self.assertRaises(OSError):
-                        fs.InstanceLock(Path(temp)).acquire()
+                        failed.acquire()
+                failed.release()  # a no-op: nothing is closed twice (a reused descriptor number belongs to someone else)
+                self.assertIsNone(failed._name)
                 fs.InstanceLock(Path(temp)).acquire().release()
 
 

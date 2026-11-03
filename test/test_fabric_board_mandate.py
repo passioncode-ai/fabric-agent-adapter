@@ -183,9 +183,13 @@ class BoardMandateTests(Conversation):
         if hasattr(sys, "set_int_max_str_digits"):  # lift the interpreter's own limit: only the kit's may refuse it
             self.addCleanup(sys.set_int_max_str_digits, sys.get_int_max_str_digits())
             sys.set_int_max_str_digits(0)
-        request = fb.BoardRequest({"body": {"text": body('{"kind": "mandate/1", "n": %s}' % ("7" * 4301))}, "request": {"id": "r"},
-                                   "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
-        self.assertEqual(link.read_mandate(request, link.PERSONAL_BOARD, "example-agent"), (None, "mandate-unreadable"))
+        for literal, unread in (("7" * 4301, "mandate-unreadable"), ("-" + "7" * 4301, "mandate-unreadable"),
+                                ("7" * 4300, None), ("-" + "7" * 4300, None)):
+            request = fb.BoardRequest({"body": {"text": body('{"kind": "mandate/1", "n": %s}' % literal)}, "request": {"id": "r"},
+                                       "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
+            got, code = link.read_mandate(request, link.PERSONAL_BOARD, "example-agent")
+            self.assertEqual(code, unread, len(literal))
+            self.assertEqual(got is None, unread is not None, len(literal))
 
     def test_a_closing_fence_may_carry_trailing_spaces(self):
         got, covered, _ = self.run_one("```json  \n%s\n```  \t\n" % json.dumps(mandate()))
