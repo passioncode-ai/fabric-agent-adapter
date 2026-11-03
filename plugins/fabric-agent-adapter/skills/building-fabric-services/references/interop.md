@@ -266,7 +266,8 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
 - A `spend` or `project` function that raises, or a spend that is not a finite number, fails closed: the call is
   answered, and a mandate with a `perCallMaxUsd` ceiling or a `projects` list refuses it (`outside-mandate: spend` or
   `outside-mandate: project`); the estimate is read as a double, so an integer past the float range is infinite and
-  refused under a ceiling, and a project function that answers anything but a string or `None` names no project a
+  refused under a ceiling (a subclass of int or float is read by the number it holds, never by its `float()`; a bool
+  is none), and a project function that answers anything but a string or `None` names no project a
   mandate can list. A refusal outside a mandate
   tells the caller the MD-4 order: call again within its own mandate, else pass the refusal up; only the leading agent
   asks the operator.

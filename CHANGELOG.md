@@ -24,11 +24,17 @@ says that his approval holds for the whole task, at every link (FAA-195).
   none; leave `project` out on the board) (a draft of this release passed them as given; 0.61.0 seam reading 14). Only
   the five members `mandate_covers` reads are read, each once, as the contract reads them (`call[name]` in Python; a
   plain property read in Node, inherited, getter and Proxy members included), but for a Node spend, read as the call's
-  own member; the rest of a call is never touched (0.61.0 seam readings 16 and 17). The kit's `mandate_spend` takes only
-  an `int` or a `float`, so a number subclass whose `float()` answers another number is no spend in any reader.
+  own member; the rest of a call is never touched (0.61.0 seam readings 16 and 17).
 
 ### Fixed
 
+- The Python mandate readers (McpToolServer and `action_gate`, the job step, the board path, and the core
+  `mandate_covers` and `action_decision` beneath them) read a spend estimate that is an `int` or `float` subclass
+  through its `float()`, so a subclass whose `float()` answered 0.0 for 100 passed a `perCallMaxUsd` of 5.
+  `mandate_spend`, `js_to_number` and McpToolServer's estimate now read a subclass by the number it holds
+  (`float.__float__`, `int.__int__`):
+  an honest subclass such as `numpy.float64` keeps its number, a lying one is read as what it holds, and a bool is none
+  as before (0.61.0 seam readings 17 and 18, product reading 18).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
   I/O error, an interrupt), the descriptor stayed held, and the lock name too, since the caller drops the object
   (`release()` would have freed only the name, on Linux and Windows), so the same process could not start the service

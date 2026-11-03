@@ -772,8 +772,9 @@ class McpToolServer:
         caller_agent = (verdict or {}).get("caller")
         # The estimate is read as a double, as the contract does: an int past the float range is infinite, and an
         # estimate that is not a finite number reads as none, which a mandate's ceiling refuses (fail closed).
-        try:
-            double = float(spend) if isinstance(spend, (int, float)) and not isinstance(spend, bool) else math.nan
+        try:  # by the number it holds: a subclass's own float() is never asked (0.61.0 seam reading 18)
+            double = (float.__float__(spend) if isinstance(spend, float) else float(int.__int__(spend))) \
+                if isinstance(spend, (int, float)) and not isinstance(spend, bool) else math.nan
         except OverflowError:
             double = math.inf
         finite = math.isfinite(double)  # the service's own number goes on when it is finite (25 stays 25)

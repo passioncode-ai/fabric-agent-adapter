@@ -31,7 +31,8 @@ The kit cannot tell a personal board from an organization's: `com.status` names 
   authenticated agent id the chain can bind), and the service's clock. A covered call answers `recordAs`
   (`via: mandate`), which the handler records as its reason; the kit puts the operator's words in no event, log or
   checkpoint.
-- Nothing else changes: `admit` still runs first, and a body stays data. A mandate never widens what `admit` refuses.
+- Nothing else on the board path changes (the release also fixes how every Python reader reads a spend subclass; see
+  the CHANGELOG's Fixed): `admit` still runs first, and a body stays data. A mandate never widens what `admit` refuses.
 
 ## Checks (to write before the code)
 

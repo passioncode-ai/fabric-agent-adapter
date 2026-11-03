@@ -3,6 +3,7 @@ project-comms.md, DEC-0125 MD-3). Reading is opt-in (`agent_id` and `mandate_fro
 
 from __future__ import annotations
 
+import collections.abc
 import importlib
 import json
 import sys
@@ -280,7 +281,64 @@ class BoardMandateTests(Conversation):
             def __float__(self):
                 return 0.0
         self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": Lying(100), "project": "site-a"}),
-                         "outside-mandate: spend", "a float subclass is no spend")
+                         "outside-mandate: spend", "a subclass is read by the number it holds, never by its float()")
+
+        class Usd(float):  # an honest subclass (numpy.float64 is one) keeps its number
+            pass
+
+        class LyingInt(int):
+            def __int__(self):
+                return 0
+
+            def __float__(self):
+                return 0.0
+        self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": Usd(3), "project": "site-a"}), "ok")
+        self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": LyingInt(100), "project": "site-a"}),
+                         "outside-mandate: spend")
+        acts = mandate(scope={"actions": ["approve"], "effects": ["draft"]})
+
+        class Hiding(collections.abc.Mapping):  # __contains__ and __iter__ hide what __getitem__ answers
+            def __init__(self, data, hidden):
+                self.data, self.hidden = data, hidden
+
+            def __getitem__(self, key):
+                return self.hidden[key] if key in self.hidden else self.data[key]
+
+            def __iter__(self):
+                return iter(self.data)
+
+            def __len__(self):
+                return len(self.data)
+
+            def __contains__(self, key):
+                return key in self.data
+        self.assertEqual(detail_of(link, acts, Hiding({"effect": "draft"}, {"action": "other"})), "outside-mandate: action")
+
+        class Raising(dict):
+            def __getitem__(self, key):
+                if key == "action":
+                    raise ValueError("unreadable")
+                return dict.__getitem__(self, key)
+        with self.assertRaises(ValueError):
+            link.covers(acts, Raising(effect="draft"), "example-agent", lambda: WALL, OTHER_PROJECT)
+
+        class Counted(dict):
+            reads: dict = {}
+
+            def __getitem__(self, key):
+                Counted.reads[key] = Counted.reads.get(key, 0) + 1
+                return dict.__getitem__(self, key)
+        detail_of(link, m, Counted(capability="video.render", action="a", effect="draft", spendUsd=3, project="site-a"))
+        self.assertEqual(Counted.reads, dict.fromkeys(("capability", "action", "effect", "spendUsd", "project"), 1), "each member read once")
+        # The kit's core reader, which action_decision and McpToolServer reach too, holds to the same number (seam reading 18).
+        got = fm.mandate_covers({"mandate": m, "tier": "T1", "now": AT, "self": "example-agent",
+                                 "call": {"capability": "video.render", "effect": "draft", "spendUsd": Lying(100), "project": "site-a"}})
+        self.assertEqual(got.get("data", {}).get("detail"), "outside-mandate: spend")
+        jsv = importlib.import_module("fabric_jsvalue")
+        self.assertEqual((jsv.js_to_number(Lying(100)), jsv.js_to_number(LyingInt(100)), jsv.js_to_number(Usd(3))), (100.0, 100.0, 3.0))
+        rules = importlib.import_module("fabric_interop_rules")
+        self.assertEqual((rules.mandate_spend(Usd(3)), type(rules.mandate_spend(Usd(3)))), (3.0, float))
+        self.assertEqual((rules.mandate_spend(Lying(100)), rules.mandate_spend(LyingInt(100)), rules.mandate_spend(True)), (100.0, 100, None))
         call = {"capability": "video.render", "effect": "draft", "spendUsd": float("nan"), "project": 5}
         kept = dict(call)
         link.covers(m, call, "example-agent", lambda: WALL, OTHER_PROJECT)

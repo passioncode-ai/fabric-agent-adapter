@@ -199,8 +199,8 @@ def js_to_number(value: Any) -> float:
     if isinstance(value, bool):
         return 1.0 if value else 0.0
     if is_number(value):
-        try:
-            return float(value)
+        try:  # by the number it holds: a subclass's own float() is never asked (0.61.0 seam reading 18)
+            return float.__float__(value) if isinstance(value, float) else float(int.__int__(value))
         except OverflowError:
             return math.inf if value > 0 else -math.inf
     if isinstance(value, list):
