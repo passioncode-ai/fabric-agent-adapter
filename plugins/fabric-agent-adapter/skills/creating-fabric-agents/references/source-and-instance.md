@@ -70,7 +70,7 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 
 | Kind | Finds |
 |---|---|
-| `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name holds a dash declares it with `home: <name>` in the owner's list, which reads it whole in every form, and one whose home name is not ASCII lists it as a plain string |
+| `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name holds a dash, a dot or an underscore (each a dash in the dashed form) declares it with `home: <name>` in the owner's list, which reads it whole in every form, and one whose home name is not ASCII lists it as a plain string |
 | `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
@@ -108,7 +108,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`, and a `#` after a string is
   part of that string. An entry matches in any case and inside any word. A line `home: <name>` declares the owner's home
   name instead (ASCII letters, digits, `.`, `_` and `-`, starting with a letter or a digit; a line that starts with
-  `home:` and holds anything else is refused, exit 2; such a line is never a string entry, so list a string like
+  `home` and a colon (`home:`, `Home :`) and holds anything else is refused, exit 2; a home name holding a space, as a Windows profile may, is
+  declared by its part before the space; such a line is never a string entry, so list a string like
   `home: page` by a part of it, `ome: page`): the check then finds that home in every form the table names (it is never neutral, even with one or two
   letters), and the bare name is not looked for anywhere else. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
