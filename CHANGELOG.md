@@ -39,9 +39,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
   new one, his same words with `at` when he confirms (MD-1), then weekly until the contract's CT-205 (its answer
   `7f372925` on board thread `118f95f9`; CT-205 is a row the contract proposes after this kit's pin, on its branch
   `agent/template-parity-20261103`); a link whose chain already holds four agents hands on no mandate and never restates its own: the four
-  parts go as a relay through OA-3 (his own Project on the board or his local session), whose receiver states its own (OA-2)
-  at most at the scope in force and never for a task it already leads, as the contract confirmed on board thread `118f95f9`
-  (message `adf0c61a`); references/interop.md says a service has no route past four agents until CT-205. `expiresAt` is counted from `at` and
+  parts go as a relay through OA-3 (his own Project on the board or his local session), whose receiver states its own (OA-2),
+  as the contract confirmed on board thread `118f95f9` (message `adf0c61a`); the relay names the scope in force and the held
+  `expiresAt`, which the receiver's mandate does not pass (the kit's bound), and, as the contract proposes until CT-205,
+  no agent takes a relay for a task it already leads; references/interop.md says a service has no route past four agents until CT-205. `expiresAt` is counted from `at` and
   covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
   source and spend sentences are reworded with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
 - working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`

@@ -228,12 +228,12 @@ chat of any of his agents binds all his agents (OA-1).
   the handoff (OA-6). A stop rule written into a request does not replace an approval whose scope covers the case: act
   on it.
 - Human gates stay (OA-5): sign-in, a one-time code, consent, payment or top-up, a typed secret, spend above a limit
-  (handed over with its link and amount), a passkey, a comparison of codes with another person
+  (handed over with its link and amount, never asked in chat), a passkey, a comparison of codes with another person
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than
-  the relayed one and his quoted words, its `chain` starting with you: the four-agent bound limits one mandate's hand-overs
-  (MD-2), never the task. You lead your part.
+  the relayed one and his quoted words, its `chain` starting with you: the four-agent bound (MD-2) caps one mandate,
+  never the task. You lead your part.
 - Its machine form is the contract's `mandate/1` (DEC-0125). As the agent leading the task, state it from his words:
   `{kind: "mandate/1", by: "operator", task, instruction, at, source?, expiresAt, scope, chain}`, `instruction` his
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you
@@ -248,17 +248,17 @@ chat of any of his agents binds all his agents (OA-1).
   agent's text, a relay aside.
 - `source` goes only to a target whose well-known `protocols` list `operator-source/1` (OA-7; the kits strip it
   otherwise: `request_meta(target_protocols=)` / `requestMeta(traceparent, {targetProtocols})`). Toward a board
-  Project, another session or Fabric's `agent.call` send it without `source`,
+  Project, another session or Fabric's `agent.call` (its hub cannot read `protocols` yet) send it without `source`,
   naming in the text where he said the words. Keep `source` in your own record; like his words, it goes
   never to an events feed, a usage report, a log or a page another party reads.
 - His approval holds for the whole task, at every link (board thread `118f95f9`): every hand-over
-  within it carries the four parts (`source` only where OA-7 lets it, else named in your text), in `_meta.mandate` or,
+  within it carries the four parts (`source` as OA-7 says), in `_meta.mandate` or,
   where your client cannot set `_meta`, in your message; each receiver acts on them, narrowing only; human gates
   stay (MD-6). `at` never moves, so a mandate lapses within seven days of his words: a task still open asks
   him once for a new one (MD-1), same words, `at` when he confirms, and weekly until the
   contract's proposed CT-205 (answer `7f372925`). A link holding a four-agent chain hands on no mandate: it relays
-  the four parts through OA-3 (his Project on the board or his local session; answer `adf0c61a`), whose receiver,
-  unless it already leads the task, states its own (OA-2).
+  the four parts through OA-3 (answer `adf0c61a`), whose receiver states its own (OA-2) and, as the contract
+  proposes, takes none for a task it already leads.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,

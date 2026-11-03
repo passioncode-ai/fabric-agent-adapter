@@ -45,7 +45,7 @@ class BoardMandateTests(Conversation):
         self.outcome = outcome
 
     def run_one(self, text: str, provenance: str = "trusted", **kw):
-        self.board.queue("video.render", text=text, provenance=provenance)
+        self.rid = self.board.queue("video.render", text=text, provenance=provenance)
         args = dict(agent_id="example-agent", mandate_from={OTHER_PROJECT}, wall=lambda: WALL)
         args.update(kw)
         self.responder(**args).step()
@@ -93,8 +93,15 @@ class BoardMandateTests(Conversation):
                 said = [e for e in self.events if e[0] == "board.request.mandate_unread"]
                 self.assertEqual(len(said), 1)
                 self.assertIn(code, said[0][2])
-                self.assertEqual(said[0][3]["data"]["value"], {"request": said[0][3]["data"]["value"]["request"], "reason": code},
+                self.assertEqual(said[0][3]["data"]["value"], {"request": self.rid, "reason": code},
                                  "the data survives FAC-SEM-101: its reason is under `reason`, never `code`")
+
+    def test_a_broken_block_beside_a_mandate_cancels_nothing(self):
+        m = mandate()
+        got, covered, _ = self.run_one(body(json.dumps(m), '{"frames": '))
+        self.assertEqual(got, m)
+        self.assertTrue(covered["ok"])
+        self.assertEqual([e for e in self.events if e[0] == "board.request.mandate_unread"], [])
 
     def test_a_json_block_that_is_no_mandate_is_ignored(self):
         got, covered, _ = self.run_one(body('{"frames": 24}'))

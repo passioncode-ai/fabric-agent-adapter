@@ -87,16 +87,17 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
                       "no machine\nhand-over is left".replace("\n", " "), "never for a task it already leads"):
             self.assertIn(words, board, words)
         for words in ("A link holding a four-agent chain hands on no mandate",
-                      "through OA-3 (his Project on the board or his local session; answer `adf0c61a`)",
-                      "unless it already leads the task, states its own (OA-2)"):
+                      "through OA-3 (answer `adf0c61a`)",
+                      "as the contract proposes, takes none for a task it already leads",
+                      "never asked in chat", "Fabric's `agent.call` (its hub cannot read `protocols` yet)"):
             self.assertIn(words, flat_rule, words)
         for words in ("from his own Project on the board or his local session", "never for a task it already leads (a proposed minimum",
-                      "relays the scope in force at its link, never his wider one", "no later than the held one"):
+                      "relays the scope in force at its link, never his wider one", "names its held `expiresAt`, which the receiver's `expiresAt` does not pass"):
             self.assertIn(words, board, words)
         interop = flat("building-fabric-services/references/interop.md")
         for words in ("takes no fifth (MD-2)", "never restate a held mandate to start a new chain",
                       "has no route past four agents until the contract's CT-205", "Projects or his local session (OA-3)",
-                      "at most the scope in force at the relaying link", "never for a task it already leads", "message `adf0c61a`"):
+                      "naming the scope in force at the relaying link and its held `expiresAt`", "never for a task it already leads", "message `adf0c61a`"):
             self.assertIn(words, interop, words)
         # the route the contract refused (board thread 118f95f9, adf0c61a) stays out of every home
         for text, gone in ((flat_rule, "restates its own mandate"), (interop, "is restated instead of handed on"),

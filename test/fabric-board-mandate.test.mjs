@@ -56,7 +56,7 @@ async function fakeHub(t) {
     emit: (kind, level, text, value) => events.push([kind, level, text, value]), service: 'example-agent', now: () => 0, rand: () => 0.5,
     agentId: 'example-agent', mandateFrom: new Set([OTHER_PROJECT]), wall: () => WALL, ...extra });
   const runOne = async (text, { provenance = 'trusted', ...extra } = {}) => {
-    await control({ op: 'queue', capability: 'video.render', text, provenance });
+    seen.request = (await control({ op: 'queue', capability: 'video.render', text, provenance })).request;
     await new fb.Responder(options(extra)).step();
     assert.equal(seen.length, 1, 'the handler ran once');
     return seen[0];
@@ -102,10 +102,19 @@ for (const [name, text, code] of [['two blocks', body(JSON.stringify(mandate()),
     const said = h.events.filter((e) => e[0] === 'board.request.mandate_unread');
     assert.equal(said.length, 1);
     assert.ok(said[0][2].includes(code));
-    assert.equal(said[0][3].data.value.reason, code, 'the data survives FAC-SEM-101: its reason is under `reason`');
+    assert.deepEqual(said[0][3].data.value, { request: h.seen.request, reason: code }, 'the data survives FAC-SEM-101: its reason is under `reason`');
     assert.ok(!JSON.stringify(h.events.map((e) => e.slice(2))).includes(WORDS), 'the operator\'s words reach no event');
   });
 }
+
+test('FAA-135: a broken block beside a mandate cancels nothing', async (t) => {
+  const h = await fakeHub(t);
+  const m = mandate();
+  const [got, covered] = await h.runOne(body(JSON.stringify(m), '{"frames": '));
+  assert.deepEqual(got, m);
+  assert.equal(covered.ok, true);
+  assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread'), []);
+});
 
 test('FAA-135: a JSON block that is no mandate is ignored', async (t) => {
   const h = await fakeHub(t);
