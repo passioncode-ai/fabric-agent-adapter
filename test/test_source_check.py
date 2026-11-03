@@ -781,7 +781,7 @@ class WhatIsRead(Tree):
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
-        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_secrets.py"):
+        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_source_homes.py", "fabric_secrets.py"):
             shutil.copy(SCRIPTS / name, tools / name)
         self.git("init", "-q")
         self.git("add", "-A")
@@ -1324,6 +1324,25 @@ class Refusals(Tree):
         seen = sc._Seen()
         sc._text_findings("/Users/o'b zq/x", [sc.HOME_ENTRY + "o'b zq"], seen)
         self.assertNotIn("zq", sc.redact("q/o'b%20zq.bin", [sc.HOME_ENTRY + "o'b zq"], seen))
+        # reading 37, unit: a found declared name is masked wherever it stands, glued or encoded; an unfound one also
+        # after an encoded separator
+        first, last = "alex" + "ander", "smi" + "th"
+        entries = [sc.HOME_ENTRY + first + "." + last]
+        seen = sc._Seen()
+        sc._text_findings("/Users/" + first + "." + last + "/p", entries, seen)
+        for path in ("x/" + first + last + "2024/a.bin", "x/q" + first + "%2E" + last + "/a.bin"):
+            self.assertNotIn(first, sc.redact(path, entries, seen).lower(), path)
+        for path in ("d/report%20" + first + "%20" + last + "/a.bin", "d/p\\u0027" + first + "." + last + "/.env"):
+            self.assertNotIn(first, sc.redact(path, entries).lower(), path)
+        # reading 37, seam: a found short declared name in every separator spelling, and an unfound one after an
+        # encoded separator or an escaped apostrophe
+        for declared, spelled in (("a.b", "a%2Eb"), ("a'b", "a\\'b"), ("a.b", "a&#39;b"), ("a.b", "a..b")):
+            seen = sc._Seen()
+            sc._text_findings("/Users/" + declared + "/x", [sc.HOME_ENTRY + declared], seen)
+            self.assertEqual(sc.redact("q/" + spelled + "/.env", [sc.HOME_ENTRY + declared], seen), "q/<home>/.env", spelled)
+        for path, declared in (("exports/Report%20for%20Jane%20Zqdo.pem", "jane zqdo"), ("q/u%2Fjzqd%2Fx.key", "jzqd"),
+                               ("q/a\\u0027jzqd.key", "jzqd")):
+            self.assertNotIn("zq", sc.redact(path, [sc.HOME_ENTRY + declared]).lower(), path)
         # reading 36, product: an unfound declared neutral name is masked as a word only
         self.assertEqual(sc.redact("src/mapping/app.json", [sc.HOME_ENTRY + "app"]), "src/mapping/<home>.json")
         seen = sc._Seen()
@@ -1368,7 +1387,7 @@ class Refusals(Tree):
             self.assertIn("a note goes on a line of its own, a path is written as its home name only", err)
         # reading 35, seam: a byte-order mark or a zero-width space before `home:` (two lists joined) is dropped
         self.write("adm.txt", "/Users/admin/p\n")
-        for mark in ("\ufeff", "\u200b"):
+        for mark in ("\ufeff", "\u200b", "\u200c", "\u200d"):
             listing.write_text("zqcorpx\n" + mark + "home: admin\n", encoding="utf-8")
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 1, repr(mark))

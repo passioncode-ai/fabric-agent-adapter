@@ -78,7 +78,7 @@ import wait for the contract's decision on CT-194 (part 2).
   exits 0; step 5 runs it again. adapting-projects-to-fabric step 4c runs the check first, moves each finding out and
   runs it again; a value already in Git history needs a fresh history, which stays the owner's act. Step 7's report
   names a contract checkout by its commit, never a home path, and the check runs again after it. The check's ignore-line
-  reading is `fabric_source_ignore.py` beside it, and the owner's list takes `home: <name>` for the owner's own home name.
+  reading is `fabric_source_ignore.py` and its reading of a declared home `fabric_source_homes.py`, both beside it, and the owner's list takes `home: <name>` for the owner's own home name.
 - Trigger and scenario evals for both (`source-apart-from-instance`, `move-instance-data-out-of-an-existing-agent`);
   the Windows CI job runs `test_source_check`; the release smoke checks the script is installed. README, AGENTS.md and
   SKILL-CARD name it.
