@@ -127,7 +127,8 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
   acts in one, since a call naming none is not limited by the mandate's `projects`; both are read failing closed, as
   the kit's other mandate readers read them, FAA-139: a `spendUsd` that is not a finite number is none, which a
-  `perCallMaxUsd` refuses, and a `project` that is not a string, None (Node null) included, is refused by a mandate
+  `perCallMaxUsd` refuses, and a `project` that is not a string (in Python an exact `str`, so a subclass too), None
+  (Node null) included, is refused by a mandate
   limited to projects, as the contract's `mandateCovers` refuses a null project: leave `project` out when the work
   acts in none; the MCP and job readers read None as naming none; only these five members are read, each once, as the
   contract reads them, `call[name]` in Python and a plain property read in Node, an inherited, getter or Proxy member

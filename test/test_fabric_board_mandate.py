@@ -445,7 +445,7 @@ class BoardMandateTests(Conversation):
             self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
         for spend in ([1, nested(fm.MAX_SPEND_DEPTH - 2)], [[1, 2], nested(fm.MAX_SPEND_DEPTH - 2)],
                       [nested(fm.MAX_SPEND_DEPTH - 2), 1], [nested(fm.MAX_SPEND_DEPTH - 2), [1, 2]]):
-            self.assertTrue(at_depth(0, spend)["ok"], "100 lists deep is read, the deep list first or last (unit reading 28)")
+            self.assertTrue(at_depth(0, spend)["ok"], "100 lists deep is read, the deep list first or last (unit 28, seam 29)")
         # A dict with an own toString that Number() reaches (at the top, or through lists alone) throws in JavaScript:
         # no estimate; under another dict Number() never reaches it (seam reading 28).
         for spend in ({"toString": 1}, [{"toString": "7"}], [1, {"toString": None}], [[{"a": 1, "toString": {}}]]):
