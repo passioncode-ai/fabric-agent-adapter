@@ -64,9 +64,9 @@ request can also wait unanswered for its responder's operator: since adapter 0.5
 to another session leaves its accepted work `accepted` and unanswered until the slot is taken back or moved back to it (until Fabric
 hands it over, CT-175), which is not the operator's hold below; tell
 the person, and cancel it if it is past what they can wait. Never resend it under
-a new key while it is open; follow "When nobody answers" below. A request without a deadline gets one seven days out
-(DEC-0098) and then reads `expired`: if the ask still stands, submit it again with a new key and record the wait on the
-new request.
+a new key while it is open; follow "When nobody answers" below. A queued or claimed request without a deadline gets one seven
+days out (DEC-0098) and then reads `expired`: if the ask still stands, submit it again with a new key and record the wait
+on the new request. An accepted one is kept past its deadline (C4) and never expires: follow "When nobody answers".
 `settledBy: "owner"` on a request (DEC-0081) means the estate owner settled it after its responder was gone: read it as
 the owner's attestation, not the responder's.
 
@@ -109,7 +109,8 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    this from slow work: when your request has stayed `accepted` with no progress note or reply past what the work
    should take, ask on its thread (`com.reply`) whether it is being worked. If nobody answers, cancel it first: while
    its `effect` is still `not_started`, `com.cancel` moves it to `cancelled` (nothing has happened yet). Only when the
-   cancel's receipt shows the request `cancelled`, submit it again or go on to step 3 or 4 with the new request; an
+   cancel's receipt shows the request `cancelled`, submit it again and read the new request from this step (an active
+   responder is step 2; step 3 only when it too stays queued and unclaimed); an
    accepted request never expires, and the old service would carry it out by a transfer once it gets the slot back, so
    it is never adapted while still accepted. `outcome_unknown` means the work began meanwhile: tell the person and
    change nothing.

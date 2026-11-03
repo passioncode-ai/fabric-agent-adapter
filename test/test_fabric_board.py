@@ -1606,12 +1606,57 @@ class MovedSlotTests(Conversation):
         self.board.advance(20)
         r.step()  # the claim commits, its answer is lost
         self.assertIsNotNone(r.session)
-        for _ in range(4):
+        self.board.advance(20)
+        r.step()  # one renewal later, before the first claim's lease lapses: the same key replays it
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(r.slots["video.render"]["state"], "held")
+        self.assertEqual(self.board.slots["video.render"]["holder"], mine)
+
+    def test_a_replayed_claim_from_before_a_later_move_is_dead(self):
+        """0.60.0 unit reading 3: a lost answer at one generation, then a move away and back within one renewal: the
+        replay's receipt is from the older generation, so it is dropped and a fresh key asks again."""
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)  # 3
+        rid = self.board.queue("video.render")
+        self.board.drop_next["com.claim"] = 1
+        self.board.advance(20)
+        r.step()  # the claim lands at 3, its answer is lost
+        self.board.move("video.render")  # 4
+        self.board.move("video.render", to=mine)  # 5
+        for _ in range(3):
             self.board.advance(20)
             r.step()
         self.assertEqual(r.slots["video.render"]["state"], "held")
         self.assertEqual(self.board.slots["video.render"]["holder"], mine)
+        self.assertGreater(self.board.slots["video.render"]["lease"], self.board.now)
+        self.assertEqual(len(self.moved()), 1)
+
+    def test_an_empty_move_back_claim_enrolls_at_once(self):
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)
+        self.board.advance(20)
+        seen = len(self.tools())
+        r.step()
+        tail = self.tools()[seen:]
+        self.assertIn("com.enroll", tail[tail.index("com.claim"):])  # in the same step, after the probe's claim
+
+    def test_two_lost_answers_after_a_move_back_claim_keep_the_session(self):
+        """0.60.0 seam reading 3: the probe's claim holds a lease from its send, so a second lost answer at the next
+        renewal is kept by finding 38's guard, as on the claim loop's path."""
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)
+        rid = self.board.queue("video.render")
+        self.board.drop_next["com.claim"] = 1
+        self.board.advance(20)
+        r.step()
+        self.board.drop_next["com.status"] = 1
+        self.board.advance(20)
+        r.step()
+        self.assertIsNotNone(r.session)
+        self.board.advance(20)
+        r.step()  # still inside the first claim's lease: the same key replays it
         self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertEqual(self.board.slots["video.render"]["holder"], mine)
 
     def test_a_lost_answer_right_after_a_move_back_claim_keeps_the_session(self):
         """0.60.0 seam reading 2: the claim that landed holds a lease, so finding 38's guard covers its first call."""

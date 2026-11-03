@@ -1101,14 +1101,59 @@ test('FAA-165: a lost answer to the move-back claim is asked again under its key
   await h.advance(20);
   await r.step(); // the claim commits, its answer is lost
   assert.ok(r.session);
-  for (let i = 0; i < 4; i += 1) {
+  await h.advance(20);
+  await r.step(); // one renewal later, before the first claim's lease lapses: the same key replays it
+  const s = await h.state();
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.equal(s.slots['video.render'].holder, mine);
+});
+
+test('FAA-165: a replayed claim from before a later move is dead (0.60.0 unit reading 3)', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  for (let i = 0; i < 3; i += 1) {
     await h.advance(20);
     await r.step();
   }
   const s = await h.state();
   assert.equal(r.slots['video.render'].state, 'held');
   assert.equal(s.slots['video.render'].holder, mine);
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+});
+
+test('FAA-165: an empty move-back claim enrolls at once', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await h.advance(20);
+  const seen = (await h.tools()).length;
+  await r.step();
+  const tail = (await h.tools()).slice(seen);
+  assert.ok(tail.slice(tail.indexOf('com.claim')).includes('com.enroll'), tail.join());
+});
+
+test('FAA-165: two lost answers after a move-back claim keep the session (0.60.0 seam reading 3)', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step();
+  await hub.control({ op: 'drop', tool: 'com.status' });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.session);
+  await h.advance(20);
+  await r.step(); // still inside the first claim's lease: the same key replays it
+  const s = await h.state();
   assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(s.slots['video.render'].holder, mine);
 });
 
 test('FAA-165: a lost answer right after a move-back claim keeps the session (0.60.0 seam reading 2)', async (t) => {

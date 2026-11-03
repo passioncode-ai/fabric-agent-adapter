@@ -154,11 +154,14 @@ export class SlotKeeper {
     if (!isInt(now, 1) || now <= held.moved) return;
     if (!this.probing.has(capability) || !this.claimKeys[capability]) this.claimKeys[capability] = this.key('claim'); // a fresh key: one from before the move may hold a dead receipt
     let answer;
+    const sent = this.now();
     try {
       answer = this.receipt('com.claim', await this.call('com.claim', { idempotency: this.idem(this.claimKeys[capability]), capability }));
     } catch (e) {
+      if (!(e instanceof BoardError)) throw e; // not the board's answer
       if (e.code === 'unreachable') { // the claim may have landed: asked again under this key, never left to the fault
         this.probing.add(capability);
+        if (this.slots[capability] && !('probeAt' in this.slots[capability])) this.slots[capability].probeAt = sent; // its lease runs from the first send
         return;
       }
       this.probing.delete(capability);
@@ -168,6 +171,7 @@ export class SlotKeeper {
         return;
       }
       if (e.code === 'lease_expired') {
+        delete this.claimKeys[capability]; // a dead attempt's receipt may sit under it
         if (await this.back(capability, held, now)) {
           this.slots[capability].renewedAt = -Infinity; // lapsed: the enroll below is recorded first
           await this.enroll(capability);
@@ -181,6 +185,10 @@ export class SlotKeeper {
     }
     this.probing.delete(capability);
     const generation = isObj(answer.attempt) && isInt(answer.attempt.generation, 1) ? answer.attempt.generation : now;
+    if (generation < now) { // a replay from before a later move: dead, asked again fresh
+      delete this.claimKeys[capability];
+      return;
+    }
     if (!(await this.back(capability, held, generation))) return;
     if ('request' in answer) {
       delete this.claimKeys[capability];
@@ -207,6 +215,8 @@ export class SlotKeeper {
   takeBack(capability) {
     if (!this.capabilities.includes(capability)) throw new BoardError('invalid_arguments', `This responder does not answer ${capability}.`);
     this.checkpoint.slot(capability, null);
+    delete this.claimKeys[capability]; // a receipt from before the take-back may be dead
+    this.probing.delete(capability);
     if (this.slots[capability]?.state === 'moved') this.slots[capability] = { state: 'contested', renewedAt: 0 };
     delete this.said['board.slot.moved'];
   }

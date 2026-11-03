@@ -517,7 +517,9 @@ class Responder(SlotKeeper):
         """Seconds this session's leases still run, by its own clock: the running attempt's, else the oldest held slot's."""
         renewed = [self.current.renewed_at or 0.0] if self.current is not None else \
             [s.get("renewed_at", 0.0) for s in self.slots.values() if s.get("state") == "held"
-             and s.get("renewed_at", 0.0) != float("-inf")]  # a lapsed slot holds no lease (FAA-163)
+             and s.get("renewed_at", 0.0) != float("-inf")] + \
+            [s["probe_at"] for c, s in self.slots.items() if c in self._probing and "probe_at" in s]
+        # a lapsed slot holds no lease (FAA-163); a move-back claim whose answer was lost holds one from its send (FAA-165)
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:

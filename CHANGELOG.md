@@ -13,10 +13,12 @@ names why a provider manifest is refused (FAA-193).
   is moved, the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the recorded
   move, sends one `com.claim` under a fresh key, as PR-2's "Learning the slot is its own" says. A claim that lands
   holds the slot again (the record loses `moved`, the request it handed out is worked, or its own enroll renews the
-  lease at once; a later move is said again); `lease_expired` enrolls again; `held` asks at the next renewal; `fenced`
-  or another refusal that is not the board session's records the new generation, so the same move is not asked about
+  lease at once; a later move is said again); `lease_expired` enrolls again; `held` asks at the next renewal;
+  `idempotency_window_expired` or `capacity_exceeded` asks again at the next renewal under a fresh key, recording
+  nothing; `fenced` or another refusal that is not the board session's records the new generation, so the same move is not asked about
   twice. A recorded move drops the capability's claim key, so a claim answer lost before the move is never replayed, and a
-  lost answer to the move-back claim itself is asked again under its key (`not_authorized` counts as another session's). It never enrolls or replaces a
+  lost answer to the move-back claim itself is asked again under its key, counting as a lease from its send meanwhile
+  (a replay from an older generation is dropped); `not_authorized` counts as another session's. It never enrolls or replaces a
   slot another session holds, and waits while other work runs. Both kits (`fabric_board_slots.py`,
   `fabric-board-slots.mjs`). The `board.slot.moved` notice and references/board.md say so (FAA-165).
 - `pack` refused a provider manifest whose `costPresets` differ from the package's with only `provider-manifest`; the
@@ -30,16 +32,19 @@ names why a provider manifest is refused (FAA-193).
   it is linked (FAA-169). A scenario eval `a-backlog-row-filed-while-a-claim-is-held`.
 - working-with-fabric references/project-board.md, "When nobody answers": an `active` responder does not prove a request
   is worked; one the old holder accepted before its slot moved stays `accepted` with nobody on it, and a requester
-  cannot see that (`com.get` shows no attempt), so it asks on the thread and, with no answer, treats the request as
-  nobody live; while its `effect` is `not_started` it may cancel and submit again (FAA-172; question to Fabric and the contract on board thread `ab12642e`).
+  cannot see that (`com.get` shows no attempt), so it asks on the thread; with no answer it cancels the request while
+  its `effect` is `not_started` and goes on only once the cancel's receipt shows `cancelled`. An accepted request is
+  never adapted by hand and never expires (FAA-172; question to Fabric and the contract on board thread `ab12642e`). A
+  scenario eval `an-accepted-request-left-behind-by-a-move`.
 - building-fabric-services SKILL.md: a moved slot stays moved until `take_back` or a move back to its session.
 
 ### Upgrading
 
 - A kit service gets the move back once it installs the 0.60.0 kit modules (`fabric_board_slots.py`,
   `fabric-board-slots.mjs` and their callers). Only the running session hears a move back: a slot moved back to a
-  session that has since ended needs take-back or a new move to the running session. A kit older than 0.60.0 never
-  hears a move back: it needs take-back, or the 0.60.0 modules and then a move.
+  session that has since ended needs take-back, since the session's end released the slot and the operator cannot move
+  a slot no session holds (a move is possible only once another session holds it). A kit older than 0.60.0 never hears
+  a move back: install the 0.60.0 modules and use take-back.
 
 ## 0.59.0 (2026-11-03)
 

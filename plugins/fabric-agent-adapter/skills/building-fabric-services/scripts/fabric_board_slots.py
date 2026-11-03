@@ -151,12 +151,13 @@ class SlotKeeper:
             return
         if capability not in self._probing or capability not in self.claim_keys:
             self.claim_keys[capability] = self._key("claim")  # a fresh key: one from before the move may hold a dead receipt
-        key = self.claim_keys[capability]
+        key, sent = self.claim_keys[capability], self.now()
         try:
             answer = self._receipt("com.claim", self._call("com.claim", {"idempotency": self._idem(key), "capability": capability}))
         except BoardError as exc:
             if exc.code == "unreachable":  # the claim may have landed: asked again under this key, never left to the fault
                 self._probing.add(capability)
+                (self.slots.get(capability) or {}).setdefault("probe_at", sent)  # its lease runs from the first send
                 return
             self._probing.discard(capability)
             if exc.code == "held":
@@ -165,6 +166,7 @@ class SlotKeeper:
                 self.claim_keys.pop(capability, None)
                 return
             if exc.code == "lease_expired":
+                self.claim_keys.pop(capability, None)  # a dead attempt's receipt may sit under it
                 if self._back(capability, held, now):
                     self.slots[capability]["renewed_at"] = float("-inf")  # lapsed: the enroll below is recorded first
                     self._enroll(capability)
@@ -178,6 +180,9 @@ class SlotKeeper:
         self._probing.discard(capability)
         attempt = answer.get("attempt") if isinstance(answer.get("attempt"), dict) else {}
         generation = _whole(attempt.get("generation"))
+        if _is_int(generation, 1) and generation < now:  # a replay from before a later move: dead, asked again fresh
+            self.claim_keys.pop(capability, None)
+            return
         if not self._back(capability, held, generation if _is_int(generation, 1) else now):
             return
         if "request" in answer:
@@ -203,6 +208,8 @@ class SlotKeeper:
             raise BoardError("invalid_arguments", "This responder does not answer %s." % capability)
         with self._lock:
             self.checkpoint.slot(capability, None)
+            self.claim_keys.pop(capability, None)  # a receipt from before the take-back may be dead
+            self._probing.discard(capability)
             if (self.slots.get(capability) or {}).get("state") == "moved":
                 self.slots[capability] = {"state": "contested", "renewed_at": 0.0}
             self._said.pop("board.slot.moved", None)

@@ -256,10 +256,13 @@ held and not transferred). The responder keeps that move instead of undoing it:
   lands is the slot held again: the record loses `moved`, the request it handed out is worked (with none, its own
   enroll renews the lease at once), accepted work left `lapsed` comes back with a transfer, and a later move is said
   again. `lease_expired` (the move reached this session and its lease lapsed first) enrolls again. `held` asks again
-  at the next renewal. `fenced`, or any other refusal that is not the board session's (`not_authorized` counted with them, since a
+  at the next renewal. `idempotency_window_expired` or `capacity_exceeded` asks again at the next renewal under a
+  fresh key, recording nothing. `fenced`, or any other refusal that is not the board session's (`not_authorized` counted with them, since a
   non-holder's claim may be refused so), is another session's slot:
   recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
-  landed is not stranded. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
+  landed is not stranded; until then it counts as a lease from its send, so a second lost answer keeps the session
+  (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
+  dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
   while other work runs: a move back during a job longer than the lease (60 s) may lapse and be lost to another
   session, after which take-back, or another move back to this session, brings it back.
 - Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move

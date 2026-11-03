@@ -463,7 +463,8 @@ export class Responder extends SlotKeeper {
   /** Seconds this session's leases still run, by its own clock: the running attempt's, else the oldest held slot's. */
   leaseLeft() {
     const renewed = this.current ? [this.current.renewedAt ?? 0]
-      : Object.values(this.slots).filter((s) => s.state === 'held' && s.renewedAt !== -Infinity).map((s) => s.renewedAt ?? 0); // a lapsed slot holds no lease (FAA-163)
+      : [...Object.values(this.slots).filter((s) => s.state === 'held' && s.renewedAt !== -Infinity).map((s) => s.renewedAt ?? 0), // a lapsed slot holds no lease (FAA-163)
+        ...Object.entries(this.slots).filter(([c, s]) => this.probing.has(c) && 'probeAt' in s).map(([, s]) => s.probeAt)]; // a move-back claim whose answer was lost holds one from its send (FAA-165)
     return renewed.length && this.session ? Math.min(...renewed) + LEASE_SECONDS - this.now() : 0;
   }
 

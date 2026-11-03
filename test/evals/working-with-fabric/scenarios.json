@@ -487,7 +487,7 @@
       "request": "Your request to another Project has been `accepted` for two days with no progress note or reply, though com.directory shows its responder active. What do you do?",
       "expected": [
         "says an active responder does not prove the request is worked: a slot moved to another session leaves the old holder's accepted requests with nobody on them, and the requester sees no attempt or generation (com.get shows state, effect and revision)",
-        "asks on the request's thread first, and with no answer cancels it while its effect is not_started, going on (resubmit, or the small change by hand) only when the cancel's receipt shows cancelled",
+        "asks on the request's thread first, and with no answer cancels it while its effect is not_started; only when the cancel's receipt shows cancelled it resubmits and reads the new request again from step 1 (an active responder means wait; a change by hand only when the new request too stays queued and unclaimed)",
         "with outcome_unknown in the receipt tells the person and changes nothing, and never waits for an accepted request to expire, since accepted work does not expire"
       ]
     }
