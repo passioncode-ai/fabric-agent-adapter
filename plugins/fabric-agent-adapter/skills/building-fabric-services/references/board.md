@@ -250,7 +250,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
 - The operator may move the slot back to this session in Fabric (DEC-0140 PR-2), which this client cannot hear. No
-  Fabric release offers the operator's move yet (Fabric 0.3.15 has none; its host part is CT-174, CT-181 and CT-125),
+  Fabric release offers the operator's move yet (Fabric 0.3.15 has none: the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
   so today every move is another session taking the slot and take-back is the route back; the check below is ready
   for the move. While
   a slot is moved the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the
@@ -264,7 +264,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   non-holder's claim may be refused so), is another session's slot:
   recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
   landed is not stranded; until then it counts as at most a lease from that key's first send (a fresh key starts
-  its own, and once that lease would have run out it counts no more, as a lapsed slot), so a second lost answer keeps
+  its own, and once less than the 10 s margin of that lease is left it counts no more, as a lapsed slot), so a second lost answer keeps
   the session (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
   dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
   it waits for its attempt's lease (60 s) before it is claimed again. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits

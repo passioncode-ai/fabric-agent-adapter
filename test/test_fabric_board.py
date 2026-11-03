@@ -1403,6 +1403,31 @@ class MovedBackTwoCapabilitiesTests(Conversation):
         self.assertIsNotNone(r.session)
         self.assertEqual(self.board.slots["video.cut"]["generation"], generation)
 
+    def test_a_lost_probe_in_its_last_ten_seconds_does_not_drop_a_fresh_lease(self):
+        """0.60.0 seam reading 6: under the fault's 10 s margin a lost probe set the oldest lease, so one lost answer
+        on the other, freshly renewed capability dropped the session; it counts only while more than the margin is left."""
+        r = self.responder()
+        r.step()
+        mine = self.board.slots["video.render"]["holder"]
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()
+        self.board.move("video.render", to=mine)
+        self.board.drop_next[("com.claim", "video.render")] = 1
+        self.board.advance(20)
+        r.step()  # the probe's answer is lost at t0
+        self.board.status_generation = "absent"
+        self.board.advance(20)
+        r.step()
+        self.board.advance(20)
+        r.step()
+        self.board.advance(15)  # t0 + 55: inside the probe's lease, under the margin
+        generation = self.board.slots["video.cut"]["generation"]
+        self.board.drop_next[("com.claim", "video.cut")] = 1
+        r.step()
+        self.assertIsNotNone(r.session)
+        self.assertEqual(self.board.slots["video.cut"]["generation"], generation)
+
     def test_a_move_back_waits_while_other_work_runs(self):
         import time
         release = threading.Event()

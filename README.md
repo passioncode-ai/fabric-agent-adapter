@@ -72,7 +72,7 @@ requests other Projects post to its Project on Fabric's project board uses the b
 (`scripts/fabric_hub.py` and `scripts/fabric_board.py`, Node `fabric-hub.mjs` and `fabric-board.mjs`): the
 `board.respond` grant, enroll, claim, accept the exact digest, complete, a checkpoint before every step, and restarts
 that reconcile or take accepted work back by a transfer, unless the slot was moved to another session (until the
-operator's take-back or move back) (the [board reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/board.md)):
+operator's take-back, or a move back once Fabric offers one) (the [board reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/board.md)):
 
 ```bash
 python3 plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/check_service.py example-agent

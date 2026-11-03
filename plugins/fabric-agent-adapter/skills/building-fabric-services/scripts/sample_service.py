@@ -100,7 +100,7 @@ CAPABILITIES = [
 #: manifest, so `register --board-project` writes it there.
 TAKE_BACK_CAPABILITY: Dict[str, Any] = {
     "name": TAKE_BACK["tool"], "effect": "change-policy", "idempotency": "required", "job": False,
-    "description": "Take back a board slot the operator moved away.",
+    "description": "Take back a board slot moved to another session.",
     # A relayed action: a probe call carries no operator decision, so it is refused and changes nothing (unit r28).
     "probeAssertion": "is refused as operator-decision-required without the operator's decision in _meta",
     "input": _schema("board.take-back-input", TAKE_BACK_INPUT),
@@ -175,7 +175,7 @@ class Service:
 
     # --- the project board (opt-in): the input gate and the answer -------------------
     def board_moved(self) -> list:
-        """The capabilities whose slot the operator moved to another session (FAA-155): the page offers their take-back.
+        """The capabilities whose slot moved to another session (FAA-155): the page offers their take-back.
         The live slot or the checkpoint's record says so: before a restart has reconnected (or while Fabric is down) the
         record alone knows the move (0.56.0 seam r3)."""
         if not self.board:

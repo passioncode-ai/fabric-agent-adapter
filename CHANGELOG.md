@@ -2,14 +2,14 @@
 
 ## 0.60.0 (unreleased)
 
-The board responder finds a slot the operator moves back to it (FAA-165), and three smaller fixes: working-with-fabric
+The board responder is ready to find a slot the operator moves back to it, once Fabric offers the move (FAA-165), and three smaller fixes: working-with-fabric
 reads a filed row's answer (FAA-169) and says when an accepted request is left behind by a move (FAA-172), and `pack`
 names why a provider manifest is refused (FAA-193).
 
 ### Fixed
 
-- A slot the operator moved to another session and then back to this one (contract DEC-0140 PR-2) was held but never
-  claimed or renewed: the responder skipped a `moved` slot until `take_back`, so its lease lapsed. Now, while a slot
+- A slot the operator moved to another session and then back to this one (contract DEC-0140 PR-2, once Fabric offers
+  the move) would be held but never claimed or renewed: the responder skipped a `moved` slot until `take_back`, so its lease lapsed. Now, while a slot
   is moved, the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the recorded
   move, sends one `com.claim` under a fresh key, as PR-2's "Learning the slot is its own" says. A claim that lands
   holds the slot again (the record loses `moved`, the request it handed out is worked, or its own enroll renews the
@@ -17,7 +17,7 @@ names why a provider manifest is refused (FAA-193).
   `idempotency_window_expired` or `capacity_exceeded` asks again at the next renewal under a fresh key, recording
   nothing; `fenced` or another refusal that is not the board session's records the new generation, so the same move is not asked about
   twice. A recorded move drops the capability's claim key, so a claim answer lost before the move is never replayed, and a
-  lost answer to the move-back claim itself is asked again under its key, counting as a lease from its send meanwhile
+  lost answer to the move-back claim itself is asked again under its key, counting as a lease from its send meanwhile (while more than the 10 s margin of that lease is left)
   (a replay from an older generation is dropped); `not_authorized` counts as another session's. It never enrolls or replaces a
   slot another session holds, and waits while other work runs. Both kits (`fabric_board_slots.py`,
   `fabric-board-slots.mjs`). The `board.slot.moved` notice and references/board.md say so (FAA-165).
@@ -46,7 +46,7 @@ names why a provider manifest is refused (FAA-193).
   `fabric-board-slots.mjs` and their callers). Only the running session hears a move back: a slot moved back to a
   session that has since ended needs take-back, since the session's end released the slot and the operator cannot move
   a slot no session holds (a move is possible only once another session holds it). A kit older than 0.60.0 never hears
-  a move back: it needs take-back (any kit from 0.53.0), or the 0.60.0 modules and then a move to the new session.
+  a move back: it needs take-back (any kit from 0.53.0), or, once Fabric offers the move, the 0.60.0 modules and then a move to the new session.
 
 ## 0.59.0 (2026-11-03)
 
