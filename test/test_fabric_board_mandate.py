@@ -260,6 +260,10 @@ class BoardMandateTests(Conversation):
             with self.subTest(project=project):
                 self.assertEqual(detail({"spendUsd": 3, "project": project}), "outside-mandate: project")
         self.assertEqual(detail({"spendUsd": 3}), "ok", "a call that names no project leaves `project` out")
+        for project, want in (("site-a", "ok"), ("site-b", "outside-mandate: project")):
+            proxy = types.MappingProxyType({"capability": "video.render", "effect": "draft", "spendUsd": 3, "project": project})
+            got = link.covers(m, proxy, "example-agent", lambda: WALL, OTHER_PROJECT)
+            self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want, "a Mapping is read as a dict")
         call = {"capability": "video.render", "effect": "draft", "spendUsd": float("nan"), "project": 5}
         kept = dict(call)
         link.covers(m, call, "example-agent", lambda: WALL, OTHER_PROJECT)

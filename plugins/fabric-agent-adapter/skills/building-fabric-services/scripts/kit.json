@@ -913,7 +913,7 @@
     "fabric-service",
     "fabric-time"
    ],
-   "sha256": "142c0c09e8251ce6e0cdb75ba5303a70e00d708ab49117a7f192cf415afa4e66"
+   "sha256": "62e7201b3300c2bed962b81644a2d1d287d29315142bb239815075103cb26d45"
   },
   {
    "module": "fabric-board-slots",
@@ -4674,7 +4674,7 @@
    "fabric-interop.mjs": "ee7e6d32be1f42e6d21a943b8886652352408c49c6404d9749b8a02dc3901e92",
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
-   "fabric-board-link.mjs": "142c0c09e8251ce6e0cdb75ba5303a70e00d708ab49117a7f192cf415afa4e66",
+   "fabric-board-link.mjs": "62e7201b3300c2bed962b81644a2d1d287d29315142bb239815075103cb26d45",
    "fabric-board-slots.mjs": "fc77a3c6e62aa18575568bef4f703cce2edaba8cef648813ebcdbb21bdc27a11",
    "fabric-board-session.mjs": "18555962e5f6d18080a3e7971c4c6640452542f6042d07917e7ebc073721c415",
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",

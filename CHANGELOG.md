@@ -21,7 +21,8 @@ says that his approval holds for the whole task, at every link (FAA-195).
   kit's MCP and job mandate readers do (FAA-139): a spend that is not a finite number is none, which a `perCallMaxUsd`
   refuses, and a `project` that is not a string, None (Node null) included, is refused by a mandate limited to
   projects, as the contract's `mandateCovers` refuses a null project (the MCP and job readers read None as naming
-  none; leave `project` out on the board) (a draft of this release
+  none; leave `project` out on the board). Node reads a spend as the call's own member and its project, capability,
+  action and effect as the contract reads them, an inherited, non-enumerable or getter member included (a draft of this release
   passed them as given; 0.61.0 seam reading 14).
 
 ### Fixed
@@ -51,7 +52,9 @@ says that his approval holds for the whole task, at every link (FAA-195).
   no agent takes a relay for a task it already leads; references/interop.md says a service has no route past four agents until CT-205. `expiresAt` is counted from `at` and
   covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
   source and spend sentences are reworded with no change in rule, and Step 5's lane-restart paragraph drops its reason
-  sentence ("The stop is usually stale by then.") for room, its rule unchanged. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
+  sentence ("The stop is usually stale by then.") for room, its rule unchanged; the paragraph for a client without `_meta`
+  leaves the mandate section for Step 5's routes (CT-125), and two sentences that restated rules kept elsewhere in the
+  section are dropped (FAA-196 (6)). A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
 - working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`
   block fenced ` ```json ` at the start of its own lines, its chain ending in the service's registry agent id, never a
   decision block; and what comes back: `mandate-not-for-this-call` is handed on again to the right id without asking

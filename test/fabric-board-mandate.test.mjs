@@ -219,7 +219,37 @@ test('FAA-135: a spend or project that does not read is refused (FAA-139; 0.61.0
   for (const project of [5, ['site-a'], {}, null]) assert.equal(detail({ spendUsd: 3, project }), 'outside-mandate: project', String(project));
   assert.equal(detail({ spendUsd: 3 }), 'ok', 'a call that names no project leaves `project` out');
   assert.equal(detail({ spendUsd: 3, project: undefined }), 'ok', 'an own undefined is no member, as member() reads');
-  assert.equal(detail(Object.create({ spendUsd: 3 })), 'outside-mandate: spend', 'an inherited spend is not read, as member() reads');
+  const direct = (call) => {
+    const got = covers(m, call, 'example-agent', () => WALL, OTHER_PROJECT);
+    return got.ok ? 'ok' : got.data.detail;
+  };
+  assert.equal(direct(Object.assign(Object.create({ spendUsd: 3 }), { capability: 'video.render', effect: 'draft', project: 'site-a' })),
+    'outside-mandate: spend', 'an inherited spend is not read, as member() reads');
+  class Call {
+    constructor() { Object.assign(this, { capability: 'video.render', effect: 'draft', spendUsd: 3 }); }
+    get project() { return 'site-b'; }
+  }
+  assert.equal(direct(new Call()), 'outside-mandate: project', 'a project from a getter is read, as the contract reads it');
+  assert.equal(direct(Object.assign(Object.create({ project: 'site-b' }), { capability: 'video.render', effect: 'draft', spendUsd: 3 })),
+    'outside-mandate: project', 'an inherited project is read');
+  const acts = handOn(operatorMandate({ task: 'task-teaser', instruction: WORDS, lead: 'lead-agent', at: AT,
+    scope: { actions: ['approve'], effects: ['draft'] } }), 'example-agent', AT);
+  const act = (call) => {
+    const got = covers(acts, call, 'example-agent', () => WALL, OTHER_PROJECT);
+    return got.ok ? 'ok' : got.data.detail;
+  };
+  assert.equal(act({ action: 'approve', effect: 'draft' }), 'ok');
+  class Act { constructor() { this.effect = 'draft'; } get action() { return 'other'; } }
+  const hidden = { effect: 'draft' };
+  Object.defineProperty(hidden, 'action', { value: 'other', enumerable: false });
+  for (const [name, call] of [['a getter', new Act()], ['an inherited', Object.assign(Object.create({ action: 'other' }), { effect: 'draft' })],
+    ['a non-enumerable', hidden]]) {
+    assert.equal(act(call), 'outside-mandate: action', `${name} action is read`);
+  }
+  let reads = 0;
+  const counted = { capability: 'video.render', effect: 'draft', project: 'site-a', get spendUsd() { reads += 1; return 3; } };
+  assert.equal(direct(counted), 'ok');
+  assert.equal(reads, 1, 'the spend is read once');
   const call = { capability: 'video.render', effect: 'draft', spendUsd: NaN, project: 5 };
   const kept = { ...call };
   covers(m, call, 'example-agent', () => WALL, OTHER_PROJECT);

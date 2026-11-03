@@ -255,19 +255,27 @@ export function readMandate(request, mandateFrom, agentId) {
  * verified (MD-3 records the caller). `wall` answers milliseconds. Null when no mandate travelled. `spendUsd` and
  * `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend that is not a
  * finite number is none (a ceiling refuses it), a `project` that is not a string, null included (the contract's
- * mandateCovers refuses a null project), unreadable; a call that names none leaves `project` out.
+ * mandateCovers refuses a null project), unreadable; a call that names none leaves `project` out. A spend is read as
+ * an own member; a project, capability, action and effect as the contract reads them (an inherited, non-enumerable or
+ * getter member included), so none opens a gate.
  */
 export function covers(mandate, call, agentId, wall, caller = null) {
   if (mandate == null || agentId == null) return null;
   if (call !== null && typeof call === 'object' && !Array.isArray(call)) {
-    const own = (name) => (Object.hasOwn(call, name) ? call[name] : undefined); // own members only, as member() reads
-    const spendUsd = own('spendUsd');
-    const project = own('project');
-    const { spendUsd: _s, project: _p, ...rest } = call;
-    call = rest;
-    const spend = mandateSpend(spendUsd);
-    if (spend !== undefined) call.spendUsd = spend;
-    if (project !== undefined) call.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
+    const read = {};
+    for (const key of Object.keys(call)) if (key !== 'spendUsd' && key !== 'project') read[key] = call[key];
+    // What the call names is read as the contract reads it, an inherited, non-enumerable or getter member included,
+    // so a mandate limited to some actions or one capability never covers a call whose name it cannot see.
+    for (const key of ['capability', 'action', 'effect']) if (!Object.hasOwn(read, key) && key in call) read[key] = call[key];
+    // A spend is read as an own member only (member() reads so): an inherited one is none, which a ceiling refuses.
+    const spend = mandateSpend(Object.hasOwn(call, 'spendUsd') ? call.spendUsd : undefined);
+    if (spend !== undefined) read.spendUsd = spend;
+    // A project is read as the contract reads it, an inherited one or a getter included, each once: never dropped.
+    if ('project' in call) {
+      const project = call.project;
+      if (project !== undefined) read.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
+    }
+    call = read;
   }
   const clock = wall();
   let now = '';
