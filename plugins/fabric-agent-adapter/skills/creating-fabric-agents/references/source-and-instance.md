@@ -72,7 +72,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   path, inside a word too (`qzone` prints `<home>one`); found nowhere, it is not masked.
 - It **changes nothing.** Exit `0`: no finding and every file read; `1`: at least one finding (the step is not done);
   `2`: the check could not run, or a file was not read: an unreadable file, a nested repository, or a binary file the
-  ignore file does not name as source (the summary counts each, and how many files were left out by name).
+  ignore file does not name as source (the summary counts each, and how many files were left out by name). A finding
+  sets `1` even when a file was not read too; the files not read are still listed, so fixing the findings can leave `2`.
 - **What it reads.** A text file of any size is read whole, and the summary counts every text file read; a binary file (a NUL byte in its first 8 KiB) or one that
   cannot be read is listed by its path as not read, and the summary counts it. A database or another binary of
   records in the tree is instance data the check cannot read: move it to the instance folder. A binary that is source
@@ -92,8 +93,9 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`, and a `#` after a string is
   part of that string. An entry matches in any case and inside any word; an invisible format character (a direction mark, a
-  soft hyphen, a joiner) at either end of a string is dropped and does not count toward the three, and one inside it is
-  kept, so a string copied with a soft hyphen in it matches only text that holds one. A line `home: <name>` declares the owner's home
+  soft hyphen, a joiner) at either end of a string is dropped, spaces between such characters too, and does not count
+  toward the three; one inside it is kept and counts (an emoji's joiner), so a string copied with a soft hyphen in it
+  matches only text that holds one. A line `home: <name>` declares the owner's home
   name instead (ASCII letters, digits, `.`, `_`, `-`, `'` and spaces, starting with a letter or a digit; a name holding a
   space, as a Windows profile may, is written whole, `home: Jane Doe`, and everything after the colon is the name, so
   a note goes on a line of its own (`# laptop`); spaces and tabs may stand around the colon; a line
