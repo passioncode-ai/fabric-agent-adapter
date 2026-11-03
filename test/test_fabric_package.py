@@ -194,6 +194,50 @@ class PackTests(unittest.TestCase):
         write_agent(self.root, secrets=[{"name": "INBOX_TOKEN", "purpose": "reads the mailbox"}, {"name": "INBOX_TOKEN", "purpose": "again"}])
         self.assertIn("FAC-SEM-065", [p["rule"] for p in fp.pack(self.root)["problems"]])
 
+    def test_a_provider_manifest_refusal_names_its_cause(self):
+        """FAA-193: the provider manifest's costPresets differ from the package's: the problem says so."""
+        write_agent(self.root, costPresets=[{"id": "quick", "capability": "digest.write", "label": "Quick", "maxUsd": 0.5, "default": True}])
+        found = [p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]
+        self.assertEqual(len(found), 1)
+        self.assertIn("costPresets", found[0]["message"])
+        self.assertIn("JSON object", found[0]["message"])
+        self.assertTrue(found[0]["message"].startswith("provider-manifest: "))
+
+    def test_an_empty_provider_manifest_is_no_refusal(self):
+        """0.60.0 product reading 8: Python refused a provider manifest of {} as Node does not, under a message whose
+        two causes did not apply; both kits now refuse it only when it is not a JSON object or its costPresets differ (FAA-194 (1))."""
+        write_agent(self.root)
+        (self.root / "fabric-agent.json").write_text("{}")
+        problems = [p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]
+        self.assertEqual(problems, [])
+        (self.root / "fabric-agent.json").write_text("[]")
+        self.assertEqual(len([p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]), 1)
+
+    def test_nan_and_infinity_are_no_json_in_any_file_the_kit_reads(self):
+        """0.60.0 seam reading 11: Python's json.loads took NaN, Infinity and -Infinity where JSON.parse and the
+        contract refuse them, so a manifest or trust file carrying one passed Python pack and verify alone."""
+        write_agent(self.root)
+        provider = self.root / "fabric-agent.json"
+        clean = provider.read_text()
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            provider.write_text(clean.rstrip().rstrip("}") + ', "x-number": %s}' % constant)
+            self.assertIn("provider-manifest", [p.get("problem") for p in fp.pack(self.root)["problems"]], constant)
+        provider.write_text(clean)
+        plugin = self.root / fp.PLUGIN_MANIFEST
+        plain = plugin.read_text()
+        plugin.write_text(plain.rstrip().rstrip("}") + ', "x-number": NaN}')
+        self.assertIn("plugin-manifest", [p.get("problem") for p in fp.pack(self.root)["problems"]])
+        plugin.write_text(plain)
+        self.assertTrue(fp.pack(self.root, apply=True)["applied"])
+        with self.assertRaisesRegex(fp.PackageError, "neither a JWK"):
+            fp.sign(self.root, self.key(xnumber=float("nan")))
+        self.assertTrue(fp.sign(self.root, self.key(), apply=True)["ok"])
+        trust = Path(self.tmp.name) / "trust.json"
+        trust.write_text('{"publisher": %s, "x-number": NaN}' % json.dumps([V["keys"]["publisher"]["jwk"]]))
+        out = subprocess.run([sys.executable, str(SCRIPTS / "fabric_package.py"), "verify", str(self.root), "--trust", str(trust)], capture_output=True, text=True)
+        self.assertEqual(out.returncode, 1, out.stdout + out.stderr)
+        self.assertIn("not JSON", json.loads(out.stdout)["error"])
+
     def test_pack_refuses_a_chosen_agent_ref_and_a_stale_receipt(self):
         write_agent(self.root, agentRef="urn:fabric:agent:example:other")
         with self.assertRaisesRegex(fp.PackageError, "urn:fabric:agent:example:inbox-digest"):

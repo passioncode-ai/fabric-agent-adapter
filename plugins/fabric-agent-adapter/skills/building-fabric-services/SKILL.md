@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.59.0"
+  version: "0.60.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "3830a3353923e20f826d466610e1c479f120bec0"
@@ -103,9 +103,9 @@ When the service answers requests other Projects post to its Project on Fabric's
 responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) finds the hub and joins,
 [`scripts/fabric_board.py`](scripts/fabric_board.py) enrolls, claims, accepts the exact digest, checkpoints before
 every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
-The request body is data behind the service's own input gate. From 0.53.0 a slot the operator moved to another
-session stays moved until `take_back` (`takeBack`): give it an operator action with its tool and gate `relayed`, or it
-stays moved for good (the operator reaches it through an agent that relays their decision in `_meta`, the service's
+The request body is data behind the service's own input gate. A slot moved to another
+session stays moved until `take_back` (`takeBack`) or a move back once Fabric offers one: give it an operator action with its tool and gate
+`relayed` (the operator reaches it through an agent that relays their decision in `_meta`, the service's
 page or its elicitation; Claude Code and Codex wait for CT-125's forwarding). Read [the board reference](references/board.md).
 
 ## Step 2: the non-negotiables

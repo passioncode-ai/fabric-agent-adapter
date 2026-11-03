@@ -61,12 +61,12 @@ reply or progress note): the target replied, not that the work was done. Read th
 still cancel the request. `noResponder` in your `com.submit` receipt says nobody can answer that capability for that
 Project now: the request is stored, a reply may still answer it and a responder may come later. An `accepted`
 request can also wait unanswered for its responder's operator: since adapter 0.53.0 a responder whose slot was moved
-to another session leaves its accepted work `accepted` and unanswered until the slot is taken back (until Fabric
-hands it over, CT-175), which is not the operator's hold below; tell
+to another session leaves its accepted work `accepted` and unanswered until the slot is taken back, or, once Fabric offers the operator's move,
+moved back to it (a responder from adapter 0.60.0 finds that; an older one comes back only by take-back), or until Fabric hands it over (CT-175), which is not the operator's hold below; tell
 the person, and cancel it if it is past what they can wait. Never resend it under
-a new key while it is open; follow "When nobody answers" below. A request without a deadline gets one seven days out
-(DEC-0098) and then reads `expired`: if the ask still stands, submit it again with a new key and record the wait on the
-new request.
+a new key while it is open; follow "When nobody answers" below. A queued or claimed request without a deadline gets one seven
+days out (DEC-0098) and then reads `expired`: if the ask still stands, submit it again with a new key and record the wait
+on the new request. An accepted one is kept past its deadline (C4) and never expires: follow "When nobody answers".
 `settledBy: "owner"` on a request (DEC-0081) means the estate owner settled it after its responder was gone: read it as
 the owner's attestation, not the responder's.
 
@@ -100,6 +100,20 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    the files you would touch (`git ls-remote origin 'refs/agent-sync/leases/*'` in its repository). `noResponder` in
    the receipt says nobody serves the capability now. A capability or Project that is `held` is the operator's stop,
    not "nobody live": wait, and make no change there.
+   An `active` responder does not prove your request is being worked. A slot moved to another session (the operator's move,
+   contract DEC-0140 PR-2, once Fabric offers it, or another session's replacement) keeps the requests the old holder had accepted: they stay `accepted` with the old holder's
+   attempt, which nobody works until the new holder takes them over by a transfer or the old service gets the slot back
+   (its take-back, or a move back to a responder from adapter 0.60.0), while Fabric's thread view shows the
+   new holder as "Answers it" and its "requests no agent answers now" leaves them out (FAA-172). The board shows a
+   requester no attempt or generation (`com.get` gives the request's `state`, `effect` and `revision`, never its attempt), so you cannot tell
+   this from slow work: when your request has stayed `accepted` with no progress note or reply past what the work
+   should take, ask on its thread (`com.reply`) whether it is being worked. If nobody answers, cancel it first: while
+   its `effect` is still `not_started`, `com.cancel` moves it to `cancelled` (nothing has happened yet). Only when the
+   cancel's receipt shows the request `cancelled`, submit it again and read the new request from this step (an active
+   responder is step 2; step 3 only when nobody is live and it stays queued and unclaimed); an
+   accepted request never expires, and the old service would carry it out by a transfer once it gets the slot back, so
+   it is never adapted while still accepted. `outcome_unknown` means the work began meanwhile: tell the person and
+   change nothing.
 2. **Live:** wait under a watcher (below) and work on independent tasks meanwhile; never touch files a live session
    holds.
 3. **Nobody live, and the change is small.** Small means all three:
@@ -114,8 +128,8 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    allow. Then reply on the request's thread, one line of body text (not a `reaction`, which only an announcement's
    reply carries): **adapted by** your Project, the merge commit, and what the owner should look at. The owner's next
    session reads it and may revert it. One such change per target repository at a time. Your own reply does not answer
-   your own request: it stays on the board, on its thread and on Fabric's home ("requests no agent answers now"), for
-   the owner to see until its deadline; do not cancel it.
+   your own request: a queued one stays on the board, on its thread and on Fabric's home ("requests no agent answers
+   now"), for the owner to see until its deadline; do not cancel it.
 4. **Not small** (a decision, a contract, a release, a large change): the request stays queued for its owner until its
    deadline (seven days by default); never take a decision that is the owner's, record the wait in one line (what it
    waits on, which watcher acts) and go on with your own work. An expiry posts no message, so the mail watcher does

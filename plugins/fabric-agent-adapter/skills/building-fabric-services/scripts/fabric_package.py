@@ -133,7 +133,7 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
     text = raw.decode("utf-8", "replace").strip(JS_WHITESPACE)  # as JavaScript's trim: a leading BOM goes too
     if text.startswith("{"):
         try:
-            jwk = json.loads(text)
+            jwk = json.loads(text, parse_constant=fd._no_constant)  # NaN and Infinity are no JSON, as JSON.parse says
         except ValueError:
             raise PackageError("The key file is neither a JWK nor a PEM private key.") from None
         if not isinstance(jwk, dict) or jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or not isinstance(jwk.get("d"), str):
@@ -394,8 +394,8 @@ def _parsed(data: Optional[bytes]) -> Optional[Dict[str, Any]]:
     if data is None:
         return None
     try:
-        value = json.loads(data.decode("utf-8"))
-    except (ValueError, RecursionError):  # invalid UTF-8 is no manifest, in both kits
+        value = json.loads(data.decode("utf-8"), parse_constant=fd._no_constant)
+    except (ValueError, RecursionError):  # invalid UTF-8, NaN or Infinity is no manifest, in both kits
         return None
     return value if isinstance(value, dict) else None
 
@@ -424,7 +424,7 @@ def check_package_folder(pkg: Dict[str, Any], files: Dict[str, bytes]) -> List[D
     provider = pkg.get("provider")
     if isinstance(provider, str) and provider in files:
         manifest = _parsed(files.get(provider))
-        if not manifest or ("costPresets" in manifest and not ("costPresets" in pkg and _json_equal(manifest["costPresets"], pkg["costPresets"]))):
+        if manifest is None or ("costPresets" in manifest and not ("costPresets" in pkg and _json_equal(manifest["costPresets"], pkg["costPresets"]))):
             problems.append({"problem": "provider-manifest", "path": provider})
     return problems
 
@@ -648,7 +648,7 @@ def _load_json(data: bytes, what: str) -> Dict[str, Any]:
     if _nesting(text) > MAX_NESTING:
         raise PackageError("%s nests deeper than %d levels." % (what, MAX_NESTING))
     try:
-        value = json.loads(text, object_pairs_hook=fd._no_duplicates)
+        value = json.loads(text, object_pairs_hook=fd._no_duplicates, parse_constant=fd._no_constant)
     except fd._Duplicate as exc:
         raise PackageError("%s names %s twice in one object." % (what, json.dumps(exc.args[0], ensure_ascii=False))) from None
     except (ValueError, RecursionError) as exc:
@@ -704,8 +704,16 @@ def _all_problems(pkg: Dict[str, Any], files: Dict[str, bytes]) -> List[Dict[str
     problems = [dict(p, rule="schema") for p in schema_problems(pkg)]
     problems += [dict(p, rule="path") for p in path_problems(pkg)]
     problems += [dict(p, rule=p["code"]) for p in package_findings(pkg)]
-    problems += [{"rule": "folder", "problem": p["problem"], "instancePath": p["path"], "message": p["problem"]} for p in check_package_folder(pkg, files)]
+    problems += [{"rule": "folder", "problem": p["problem"], "instancePath": p["path"], "message": FOLDER_MESSAGES.get(p["problem"], p["problem"])}
+                 for p in check_package_folder(pkg, files)]
     return problems
+
+
+#: What a folder problem means, where its code alone does not say what to change (FAA-193).
+FOLDER_MESSAGES = {
+    "provider-manifest": "provider-manifest: the provider manifest must be a JSON object, and when it carries costPresets "
+                         "fabric.package.json must carry the same costPresets (copy them; pack does not)",
+}
 
 
 def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:

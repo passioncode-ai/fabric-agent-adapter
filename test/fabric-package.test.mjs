@@ -111,6 +111,55 @@ test('pack rebuilds the vector package byte for byte, and a dry run writes nothi
   assert.equal(k.pack(root).digest, V.digest.expected, 'packing a packed folder again is stable');
 });
 
+test('FAA-193: a provider manifest refusal names its cause', (t) => {
+  const root = path.join(tempDir(t), 'inbox-digest');
+  fs.mkdirSync(root);
+  writeAgent(root, { costPresets: [{ id: 'quick', capability: 'digest.write', label: 'Quick', maxUsd: 0.5, default: true }] });
+  const found = k.pack(root).problems.filter((p) => p.problem === 'provider-manifest');
+  assert.equal(found.length, 1);
+  assert.match(found[0].message, /^provider-manifest: .*JSON object.*costPresets/);
+});
+
+test('an empty provider manifest is no refusal, a non-object is (0.60.0 product reading 8)', (t) => {
+  const root = path.join(tempDir(t), 'inbox-digest');
+  fs.mkdirSync(root);
+  writeAgent(root);
+  fs.writeFileSync(path.join(root, 'fabric-agent.json'), '{}');
+  assert.equal(k.pack(root).problems.filter((p) => p.problem === 'provider-manifest').length, 0);
+  fs.writeFileSync(path.join(root, 'fabric-agent.json'), '[]');
+  assert.equal(k.pack(root).problems.filter((p) => p.problem === 'provider-manifest').length, 1);
+});
+
+test('NaN and Infinity are no JSON in any file the kit reads (0.60.0 seam reading 11)', (t) => {
+  const dir = tempDir(t);
+  const root = path.join(dir, 'inbox-digest');
+  fs.mkdirSync(root);
+  writeAgent(root);
+  const provider = path.join(root, 'fabric-agent.json');
+  const clean = fs.readFileSync(provider, 'utf8');
+  const withNumber = (text, constant) => `${text.trimEnd().replace(/}$/, '')}, "x-number": ${constant}}`;
+  for (const constant of ['NaN', 'Infinity', '-Infinity']) {
+    fs.writeFileSync(provider, withNumber(clean, constant));
+    assert.ok(k.pack(root).problems.some((p) => p.problem === 'provider-manifest'), constant);
+  }
+  fs.writeFileSync(provider, clean);
+  const plugin = path.join(root, k.PLUGIN_MANIFEST);
+  const plain = fs.readFileSync(plugin, 'utf8');
+  fs.writeFileSync(plugin, withNumber(plain, 'NaN'));
+  assert.ok(k.pack(root).problems.some((p) => p.problem === 'plugin-manifest'));
+  fs.writeFileSync(plugin, plain);
+  assert.ok(k.pack(root, { apply: true }).applied);
+  const key = keyFile(dir);
+  fs.writeFileSync(key, withNumber(fs.readFileSync(key, 'utf8'), 'NaN'));
+  assert.throws(() => k.sign(root, key), /neither a JWK/);
+  assert.ok(k.sign(root, keyFile(dir), { apply: true }).ok);
+  const trust = path.join(dir, 'trust.json');
+  fs.writeFileSync(trust, `{"publisher": ${JSON.stringify([V.keys.publisher.jwk])}, "x-number": NaN}`);
+  const out = spawnSync(process.execPath, [path.join(scripts, 'fabric-package.mjs'), 'verify', root, '--trust', trust], { encoding: 'utf8' });
+  assert.equal(out.status, 1, out.stdout + out.stderr);
+  assert.match(JSON.parse(out.stdout).error, /not JSON/);
+});
+
 test('pack refuses what must not ship', (t) => {
   const root = tempDir(t);
   writeAgent(root);

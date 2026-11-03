@@ -155,6 +155,7 @@ class Responder(SlotKeeper):
         self.wait_until = 0.0
         self.stopping = False
         self.claim_keys: Dict[str, str] = {}
+        self._probing: set = set()  # moved slots whose move-back claim lost its answer: asked again under the same key
         self._said: Dict[str, str] = {}
         self._rr = 0
         #: The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS.
@@ -237,6 +238,7 @@ class Responder(SlotKeeper):
         self.state = "connecting"
         self.slots = {}  # the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
         self._confirmed = {}  # nor its confirmations: a slot may have moved between the two sessions
+        self._probing = set()  # nor its lost move-back claims
         grant = self.hub.join_board(self.project, self.credential_file)
         missing = [c for c in self.capabilities if c not in grant.capabilities]
         session = self.session_factory(grant)
@@ -516,7 +518,11 @@ class Responder(SlotKeeper):
         """Seconds this session's leases still run, by its own clock: the running attempt's, else the oldest held slot's."""
         renewed = [self.current.renewed_at or 0.0] if self.current is not None else \
             [s.get("renewed_at", 0.0) for s in self.slots.values() if s.get("state") == "held"
-             and s.get("renewed_at", 0.0) != float("-inf")]  # a lapsed slot holds no lease (FAA-163)
+             and s.get("renewed_at", 0.0) != float("-inf")] + \
+            [s["probe_at"] for c, s in self.slots.items() if c in self._probing and "probe_at" in s
+             and self.now() - s["probe_at"] < LEASE_SECONDS - LEASE_MARGIN_SECONDS]
+        # a lapsed slot holds no lease (FAA-163); a move-back claim whose answer was lost holds one from its send, while
+        # more than the 10 s margin of that lease is left (FAA-165)
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:
@@ -588,8 +594,10 @@ class Responder(SlotKeeper):
             self._gone(capability)
             self._suspect.discard(capability)
         for capability, slot in list(self.slots.items()):
-            if slot.get("state") == "moved":
-                continue  # never enrolled again on its own, even when the new holder's lease lapses (FAA-155)
+            if slot.get("state") == "moved":  # never enrolled again on its own, even when the new holder lapses (FAA-155)
+                if self.now() - slot.get("renewed_at", 0) >= RENEW_SECONDS - 0.5:
+                    self._moved_back(capability)  # unless com.status shows a later generation it may hold (FAA-165)
+                continue
             if slot.get("state") == "paused":
                 if capability != held_by_work and self.now() >= slot.get("retry_at", 0.0) and not self._gone(capability):
                     self._enroll(capability)  # still held: a longer pause; lifted: the slot is ours again (moved: read first)

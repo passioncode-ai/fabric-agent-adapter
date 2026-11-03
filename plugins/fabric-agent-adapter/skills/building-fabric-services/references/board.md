@@ -120,7 +120,7 @@ once the kit reads it (FAA-135).
 |---|---|
 | `fenced` | the attempt is another responder's: stop the handler, drop the entry (nothing outside had begun); accepted work on a slot this responder recorded holding stays as `lapsed`, and the next tick asks `com.status` whether the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155) |
 | `lease_expired` on accepted work | stop the handler; the board holds the request, and the kit takes it back with `com.responder_replace` and a transfer |
-| `authority_changed`, `not_authorized` | stop claiming; one `board.access.needed` event (notify) saying what to ask for |
+| `authority_changed`, `not_authorized` | stop claiming; one `board.access.needed` event (notify) saying what to ask for (except `not_authorized` on the move-back claim of a moved slot, read as another session's slot, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)) |
 | `fenced` on enroll or claim | another live holder: wait for it to lapse; never replace it on its own initiative. When this responder recorded holding the slot, it first reads `com.status`: a newer generation means the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155), and it is not taken again even after that holder lapses |
 | lost after an effect began | keep the entry as `unknown`; `observe(entry)` is asked to settle it with `com.reconcile` |
 | Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning |
@@ -134,7 +134,7 @@ the target Project's participant reply answered it, DEC-0098 and DEC-0102; not s
 it, but no longer this responder's); `in_progress` and `outcome_unknown` are
 reconciled from what `observe(entry)` answers (observed only; with no observation they stay unknown and notify);
 accepted ones go back to this responder with `com.responder_replace {expectedGeneration, transfer}` (unless the slot
-moved to another session meanwhile: they stay `lapsed` until take-back, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)), whose receipt's
+moved to another session meanwhile: they stay `lapsed` until take-back or a move back to this session, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)), whose receipt's
 `transferred` (DEC-0078: `{request, revision, attempt}`) carries the new fence. **A Fabric that does not answer
 `transferred` yet leaves the request held** (`board.request.held`, notify): the kit never claims it back, because the
 contract has no `com.claim` read-back and `com.claim` never moves an accepted request. A known outcome is sent after the
@@ -181,7 +181,7 @@ contract's matrix, held to its vectors (`test/fixtures/contract/comms-hold-vecto
 | Refused `held` | What the kit does |
 |---|---|
 | `com.status` names the slot `held: true` at connect | the slot is not enrolled; it pauses |
-| `com.enroll`, `com.claim`, `com.responder_replace` | the slot pauses: asked again after 15 s, then 30 s, doubling to 15 minutes; one `board.slot.held` event per capability, and `board.slot.released` when an enroll succeeds again |
+| `com.enroll`, `com.claim`, `com.responder_replace` | the slot pauses: asked again after 15 s, then 30 s, doubling to 15 minutes; one `board.slot.held` event per capability, and `board.slot.released` when an enroll succeeds again (except the move-back claim of a moved slot, which asks again at the next renewal with no `board.slot.held`, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)) |
 | `com.accept` (the hold came after the claim) | nothing was done: the entry is dropped, the claim lapses and the request waits on the board (`board.request.waiting`); the slot pauses |
 | `com.effect_begin` | the effect has not begun: the handler waits (same idempotency key, the pause doubling) while the tick keeps renewing the lease, then begins once the hold is lifted; `ctx.stopped` ends the wait |
 | accepted work at restart under a hold | kept as `lapsed`, then taken back with `com.responder_replace` and a transfer once the hold is lifted, never claimed back |
@@ -194,7 +194,7 @@ whose responder was gone. Read it as the owner's attestation, not the responder'
 
 ## When the operator moves a slot to another session (FAA-155)
 
-The contract's DEC-0140 PR-2 (proposed, after this kit's pin; Fabric plans it for 0.3.15) lets the operator move a
+The contract's DEC-0140 PR-2 (accepted 2026-10-30, after this kit's pin) lets the operator move a
 (Project, capability) slot to another live session of the Project: one transition, as `com.responder_replace` would make
 it for the receiving session (generation up, `claimed` back to `queued`, `in_progress` to `outcome_unknown`, `accepted`
 held and not transferred). The responder keeps that move instead of undoing it:
@@ -228,17 +228,18 @@ held and not transferred). The responder keeps that move instead of undoing it:
   this service left unanswered, is a move, whatever made it: the operator, or another session that took the slot while
   this one was away or after it crashed. Before 0.53.0 a restarted responder took such a slot back by itself. So a
   second responder of the same capability is no longer a standby once the slot changed hands: after any change of
-  holder it waits for take-back, not for the other's lapse.
+  holder it waits for take-back or a move back to its session, not for the other's lapse.
 - A `fenced` refusal on accepted work while the slot did not move (the generation unchanged) keeps the entry
   `lapsed`; the next tick takes it back with a transfer and goes on (before 0.53.0 the entry was dropped and the
   request left accepted on the board).
 - Then the slot is `moved`: the running handler is told to stop (`ctx.stopped`); a `claimed` entry is dropped (the move
   returned it to the queue); accepted work stays as `lapsed` and work whose effect began as `unknown` (only the slot's
-  holder, or the estate owner, reconciles it now). No `com.claim`, `com.renew`, `com.complete`, `com.enroll` or
-  `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
+  holder, or the estate owner, reconciles it now). While the slot is moved nothing but the move-back check
+  (`com.status` once a renewal, then one `com.claim`, below) is sent for that capability: no `com.renew`,
+  `com.complete`, `com.enroll` or `com.responder_replace`, not at recovery after a restart, and not when the new
   holder's lease lapses, nor when com.status later names no generation for the slot (a recorded move stays until
-  take-back). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back (CT-175
-  will hand them to the new holder). One `board.slot.moved` event (warning, notify) says so, once, also across restarts
+  take-back or a move back). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back
+  or moved back (CT-175 will hand them to the new holder). One `board.slot.moved` event (warning, notify) says so, once, also across restarts
   (the record keeps `moved`).
 - A responder that never held the slot (a first start: no record, or a record of another Project), or whose record
   equals the current generation, behaves as before: it enrolls, recovers and replaces its own lapsed work. A recorded or
@@ -248,7 +249,29 @@ held and not transferred). The responder keeps that move instead of undoing it:
   records its own generation. Only a replay the board refuses, or one that ran for the first time (`repeated: false`)
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
-- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
+- The operator may move the slot back to this session in Fabric (DEC-0140 PR-2), which this client cannot hear. No
+  Fabric release offers the operator's move yet (Fabric 0.3.15 has none: the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
+  so today every move is another session taking the slot and take-back is the route back; the check below is ready
+  for the move. While
+  a slot is moved the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the
+  recorded move, sends one `com.claim` under a fresh key, as PR-2's "Learning the slot is its own" says (FAA-165,
+  0.60.0); the move itself drops the claim key of that capability, whose receipt the move made dead. A claim that
+  lands is the slot held again: the record loses `moved`, the request it handed out is worked (with none, its own
+  enroll renews the lease at once), accepted work left `lapsed` comes back with a transfer, and a later move is said
+  again. `lease_expired` (the move reached this session and its lease lapsed first) enrolls again. `held` asks again
+  at the next renewal. `idempotency_window_expired` or `capacity_exceeded` asks again at the next renewal under a
+  fresh key, recording nothing. `fenced`, or any other refusal that is not the board session's (`not_authorized` counted with them, since a
+  non-holder's claim may be refused so), is another session's slot:
+  recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
+  landed is not stranded; until then it counts as at most a lease from that key's first send (a fresh key starts
+  its own, and it counts only while more than the 10 s margin of that lease is left, then no more, as a lapsed slot), so a second lost answer keeps
+  the session (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
+  dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
+  it waits for its attempt's lease (60 s) before it is claimed again (a take-back that lands before the move-back check makes its claim key
+  leaves that key to the claim loop, which works the request at once). Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
+  while other work runs: a move back during a job longer than the lease (60 s) may lapse and be lost to another
+  session, after which take-back, or another move back to this session, brings it back.
+- Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
   being read at the same time: the move is written under the responder's lock (Node: on the fence queue, after any fenced
   call in flight) and only while the record is unchanged (FAA-158). Never edit the
   checkpoint's `slots` record by hand to undo a move. In the same board
@@ -269,9 +292,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
   `change-policy` (DEC-0125); the operator reaches it through an agent that relays their decision in `_meta`, the
-  service's page or its elicitation (Claude Code and Codex, which cannot set `_meta`, wait for CT-125's forwarding), and the service names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
-  detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
-  surface.
+  service's page or its elicitation (Claude Code and Codex, which cannot set `_meta`, wait for CT-125's forwarding), and the service names it in its docs; otherwise a moved slot stays moved for good today (no Fabric release offers the operator's move back, above). The
+  hand-over of accepted requests to another session (contract CT-175) waits for Fabric's session surface.
 
 ## What a board session may call
 

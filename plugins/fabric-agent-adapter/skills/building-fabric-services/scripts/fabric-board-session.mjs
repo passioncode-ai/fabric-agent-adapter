@@ -88,6 +88,7 @@ export class Responder extends SlotKeeper {
     this.waitUntil = 0;
     this.stopping = false;
     this.claimKeys = {};
+    this.probing = new Set(); // moved slots whose move-back claim lost its answer: asked again under the same key
     this.said = {};
     this.rr = 0;
     this.reconcileAt = 0;
@@ -172,6 +173,7 @@ export class Responder extends SlotKeeper {
     this.state = 'connecting';
     this.slots = {}; // the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
     this.confirmed = {}; // nor its confirmations: a slot may have moved between the two sessions
+    this.probing = new Set(); // nor its lost move-back claims
     const grant = await this.hub.joinBoard(this.project, this.credentialFile);
     const missing = this.capabilities.filter((c) => !grant.capabilities.includes(c));
     const session = this.sessionFactory(grant);
@@ -462,7 +464,9 @@ export class Responder extends SlotKeeper {
   /** Seconds this session's leases still run, by its own clock: the running attempt's, else the oldest held slot's. */
   leaseLeft() {
     const renewed = this.current ? [this.current.renewedAt ?? 0]
-      : Object.values(this.slots).filter((s) => s.state === 'held' && s.renewedAt !== -Infinity).map((s) => s.renewedAt ?? 0); // a lapsed slot holds no lease (FAA-163)
+      : [...Object.values(this.slots).filter((s) => s.state === 'held' && s.renewedAt !== -Infinity).map((s) => s.renewedAt ?? 0), // a lapsed slot holds no lease (FAA-163)
+        ...Object.entries(this.slots).filter(([c, s]) => this.probing.has(c) && 'probeAt' in s && this.now() - s.probeAt < LEASE_SECONDS - LEASE_MARGIN_SECONDS)
+          .map(([, s]) => s.probeAt)]; // a move-back claim whose answer was lost holds one from its send, while more than the 10 s margin of that lease is left (FAA-165)
     return renewed.length && this.session ? Math.min(...renewed) + LEASE_SECONDS - this.now() : 0;
   }
 
@@ -528,7 +532,10 @@ export class Responder extends SlotKeeper {
       this.suspect.delete(capability);
     }
     for (const [capability, slot] of Object.entries(this.slots)) {
-      if (slot.state === 'moved') continue; // never enrolled again on its own, even when the new holder's lease lapses (FAA-155)
+      if (slot.state === 'moved') { // never enrolled again on its own, even when the new holder lapses (FAA-155)
+        if (this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.movedBack(capability); // unless com.status shows a later generation it may hold (FAA-165)
+        continue;
+      }
       if (slot.state === 'paused') {
         // still held: a longer pause; lifted: the slot is ours again
         if (capability !== heldByWork && this.now() >= (slot.retryAt ?? 0) && !(await this.gone(capability))) await this.enroll(capability); // a move is read first

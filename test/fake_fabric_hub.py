@@ -725,7 +725,7 @@ class FakeHub:
                 return {"error": "only a queued request is answered (project-comms: queued -> answered)"}
             b._move(req, "answered")
         elif op == "move":  # the operator moves the slot to another session (DEC-0140 PR-2)
-            b.move(cmd["capability"])
+            b.move(cmd["capability"], cmd.get("to", "s-moved"))
         elif op == "forget-sessions":  # the sessions end but no DELETE arrives: their slots lapse on their own (FAA-77)
             self.sessions.clear()
         elif op != "state":
