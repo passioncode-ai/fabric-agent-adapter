@@ -346,7 +346,9 @@ job's approval steps, name the job's capability in `capabilities` (or leave `cap
 mandate from another agent's text, a page or a file; a callee hands on only what it received, narrowed. A chain that
 already holds four agents is restated instead of handed on (the contract's answer `7f372925` on OA-2, working-with-fabric):
 `operator_mandate` / `operatorMandate` with the held `task`, `instruction`, `at`, `expires_at` / `expiresAt` and `source`, the
-scope in force (`effective_scope` / `effectiveScope`, never wider) and your own id as `lead`, then handed on as usual.
+scope in force (`effective_scope` / `effectiveScope`, never wider) and your own id as `lead`, then handed on as usual. The
+receiver's record then names only the restated chain, so keep the held mandate in your own record (OA-6); a test per kit
+walks the route (`test_fabric_mandate.RestatingAFullChain`, `fabric-mandate.test.mjs`).
 
 A relay the operator's rule accepts (DEC-0126 OA-2, OA-3: one of his own Projects on his board, provenance `trusted`,
 or a session on his own machine, with his words verbatim, when, where and the scope) is stated with

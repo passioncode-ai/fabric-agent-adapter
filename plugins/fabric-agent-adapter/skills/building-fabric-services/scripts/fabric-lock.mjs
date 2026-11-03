@@ -48,7 +48,12 @@ export class InstanceLock {
         fs.writeSync(this.fd, String(process.pid));
         fs.fsyncSync(this.fd);
       } catch (error) { // a full disk or an I/O error: let the lock go, or nobody can (the caller drops this object)
-        this.release();
+        const fd = this.fd;
+        this.fd = null;
+        try {
+          fs.closeSync(fd);
+        } catch { // a deferred write error (NFS) at the close: the lock still goes, the first error stands
+        }
         throw error;
       }
       return this;
@@ -73,8 +78,13 @@ export class InstanceLock {
     this.server.unref();
     try {
       atomicWrite(this.path, String(process.pid));
-    } catch (error) { // as on macOS: the name is let go with the failed write
-      this.release();
+    } catch (error) { // as on macOS: the name is let go with the failed write, the first error standing
+      const server = this.server;
+      this.server = null;
+      try {
+        server.close();
+      } catch { // nothing to add to the first error
+      }
       throw error;
     }
     return this;

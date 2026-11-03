@@ -162,3 +162,24 @@ test('DEC-0136 MD-2a: a hand-over adds no naming list the scope in force leaves 
   const cases = JSON.parse(fs.readFileSync(new URL('./fixtures/kit-mandate-md2a-cases.json', import.meta.url), 'utf8')).cases;
   for (const c of cases) assert.equal(scopeWithin(c.child, c.parent), c.within, c.name);
 });
+
+test('a full chain is restated with the scope in force (0.61.0 seam reading 7)', () => {
+  const at = '2026-11-03T10:00:00Z';
+  const scope = { capabilities: ['page.update', 'page.publish'], effects: ['publish'], perCallMaxUsd: 10 };
+  let held = operatorMandate({ task: 'task-timetable', instruction: 'update the timetable page', scope, lead: 'agent-a', at, expiresAt: '2026-11-09T10:00:00Z',
+    source: { project: 'example-site', session: 'sess-1' } });
+  held = handOn(held, 'agent-b', at, { capabilities: ['page.update'], effects: ['draft'], perCallMaxUsd: 3 });
+  held = handOn(handOn(held, 'agent-c', at), 'agent-d', at);
+  assert.throws(() => handOn(held, 'agent-e', at), ServiceError, 'a fifth agent: the chain is full');
+  const restated = operatorMandate({ task: held.task, instruction: held.instruction, scope: effectiveScope(held), lead: 'agent-d', at: held.at,
+    expiresAt: held.expiresAt, source: held.source });
+  const handed = handOn(restated, 'agent-e', at);
+  const now = '2026-11-06T10:00:00Z';
+  const call = { capability: 'page.update', effect: 'draft', spendUsd: 2 };
+  const covered = mandateCovers({ mandate: handed, tier: 'T1', now, self: 'agent-e', callerAgent: 'agent-d', call });
+  assert.equal(covered.ok, true, JSON.stringify(covered));
+  assert.deepEqual(covered.recordAs.source, { project: 'example-site', session: 'sess-1' });
+  assert.equal(mandateCovers({ mandate: handed, tier: 'T1', now, self: 'agent-e', call: { ...call, capability: 'page.publish', effect: 'publish' } }).data.detail,
+    'outside-mandate: capability');
+  assert.equal(mandateCovers({ mandate: handed, tier: 'T1', now, self: 'agent-e', call: { ...call, spendUsd: 4 } }).data.detail, 'outside-mandate: spend');
+});

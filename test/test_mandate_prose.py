@@ -88,6 +88,10 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
             self.assertIn(words, board, words)
         for words in ("restates its own mandate", "`expiresAt` and the scope in force unchanged", "chain starting with it"):
             self.assertIn(words, flat_rule, words)
+        interop = flat("building-fabric-services/references/interop.md")
+        for words in ("is restated instead of handed on", "the scope in force (`effective_scope` / `effectiveScope`, never wider)",
+                      "keep the held mandate in your own record (OA-6)"):
+            self.assertIn(words, interop, words)
 
     def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)
         self.assertIn("pass the refusal to the agent that called you", self.rule)

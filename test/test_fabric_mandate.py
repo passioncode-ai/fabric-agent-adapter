@@ -203,6 +203,36 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class RestatingAFullChain(unittest.TestCase):
+    """The route working-with-fabric and references/interop.md document for a chain that already holds four agents
+    (0.61.0 seam reading 7): restate with the held parts and the scope in force, hand on, and the callee covers it."""
+
+    def test_a_full_chain_is_restated_with_the_scope_in_force(self):
+        at, expires = "2026-11-03T10:00:00Z", "2026-11-09T10:00:00Z"
+        scope = {"capabilities": ["page.update", "page.publish"], "effects": ["publish"], "perCallMaxUsd": 10}
+        held = fm.operator_mandate("task-timetable", "update the timetable page", scope, "agent-a", at=at, expires_at=expires,
+                                   source={"project": "example-site", "session": "sess-1"})
+        held = fm.hand_on(held, "agent-b", at, {"capabilities": ["page.update"], "effects": ["draft"], "perCallMaxUsd": 3})
+        held = fm.hand_on(fm.hand_on(held, "agent-c", at), "agent-d", at)
+        with self.assertRaises(fm.ServiceError):
+            fm.hand_on(held, "agent-e", at)  # a fifth agent: the chain is full
+        restated = fm.operator_mandate(held["task"], held["instruction"], fm.effective_scope(held), "agent-d", at=held["at"],
+                                       expires_at=held["expiresAt"], source=held["source"])
+        self.assertEqual([step["agent"] for step in restated["chain"]], ["agent-d"])
+        handed = fm.hand_on(restated, "agent-e", at)
+        now = "2026-11-06T10:00:00Z"  # three days on: the held expiry still runs
+        call = {"capability": "page.update", "effect": "draft", "spendUsd": 2}
+        covered = fm.mandate_covers({"mandate": handed, "tier": "T1", "now": now, "self": "agent-e", "callerAgent": "agent-d", "call": call})
+        self.assertTrue(covered["ok"], covered)
+        self.assertEqual(covered["recordAs"]["source"], {"project": "example-site", "session": "sess-1"})
+        wider = dict(call, capability="page.publish", effect="publish")
+        self.assertEqual(fm.mandate_covers({"mandate": handed, "tier": "T1", "now": now, "self": "agent-e", "call": wider})["data"]["detail"],
+                         "outside-mandate: capability", "the scope in force binds, not the lead's wider one")
+        spend = dict(call, spendUsd=4)
+        self.assertEqual(fm.mandate_covers({"mandate": handed, "tier": "T1", "now": now, "self": "agent-e", "call": spend})["data"]["detail"],
+                         "outside-mandate: spend")
+
+
 class NamingListsMd2a(unittest.TestCase):
     """DEC-0136 MD-2a: a hand-over never adds a naming list the scope in force
     leaves out, which would let a callee cover a relayed action the operator never named."""

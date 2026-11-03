@@ -107,9 +107,12 @@ class InstanceLock:
             except OSError:  # a deferred write error (NFS) at the close: the name still goes, the first error stands
                 pass
             finally:
-                if self._name is not None:
-                    _drop_lock_name(self._name)
-                    self._name = None
+                name, self._name = self._name, None
+                if name is not None:
+                    try:
+                        _drop_lock_name(name)
+                    except OSError:  # as with the close: nothing to add to the first error
+                        pass
             raise
         self._fd = fd
         return self

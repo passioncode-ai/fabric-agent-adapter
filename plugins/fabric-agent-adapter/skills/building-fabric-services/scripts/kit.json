@@ -230,7 +230,7 @@
     "fabric_paths",
     "fabric_platform"
    ],
-   "sha256": "7595502c73adb3c73f836cb0c79a1ca9284bc32caaa635c0b71ae38353194236"
+   "sha256": "dfaf92a7086cbb097d832a305869b7964e2d2a9da0e3365c8ec1685a7bb4fef9"
   },
   {
    "module": "fabric_usage",
@@ -717,7 +717,7 @@
     "fabric-base",
     "fabric-paths"
    ],
-   "sha256": "6811b9b7d06e952bf4fe49af15e87a6cc958fbcfa822b96e258d7db460c786c1"
+   "sha256": "02cf833c97a07a8b3c788f9c93f70c4b9c9066efa25318dccf0038e0fc79717f"
   },
   {
    "module": "fabric-usage",
@@ -4614,7 +4614,7 @@
    "fabric_connections.py": "7de55cb7d808f756d650effabfaa12027d40a5bd5d2f6d448c32969d47529ecb",
    "fabric_a2a.py": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919",
    "fabric_page_links.py": "1b57ea573c550e2f90d1ec3edcc655917ceaa0db9dd1635fccf422ec3024d25e",
-   "fabric_lock.py": "7595502c73adb3c73f836cb0c79a1ca9284bc32caaa635c0b71ae38353194236",
+   "fabric_lock.py": "dfaf92a7086cbb097d832a305869b7964e2d2a9da0e3365c8ec1685a7bb4fef9",
    "fabric_usage.py": "5cc2e03ccc5b06e81987ed7bc3eead7a7e6cbf1a7cb8e05c6c64315eed9d91b6",
    "fabric_backups.py": "1f3f0d7ecf361b29e9101e07f1c53e5dc304d598bf26fd59ec89f16b9fed2420",
    "fabric_descriptor.py": "a6d7a4a38186f7ef527d16218bbf96e39e255f9547be668adcfbec063dabb7ed",
@@ -4657,7 +4657,7 @@
    "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",
    "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
    "fabric-page-links.mjs": "a8834926e9d4bbf7c4857f551451d2ebf6ac8873bbccaaf89c5e30cf45b17ee6",
-   "fabric-lock.mjs": "6811b9b7d06e952bf4fe49af15e87a6cc958fbcfa822b96e258d7db460c786c1",
+   "fabric-lock.mjs": "02cf833c97a07a8b3c788f9c93f70c4b9c9066efa25318dccf0038e0fc79717f",
    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7",
    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
    "fabric-descriptor.mjs": "243bbce42989f67c4c5ec6b7659e201b3f9a1c08c71d429d88ec934d870f5104",

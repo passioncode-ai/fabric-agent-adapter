@@ -109,6 +109,20 @@ class LockTests(unittest.TestCase):
             self.assertEqual(caught.exception.errno, 28, "the first error stands")
             self.assertEqual(dropped, ["held-name"])
 
+    def test_a_name_that_fails_to_drop_keeps_the_first_error(self):
+        """0.61.0 unit reading 7: an error from _drop_lock_name replaced the first one and left _name set."""
+        from unittest import mock
+        lock_module = sys.modules[fs.InstanceLock.__module__]
+        with tempfile.TemporaryDirectory() as temp, \
+                mock.patch.object(lock_module, "_hold_lock_name", return_value="held-name"), \
+                mock.patch.object(lock_module, "_drop_lock_name", side_effect=OSError(9, "Bad file descriptor")), \
+                mock.patch.object(lock_module.os, "fsync", side_effect=OSError(28, "No space left on device")):
+            lock = fs.InstanceLock(Path(temp))
+            with self.assertRaises(OSError) as caught:
+                lock.acquire()
+        self.assertEqual(caught.exception.errno, 28)
+        self.assertIsNone(lock._name)
+
 
 class LoopbackServerTests(unittest.TestCase):
     """http.server's server_bind() calls socket.getfqdn() between bind() and listen(); a Mac
