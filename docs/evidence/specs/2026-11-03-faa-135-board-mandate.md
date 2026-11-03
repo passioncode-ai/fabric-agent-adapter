@@ -24,8 +24,8 @@ The kit cannot tell a personal board from an organization's: `com.status` names 
   Default `None`: no mandate is read (today's behaviour). Both kits.
 - A request is read for a mandate only when its sender's principal has `provenance: trusted` and its Project is
   within `mandate_from`, and `agent_id` is set. Exactly one fenced `json` block whose value has `kind: "mandate/1"`;
-  two such blocks, or one that does not parse, read as no mandate and are named in the event log by code, never by
-  content.
+  two such blocks, or one whose text holds `mandate/1` and does not parse, read as no mandate and are named in the
+  event log by the request id and a code, never by content; a broken block without `mandate/1` is skipped.
 - The handler gets `ctx.mandate` (the mandate block with any `source` dropped, OA-7, or `None`) and `ctx.mandate_covers(call)`, which calls
   `mandate_covers` with `tier: "T1"`, `self: agent_id`, no `callerAgent` (the board names a Project's principal, not an
   authenticated agent id the chain can bind), and the service's clock. A covered call answers `recordAs`
