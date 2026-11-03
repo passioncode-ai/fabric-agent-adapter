@@ -238,29 +238,34 @@ def _member_of(items: Any, value: Any) -> bool:
     return set_has(items, value)
 
 
+#: A spend nested deeper than this is no estimate: JavaScript's Number() throws on one a few thousand deep, and no
+#: estimate needs more (0.61.0 product reading 25).
+MAX_SPEND_DEPTH = 100
+
+
 def _json_data(value: Any) -> bool:
     """Whether a value is JSON data as json.loads gives it, by exact type all the way down (never `==` or isinstance,
-    which a metaclass or `__class__` can answer), walked without recursion in one pass. json.loads never shares a list
-    or dict, so a structure that meets one twice (shared or cyclic) is not JSON data (0.61.0 unit reading 21, seam
-    reading 22)."""
-    stack, seen = [value], set()
+    which a metaclass or `__class__` can answer), walked without recursion in one pass, nested at most MAX_SPEND_DEPTH
+    lists or dicts deep. json.loads never shares a list or dict, so a structure that meets one twice (shared or
+    cyclic) is not JSON data (0.61.0 unit reading 21, seam reading 22, product reading 25)."""
+    stack, seen = [(value, 0)], set()
     while stack:
-        item = stack.pop()
+        item, depth = stack.pop()
         kind = type(item)
         if item is None or kind is bool or kind is str or kind is int or kind is float:
             continue
         if kind is not list and kind is not dict:
             return False
-        if id(item) in seen:
+        if id(item) in seen or depth >= MAX_SPEND_DEPTH:
             return False
         seen.add(id(item))
         if kind is list:
-            stack.extend(item)
+            stack.extend((sub, depth + 1) for sub in item)
             continue
         for key, sub in item.items():
             if type(key) is not str:
                 return False
-            stack.append(sub)
+            stack.append((sub, depth + 1))
     return True
 
 
@@ -342,7 +347,7 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     if readable:
         try:
             over = _spend_number(spend) > ceiling
-        except RecursionError:  # a list too deep to read at this stack depth: no estimate (0.61.0 seam reading 21)
+        except RecursionError:  # a caller already at the stack's edge: no estimate, never a raise (seam reading 21)
             readable = False
     if ceiling is not MISSING and (spend is MISSING or not readable or over):
         data: Dict[str, Any] = {"detail": "outside-mandate: spend"}

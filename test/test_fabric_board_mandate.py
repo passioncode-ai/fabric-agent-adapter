@@ -411,11 +411,15 @@ class BoardMandateTests(Conversation):
         for text, want in ((".", None), ("+", None), ("-", None), ("e5", None), (".e1", None), ("1e", None), (".5", 0.5), ("5.", 5.0)):
             got = jsv.js_to_number(text)  # the pattern needs a digit (unit reading 23)
             self.assertTrue(math.isnan(got) if want is None else got == want, text)
-        limit = sys.getrecursionlimit()
-        for depth in range(max(1, limit // 3 - 60), limit + 20, 3):  # never raises, whatever the nesting and the stack
+        # A spend nested at most MAX_SPEND_DEPTH lists deep is read; a deeper one is no estimate, at any depth and stack
+        # offset, never a raise (product reading 25: JavaScript's Number() throws on one a few thousand deep).
+        self.assertEqual(fm.MAX_SPEND_DEPTH, 100)
+        for depth in (fm.MAX_SPEND_DEPTH - 2, fm.MAX_SPEND_DEPTH - 1):
+            self.assertTrue(at_depth(0, nested(depth))["ok"], depth)
+        for depth in (fm.MAX_SPEND_DEPTH, fm.MAX_SPEND_DEPTH + 1, sys.getrecursionlimit() + 20, 100000):
             for frames in (0, 5, 11):
                 got = at_depth(frames, nested(depth))
-                self.assertIn("ok" if got.get("ok") else got.get("data", {}).get("detail"), ("ok", "outside-mandate: spend"))
+                self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False), depth)
 
         class ClaimsFloat(int):  # an int whose __class__ says float: read as the int it is (unit reading 20)
             @property
