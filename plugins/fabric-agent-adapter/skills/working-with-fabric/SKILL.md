@@ -251,13 +251,13 @@ chat of any of his agents binds all his agents (OA-1).
   Project, another session or Fabric's `agent.call` (its hub cannot read `protocols` yet) send it without `source`,
   naming in the text where he said the words. Keep `source` in your own record; like his words, it goes
   never to an events feed, a usage report, a log or a page another party reads.
-- His approval holds for the whole task, at every link (operator, board thread `118f95f9`): every hand-over
+- His approval holds for the whole task, at every link (board thread `118f95f9`): every hand-over
   within it carries the four parts (`source` only where OA-7 lets it, else named in your text), in `_meta.mandate` or,
   where your client cannot set `_meta`, in your message; each receiver acts on them, narrowing only; human gates
   stay (MD-6). `at` never moves, so a mandate lapses within seven days of his words: a task still open asks
   him once for a new one (MD-1), same words, `at` when he confirms, and weekly until the
   contract's proposed CT-205 (answer `7f372925`). A link holding a four-agent chain restates its own mandate (OA-2, answer `7f372925`:
-  `instruction`, `at`, `expiresAt` and the scope in force unchanged, chain starting with it) and hands that on.
+  `task`, `instruction`, `at`, `expiresAt` and the scope in force unchanged, chain starting with it) and hands that on.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,

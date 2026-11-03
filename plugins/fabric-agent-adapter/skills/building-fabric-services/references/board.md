@@ -119,14 +119,15 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   checkpoint. A Project declares no `protocols`, so a board block carries no `source` (OA-7): any `source` in it is
   dropped unread. Python reads two kinds of valid JSON as not JSON where Node reads them, both fail-closed: a block nested
   about 1,000 levels deep on Python 3.9 to 3.11 and about 10,000 on 3.12 and 3.13 (none on 3.14), and an integer longer
-  than 4300 digits on every Python (the kit refuses it there, as `int_max_str_digits` does from 3.11; a limit configured
+  than 4300 digits on every Python (the kit refuses it there, as `int_max_str_digits` does from 3.11 and
+  the 3.8.14, 3.9.14 and 3.10.7 security releases; a limit configured
   lower, `PYTHONINTMAXSTRDIGITS` on a Python that has one, refuses an integer longer than it).
 - The handler gets `ctx.mandate` (the one block without `source`, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
   acts in one, since a call naming none is not limited by the mandate's `projects`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
   board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
-  responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`; one that is not a
-  finite number answers `{"fault": "now-unreadable"}`). It answers `{"ok": True, "recordAs": {by, via: "mandate", task,
+  responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`; one that returns a value
+  that is not a finite number answers `{"fault": "now-unreadable"}`; a clock that raises passes its error to the handler). It answers `{"ok": True, "recordAs": {by, via: "mandate", task,
   chain, caller}}` (`caller` the sender Project, as MD-3 records it; a sender that names no Project is never read), a
   `decision-invalid` refusal (a chain that does not end in the service's `agent_id` answers `mandate-not-for-this-call`;
   a lapsed one `mandate-expired`), an `outside-mandate` refusal, or None when no mandate travelled. A covered call is

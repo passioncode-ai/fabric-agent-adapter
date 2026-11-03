@@ -41,10 +41,13 @@ test('a failed pid write lets the instance lock go (a board finding of 2026-11-0
       throw Object.assign(new Error('No space left on device'), { code: 'ENOSPC' });
     };
     let lock = null;
+    const attempt = new k.InstanceLock(dir);
     try {
-      lock = await new k.InstanceLock(dir).acquire();
+      lock = await attempt.acquire();
     } catch (error) {
       assert.equal(error.code, 'ENOSPC', call);
+      assert.equal(attempt.fd ?? null, null, `${call}: no descriptor kept`);
+      assert.equal(attempt.server ?? null, null, `${call}: no name kept (Linux, Windows)`);
     } finally {
       fs[call] = original;
     }

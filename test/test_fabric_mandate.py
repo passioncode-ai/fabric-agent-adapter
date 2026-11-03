@@ -199,8 +199,6 @@ class Building(unittest.TestCase):
         self.assertIs(fd.effect_closure.__module__, fm.effect_closure.__module__)
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class RestatingAFullChain(unittest.TestCase):
@@ -217,7 +215,7 @@ class RestatingAFullChain(unittest.TestCase):
         with self.assertRaises(fm.ServiceError):
             fm.hand_on(held, "agent-e", at)  # a fifth agent: the chain is full
         restated = fm.operator_mandate(held["task"], held["instruction"], fm.effective_scope(held), "agent-d", at=held["at"],
-                                       expires_at=held["expiresAt"], source=held["source"])
+                                       expires_at=held["expiresAt"], source=held.get("source"))
         self.assertEqual([step["agent"] for step in restated["chain"]], ["agent-d"])
         handed = fm.hand_on(restated, "agent-e", at)
         now = "2026-11-06T10:00:00Z"  # three days on: the held expiry still runs
@@ -242,3 +240,6 @@ class NamingListsMd2a(unittest.TestCase):
         for case in cases:
             with self.subTest(case["name"]):
                 self.assertIs(fm.scope_within(case["child"], case["parent"]), case["within"])
+
+if __name__ == "__main__":
+    unittest.main()

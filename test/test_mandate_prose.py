@@ -86,7 +86,8 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
                       "`mandate-expired` means your lead asks him once for a new one (MD-1)", "`-widened`",
                       "the scope in force, `effective_scope`, never wider"):
             self.assertIn(words, board, words)
-        for words in ("restates its own mandate", "`expiresAt` and the scope in force unchanged", "chain starting with it"):
+        for words in ("restates its own mandate", "`task`, `instruction`, `at`, `expiresAt` and the scope in force unchanged",
+                      "chain starting with it"):
             self.assertIn(words, flat_rule, words)
         interop = flat("building-fabric-services/references/interop.md")
         for words in ("is restated instead of handed on", "the scope in force (`effective_scope` / `effectiveScope`, never wider)",
