@@ -40,10 +40,11 @@ says that his approval holds for the whole task, at every link (FAA-195).
   `mandate_covers` reads a spend only when it is a number or JSON data as `json.loads` gives it, by exact type all the
   way down, so for its direct callers a tuple, bytes, a `str`, `list` or `dict` subclass, or a list holding a number
   subclass is no estimate either, a stricter reading than 0.60.0's (checked only under a ceiling, without recursion in one
-  pass, then read as `Number()` reads it, in time linear in the structure; a shared or cyclic list or dict, which `json.loads` never gives, is no estimate, and a list too deep to
+  pass, then read as `Number()` reads it, in time linear in the structure (a list is never joined: two or more items are
+  NaN, one is read for itself); a shared or cyclic list or dict, which `json.loads` never gives, is no estimate, and a list too deep to
   read is no estimate where 0.60.0 raised RecursionError). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
   the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
-  seam readings 17 to 22, product readings 18 to 20 and 22, unit readings 19 and 21). `js_to_number`'s decimal
+  seam readings 17 to 22 and 24, product readings 18 to 20 and 22 to 24, unit readings 19, 21 and 24). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
   (0.61.0 seam reading 22).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an

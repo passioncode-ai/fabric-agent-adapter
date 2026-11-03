@@ -394,6 +394,13 @@ class BoardMandateTests(Conversation):
         started = time.monotonic()
         self.assertTrue(math.isnan(jsv.js_to_number("1" * 20000 + "x")))  # the decimal pattern costs its length
         self.assertLess(time.monotonic() - started, 0.5, "seconds on a backtracking pattern, a millisecond on this one")
+        long = "7" * 16000  # one string repeated: Number() of the list read without building the join (seam reading 24)
+        started = time.monotonic()
+        self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": 3, "project": "site-a"}), "ok")
+        for spend, want in (([long] * 16000, "ok"), ([[["100"]]], "outside-mandate: spend"), ([[None]], "ok"), ([[1, 2]], "ok")):
+            got = at_depth(0, spend)
+            self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want)
+        self.assertLess(time.monotonic() - started, 0.5)
         for text, want in ((".", None), ("+", None), ("-", None), ("e5", None), (".e1", None), ("1e", None), (".5", 0.5), ("5.", 5.0)):
             got = jsv.js_to_number(text)  # the pattern needs a digit (unit reading 23)
             self.assertTrue(math.isnan(got) if want is None else got == want, text)

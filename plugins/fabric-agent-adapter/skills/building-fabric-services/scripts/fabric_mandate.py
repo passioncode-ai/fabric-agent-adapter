@@ -33,7 +33,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_jsvalue import MISSING, get, is_number, js_to_number, real_number, same, set_has  # noqa: E402
+from fabric_jsvalue import MISSING, get, is_number, js_string, js_to_number, real_number, same, set_has  # noqa: E402
 from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
 
 #: The longest a mandate stands after the operator gave it (FAC-SEM-144).
@@ -264,6 +264,22 @@ def _json_data(value: Any) -> bool:
     return True
 
 
+def _spend_number(spend: Any) -> float:
+    """Number(spend) for JSON data, without the join JavaScript builds for a list: [] is 0, a list of two or more items
+    is NaN (the comma never reads as a number), one item is read for itself, all in one descent (0.61.0 seam
+    reading 24: a list repeating one long string cost its length times its references)."""
+    value = spend
+    while type(value) is list:
+        if not value:
+            return 0.0
+        if len(value) > 1:
+            return math.nan
+        value = value[0]
+    if value is spend:
+        return js_to_number(value)
+    return 0.0 if value is None else js_to_number(js_string(value))
+
+
 def mandate_covers(inputs: Any) -> Dict[str, Any]:
     """Whether a callee takes one call as the operator's decision under a mandate (DEC-0125 MD-3 to MD-5), after it has
     placed the caller's tier (DL-25), as the contract's mandateCovers answers.
@@ -325,7 +341,7 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
         readable = is_number(spend) or _json_data(spend)
     if readable:
         try:
-            over = js_to_number(spend) > ceiling
+            over = _spend_number(spend) > ceiling
         except RecursionError:  # a list too deep to read at this stack depth: no estimate (0.61.0 seam reading 21)
             readable = False
     if ceiling is not MISSING and (spend is MISSING or not readable or over):

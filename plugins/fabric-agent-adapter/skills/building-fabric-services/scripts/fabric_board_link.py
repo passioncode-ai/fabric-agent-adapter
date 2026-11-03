@@ -23,6 +23,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 import fabric_hub as _hub
 import fabric_interop_rules as _rules
 import fabric_mandate as _mandate
+from fabric_time import format_rfc3339 as _format_rfc3339  # noqa: E402 - the core's (FAA-65)
 import fabric_service as _fs
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
     BoardError,
@@ -327,7 +328,7 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     clock, now = wall(), ""
     if isinstance(clock, (int, float)) and not isinstance(clock, bool):
         try:
-            now = _mandate.format_rfc3339(clock * 1000) if math.isfinite(clock) else ""
+            now = _format_rfc3339(clock * 1000) if math.isfinite(clock) else ""
         except (OverflowError, ValueError):  # finite but outside the dates a clock can name
             now = ""
     answer = _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": now, "self": agent_id, "call": call})
