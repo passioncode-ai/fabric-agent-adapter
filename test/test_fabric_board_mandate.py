@@ -397,9 +397,16 @@ class BoardMandateTests(Conversation):
         long = "7" * 16000  # one string repeated: Number() of the list read without building the join (seam reading 24)
         started = time.monotonic()
         self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": 3, "project": "site-a"}), "ok")
-        for spend, want in (([long] * 16000, "ok"), ([[["100"]]], "outside-mandate: spend"), ([[None]], "ok"), ([[1, 2]], "ok")):
-            got = at_depth(0, spend)
-            self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want)
+        tracemalloc = importlib.import_module("tracemalloc")
+        tracemalloc.start()
+        try:
+            for spend, want in (([long] * 16000, "ok"), ([[["100"]]], "outside-mandate: spend"), ([[None]], "ok"), ([[1, 2]], "ok")):
+                got = at_depth(0, spend)
+                self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want)
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, 8 * 1024 * 1024, "the join is never built (it would be 256 MB)")
         self.assertLess(time.monotonic() - started, 0.5)
         for text, want in ((".", None), ("+", None), ("-", None), ("e5", None), (".e1", None), ("1e", None), (".5", 0.5), ("5.", 5.0)):
             got = jsv.js_to_number(text)  # the pattern needs a digit (unit reading 23)
