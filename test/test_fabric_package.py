@@ -205,7 +205,7 @@ class PackTests(unittest.TestCase):
 
     def test_an_empty_provider_manifest_is_no_refusal(self):
         """0.60.0 product reading 8: Python refused a provider manifest of {} as Node does not, under a message whose
-        two causes did not apply; both kits now refuse only a manifest that is not a JSON object (FAA-194 (1))."""
+        two causes did not apply; both kits now refuse it only when it is not a JSON object or its costPresets differ (FAA-194 (1))."""
         write_agent(self.root)
         (self.root / "fabric-agent.json").write_text("{}")
         problems = [p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]

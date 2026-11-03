@@ -1814,6 +1814,25 @@ class MovedSlotTests(Conversation):
         self.assertEqual(self.events[seen:], [])
         self.assertEqual(r.state, "ready")
 
+    def test_a_take_back_between_the_probe_keys_write_and_read_does_not_crash(self):
+        """0.60.0 unit reading 9: take_back (an action thread) popping the claim key between the probe's write and its
+        read raised KeyError out of step() and ended the responder's loop; the key is now read once, into a local."""
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)
+        self.board.advance(20)
+
+        class Slots(dict):
+            armed = True
+
+            def get(self, k, d=None):
+                if self.armed and k in r.claim_keys:
+                    self.armed = False
+                    r.take_back(k)  # what another thread may do between two statements
+                return dict.get(self, k, d)
+        r.slots = Slots(r.slots)
+        r.step()  # returns, never raises
+        self.assertNotIn("moved", self.record().get("video.render") or {})
+
     def test_a_stopping_responder_does_not_ask_about_a_move_back(self):
         r, mine = self._moved_off()
         self.board.move("video.render", to=mine)

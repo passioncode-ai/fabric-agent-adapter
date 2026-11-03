@@ -149,10 +149,11 @@ class SlotKeeper:
         now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
         if not _is_int(now, 1) or now <= seen:
             return
-        if capability not in self._probing or capability not in self.claim_keys:
-            self.claim_keys[capability] = self._key("claim")  # a fresh key: one from before the move may hold a dead receipt
+        key = self.claim_keys.get(capability) if capability in self._probing else None  # read once: take_back may pop it
+        if key is None:
+            key = self.claim_keys[capability] = self._key("claim")  # a fresh key: one from before the move may hold a dead receipt
             (self.slots.get(capability) or {}).pop("probe_at", None)  # and a send time of its own
-        key, sent = self.claim_keys[capability], self.now()
+        sent = self.now()
         try:
             answer = self._receipt("com.claim", self._call("com.claim", {"idempotency": self._idem(key), "capability": capability}))
         except BoardError as exc:

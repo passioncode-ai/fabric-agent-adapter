@@ -478,7 +478,7 @@
       "expected": [
         "files it with the row's address as source {repository, path, id}, never the row's text or status",
         "reads fabric_task_create's answer as Step 4 item 2 says: created false with a code filed nothing, proposed true filed nothing and waits for the operator, spawned_from names the parent Fabric chose",
-        "says that while its single live claim is held Fabric 0.3.14 links the new task as spawned from it, so it files the unrelated row after releasing its claim or tells the person the row is linked to the request"
+        "says that while its single live claim is held Fabric 0.3.14 links the new task as spawned from it, so it files the unrelated row after releasing its claim or tells the person the row is linked to the request; the row filed after the release answers spawned_from: null and is left unlinked, never linked by hand to the released task"
       ]
     },
     {
