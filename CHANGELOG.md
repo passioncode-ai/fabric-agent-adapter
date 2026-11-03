@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.59.0 (2026-11-06)
+## 0.59.0 (2026-11-03)
 
 Portable from day 0 (FAA-191, RM-36): on top of 0.58.0's source and instance, every new agent gets a data home, a
 data kind and an uptime category, and a new private agent a `LICENSE` naming its copyright holder, from its first commit, and runs the transfer
