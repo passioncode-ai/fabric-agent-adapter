@@ -205,6 +205,21 @@ test('FAA-135: a uuid matches in any case, any other id as written', () => {
   assert.notEqual(readMandate(request, mandateOptions('example-agent', new Set(['team-a'])), 'example-agent').mandate, null);
 });
 
+test('FAA-135: a spend or project that does not read is refused (FAA-139; 0.61.0 seam reading 14)', () => {
+  const m = handOn(operatorMandate({ task: 'task-teaser', instruction: WORDS, lead: 'lead-agent', at: AT,
+    scope: { capabilities: ['video.render'], effects: ['draft'], perCallMaxUsd: 5, projects: ['site-a'] } }), 'example-agent', AT);
+  const detail = (call) => {
+    const got = covers(m, { capability: 'video.render', effect: 'draft', ...call }, 'example-agent', () => WALL, OTHER_PROJECT);
+    return got.ok ? 'ok' : got.data.detail;
+  };
+  assert.equal(detail({ spendUsd: 3, project: 'site-a' }), 'ok');
+  for (const spendUsd of [null, NaN, Infinity, '3', true, [1], 10n, 50]) {
+    assert.equal(detail({ spendUsd, project: 'site-a' }), 'outside-mandate: spend', String(spendUsd));
+  }
+  for (const project of [5, ['site-a'], {}]) assert.equal(detail({ spendUsd: 3, project }), 'outside-mandate: project', String(project));
+  assert.equal(detail({ spendUsd: 3, project: null }), 'ok', 'a null project names none, as the action path reads it');
+});
+
 test('FAA-135: a clock that does not read answers now-unreadable', () => {
   for (const clock of [NaN, null, Infinity, 1e18, -1e18, 1e300, true, '1762300800000']) {
     assert.deepEqual(covers(mandate(), { capability: 'video.render', effect: 'draft' }, 'example-agent', () => clock), { fault: 'now-unreadable' });

@@ -21,6 +21,7 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_hub as _hub
+import fabric_interop_rules as _rules
 import fabric_mandate as _mandate
 import fabric_service as _fs
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
@@ -296,9 +297,22 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     """`mandate_covers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
     board names a Project's principal, not an agent the chain can bind; the chain's end alone binds it, MD-3). A covered
     answer's `recordAs` names `caller`, the sender Project the board verified (MD-3 records the caller, as the action
-    path does). None when no mandate travelled: the handler asks the operator as it would without one."""
+    path does). None when no mandate travelled: the handler asks the operator as it would without one. The call's
+    `spendUsd` and `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend
+    that is not a finite number is none, which a ceiling refuses; a `project` that is not a string is unreadable, which
+    a mandate limited to projects refuses; a `project` of None names none."""
     if mandate is None or agent_id is None:
         return None
+    if isinstance(call, Mapping):
+        call = dict(call)
+        if "spendUsd" in call:
+            spend = _rules.mandate_spend(call.pop("spendUsd"))
+            if spend is not None:
+                call["spendUsd"] = spend
+        if "project" in call:
+            project = call.pop("project")
+            if project is not None:
+                call["project"] = project if isinstance(project, str) else _rules.UNREADABLE_PROJECT
     clock, now = wall(), ""
     if isinstance(clock, (int, float)) and not isinstance(clock, bool):
         try:

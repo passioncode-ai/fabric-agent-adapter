@@ -6,6 +6,7 @@ import path from 'node:path';
 import { HubError, MCP_PROTOCOL_VERSION, postMcp, toolAnswer } from './fabric-hub.mjs';
 import { atomicWrite, ensurePrivateDir } from './fabric-service.mjs';
 import { BoardError, RESPOND_TOOLS, isObj, refusalProblems } from './fabric-board-shapes.mjs';
+import { UNREADABLE_PROJECT, mandateSpend } from './fabric-interop-rules.mjs'; // FAA-139
 import { isAgentId, mandateCovers } from './fabric-mandate.mjs';
 import { formatRfc3339 } from './fabric-time.mjs';
 
@@ -251,10 +252,19 @@ export function readMandate(request, mandateFrom, agentId) {
 /**
  * `mandateCovers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
  * chain's end alone binds it, MD-3). A covered answer's `recordAs` names `caller`, the sender Project the board
- * verified (MD-3 records the caller). `wall` answers milliseconds. Null when no mandate travelled.
+ * verified (MD-3 records the caller). `wall` answers milliseconds. Null when no mandate travelled. `spendUsd` and
+ * `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend that is not a
+ * finite number is none (a ceiling refuses it), a non-string `project` unreadable, a null `project` none.
  */
 export function covers(mandate, call, agentId, wall, caller = null) {
   if (mandate == null || agentId == null) return null;
+  if (call !== null && typeof call === 'object' && !Array.isArray(call)) {
+    const { spendUsd, project, ...rest } = call;
+    call = rest;
+    const spend = mandateSpend(spendUsd);
+    if (spend !== undefined) call.spendUsd = spend;
+    if (project !== undefined && project !== null) call.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
+  }
   const clock = wall();
   let now = '';
   try {

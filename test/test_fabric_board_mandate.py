@@ -242,6 +242,25 @@ class BoardMandateTests(Conversation):
             self.assertEqual(link.covers(mandate(), {"capability": "video.render", "effect": "draft"}, "example-agent",
                                          lambda c=clock: c), {"fault": "now-unreadable"})
 
+    def test_a_spend_or_project_that_does_not_read_is_refused(self):
+        """0.61.0 seam reading 14: the board path read the handler's spend and project as given, so a spend that is not
+        a finite number passed a ceiling the kit's other mandate readers refuse it at (FAA-139)."""
+        link = importlib.import_module("fabric_board_link")
+        m = mandate(scope={"capabilities": ["video.render"], "effects": ["draft"], "perCallMaxUsd": 5, "projects": ["site-a"]})
+
+        def detail(call):
+            got = link.covers(m, dict({"capability": "video.render", "effect": "draft"}, **call), "example-agent",
+                              lambda: WALL, OTHER_PROJECT)
+            return "ok" if got.get("ok") else got["data"]["detail"]
+        self.assertEqual(detail({"spendUsd": 3, "project": "site-a"}), "ok")
+        for spend in (None, float("nan"), float("inf"), "3", True, [1], 10 ** 400, 50):
+            with self.subTest(spend=spend):
+                self.assertEqual(detail({"spendUsd": spend, "project": "site-a"}), "outside-mandate: spend")
+        for project in (5, ["site-a"], b"site-a"):
+            with self.subTest(project=project):
+                self.assertEqual(detail({"spendUsd": 3, "project": project}), "outside-mandate: project")
+        self.assertEqual(detail({"spendUsd": 3, "project": None}), "ok", "a project of None names none, as the action path reads it")
+
     def test_the_operators_words_reach_no_checkpoint_during_the_work(self):
         """0.61.0 product reading 5: the checkpoint was read only after the request completed and its entry was gone."""
         during = []

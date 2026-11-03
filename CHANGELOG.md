@@ -17,7 +17,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
   error to the handler). A `source` in the block is dropped (OA-7). Two `mandate/1` blocks, or one whose text holds
   `mandate/1` and is not JSON (an integer longer than 4300 digits included, on every Python), read as none, with a `board.request.mandate_unread` warning carrying the request id and its `reason`, never the block.
   Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
-  mandate. Both kits (FAA-135).
+  mandate. Both kits (FAA-135). `ctx.mandate_covers` reads the call's `spendUsd` and `project` failing closed, as the
+  kit's MCP and job mandate readers do (FAA-139): a spend that is not a finite number is none, which a `perCallMaxUsd`
+  refuses, and a `project` that is not a string is refused by a mandate limited to projects (a draft of this release
+  passed them as given; 0.61.0 seam reading 14).
 
 ### Fixed
 
