@@ -439,10 +439,13 @@ class BoardMandateTests(Conversation):
             self.assertTrue(at_depth(0, chain_around(inner, fm.MAX_SPEND_DEPTH - lists))["ok"], inner)
             got = at_depth(0, chain_around(inner, fm.MAX_SPEND_DEPTH - lists + 1))
             self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False), inner)
-        for spend in ([1, nested(fm.MAX_SPEND_DEPTH - 1)], [1, nested(5000)], [[1, 2], nested(fm.MAX_SPEND_DEPTH)]):
+        for spend in ([1, nested(fm.MAX_SPEND_DEPTH - 1)], [1, nested(5000)], [[1, 2], nested(fm.MAX_SPEND_DEPTH - 1)],
+                      [nested(fm.MAX_SPEND_DEPTH - 1), 1], [nested(fm.MAX_SPEND_DEPTH - 1), [1, 2]]):  # 101 lists, either side
             got = at_depth(0, spend)
             self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
-        self.assertTrue(at_depth(0, [1, nested(fm.MAX_SPEND_DEPTH - 2)])["ok"], "100 lists deep is read")
+        for spend in ([1, nested(fm.MAX_SPEND_DEPTH - 2)], [[1, 2], nested(fm.MAX_SPEND_DEPTH - 2)],
+                      [nested(fm.MAX_SPEND_DEPTH - 2), 1]):
+            self.assertTrue(at_depth(0, spend)["ok"], "100 lists deep is read, the deep list first or last (unit reading 28)")
         # A dict with an own toString that Number() reaches (at the top, or through lists alone) throws in JavaScript:
         # no estimate; under another dict Number() never reaches it (seam reading 28).
         for spend in ({"toString": 1}, [{"toString": "7"}], [1, {"toString": None}], [[{"a": 1, "toString": {}}]]):
