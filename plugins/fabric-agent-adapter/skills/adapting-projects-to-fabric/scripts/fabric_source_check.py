@@ -60,17 +60,20 @@ import stat
 import subprocess
 import sys
 import unicodedata
-import warnings
 from urllib.parse import unquote
 from typing import Dict, Iterable, List, NoReturn, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 _WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the checked tree adds no .pyc
-import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
-from fabric_source_ignore import (  # noqa: E402 - how the ignore lines are read, beside this file
-    IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _name_bytes, _readable_glob, _takes_folder, _under,
-    ignore_globs)
-sys.dont_write_bytecode = _WROTE_BYTECODE
+try:
+    import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
+    from fabric_source_ignore import (  # noqa: E402,F401 - how the ignore lines are read, beside this file
+        IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _readable_glob, ignore_globs)
+except ImportError as _missing:  # a copy without its two siblings: say so, as a refusal, never a finding's exit 1
+    sys.stderr.write("fabric_source_check.py: %s.py must sit beside this file\n" % (_missing.name or "a module"))
+    sys.exit(2)
+finally:
+    sys.dont_write_bytecode = _WROTE_BYTECODE
 
 LIST_NAME = "instance-strings.txt"
 #: The folders `pack` refuses to carry (fabric_package.JUNK); --every-file leaves them and the files below unread.
@@ -143,7 +146,23 @@ def _home_names(text: str, owner: Iterable[str] = ()) -> List[Tuple[int, int]]:
             name = match.group(1).lower()
             if name in owner or (len(name) > 1 and name not in NEUTRAL_HOMES):  # one letter (`/Users/a`): a placeholder
                 spans.append(match.span(1))
+    for pattern in (p for name in sorted(owner) for p in _dashed_home(name)):  # declared: found whatever it reads as
+        spans += [match.span(1) for match in pattern.finditer(text)]
     return spans
+
+
+_DASHED: Dict[str, Tuple["re.Pattern[str]", ...]] = {}
+
+
+def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
+    """A declared home name in the dashed forms, read whole and spelled as a tool dashes it (`.` and `_` become `-`):
+    the generic dashed form ends a name at its first dash, so `-Users-j-doe-proj` would read `j`."""
+    if name not in _DASHED:
+        whole = r"((?i:%s))(?![A-Za-z0-9._])" % re.escape(re.sub(r"[._]", "-", name))
+        _DASHED[name] = (
+            re.compile(r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-Za-z]-Users)-" + whole, re.ASCII),
+            re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-" + whole, re.ASCII | re.IGNORECASE))
+    return _DASHED[name]
 
 
 def _real(token: str) -> bool:
@@ -287,13 +306,19 @@ def _fold_map(text: str) -> Tuple[str, List[int], List[int]]:
     starts: List[int] = []
     ends: List[int] = []
     run = 0
+    last = text[:1]  # the last character of the piece composed so far: what the next one may compose with
     for k in range(1, len(text) + 1):
-        if k == len(text) or not unicodedata.combining(text[k]):
-            piece = unicodedata.normalize("NFC", text[run:k].casefold())
-            out.append(piece)
-            starts += [run] * len(piece)
-            ends += [k] * len(piece)
-            run = k
+        if k < len(text):
+            joined = unicodedata.normalize("NFC", last + text[k])
+            if unicodedata.combining(text[k]) or len(joined) < len(last) + 1:  # a mark, or a jamo or vowel sign
+                last = joined[-1:]
+                continue
+            last = text[k]
+        piece = unicodedata.normalize("NFC", text[run:k].casefold())
+        out.append(piece)
+        starts += [run] * len(piece)
+        ends += [k] * len(piece)
+        run = k
     return "".join(out), starts, ends
 
 
@@ -303,7 +328,8 @@ def _fold(text: str) -> str:
 
 #: How a `home: <name>` line of the owner's list is kept among the entries: a character no line can hold.
 HOME_ENTRY = "\0"
-_HOME_LINE = re.compile(r"home:[ \t]*([A-Za-z0-9._-]+)[ \t]*", re.IGNORECASE)
+_HOME_LINE = re.compile(r"home:[ \t]*([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*", re.IGNORECASE | re.ASCII)
+_HOME_KEY = re.compile(r"home[ \t]*:", re.IGNORECASE)
 
 
 def read_list(path: Path) -> List[str]:
@@ -317,19 +343,30 @@ def read_list(path: Path) -> List[str]:
         if home:
             entries.append(HOME_ENTRY + home.group(1).lower())
             continue
+        if _HOME_KEY.match(text):  # meant as a home and not one: never kept as a string that cannot match
+            raise CheckError("line %d of the owner's list starts with `home:` but holds no one ASCII home name "
+                             "(a letter or digit, then letters, digits, `.`, `_`, `-`); list a name outside ASCII as a plain string"
+                             % (len(entries) + 1))
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
 
 def _entry_spans(text: str, entries: List[str]) -> List[Tuple[int, int, int]]:
-    folded, starts, ends = _fold_map(text)
+    strings = [(n, e) for n, e in enumerate(entries, 1) if e and not e.startswith(HOME_ENTRY)]
+    if not strings:
+        return []
+    if text.isascii():  # casefolding ASCII is lowering it, one character for one: no map to build
+        folded, starts, ends = text.lower(), None, None
+    else:
+        folded, starts, ends = _fold_map(text)
     spans = []
-    for number, entry in enumerate(entries, 1):
-        if entry and not entry.startswith(HOME_ENTRY):
-            start = folded.find(entry)
-            while start != -1:  # back to the original characters: every one a matched character came from
-                spans.append((starts[start], ends[start + len(entry) - 1], number))
-                start = folded.find(entry, start + 1)
+    for number, entry in strings:
+        start = folded.find(entry)
+        while start != -1:  # back to the original characters: every one a matched character came from
+            end = start + len(entry)
+            spans.append((start, end, number) if starts is None or ends is None
+                         else (starts[start], ends[end - 1], number))
+            start = folded.find(entry, start + 1)
     return spans
 
 
@@ -834,8 +871,8 @@ def run(argv: Optional[List[str]] = None) -> int:
                   "every file, as pack reads them" if args.every_file else "every file but dependency folders, Git not used",
                   len(findings), skipped["binary"], skipped["unreadable"], skipped["nested"],  # type: ignore[index]
                   skipped["excluded"], listed,  # type: ignore[index]
-                  "" if listed else (" (the owner's list holds no string of three or more characters)" if list_path
-                                     else " (no owner's list)"),
+                  "" if listed or homes else (" (the owner's list holds no string of three or more characters)"
+                                              if list_path else " (no owner's list)"),
                   "; %d home name(s) declared" % homes if homes else ""))
     if findings:
         return 1
@@ -875,12 +912,24 @@ def _interpreter_flags(flags: object, xoptions: Dict[str, object]) -> List[str]:
     if getattr(flags, "optimize", 0):
         out.append("-" + "O" * int(getattr(flags, "optimize")))
     for key, value in xoptions.items():
-        if key != "utf8":
+        if key not in ("utf8", "fabric_console"):
             out += ["-X", key if value is True else "%s=%s" % (key, value)]
     return out
 
 
+def _keep_console(xoptions: Dict[str, object]) -> None:
+    """After a restart, write the console's own encoding again (the parent named it in `-X fabric_console=`)."""
+    console = xoptions.get("fabric_console")
+    if isinstance(console, str):
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.reconfigure(encoding=console, errors="backslashreplace")  # type: ignore[union-attr]
+            except (AttributeError, LookupError, ValueError):
+                pass
+
+
 if __name__ == "__main__":
+    _keep_console(getattr(sys, "_xoptions", {}))
     _argv = (list(sys.orig_argv[1:]) if hasattr(sys, "orig_argv")
              else _interpreter_flags(sys.flags, getattr(sys, "_xoptions", {})) + sys.argv)
     _restart = _utf8_restart(sys.getfilesystemencoding(), sys.flags.utf8_mode, _interpreter(), _argv)
@@ -888,11 +937,9 @@ if __name__ == "__main__":
         try:
             if not _restart:
                 raise OSError("no interpreter")
-            # the output keeps the console's encoding, as before the restart: a reader of the text sees the same bytes
-            _env = dict(os.environ)
+            # the output keeps the console's encoding, as before the restart: an -X option survives -I and -E
             _console = getattr(sys.stdout, "encoding", None) or "ascii"
-            _env.setdefault("PYTHONIOENCODING", "%s:backslashreplace" % _console)
-            os.execve(_restart[0], _restart, _env)
+            os.execv(_restart[0], _restart[:3] + [b"-X", os.fsencode("fabric_console=" + _console)] + _restart[3:])
         except OSError:
             sys.stderr.write("fabric_source_check.py: could not restart in Python's UTF-8 mode under this locale; run it "
                              "as `python3 -X utf8 fabric_source_check.py ...`\n")
