@@ -113,9 +113,9 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   any other id as written. The mandate is a block fenced ` ```json `, the opening and the closing fence each at the start
   of its own line, with no indent (lowercase; an indented fence, as inside a list item, is not read either; ` ````json `, ` ```JSON ` and `~~~` are not read), whose value has `kind: "mandate/1"`; any other JSON
   block, a decision block included, is not read, with no warning. A fence quoted inside another fenced block is still
-  read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one that is
-  not JSON (`NaN` included), read as none, and the responder emits `board.request.mandate_unread` (a warning) with only
-  its `reason`, `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or
+  read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one whose text holds `mandate/1` and is
+  not JSON (`NaN` included), read as none, and the responder emits `board.request.mandate_unread` (a warning) with the
+  request id and its `reason`, `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or
   checkpoint. A Project declares no `protocols`, so a board block carries no `source` (OA-7): any `source` in it is
   dropped unread. Python reads two kinds of valid JSON as not JSON where Node reads them, both fail-closed: a block nested
   about 1,000 levels deep on Python 3.9 to 3.11 and about 10,000 on 3.12 and 3.13 (none on 3.14), and an integer longer

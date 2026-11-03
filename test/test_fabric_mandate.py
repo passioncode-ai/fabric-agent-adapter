@@ -211,8 +211,9 @@ class AFullChainTakesNoFifth(unittest.TestCase):
                                    "agent-a", at=at, expires_at="2026-11-09T10:00:00Z")
         for agent in ("agent-b", "agent-c", "agent-d"):
             held = fm.hand_on(held, agent, at)
-        with self.assertRaises(fm.ServiceError):
+        with self.assertRaises(fm.ServiceError) as caught:
             fm.hand_on(held, "agent-e", at)
+        self.assertEqual(str(caught.exception).rsplit(": ", 1)[-1], "mandate-malformed")  # the 1..4 chain bound
 
 
 class NamingListsMd2a(unittest.TestCase):

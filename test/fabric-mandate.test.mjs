@@ -168,5 +168,5 @@ test('a full chain takes no fifth agent (MD-2; the contract on board thread 118f
   let held = operatorMandate({ task: 'task-timetable', instruction: 'update the timetable page', scope: { capabilities: ['page.update'], effects: ['draft'] },
     lead: 'agent-a', at, expiresAt: '2026-11-09T10:00:00Z' });
   for (const agent of ['agent-b', 'agent-c', 'agent-d']) held = handOn(held, agent, at);
-  assert.throws(() => handOn(held, 'agent-e', at), ServiceError);
+  assert.throws(() => handOn(held, 'agent-e', at), (e) => e instanceof ServiceError && e.message.endsWith(': mandate-malformed'));
 });

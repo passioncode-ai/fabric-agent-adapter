@@ -216,8 +216,10 @@ agent id (`hand_on`), which you learn from the service's owner or the project th
 request as if none travelled. A service that follows the kit's guidance answers a refused mandate as the request's
 outcome, `failed_known` naming the detail: `mandate-not-for-this-call` means you handed it on to the wrong agent id, so
 hand it on again from your own mandate to the service's (`hand_on`; with four agents in the chain already no machine
-hand-over is left: an agent past it takes the four parts as a relay from his own Project on the board, OA-3, and states
-its own mandate, OA-2, never for a task it already leads; a service, which reads no prose, works the request as without a
+hand-over is left: an agent past it takes the four parts as a relay through OA-3, from his own Project on the board or his local
+session, and states its own mandate, OA-2, never for a task it already leads (a proposed minimum, answer `adf0c61a`);
+the relaying link relays the scope in force at its link, never his wider one, and the receiver's `expiresAt` is no later
+than the held one; a service, which reads no prose, works the request as without a
 mandate until the contract's CT-205), never asking him; `mandate-malformed`, `-widened` or `-early` is the
 sender's own fault too: send a valid one (check your clock for early), never asking him; `mandate-expired` means your lead
 asks him once for a new one (MD-1); an `outside-mandate` outcome names the part to ask him about, alone (MD-4).
