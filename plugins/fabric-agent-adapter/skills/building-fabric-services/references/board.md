@@ -110,7 +110,10 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   `mandate_from` names. Its sender is then a T1 caller. One fenced `json` block whose value has `kind: "mandate/1"` is
   the mandate; any other JSON block is ignored. Two such blocks, or one naming `mandate/1` that is not JSON (`NaN`
   included), read as none, and the responder emits `board.request.mandate-unread` (a warning) naming only its code,
-  `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or checkpoint.
+  `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or checkpoint. A
+  Project declares no `protocols`, so a board block carries no `source` (OA-7): one that does has it dropped. Python
+  reads two kinds of valid JSON as not JSON where Node reads them, both fail-closed: from 3.11 an integer longer than
+  4300 digits (`int_max_str_digits`), and on 3.9 a block nested about a thousand levels deep.
 - The handler gets `ctx.mandate` (the block as received, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
   board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the

@@ -193,7 +193,8 @@ const JSON_BLOCK = /```json[ \t]*\r?\n([\s\S]*?)\r?\n?```/g;
  * The mandate a request carries, read only when the service opted in (`agentId` and `mandateFrom` set), the board
  * verified the sender (`provenance: trusted`) and its Project is one `mandateFrom` names (or `PERSONAL_BOARD`): a T1
  * caller by project-comms. Answers `{ mandate, unread }`: `mandate` null when none is read, `unread` `mandate-blocks`
- * (more than one) or `mandate-unreadable` (a block naming `mandate/1` that is not JSON).
+ * (more than one) or `mandate-unreadable` (a block naming `mandate/1` that is not JSON). A `source` in the block is
+ * dropped: a board block carries none (OA-7).
  */
 export function readMandate(request, mandateFrom, agentId) {
   const none = { mandate: null, unread: null };
@@ -211,7 +212,10 @@ export function readMandate(request, mandateFrom, agentId) {
       if (block.includes('mandate/1')) return { mandate: null, unread: 'mandate-unreadable' };
       continue;
     }
-    if (isObj(value) && value.kind === 'mandate/1') found.push(value);
+    if (isObj(value) && value.kind === 'mandate/1') {
+      delete value.source; // a Project declares no protocols: a board block carries no source (OA-7)
+      found.push(value);
+    }
   }
   if (found.length > 1) return { mandate: null, unread: 'mandate-blocks' };
   return found.length ? { mandate: found[0], unread: null } : none;
@@ -230,7 +234,7 @@ export function covers(mandate, call, agentId, wall) {
 export function mandateOptions(agentId, mandateFrom) {
   if (agentId != null && !isAgentId(agentId)) throw new BoardError('invalid_arguments', 'agentId must be the service\'s registry agent id.');
   if (mandateFrom == null || mandateFrom === PERSONAL_BOARD) return mandateFrom ?? null;
-  const projects = typeof mandateFrom === 'string' || typeof mandateFrom?.[Symbol.iterator] !== 'function' ? null : [...mandateFrom];
+  const projects = typeof mandateFrom === 'string' || mandateFrom instanceof String || typeof mandateFrom?.[Symbol.iterator] !== 'function' ? null : [...mandateFrom];
   if (projects === null || !projects.every((p) => typeof p === 'string' && p)) {
     throw new BoardError('invalid_arguments', `mandateFrom is '${PERSONAL_BOARD}' or a collection of Project ids.`);
   }

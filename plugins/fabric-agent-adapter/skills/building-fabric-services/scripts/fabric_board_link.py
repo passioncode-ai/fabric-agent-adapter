@@ -231,7 +231,8 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
     verified the sender (`provenance: trusted`) and its Project is one `mandate_from` names (or `PERSONAL_BOARD`): a T1
     caller by project-comms. Answers `(mandate, None)`, `(None, None)` when none is read, or `(None, code)` for a body
     that carries one the kit will not read: `mandate-blocks` (more than one) or `mandate-unreadable` (a block naming
-    `mandate/1` that is not JSON). Whether it covers a call is `covers`' answer, never this one's."""
+    `mandate/1` that is not JSON). A `source` in the block is dropped: a board block carries none (OA-7). Whether it
+    covers a call is `covers`' answer, never this one's."""
     if agent_id is None or mandate_from is None or not isinstance(request.body, str):
         return None, None
     sender = request.sender if isinstance(request.sender, dict) else {}
@@ -249,6 +250,7 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
                 return None, "mandate-unreadable"
             continue
         if isinstance(value, dict) and value.get("kind") == "mandate/1":
+            value.pop("source", None)  # a Project declares no protocols: a board block carries no source (OA-7)
             found.append(value)
     if len(found) > 1:
         return None, "mandate-blocks"
@@ -273,7 +275,7 @@ def mandate_options(agent_id: Any, mandate_from: Any) -> Any:
     if mandate_from is None or mandate_from == PERSONAL_BOARD:
         return mandate_from
     try:
-        projects = None if isinstance(mandate_from, (str, bytes)) else list(mandate_from)
+        projects = None if isinstance(mandate_from, (str, bytes, dict)) else list(mandate_from)
     except TypeError:
         projects = None
     if projects is None or not all(isinstance(p, str) and p for p in projects):

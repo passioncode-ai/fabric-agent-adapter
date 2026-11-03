@@ -17,9 +17,9 @@ AT = fm.format_rfc3339(WALL * 1000)
 WORDS = "render the teaser for the launch"
 
 
-def mandate(callee: str = "example-agent", scope=None) -> dict:
+def mandate(callee: str = "example-agent", scope=None, source=None) -> dict:
     lead = fm.operator_mandate("task-teaser", WORDS, scope or {"capabilities": ["video.render"], "effects": ["draft"]},
-                               "lead-agent", at=AT)
+                               "lead-agent", at=AT, source=source)
     return fm.hand_on(lead, callee, AT)
 
 
@@ -110,8 +110,25 @@ class BoardMandateTests(Conversation):
         path = self.data / "board-checkpoint.json"
         self.assertNotIn(WORDS, path.read_text() if path.exists() else "")
 
+    def test_a_crlf_body_is_read(self):
+        got, covered, _ = self.run_one(body(json.dumps(mandate())).replace("\n", "\r\n"))
+        self.assertTrue(covered["ok"])
+
+    def test_a_deeply_nested_block_never_stops_the_responder(self):
+        """On Python 3.9 a block nested 3000 deep raises RecursionError in json.loads: read as no mandate, never a raise."""
+        deep = '{"kind": "mandate/1", "x": ' + "[" * 3000 + "]" * 3000 + "}"
+        got, covered, _ = self.run_one(body(deep))
+        self.assertTrue(got is None or covered["data"]["detail"] == "mandate-malformed")
+
+    def test_a_board_block_carries_no_source(self):
+        """OA-7: a Project declares no protocols, so its block carries no source; one that does has it dropped."""
+        got, covered, _ = self.run_one(body(json.dumps(mandate(source={"project": "example-site", "session": "sess-1"}))))
+        self.assertNotIn("source", got)
+        self.assertNotIn("source", covered["recordAs"])
+
     def test_a_responder_refuses_a_bad_agent_id_or_mandate_from(self):
-        for kw in ({"agent_id": "Not An Id"}, {"mandate_from": "everyone"}, {"mandate_from": [42]}, {"mandate_from": 42}):
+        for kw in ({"agent_id": "Not An Id"}, {"mandate_from": "everyone"}, {"mandate_from": [42]}, {"mandate_from": 42},
+                   {"mandate_from": {OTHER_PROJECT: True}}):
             with self.subTest(kw=kw):
                 with self.assertRaises(fb.BoardError):
                     self.responder(**kw)

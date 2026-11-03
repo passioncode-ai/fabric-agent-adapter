@@ -17,8 +17,8 @@ const WALL = 1_793_700_000_000; // the responder's wall clock, in milliseconds
 const AT = new Date(WALL).toISOString();
 const WORDS = 'render the teaser for the launch';
 
-const mandate = (callee = 'example-agent') => handOn(operatorMandate({
-  task: 'task-teaser', instruction: WORDS, scope: { capabilities: ['video.render'], effects: ['draft'] }, lead: 'lead-agent', at: AT,
+const mandate = (callee = 'example-agent', source = undefined) => handOn(operatorMandate({
+  task: 'task-teaser', instruction: WORDS, scope: { capabilities: ['video.render'], effects: ['draft'] }, lead: 'lead-agent', at: AT, source,
 }), callee, AT);
 const body = (...blocks) => `Render the teaser.\n\n${blocks.map((b) => `\`\`\`json\n${b}\n\`\`\``).join('\n\n')}\n`;
 
@@ -129,7 +129,21 @@ test('FAA-135: the operator\'s words reach no checkpoint', async (t) => {
 
 test('FAA-135: a responder refuses a bad agentId or mandateFrom', async (t) => {
   const h = await fakeHub(t);
-  for (const extra of [{ agentId: 'Not An Id' }, { mandateFrom: 'everyone' }, { mandateFrom: [42] }, { mandateFrom: 42 }]) {
+  for (const extra of [{ agentId: 'Not An Id' }, { mandateFrom: 'everyone' }, { mandateFrom: [42] }, { mandateFrom: 42 },
+    { mandateFrom: new String('personal-board') }, { mandateFrom: new Map([[OTHER_PROJECT, true]]) }]) {
     assert.throws(() => new fb.Responder(h.options(extra)), fb.BoardError, JSON.stringify(extra));
   }
+});
+
+test('FAA-135: a CRLF body is read', async (t) => {
+  const h = await fakeHub(t);
+  const [, covered] = await h.runOne(body(JSON.stringify(mandate())).replaceAll('\n', '\r\n'));
+  assert.equal(covered.ok, true);
+});
+
+test('FAA-135: a board block carries no source (OA-7): one that does has it dropped', async (t) => {
+  const h = await fakeHub(t);
+  const [got, covered] = await h.runOne(body(JSON.stringify(mandate('example-agent', { project: 'example-site', session: 'sess-1' }))));
+  assert.equal('source' in got, false);
+  assert.equal('source' in covered.recordAs, false);
 });
