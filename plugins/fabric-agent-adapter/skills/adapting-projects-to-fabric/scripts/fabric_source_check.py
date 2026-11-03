@@ -154,18 +154,38 @@ def _home_names(text: str, owner: Iterable[str] = ()) -> List[Tuple[int, int]]:
 _DASHED: Dict[str, Tuple["re.Pattern[str]", ...]] = {}
 
 
+#: Where a declared home name stands in each form the table names: the slashed, drive, URL-encoded and dashed homes.
+_DECLARED_SLASHED = (r"(?<![A-Za-z0-9_.-])(?:/var)?/home/", r"(?<![A-Za-z0-9_.-])/Users/",
+                     r"(?<![A-Za-z0-9_.-])(?:/mnt)?/[A-Za-z]/Users/",
+                     r"(?<![A-Za-z0-9_.-])(?i:[A-Za-z]:%sUsers%s)" % (_SEP, _SEP),
+                     r"%2[Ff](?:Users|home)%2[Ff]", r"(?i:%5CUsers%5C)")
+_DECLARED_DASHED = (r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-Za-z]-Users)-",
+                    r"(?<![A-Za-z0-9])(?i:[A-Za-z]--Users-)")
+
+
+def _spellings(found: Iterable[str], owner: Iterable[str]) -> Set[str]:
+    """The names found, and every spelling of a declared home one of them spells (as written, dashed, `%20`), so a
+    printed path masks the other spellings of that home too."""
+    names = set(found)
+    for name in owner:
+        spelled = {name, name.replace(" ", "%20"), re.sub(r"[ ._]", "-", name)}
+        if {n.lower() for n in names} & spelled:
+            names |= spelled
+    return names
+
+
 def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
-    """A declared home name in the dashed forms, read whole and spelled as a tool dashes it (`.` and `_` become `-`):
-    the generic dashed form ends a name at its first dash, so `-Users-j-doe-proj` would read `j`."""
+    """A declared home name in every form, read whole: as written (a space, a `.` or `_` kept; a space also as `%20`)
+    and, in the dashed forms, as a tool dashes it (a space, `.` and `_` become `-`), since the generic forms end a
+    name at a dash or a space, so `-Users-j-doe-proj` would read `j`. It ends only where a letter or digit would
+    continue it: a `.` or `_` after it (an extension, a sentence's end) is read as the declared home, failing closed."""
     if name not in _DASHED:
-        patterns: List["re.Pattern[str]"] = []
-        for spelling in sorted({re.sub(r"[._]", "-", name), name}):  # dashed by a tool, or kept as written
-            # ends only where a letter or digit would continue it: a `.` or `_` after it (an extension, a
-            # sentence's end) is read as the declared home, failing closed
-            whole = r"((?i:%s))(?![A-Za-z0-9])" % re.escape(spelling)
-            patterns += [
-                re.compile(r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-Za-z]-Users)-" + whole, re.ASCII),
-                re.compile(r"(?<![A-Za-z0-9])[A-Za-z]--Users-" + whole, re.ASCII | re.IGNORECASE)]
+        def whole(spelling: str) -> str:
+            return r"((?i:%s))(?![A-Za-z0-9])" % re.escape(spelling)
+        patterns = [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_SLASHED
+                    for spelling in sorted({name, name.replace(" ", "%20")})]
+        patterns += [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_DASHED
+                     for spelling in sorted({re.sub(r"[ ._]", "-", name), name})]
         _DASHED[name] = tuple(patterns)
     return _DASHED[name]
 
@@ -333,8 +353,11 @@ def _fold(text: str) -> str:
 
 #: How a `home: <name>` line of the owner's list is kept among the entries: a character no line can hold.
 HOME_ENTRY = "\0"
-_HOME_LINE = re.compile(r"home:[ \t]*([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*", re.IGNORECASE | re.ASCII)
-_HOME_KEY = re.compile(r"home[ \t]*:", re.IGNORECASE)
+#: `home: <name>`: one ASCII name (a letter or digit first; letters, digits, `.`, `_`, `-` and spaces inside, as a
+#: Windows profile may hold), any space around the colon. The name is checked as ASCII apart: IGNORECASE alone would
+#: let `[A-Za-z]` take U+017F and U+212A.
+_HOME_LINE = re.compile(r"home\s*:\s*([A-Za-z0-9](?:[A-Za-z0-9._ -]*[A-Za-z0-9._-])?)", re.IGNORECASE)
+_HOME_KEY = re.compile(r"home\s*:", re.IGNORECASE)
 
 
 def read_list(path: Path) -> List[str]:
@@ -345,14 +368,13 @@ def read_list(path: Path) -> List[str]:
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         text = raw.strip().replace(HOME_ENTRY, "")
         home = _HOME_LINE.fullmatch(text)
-        if home:
+        if home and home.group(1).isascii():
             entries.append(HOME_ENTRY + home.group(1).lower())
             continue
         if _HOME_KEY.match(text):  # meant as a home and not one: never kept as a string that cannot match
-            raise CheckError("line %d of the owner's list starts with `home` and a colon but is not one ASCII home name and nothing "
-                             "after it (a letter or digit, then letters, digits, `.`, `_`, `-`): declare a name holding a "
-                             "space by its part before the space, and list a name outside ASCII as a plain string"
-                             % (len(entries) + 1))
+            raise CheckError("line %d of the owner's list starts with `home` and a colon but is not one ASCII home name "
+                             "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`): "
+                             "list a name outside ASCII as a plain string" % (len(entries) + 1))
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
@@ -519,7 +541,7 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130),
     # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`); the names
     # found elsewhere in the tree are one compiled pattern, so the cost does not grow with names times paths
-    for name in {path[s:e] for s, e in found}:
+    for name in _spellings({path[s:e] for s, e in found}, _owner_homes(entries)):
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]
     if seen is not None and seen.names:
         marks += [(m.start(1), m.end(1), "<home>") for m in seen.names_pattern().finditer(path)]
@@ -614,7 +636,7 @@ def _text_findings(text: str, entries: List[str], seen: Optional["_Seen"] = None
     if homes:
         found.append(("home-path", "a path inside a person's home folder"))
         if seen is not None:
-            seen.names.update(text[a:b] for a, b in homes)
+            seen.names.update(_spellings({text[a:b] for a, b in homes}, _owner_homes(entries)))
     secret = _secret_finding(text)
     if secret:
         found.append(("secret", secret))

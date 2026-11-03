@@ -1291,6 +1291,10 @@ class Refusals(Tree):
         for text in ("~/.claude/projects/-Users-j-doe.", "-Users-j-doe_", "C--Users-j-doe."):
             self.assertTrue(sc._home_names(text, {"j-doe"}), text)
         self.assertNotIn("longername", sc.redact("-Users-a.b-longername-x/f", [sc.HOME_ENTRY + "a.b-longername"]))
+        # reading 33, unit: the other spelling of a declared home in the same path is masked too
+        self.assertNotIn("longername", sc.redact("-Users-a-b-longername-x/f_a.b-longername.txt",
+                                                 [sc.HOME_ENTRY + "a.b-longername"]))
+        self.assertNotIn("j.doe", sc.redact("-Users-j-doe-proj/j.doe.md", [sc.HOME_ENTRY + "j.doe"]))
         # reading 32, product: the reference sends a dotted or underscored home to `home:` too
         reference = (SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8")
         self.assertIn("holds a dash, a dot or an underscore (each a dash in the dashed form)", reference)
@@ -1307,13 +1311,13 @@ class Refusals(Tree):
     def test_a_home_line_that_cannot_be_read_is_refused(self):
         listing = self.tmp / "cfg" / "list.txt"
         listing.parent.mkdir()
-        for line in ("home: \u042f\u043d", "home: Admin User", "home: jo # mine", "home : jo", "home: /Users/jo",
-                     "home: _svc", "home: \u017fam"):
+        for line in ("home: \u042f\u043d", "home: jo # mine", "home: /Users/jo", "home: _svc", "home: \u017fam",
+                     "home\u00a0: jos\u00e9", "home:", "home: jo, al"):
             listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 2, line)
             self.assertIn("line 2 of the owner's list", err)
-            self.assertIn("by its part before the space", err)  # reading 32: the remedy names each cause
+            self.assertIn("list a name outside ASCII as a plain string", err)
         listing.write_text("home: admin\n", encoding="utf-8")  # only homes: the summary does not call the list empty
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
         self.assertNotIn("holds no string", out)
@@ -1329,6 +1333,29 @@ class Refusals(Tree):
         self.assertEqual(done.returncode, 2, done.stderr)
         self.assertIn("fabric_source_ignore.py must sit beside this file", done.stderr)
         self.assertNotIn("Traceback", done.stderr)
+
+    def test_a_declared_home_with_a_space_is_found_whole_in_every_form(self):
+        # reading 33, product: the part before the space left the surname in printed paths; a `home:` line now takes
+        # the whole name, spaces included, and any space around the colon (`Home : jd`, a no-break space)
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        bs = chr(92)
+        surname = "Zq" + "dovski"
+        forms = ["C:" + bs + "Users" + bs + "Jane " + surname + bs + "p", "C:/Users/Jane " + surname + "/p",
+                 "/Users/Jane " + surname + "/p", "-Users-Jane-" + surname + "-proj", "C--Users-Jane-" + surname + "-p",
+                 "%2FUsers%2FJane%20" + surname + "%2Fp", "/home/jane " + surname + "/x"]
+        for n, form in enumerate(forms):
+            self.write("f%d.txt" % n, "x " + form + "\n")
+            self.write("p%d/x%s/a.env" % (n, form.replace("/", "_").replace(bs, "_").replace(":", "")), "K=1\n")
+        for line in ("home: Jane " + surname, "Home : Jane " + surname, "home\u00a0: Jane " + surname):
+            listing.write_text(line + "\n", encoding="utf-8")
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing), "--json", "--every-file"])
+            self.assertEqual(code, 1, line)
+            result = json.loads(out)
+            self.assertEqual(result["ownerHomes"], 1, line)
+            self.assertEqual(sorted(f["path"] for f in result["findings"] if f["path"].startswith("f")),
+                             ["f%d.txt" % n for n in range(len(forms))], line)
+            self.assertNotIn(surname.lower(), out.lower(), line)
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):
