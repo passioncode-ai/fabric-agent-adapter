@@ -249,15 +249,15 @@ already approved.
   agent's text.
 - `source` goes only to a target whose well-known `protocols` list `operator-source/1` (OA-7; the kits strip it
   otherwise: `request_meta(target_protocols=)` / `requestMeta(traceparent, {targetProtocols})`). Toward a board
-  Project, another session or Fabric's `agent.call` (its hub cannot read the callee's `protocols` yet) name in the text
-  where he said the words. Keep `source` in your own record; like his words, never in an events feed, a usage report, a
-  log or a page another party reads.
+  Project, another session or Fabric's `agent.call` (its hub cannot read `protocols` yet) send it without `source`,
+  naming in the text where he said the words. Keep `source` in your own record; like his words, it goes
+  never to an events feed, a usage report, a log or a page another party reads.
 - His approval holds for the whole task, at every link (operator, 2026-11-03, board thread `118f95f9`): every hand-over
   within it carries the four parts, in `_meta.mandate` or, where your client cannot set `_meta`, in your message, and
   each receiver acts on them as above, narrowing only; the human gates stay (MD-6). `at` never moves: a task open at the
   expiry, at most seven days after his words, asks him once to confirm the same words (MD-1), then weekly until the
-  contract's CT-205. Until Fabric's hub forwards decisions (CT-125), a client without `_meta` reaches a service's relayed
-  action only through the service's elicitation or its page: report that as the gap.
+  contract's CT-205. Until Fabric's hub forwards decisions (CT-125), such a client reaches a service's relayed action
+  only through its elicitation or its page: report that gap.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,
