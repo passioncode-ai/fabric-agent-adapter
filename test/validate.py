@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.57.0"
+VERSION = "0.58.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -28,7 +28,7 @@ LICENSE_SPDX = "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial"
 FIRST_AGPL_VERSION = "0.5.3"
 TEMPLATE_SHA256 = {
     "LICENSE": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
-    "COMMERCIAL-LICENSE.md": "893b4bb9e4597b19b178ad69f56b799b4e5d468463ecb2d05ab05f0eee92804a",
+    "COMMERCIAL-LICENSE.md": "76366a8dad631039fd74ad3b22259c1b9c585576fe6f600c2753537b1afd709e",
     "CLA.md": "cf44ce2b052fd75e9ef48f8124fb6eed71513c9152aac90eede0a2132951e408",
 }
 EXPECTED_FILES = tuple(
@@ -58,7 +58,7 @@ STDLIB_IMPORTS = {
     "os", "pathlib", "re", "subprocess", "sys", "tempfile", "typing", "unittest",
     "urllib", "base64", "errno", "fcntl", "hmac", "html", "http", "plistlib", "secrets", "socketserver",
     "shutil", "signal", "socket", "ssl", "stat", "threading", "time",
-    "random", "io", "contextlib", "textwrap", "traceback", "difflib",
+    "random", "bisect", "warnings", "io", "contextlib", "types", "textwrap", "traceback", "difflib",
     "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
     "email",  # email.utils: the probe reads a cookie's Expires date (DEC-0039)
     "xml",  # the supervisor tests read the Task Scheduler XML back (FAA-21)

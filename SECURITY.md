@@ -57,4 +57,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   executing it and writes only the seven documented bundle paths (`scaffold --dry-run`
   writes nothing); `check --contract` runs the contract checkout's own
   `node_modules/.bin/tsx` and installs nothing. `fabric_provider.py write` writes one
-  entry (0600) in the providers directory.
+  entry (0600) in the providers directory. `fabric_source_check.py check` reads the files of a
+  tree (credential values included, in memory only), the owner's list from the user's
+  configuration folder, and runs `git ls-files` (without the caller's `GIT_DIR` or other Git
+  location variables) and nothing else, except that under a locale whose
+  file-system encoding is not UTF-8 it restarts itself once with the same interpreter in Python's
+  UTF-8 mode; it writes nothing and prints no value it finds.

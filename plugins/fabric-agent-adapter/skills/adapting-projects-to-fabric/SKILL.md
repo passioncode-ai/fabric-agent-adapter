@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.57.0"
+  version: "0.58.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -159,6 +159,19 @@ A provider entry only describes an MCP server: a CLI that does not speak MCP get
 announced by its `local-runner` manifest (step 3). An agent that runs as a service uses a
 descriptor instead (`building-fabric-services`).
 
+### 4c. Keep the instance out of the source
+
+An agent's source (what its owner could hand over) and its instance (records, logs, keys, the owner's names and paths,
+its configuration) are kept apart; load [the source and the instance](references/source-and-instance.md). First run
+[`scripts/fabric_source_check.py`](scripts/fabric_source_check.py) `check <project-root>`, with the owner's list of
+their own strings or a note that none was given (when the owner's own home name is neutral, has one or two letters,
+or holds a space, `.`, `_`, `-` or `'`, the list gains `home: <name>` first, the reference's rule; a container's, a cloud image's or a CI runner's user that only the image uses, such as `node` or `vscode`, is never declared): it reports instance data by
+path, line and kind, never repeating a value, and changes nothing. Then move each finding out in the source: an
+instance value into the instance configuration outside the repository, read through a named variable with a neutral
+default and a committed `*.example`; a key into the secret store, named only. Run the check again until it exits 0; it is a floor under the owner's review, not a secret scanner.
+A value already committed stays in Git history: say so; a fresh history is the owner's act (no history rewrite, no
+force-push).
+
 ### 5. Make probes safe and meaningful
 
 For each capability, create at least one bounded fixture that:
@@ -208,7 +221,8 @@ Update `fabric/FABRIC-CONFORMANCE.md` with dated receipts for:
 3. bounded semantic probes;
 4. project-binding readiness.
 
-Include commands and exit codes, immutable endpoint or artifact identities, and explicit
+Include commands and exit codes (a contract checkout named by its commit or `<contract>`, never a home path; run the
+source check again after), immutable endpoint or artifact identities, and explicit
 unverified surfaces. If live Fabric admission/runtime does not yet exist, the last gates
 remain `NOT_VERIFIED`; the completed deliverable is an adaptation-ready provider bundle,
 not a connected provider.

@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.57.0"
+  version: "0.58.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -73,8 +73,10 @@ failures, a retro), distil it before writing code:
    failures and dead ends).
 3. **Convert every trap into a planted eval fixture.** The new agent is not done until
    it has been watched rejecting the exact defects its predecessors were burned by:
-   knowledge transfers as a check, not as prose.
-4. Record the pack in the new project as `docs/knowledge-pack.md` with its sources, so
+   knowledge transfers as a check, not as prose. A fixture carries the defect on neutral
+   ids, never the predecessor's owner, paths or accounts.
+4. Record the pack in the new project as `docs/knowledge-pack.md` with its sources (a public URL or commit, else a
+   neutral name, the private address kept in the instance), so
    the provenance of every borrowed decision survives the person who borrowed it.
 
 Skipping this step because there is no prior art is legal; skipping it because reading
@@ -121,6 +123,13 @@ Without it, the person's OS keychain or secret manager injects the key into the 
 at start. Either way: no `.env` of its own, no key file beside its data, no value in argv, code,
 configuration or a commit. A workflow names the keys it needs in its checkpoint (`credentials`),
 never their values.
+
+**The source stays apart from the instance**, from the first commit: instance values (the
+repository address of the owner's account, folders, the owner, accounts, hosts) live in a configuration outside the repository, read through a
+named variable with a neutral default and a committed `*.example`; records, logs and state documents live in the
+instance folder; fixtures use neutral ids. Load [the source and the instance](references/source-and-instance.md). The
+sibling's `scripts/fabric_source_check.py check <project-root>` finds instance data in the tree without repeating it;
+run it with the owner's list of their own strings, or record that none was given (the owner's own home name, when it is neutral, has one or two letters, or holds a space, `.`, `_`, `-` or `'`, is declared there with `home: <name>` first; a container's, a cloud image's or a CI runner's user that only the image uses, such as `node` or `vscode`, is never declared); the skeleton is done when it exits 0 and the owner has reviewed it (a floor, not a secret scanner; without the sibling or Python 3.9+, record the check as NOT_RUN, as in step 3). Handing the source over stays the owner's act.
 
 ## Step 3: scaffold the provider bundle
 
@@ -181,8 +190,8 @@ lets the output decide what counts as success.
 
 Run the sibling skill's `check` (structural, then exact when the contract checkout is
 available) and complete `fabric/FABRIC-CONFORMANCE.md` with dated receipts, exactly as
-its workflow steps 5–7 prescribe; this skill adds no second verification path on
-purpose. Then record one expectation the report must carry:
+its workflow steps 5–7 prescribe, and run its `fabric_source_check.py check` again (exit 0); this skill adds no
+second verification path on purpose. Then record one expectation the report must carry:
 
 > When a Fabric host admits this provider, it enters under a **canary binding** (a
 > checker on its output and a budget cap), regardless of who wrote it. Unsupervised

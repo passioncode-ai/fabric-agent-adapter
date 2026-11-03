@@ -124,7 +124,10 @@ For provider bundles the adapting skill helps an agent author:
 - scaffold a version-pinned provider manifest, schemas, safe fixture, probes, and
   conformance report;
 - distinguish structural validation from live protocol negotiation, semantic
-  admission, and project binding.
+  admission, and project binding;
+- keep the agent's source apart from its instance data, with `scripts/fabric_source_check.py check`, which reports a
+  home path, a credential-shaped value or a string from the owner's list by path, line and kind and never repeats it
+  (FAA-188).
 
 The skill never treats generated files as admission. Fabric contract `0.1.0` does not
 yet ship the host registry/runtime needed to connect and authorize a live provider.
@@ -266,13 +269,21 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
 ```
 
 Pack, sign and verify an agent as a `fabric-package/1` folder (contract DEC-0050, DEC-0051; nothing is written without
-`--apply`, and the key file is the person's, never made or kept here):
+`--apply`, and the key file is the person's, never made or kept here). First check the checkout, then make the clean
+copy [the package reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/package.md)
+describes and check that with `--every-file`, since it is what `pack` carries (a path named in `.fabric-source-ignore`
+or `--exclude` is carried unread; a nested repository is checked in its own tree with `--every-file`):
 
 ```bash
-npx @passioncode-ai/fabric-agent-adapter pack ./example-agent            # the digest, agentRef and every problem
-npx @passioncode-ai/fabric-agent-adapter pack ./example-agent --apply
-npx @passioncode-ai/fabric-agent-adapter sign ./example-agent --key ./publisher.jwk --apply
-npx @passioncode-ai/fabric-agent-adapter verify ./example-agent --trust ./trust.json
+python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check ./example-agent
+python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check ./example-agent-clean --every-file
+```
+
+```bash
+npx @passioncode-ai/fabric-agent-adapter pack ./example-agent-clean      # the clean copy: the digest, agentRef, every problem
+npx @passioncode-ai/fabric-agent-adapter pack ./example-agent-clean --apply
+npx @passioncode-ai/fabric-agent-adapter sign ./example-agent-clean --key ~/.config/example-publisher/publisher.jwk --apply   # a key outside any checkout
+npx @passioncode-ai/fabric-agent-adapter verify ./example-agent-clean --trust ./trust.json
 ```
 
 See [the package reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/package.md).

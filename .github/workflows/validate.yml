@@ -180,6 +180,9 @@ jobs:
       - name: The session hooks on Windows (FAA-72)
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_session.py" -v
+      - name: The source check on Windows (FAA-188)
+        if: ${{ !cancelled() }}
+        run: python -m unittest discover -s test -p "test_source_check.py" -v
       - name: The whole Node suite on Windows (FAA-72)
         if: ${{ !cancelled() }}
         run: node --test "test/*.test.mjs"

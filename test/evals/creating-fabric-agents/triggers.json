@@ -28,6 +28,8 @@
     {"query": "Turn example-agent into an always-on local Fabric service with a dashboard and launchd.", "shouldTrigger": false, "note": "sibling: building-fabric-services"},
     {"query": "Подключись к Fabric и проверь доску проекта перед работой.", "shouldTrigger": false, "note": "sibling: working-with-fabric"},
     {"query": "Подключи существующий проект к Fabric: подготовь fabric-agent.json для его CLI.", "shouldTrigger": false, "note": "sibling: adapting-projects-to-fabric"},
-    {"query": "Create a new Fabric agent with a dashboard whose AGENTS.md says pages open only in Fabric Dashboards.", "shouldTrigger": true}
+    {"query": "Create a new Fabric agent with a dashboard whose AGENTS.md says pages open only in Fabric Dashboards.", "shouldTrigger": true},
+    {"query": "Создай нового агента Fabric так, чтобы его потом можно было передать как исходник, без моих данных.", "shouldTrigger": true},
+    {"query": "Scaffold a portable Fabric agent whose source carries no instance data.", "shouldTrigger": true}
   ]
 }

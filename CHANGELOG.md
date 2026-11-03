@@ -1,5 +1,67 @@
 # Changelog
 
+## 0.58.0 (2026-11-03)
+
+Portable agents, part 1 (FAA-188, RM-36): an agent keeps its source apart from its instance from its first commit, and
+a local check finds instance data in a source tree without repeating it. The manifest of a source, its export and
+import wait for the contract's decision on CT-194 (part 2).
+
+### Added
+
+- **`fabric_source_check.py check`** (adapting-projects-to-fabric) reads the files a source would carry (what Git would
+  commit; every file but the dependency folders it names when Git lists none; or with `--every-file`, which reads
+  what `pack` carries) and reports, by path, line and kind: a path inside a person's home folder
+  (`home-path`: an ASCII home name in the macOS, Linux (`/home`, `/var/home`) and Windows forms (Git Bash's `/c/Users`
+  and WSL's `/mnt/c/Users` included), the dashed form of DEC-0105 (`C--Users-` on Windows; a name holding a space, a dash, a dot, an underscore or an apostrophe is declared with `home: <name>` to be read whole there) and the URL-encoded ones; a web route `/users/...`, a flag `--home-dir` or a CSS variable is not one), a
+  value shaped like a credential by the contract's detector read line by line, a long random value under a
+  credential's name (a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, is public and not one; a storage URL's `sig=` is) or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` (JSON, escaped JSON or a Python dict), a URL carrying a password (8 or more characters with at least one letter and one digit) or a credential in its query (percent-encoded, JSON-escaped or nested), and a
+  file that is a credential by its name as `pack` refuses it, or a kit credential file (`*.token`,
+  `board.credential`) (`secret`), and a string from the owner's list of instance strings, kept
+  outside the tree in the user's configuration folder (`instance-string`, in a file, its path or a link's target). It
+  never prints a value it found, a line that holds one, an entry of the owner's list or the folder it checks: a file's
+  path is checked like its text and printed with an entry as `<line N>`, a home name as `<home>` and a segment holding a
+  credential-shaped value as `<secret>`. Every text file is read whole; a binary, unreadable or (in Git mode) nested-repository path is listed as not
+  read (check a nested repository in its own tree, then name it in the ignore file; before `pack`, check it with
+  `--every-file` too). It changes nothing: exit 0 with no finding and every file read, 1 with a finding, 2 when it cannot run or a file
+  was not read (a binary file counts unless the ignore file names it as source). `.fabric-source-ignore` and
+  `--exclude` leave out named files of synthetic test values (and a project `.npmrc` that holds no credential: `pack`
+  still refuses it, so the package is a copy without it), and the summary counts them. A line is a path from the
+  root, not as `.gitignore` reads one: a line with no `/` matches at the root only, a wildcard line takes only what
+  it matches (`*` stays in a folder, `**` crosses folders), and a line ending in `/`, or a path with no wildcard,
+  takes the folder; a nested repository or a submodule is left out only by a line naming its folder (`vendor/sub/`),
+  never by `vendor/*`, and a wildcard folder line (`vendor/*/`) takes every one it reaches, checked or not, so name
+  each by its path; an exception line (`!`), a line holding `\`, `//`, an unclosed `[` or a POSIX class, and a
+  glob it cannot read are refused. Git is run as `git ls-files` with its fsmonitor off and without the caller's `GIT_DIR` or index, taken only from PATH's
+  absolute folders (with PATH unset, `/bin` and `/usr/bin`; on Windows only a `git.exe`, and none with PATH unset). Under a locale whose file-system encoding is not UTF-8 it restarts itself in Python's UTF-8 mode, so names, arguments and text are read in one encoding; an owner's entry is compared composed (NFC), so it finds a name macOS stored decomposed. A neutral home (container, cloud and CI users, first names such as `alice` and accounts such as `admin`; an owner whose own home is a first name, an account or one or two letters writes `home: <name>` in the owner's list, the whole name, spaces included, which is then read in every form, while a container's, a cloud image's or a CI runner's user that only the image uses, such as `node` or `vscode`, is never declared; the owner's own machine's home is declared even when its name is an image user's (`ubuntu`, `admin`), and an image's paths under it then go through a build argument that names the user; a folder holding a typographic apostrophe is listed as a plain string with it kept and declared too with `home:` written with `'`) and
+  a value that says it is synthetic are not findings. Standard library only; the adapter's own tree passes it, with its
+  contract vectors, eight test files and its icon named in its `.fabric-source-ignore` (`test_source_check`).
+  `building-fabric-services/references/package.md` runs it with `--every-file` before `pack`, on a clean copy it
+  describes: what Git would commit and the nested trees checked on their own, each committed symbolic link replaced
+  by its committed target or removed and reviewed, shared source copied in and committed, dependency folders and
+  what `pack` refuses left out; SECURITY.md names what it reads.
+- **references/source-and-instance.md** (both skills): the layout (instance values in a configuration outside the
+  repository with a neutral default and a committed `*.example`, records and state documents in the kit's data folder,
+  keys by name, fixtures on neutral ids; the supervisor label and `createdBy` name the publisher until CT-194) and the
+  check. It is registered as a shared reference (`test_shared_references`).
+- creating-fabric-agents step 2 lays an agent out as source and instance and calls the skeleton done, once the owner has reviewed it (a floor, not a secret scanner), when the check
+  exits 0; step 5 runs it again. adapting-projects-to-fabric step 4c runs the check first, moves each finding out and
+  runs it again; a value already in Git history needs a fresh history, which stays the owner's act. Step 7's report
+  names a contract checkout by its commit, never a home path, and the check runs again after it. The check's ignore-line
+  reading is `fabric_source_ignore.py` and its reading of a declared home `fabric_source_homes.py`, both beside it, and the owner's list takes `home: <name>` for the owner's own home name.
+- Trigger and scenario evals for both (`source-apart-from-instance`, `move-instance-data-out-of-an-existing-agent`);
+  the Windows CI job runs `test_source_check`; the release smoke checks the script is installed. README, AGENTS.md and
+  SKILL-CARD name it.
+
+### Changed
+
+- `COMMERCIAL-LICENSE.md` is the knowledge base template as of fabric-workspace `875faae2` (line 5 now uses a comma
+  where it had a dash); the hash `test/validate.py` pins moved with it. The licence terms are unchanged.
+
+### Upgrading
+
+- Nothing to change: the check is new and opt-in. Handing a source over (a new remote, a push, a change of
+  visibility) stays the owner's act each time; the check reads the tree, never Git history.
+
 ## 0.57.0 (2026-10-28)
 
 The contract pin moves to `3830a33` (`v0.1.0+2026-10-27.6`) from `00e050ba` (FAA-176).

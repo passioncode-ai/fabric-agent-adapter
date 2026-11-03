@@ -107,6 +107,14 @@
     {
       "query": "Adapt this existing agent to Fabric; it has a local page that today opens in Safari.",
       "shouldTrigger": true
+    },
+    {
+      "query": "Отдели данные экземпляра от исходников существующего агента перед подключением к Fabric.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Before adapting this agent to Fabric, check its repository for my home paths and keys so I can share it as source.",
+      "shouldTrigger": true
     }
   ]
 }

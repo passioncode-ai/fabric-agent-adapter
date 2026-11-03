@@ -42,6 +42,28 @@ python3 scripts/fabric_package.py pack <folder>           # a dry run: the packa
 python3 scripts/fabric_package.py pack <folder> --apply   # writes fabric.package.json when nothing is wrong
 ```
 
+Run `adapting-projects-to-fabric/scripts/fabric_source_check.py check <folder> --every-file` on the folder you pack first (a floor under your own
+review, not a secret scanner): a package carries
+the source, and the instance (the owner's paths, keys, strings) stays out of it (`references/source-and-instance.md` of
+that skill). `--every-file` reads what `pack` reads, files Git ignores included; without it the check reads only what Git
+would commit. A path named in `.fabric-source-ignore` or `--exclude` is still carried by `pack`, unread, so name only synthetic files
+there, and check a nested repository named there with `--every-file` in its own tree. Keep the signing key file
+outside the folder. Pack a clean copy: what Git would commit (`git ls-files --cached --others --exclude-standard`) plus the nested
+trees checked on their own, copied without their `.git` and with each committed symbolic link replaced or removed by where its resolved
+target is (`pack` refuses a link): a file or folder Git would commit in the tree being packed, or in a nested tree checked
+on its own, is copied in its place (a folder's committed files, each link inside it by the same rule; a file the ignore
+file names needs an ignore line of its own at the new path); a link whose target is a folder already being copied on
+the way to it (an ancestor, or a folder a link above it led into) is removed, so the copy ends; a target that leaves
+that tree or lies in what `.gitignore` keeps out, such as an instance folder in the checkout, is removed, since it is
+the instance or another project. Source the agent shares from outside the tree (a monorepo's common code, linked or
+imported by a relative path) is copied into the agent's tree at the path it is reached by and committed before
+packing. List each link removed and review it: a missing file is not seen by `pack` or `verify`. Leave out dependency
+folders (`node_modules`, virtual environments, which hold install paths and binaries), what `.gitignore` keeps out as
+instance (the real configuration, an instance folder in the checkout) and the files `pack` refuses by name (a
+credential-free `.npmrc` that `.fabric-source-ignore` names for the check included). `pack` does not read
+`.gitignore`, and an account id or a host is found only through the owner's list. The check is Python only (3.9+); a Node-only machine packs without it, and `pack` itself carries the kit's token files
+and a private `*.jwk` by their names: keep them in the instance.
+
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
 `*.pyc`, and files that are credentials by name (`.env` and `.env.*` but `.env.example|sample|template`, `*.pem`, `*.key`,
 `*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa`-style keys, `.npmrc`, `.netrc`, `.pypirc`). Remove them or pack a clean

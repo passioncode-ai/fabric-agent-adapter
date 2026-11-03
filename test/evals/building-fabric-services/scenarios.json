@@ -407,7 +407,7 @@
       "request": "Pack example-agent so an organization can install it, and sign the package.",
       "expected": [
         "writes the author's fabric.package.json (schema, kind, id, version, publisher, licence; for an agent resultSignal and evals with the receipt of the suite as packed) and runs fabric_package.py pack / fabric-package.mjs pack (or npx @passioncode-ai/fabric-agent-adapter pack) without --apply first",
-        "lets pack derive agentRef (urn:fabric:agent:<publisher>:<id>), list every file with its SHA-256 and compute the digest; removes what pack refuses (.env, keys, .git, caches, symlinks) instead of working around it",
+        "lets pack derive agentRef (urn:fabric:agent:<publisher>:<id>), list every file with its SHA-256 and compute the digest; packs a clean copy as package.md describes: runs fabric_source_check.py check --every-file on it, replaces each committed symlink by its committed target or removes it and lists what it removed, and removes what pack refuses (.env, keys, .git, caches) instead of working around it",
         "fixes every schema, FAC-SEM-064/065/066/102 and folder-check problem pack names (a stale receipt is re-run, never edited to match), then packs with --apply",
         "signs with an Ed25519 key file the person names (mode 600, a kid), never generates, stores or prints a key, and hands the public JWK over for the installing machine to pin; the algorithm is EdDSA until Fabric records D2",
         "verifies with verify --trust before handing it over, and names what this version does not do: ES256, hub or passkey signing, the organization's passkey countersignature, Fabric recording packages by agentRef"
