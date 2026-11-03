@@ -212,7 +212,8 @@
         "names keys by name only and never writes a value",
         "runs fabric_source_check.py check on the tree before calling a step done, and reports its findings without repeating a value it found",
         "names its supervisor label on the publisher's domain (LC-09), never the owner's account, and leaves createdBy as the publisher or the scaffold's sentinel",
-        "does not create a remote, push or publish the source: handing it over stays the owner's act"
+        "does not create a remote, push or publish the source: handing it over stays the owner's act",
+        "when the owner's own home name is neutral, has one or two letters, or holds a space, a dot, an underscore, a dash or an apostrophe, adds `home: <name>` to the owner's list before the check, and never declares a container's, a cloud machine's or a CI runner's user such as node or vscode"
       ]
     }
   ]

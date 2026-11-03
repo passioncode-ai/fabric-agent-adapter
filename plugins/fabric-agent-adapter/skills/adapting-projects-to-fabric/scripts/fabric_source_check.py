@@ -69,6 +69,8 @@ try:
     import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
     from fabric_source_ignore import (  # noqa: E402,F401 - how the ignore lines are read, beside this file
         IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _readable_glob, ignore_globs)
+    from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
+        HOME_ENTRY, _NAME_JOIN, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
 except ImportError as _missing:  # a copy without its two siblings: say so, as a refusal, never a finding's exit 1
     sys.stderr.write("fabric_source_check.py: %s.py must sit beside this file\n" % (_missing.name or "a module"))
     sys.exit(2)
@@ -86,7 +88,6 @@ NEUTRAL_HOMES = {"example", "examples", "user", "username", "you", "me", "name",
                  "node", "ubuntu", "ec2-user", "runneradmin", "admin", "vagrant", "debian", "centos", "app", "builder",
                  # dev containers and hosted workspaces, and the reference's own fixture id
                  "vscode", "codespace", "circleci", "gitpod", "jovyan", "coder", "example-agent"}
-_SEP = r"(?:\\|/)+"  # one way to read a run: two alternatives that both take a `\\` backtrack exponentially
 HOME_PATHS = (
     re.compile(r"(?<![A-Za-z0-9_.-])(?:/var)?/home/([A-Za-z0-9][A-Za-z0-9._-]*)", re.ASCII),
     # macOS writes `/Users` capitalised; `/users/...` in code is a web route
@@ -131,11 +132,6 @@ ASSIGNED = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]{0,63})[\"']?
                       r"((?:[A-Za-z0-9+/_-]|%[0-9A-Fa-f]{2}){40,}={0,2})")  # `=` only as padding; `%2B` read decoded
 
 
-def _owner_homes(entries: List[str]) -> Set[str]:
-    """The home names the owner's list declares (`home: <name>`), which are never neutral."""
-    return {e[1:] for e in entries if e.startswith(HOME_ENTRY)}
-
-
 def _home_names(text: str, owner: Iterable[str] = ()) -> List[Tuple[int, int]]:
     """The spans of the names of real people's home folders in a text (neutral and one-letter names left out, unless
     the owner's list declares the name as the owner's home)."""
@@ -149,52 +145,6 @@ def _home_names(text: str, owner: Iterable[str] = ()) -> List[Tuple[int, int]]:
     for pattern in (p for name in sorted(owner) for p in _dashed_home(name)):  # declared: found whatever it reads as
         spans += [match.span(1) for match in pattern.finditer(text)]
     return spans
-
-
-_DASHED: Dict[str, Tuple["re.Pattern[str]", ...]] = {}
-
-
-#: Where a declared home name stands in each form the table names: the slashed, drive, URL-encoded and dashed homes.
-_DECLARED_SLASHED = (r"(?<![A-Za-z0-9_.-])(?:/var)?/home/", r"(?<![A-Za-z0-9_.-])/Users/",
-                     r"(?<![A-Za-z0-9_.-])(?:/mnt)?/[A-Za-z]/Users/",
-                     r"(?<![A-Za-z0-9_.-])(?i:[A-Za-z]:%sUsers%s)" % (_SEP, _SEP),
-                     r"%2[Ff](?:Users|home)%2[Ff]", r"(?i:%5CUsers%5C)")
-_DECLARED_DASHED = (r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-Za-z]-Users)-",
-                    r"(?<![A-Za-z0-9])(?i:[A-Za-z]--Users-)")
-
-
-#: One separator between the parts of a declared home name, in any spelling a tool or a language writes: a space, `.`,
-#: `_`, `-`, `+`, `'`, an escaped `\'` or `\u0027`, an HTML `&#39;` or `&#x27;`, or a percent-encoding of one of them.
-_NAME_JOIN = r"(?:[ ._+'-]|\\'|\\u0027|&#0?39;|&#[xX]27;|%2[07BbDdEe]|%5[Ff])"
-
-
-def _name_parts(name: str) -> List[str]:
-    return [part for part in re.split(r"[ ._'-]+", name) if part]
-
-
-def _spellings(found: Iterable[str], owner: Iterable[str]) -> Set[str]:
-    """The names found, and every spelling of a declared home one of them spells (its parts joined by each separator
-    a tool writes), so a printed path masks the other spellings of that home too."""
-    names = set(found)
-    for name in owner:
-        parts = _name_parts(name)
-        body = re.compile(r"(?i:%s)" % (_NAME_JOIN + "+").join(re.escape(part) for part in parts), re.ASCII)
-        if parts and any(body.fullmatch(n) for n in names):
-            names |= {name} | {sep.join(parts) for sep in (" ", ".", "_", "-", "+", "'", "%20", "%27")}
-    return names
-
-
-def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
-    """A declared home name in every form, read whole, its parts joined by any run of the separators a tool or a
-    language writes (`_NAME_JOIN`: a space, `.`, `_`, `-`, `+`, `'` and their escapes and percent-encodings), since
-    the generic forms end a name at a dash or a space, so `-Users-j-doe-proj` would read `j`. It ends only where a
-    letter or digit would continue it: a `.` or `_` after it (an extension, a sentence's end) is read as the declared
-    home, failing closed."""
-    if name not in _DASHED:
-        body = (_NAME_JOIN + "+").join(re.escape(part) for part in _name_parts(name)) or re.escape(name)
-        whole = r"((?i:%s))(?![A-Za-z0-9])" % body
-        _DASHED[name] = tuple(re.compile(prefix + whole, re.ASCII) for prefix in _DECLARED_SLASHED + _DECLARED_DASHED)
-    return _DASHED[name]
 
 
 def _real(token: str) -> bool:
@@ -358,8 +308,6 @@ def _fold(text: str) -> str:
     return _fold_map(text)[0]
 
 
-#: How a `home: <name>` line of the owner's list is kept among the entries: a character no line can hold.
-HOME_ENTRY = "\0"
 #: `home: <name>`: one ASCII name (a letter or digit first; letters, digits, `.`, `_`, `-`, `'` and spaces inside, as
 #: a Windows profile may hold), a horizontal space (a space, a tab, a Unicode space) around the colon; any other white
 #: space there is refused. The name is checked as ASCII apart: IGNORECASE alone would
@@ -377,15 +325,18 @@ def read_list(path: Path) -> List[str]:
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         # a byte-order mark or a zero-width character at a line's start (two lists joined) is no part of the line
         text = raw.strip().lstrip("\ufeff\u200b\u2060").strip().replace(HOME_ENTRY, "")  # no meaning at a start
-        home = _HOME_LINE.fullmatch(text)
+        # a joiner (U+200C, U+200D) at a start may belong to a string, never to `home:`: a home line is read or refused
+        bare = text.lstrip("\u200c\u200d").strip()
+        home = _HOME_LINE.fullmatch(bare)
         if home and home.group(1).isascii():
             entries.append(HOME_ENTRY + home.group(1).lower())
             continue
-        if _HOME_KEY.match(text):  # meant as a home and not one: never kept as a string that cannot match
+        if _HOME_KEY.match(bare):  # meant as a home and not one: never kept as a string that cannot match
             raise CheckError("line %d of the owner's list starts with `home` and a colon but is not one ASCII home name "
                              "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`, "
                              "`'`): a note goes on a line of its own, a path is written as its home name only, and a name "
-                             "outside ASCII, or holding another character, is listed as a plain string" % (len(entries) + 1))
+                             "outside ASCII, or holding another character, is listed as a plain string (a typographic "
+                             "apostrophe is written as ')" % (len(entries) + 1))
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
@@ -555,12 +506,20 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     # a declared home of three or more letters and digits is the owner's own name: masked wherever a printed path holds
     # it, its parts joined by none or any run of the separators a tool writes (a space, `.`, `_`, `-`, `+`, and their
     # percent-encodings), found or not
+    known = {path[s:e] for s, e in found} | (seen.names if seen is not None else set())
     for declared in _owner_homes(entries):
         parts = _name_parts(declared)
+        if sum(len(part) for part in parts) < 3 and len(parts) > 1:  # a short name found: each spelling with a separator
+            spaced = (_NAME_JOIN + "+").join(re.escape(part) for part in parts)
+            if any(re.fullmatch(spaced, name, re.IGNORECASE) for name in known):
+                marks += [(m.start(), m.end(), "<home>") for m in re.finditer(spaced, path, re.IGNORECASE)]
         if sum(len(part) for part in parts) >= 3:
-            # a whole word only: an unfound `home: app` leaves `mapping` and `app.json`'s neighbours readable
-            joined = r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % (_NAME_JOIN + "*").join(re.escape(part) for part in parts)
-            marks += [(m.start(), m.end(), "<home>") for m in re.finditer(joined, path, re.IGNORECASE)]
+            body = (_NAME_JOIN + "*").join(re.escape(part) for part in parts)
+            # found in the tree: masked wherever it stands; unfound: a whole word only, so `home: app` leaves `mapping`
+            # readable (a percent-encoded or escaped separator before it starts a word too)
+            if not any(re.fullmatch(body, name, re.IGNORECASE) for name in known):
+                body = r"(?:(?<![A-Za-z0-9])|(?<=%[0-9A-Fa-f]{2})|(?<=\\u0027)|(?<=&#39;)|(?<=&#x27;))" + body + "(?![A-Za-z0-9])"
+            marks += [(m.start(), m.end(), "<home>") for m in re.finditer(body, path, re.IGNORECASE)]
     for name in _spellings({path[s:e] for s, e in found}, _owner_homes(entries)):
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]
     if seen is not None and seen.names:
