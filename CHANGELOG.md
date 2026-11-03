@@ -33,8 +33,9 @@ audit at every release until the contract's export (CT-194) replaces it.
   (`AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`); adapting-projects-to-fabric leaves an existing agent's
   licence as it is.
 - where-agents-run.md: Heroku is the default host of an A agent unless it runs in the person's or an organization's
-  PassionCode cloud or is sold; an A agent's data lives in a durable store, never the host's own folder, and the data
-  home section says the same for a host that does not keep its disk.
+  PassionCode cloud or is sold; an A agent's data lives in a durable store, never the host's own folder (source-and-instance.md's
+  data home says the same for a host that does not keep its disk), and on a host with no Fabric hub it answers only
+  what reaches its own origin.
 - building-fabric-services' gotchas are shorter (the same rules); `test_fabric_kit` runs its by-path load with `-B`.
 
 ### Upgrading

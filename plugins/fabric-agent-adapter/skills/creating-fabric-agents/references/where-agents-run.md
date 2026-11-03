@@ -100,7 +100,9 @@ Every new agent is given an uptime category on its first day, and the README nam
 - **A, around the clock.** A capability must answer while the owner's machine is off or asleep: a schedule, a chat,
   callers outside the machine. A cloud host is required from the first release; Heroku is the default, another host
   only when a reason names it: an instance in the person's PassionCode cloud or an organization's cloud runs there
-  (the places above), and a paid agent stays in PassionCode's cloud (selling an agent, below). The agent is an online service (building-fabric-services, the remote placement), often
+  (the places above), and a paid agent stays in PassionCode's cloud (selling an agent, below). On a host with no
+  Fabric hub it answers what reaches its own origin (its schedule, its chat, its API); a call Fabric admits needs a
+  cloud hub, as running while the laptop is closed says. The agent is an online service (building-fabric-services, the remote placement), often
   alongside its local instance, and starts from the cloud Fabric-server template once that template's repository
   exists. Its data lives where the cloud reaches it, in a durable store (a database, an object store, the private
   `<agent>-data` repository), never the host's own folder, which a platform such as Heroku does not keep across a

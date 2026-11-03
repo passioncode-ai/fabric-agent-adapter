@@ -66,7 +66,8 @@ class PortableFromDayZero(unittest.TestCase):
     def test_every_release_runs_the_transfer_audit(self):
         step_5 = " ".join(section("creating-fabric-agents", "Step 5: check, report, and set the canary expectation").split())
         self.assertIn("Every release of the agent runs it too, in Git mode on the checkout and with `--every-file` on the "
-                      "clean copy a transfer would carry (what Git would commit, as the packing step makes it), as the "
+                      "clean copy a transfer would carry (what Git would commit, as building-fabric-services' "
+                      "`references/package.md` makes it), as the "
                       "transfer audit "
                       "(each exit 0, with the owner's list or its absence recorded) until the contract's export (CT-194) "
                       "replaces it", step_5)
@@ -98,6 +99,7 @@ class PortableFromDayZero(unittest.TestCase):
                       # 0.59.0 product r1: one answer per placement, and a durable data home on a cloud host
                       "an instance in the person's PassionCode cloud or an organization's cloud runs there",
                       "a paid agent stays in PassionCode's cloud",
+                      "On a host with no Fabric hub it answers what reaches its own origin",
                       "never the host's own folder, which a platform such as Heroku does not keep across a restart"):
             self.assertIn(words, where, words)
 
@@ -115,13 +117,16 @@ class PortableFromDayZero(unittest.TestCase):
             for words in ("except that an agent built new carries a `LICENSE` naming the copyright holder (all rights "
                           "reserved unless the owner gives other terms)",
                           # 0.59.0 product r2: the kit files copied in keep their own licence
-                          "files the adapter copies in (the service kit, the dashboard kit) keep their own licence"):
+                          "files the adapter copies in (the service kit, the dashboard kit) keep their own licence",
+                          "`AGPL-3.0-only OR LicenseRef-PassionCode-Commercial` ([COMMERCIAL-LICENSE.md]"):
                 self.assertIn(words, flat(path), (path, words))
         # 0.59.0 seam and product r2: an existing project keeps what it has, as the CHANGELOG's Upgrading says
         self.assertIn("an existing one keeps what it has", flat("adapting-projects-to-fabric/SKILL.md"))
-        self.assertIn("the kit files the adapter copies in keep their own licence",
+        self.assertIn("the kit files the adapter copies in keep their own licence (AGPL-3.0-only OR "
+                      "LicenseRef-PassionCode-Commercial)",
                       " ".join(section("creating-fabric-agents", "Step 2: the project skeleton").split()))
-        self.assertIn("of these files only a `LICENSE` naming its copyright holder is required",
+        # 0.59.0 seam and product r3: scoped to a service built new, as the CHANGELOG says
+        self.assertIn("one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep theirs)",
                       flat("building-fabric-services/SKILL.md"))
 
 

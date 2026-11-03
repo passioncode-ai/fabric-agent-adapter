@@ -200,7 +200,7 @@ Run the sibling skill's `check` (structural, then exact when the contract checko
 available) and complete `fabric/FABRIC-CONFORMANCE.md` with dated receipts, exactly as
 its workflow steps 5–7 prescribe, and run its `fabric_source_check.py check` again (exit 0). Every release of the
 agent runs it too, in Git mode on the checkout and with `--every-file` on the clean copy a transfer would carry (what
-Git would commit, as the packing step makes it), as the transfer audit (each exit 0, with the owner's list or
+Git would commit, as building-fabric-services' `references/package.md` makes it), as the transfer audit (each exit 0, with the owner's list or
 its absence recorded) until the contract's export (CT-194) replaces it; this skill adds no second verification path
 on purpose. Then record one expectation the report must carry:
 
