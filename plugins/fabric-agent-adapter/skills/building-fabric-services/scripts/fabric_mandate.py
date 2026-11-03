@@ -238,8 +238,10 @@ def _member_of(items: Any, value: Any) -> bool:
     return set_has(items, value)
 
 
-#: A spend nested deeper than this is no estimate: JavaScript's Number() throws on one a few thousand deep, and no
-#: estimate needs more (0.61.0 product reading 25).
+#: A spend nested deeper than this, in lists or dicts, is no estimate, so the spend a refusal carries as estimateUsd is
+#: one a serialiser writes. Stricter than 0.60.0 (a list to about 500 deep, a dict at any depth) and than Node and the
+#: contract (a list to a few thousand deep, a dict at any depth): FAA-196 (22), no JSON reader of the kit reaches it
+#: (0.61.0 product readings 25 and 26).
 MAX_SPEND_DEPTH = 100
 
 

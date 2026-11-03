@@ -42,8 +42,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
   subclass is no estimate either, a stricter reading than 0.60.0's (checked only under a ceiling, without recursion in one
   pass, then read as `Number()` reads it, in time linear in the structure (a list is never joined: two or more items are
   NaN, one is read for itself); a shared or cyclic list or dict, which `json.loads` never gives, is no estimate, and a spend nested more than 100
-  lists or dicts deep (`MAX_SPEND_DEPTH`) is no estimate, where 0.60.0 raised RecursionError and JavaScript's
-  `Number()` throws a few thousand levels down). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
+  lists or dicts deep (`MAX_SPEND_DEPTH`) is no estimate, also stricter than 0.60.0, which read a list to about 500
+  deep (RecursionError past it) and a dict at any depth, as Node's `mandateCovers` and the contract read a list to a
+  few thousand deep and a dict at any depth: a fail-closed twin split that no board, MCP or job reader reaches, since
+  they take no list or dict spend). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
   the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
   seam readings 17 to 22 and 24, product readings 18 to 20 and 22 to 25, unit readings 19, 21 and 24). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length

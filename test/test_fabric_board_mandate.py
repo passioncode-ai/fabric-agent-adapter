@@ -424,6 +424,17 @@ class BoardMandateTests(Conversation):
                 got = at_depth(frames, nested(depth))
                 self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False), depth)
 
+        def nested_dicts(depth):  # depth + 1 dicts, the bound counting them as it counts lists (product reading 26)
+            value = {"a": 3}
+            for _ in range(depth):
+                value = {"a": value}
+            return value
+        self.assertTrue(at_depth(0, nested_dicts(fm.MAX_SPEND_DEPTH - 1))["ok"])
+        for spend in (nested_dicts(fm.MAX_SPEND_DEPTH), nested_dicts(100000), {"a": nested(fm.MAX_SPEND_DEPTH - 1)},
+                      [{"a": nested(fm.MAX_SPEND_DEPTH - 2)}]):
+            got = at_depth(0, spend)
+            self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
+
         class ClaimsFloat(int):  # an int whose __class__ says float: read as the int it is (unit reading 20)
             @property
             def __class__(self):
