@@ -49,6 +49,9 @@ export class WorkContext {
   toJSON() {
     return { stopped: this.stopped }; // never the mandate: it holds the operator's words
   }
+  [Symbol.for('nodejs.util.inspect.custom')]() {
+    return this.toJSON(); // console.log(ctx) prints no mandate either
+  }
   async progress(note) {
     if (this.stopped) throw new Stopped();
     await this.#responder.progress(this.#entry, note, this);

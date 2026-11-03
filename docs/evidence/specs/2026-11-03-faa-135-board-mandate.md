@@ -26,7 +26,7 @@ The kit cannot tell a personal board from an organization's: `com.status` names 
   within `mandate_from`, and `agent_id` is set. Exactly one fenced `json` block whose value has `kind: "mandate/1"`;
   two such blocks, or one that does not parse, read as no mandate and are named in the event log by code, never by
   content.
-- The handler gets `ctx.mandate` (the mandate as received, or `None`) and `ctx.mandate_covers(call)`, which calls
+- The handler gets `ctx.mandate` (the mandate block with any `source` dropped, OA-7, or `None`) and `ctx.mandate_covers(call)`, which calls
   `mandate_covers` with `tier: "T1"`, `self: agent_id`, no `callerAgent` (the board names a Project's principal, not an
   authenticated agent id the chain can bind), and the service's clock. A covered call answers `recordAs`
   (`via: mandate`), which the handler records as its reason; the kit puts the operator's words in no event, log or

@@ -25,8 +25,9 @@ says that his approval holds for the whole task, at every link (FAA-195).
   (human gates stay, MD-6); a relayed receiver's chain starts with it (OA-2), so the four-agent bound limits one
   mandate, never the task; a mandate lapses within seven days of his words, and a task still open asks him once for a
   new one, his same words with `at` when he confirms (MD-1), then weekly until the contract's CT-205 (its answer
-  `7f372925` on board thread `118f95f9`). `expiresAt` is counted from `at`; the source and spend sentences are reworded
-  with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
+  `7f372925` on board thread `118f95f9`; CT-205 is a row after this kit's pin). `expiresAt` is counted from `at` and
+  covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
+  source and spend sentences are reworded with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
 - working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`
   block fenced ` ```json `, its chain ending in the service's registry agent id, never a decision block.
 

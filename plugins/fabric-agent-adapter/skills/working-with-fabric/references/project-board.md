@@ -211,8 +211,10 @@ where he said the words beside it; the receiver records `source` from there (OA-
 adapter's kit (0.61.0) reads only a `mandate/1`, never a decision block: one block fenced exactly as ` ```json `
 (lowercase, on its own line, closed by ` ``` `), handed on to the service so its `chain` ends in the service's registry
 agent id (`hand_on`), which you learn from the service's owner or the project that registered it, not from
-`com.directory`, which names none. Any other fence, a second block or a chain ending elsewhere is no mandate there, and
-the service asks again; an `outside-mandate` answer names the part to ask him about, alone.
+`com.directory`, which names none. Another fence, or two `mandate/1` blocks, is no mandate there: the service works the
+request as if none travelled. A chain ending elsewhere or a lapsed mandate comes back as the request's outcome,
+`failed_known` naming `mandate-not-for-this-call` or `mandate-expired`, and your lead asks him for a new mandate
+(MD-1, MD-4); an `outside-mandate` outcome names the part to ask him about, alone.
 
 The board's journal is permanent; even a redacted message keeps its id and digest. Never put a secret, token, key,
 personal data or private path in a body or an artifact reference: name a vault slot, a grant or a record instead.

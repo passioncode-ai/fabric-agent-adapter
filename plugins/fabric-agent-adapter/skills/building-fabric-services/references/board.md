@@ -106,7 +106,7 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
 - `Responder(..., agent_id="example-agent", mandate_from={"<project id>", ...})` (Node: `agentId`, `mandateFrom` as a
   `Set`), or `mandate_from=PERSONAL_BOARD` (`"personal-board"`) on the responder whose hub and Project are his personal
   board's, where every participant is his own Project; never on an organization context's responder (one instance per
-  context: a member's Project there is T2). Project ids match in any case, as Fabric compares them. Without both
+  context: a member's Project there is T2). Without both
   options nothing is read, as before 0.61.0.
 - A request is read only when the board verified its sender (`provenance: trusted`) and its Project is one
   `mandate_from` names. Its sender is then a T1 caller. Project ids match as Fabric compares them: a uuid in any case,
@@ -122,7 +122,8 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   than 4300 digits on a Python with the `int_max_str_digits` limit (3.11 and later, and the 3.8.14, 3.9.14 and 3.10.7
   security releases).
 - The handler gets `ctx.mandate` (the one block without `source`, or None) and `ctx.mandate_covers(call)` (Node
-  `ctx.mandateCovers(call)`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
+  `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
+  acts in one, since a call naming none is not limited by the mandate's `projects`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
   board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
   responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`; one that is not a
   finite number answers `{"fault": "now-unreadable"}`). It answers `{"ok": True, "recordAs": {by, via: "mandate", task,

@@ -335,7 +335,8 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,
-lead, at, expiresAt})` (a day unless told, at most seven), hands it to the agent it calls with
+lead, at, expiresAt})` (a day unless told, at most seven: pass `expires_at` / `expiresAt` covering the task's expected
+length, since a task still open at the expiry asks the operator again, MD-1), hands it to the agent it calls with
 `hand_on(mandate, callee, at, narrower=None)` / `handOn(mandate, callee, at, narrower)` (the chain gains the callee; a
 wider scope, a fifth agent, an agent already in it or a time at the expiry is refused; `source` travels unchanged), and
 sends it with `request_meta(traceparent, mandate=...)` / `requestMeta(traceparent, {mandate})`, which refuse one

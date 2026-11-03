@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -221,7 +222,28 @@ class BoardRequest:
 
 #: `mandate_from` naming every trusted sender of the board the service is installed on: the operator's personal board.
 PERSONAL_BOARD = "personal-board"
-_JSON_BLOCK = re.compile(r"^```json[ \t]*\r?\n(.*?)\r?\n```[ \t]*\r?$", re.S | re.M)  # each fence on its own line
+_OPENER = re.compile(r"```json[ \t]*")
+_CLOSER = re.compile(r"```[ \t]*")
+
+
+def _json_blocks(body: str) -> List[str]:
+    """The bodies of the ```json blocks, each fence on its own line: one pass over the lines, so linear in the body
+    (an anchored regex rescanned to the end from every unclosed opener). Lines end at "\\n" alone, one "\\r" before it
+    dropped, as in the Node twin; an unclosed opener ends the scan."""
+    lines = [line[:-1] if line.endswith("\r") else line for line in body.split("\n")]
+    blocks: List[str] = []
+    i = 0
+    while i < len(lines):
+        if _OPENER.fullmatch(lines[i]):
+            j = i + 1
+            while j < len(lines) and not _CLOSER.fullmatch(lines[j]):
+                j += 1
+            if j == len(lines):
+                break
+            blocks.append("\n".join(lines[i + 1:j]))
+            i = j
+        i += 1
+    return blocks
 
 
 def _no_constant(name: str) -> Any:
@@ -241,12 +263,12 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
     principal = sender.get("principal") if isinstance(sender.get("principal"), dict) else {}
     if principal.get("provenance") != "trusted":
         return None, None
-    if not isinstance(sender.get("project"), str):  # comms-message requires it; a caller is recorded from it
+    if not isinstance(sender.get("project"), str) or not sender["project"]:  # comms-message requires it; the caller
         return None, None
     if mandate_from != PERSONAL_BOARD and _fold(sender["project"]) not in mandate_from:
         return None, None
     found = []
-    for block in _JSON_BLOCK.findall(request.body):
+    for block in _json_blocks(request.body):
         try:
             value = json.loads(block, parse_constant=_no_constant)
         except (ValueError, RecursionError):
@@ -269,8 +291,12 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     path does). None when no mandate travelled: the handler asks the operator as it would without one."""
     if mandate is None or agent_id is None:
         return None
-    clock = wall()
-    now = _mandate.format_rfc3339(clock * 1000) if isinstance(clock, (int, float)) and math.isfinite(clock) else ""
+    clock, now = wall(), ""
+    if isinstance(clock, (int, float)) and not isinstance(clock, bool):
+        try:
+            now = _mandate.format_rfc3339(clock * 1000) if math.isfinite(clock) else ""
+        except (OverflowError, ValueError):  # finite but outside the dates a clock can name
+            now = ""
     answer = _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": now, "self": agent_id, "call": call})
     if "recordAs" in answer:
         answer = {"ok": True, "recordAs": dict(answer["recordAs"], caller=caller)}

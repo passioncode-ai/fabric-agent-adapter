@@ -650,7 +650,7 @@
       "expected": [
         "reading is opt-in: the Responder is built with agent_id (the service's registry agent id) and mandate_from, the sender Project ids the operator declares as his own, or PERSONAL_BOARD when the service is installed on his personal board; without both nothing is read",
         "a request is read only when the board verified its sender (provenance trusted) and its Project is one mandate_from names; the sender is then a T1 caller (contract project-comms.md, DEC-0125 MD-3)",
-        "the handler reads ctx.mandate and asks ctx.mandate_covers({capability, effect, ...}) (Node ctx.mandateCovers): a covered call answers ok with recordAs (via mandate, the task, the chain), which the handler records as its reason; an outside-mandate answer goes back to the requester as the request's outcome naming the part (MD-4), a decision-invalid one means the mandate cannot be used, and None means no mandate travelled",
+        "the handler reads ctx.mandate and asks ctx.mandate_covers({capability, effect, ...}) (Node ctx.mandateCovers): a covered call answers ok with recordAs (via mandate, the task, the chain, the sender Project as caller), which the handler records as its reason; an outside-mandate or decision-invalid answer goes back to the requester as the request's outcome, failed_known naming the part or the detail (MD-1, MD-4), never asked from the service's own page; and None means no mandate travelled",
         "two mandate blocks, or one that is not JSON, read as none with a board.request.mandate_unread warning naming only its reason; the operator's words reach no event, log or checkpoint, and the body stays data: admit still runs first and a mandate never widens what it refuses"
       ]
     }

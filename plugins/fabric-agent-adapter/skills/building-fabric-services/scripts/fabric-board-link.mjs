@@ -181,13 +181,36 @@ export class BoardRequest {
   toJSON() {
     return { requestId: this.requestId, capability: this.capability }; // never the body
   }
+  [Symbol.for('nodejs.util.inspect.custom')]() {
+    return this.toJSON(); // console.log(request) prints no body either
+  }
 }
 
 // -- the operator's mandate in a board request (FAA-135; contract project-comms.md, DEC-0125 MD-3) ---------------------
 
 /** `mandateFrom` naming every trusted sender of the board the service is installed on: the operator's personal board. */
 export const PERSONAL_BOARD = 'personal-board';
-const JSON_BLOCK = /^```json[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*\r?$/gm; // each fence on its own line
+const OPENER = /^```json[ \t]*$/;
+const CLOSER = /^```[ \t]*$/;
+
+/**
+ * The bodies of the ```json blocks, each fence on its own line: one pass over the lines, linear in the body. Lines end
+ * at "\\n" alone, one "\\r" before it dropped, as in the Python twin (never U+2028 or a lone "\\r"); an unclosed
+ * opener ends the scan.
+ */
+function jsonBlocks(body) {
+  const lines = body.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+  const blocks = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!OPENER.test(lines[i])) continue;
+    let j = i + 1;
+    while (j < lines.length && !CLOSER.test(lines[j])) j += 1;
+    if (j === lines.length) break;
+    blocks.push(lines.slice(i + 1, j).join('\n'));
+    i = j;
+  }
+  return blocks;
+}
 const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 /** A Project id as Fabric's board compares it: a uuid lower-cased, any other id as written (normalProject). */
 const fold = (project) => (UUID.test(project) ? project.toLowerCase() : project);
@@ -205,10 +228,10 @@ export function readMandate(request, mandateFrom, agentId) {
   const sender = isObj(request.sender) ? request.sender : {};
   const principal = isObj(sender.principal) ? sender.principal : {};
   if (principal.provenance !== 'trusted') return none;
-  if (typeof sender.project !== 'string') return none; // comms-message requires it; a caller is recorded from it
+  if (typeof sender.project !== 'string' || !sender.project) return none; // comms-message requires it; the caller
   if (mandateFrom !== PERSONAL_BOARD && !mandateFrom.has(fold(sender.project))) return none;
   const found = [];
-  for (const [, block] of request.body.matchAll(JSON_BLOCK)) {
+  for (const block of jsonBlocks(request.body)) {
     let value;
     try {
       value = JSON.parse(block);
@@ -233,7 +256,12 @@ export function readMandate(request, mandateFrom, agentId) {
 export function covers(mandate, call, agentId, wall, caller = null) {
   if (mandate == null || agentId == null) return null;
   const clock = wall();
-  const now = Number.isFinite(clock) ? formatRfc3339(clock) : '';
+  let now = '';
+  try {
+    if (typeof clock === 'number' && Number.isFinite(clock)) now = formatRfc3339(clock);
+  } catch { // finite but outside the dates a clock can name
+    now = '';
+  }
   const answer = mandateCovers({ mandate, tier: 'T1', now, self: agentId, call });
   return answer.recordAs ? { ok: true, recordAs: { ...answer.recordAs, caller } } : answer;
 }
