@@ -4,7 +4,9 @@ names. Standard library only, Python 3.9+."""
 from __future__ import annotations
 
 import json
+import math
 import re
+from collections.abc import Mapping
 import threading
 from pathlib import Path
 from typing import Any
@@ -219,7 +221,7 @@ class BoardRequest:
 
 #: `mandate_from` naming every trusted sender of the board the service is installed on: the operator's personal board.
 PERSONAL_BOARD = "personal-board"
-_JSON_BLOCK = re.compile(r"```json[ \t]*\r?\n(.*?)\r?\n?```", re.S)
+_JSON_BLOCK = re.compile(r"^```json[ \t]*\r?\n(.*?)\r?\n```[ \t]*\r?$", re.S | re.M)  # each fence on its own line
 
 
 def _no_constant(name: str) -> Any:
@@ -239,7 +241,9 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
     principal = sender.get("principal") if isinstance(sender.get("principal"), dict) else {}
     if principal.get("provenance") != "trusted":
         return None, None
-    if mandate_from != PERSONAL_BOARD and not (isinstance(sender.get("project"), str) and sender["project"].lower() in mandate_from):
+    if not isinstance(sender.get("project"), str):  # comms-message requires it; a caller is recorded from it
+        return None, None
+    if mandate_from != PERSONAL_BOARD and _fold(sender["project"]) not in mandate_from:
         return None, None
     found = []
     for block in _JSON_BLOCK.findall(request.body):
@@ -265,8 +269,9 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     path does). None when no mandate travelled: the handler asks the operator as it would without one."""
     if mandate is None or agent_id is None:
         return None
-    answer = _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": _mandate.format_rfc3339(wall() * 1000),
-                                      "self": agent_id, "call": call})
+    clock = wall()
+    now = _mandate.format_rfc3339(clock * 1000) if isinstance(clock, (int, float)) and math.isfinite(clock) else ""
+    answer = _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": now, "self": agent_id, "call": call})
     if "recordAs" in answer:
         answer = {"ok": True, "recordAs": dict(answer["recordAs"], caller=caller)}
     return answer
@@ -280,9 +285,14 @@ def mandate_options(agent_id: Any, mandate_from: Any) -> Any:
     if mandate_from is None or mandate_from == PERSONAL_BOARD:
         return mandate_from
     try:
-        projects = None if isinstance(mandate_from, (str, bytes, dict)) else list(mandate_from)
+        projects = None if isinstance(mandate_from, (str, bytes, Mapping)) else list(mandate_from)
     except TypeError:
         projects = None
     if projects is None or not all(isinstance(p, str) and p for p in projects):
         raise BoardError("invalid_arguments", "mandate_from is %r or a collection of Project ids." % PERSONAL_BOARD)
-    return frozenset(p.lower() for p in projects)  # Fabric compares Project uuids lower-cased, as _hub._project
+    return frozenset(_fold(p) for p in projects)
+
+
+def _fold(project: str) -> str:
+    """A Project id as Fabric's board compares it: a uuid lower-cased, any other id as written (_hub._project)."""
+    return project.lower() if _hub.UUID.fullmatch(project) else project

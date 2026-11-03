@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import importlib
 import json
+import types
 import unittest
+from unittest import mock
 
 from test_fabric_board import Conversation, fb  # noqa: F401 - the shared conversation against the fake hub
 from fake_fabric_hub import OTHER_PROJECT
@@ -123,6 +125,20 @@ class BoardMandateTests(Conversation):
         got, covered, _ = self.run_one(body(deep))
         self.assertTrue(got is None or covered["data"]["detail"] == "mandate-malformed")
 
+    def test_a_recursion_error_reads_as_unreadable_on_any_python(self):
+        """The catch the 3.9 floor needs, pinned on every interpreter (0.61.0 seam reading 2)."""
+        link = importlib.import_module("fabric_board_link")
+        request = fb.BoardRequest({"body": {"text": body(json.dumps(mandate()))}, "request": {"id": "r"},
+                                   "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
+        with mock.patch.object(link.json, "loads", side_effect=RecursionError):
+            self.assertEqual(link.read_mandate(request, frozenset([OTHER_PROJECT]), "example-agent"), (None, "mandate-unreadable"))
+
+    def test_a_sender_without_a_project_is_never_read(self):
+        link = importlib.import_module("fabric_board_link")
+        for sender in ({"principal": {"provenance": "trusted"}}, {"project": 42, "principal": {"provenance": "trusted"}}):
+            request = fb.BoardRequest({"body": {"text": body(json.dumps(mandate()))}, "request": {"id": "r"}, "sender": sender}, "video.render")
+            self.assertEqual(link.read_mandate(request, link.PERSONAL_BOARD, "example-agent"), (None, None))
+
     def test_a_board_block_carries_no_source(self):
         """OA-7: a Project declares no protocols, so its block carries no source; one that does has it dropped."""
         got, covered, _ = self.run_one(body(json.dumps(mandate(source={"project": "example-site", "session": "sess-1"}))))
@@ -147,9 +163,34 @@ class BoardMandateTests(Conversation):
         path = self.data / "board-checkpoint.json"
         self.assertNotIn(WORDS, path.read_text() if path.exists() else "")
 
+    def test_each_fence_stands_on_its_own_line(self):
+        """0.61.0 unit and product readings 2: an opener mid-line or a four-backtick fence is no mandate block."""
+        m = json.dumps(mandate())
+        for text in ("Here it is: ```json\n%s\n```\n" % m, "````json\n%s\n````\n" % m, "```json\n%s```\n" % m):
+            with self.subTest(text=text[:20]):
+                self.tearDown()
+                self.setUp()
+                got, covered, _ = self.run_one(text)
+                self.assertIsNone(got)
+
+    def test_a_uuid_matches_in_any_case_and_any_other_id_as_written(self):
+        link = fb._link if hasattr(fb, "_link") else importlib.import_module("fabric_board_link")
+        request = fb.BoardRequest({"body": {"text": body(json.dumps(mandate()))}, "request": {"id": "r"},
+                                   "sender": {"project": OTHER_PROJECT.upper(), "principal": {"provenance": "trusted"}}}, "video.render")
+        self.assertIsNotNone(link.read_mandate(request, link.mandate_options("example-agent", {OTHER_PROJECT}), "example-agent")[0])
+        request.sender = {"project": "team-a", "principal": {"provenance": "trusted"}}
+        self.assertIsNone(link.read_mandate(request, link.mandate_options("example-agent", {"Team-A"}), "example-agent")[0])
+        self.assertIsNotNone(link.read_mandate(request, link.mandate_options("example-agent", {"team-a"}), "example-agent")[0])
+
+    def test_a_clock_that_does_not_read_answers_now_unreadable(self):
+        link = importlib.import_module("fabric_board_link")
+        for clock in (float("nan"), None, float("inf")):
+            self.assertEqual(link.covers(mandate(), {"capability": "video.render", "effect": "draft"}, "example-agent",
+                                         lambda c=clock: c), {"fault": "now-unreadable"})
+
     def test_a_responder_refuses_a_bad_agent_id_or_mandate_from(self):
         for kw in ({"agent_id": "Not An Id"}, {"mandate_from": "everyone"}, {"mandate_from": [42]}, {"mandate_from": 42},
-                   {"mandate_from": {OTHER_PROJECT: True}}):
+                   {"mandate_from": {OTHER_PROJECT: True}}, {"mandate_from": types.MappingProxyType({OTHER_PROJECT: 1})}):
             with self.subTest(kw=kw):
                 with self.assertRaises(fb.BoardError):
                     self.responder(**kw)

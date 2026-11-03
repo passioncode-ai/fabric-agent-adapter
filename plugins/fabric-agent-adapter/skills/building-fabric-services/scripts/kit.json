@@ -427,7 +427,7 @@
     "fabric_mandate",
     "fabric_service"
    ],
-   "sha256": "3fae59a6005cd0404bec672325972c60f8a6b955c28ad85680b22eaf395c69b2"
+   "sha256": "9dcee3288acdc52d6251ca8a782b1d3d82f061a23b5350dd79038e6e7bc0efa7"
   },
   {
    "module": "fabric_board_slots",
@@ -911,7 +911,7 @@
     "fabric-service",
     "fabric-time"
    ],
-   "sha256": "00f512d6edc55e851ae2ba941cf40c1af983c3a0d14df92816e8e2f967cdf40b"
+   "sha256": "fcca6dac98ff8a0b79d853e061b953e381ae8a58b9ac8f108ca289d14e727389"
   },
   {
    "module": "fabric-board-slots",
@@ -4629,7 +4629,7 @@
    "fabric_interop.py": "8f7e43bf01fa5e969d7d819f4b0188b9acfd846f6f85a37ea139e550d61e4e6c",
    "fabric_hub.py": "b9ac852e601b1d54cf61351677a628afc69faeed7d1fc74ebe541c1cf38e0c2a",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
-   "fabric_board_link.py": "3fae59a6005cd0404bec672325972c60f8a6b955c28ad85680b22eaf395c69b2",
+   "fabric_board_link.py": "9dcee3288acdc52d6251ca8a782b1d3d82f061a23b5350dd79038e6e7bc0efa7",
    "fabric_board_slots.py": "92b065e3df935547cf46653245f1129e4a1f8b59b0a41e8fa9ffdc41596ee592",
    "fabric_board_session.py": "1fd3c3884f3044b56a40f78b33ff88dcac9272284f6681ea359c662879826f7e",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
@@ -4672,7 +4672,7 @@
    "fabric-interop.mjs": "ee7e6d32be1f42e6d21a943b8886652352408c49c6404d9749b8a02dc3901e92",
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
-   "fabric-board-link.mjs": "00f512d6edc55e851ae2ba941cf40c1af983c3a0d14df92816e8e2f967cdf40b",
+   "fabric-board-link.mjs": "fcca6dac98ff8a0b79d853e061b953e381ae8a58b9ac8f108ca289d14e727389",
    "fabric-board-slots.mjs": "fc77a3c6e62aa18575568bef4f703cce2edaba8cef648813ebcdbb21bdc27a11",
    "fabric-board-session.mjs": "bf7b314948b9b33b092349c11a5cd04d4054ee23e2f92f41a3a0a5f7e25cf0cd",
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",

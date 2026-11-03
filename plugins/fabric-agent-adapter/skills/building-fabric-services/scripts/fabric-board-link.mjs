@@ -187,7 +187,10 @@ export class BoardRequest {
 
 /** `mandateFrom` naming every trusted sender of the board the service is installed on: the operator's personal board. */
 export const PERSONAL_BOARD = 'personal-board';
-const JSON_BLOCK = /```json[ \t]*\r?\n([\s\S]*?)\r?\n?```/g;
+const JSON_BLOCK = /^```json[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*\r?$/gm; // each fence on its own line
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+/** A Project id as Fabric's board compares it: a uuid lower-cased, any other id as written (normalProject). */
+const fold = (project) => (UUID.test(project) ? project.toLowerCase() : project);
 
 /**
  * The mandate a request carries, read only when the service opted in (`agentId` and `mandateFrom` set), the board
@@ -202,7 +205,8 @@ export function readMandate(request, mandateFrom, agentId) {
   const sender = isObj(request.sender) ? request.sender : {};
   const principal = isObj(sender.principal) ? sender.principal : {};
   if (principal.provenance !== 'trusted') return none;
-  if (mandateFrom !== PERSONAL_BOARD && !(typeof sender.project === 'string' && mandateFrom.has(sender.project.toLowerCase()))) return none;
+  if (typeof sender.project !== 'string') return none; // comms-message requires it; a caller is recorded from it
+  if (mandateFrom !== PERSONAL_BOARD && !mandateFrom.has(fold(sender.project))) return none;
   const found = [];
   for (const [, block] of request.body.matchAll(JSON_BLOCK)) {
     let value;
@@ -228,7 +232,9 @@ export function readMandate(request, mandateFrom, agentId) {
  */
 export function covers(mandate, call, agentId, wall, caller = null) {
   if (mandate == null || agentId == null) return null;
-  const answer = mandateCovers({ mandate, tier: 'T1', now: formatRfc3339(wall()), self: agentId, call });
+  const clock = wall();
+  const now = Number.isFinite(clock) ? formatRfc3339(clock) : '';
+  const answer = mandateCovers({ mandate, tier: 'T1', now, self: agentId, call });
   return answer.recordAs ? { ok: true, recordAs: { ...answer.recordAs, caller } } : answer;
 }
 
@@ -240,6 +246,6 @@ export function mandateOptions(agentId, mandateFrom) {
   if (projects === null || !projects.every((p) => typeof p === 'string' && p)) {
     throw new BoardError('invalid_arguments', `mandateFrom is '${PERSONAL_BOARD}' or a collection of Project ids.`);
   }
-  return new Set(projects.map((p) => p.toLowerCase())); // Fabric compares Project uuids lower-cased, as normalProject
+  return new Set(projects.map(fold));
 }
 

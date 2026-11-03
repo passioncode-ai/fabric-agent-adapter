@@ -10,6 +10,7 @@ import * as fb from '../plugins/fabric-agent-adapter/skills/building-fabric-serv
 import * as fh from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs';
 import { handOn, operatorMandate } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-mandate.mjs';
 import { makeEvent } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-events.mjs';
+import { PERSONAL_BOARD as _PB, covers, mandateOptions, readMandate, BoardRequest } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board-link.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -163,4 +164,35 @@ test('FAA-135: a declared Project matches in any case; a read mandate reaches no
   const [, covered] = await h.runOne(body(JSON.stringify(mandate())), { mandateFrom: new Set([OTHER_PROJECT.toUpperCase()]) });
   assert.equal(covered.ok, true);
   assert.ok(!h.seen.ctx.includes(WORDS), 'JSON.stringify(ctx) never carries the operator\'s words');
+});
+
+for (const [name, text] of [['an opener mid-line', (m) => `Here it is: \`\`\`json\n${m}\n\`\`\`\n`],
+  ['a four-backtick fence', (m) => `\`\`\`\`json\n${m}\n\`\`\`\`\n`], ['a closer on the content line', (m) => `\`\`\`json\n${m}\`\`\`\n`]]) {
+  test(`FAA-135: ${name} is no mandate block (0.61.0 readings 2)`, () => {
+    const request = new BoardRequest({ body: { text: text(JSON.stringify(mandate())) }, request: { id: 'r' },
+      sender: { project: OTHER_PROJECT, principal: { provenance: 'trusted' } } }, 'video.render');
+    assert.equal(readMandate(request, mandateOptions('example-agent', new Set([OTHER_PROJECT])), 'example-agent').mandate, null);
+  });
+}
+
+test('FAA-135: a uuid matches in any case, any other id as written', () => {
+  const request = new BoardRequest({ body: { text: body(JSON.stringify(mandate())) }, request: { id: 'r' },
+    sender: { project: OTHER_PROJECT.toUpperCase(), principal: { provenance: 'trusted' } } }, 'video.render');
+  assert.notEqual(readMandate(request, mandateOptions('example-agent', new Set([OTHER_PROJECT])), 'example-agent').mandate, null);
+  request.sender = { project: 'team-a', principal: { provenance: 'trusted' } };
+  assert.equal(readMandate(request, mandateOptions('example-agent', new Set(['Team-A'])), 'example-agent').mandate, null);
+  assert.notEqual(readMandate(request, mandateOptions('example-agent', new Set(['team-a'])), 'example-agent').mandate, null);
+});
+
+test('FAA-135: a clock that does not read answers now-unreadable', () => {
+  for (const clock of [NaN, null, Infinity]) {
+    assert.deepEqual(covers(mandate(), { capability: 'video.render', effect: 'draft' }, 'example-agent', () => clock), { fault: 'now-unreadable' });
+  }
+});
+
+test('FAA-135: a sender without a project is never read, even on the personal board', () => {
+  for (const sender of [{ principal: { provenance: 'trusted' } }, { project: 42, principal: { provenance: 'trusted' } }]) {
+    const request = new BoardRequest({ body: { text: body(JSON.stringify(mandate())) }, request: { id: 'r' }, sender }, 'video.render');
+    assert.deepEqual(readMandate(request, _PB, 'example-agent'), { mandate: null, unread: null });
+  }
 });

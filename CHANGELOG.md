@@ -8,12 +8,12 @@ says that his approval holds for the whole task, at every link (FAA-195).
 ### Added
 
 - `Responder(..., agent_id=, mandate_from=)`: with both set, a request whose sender the board verified
-  (`provenance: trusted`) and whose Project `mandate_from` names, in any case (or every such sender,
+  (`provenance: trusted`) and whose Project `mandate_from` names (a uuid in any case; or every such sender,
   `mandate_from="personal-board"`, only on the personal board's responder) is read for one `mandate/1` block fenced
-  ` ```json ` in its body (contract project-comms.md, DEC-0125 MD-3). The handler gets it as `ctx.mandate`, and
+  ` ```json `, each fence on its own line, in its body (contract project-comms.md, DEC-0125 MD-3). The handler gets it as `ctx.mandate`, and
   `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1, the responder's wall clock (`wall=`,
   `time.time` by default; Node `Date.now`, milliseconds) and the sender Project as the `caller` of a covered answer's
-  `recordAs`; None when no mandate travelled. A `source` in the block is dropped (OA-7). Two blocks, or one naming
+  `recordAs`; None when no mandate travelled, and `{"fault": "now-unreadable"}` when the clock does not read. A `source` in the block is dropped (OA-7). Two blocks, or one naming
   `mandate/1` that is not JSON, read as none, with a `board.request.mandate_unread` warning carrying only its `reason`.
   Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
   mandate. Both kits (FAA-135).

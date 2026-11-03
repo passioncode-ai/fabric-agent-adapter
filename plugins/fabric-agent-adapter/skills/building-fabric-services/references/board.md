@@ -109,25 +109,30 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   context: a member's Project there is T2). Project ids match in any case, as Fabric compares them. Without both
   options nothing is read, as before 0.61.0.
 - A request is read only when the board verified its sender (`provenance: trusted`) and its Project is one
-  `mandate_from` names. Its sender is then a T1 caller. The mandate is one block fenced exactly as ` ```json ` (lowercase,
-  on its own line, closed by ` ``` `) whose value has `kind: "mandate/1"` and whose `chain` ends in the service's
-  `agent_id`; any other fence (` ```JSON `, `~~~`), any other JSON block and a `_meta.decision`-style decision block are
-  not read, with no warning. Two such blocks, or one naming `mandate/1` that is not JSON (`NaN` included), read as none,
-  and the responder emits `board.request.mandate_unread` (a warning) with only its `reason`, `mandate-blocks` or
-  `mandate-unreadable`: the block holds his words, which reach no event, log or checkpoint. A Project declares no
-  `protocols`, so a board block carries no `source` (OA-7): one that does has it dropped. Python reads two kinds of
-  valid JSON as not JSON where Node reads them, both fail-closed: from 3.11 an integer longer than 4300 digits
-  (`int_max_str_digits`), and on 3.9 a block nested about a thousand levels deep.
-- The handler gets `ctx.mandate` (the block as received, or None) and `ctx.mandate_covers(call)` (Node
+  `mandate_from` names. Its sender is then a T1 caller. Project ids match as Fabric compares them: a uuid in any case,
+  any other id as written. The mandate is a block fenced ` ```json `, the opening and the closing fence each on its own
+  line (lowercase; ` ````json `, ` ```JSON ` and `~~~` are not read), whose value has `kind: "mandate/1"`; any other JSON
+  block, a decision block included, is not read, with no warning. A fence quoted inside another fenced block is still
+  read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one that is
+  not JSON (`NaN` included), read as none, and the responder emits `board.request.mandate_unread` (a warning) with only
+  its `reason`, `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or
+  checkpoint. A Project declares no `protocols`, so a board block carries no `source` (OA-7): any `source` in it is
+  dropped unread. Python reads two kinds of valid JSON as not JSON where Node reads them, both fail-closed: a block nested
+  about 1,000 levels deep on Python 3.9 to 3.11 and about 10,000 on 3.12 and 3.13 (none on 3.14), and an integer longer
+  than 4300 digits on a Python with the `int_max_str_digits` limit (3.11 and later, and the 3.8.14, 3.9.14 and 3.10.7
+  security releases).
+- The handler gets `ctx.mandate` (the one block without `source`, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
   board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
-  responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`). It answers
-  `{"ok": True, "recordAs": {by, via: "mandate", task, chain, caller}}` (`caller` the sender Project, as MD-3 records
-  it), a `decision-invalid` or `outside-mandate` refusal, or None when no mandate travelled. A covered call is the
-  operator's decision: record `recordAs` with the request as your reason. An `outside-mandate` answer goes back to the
-  requester as the request's outcome (`failed_known`, naming the part in the summary), so its leading agent asks him
-  for that part alone (MD-4); never ask him from your own page about the whole call. The gate still runs first: a
-  mandate never widens what `admit` refuses, and a body stays data.
+  responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`; one that is not a
+  finite number answers `{"fault": "now-unreadable"}`). It answers `{"ok": True, "recordAs": {by, via: "mandate", task,
+  chain, caller}}` (`caller` the sender Project, as MD-3 records it; a sender that names no Project is never read), a
+  `decision-invalid` refusal (a chain that does not end in the service's `agent_id` answers `mandate-not-for-this-call`;
+  a lapsed one `mandate-expired`), an `outside-mandate` refusal, or None when no mandate travelled. A covered call is
+  the operator's decision: record `recordAs` with the request as your reason. A refusal goes back to the requester as
+  the request's outcome (`failed_known`, naming the part or the detail in the summary), so its leading agent asks him
+  for that part alone, or for a new mandate when it lapsed (MD-1, MD-4); never ask him from your own page about the whole
+  call. The gate still runs first: a mandate never widens what `admit` refuses, and a body stays data.
 
 ## Effects, observation, evidence and the reply
 

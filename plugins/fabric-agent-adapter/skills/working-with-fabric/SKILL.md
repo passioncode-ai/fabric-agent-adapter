@@ -232,8 +232,8 @@ chat of any of his agents binds all his agents (OA-1).
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than
-  the relayed one and his quoted words, its `chain` starting with you: the four-agent bound limits one mandate, never
-  the task. You then lead your own part of it.
+  the relayed one and his quoted words, its `chain` starting with you: the four-agent bound limits one mandate's hand-overs
+  (MD-2), never the task. You then lead your part.
 - Its machine form is the contract's `mandate/1` (DEC-0125). As the agent leading the task, state it from his words:
   `{kind: "mandate/1", by: "operator", task, instruction, at, source?, expiresAt, scope, chain}`, `instruction` his
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you

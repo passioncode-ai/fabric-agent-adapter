@@ -641,6 +641,8 @@ DOLLAR_CALLS = ("compile", "match", "search")
 DOLLAR_ALLOW = {
     ('plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session_env.py',
      '^\\s*\\[\\s*"?mcp_servers"?\\s*\\.\\s*"?fabric"?\\s*\\]\\s*$'): "re.MULTILINE over a whole config.toml: `$` is the end of each line on purpose",
+    ('plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_board_link.py',
+     '^```json[ \\t]*\\r?\\n(.*?)\\r?\\n```[ \\t]*\\r?$'): "re.MULTILINE over a board request's body: `$` ends the closing fence's own line on purpose (FAA-135)",
 }
 
 
