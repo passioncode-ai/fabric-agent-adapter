@@ -378,6 +378,17 @@
       ]
     },
     {
+      "id": "an-approval-holds-for-the-whole-task",
+      "trap": "the third agent of a task asked the operator again for what he had approved when the task was set, because the second agent handed it the work with only 'the operator approved this' and no quote, date, source or scope; or the agent extended a mandate past its seven days by re-dating it, or dropped the bound of four agents for the task",
+      "request": "The operator approved «research eSIM prices and update the pricing page draft» on 2026-11-03 in example-site's session, scope page.update on example-site. I am the second agent and now hand the page update to a third agent; the task may run nine days. What does my hand-over carry, and what happens on day eight?",
+      "expected": [
+        "his approval holds for the whole task at every link (operator, 2026-11-03, board thread 118f95f9): the hand-over carries the four parts, his words verbatim, the date, where he said them and the scope, in _meta.mandate or, where the client cannot set _meta, in the message",
+        "the third agent acts on them without asking him again, narrowing only; the human gates (sign-in, a one-time code, payment, a typed secret, spend above a limit) stay the person's (MD-6)",
+        "an agent that receives the relay states its own mandate/1 with instruction and at unchanged and its chain starting with it (OA-2), so the bound of four agents limits one mandate, never the number of links in the task",
+        "at never moves, so the mandate expires at most seven days after his words: the task still open then asks him once to confirm the same words (MD-1), then weekly until the contract's CT-205; it never re-dates or extends a mandate itself"
+      ]
+    },
+    {
       "id": "lead-covers-a-job-step-by-its-capability",
       "trap": "the lead listed the step's request key in `actions` (a key the service chooses), or listed fabric.job.get in `capabilities`, so the job's approval step was never covered and the operator was asked again",
       "request": "The operator told me (the lead agent) «approve the replies to this week's reviews». The review agent runs that as a job (its capability reviews.approve) and asks for approval at a step before it publishes. How do I write the mandate's scope so that step goes through without asking him again?",

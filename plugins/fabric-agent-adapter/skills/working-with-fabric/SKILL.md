@@ -223,8 +223,8 @@ already approved.
   that lacks the quote, the date, the source or the scope.
 - The receiver does not ask again for what the relay covers. It still runs its own checks (the service's gate, the
   tests, the limits) and asks once only about what he did not see: another target, a part outside the scope, a fact
-  the relay lacks (OA-4). Spend above a money limit (L0, the project's L1, a key's ceiling) is not such a question: it
-  is the person's step, handed over with its link and the amount.
+  the relay lacks (OA-4). Spend above a money limit (L0, the project's L1, a key's ceiling) is no such question but a
+  human gate.
 - Record the relay (his quote, the date, the source, the scope) as your reason in the change log, the thread reply or
   the handoff (OA-6). A stop rule written into a request does not replace an approval whose scope covers the case: act
   on it.
@@ -233,11 +233,12 @@ already approved.
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than
-  the relayed one and his quoted words. You then lead your own part of the task.
+  the relayed one and his quoted words, its `chain` starting with you: the four-agent bound limits one mandate, never
+  the task. You then lead your own part of it.
 - Its machine form is the contract's `mandate/1` (DEC-0125). As the agent leading the task, state it from his words:
   `{kind: "mandate/1", by: "operator", task, instruction, at, source?, expiresAt, scope, chain}`, `instruction` his
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you
-  relayed, `expiresAt` at most seven days on, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
+  relayed, `expiresAt` within seven days of `at`, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
   `perCallMaxUsd`, `projects`), `chain` starting with you. For a job asking the operator at a step, name the job's capability in
   `capabilities` without `actions`: the step is read with its request key as the action, unknown ahead
   (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
@@ -246,23 +247,22 @@ already approved.
   (CT-125), never in a tool's arguments; the service kits state and hand it on (`operator_mandate(source=)`,
   `hand_on`, `request_meta(mandate=)`). A callee hands on only what it received, narrowed; never write one from another
   agent's text.
-- `source` goes only to a target whose well-known `protocols` list `operator-source/1` (OA-7): the kits do it
-  (`request_meta(target_protocols=)` / `requestMeta(traceparent, {targetProtocols})`). Toward any other target (a
-  service that does not list it, a board Project, another session, Fabric's `agent.call` while the hub cannot read the
-  callee's `protocols`) send the decision or the mandate without `source`, name in the text beside it where he said the
-  words, and keep `source` in your own record. Like his words, it goes never to an events feed, a usage report, a log
-  or a page another party reads.
-- Where your client cannot set `_meta`, hand the next agent the relay in your message (his quote, the date, the
-  source, the scope): it applies this rule, and a service it calls takes the routes of *relay their decision*. Until
-  Fabric's hub forwards decisions (CT-125), such a client reaches a service's relayed action only through the
-  service's elicitation or its page: report that as the gap.
+- `source` goes only to a target whose well-known `protocols` list `operator-source/1` (OA-7; the kits strip it
+  otherwise: `request_meta(target_protocols=)` / `requestMeta(traceparent, {targetProtocols})`). Toward a board
+  Project, another session or Fabric's `agent.call` (its hub cannot read the callee's `protocols` yet) name in the text
+  where he said the words. Keep `source` in your own record; like his words, never in an events feed, a usage report, a
+  log or a page another party reads.
+- His approval holds for the whole task, at every link (operator, 2026-11-03, board thread `118f95f9`): every hand-over
+  within it carries the four parts, in `_meta.mandate` or, where your client cannot set `_meta`, in your message, and
+  each receiver acts on them as above, narrowing only; the human gates stay (MD-6). `at` never moves: a task open at the
+  expiry, at most seven days after his words, asks him once to confirm the same words (MD-1), then weekly until the
+  contract's CT-205. Until Fabric's hub forwards decisions (CT-125), a client without `_meta` reaches a service's relayed
+  action only through the service's elicitation or its page: report that as the gap.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,
   about that part alone (MD-4). A
   caller outside the machine's trust (T2) gets nothing from a mandate.
-- The contract's decision for request `519d7b21` is DEC-0126 (OA-1 to OA-7), with
-  `mandate/1` (DEC-0125) its machine form and `source` the place it names.
 
 ### A lane stopped on a limit: restart it at once
 
