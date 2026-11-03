@@ -33,6 +33,7 @@ import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 from fabric_actions import action_caller, readable_action  # noqa: E402 - DEC-0121
 from fabric_mandate import EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, is_agent_id  # noqa: E402 - DEC-0125, DEC-0126
+from fabric_jsvalue import real_number as _real_number  # noqa: E402 - the core's (FAA-65)
 from fabric_time import format_rfc3339  # noqa: E402 - the core's (FAA-65)
 from fabric_page_links import (  # noqa: E402 - DEC-0123
     PageLinkError, dashboards_link, input_request_link_findings, page_link_findings, parse_dashboards_link)
@@ -772,11 +773,12 @@ class McpToolServer:
         caller_agent = (verdict or {}).get("caller")
         # The estimate is read as a double, as the contract does: an int past the float range is infinite, and an
         # estimate that is not a finite number reads as none, which a mandate's ceiling refuses (fail closed).
-        try:  # by the number it holds: a subclass's own float() is never asked (0.61.0 seam reading 18)
-            double = (float.__float__(spend) if isinstance(spend, float) else float(int.__int__(spend))) \
-                if isinstance(spend, (int, float)) and not isinstance(spend, bool) else math.nan
+        number = _real_number(spend)  # by what it stores; a bool, a mock or not a number is none (seam reading 18)
+        try:
+            double = float(number) if number is not None else math.nan
         except OverflowError:
             double = math.inf
+        spend = number
         finite = math.isfinite(double)  # the service's own number goes on when it is finite (25 stays 25)
         if project is _UNREADABLE or not (project is None or isinstance(project, str)):
             project = _UNREADABLE_PROJECT  # a function that raised or named no string: a scoped mandate refuses

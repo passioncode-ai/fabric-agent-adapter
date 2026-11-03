@@ -150,6 +150,7 @@ def _own(value: Any, key: str) -> Any:
     return value.get(key, _ABSENT) if isinstance(value, dict) else _ABSENT
 
 
+import fabric_jsvalue as _jsvalue  # noqa: E402 - the core's (FAA-65)
 from fabric_time import days_from_civil as _days_from_civil  # noqa: E402 - the core's (FAA-65)
 
 
@@ -382,9 +383,9 @@ def mandate_spend(value: Any) -> Any:
     ceiling refuses (fail closed). A finite number stays as given (25 stays 25). A subclass of int or float is read by
     the number it holds, never by an overridden `float()` or `int()` (numpy.float64 3.0 reads 3.0; one whose `float()`
     answers 0.0 for 100 reads 100); a bool is none."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    value = _jsvalue.real_number(value)  # a bool, a mock that claims a number, or not a number: none
+    if value is None:
         return None
-    value = float.__float__(value) if isinstance(value, float) else int.__int__(value)
     try:
         return value if math.isfinite(float(value)) else None
     except OverflowError:

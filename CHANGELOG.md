@@ -28,13 +28,18 @@ says that his approval holds for the whole task, at every link (FAA-195).
 
 ### Fixed
 
-- The Python mandate readers (McpToolServer and `action_gate`, the job step, the board path, and the core
-  `mandate_covers` and `action_decision` beneath them) read a spend estimate that is an `int` or `float` subclass
-  through its `float()`, so a subclass whose `float()` answered 0.0 for 100 passed a `perCallMaxUsd` of 5.
-  `mandate_spend`, `js_to_number` and McpToolServer's estimate now read a subclass by the number it holds
-  (`float.__float__`, `int.__int__`):
-  an honest subclass such as `numpy.float64` keeps its number, a lying one is read as what it holds, and a bool is none
-  as before (0.61.0 seam readings 17 and 18, product reading 18).
+- The Python mandate readers (McpToolServer and `action_gate`, the job step, and the core `mandate_covers` and
+  `action_decision` beneath them; a draft of this release's board path too) read a spend estimate that is an `int` or
+  `float` subclass through its own `float()` and comparisons, so a subclass whose `float()` answered 0.0 for 100, or
+  whose `>` lied about an integer past the double range, passed a `perCallMaxUsd` of 5. A number is now an `int` or
+  `float` by its real type (`fabric_jsvalue.is_number`, never `__class__`) and is read by the number it stores
+  (`real_number`: `float.__float__`, `int.__int__`), in `mandate_spend`, `js_to_number`, `double` and McpToolServer's
+  estimate: an honest subclass such as `numpy.float64` keeps its number, a lying one is read as what it holds. A value
+  that only claims a number through `__class__` (a mock with `spec=float`, a lazy proxy), a `Decimal` or a
+  `numpy.int64` is no estimate: the call is answered and a `perCallMaxUsd` refuses it, in every reader, the core
+  `mandate_covers` included. A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
+  the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
+  seam readings 17 to 19, product readings 18 and 19, unit reading 19).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
   I/O error, an interrupt), the descriptor stayed held, and the lock name too, since the caller drops the object
   (`release()` would have freed only the name, on Linux and Windows), so the same process could not start the service

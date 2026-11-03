@@ -145,11 +145,29 @@ def get_string(value: Any, key: str) -> str:
 
 
 def is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """An int or a float by its real type, a subclass's included; a bool, or a value that only claims a number through
+    `__class__` (a mock, a proxy), is not one (0.61.0 seam reading 19)."""
+    kind = type(value)
+    return kind is not bool and issubclass(kind, (int, float))
+
+
+def real_number(value: Any) -> Any:
+    """The plain int or float a number holds (is_number), read by what it stores, never by its own float(), int() or
+    comparisons; None for anything else (0.61.0 seam reading 18, unit and product readings 19)."""
+    if not is_number(value):
+        return None
+    return float.__float__(value) if issubclass(type(value), float) else int.__int__(value)
+
+
+def held(value: Any) -> Any:
+    """A number by what it stores (real_number); any other value as given, so it reads as it did before."""
+    number = real_number(value)
+    return value if number is None else number
 
 
 def double(value: Any) -> float:
     """A JSON number as JavaScript holds it: the nearest double, and an integer beyond the double range ±Infinity."""
+    value = held(value)
     try:
         return float(value)
     except OverflowError:
@@ -199,8 +217,9 @@ def js_to_number(value: Any) -> float:
     if isinstance(value, bool):
         return 1.0 if value else 0.0
     if is_number(value):
-        try:  # by the number it holds: a subclass's own float() is never asked (0.61.0 seam reading 18)
-            return float.__float__(value) if isinstance(value, float) else float(int.__int__(value))
+        value = held(value)  # by the number it holds: a subclass's own float() or comparison is never asked
+        try:
+            return float(value)
         except OverflowError:
             return math.inf if value > 0 else -math.inf
     if isinstance(value, list):

@@ -811,6 +811,32 @@ class ActionGateMandateTests(unittest.TestCase):
             error = answer["result"]["structuredContent"]["error"]
             self.assertEqual((error["code"], error["data"]["detail"]), ("operator-decision-required", "outside-mandate: spend"))
 
+    def test_a_spend_subclass_is_read_by_the_number_it_holds(self):
+        # 0.61.0 seam reading 18, unit and product readings 19: a subclass's own float() is never asked, and a value that
+        # only claims a number through __class__ (a mock) is no estimate; the call is answered either way.
+        from unittest import mock
+
+        class NanFloat(float):
+            def __float__(self):
+                return float("nan")
+
+        class RaisingFloat(float):
+            def __float__(self):
+                raise ValueError("unreadable")
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        for estimate, covered in ((NanFloat(0.5), True), (RaisingFloat(0.5), True), (mock.MagicMock(spec=float), False)):
+            server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
+            server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
+                            target="reply", effect="reply", spend=lambda a, e=estimate: e)
+            params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": tight}}
+            answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
+            error = answer["result"].get("structuredContent", {}).get("error")
+            with self.subTest(estimate=type(estimate).__name__):
+                if covered:
+                    self.assertIsNone(error, answer)
+                else:
+                    self.assertEqual(error["data"]["detail"], "outside-mandate: spend")
+
     def test_the_direct_gate_reads_spend_and_project_failing_closed(self):
         """FAA-139: action_gate reads as McpToolServer does: a spend past the float range, NaN or infinite is none (a
         ceiling refuses it, and no 5000-digit number reaches the refusal), a project that is no string is unreadable."""

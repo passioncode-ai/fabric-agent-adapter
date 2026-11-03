@@ -335,6 +335,26 @@ class BoardMandateTests(Conversation):
                                  "call": {"capability": "video.render", "effect": "draft", "spendUsd": Lying(100), "project": "site-a"}})
         self.assertEqual(got.get("data", {}).get("detail"), "outside-mandate: spend")
         jsv = importlib.import_module("fabric_jsvalue")
+
+        class Big(int):  # an overflow's sign is read from what it holds, never from its own comparison (unit reading 19)
+            def __gt__(self, other):
+                return False
+        self.assertEqual(jsv.js_to_number(Big(10 ** 400)), float("inf"))
+        got = fm.mandate_covers({"mandate": m, "tier": "T1", "now": AT, "self": "example-agent",
+                                 "call": {"capability": "video.render", "effect": "draft", "spendUsd": Big(10 ** 400), "project": "site-a"}})
+        self.assertEqual(got.get("data", {}).get("detail"), "outside-mandate: spend")
+        from unittest import mock
+        spoof = mock.MagicMock(spec=float)  # claims float through __class__: no estimate, never a raise (product reading 19)
+        self.assertIsNone(importlib.import_module("fabric_interop_rules").mandate_spend(spoof))
+        for odd in (spoof, importlib.import_module("decimal").Decimal(100)):  # no JSON value: no estimate in the core reader, a ceiling refuses it
+            with self.subTest(odd=type(odd).__name__):
+                got = fm.mandate_covers({"mandate": m, "tier": "T1", "now": AT, "self": "example-agent",
+                                         "call": {"capability": "video.render", "effect": "draft", "spendUsd": odd, "project": "site-a"}})
+                self.assertEqual(got.get("data", {}).get("detail"), "outside-mandate: spend")
+                self.assertNotIn("estimateUsd", got["data"])
+        self.assertFalse(jsv.is_number(spoof), "a value that only claims a number is none")
+        self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": spoof, "project": "site-a"}),
+                         "outside-mandate: spend")
         self.assertEqual((jsv.js_to_number(Lying(100)), jsv.js_to_number(LyingInt(100)), jsv.js_to_number(Usd(3))), (100.0, 100.0, 3.0))
         rules = importlib.import_module("fabric_interop_rules")
         self.assertEqual((rules.mandate_spend(Usd(3)), type(rules.mandate_spend(Usd(3)))), (3.0, float))

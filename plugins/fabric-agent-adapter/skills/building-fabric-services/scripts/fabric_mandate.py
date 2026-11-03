@@ -33,7 +33,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_jsvalue import MISSING, get, is_number, js_to_number, same, set_has  # noqa: E402
+from fabric_jsvalue import MISSING, get, is_number, js_to_number, real_number, same, set_has  # noqa: E402
 from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
 
 #: The longest a mandate stands after the operator gave it (FAC-SEM-144).
@@ -290,10 +290,13 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     if not set_has(list(_READS_AND_DRAFTS), effect) and capabilities is MISSING and (action is MISSING or actions is MISSING):
         return _outside("outside-mandate: capability")
     ceiling, spend = get(scope, "perCallMaxUsd"), get(call, "spendUsd")
-    if ceiling is not MISSING and (spend is MISSING or js_to_number(spend) > ceiling):
+    # A spend that is no JSON value (a mock, a proxy, a Decimal, a numpy.int64) is no estimate, which a ceiling refuses
+    # (0.61.0 seam reading 19); a JSON value is read as the contract reads it.
+    readable = spend is None or type(spend) in (bool, str, list, dict) or is_number(spend)
+    if ceiling is not MISSING and (spend is MISSING or not readable or js_to_number(spend) > ceiling):
         data: Dict[str, Any] = {"detail": "outside-mandate: spend"}
-        if spend is not MISSING:
-            data["estimateUsd"] = spend
+        if spend is not MISSING and readable:
+            data["estimateUsd"] = real_number(spend) if is_number(spend) else spend
         data["perCallMaxUsd"] = ceiling
         return {"ok": False, "code": OUTSIDE_MANDATE, "data": data}
     project, projects = get(call, "project"), get(scope, "projects")
