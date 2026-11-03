@@ -70,8 +70,8 @@ try:
     from fabric_source_ignore import (  # noqa: E402,F401 - how the ignore lines are read, beside this file
         IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _readable_glob, ignore_globs)
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
-        HOME_ENTRY, _NAME_JOIN, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
-except ImportError as _missing:  # a copy without its two siblings: say so, as a refusal, never a finding's exit 1
+        HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
+except ImportError as _missing:  # a copy without its siblings: say so, as a refusal, never a finding's exit 1
     sys.stderr.write("fabric_source_check.py: %s.py must sit beside this file\n" % (_missing.name or "a module"))
     sys.exit(2)
 finally:
@@ -325,8 +325,9 @@ def read_list(path: Path) -> List[str]:
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         # a byte-order mark or a zero-width character at a line's start (two lists joined) is no part of the line
         text = raw.strip().lstrip("\ufeff\u200b\u2060").strip().replace(HOME_ENTRY, "")  # no meaning at a start
-        # a joiner (U+200C, U+200D) at a start may belong to a string, never to `home:`: a home line is read or refused
-        bare = text.lstrip("\u200c\u200d").strip()
+        # a joiner (U+200C, U+200D) at a start may belong to a string, never to `home:`: a home line is read or refused,
+        # whatever order the invisible characters before it come in
+        bare = re.sub(r"^[\s\ufeff\u200b-\u200d\u2060]+", "", text)
         home = _HOME_LINE.fullmatch(bare)
         if home and home.group(1).isascii():
             entries.append(HOME_ENTRY + home.group(1).lower())
@@ -336,7 +337,8 @@ def read_list(path: Path) -> List[str]:
                              "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`, "
                              "`'`): a note goes on a line of its own, a path is written as its home name only, and a name "
                              "outside ASCII, or holding another character, is listed as a plain string (a typographic "
-                             "apostrophe is written as ')" % (len(entries) + 1))
+                             "apostrophe the folder's name does not hold is written as ', one it holds stays in the plain "
+                             "string)" % (len(entries) + 1))
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
@@ -518,7 +520,7 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
             # found in the tree: masked wherever it stands; unfound: a whole word only, so `home: app` leaves `mapping`
             # readable (a percent-encoded or escaped separator before it starts a word too)
             if not any(re.fullmatch(body, name, re.IGNORECASE) for name in known):
-                body = r"(?:(?<![A-Za-z0-9])|(?<=%[0-9A-Fa-f]{2})|(?<=\\u0027)|(?<=&#39;)|(?<=&#x27;))" + body + "(?![A-Za-z0-9])"
+                body = _NAME_START + body + "(?![A-Za-z0-9])"
             marks += [(m.start(), m.end(), "<home>") for m in re.finditer(body, path, re.IGNORECASE)]
     for name in _spellings({path[s:e] for s, e in found}, _owner_homes(entries)):
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]

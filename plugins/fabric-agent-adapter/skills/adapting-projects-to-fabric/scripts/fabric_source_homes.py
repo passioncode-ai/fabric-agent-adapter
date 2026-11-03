@@ -37,6 +37,13 @@ _DECLARED_DASHED = (r"(?:^|[^A-Za-z0-9-])(?:-Users|-home|-var-home|(?:-mnt)?-[A-
 _NAME_JOIN = r"(?:[ ._+'-]|\\'|\\x27|\\u0027|&#0?39;|&#[xX]27;|&apos;|%2[07BbDdEe]|%5[Ff])"
 
 
+#: Where an unfound declared name starts a word: no letter or digit before it, or one of `_NAME_JOIN`'s escapes that ends
+#: in a letter or digit (a percent-encoding, `\x27`, `\u0027`, `&#39;`, `&#x27;`). Kept beside `_NAME_JOIN`, so a
+#: separator added to one is added to the other.
+_NAME_START = (r"(?:(?<![A-Za-z0-9])|(?<=%[0-9A-Fa-f]{2})|(?<=\\x27)|(?<=\\u0027)|(?<=&#39;)|(?<=&#039;)|(?<=&#x27;)"
+               r"|(?<=&#X27;))")
+
+
 def _name_parts(name: str) -> List[str]:
     return [part for part in re.split(r"[ ._'-]+", name) if part]
 

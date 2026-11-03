@@ -1341,7 +1341,7 @@ class Refusals(Tree):
             sc._text_findings("/Users/" + declared + "/x", [sc.HOME_ENTRY + declared], seen)
             self.assertEqual(sc.redact("q/" + spelled + "/.env", [sc.HOME_ENTRY + declared], seen), "q/<home>/.env", spelled)
         for path, declared in (("exports/Report%20for%20Jane%20Zqdo.pem", "jane zqdo"), ("q/u%2Fjzqd%2Fx.key", "jzqd"),
-                               ("q/a\\u0027jzqd.key", "jzqd")):
+                               ("q/a\\u0027jzqd.key", "jzqd"), ("q/a\\x27jzqd.key", "jzqd")):
             self.assertNotIn("zq", sc.redact(path, [sc.HOME_ENTRY + declared]).lower(), path)
         # reading 36, product: an unfound declared neutral name is masked as a word only
         self.assertEqual(sc.redact("src/mapping/app.json", [sc.HOME_ENTRY + "app"]), "src/mapping/<home>.json")
@@ -1363,6 +1363,12 @@ class Refusals(Tree):
         # reading 32, product: the reference sends a dotted or underscored home to `home:` too
         reference = (SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8")
         self.assertIn("holds a space, a dash, a dot, an underscore or an apostrophe (each a dash in the dashed form", reference)
+        # reading 38, product: the reference says what happens to a short declared home and to a typographic apostrophe
+        flat = " ".join(reference.split())
+        self.assertIn("once found anywhere in the tree, is masked wherever it stands in a printed path", flat)
+        self.assertIn("a folder whose name holds `\u2019` is listed as a plain string with `\u2019` kept", flat)
+        changelog = " ".join((ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split())
+        self.assertNotIn("including container and cloud users", changelog)
         # reading 31, unit: a `.` is dashed too, and the whole name is masked in a printed path
         listing.write_text("home: j.doe\nhome: bob-smith\n", encoding="utf-8")
         self.write("-Users-bob-smith-proj/.env", "X=1\n")
@@ -1387,7 +1393,7 @@ class Refusals(Tree):
             self.assertIn("a note goes on a line of its own, a path is written as its home name only", err)
         # reading 35, seam: a byte-order mark or a zero-width space before `home:` (two lists joined) is dropped
         self.write("adm.txt", "/Users/admin/p\n")
-        for mark in ("\ufeff", "\u200b", "\u200c", "\u200d"):
+        for mark in ("\ufeff", "\u200b", "\u200c", "\u200d", "\u200c\u200b", "\u200d\u2060", "\u200c\ufeff"):
             listing.write_text("zqcorpx\n" + mark + "home: admin\n", encoding="utf-8")
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 1, repr(mark))
@@ -1399,15 +1405,17 @@ class Refusals(Tree):
         self.assertIn("1 home name(s) declared", out)
 
     def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
-        tools = self.tmp / "tools"
-        tools.mkdir()
-        for name in ("fabric_source_check.py", "fabric_secrets.py"):  # fabric_source_ignore.py left behind
-            shutil.copy(SCRIPTS / name, tools / name)
-        done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
-                              capture_output=True, text=True)
-        self.assertEqual(done.returncode, 2, done.stderr)
-        self.assertIn("fabric_source_ignore.py must sit beside this file", done.stderr)
-        self.assertNotIn("Traceback", done.stderr)
+        siblings = ("fabric_source_ignore.py", "fabric_source_homes.py", "fabric_secrets.py")
+        for missing in siblings:  # reading 38, seam: each sibling left behind in turn
+            tools = self.tmp / ("tools-" + missing)
+            tools.mkdir()
+            for name in ("fabric_source_check.py",) + tuple(s for s in siblings if s != missing):
+                shutil.copy(SCRIPTS / name, tools / name)
+            done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
+                                  capture_output=True, text=True)
+            self.assertEqual(done.returncode, 2, done.stderr)
+            self.assertIn(missing + " must sit beside this file", done.stderr)
+            self.assertNotIn("Traceback", done.stderr)
 
     def test_a_declared_home_with_a_space_is_found_whole_in_every_form(self):
         # reading 33, product: the part before the space left the surname in printed paths; a `home:` line now takes
