@@ -245,7 +245,8 @@ def _member_of(items: Any, value: Any) -> bool:
 #: nesting is what JavaScript's String() of a list recurses through (Node and the contract throw RangeError a few
 #: thousand deep, 0.60.0 raised RecursionError a few hundred deep), and the spend a refusal carries as estimateUsd is
 #: then one a serialiser writes. Under a dict there is no bound: Number() never descends a dict, which is NaN at any
-#: depth in 0.60.0, Node and the contract alike. Stricter than all three between 100 and their limit: FAA-196 (22); no
+#: depth in 0.60.0, Node and the contract alike, but for one with an own toString at the top or through lists alone,
+#: on which Number() throws (see _json_data). Stricter than all three between 100 and their limit: FAA-196 (22); no
 #: JSON reader of the kit reaches it (0.61.0 readings 25 to 27).
 MAX_SPEND_DEPTH = 100
 
@@ -355,8 +356,9 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     # A spend is read as the contract reads it only when it is JSON data as json.loads gives it, by exact type all the
     # way down, or an int or float (a subclass read by the number it stores); anything else (a mock or proxy, a
     # Decimal, a numpy.int64, a tuple, bytes, a str, list or dict subclass, a list holding one) is no estimate, which a
-    # ceiling refuses (0.61.0 seam readings 19 and 20), as is JSON data Number() cannot read: lists nested more than
-    # MAX_SPEND_DEPTH deep, or a dict with an own toString it reaches (readings 25 to 28).
+    # ceiling refuses (0.61.0 seam readings 19 and 20), as is JSON data the core does not read as Number() does: lists
+    # nested more than MAX_SPEND_DEPTH deep (stricter than Number() between 100 and its limit), or a dict with an own
+    # toString Number() reaches, on which it throws (readings 25 to 29).
     readable = over = False
     if ceiling is not MISSING and spend is not MISSING:  # read only when a ceiling asks (no walk without one)
         readable = is_number(spend) or _json_data(spend)
