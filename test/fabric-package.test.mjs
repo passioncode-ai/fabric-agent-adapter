@@ -120,6 +120,16 @@ test('FAA-193: a provider manifest refusal names its cause', (t) => {
   assert.match(found[0].message, /^provider-manifest: .*JSON object.*costPresets/);
 });
 
+test('an empty provider manifest is no refusal, a non-object is (0.60.0 product reading 8)', (t) => {
+  const root = path.join(tempDir(t), 'inbox-digest');
+  fs.mkdirSync(root);
+  writeAgent(root);
+  fs.writeFileSync(path.join(root, 'fabric-agent.json'), '{}');
+  assert.equal(k.pack(root).problems.filter((p) => p.problem === 'provider-manifest').length, 0);
+  fs.writeFileSync(path.join(root, 'fabric-agent.json'), '[]');
+  assert.equal(k.pack(root).problems.filter((p) => p.problem === 'provider-manifest').length, 1);
+});
+
 test('pack refuses what must not ship', (t) => {
   const root = tempDir(t);
   writeAgent(root);

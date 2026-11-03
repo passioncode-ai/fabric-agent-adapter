@@ -23,7 +23,7 @@ names why a provider manifest is refused (FAA-193).
   `fabric_board_session.py` and their Node twins). The `board.slot.moved` notice and references/board.md say so (FAA-165).
 - `pack`, `sign` and `verify` refused a provider manifest whose `costPresets` differ from the package's with only
   `provider-manifest` as the message; the message now names both causes (the `problem` code is unchanged) (not a JSON object, or `costPresets` that differ). Both kits (FAA-193, found by the
-  FAA-124 pilot rehearsal).
+  FAA-124 pilot rehearsal). Python no longer refuses an empty provider manifest (`{}`), as Node never did (FAA-194 (1)).
 
 ### Changed
 
@@ -37,15 +37,17 @@ names why a provider manifest is refused (FAA-193).
   never adapted by hand and never expires (FAA-172; question to Fabric and the contract on board thread `ab12642e`). A
   scenario eval `an-accepted-request-left-behind-by-a-move`.
 - building-fabric-services SKILL.md: a moved slot stays moved until `take_back` or a move back once Fabric offers one.
+- The reference service's take-back tool now reads "Take back a board slot moved to another session."; a manifest
+  registered before 0.60.0 keeps the old description until it is registered again.
 
 ### Upgrading
 
 - No Fabric release offers the operator's move of a slot yet (Fabric 0.3.15 has none): today a moved slot is
   another session's taking it, and take-back is the way back; the move-back check is ready for when Fabric ships it.
 - A kit service gets the move back once it installs the 0.60.0 kit modules (`fabric_board_slots.py`,
-  `fabric-board-slots.mjs` and their callers). Only the running session hears a move back: a slot moved back to a
+  `fabric-board-slots.mjs` and their callers). Only the running session finds a move back: a slot moved back to a
   session that has since ended needs take-back, since the session's end released the slot and the operator cannot move
-  a slot no session holds (a move is possible only once another session holds it). A kit older than 0.60.0 never hears
+  a slot no session holds (a move is possible only once another session holds it). A kit older than 0.60.0 never finds
   a move back: it needs take-back (any kit from 0.53.0), or, once Fabric offers the move, the 0.60.0 modules and then a move to the new session.
 
 ## 0.59.0 (2026-11-03)

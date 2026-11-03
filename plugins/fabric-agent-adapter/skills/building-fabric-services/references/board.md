@@ -267,7 +267,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   its own, and it counts only while more than the 10 s margin of that lease is left, then no more, as a lapsed slot), so a second lost answer keeps
   the session (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
   dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
-  it waits for its attempt's lease (60 s) before it is claimed again. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
+  it waits for its attempt's lease (60 s) before it is claimed again (a take-back that lands before the claim is sent
+  leaves that claim's key to the claim loop, which works the request at once). Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
   while other work runs: a move back during a job longer than the lease (60 s) may lapse and be lost to another
   session, after which take-back, or another move back to this session, brings it back.
 - Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move

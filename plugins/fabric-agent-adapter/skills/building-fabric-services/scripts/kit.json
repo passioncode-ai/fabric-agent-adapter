@@ -165,7 +165,7 @@
     "fabric_package_schema",
     "fabric_secrets"
    ],
-   "sha256": "a2a3b53370d993d30f263dd8356ce27ff008c05f552fd8cffd41079342b41808"
+   "sha256": "984733c0ab83fd5b1077a5188aec2fe422120f6e527da8816290481d1c345ede"
   },
   {
    "module": "fabric_protocols",
@@ -4515,7 +4515,7 @@
    "fabric_share.py": "da36a466426fc29dd7dd40013167f3959a18375f8fedd228bf64f298cec1040c",
    "fabric_ceremonies.py": "a59e83cf4adb2669a9b98008e3d3a0cba991a35cbff97bc604fc82fe81cfd49f",
    "fabric_package_schema.py": "e623f0408d38e3343ed66222fb812907c6c52e1a286eb1c1176ab2e64640c9ad",
-   "fabric_package.py": "a2a3b53370d993d30f263dd8356ce27ff008c05f552fd8cffd41079342b41808",
+   "fabric_package.py": "984733c0ab83fd5b1077a5188aec2fe422120f6e527da8816290481d1c345ede",
    "fabric_protocols.py": "42529a7df4d753544d2e37a18ec81266d6e1e80477cb8558a3ab521416d45791",
    "fabric_actions.py": "ae21d1199614c4f74d1dcd1e0a87107a9d52434cd9e2d64aa24a7b1e196fb723",
    "fabric_connections.py": "7de55cb7d808f756d650effabfaa12027d40a5bd5d2f6d448c32969d47529ecb",

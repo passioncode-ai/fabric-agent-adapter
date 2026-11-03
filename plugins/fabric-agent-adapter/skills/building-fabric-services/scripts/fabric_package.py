@@ -424,7 +424,7 @@ def check_package_folder(pkg: Dict[str, Any], files: Dict[str, bytes]) -> List[D
     provider = pkg.get("provider")
     if isinstance(provider, str) and provider in files:
         manifest = _parsed(files.get(provider))
-        if not manifest or ("costPresets" in manifest and not ("costPresets" in pkg and _json_equal(manifest["costPresets"], pkg["costPresets"]))):
+        if manifest is None or ("costPresets" in manifest and not ("costPresets" in pkg and _json_equal(manifest["costPresets"], pkg["costPresets"]))):
             problems.append({"problem": "provider-manifest", "path": provider})
     return problems
 

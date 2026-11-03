@@ -203,6 +203,16 @@ class PackTests(unittest.TestCase):
         self.assertIn("JSON object", found[0]["message"])
         self.assertTrue(found[0]["message"].startswith("provider-manifest: "))
 
+    def test_an_empty_provider_manifest_is_no_refusal(self):
+        """0.60.0 product reading 8: Python refused a provider manifest of {} as Node does not, under a message whose
+        two causes did not apply; both kits now refuse only a manifest that is not a JSON object (FAA-194 (1))."""
+        write_agent(self.root)
+        (self.root / "fabric-agent.json").write_text("{}")
+        problems = [p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]
+        self.assertEqual(problems, [])
+        (self.root / "fabric-agent.json").write_text("[]")
+        self.assertEqual(len([p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]), 1)
+
     def test_pack_refuses_a_chosen_agent_ref_and_a_stale_receipt(self):
         write_agent(self.root, agentRef="urn:fabric:agent:example:other")
         with self.assertRaisesRegex(fp.PackageError, "urn:fabric:agent:example:inbox-digest"):

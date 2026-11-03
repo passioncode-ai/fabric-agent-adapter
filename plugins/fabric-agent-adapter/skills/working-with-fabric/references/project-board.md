@@ -62,7 +62,7 @@ still cancel the request. `noResponder` in your `com.submit` receipt says nobody
 Project now: the request is stored, a reply may still answer it and a responder may come later. An `accepted`
 request can also wait unanswered for its responder's operator: since adapter 0.53.0 a responder whose slot was moved
 to another session leaves its accepted work `accepted` and unanswered until the slot is taken back, or, once Fabric offers the operator's move,
-moved back to it (a responder from adapter 0.60.0 hears that; an older one comes back only by take-back), or until Fabric hands it over (CT-175), which is not the operator's hold below; tell
+moved back to it (a responder from adapter 0.60.0 finds that; an older one comes back only by take-back), or until Fabric hands it over (CT-175), which is not the operator's hold below; tell
 the person, and cancel it if it is past what they can wait. Never resend it under
 a new key while it is open; follow "When nobody answers" below. A queued or claimed request without a deadline gets one seven
 days out (DEC-0098) and then reads `expired`: if the ask still stands, submit it again with a new key and record the wait
