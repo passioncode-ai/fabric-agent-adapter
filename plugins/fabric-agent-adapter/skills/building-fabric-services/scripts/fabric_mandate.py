@@ -3,8 +3,9 @@ the task, narrowed at each hand-over. Part of the service kit (layer L2); the tw
 
 - ``mandate_covers(inputs)``: whether a callee takes one call as the operator's decision under a mandate (MD-3 to
   MD-5), as the contract's ``mandateCovers`` answers, but for a spend that is no JSON data a ``json.loads`` gives
-  (shared, cyclic, or a chain of more than MAX_SPEND_DEPTH one-item lists), which it refuses (FAA-196 (22)). ``inputs`` holds ``mandate``, ``tier``, ``now``, ``self``
-  (the callee's own agent id), ``callerAgent`` (only when the callee authenticated one) and ``call`` ({capability,
+  (shared or cyclic), or whose lists nest in lists more than MAX_SPEND_DEPTH deep, which ``json.loads`` can give: the
+  core refuses both, where the contract reads the first and reads or throws on the second (FAA-196 (22)). ``inputs`` holds ``mandate``, ``tier``, ``now``,
+  ``self`` (the callee's own agent id), ``callerAgent`` (only when the callee authenticated one) and ``call`` ({capability,
   action?, effect, spendUsd?, project?}).
 - ``mandate_problem(mandate)``: ``mandate-malformed``, ``mandate-widened`` or None (FAC-SEM-144);
   ``mandate_shape(mandate)``: ``mandate.schema.json`` alone; ``mandate_rules(kind, value)``: the findings.
@@ -239,21 +240,24 @@ def _member_of(items: Any, value: Any) -> bool:
     return set_has(items, value)
 
 
-#: A spend that is a chain of more one-item lists than this is no estimate, so the spend a refusal carries as estimateUsd
-#: is one a serialiser writes. Only such a chain reads as a number through a list: a dict is NaN and a list of two or
-#: more items NaN, at any depth, as in 0.60.0, Node and the contract. Stricter than 0.60.0 (a chain a few hundred deep)
-#: and than Node and the contract (a few thousand): FAA-196 (22); no JSON reader of the kit reaches it (0.61.0 readings
-#: 25 and 26).
+#: A spend whose lists nest in one another more deeply than this, with no dict between them, is no estimate: that
+#: nesting is what JavaScript's String() of a list recurses through (Node and the contract throw RangeError a few
+#: thousand deep, 0.60.0 raised RecursionError a few hundred deep), and the spend a refusal carries as estimateUsd is
+#: then one a serialiser writes. Under a dict there is no bound: Number() never descends a dict, which is NaN at any
+#: depth in 0.60.0, Node and the contract alike. Stricter than all three between 100 and their limit: FAA-196 (22); no
+#: JSON reader of the kit reaches it (0.61.0 readings 25 to 27).
 MAX_SPEND_DEPTH = 100
 
 
 def _json_data(value: Any) -> bool:
     """Whether a value is JSON data as json.loads gives it, by exact type all the way down (never `==` or isinstance,
-    which a metaclass or `__class__` can answer), walked without recursion in one pass at any depth. json.loads never shares a list or dict, so a structure that meets one twice (shared or
-    cyclic) is not JSON data (0.61.0 unit reading 21, seam reading 22)."""
-    stack, seen = [value], set()
+    which a metaclass or `__class__` can answer), walked without recursion in one pass, its lists nested in lists at
+    most MAX_SPEND_DEPTH deep (a dict ends the count: its members are walked at any depth). json.loads never shares a
+    list or dict, so a structure that meets one twice (shared or cyclic) is not JSON data (0.61.0 unit reading 21,
+    seam reading 22, readings 25 to 27)."""
+    stack, seen = [(value, 0)], set()
     while stack:
-        item = stack.pop()
+        item, depth = stack.pop()
         kind = type(item)
         if item is None or kind is bool or kind is str or kind is int or kind is float:
             continue
@@ -263,25 +267,25 @@ def _json_data(value: Any) -> bool:
             return False
         seen.add(id(item))
         if kind is list:
-            stack.extend(item)
+            if depth is not None:
+                depth += 1
+                if depth > MAX_SPEND_DEPTH:
+                    return False
+            stack.extend((sub, depth) for sub in item)
             continue
         for key, sub in item.items():
             if type(key) is not str:
                 return False
-            stack.append(sub)
+            stack.append((sub, None))
     return True
 
 
-def _spend_number(spend: Any) -> Optional[float]:
+def _spend_number(spend: Any) -> float:
     """Number(spend) for JSON data, without the join JavaScript builds for a list: [] is 0, a list of two or more items
     is NaN (the comma never reads as a number), one item is read for itself, all in one descent (0.61.0 seam
-    reading 24: a list repeating one long string cost its length times its references). None for a chain of more than
-    MAX_SPEND_DEPTH one-item lists: no estimate."""
-    value, depth = spend, 0
+    reading 24: a list repeating one long string cost its length times its references)."""
+    value = spend
     while type(value) is list:
-        depth += 1
-        if depth > MAX_SPEND_DEPTH:
-            return None
         if not value:
             return 0.0
         if len(value) > 1:
@@ -353,11 +357,9 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
         readable = is_number(spend) or _json_data(spend)
     if readable:
         try:
-            number = _spend_number(spend)
+            over = _spend_number(spend) > ceiling
         except RecursionError:  # the number's read at the stack's edge: no estimate, never a raise (seam reading 21)
-            number = None
-        readable = number is not None
-        over = readable and number > ceiling
+            readable = False
     if ceiling is not MISSING and (spend is MISSING or not readable or over):
         data: Dict[str, Any] = {"detail": "outside-mandate: spend"}
         if spend is not MISSING and readable:

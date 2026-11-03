@@ -100,7 +100,7 @@
     "fabric_jsvalue",
     "fabric_time"
    ],
-   "sha256": "c7ccb05c8d62193ea63f8a4d7b24af6fb688bb3b6d447aab8485aea13aa86815"
+   "sha256": "788515d8b0ef9ba152ac0374feaa557934aac7d12e1a8df879cf4e2f5c3e28ae"
   },
   {
    "module": "fabric_delegation",
@@ -4608,7 +4608,7 @@
    "fabric_paths.py": "8a1ee742f80f436e9f28c61b4f049a9545de2a9e0d66bfc61faa6ee5d1ba3734",
    "fabric_estate_rules.py": "8b36a7f4108d9c2b1fb38c8bff344778c807bed631a99b4a563ecb0a49c10b1c",
    "fabric_estate.py": "b3cd56dcb86e04d252980322ac8054da1aaef24ac64690f7aa80e7c765ee6f60",
-   "fabric_mandate.py": "c7ccb05c8d62193ea63f8a4d7b24af6fb688bb3b6d447aab8485aea13aa86815",
+   "fabric_mandate.py": "788515d8b0ef9ba152ac0374feaa557934aac7d12e1a8df879cf4e2f5c3e28ae",
    "fabric_delegation.py": "716f0ff7ac01095f54b24970beac1962128e8ff33026b243fc0467876142ab03",
    "fabric_share.py": "da36a466426fc29dd7dd40013167f3959a18375f8fedd228bf64f298cec1040c",
    "fabric_ceremonies.py": "a59e83cf4adb2669a9b98008e3d3a0cba991a35cbff97bc604fc82fe81cfd49f",

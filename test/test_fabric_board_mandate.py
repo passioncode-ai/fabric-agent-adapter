@@ -429,9 +429,23 @@ class BoardMandateTests(Conversation):
             for _ in range(depth):
                 value = {"a": value}
             return value
-        for spend in (nested_dicts(fm.MAX_SPEND_DEPTH), nested_dicts(100000), {"a": nested(5000)}, [1, nested(5000)],
-                      [{"a": nested(5000)}], json.loads('{"a":' * 150 + "1" + "}" * 150)):
-            self.assertTrue(at_depth(0, spend)["ok"], "a dict or a list of two items is NaN at any depth, as 0.60.0 read it")
+        def chain_around(inner, count):  # `count` one-item lists around a list that ends the chain (seam reading 27)
+            for _ in range(count):
+                inner = [inner]
+            return inner
+        # The bound counts lists nested in lists, whatever ends them; String() of a list recurses through that nesting,
+        # so 0.60.0 raised and JavaScript throws on [1, deep] too (product reading 27).
+        for inner, lists in (([1, 2], 1), ([], 1), (3, 0)):  # `lists`: the lists `inner` itself adds to the depth
+            self.assertTrue(at_depth(0, chain_around(inner, fm.MAX_SPEND_DEPTH - lists))["ok"], inner)
+            got = at_depth(0, chain_around(inner, fm.MAX_SPEND_DEPTH - lists + 1))
+            self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False), inner)
+        for spend in ([1, nested(fm.MAX_SPEND_DEPTH - 1)], [1, nested(5000)], [[1, 2], nested(fm.MAX_SPEND_DEPTH)]):
+            got = at_depth(0, spend)
+            self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
+        self.assertTrue(at_depth(0, [1, nested(fm.MAX_SPEND_DEPTH - 2)])["ok"], "100 lists deep is read")
+        for spend in (nested_dicts(fm.MAX_SPEND_DEPTH), nested_dicts(100000), {"a": nested(5000)}, [{"a": nested(5000)}],
+                      [1, {"a": nested(5000)}], json.loads('{"a":' * 150 + "1" + "}" * 150)):
+            self.assertTrue(at_depth(0, spend)["ok"], "Number() never descends a dict: NaN at any depth, as 0.60.0 read it")
 
         class ClaimsFloat(int):  # an int whose __class__ says float: read as the int it is (unit reading 20)
             @property
