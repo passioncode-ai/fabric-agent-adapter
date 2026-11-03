@@ -19,7 +19,9 @@ says that his approval holds for the whole task, at every link (FAA-195).
   Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
   mandate. Both kits (FAA-135). `ctx.mandate_covers` reads the call's `spendUsd` and `project` failing closed, as the
   kit's MCP and job mandate readers do (FAA-139): a spend that is not a finite number is none, which a `perCallMaxUsd`
-  refuses, and a `project` that is not a string is refused by a mandate limited to projects (a draft of this release
+  refuses, and a `project` that is not a string, None (Node null) included, is refused by a mandate limited to
+  projects, as the contract's `mandateCovers` refuses a null project (the MCP and job readers read None as naming
+  none; leave `project` out on the board) (a draft of this release
   passed them as given; 0.61.0 seam reading 14).
 
 ### Fixed
@@ -54,6 +56,12 @@ says that his approval holds for the whole task, at every link (FAA-195).
   block fenced ` ```json ` at the start of its own lines, its chain ending in the service's registry agent id, never a
   decision block; and what comes back: `mandate-not-for-this-call` is handed on again to the right id without asking
   him, `mandate-expired` asks him once for a new one.
+
+### Upgrading
+
+- `fabric_board_link` (and `fabric-board-link.mjs`) now imports `fabric_interop_rules`, so a board responder's install
+  brings it and its `fabric_delegation` too (`fabric_kit.py install --module fabric_board` copies 33 modules, 31 in
+  0.60.0): reinstall with `fabric_kit.py install` and check with `status`, never by copying `fabric_board_link` alone.
 
 ## 0.60.0 (2026-11-03)
 

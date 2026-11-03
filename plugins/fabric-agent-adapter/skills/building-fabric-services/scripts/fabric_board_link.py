@@ -299,8 +299,9 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     answer's `recordAs` names `caller`, the sender Project the board verified (MD-3 records the caller, as the action
     path does). None when no mandate travelled: the handler asks the operator as it would without one. The call's
     `spendUsd` and `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend
-    that is not a finite number is none, which a ceiling refuses; a `project` that is not a string is unreadable, which
-    a mandate limited to projects refuses; a `project` of None names none."""
+    that is not a finite number is none, which a ceiling refuses; a `project` that is not a string, None included (the
+    contract's mandateCovers refuses a null project), is unreadable, which a mandate limited to projects refuses; a call
+    that names none leaves `project` out."""
     if mandate is None or agent_id is None:
         return None
     if isinstance(call, Mapping):
@@ -311,8 +312,7 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
                 call["spendUsd"] = spend
         if "project" in call:
             project = call.pop("project")
-            if project is not None:
-                call["project"] = project if isinstance(project, str) else _rules.UNREADABLE_PROJECT
+            call["project"] = project if isinstance(project, str) else _rules.UNREADABLE_PROJECT
     clock, now = wall(), ""
     if isinstance(clock, (int, float)) and not isinstance(clock, bool):
         try:

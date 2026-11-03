@@ -127,7 +127,9 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
   acts in one, since a call naming none is not limited by the mandate's `projects`; both are read failing closed, as
   the kit's other mandate readers read them, FAA-139: a `spendUsd` that is not a finite number is none, which a
-  `perCallMaxUsd` refuses, and a `project` that is not a string is refused by a mandate limited to projects): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
+  `perCallMaxUsd` refuses, and a `project` that is not a string, None (Node null) included, is refused by a mandate
+  limited to projects, as the contract's `mandateCovers` refuses a null project: leave `project` out when the work
+  acts in none; the MCP and job readers read None as naming none): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
   board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
   responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`; one that returns a value
   that is not a finite number answers `{"fault": "now-unreadable"}`; a clock that raises passes its error to the handler). It answers `{"ok": True, "recordAs": {by, via: "mandate", task,

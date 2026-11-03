@@ -254,16 +254,20 @@ export function readMandate(request, mandateFrom, agentId) {
  * chain's end alone binds it, MD-3). A covered answer's `recordAs` names `caller`, the sender Project the board
  * verified (MD-3 records the caller). `wall` answers milliseconds. Null when no mandate travelled. `spendUsd` and
  * `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend that is not a
- * finite number is none (a ceiling refuses it), a non-string `project` unreadable, a null `project` none.
+ * finite number is none (a ceiling refuses it), a `project` that is not a string, null included (the contract's
+ * mandateCovers refuses a null project), unreadable; a call that names none leaves `project` out.
  */
 export function covers(mandate, call, agentId, wall, caller = null) {
   if (mandate == null || agentId == null) return null;
   if (call !== null && typeof call === 'object' && !Array.isArray(call)) {
-    const { spendUsd, project, ...rest } = call;
+    const own = (name) => (Object.hasOwn(call, name) ? call[name] : undefined); // own members only, as member() reads
+    const spendUsd = own('spendUsd');
+    const project = own('project');
+    const { spendUsd: _s, project: _p, ...rest } = call;
     call = rest;
     const spend = mandateSpend(spendUsd);
     if (spend !== undefined) call.spendUsd = spend;
-    if (project !== undefined && project !== null) call.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
+    if (project !== undefined) call.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
   }
   const clock = wall();
   let now = '';

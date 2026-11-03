@@ -256,10 +256,14 @@ class BoardMandateTests(Conversation):
         for spend in (None, float("nan"), float("inf"), "3", True, [1], 10 ** 400, 50):
             with self.subTest(spend=spend):
                 self.assertEqual(detail({"spendUsd": spend, "project": "site-a"}), "outside-mandate: spend")
-        for project in (5, ["site-a"], b"site-a"):
+        for project in (5, ["site-a"], b"site-a", None):  # None as the contract's mandateCovers reads a null project
             with self.subTest(project=project):
                 self.assertEqual(detail({"spendUsd": 3, "project": project}), "outside-mandate: project")
-        self.assertEqual(detail({"spendUsd": 3, "project": None}), "ok", "a project of None names none, as the action path reads it")
+        self.assertEqual(detail({"spendUsd": 3}), "ok", "a call that names no project leaves `project` out")
+        call = {"capability": "video.render", "effect": "draft", "spendUsd": float("nan"), "project": 5}
+        kept = dict(call)
+        link.covers(m, call, "example-agent", lambda: WALL, OTHER_PROJECT)
+        self.assertEqual(repr(call), repr(kept), "covers reads the handler's call, never changes it")
 
     def test_the_operators_words_reach_no_checkpoint_during_the_work(self):
         """0.61.0 product reading 5: the checkpoint was read only after the request completed and its entry was gone."""

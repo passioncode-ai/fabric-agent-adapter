@@ -216,8 +216,14 @@ test('FAA-135: a spend or project that does not read is refused (FAA-139; 0.61.0
   for (const spendUsd of [null, NaN, Infinity, '3', true, [1], 10n, 50]) {
     assert.equal(detail({ spendUsd, project: 'site-a' }), 'outside-mandate: spend', String(spendUsd));
   }
-  for (const project of [5, ['site-a'], {}]) assert.equal(detail({ spendUsd: 3, project }), 'outside-mandate: project', String(project));
-  assert.equal(detail({ spendUsd: 3, project: null }), 'ok', 'a null project names none, as the action path reads it');
+  for (const project of [5, ['site-a'], {}, null]) assert.equal(detail({ spendUsd: 3, project }), 'outside-mandate: project', String(project));
+  assert.equal(detail({ spendUsd: 3 }), 'ok', 'a call that names no project leaves `project` out');
+  assert.equal(detail({ spendUsd: 3, project: undefined }), 'ok', 'an own undefined is no member, as member() reads');
+  assert.equal(detail(Object.create({ spendUsd: 3 })), 'outside-mandate: spend', 'an inherited spend is not read, as member() reads');
+  const call = { capability: 'video.render', effect: 'draft', spendUsd: NaN, project: 5 };
+  const kept = { ...call };
+  covers(m, call, 'example-agent', () => WALL, OTHER_PROJECT);
+  assert.deepEqual(call, kept, "covers reads the handler's call, never changes it");
 });
 
 test('FAA-135: a clock that does not read answers now-unreadable', () => {
