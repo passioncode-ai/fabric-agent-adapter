@@ -65,24 +65,31 @@ from typing import Dict, Iterable, List, NoReturn, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 _WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the checked tree adds no .pyc
+_STEP = "fabric_secrets"  # the sibling being loaded, so a refusal names it whatever the exception says
 try:
     import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
+    _STEP = "fabric_source_ignore"
     from fabric_source_ignore import (  # noqa: E402,F401 - how the ignore lines are read, beside this file
         IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _readable_glob, ignore_globs)
+    _STEP = "fabric_source_homes"
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
 except Exception as _missing:  # a copy without its siblings, or mixed from two versions: a refusal, never exit 1
-    _HERE, _SIBLINGS = Path(__file__).resolve().parent, ("fabric_secrets", "fabric_source_ignore", "fabric_source_homes")
-    _file = getattr(_missing, "filename", None) if isinstance(_missing, (SyntaxError, OSError)) else None
-    _named = (getattr(_missing, "name", None) if isinstance(_missing, ImportError) else
-              Path(_file).stem if _file and Path(_file).resolve().parent == _HERE else None)
-    _sibling = (_named or "") + ".py"
-    sys.stderr.write("fabric_source_check.py: %s\n" % (
-        "a module beside this file refused to load (%s: %s): copy the scripts folder whole, from one version"
-        % (type(_missing).__name__, _missing) if _named not in _SIBLINGS
-        else "%s beside this file cannot be read" % _sibling if isinstance(_missing, OSError)
-        else "%s beside this file is from another version: copy it with this one" % _sibling
-        if (_HERE / _sibling).is_file() else "%s must sit beside this file" % _sibling))
+    # the exception's own text is never printed: an OSError's carries a path, which may be under the owner's home
+    _why = "a module beside this file refused to load"
+    try:
+        _HERE, _sibling = Path(__file__).resolve().parent, _STEP + ".py"
+        _file = getattr(_missing, "filename", None) if isinstance(_missing, OSError) else None
+        _why = ("%s must sit beside this file" % _sibling if not (_HERE / _sibling).is_file()
+                else "%s beside this file cannot be read" % _sibling
+                if isinstance(_file, (str, bytes)) and Path(os.fsdecode(_file)).resolve() == _HERE / _sibling
+                else "%s beside this file is from another version: copy it with this one" % _sibling
+                if isinstance(_missing, (ImportError, SyntaxError))
+                else "%s beside this file refused to load (%s): copy the scripts folder whole, from one version"
+                % (_sibling, type(_missing).__name__))
+    except Exception:  # naming the cause must never be what fails
+        pass
+    sys.stderr.write("fabric_source_check.py: %s\n" % _why)
     sys.exit(2)
 finally:
     sys.dont_write_bytecode = _WROTE_BYTECODE
@@ -334,7 +341,9 @@ def read_list(path: Path) -> List[str]:
     # at CRLF, CR or LF: a list saved with CR alone keeps its lines, and a FF or U+2028 starts none
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         # a byte-order mark or a zero-width character at a line's start (two lists joined) is no part of the line
-        text = raw.strip().lstrip("\ufeff\u200b\u2060").strip().replace(HOME_ENTRY, "")  # no meaning at a start
+        if HOME_ENTRY in raw:  # never read as another name: a NUL is no character an owner types
+            raise CheckError("line %d of the owner's list holds a NUL character: save it as plain text" % (len(entries) + 1))
+        text = raw.strip().lstrip("\ufeff\u200b\u2060").strip()  # no meaning at a start
         # a joiner (U+200C, U+200D) may belong to a string, never to `home:`: a home line is read or refused with every
         # format character (Unicode Cf: a joiner, a direction mark, a soft hyphen) taken out, wherever it stands
         bare = "".join(c for c in text if unicodedata.category(c) != "Cf").strip()
@@ -574,6 +583,10 @@ def _git() -> Optional[str]:
     return None
 
 
+_GIT_LOCATION = frozenset(("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR",
+                           "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX"))
+
+
 def _git_files(root: Path) -> Optional[List[str]]:
     git = _git()
     if git is None:
@@ -581,8 +594,11 @@ def _git_files(root: Path) -> Optional[List[str]]:
     try:
         # `core.fsmonitor` off: `--others` would run a command the checked tree's own configuration names. Empty, not
         # `false`: Git before 2.36 reads the value as a hook and would run a program named `false` from PATH
+        # the repository is found from ROOT: a Git location the caller exports (every hook in a linked worktree gets
+        # GIT_DIR and GIT_INDEX_FILE) would list another repository's files and leave ROOT's own unread
+        env = {k: v for k, v in os.environ.items() if k.upper() not in _GIT_LOCATION}
         result = subprocess.run([git, "-c", "core.fsmonitor=", "-C", str(root), "ls-files", "-z", "--cached",
-                                 "--others", "--exclude-standard"], capture_output=True, timeout=60)
+                                 "--others", "--exclude-standard"], capture_output=True, timeout=60, env=env)
     except (OSError, subprocess.SubprocessError):
         return None
     if result.returncode != 0:

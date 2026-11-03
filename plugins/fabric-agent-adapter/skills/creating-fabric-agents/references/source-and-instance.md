@@ -116,7 +116,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   space, as a Windows profile may, is written whole, `home: Jane Doe`, and everything after the colon is the name, so
   a note goes on a line of its own (`# laptop`); spaces and tabs may stand around the colon; a line
   that starts with `home` and a colon and holds anything else is refused, exit 2 (an invisible format character before
-  the name or inside `home` is dropped, one inside the name refuses the line); such a line is never a string
+  the name, after it or inside `home` is dropped, one inside the name refuses the line; a NUL anywhere in the list
+  refuses it too); such a line is never a string
   entry, so list a string like `home: page` by a part of it, `ome: page`): the check then finds that home in every form the table names (it is never neutral, even with one or two
   letters), and the bare name is not looked for anywhere else, though a declared name of three or more letters and digits is
   masked wherever a printed path holds it as a word, its parts joined by none or any run of a space, `.`, `_`, `-`, `+`, `'`, their
@@ -163,6 +164,7 @@ The check finds the forms the table names, and only those: a credential in anoth
 before it, a provider's key the contract's names do not cover) passes it. It is a floor under the owner's review and a
 secret scanner, never a replacement for either.
 
-The check reads the tree, not Git history. A value that was committed once is still in the history after the tree is
+The check finds the repository from the folder it checks: a Git location the caller exports (`GIT_DIR`,
+`GIT_INDEX_FILE`, as a hook in a linked worktree has) is not passed to Git. The check reads the tree, not Git history. A value that was committed once is still in the history after the tree is
 clean: handing such a source over needs a fresh history, which is the owner's act, never the agent's (no history
 rewrite, no force-push).

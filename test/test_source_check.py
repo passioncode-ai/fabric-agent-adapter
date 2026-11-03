@@ -59,6 +59,13 @@ def run(argv):
     return code, out.getvalue(), err.getvalue()
 
 
+# reading 43, seam: a Git location the runner exports (any hook in a linked worktree has GIT_DIR and GIT_INDEX_FILE)
+# would point the tests' own `git init` and `git config` at that repository; the tests find theirs from their folder
+for _name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR",
+              "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX"):
+    os.environ.pop(_name, None)
+
+
 class Tree(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -607,6 +614,22 @@ class NeverRepeated(Tree):
 class WhatIsRead(Tree):
     def git(self, *args):
         subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_git_location_the_caller_exports_is_not_passed_to_git(self):
+        # reading 43, seam: with another repository's GIT_DIR or index exported, a force-added file ROOT ignores was
+        # never read and the check passed; in a linked worktree's hook a clean subfolder exited 2
+        self.git("init", "-q")
+        self.write(".gitignore", "notes/\n")
+        self.write("notes/a.txt", MAC_HOME + "\n")
+        self.git("add", "-f", ".gitignore", "notes/a.txt")
+        other = self.tmp / "other"
+        subprocess.run(["git", "init", "-q", str(other)], check=True, capture_output=True)
+        for name, value in (("GIT_DIR", str(other / ".git")), ("GIT_INDEX_FILE", str(other / ".git" / "index"))):
+            with mock.patch.dict(os.environ, {name: value}):
+                code, out, err = run(["check", str(self.root)])
+            self.assertEqual(code, 1, name + out[-300:])
+            self.assertIn("notes/a.txt:1: home-path", out)
 
     @unittest.skipIf(shutil.which("git") is None, "needs git")
     def test_a_submodule_named_as_a_folder_in_the_ignore_file_is_left_out(self):
@@ -1469,11 +1492,16 @@ class Refusals(Tree):
             self.assertIn("fabric_source_homes.py beside this file cannot be read", done.stderr)
             self.assertNotIn("Traceback", done.stderr)
         for name, tail, said in (  # reading 42, unit: any exception at import, and an OSError about another file
-                ("fabric_secrets.py", '\nraise ValueError("newer shape")\n', "refused to load (ValueError: newer shape)"),
-                ("fabric_source_homes.py", "\nopen('/nonexistent-zq/settings.json')\n", "refused to load (FileNotFoundError"),
+                ("fabric_secrets.py", '\nraise ValueError("newer shape")\n',
+                 "fabric_secrets.py beside this file refused to load (ValueError)"),
+                ("fabric_source_homes.py", "\nopen('/Users/zqowner/settings.json')\n",
+                 "fabric_source_homes.py beside this file refused to load (FileNotFoundError)"),
+                # reading 43, unit: an OSError with a bytes file name must not break the refusal itself
+                ("fabric_source_ignore.py", "\nimport os\nos.stat(b'/Users/zqowner/x')\n",
+                 "fabric_source_ignore.py beside this file refused to load (FileNotFoundError)"),
                 # reading 42, seam: a NUL byte is a ValueError before Python 3.11, a SyntaxError from it
-                ("fabric_source_ignore.py", "\n# \x00\n", "refused to load (")):
-            tools = self.tmp / ("raise-" + name)
+                ("fabric_source_ignore.py", "\n# \x00\n", "fabric_source_ignore.py beside this file")):
+            tools = self.tmp / ("raise-%d-%s" % (len(tail), name))
             tools.mkdir()
             for sibling in ("fabric_source_check.py",) + siblings:
                 shutil.copy(SCRIPTS / sibling, tools / sibling)
@@ -1484,6 +1512,7 @@ class Refusals(Tree):
             self.assertEqual(done.returncode, 2, done.stderr)
             self.assertIn(said, done.stderr)
             self.assertNotIn("settings.py", done.stderr)
+            self.assertNotIn("zqowner", done.stderr)  # reading 43, unit: an exception's path is never printed
             self.assertNotIn("Traceback", done.stderr)
         # reading 41, unit: a sibling that raises its own ImportError names no module; the refusal quotes it
         tools = self.tmp / "raising"
@@ -1495,7 +1524,7 @@ class Refusals(Tree):
         done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
                               capture_output=True, text=True)
         self.assertEqual(done.returncode, 2, done.stderr)
-        self.assertIn("refused to load (ImportError: needs a newer contract)", done.stderr)
+        self.assertIn("fabric_secrets.py beside this file is from another version", done.stderr)
         self.assertNotIn("a module.py", done.stderr)
         self.assertNotIn("Traceback", done.stderr)
 
@@ -1621,6 +1650,16 @@ class Refusals(Tree):
         self.write("a.txt", "zq\u200dcx\n")
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
         self.assertIn("a.txt:1: instance-string", out)
+
+    def test_a_nul_in_the_owners_list_is_refused(self):
+        # reading 43, seam: a NUL was removed silently, so `home: zq<NUL>x` declared `zqx`
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        for line in (b"home: zq\x00x\n", b"zq\x00corpx\n"):
+            listing.write_bytes(b"# terms\n" + line)
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+            self.assertEqual(code, 2, line)
+            self.assertIn("line 2 of the owner's list holds a NUL character", err)
 
     def test_a_list_inside_the_tree_is_refused(self):
         inside = self.write("instance-strings.txt", OWNER + "\n")
