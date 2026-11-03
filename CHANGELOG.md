@@ -21,8 +21,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
 ### Fixed
 
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
-  I/O error, an interrupt), the descriptor and the lock name stayed held while `release()` freed nothing, so the same
-  process could not start the service again. The lock now lets both go and re-raises; the Node twin
+  I/O error, an interrupt), the descriptor stayed held, and the lock name too, since the caller drops the object
+  (`release()` would have freed only the name, on Linux and Windows), so the same process could not start the service
+  again. The lock now lets both go and re-raises the first error, even when the
+  close itself fails; the Node twin
   (`fabric-lock.mjs`), whose caller drops a lock that failed to start, does the same for its descriptor or its name.
   Found by a service that vendors the kit, on the board.
 
@@ -34,8 +36,9 @@ says that his approval holds for the whole task, at every link (FAA-195).
   mandate, never the task; a mandate lapses within seven days of his words, and a task still open asks him once for a
   new one, his same words with `at` when he confirms (MD-1), then weekly until the contract's CT-205 (its answer
   `7f372925` on board thread `118f95f9`; CT-205 is a row the contract proposes after this kit's pin, on its branch
-  `agent/template-parity-20261103`); a link whose chain already holds four agents restates its own mandate from the four
-  parts and hands that on (OA-2), since a service reads no prose. `expiresAt` is counted from `at` and
+  `agent/template-parity-20261103`); a link whose chain already holds four agents restates its own mandate, keeping
+  `instruction`, `at`, `expiresAt` and the scope in force, and hands that on (OA-2, the contract's answer `7f372925`),
+  since a service reads no prose; references/interop.md gives a service at a full chain the same route. `expiresAt` is counted from `at` and
   covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
   source and spend sentences are reworded with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
 - working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`

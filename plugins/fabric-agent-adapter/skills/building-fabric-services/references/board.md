@@ -120,7 +120,7 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   dropped unread. Python reads two kinds of valid JSON as not JSON where Node reads them, both fail-closed: a block nested
   about 1,000 levels deep on Python 3.9 to 3.11 and about 10,000 on 3.12 and 3.13 (none on 3.14), and an integer longer
   than 4300 digits on every Python (the kit refuses it there, as `int_max_str_digits` does from 3.11; a limit configured
-  lower, `PYTHONINTMAXSTRDIGITS`, refuses from that length).
+  lower, `PYTHONINTMAXSTRDIGITS` on a Python that has one, refuses an integer longer than it).
 - The handler gets `ctx.mandate` (the one block without `source`, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
   acts in one, since a call naming none is not limited by the mandate's `projects`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the

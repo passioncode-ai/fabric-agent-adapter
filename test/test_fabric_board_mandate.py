@@ -171,7 +171,9 @@ class BoardMandateTests(Conversation):
         m = json.dumps(mandate())
         for text in ("Here it is: ```json\n%s\n```\n" % m, "````json\n%s\n````\n" % m, "```json\n%s```\n" % m,
                      "```json\n%s\n```x\n" % m, "x\r```json\n%s\n```\n" % m, "x\u2028```json\n%s\n```\n" % m,
-                     "```jsonc\n%s\n```\n" % m, "```json x\n%s\n```\n" % m):
+                     "```jsonc\n%s\n```\n" % m, "```json x\n%s\n```\n" % m, "  ```json\n%s\n  ```\n" % m,
+                     "\t```json\n%s\n```\n" % m, "```JSON\n%s\n```\n" % m, "~~~json\n%s\n~~~\n" % m,
+                     "- the mandate:\n  ```json\n  %s\n  ```\n" % m):
             with self.subTest(text=text[:20]):
                 self.tearDown()
                 self.setUp()

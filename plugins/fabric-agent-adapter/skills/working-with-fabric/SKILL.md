@@ -256,8 +256,8 @@ chat of any of his agents binds all his agents (OA-1).
   where your client cannot set `_meta`, in your message; each receiver acts on them, narrowing only; human gates
   stay (MD-6). `at` never moves, so a mandate lapses within seven days of his words: a task still open asks
   him once for a new one (MD-1), same words, `at` when he confirms, and weekly until the
-  contract's proposed CT-205 (answer `7f372925`). A link whose chain holds four agents restates its own mandate from the four parts (OA-2:
-  `instruction` and `at` unchanged, its chain starting with it) and hands that on.
+  contract's proposed CT-205 (answer `7f372925`). A link holding a four-agent chain restates its own mandate (OA-2, answer `7f372925`:
+  `instruction`, `at`, `expiresAt` and the scope in force unchanged, chain starting with it) and hands that on.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,

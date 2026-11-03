@@ -173,7 +173,10 @@ for (const [name, text] of [['an opener mid-line', (m) => `Here it is: \`\`\`jso
   ['a four-backtick fence', (m) => `\`\`\`\`json\n${m}\n\`\`\`\`\n`], ['a closer on the content line', (m) => `\`\`\`json\n${m}\`\`\`\n`],
   ['text after the closer', (m) => `\`\`\`json\n${m}\n\`\`\`x\n`], ['a lone CR before the opener', (m) => `x\r\`\`\`json\n${m}\n\`\`\`\n`],
   ['U+2028 before the opener', (m) => `x\u2028\`\`\`json\n${m}\n\`\`\`\n`], ['U+2029 after the closer', (m) => `\`\`\`json\n${m}\n\`\`\`\u2029\n`],
-  ['an opener with a suffix', (m) => `\`\`\`jsonc\n${m}\n\`\`\`\n`], ['an opener with a word after it', (m) => `\`\`\`json x\n${m}\n\`\`\`\n`]]) {
+  ['an opener with a suffix', (m) => `\`\`\`jsonc\n${m}\n\`\`\`\n`], ['an opener with a word after it', (m) => `\`\`\`json x\n${m}\n\`\`\`\n`],
+  ['an indented fence', (m) => `  \`\`\`json\n${m}\n  \`\`\`\n`], ['a tab before the opener', (m) => `\t\`\`\`json\n${m}\n\`\`\`\n`],
+  ['an upper-case tag', (m) => `\`\`\`JSON\n${m}\n\`\`\`\n`], ['a tilde fence', (m) => `~~~json\n${m}\n~~~\n`],
+  ['a fence inside a list item', (m) => `- the mandate:\n  \`\`\`json\n  ${m}\n  \`\`\`\n`]]) {
   test(`FAA-135: ${name} is no mandate block (0.61.0 readings 2)`, () => {
     const request = new BoardRequest({ body: { text: text(JSON.stringify(mandate())) }, request: { id: 'r' },
       sender: { project: OTHER_PROJECT, principal: { provenance: 'trusted' } } }, 'video.render');

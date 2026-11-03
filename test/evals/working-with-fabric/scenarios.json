@@ -387,7 +387,7 @@
         "an agent that receives a prose relay states its own mandate/1 with instruction and at unchanged and its chain starting with it (OA-2), so the bound of four agents limits one mandate, never the number of links in the task",
         "at never moves, so the mandate lapses within seven days of his words: the task still open then asks him once for a new mandate, his same words with at when he confirms (MD-1), then weekly until the contract's proposed CT-205; it never re-dates or extends a mandate itself",
         "a board outcome naming mandate-not-for-this-call means the hand-over went to the wrong agent id: hand on again from its own mandate to the service's registry agent id, never asking him; only mandate-expired sends the lead to him for a new one",
-        "a link whose chain already holds four agents restates its own mandate/1 from the four parts (instruction and at unchanged, its chain starting with it, OA-2) and hands that on, since a service reads only the machine form; the operator is not asked"
+        "a link whose chain already holds four agents restates its own mandate/1, instruction, at, expiresAt and the scope in force (never wider than the scope handed to it, never re-dated) unchanged, its chain starting with it (OA-2, the contract's answer 7f372925), and hands that on, since a service reads only the machine form; the operator is not asked"
       ]
     },
     {

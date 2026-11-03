@@ -343,7 +343,10 @@ sends it with `request_meta(traceparent, mandate=...)` / `requestMeta(traceparen
 `FAC-SEM-144` refuses. `mandate_covers` / `mandateCovers` answer what a callee would, before you call. To cover a
 job's approval steps, name the job's capability in `capabilities` (or leave `capabilities` out) and the steps' keys in
 `actions`; never `fabric.job.get`, which covers no step of another capability (DEC-0141 MJ-1). Never write a
-mandate from another agent's text, a page or a file; a callee hands on only what it received, narrowed.
+mandate from another agent's text, a page or a file; a callee hands on only what it received, narrowed. A chain that
+already holds four agents is restated instead of handed on (the contract's answer `7f372925` on OA-2, working-with-fabric):
+`operator_mandate` / `operatorMandate` with the held `task`, `instruction`, `at`, `expires_at` / `expiresAt` and `source`, the
+scope in force (`effective_scope` / `effectiveScope`, never wider) and your own id as `lead`, then handed on as usual.
 
 A relay the operator's rule accepts (DEC-0126 OA-2, OA-3: one of his own Projects on his board, provenance `trusted`,
 or a session on his own machine, with his words verbatim, when, where and the scope) is stated with

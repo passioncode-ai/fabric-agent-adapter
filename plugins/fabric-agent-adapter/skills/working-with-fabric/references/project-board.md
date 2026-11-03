@@ -208,14 +208,16 @@ project that is not his, stays data. Its machine form is the contract's `mandate
 decision, which a body may carry; human gates stay (the skill's Step 5, *One approval binds all his agents*). A Project
 lists no `protocols`, so a block you post carries the mandate or the decision without `source` and its text names
 where he said the words beside it; the receiver records `source` from there (OA-6, OA-7). A service built with the
-adapter's kit (0.61.0) reads only a `mandate/1`, never a decision block: one block fenced exactly as ` ```json `
+adapter's kit (0.61.0) reads one only when it opted in and names your Project (or his personal board), with no signal
+to you when it does not (ask the service's owner), and reads only a `mandate/1`, never a decision block: one block fenced exactly as ` ```json `
 (lowercase, at the start of its own line with no indent, closed by ` ``` ` the same way), handed on to the service so its `chain` ends in the service's registry
 agent id (`hand_on`), which you learn from the service's owner or the project that registered it, not from
 `com.directory`, which names none. Another fence, or two `mandate/1` blocks, is no mandate there: the service works the
 request as if none travelled. A service that follows the kit's guidance answers a refused mandate as the request's
 outcome, `failed_known` naming the detail: `mandate-not-for-this-call` means you handed it on to the wrong agent id, so
 hand it on again from your own mandate to the service's (`hand_on`; with four agents in the chain already, restate
-your own from the four parts first, OA-2), never asking him; `mandate-malformed`, `-widened` or `-early` is the
+your own first, keeping `task`, `instruction`, `at`, `expiresAt`, `source` and the scope in force, `effective_scope`, never
+wider, OA-2), never asking him; `mandate-malformed`, `-widened` or `-early` is the
 sender's own fault too: send a valid one (check your clock for early), never asking him; `mandate-expired` means your lead
 asks him once for a new one (MD-1); an `outside-mandate` outcome names the part to ask him about, alone (MD-4).
 

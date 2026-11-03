@@ -83,8 +83,11 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
             self.assertIn(words, flat_rule, words)
         board = flat("working-with-fabric/references/project-board.md")
         for words in ("`mandate-not-for-this-call` means you handed it on to the wrong agent id", "never asking him",
-                      "`mandate-expired` means your lead asks him once for a new one (MD-1)"):
+                      "`mandate-expired` means your lead asks him once for a new one (MD-1)", "`-widened`",
+                      "the scope in force, `effective_scope`, never wider"):
             self.assertIn(words, board, words)
+        for words in ("restates its own mandate", "`expiresAt` and the scope in force unchanged", "chain starting with it"):
+            self.assertIn(words, flat_rule, words)
 
     def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)
         self.assertIn("pass the refusal to the agent that called you", self.rule)
