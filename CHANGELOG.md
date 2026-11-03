@@ -1,10 +1,10 @@
 # Changelog
 
-## 0.60.0 (unreleased)
+## 0.60.0 (2026-11-03)
 
-The board responder is ready to find a slot the operator moves back to it, once Fabric offers the move (FAA-165), and three smaller fixes: working-with-fabric
-reads a filed row's answer (FAA-169) and says when an accepted request is left behind by a move (FAA-172), and `pack`
-names why a provider manifest is refused (FAA-193).
+The board responder is ready to find a slot the operator moves back to it, once Fabric offers the move (FAA-165), and four smaller fixes: working-with-fabric
+reads a filed row's answer (FAA-169) and says when an accepted request is left behind by a move (FAA-172), `pack`
+names why a provider manifest is refused (FAA-193), and Python's package kit refuses `NaN` and `Infinity` as Node's does.
 
 ### Fixed
 
