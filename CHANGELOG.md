@@ -20,9 +20,9 @@ names why a provider manifest is refused (FAA-193).
   lost answer to the move-back claim itself is asked again under its key, counting as a lease from its send meanwhile (while more than the 10 s margin of that lease is left)
   (a replay from an older generation is dropped); `not_authorized` counts as another session's. It never enrolls or replaces a
   slot another session holds, and waits while other work runs. Both kits (`fabric_board_slots.py`,
-  `fabric-board-slots.mjs`). The `board.slot.moved` notice and references/board.md say so (FAA-165).
-- `pack` refused a provider manifest whose `costPresets` differ from the package's with only `provider-manifest`; the
-  message now names both causes (not a JSON object, or `costPresets` that differ). Both kits (FAA-193, found by the
+  `fabric_board_session.py` and their Node twins). The `board.slot.moved` notice and references/board.md say so (FAA-165).
+- `pack`, `sign` and `verify` refused a provider manifest whose `costPresets` differ from the package's with only
+  `provider-manifest` as the message; the message now names both causes (the `problem` code is unchanged) (not a JSON object, or `costPresets` that differ). Both kits (FAA-193, found by the
   FAA-124 pilot rehearsal).
 
 ### Changed

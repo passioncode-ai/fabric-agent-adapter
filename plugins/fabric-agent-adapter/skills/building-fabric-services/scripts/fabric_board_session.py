@@ -521,8 +521,8 @@ class Responder(SlotKeeper):
              and s.get("renewed_at", 0.0) != float("-inf")] + \
             [s["probe_at"] for c, s in self.slots.items() if c in self._probing and "probe_at" in s
              and self.now() - s["probe_at"] < LEASE_SECONDS - LEASE_MARGIN_SECONDS]
-        # a lapsed slot holds no lease (FAA-163); a move-back claim whose answer was lost holds one from its send, until
-        # that lease would have run out (FAA-165)
+        # a lapsed slot holds no lease (FAA-163); a move-back claim whose answer was lost holds one from its send, while
+        # more than the 10 s margin of that lease is left (FAA-165)
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:

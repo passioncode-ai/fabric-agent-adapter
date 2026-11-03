@@ -264,7 +264,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   non-holder's claim may be refused so), is another session's slot:
   recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
   landed is not stranded; until then it counts as at most a lease from that key's first send (a fresh key starts
-  its own, and once less than the 10 s margin of that lease is left it counts no more, as a lapsed slot), so a second lost answer keeps
+  its own, and it counts only while more than the 10 s margin of that lease is left, then no more, as a lapsed slot), so a second lost answer keeps
   the session (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
   dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
   it waits for its attempt's lease (60 s) before it is claimed again. Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
@@ -291,7 +291,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
   `change-policy` (DEC-0125); the operator reaches it through an agent that relays their decision in `_meta`, the
-  service's page or its elicitation (Claude Code and Codex, which cannot set `_meta`, wait for CT-125's forwarding), and the service names it in its docs; otherwise a moved slot stays moved unless the operator moves it back to this session (above). The
+  service's page or its elicitation (Claude Code and Codex, which cannot set `_meta`, wait for CT-125's forwarding), and the service names it in its docs; otherwise a moved slot stays moved for good today (no Fabric release offers the operator's move back, above). The
   hand-over of accepted requests to another session (contract CT-175) waits for Fabric's session surface.
 
 ## What a board session may call
