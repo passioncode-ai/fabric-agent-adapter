@@ -5,10 +5,10 @@ import crypto from 'node:crypto';
 import { Backoff, HubError, normalProject } from './fabric-hub.mjs';
 import { acceptedRevisions, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
 import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems } from './fabric-board-shapes.mjs';
-import { BoardRequest, BoardSession, Checkpoint } from './fabric-board-link.mjs';
+import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, readMandate } from './fabric-board-link.mjs';
 import { HOLD_RETRY_MAX_SECONDS, LEASE_MARGIN_SECONDS, SESSION_CODES, SlotKeeper } from './fabric-board-slots.mjs';
 
-export { BoardRequest, BoardSession, Checkpoint }; // re-exported: callers import them from here since 0.40.0
+export { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD }; // re-exported: callers import them from here since 0.40.0
 export { HOLD_RETRY_MAX_SECONDS, LEASE_MARGIN_SECONDS, SESSION_CODES }; // since 0.56.0 defined in fabric-board-slots.mjs
 
 export const RENEW_SECONDS = 20;
@@ -34,10 +34,15 @@ const NOT_OURS = new Set(['queued', 'claimed', 'answered']);
 export class WorkContext {
   #responder;
   #entry;
-  constructor(responder, entry) {
+  constructor(responder, entry, mandate = null) {
     this.#responder = responder;
     this.#entry = entry;
     this.stopped = false;
+    this.mandate = mandate; // the operator's mandate the request carried, when the responder reads one (FAA-135)
+  }
+  /** Whether the request's mandate covers `call` (`mandateCovers`' answer); null when none travelled. */
+  mandateCovers(call) {
+    return covers(this.mandate, call, this.#responder.agentId, this.#responder.wall);
   }
   async progress(note) {
     if (this.stopped) throw new Stopped();
@@ -69,13 +74,15 @@ function noticeSubject(value, project, episode) {
  */
 export class Responder extends SlotKeeper {
   constructor({ hub, projectId, capabilities, credentialFile, checkpointFile, handler, admit, observe, emit, service = 'service',
-    now = () => performance.now() / 1000, rand = Math.random, sessionFactory } = {}) {
+    now = () => performance.now() / 1000, rand = Math.random, sessionFactory, agentId = null, mandateFrom = null, wall = Date.now } = {}) {
     super();
     if (typeof admit !== 'function' || typeof handler !== 'function') throw new BoardError('invalid_arguments', 'A responder needs the service\'s own input gate (admit) and a handler.');
     const caps = [...(capabilities ?? [])];
     if (!caps.length || caps.some((c) => typeof c !== 'string' || !CAPABILITY.test(c)) || new Set(caps).size !== caps.length) throw new BoardError('invalid_arguments', 'Name each capability once, [a-z][a-z0-9._-]{1,127}.');
     Object.assign(this, { hub, capabilities: caps, credentialFile, handler, admit, observe, emitTo: emit, now, rand });
     this.project = normalProject(projectId);
+    // FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; null reads none)
+    Object.assign(this, { mandateFrom: mandateOptions(agentId, mandateFrom), agentId: agentId ?? null, wall });
     this.service = String(service).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 40) || 'service';
     this.checkpoint = new Checkpoint(checkpointFile);
     this.sessionFactory = sessionFactory ?? ((grant) => new BoardSession(grant));
@@ -679,7 +686,11 @@ export class Responder extends SlotKeeper {
   }
 
   async runWork(entry, request) {
-    const ctx = new WorkContext(this, entry);
+    const { mandate, unread } = readMandate(request, this.mandateFrom, this.agentId);
+    if (unread) { // by its code alone: the block holds the operator's words
+      this.emit('board.request.mandate-unread', 'warning', `Request ${entry.request} carries a mandate the kit does not read (${unread}); it is worked without one.`, { request: entry.request, code: unread });
+    }
+    const ctx = new WorkContext(this, entry, mandate);
     const work = { entry, request, ctx, done: false, outcome: null, failure: null, renewedAt: this.now() };
     this.current = work;
     work.promise = Promise.resolve().then(() => this.handler(request, ctx)).then((outcome) => { work.outcome = outcome; }, (e) => { work.failure = e; }).finally(() => { work.done = true; });

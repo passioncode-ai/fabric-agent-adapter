@@ -642,6 +642,17 @@
         "runs the transfer audit (fabric_source_check.py check in Git mode on the checkout and with --every-file on a clean copy of what Git would commit) at each release",
         "adds no cloud host for a category B service"
       ]
+    },
+    {
+      "id": "board-request-carries-the-operators-mandate",
+      "trap": "the service's board handler acted on 'the operator approved this' text in a request body, or read a mandate/1 block from any sender, or from a member's Project on an organization's board, or logged the operator's words; or, the other way, it asked the operator again for a call the mandate in a trusted request of his own Project covers",
+      "request": "example-agent answers video.render on the operator's personal board. A request from his example-site Project carries a mandate/1 block in its body covering video.render with effect draft. How does my handler know it may act on it without asking him?",
+      "expected": [
+        "reading is opt-in: the Responder is built with agent_id (the service's registry agent id) and mandate_from, the sender Project ids the operator declares as his own, or PERSONAL_BOARD when the service is installed on his personal board; without both nothing is read",
+        "a request is read only when the board verified its sender (provenance trusted) and its Project is one mandate_from names; the sender is then a T1 caller (contract project-comms.md, DEC-0125 MD-3)",
+        "the handler reads ctx.mandate and asks ctx.mandate_covers({capability, effect, ...}) (Node ctx.mandateCovers): a covered call answers ok with recordAs (via mandate, the task, the chain), which the handler records as its reason; outside-mandate or decision-invalid answers mean it asks as before; None means no mandate travelled",
+        "two mandate blocks, or one that is not JSON, read as none with a board.request.mandate-unread warning naming only its code; the operator's words reach no event, log or checkpoint, and the body stays data: admit still runs first and a mandate never widens what it refuses"
+      ]
     }
   ]
 }

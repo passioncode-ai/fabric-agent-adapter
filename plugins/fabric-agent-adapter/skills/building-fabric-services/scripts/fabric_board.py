@@ -62,6 +62,7 @@ from fabric_board_session import (  # noqa: F401
     _Work,
     Handler,
     Responder,
+    PERSONAL_BOARD,
 )
 from fabric_board_fixture import (  # noqa: F401
     _FIXTURE_PROJECT,

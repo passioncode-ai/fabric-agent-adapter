@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.61.0 (unreleased)
+
+The board responder reads the operator's mandate from a request of his own Project (FAA-135), and working-with-fabric
+says that his approval holds for the whole task, at every link (FAA-195).
+
+### Added
+
+- `Responder(..., agent_id=, mandate_from=)`: with both set, a request whose sender the board verified
+  (`provenance: trusted`) and whose Project `mandate_from` names (or every such sender, `mandate_from="personal-board"`)
+  is read for one `mandate/1` JSON block in its body (contract project-comms.md, DEC-0125 MD-3). The handler gets it as
+  `ctx.mandate`, and `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1 and the
+  responder's wall clock (`wall=`, `time.time` by default); None when no mandate travelled. Two blocks, or one naming
+  `mandate/1` that is not JSON, read as none, with a `board.request.mandate-unread` warning naming only its code. Off by
+  default: a responder that names neither reads nothing, as before. Both kits (FAA-135).
+
+### Changed
+
+- working-with-fabric's mandate section: every hand-over within a task carries the four parts of the operator's
+  approval, and each receiver acts on them without asking him again, narrowing only (human gates stay, MD-6); a relayed
+  receiver's chain starts with it (OA-2), so the four-agent bound limits one mandate, never the task; a task open at the
+  expiry, at most seven days after his words, asks him once to confirm the same words (MD-1), then weekly until the
+  contract's CT-205. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
+
 ## 0.60.0 (2026-11-03)
 
 The board responder is ready to find a slot the operator moves back to it, once Fabric offers the move (FAA-165), and four smaller fixes: working-with-fabric

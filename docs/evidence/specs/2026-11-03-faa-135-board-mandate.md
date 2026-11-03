@@ -1,6 +1,6 @@
 # FAA-135 (board part): the board responder reads the operator's mandate
 
-Status: spec, 2026-11-03. Release: 0.61.0, stacked on 0.60.0. The job step shipped in 0.52.0; the `identify_agent`
+Status: implemented 2026-11-03 (both kits; tests `test/test_fabric_board_mandate.py`, `test/fabric-board-mandate.test.mjs`). Release: 0.61.0, stacked on 0.60.0. The job step shipped in 0.52.0; the `identify_agent`
 hook is the second part of this row and gets its own spec.
 
 ## What the contract says (pin 3830a33)
@@ -29,8 +29,8 @@ The kit cannot tell a personal board from an organization's: `com.status` names 
 - The handler gets `ctx.mandate` (the mandate as received, or `None`) and `ctx.mandate_covers(call)`, which calls
   `mandate_covers` with `tier: "T1"`, `self: agent_id`, no `callerAgent` (the board names a Project's principal, not an
   authenticated agent id the chain can bind), and the service's clock. A covered call answers `recordAs`
-  (`via: mandate`); the kit records it in the request's evidence summary and never the operator's words in the
-  events feed.
+  (`via: mandate`), which the handler records as its reason; the kit puts the operator's words in no event, log or
+  checkpoint.
 - Nothing else changes: `admit` still runs first, and a body stays data. A mandate never widens what `admit` refuses.
 
 ## Checks (to write before the code)

@@ -6,6 +6,8 @@ import path from 'node:path';
 import { HubError, MCP_PROTOCOL_VERSION, postMcp, toolAnswer } from './fabric-hub.mjs';
 import { atomicWrite, ensurePrivateDir } from './fabric-service.mjs';
 import { BoardError, RESPOND_TOOLS, isObj, refusalProblems } from './fabric-board-shapes.mjs';
+import { isAgentId, mandateCovers } from './fabric-mandate.mjs';
+import { formatRfc3339 } from './fabric-time.mjs';
 
 /** MCP over HTTP with a board session's one-session bearer; calls are serialised; close() sends the session's DELETE. */
 export class BoardSession {
@@ -180,3 +182,58 @@ export class BoardRequest {
     return { requestId: this.requestId, capability: this.capability }; // never the body
   }
 }
+
+// -- the operator's mandate in a board request (FAA-135; contract project-comms.md, DEC-0125 MD-3) ---------------------
+
+/** `mandateFrom` naming every trusted sender of the board the service is installed on: the operator's personal board. */
+export const PERSONAL_BOARD = 'personal-board';
+const JSON_BLOCK = /```json[ \t]*\r?\n([\s\S]*?)\r?\n?```/g;
+
+/**
+ * The mandate a request carries, read only when the service opted in (`agentId` and `mandateFrom` set), the board
+ * verified the sender (`provenance: trusted`) and its Project is one `mandateFrom` names (or `PERSONAL_BOARD`): a T1
+ * caller by project-comms. Answers `{ mandate, unread }`: `mandate` null when none is read, `unread` `mandate-blocks`
+ * (more than one) or `mandate-unreadable` (a block naming `mandate/1` that is not JSON).
+ */
+export function readMandate(request, mandateFrom, agentId) {
+  const none = { mandate: null, unread: null };
+  if (agentId == null || mandateFrom == null || typeof request.body !== 'string') return none;
+  const sender = isObj(request.sender) ? request.sender : {};
+  const principal = isObj(sender.principal) ? sender.principal : {};
+  if (principal.provenance !== 'trusted') return none;
+  if (mandateFrom !== PERSONAL_BOARD && !mandateFrom.has(sender.project)) return none;
+  const found = [];
+  for (const [, block] of request.body.matchAll(JSON_BLOCK)) {
+    let value;
+    try {
+      value = JSON.parse(block);
+    } catch {
+      if (block.includes('mandate/1')) return { mandate: null, unread: 'mandate-unreadable' };
+      continue;
+    }
+    if (isObj(value) && value.kind === 'mandate/1') found.push(value);
+  }
+  if (found.length > 1) return { mandate: null, unread: 'mandate-blocks' };
+  return found.length ? { mandate: found[0], unread: null } : none;
+}
+
+/**
+ * `mandateCovers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
+ * chain's end alone binds it, MD-3). `wall` answers milliseconds. Null when no mandate travelled.
+ */
+export function covers(mandate, call, agentId, wall) {
+  if (mandate == null || agentId == null) return null;
+  return mandateCovers({ mandate, tier: 'T1', now: formatRfc3339(wall()), self: agentId, call });
+}
+
+/** The responder's opt-in, checked: answers `mandateFrom` as the responder keeps it (a Set or the string). */
+export function mandateOptions(agentId, mandateFrom) {
+  if (agentId != null && !isAgentId(agentId)) throw new BoardError('invalid_arguments', 'agentId must be the service\'s registry agent id.');
+  if (mandateFrom == null || mandateFrom === PERSONAL_BOARD) return mandateFrom ?? null;
+  const projects = typeof mandateFrom === 'string' || typeof mandateFrom?.[Symbol.iterator] !== 'function' ? null : [...mandateFrom];
+  if (projects === null || !projects.every((p) => typeof p === 'string' && p)) {
+    throw new BoardError('invalid_arguments', `mandateFrom is '${PERSONAL_BOARD}' or a collection of Project ids.`);
+  }
+  return new Set(projects);
+}
+

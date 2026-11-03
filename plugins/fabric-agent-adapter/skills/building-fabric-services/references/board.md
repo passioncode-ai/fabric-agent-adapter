@@ -95,9 +95,29 @@ from `leaseExpiresAt`.
 why not; a refusal accepts the request and completes it `failed_known` with that sentence, so the requester learns it
 and the request does not bounce. A redacted body is refused the same way. The kit never hands a body to a model, a
 shell or a tool; what the handler does with an admitted body (and the checks it needs before a model, a tool or a
-spend sees it) is the service's own responsibility. The kit's responder reads no approval or mandate from a message yet
-(0.52.0): a request from the operator's own Project may carry `mandate/1` (DEC-0125 MD-3), and a handler acts on it only
-once the kit reads it (FAA-135).
+spend sees it) is the service's own responsibility.
+
+### The operator's mandate in a request (FAA-135, 0.61.0)
+
+A request one of the operator's own Projects sends for his task may carry his `mandate/1` as a JSON code block in its
+body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his personal board from an organization's
+(`com.status` names neither), so reading one is opt-in and fail-closed:
+
+- `Responder(..., agent_id="example-agent", mandate_from={"<project id>", ...})` (Node: `agentId`, `mandateFrom` as a
+  `Set`), or `mandate_from=PERSONAL_BOARD` (`"personal-board"`) when the service is installed on his personal board,
+  where every participant is his own Project. Without both, nothing is read, as before 0.61.0.
+- A request is read only when the board verified its sender (`provenance: trusted`) and its Project is one
+  `mandate_from` names. Its sender is then a T1 caller. One fenced `json` block whose value has `kind: "mandate/1"` is
+  the mandate; any other JSON block is ignored. Two such blocks, or one naming `mandate/1` that is not JSON (`NaN`
+  included), read as none, and the responder emits `board.request.mandate-unread` (a warning) naming only its code,
+  `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or checkpoint.
+- The handler gets `ctx.mandate` (the block as received, or None) and `ctx.mandate_covers(call)` (Node
+  `ctx.mandateCovers(call)`): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
+  board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
+  responder's wall clock (`wall=`, `time.time` by default; Node `Date.now`). It answers `{"ok": True, "recordAs": ...}`,
+  a `decision-invalid` or `outside-mandate` refusal, or None when no mandate travelled. A covered call is the operator's
+  decision: record `recordAs` (`via: mandate`, the task, the chain) with the request as your reason. The gate still runs
+  first: a mandate never widens what `admit` refuses, and a body stays data.
 
 ## Effects, observation, evidence and the reply
 
@@ -326,7 +346,7 @@ checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `boar
 `board.request.skipped`, `board.request.reconciled`, `board.request.held`, `board.attempt.lost`,
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,
 `board.down`, each notifying episode said once, and `board.outcome.invalid` (warning) when a handler's outcome fails
-its checks and is not sent. The operator's hold (below) adds `board.held`, `board.slot.held`,
+its checks and is not sent, and `board.request.mandate-unread` (warning) when a request's mandate is not read (above). The operator's hold (below) adds `board.held`, `board.slot.held`,
 `board.slot.released` and `board.request.waiting`. The reference service adds `board.slot.returned` at a take-back.
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
