@@ -414,8 +414,8 @@ class BoardMandateTests(Conversation):
         for text, want in ((".", None), ("+", None), ("-", None), ("e5", None), (".e1", None), ("1e", None), (".5", 0.5), ("5.", 5.0)):
             got = jsv.js_to_number(text)  # the pattern needs a digit (unit reading 23)
             self.assertTrue(math.isnan(got) if want is None else got == want, text)
-        # A spend nested at most MAX_SPEND_DEPTH lists deep is read; a deeper one is no estimate, at any depth and stack
-        # offset, never a raise (product reading 25: JavaScript's Number() throws on one a few thousand deep).
+        # A chain of at most MAX_SPEND_DEPTH one-item lists is read; a longer one is no estimate, at any length and stack
+        # offset, never a raise (readings 25 and 26: the estimate a refusal carries is one a serialiser writes).
         self.assertEqual(fm.MAX_SPEND_DEPTH, 100)
         for depth in (fm.MAX_SPEND_DEPTH - 2, fm.MAX_SPEND_DEPTH - 1):
             self.assertTrue(at_depth(0, nested(depth))["ok"], depth)
@@ -424,16 +424,14 @@ class BoardMandateTests(Conversation):
                 got = at_depth(frames, nested(depth))
                 self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False), depth)
 
-        def nested_dicts(depth):  # depth + 1 dicts, the bound counting them as it counts lists (product reading 26)
+        def nested_dicts(depth):  # depth + 1 dicts: Number() never descends a dict, so no depth bound (readings 26)
             value = {"a": 3}
             for _ in range(depth):
                 value = {"a": value}
             return value
-        self.assertTrue(at_depth(0, nested_dicts(fm.MAX_SPEND_DEPTH - 1))["ok"])
-        for spend in (nested_dicts(fm.MAX_SPEND_DEPTH), nested_dicts(100000), {"a": nested(fm.MAX_SPEND_DEPTH - 1)},
-                      [{"a": nested(fm.MAX_SPEND_DEPTH - 2)}]):
-            got = at_depth(0, spend)
-            self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
+        for spend in (nested_dicts(fm.MAX_SPEND_DEPTH), nested_dicts(100000), {"a": nested(5000)}, [1, nested(5000)],
+                      [{"a": nested(5000)}], json.loads('{"a":' * 150 + "1" + "}" * 150)):
+            self.assertTrue(at_depth(0, spend)["ok"], "a dict or a list of two items is NaN at any depth, as 0.60.0 read it")
 
         class ClaimsFloat(int):  # an int whose __class__ says float: read as the int it is (unit reading 20)
             @property

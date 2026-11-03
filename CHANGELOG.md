@@ -41,13 +41,15 @@ says that his approval holds for the whole task, at every link (FAA-195).
   way down, so for its direct callers a tuple, bytes, a `str`, `list` or `dict` subclass, or a list holding a number
   subclass is no estimate either, a stricter reading than 0.60.0's (checked only under a ceiling, without recursion in one
   pass, then read as `Number()` reads it, in time linear in the structure (a list is never joined: two or more items are
-  NaN, one is read for itself); a shared or cyclic list or dict, which `json.loads` never gives, is no estimate, and a spend nested more than 100
-  lists or dicts deep (`MAX_SPEND_DEPTH`) is no estimate, also stricter than 0.60.0, which read a list to about 500
-  deep (RecursionError past it) and a dict at any depth, as Node's `mandateCovers` and the contract read a list to a
-  few thousand deep and a dict at any depth: a fail-closed twin split that no board, MCP or job reader reaches, since
-  they take no list or dict spend). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
+  NaN, one is read for itself); a shared or cyclic list or dict, which `json.loads` never gives, is no estimate, and a chain of more than 100
+  one-item lists (`MAX_SPEND_DEPTH`), the only spend `Number()` reads through a list as a number, is no estimate, so
+  the spend a refusal carries as `estimateUsd` is one a serialiser writes; a dict, or a list of two or more items, is
+  NaN at any depth, as in 0.60.0, Node and the contract. The chain bound is also stricter than 0.60.0, which read one
+  a few hundred deep (RecursionError past it: about 500 on Python 3.14, 330 on 3.9), and than Node's `mandateCovers`
+  and the contract, which read one a few thousand deep: a fail-closed twin split that no board, MCP or job reader
+  reaches, since they take no list or dict spend). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
   the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
-  seam readings 17 to 22 and 24, product readings 18 to 20 and 22 to 25, unit readings 19, 21 and 24). `js_to_number`'s decimal
+  seam readings 17 to 22, 24 and 26, product readings 18 to 20 and 22 to 26, unit readings 19, 21, 24 and 26). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
   (0.61.0 seam reading 22).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
