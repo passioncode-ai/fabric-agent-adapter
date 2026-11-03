@@ -292,6 +292,9 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
     return (found[0], None) if found else (None, None)
 
 
+CALL_MEMBERS = ("capability", "action", "effect", "spendUsd", "project")  # what mandate_covers reads of a call
+
+
 def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str], wall: Callable[[], float],
            caller: Any = None) -> Optional[Dict[str, Any]]:
     """`mandate_covers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
@@ -301,18 +304,26 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     `spendUsd` and `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend
     that is not a finite number is none, which a ceiling refuses; a `project` that is not a string, None included (the
     contract's mandateCovers refuses a null project), is unreadable, which a mandate limited to projects refuses; a call
-    that names none leaves `project` out."""
+    that names none leaves `project` out. Only the five members `mandate_covers` reads are read, each once, the way the
+    handler's own `call[name]` reads it (a `__getitem__` or a default answers, never the mapping's storage), and the
+    rest of the call is never touched."""
     if mandate is None or agent_id is None:
         return None
     if isinstance(call, Mapping):
-        call = dict(call)
-        if "spendUsd" in call:
-            spend = _rules.mandate_spend(call.pop("spendUsd"))
-            if spend is not None:
-                call["spendUsd"] = spend
-        if "project" in call:
-            project = call.pop("project")
-            call["project"] = project if isinstance(project, str) else _rules.UNREADABLE_PROJECT
+        read: Dict[str, Any] = {}
+        for name in CALL_MEMBERS:
+            try:
+                value = call[name]
+            except KeyError:  # not named; any other error the mapping raises passes to the handler
+                continue
+            if name == "spendUsd":
+                value = _rules.mandate_spend(value)
+                if value is None:
+                    continue
+            elif name == "project":
+                value = value if type(value) is str else _rules.UNREADABLE_PROJECT
+            read[name] = value
+        call = read
     clock, now = wall(), ""
     if isinstance(clock, (int, float)) and not isinstance(clock, bool):
         try:

@@ -380,7 +380,7 @@ def mandate_spend(value: Any) -> Any:
     """A spend estimate as a mandate reads it (FAA-139): a number read as a double, as the contract does; one that is
     not a finite double (an int past the float range, NaN, infinity) or not a number is none, which a mandate's
     ceiling refuses (fail closed). A finite number stays as given (25 stays 25)."""
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
+    if type(value) not in (int, float):  # a bool, or a subclass whose float() could answer another number, is none
         return None
     try:
         return value if math.isfinite(float(value)) else None

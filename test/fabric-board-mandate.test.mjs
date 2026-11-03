@@ -246,6 +246,14 @@ test('FAA-135: a spend or project that does not read is refused (FAA-139; 0.61.0
     ['a non-enumerable', hidden]]) {
     assert.equal(act(call), 'outside-mandate: action', `${name} action is read`);
   }
+  // A Proxy is read as the contract reads it, through get alone (0.61.0 seam reading 17).
+  const defaults = (target, extra) => new Proxy(target, { get: (o, k) => (k in o ? o[k] : extra[k]) });
+  assert.equal(direct(defaults({ capability: 'video.render', effect: 'draft', spendUsd: 3 }, { project: 'site-b' })), 'outside-mandate: project');
+  assert.equal(act(defaults({ effect: 'draft' }, { action: 'other' })), 'outside-mandate: action');
+  const hiding = new Proxy({ effect: 'draft', action: 'other' }, { has: (o, k) => k !== 'action' });
+  assert.equal(act(hiding), 'outside-mandate: action');
+  const unrelated = { capability: 'video.render', effect: 'draft', spendUsd: 3, project: 'site-a', get note() { throw new Error('never read'); } };
+  assert.equal(direct(unrelated), 'ok', 'a member mandateCovers does not read is never touched');
   let reads = 0;
   const counted = { capability: 'video.render', effect: 'draft', project: 'site-a', get spendUsd() { reads += 1; return 3; } };
   assert.equal(direct(counted), 'ok');

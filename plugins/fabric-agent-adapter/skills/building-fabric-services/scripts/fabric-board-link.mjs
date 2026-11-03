@@ -255,26 +255,24 @@ export function readMandate(request, mandateFrom, agentId) {
  * verified (MD-3 records the caller). `wall` answers milliseconds. Null when no mandate travelled. `spendUsd` and
  * `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend that is not a
  * finite number is none (a ceiling refuses it), a `project` that is not a string, null included (the contract's
- * mandateCovers refuses a null project), unreadable; a call that names none leaves `project` out. A spend is read as
- * an own member; a project, capability, action and effect as the contract reads them (an inherited, non-enumerable or
- * getter member included), so none opens a gate.
+ * mandateCovers refuses a null project), unreadable; a call that names none leaves `project` out. Only the five
+ * members mandateCovers reads are read, each once: a spend as an own member (an inherited one is none, which a ceiling
+ * refuses), a capability, action, effect and project as the contract reads them, a plain [[Get]] whose undefined is
+ * absent (an inherited, non-enumerable, getter or Proxy member included); the rest of the call is never touched. A
+ * getter whose value changes is answered on its one read.
  */
 export function covers(mandate, call, agentId, wall, caller = null) {
   if (mandate == null || agentId == null) return null;
   if (call !== null && typeof call === 'object' && !Array.isArray(call)) {
     const read = {};
-    for (const key of Object.keys(call)) if (key !== 'spendUsd' && key !== 'project') read[key] = call[key];
-    // What the call names is read as the contract reads it, an inherited, non-enumerable or getter member included,
-    // so a mandate limited to some actions or one capability never covers a call whose name it cannot see.
-    for (const key of ['capability', 'action', 'effect']) if (!Object.hasOwn(read, key) && key in call) read[key] = call[key];
-    // A spend is read as an own member only (member() reads so): an inherited one is none, which a ceiling refuses.
+    for (const key of ['capability', 'action', 'effect']) {
+      const value = call[key]; // the contract's read: whatever [[Get]] answers, undefined being absent
+      if (value !== undefined) read[key] = value;
+    }
     const spend = mandateSpend(Object.hasOwn(call, 'spendUsd') ? call.spendUsd : undefined);
     if (spend !== undefined) read.spendUsd = spend;
-    // A project is read as the contract reads it, an inherited one or a getter included, each once: never dropped.
-    if ('project' in call) {
-      const project = call.project;
-      if (project !== undefined) read.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
-    }
+    const project = call.project;
+    if (project !== undefined) read.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
     call = read;
   }
   const clock = wall();

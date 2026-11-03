@@ -28,6 +28,11 @@ def mandate(callee: str = "example-agent", scope=None, source=None) -> dict:
     return fm.hand_on(lead, callee, AT)
 
 
+def detail_of(link, mandate_, call) -> str:
+    got = link.covers(mandate_, call, "example-agent", lambda: WALL, OTHER_PROJECT)
+    return "ok" if got.get("ok") else got["data"]["detail"]
+
+
 def body(*blocks: str) -> str:
     return "Render the teaser.\n\n" + "\n\n".join("```json\n%s\n```" % b for b in blocks) + "\n"
 
@@ -264,6 +269,18 @@ class BoardMandateTests(Conversation):
             proxy = types.MappingProxyType({"capability": "video.render", "effect": "draft", "spendUsd": 3, "project": project})
             got = link.covers(m, proxy, "example-agent", lambda: WALL, OTHER_PROJECT)
             self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want, "a Mapping is read as a dict")
+
+        class Defaults(dict):  # a stored member hidden behind __getitem__ (0.61.0 seam reading 17)
+            def __getitem__(self, key):
+                return "site-b" if key == "project" else dict.__getitem__(self, key)
+        self.assertEqual(detail_of(link, m, Defaults(capability="video.render", effect="draft", spendUsd=3, project="site-a")),
+                         "outside-mandate: project", "the call is read as its own __getitem__ answers")
+
+        class Lying(float):
+            def __float__(self):
+                return 0.0
+        self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": Lying(100), "project": "site-a"}),
+                         "outside-mandate: spend", "a float subclass is no spend")
         call = {"capability": "video.render", "effect": "draft", "spendUsd": float("nan"), "project": 5}
         kept = dict(call)
         link.covers(m, call, "example-agent", lambda: WALL, OTHER_PROJECT)

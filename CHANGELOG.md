@@ -21,9 +21,11 @@ says that his approval holds for the whole task, at every link (FAA-195).
   kit's MCP and job mandate readers do (FAA-139): a spend that is not a finite number is none, which a `perCallMaxUsd`
   refuses, and a `project` that is not a string, None (Node null) included, is refused by a mandate limited to
   projects, as the contract's `mandateCovers` refuses a null project (the MCP and job readers read None as naming
-  none; leave `project` out on the board). Node reads a spend as the call's own member and its project, capability,
-  action and effect as the contract reads them, an inherited, non-enumerable or getter member included (a draft of this release
-  passed them as given; 0.61.0 seam reading 14).
+  none; leave `project` out on the board) (a draft of this release passed them as given; 0.61.0 seam reading 14). Only
+  the five members `mandate_covers` reads are read, each once, as the contract reads them (`call[name]` in Python; a
+  plain property read in Node, inherited, getter and Proxy members included), but for a Node spend, read as the call's
+  own member; the rest of a call is never touched (0.61.0 seam readings 16 and 17). The kit's `mandate_spend` takes only
+  an `int` or a `float`, so a number subclass whose `float()` answers another number is no spend in any reader.
 
 ### Fixed
 
