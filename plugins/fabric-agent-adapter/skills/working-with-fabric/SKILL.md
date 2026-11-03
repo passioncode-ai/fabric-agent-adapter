@@ -239,7 +239,7 @@ chat of any of his agents binds all his agents (OA-1).
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you
   relayed, `expiresAt` the task's length, within seven days of `at`, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
   `perCallMaxUsd`, `projects`), `chain` starting with you. For a job asking the operator at a step, name the job's capability in
-  `capabilities` without `actions`: the step is read with its request key as the action, unknown ahead
+  `capabilities` without `actions`: the step is read with its request key as the action
   (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
   narrower `scope` when you hand on less, never wider; at most four agents; `source` never changes down the chain. It
   travels in the call's `_meta.mandate` or as `call.mandate` of Fabric's `agent.call` once Fabric's hub forwards it
@@ -256,8 +256,8 @@ chat of any of his agents binds all his agents (OA-1).
   where your client cannot set `_meta`, in your message; each receiver acts on them, narrowing only; human gates
   stay (MD-6). `at` never moves, so a mandate lapses within seven days of his words: a task still open asks
   him once for a new one (MD-1), same words, `at` when he confirms, and weekly until the
-  contract's proposed CT-205 (answer `7f372925`). A link whose chain already holds four agents hands the next the four
-  parts as a relay, and it restates (OA-2).
+  contract's proposed CT-205 (answer `7f372925`). A link whose chain holds four agents restates its own mandate from the four parts (OA-2:
+  `instruction` and `at` unchanged, its chain starting with it) and hands that on.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,
@@ -276,8 +276,7 @@ Restart it from where it stopped:
 - a subagent: `SendMessage` «resume» to its id, so it keeps its context;
 - a session: re-prompt it with «continue from where you stopped».
 
-The stop is usually stale by then. Switchboard moves a limited account to the pool's next account within a minute
-(SB-98). If a restart stops again at once, retry after 2, 5, 10, then every 15 minutes, and do other work meanwhile.
+Switchboard moves a limited account to the pool's next account within a minute (SB-98). If a restart stops again at once, retry after 2, 5, 10, then every 15 minutes, and do other work meanwhile.
 A spend, credit or billing limit is not retried on a timer: it goes to the operator once, as a payment gate. A long
 build or test in flight is not a stall. Note each restart (what stopped, when, attempt) with `fabric_task_note`.
 

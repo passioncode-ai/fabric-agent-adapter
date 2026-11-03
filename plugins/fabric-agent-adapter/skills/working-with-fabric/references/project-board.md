@@ -214,7 +214,9 @@ agent id (`hand_on`), which you learn from the service's owner or the project th
 `com.directory`, which names none. Another fence, or two `mandate/1` blocks, is no mandate there: the service works the
 request as if none travelled. A service that follows the kit's guidance answers a refused mandate as the request's
 outcome, `failed_known` naming the detail: `mandate-not-for-this-call` means you handed it on to the wrong agent id, so
-hand it on again from your own mandate to the service's (`hand_on`), never asking him; `mandate-expired` means your lead
+hand it on again from your own mandate to the service's (`hand_on`; with four agents in the chain already, restate
+your own from the four parts first, OA-2), never asking him; `mandate-malformed`, `-widened` or `-early` is the
+sender's own fault too: send a valid one (check your clock for early), never asking him; `mandate-expired` means your lead
 asks him once for a new one (MD-1); an `outside-mandate` outcome names the part to ask him about, alone (MD-4).
 
 The board's journal is permanent; even a redacted message keeps its id and digest. Never put a secret, token, key,

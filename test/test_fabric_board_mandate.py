@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import sys
 import time
 import types
 import unittest
@@ -179,6 +180,9 @@ class BoardMandateTests(Conversation):
 
     def test_an_integer_over_4300_digits_reads_as_unreadable_on_every_python(self):
         link = importlib.import_module("fabric_board_link")
+        if hasattr(sys, "set_int_max_str_digits"):  # lift the interpreter's own limit: only the kit's may refuse it
+            self.addCleanup(sys.set_int_max_str_digits, sys.get_int_max_str_digits())
+            sys.set_int_max_str_digits(0)
         request = fb.BoardRequest({"body": {"text": body('{"kind": "mandate/1", "n": %s}' % ("7" * 4301))}, "request": {"id": "r"},
                                    "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
         self.assertEqual(link.read_mandate(request, link.PERSONAL_BOARD, "example-agent"), (None, "mandate-unreadable"))
@@ -220,6 +224,22 @@ class BoardMandateTests(Conversation):
         for clock in (float("nan"), None, float("inf"), 1e15, -1e15, 1e300, 10 ** 400, True):
             self.assertEqual(link.covers(mandate(), {"capability": "video.render", "effect": "draft"}, "example-agent",
                                          lambda c=clock: c), {"fault": "now-unreadable"})
+
+    def test_the_operators_words_reach_no_checkpoint_during_the_work(self):
+        """0.61.0 product reading 5: the checkpoint was read only after the request completed and its entry was gone."""
+        during = []
+
+        def outcome(request, ctx):
+            path = self.data / "board-checkpoint.json"
+            during.append(path.read_text() if path.exists() else "")
+            self.seen.append((ctx.mandate, None, None))
+            return {"state": "completed", "summary": "Rendered."}
+
+        self.outcome = outcome
+        got, _, _ = self.run_one(body(json.dumps(mandate())))
+        self.assertIsNotNone(got, "a mandate was read")
+        self.assertTrue(during[0], "the request's entry is in the checkpoint while it is worked")
+        self.assertNotIn(WORDS, during[0])
 
     def test_a_responder_refuses_a_bad_agent_id_or_mandate_from(self):
         for kw in ({"agent_id": "Not An Id"}, {"mandate_from": "everyone"}, {"mandate_from": [42]}, {"mandate_from": 42},

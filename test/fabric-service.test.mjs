@@ -29,6 +29,30 @@ test('second holder of the instance lock is refused with the pid', { skip: noLin
   (await new k.InstanceLock(dir).acquire()).release();
 });
 
+test('a failed pid write lets the instance lock go (a board finding of 2026-11-03)', { skip: noLinuxLock }, async () => {
+  // The caller (holdSingleInstance) drops a lock whose acquire threw, so acquire itself must let the lock go.
+  for (const call of ['ftruncateSync', 'writeSync', 'fsyncSync']) {
+    const dir = temp();
+    const original = fs[call];
+    let thrown = false;
+    fs[call] = (...args) => {
+      if (thrown) return original(...args);
+      thrown = true;
+      throw Object.assign(new Error('No space left on device'), { code: 'ENOSPC' });
+    };
+    let lock = null;
+    try {
+      lock = await new k.InstanceLock(dir).acquire();
+    } catch (error) {
+      assert.equal(error.code, 'ENOSPC', call);
+    } finally {
+      fs[call] = original;
+    }
+    if (lock) lock.release(); // ftruncateSync off macOS: the pid goes through atomicWrite, which does not call it
+    (await new k.InstanceLock(dir).acquire()).release();
+  }
+});
+
 test('the Node lock and the Python lock exclude each other', { skip: process.platform !== 'darwin' }, async () => {
   const dir = temp();
   const lock = await new k.InstanceLock(dir).acquire();

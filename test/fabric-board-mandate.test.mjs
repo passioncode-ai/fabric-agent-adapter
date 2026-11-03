@@ -45,6 +45,8 @@ async function fakeHub(t) {
   const events = [];
   const seen = [];
   const handler = async (request, ctx) => {
+    const file = path.join(data, 'board-checkpoint.json');
+    seen.checkpoint = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''; // during the work (product reading 5)
     seen.ctx = JSON.stringify(ctx);
     seen.push([ctx.mandate, ctx.mandateCovers({ capability: 'video.render', effect: 'draft' }), ctx.mandateCovers({ capability: 'video.cut', effect: 'draft' })]);
     return { state: 'completed', summary: 'Rendered.' };
@@ -232,4 +234,12 @@ test('FAA-135: util.inspect of a context or a request prints no mandate and no b
   assert.ok(!util.inspect(ctx).includes(WORDS));
   const request = new BoardRequest({ body: { text: WORDS }, request: { id: 'r' } }, 'video.render');
   assert.ok(!util.inspect(request).includes(WORDS));
+});
+
+test('FAA-135: the operator\'s words reach no checkpoint during the work', async (t) => {
+  const h = await fakeHub(t);
+  const [got] = await h.runOne(body(JSON.stringify(mandate())));
+  assert.notEqual(got, null, 'a mandate was read');
+  assert.ok(h.seen.checkpoint, 'the request\'s entry is in the checkpoint while it is worked');
+  assert.ok(!h.seen.checkpoint.includes(WORDS));
 });

@@ -717,7 +717,7 @@
     "fabric-base",
     "fabric-paths"
    ],
-   "sha256": "ac219ab0a326d5c43c7c4c255e0c3843d4794de795a60e3af661e7d5350ea052"
+   "sha256": "6811b9b7d06e952bf4fe49af15e87a6cc958fbcfa822b96e258d7db460c786c1"
   },
   {
    "module": "fabric-usage",
@@ -4657,7 +4657,7 @@
    "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",
    "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
    "fabric-page-links.mjs": "a8834926e9d4bbf7c4857f551451d2ebf6ac8873bbccaaf89c5e30cf45b17ee6",
-   "fabric-lock.mjs": "ac219ab0a326d5c43c7c4c255e0c3843d4794de795a60e3af661e7d5350ea052",
+   "fabric-lock.mjs": "6811b9b7d06e952bf4fe49af15e87a6cc958fbcfa822b96e258d7db460c786c1",
    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7",
    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
    "fabric-descriptor.mjs": "243bbce42989f67c4c5ec6b7659e201b3f9a1c08c71d429d88ec934d870f5104",
