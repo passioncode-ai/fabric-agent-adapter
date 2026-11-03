@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.59.0 (2026-11-03)
+
+Portable from day 0 (FAA-191, RM-36): on top of 0.58.0's source and instance, every new agent gets a data home, a
+data kind and an uptime category, and a new private agent a `LICENSE` naming its copyright holder, from its first commit, and runs the transfer
+audit at every release until the contract's export (CT-194) replaces it.
+
+### Added
+
+- creating-fabric-agents' intake grill asks three more rows: **Does it run around the clock?** (uptime category A, a
+  cloud host from the first release, Heroku unless a reason names another, from the cloud Fabric-server template once
+  its repository exists; or B, a local service only), **Whose data does it keep?** (kind U, data of people outside the
+  owner's team, never in the source, a copy or its tests; or O; in doubt U) and **Who holds the copyright?**
+- Step 2 gives the data a home of its own, `<agent>-data` (a folder beside the checkout or a private repository of
+  that name), and the README names the data kind and the uptime category; an agent someone builds for themselves gets
+  a `LICENSE` naming the holder (all rights reserved unless the owner gives other terms).
+- Step 5: every release runs `fabric_source_check.py check` as the transfer audit, in Git mode on the checkout and
+  with `--every-file` on a clean copy of what Git would commit (building-fabric-services' `references/package.md`).
+  references/source-and-instance.md adds why never the checkout (its ignored configuration and dependency folders
+  `--every-file` reads too), and that a `LICENSE` whose holder is on the owner's list is named in
+  `.fabric-source-ignore`, since authorship travels with the source.
+- references/source-and-instance.md (both skills): *The data home and its kind*; references/where-agents-run.md:
+  *Uptime: A or B* and a checklist line. building-fabric-services' Step 0 answers carry the same (data kind, data
+  home, uptime, holder, the audit per release).
+- Scenario evals `portable-from-day-zero` (creating-fabric-agents) and `new-service-names-data-and-uptime`
+  (building-fabric-services), a trigger, and `test/test_portable_from_day_zero_prose.py` pinning the prose to them.
+
+### Changed
+
+- The eval `own-agent-licence-is-the-owners-choice` expects a `LICENSE` naming the holder; still no AGPL or
+  commercial licence files unasked. The shared operator-channel reference and building-fabric-services say the same
+  for an agent built new, and that the kit files the adapter copies in keep their own licence
+  (`AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`); adapting-projects-to-fabric leaves an existing agent's
+  licence as it is.
+- where-agents-run.md: Heroku is the default host of an A agent unless it runs in the person's or an organization's
+  PassionCode cloud or is sold; an A agent's data lives in a durable store, never the host's own folder (source-and-instance.md's
+  data home says the same for a host that does not keep its disk), and on a host with no Fabric hub it answers only
+  what reaches its own origin.
+- building-fabric-services' gotchas are shorter (the same rules); `test_fabric_kit` runs its by-path load with `-B`.
+
+### Upgrading
+
+- Nothing to change for an existing agent: an adapted project keeps its licence, data and release checks as they
+  are. A new one answers the three grill rows before its first commit.
+
 ## 0.58.0 (2026-11-03)
 
 Portable agents, part 1 (FAA-188, RM-36): an agent keeps its source apart from its instance from its first commit, and

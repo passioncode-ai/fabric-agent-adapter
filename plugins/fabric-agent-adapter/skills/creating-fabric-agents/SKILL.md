@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.58.0"
+  version: "0.59.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -57,6 +57,9 @@ No file is created until every row has an answer. An answer of "later" fails the
 | **Which profile?** | `mcp` when Fabric owns planning and retries and the capability has a schema; `a2a` when the provider owns its task lifecycle end to end; `local-runner` when it is a terminal agent Fabric drives. When unsure, the sibling skill's profile-selection reference is the decision record |
 | **What effects?** | declare anything money-, deletion-, or publication-adjacent now; the host's floor and grants are designed against these declarations, and one discovered late invalidates the admission |
 | **Where does it run, for whom?** | this machine, the person's cloud or an organization's, and in which contexts (`personal`, `org:<id>`): one instance per context, its secrets, spend and journal never crossing into another. Record which capabilities need the person's machine and what they answer when it is off (references/where-agents-run.md) |
+| **Does it run around the clock?** | the uptime category, decided now: **A** when a capability must answer while the owner's machine is off or asleep (a schedule, a chat, callers outside the machine): the agent gets a cloud host from its first release, Heroku unless a reason names another (the person's or an organization's cloud, or PassionCode's for a paid agent), built as an online service (building-fabric-services, the remote placement) and started from the cloud Fabric-server template once that template's repository exists; **B** when nothing needs it then: a local service only, no cloud, reading an A agent's data through that agent's MCP or API. The README names the category (references/where-agents-run.md) |
+| **Whose data does it keep?** | the kind of its data, named in the README: **U** when it keeps data of people outside the owner's team (messages, support requests, reviews, customers' answers), which never enters the source, a copy of it or its tests: the source holds the schema and synthetic fixtures, and a copy starts with an empty store of its own; **O** when it keeps none (a tool or service for other agents, the owner's reports, runs and media). In doubt, U. Either way the data lives in `<agent>-data` (a kit service: the kit's folders; on a cloud host: a durable store), apart from the source, from the first commit (references/source-and-instance.md) |
+| **Who holds the copyright?** | the holder the agent's `LICENSE` names: a new private agent (built for its owner or for a client) gets a `LICENSE` naming that holder in its first commit, all rights reserved unless the owner gives other terms; a public product keeps its own licence (a PassionCode.ai repository: the organization's, step 2) |
 | **Which models?** | per lane (planning, replies, volume work, media): a primary, a fallback of another vendor, an open-vendor model where it reads what users send, the input kinds each reads, declared as classes in the profile (references/models-and-providers.md) |
 | **Who pays?** | one key per agent and context with its own ceiling, from the estate's key manager, read from the environment; checked before every call; a personal key never pays for an organization |
 | **How does it learn?** | decisions recorded with reasons, one trace per turn, every failure a planted fixture first, history replayed, learnings proposed and never self-approved (references/orchestration-and-learning.md) |
@@ -111,8 +114,11 @@ are its seed because a source project's recorded failures count as production.
 repository standard (`knowledge/repository-standard.md`) from its first commit: the licence files,
 the README quick start verified with a real client, `AGENTS.md` and `CLAUDE.md`, as
 [the operator channel and the repository standard](references/operator-channel-and-repository.md)
-lists them. An agent someone builds for themselves is not a PassionCode.ai repository: its licence
-is its owner's choice and none of those files is required of it.
+lists them. An agent someone builds for themselves, or a private agent built for a client, is not a PassionCode.ai repository: its licence
+is its owner's choice and none of those files is required of it, but its first commit carries a `LICENSE` naming
+the copyright holder the grill recorded (all rights reserved unless the owner gives other terms); it covers the
+holder's own files, and the kit files the adapter copies in keep their own licence (AGPL-3.0-only OR
+LicenseRef-PassionCode-Commercial).
 
 **Every credential the agent uses is read by name, never held as a value**, from its first commit:
 the README's Configure section lists key NAMES. With Project Observatory installed, the agent finds
@@ -127,7 +133,9 @@ never their values.
 **The source stays apart from the instance**, from the first commit: instance values (the
 repository address of the owner's account, folders, the owner, accounts, hosts) live in a configuration outside the repository, read through a
 named variable with a neutral default and a committed `*.example`; records, logs and state documents live in the
-instance folder; fixtures use neutral ids. Load [the source and the instance](references/source-and-instance.md). The
+instance folder; fixtures use neutral ids. Its data has a home of its own from the same commit, the one the grill recorded: `<agent>-data` (a folder beside the
+checkout, or a private repository of that name; a kit service: the kit's folders; on a cloud host: a durable store), and the README names the data kind (U or O) and the uptime
+category (A or B) from the grill. Load [the source and the instance](references/source-and-instance.md). The
 sibling's `scripts/fabric_source_check.py check <project-root>` finds instance data in the tree without repeating it;
 run it with the owner's list of their own strings, or record that none was given (the owner's own home name, when it is neutral, has one or two letters, or holds a space, `.`, `_`, `-` or `'`, is declared there with `home: <name>` first; a container's, a cloud image's or a CI runner's user that only the image uses, such as `node` or `vscode`, is never declared); the skeleton is done when it exits 0 and the owner has reviewed it (a floor, not a secret scanner; without the sibling or Python 3.9+, record the check as NOT_RUN, as in step 3). Handing the source over stays the owner's act.
 
@@ -172,7 +180,8 @@ reference). An agent that is not a service is announced with a provider entry
 If the agent keeps running on the operator's computer (it answers other agents, runs
 long jobs or shows a dashboard), build it as a service with the sibling skill
 `building-fabric-services`: its instance lock, launchd plist, descriptor, well-known
-document and events feed are part of this step, not a later retrofit. If that skill is
+document and events feed are part of this step, not a later retrofit. An uptime A agent is built with the same
+skill as an online service (its remote placement: the https origin, keys as the platform's secrets). If that skill is
 absent, apply the `fabric-service/0.1` rules from the pinned contract's
 `docs/specification/service.md` by hand and mark its probe `NOT_RUN`.
 
@@ -190,8 +199,11 @@ lets the output decide what counts as success.
 
 Run the sibling skill's `check` (structural, then exact when the contract checkout is
 available) and complete `fabric/FABRIC-CONFORMANCE.md` with dated receipts, exactly as
-its workflow steps 5–7 prescribe, and run its `fabric_source_check.py check` again (exit 0); this skill adds no
-second verification path on purpose. Then record one expectation the report must carry:
+its workflow steps 5–7 prescribe, and run its `fabric_source_check.py check` again (exit 0). Every release of the
+agent runs it too, in Git mode on the checkout and with `--every-file` on the clean copy a transfer would carry (what
+Git would commit, as building-fabric-services' `references/package.md` makes it), as the transfer audit (each exit 0, with the owner's list or
+its absence recorded) until the contract's export (CT-194) replaces it; this skill adds no second verification path
+on purpose. Then record one expectation the report must carry:
 
 > When a Fabric host admits this provider, it enters under a **canary binding** (a
 > checker on its output and a budget cap), regardless of who wrote it. Unsupervised

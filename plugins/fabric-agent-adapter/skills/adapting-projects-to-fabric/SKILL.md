@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.58.0"
+  version: "0.59.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -242,7 +242,8 @@ relayed, DEC-0121). An agent with neither stops nor notify events skips this ste
 repository standard (`knowledge/repository-standard.md`) from its first commit: the licence files,
 the README quick start verified with a real client, `AGENTS.md` and `CLAUDE.md`, listed in the
 shared reference above. An agent someone builds for themselves is not a PassionCode.ai repository:
-its licence is its owner's choice and none of those files is required of it.
+its licence is its owner's choice and none of those files is required of it (an agent built new with
+creating-fabric-agents carries a `LICENSE` naming its holder; an existing one keeps what it has).
 
 ## Completion format
 

@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.58.0"
+  version: "0.59.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "3830a3353923e20f826d466610e1c479f120bec0"
@@ -63,6 +63,7 @@ Answer before writing code, and record the answers in the project README:
 | Port | one number; run the claim check below before choosing it |
 | Who calls it | the named agents or people, and through which surface (Step 1) |
 | What it stores | the store, where it lives (Step 2, rule 5), and what survives uninstall |
+| Data and uptime | kind U or O, kit folders, a durable store or `<id>-data`, uptime A or B; a new agent's `LICENSE` holder, transfer audit per release (creating-fabric-agents) |
 | What it tells the operator | the events worth a notification (Step 5) |
 
 ## Step 1: choose the surfaces
@@ -353,9 +354,9 @@ first commit:
 
 Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
 (below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
-someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
-choice, nothing about it is published or listed by the organization, and none of these files is
-required of it, though the verified MCP quick start is still how anyone learns to drive it.
+someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's choice, the organization
+publishes and lists nothing about it, of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep
+theirs), and the verified MCP quick start teaches anyone to drive it.
 
 ## Online services: the remote placement
 
@@ -418,20 +419,16 @@ this estate needs.
 ## Gotchas
 
 - `lsof` shows `*:<port>` or `0.0.0.0` → the bind is wrong even if the Host check works.
-- A health probe that only checks HTTP 200 accepts any program on the port. Compare
-  `service.id` and `service.instance`: two services here once defaulted to ports
-  another service already held.
-- `launchctl bootstrap` right after `bootout` fails with I/O error 5 until the unload
-  finishes; wait, then retry.
+- A health probe that only checks HTTP 200 accepts any program on the port: compare
+  `service.id` and `service.instance`.
+- `launchctl bootstrap` right after `bootout` fails with I/O error 5: wait for the unload, then retry.
 - Under launchd `PATH` is bare. Pin the interpreter by absolute path; set `PATH`
   explicitly in the plist; never copy the whole shell environment into it.
-- A plist pointing at a worktree or a checkout breaks the day it moves. Point it at a
-  release.
-- `http.server.HTTPServer` asks the resolver for its FQDN between `bind()` and
-  `listen()`. With a slow resolver (a macOS CI runner, a Mac offline) the port is bound
-  but silent: connects time out instead of being refused. Use `fs.LoopbackHTTPServer`.
-- `logging.basicConfig` called twice: the second call is a no-op, so a server's own
-  log file stays empty. Configure logging once, in the entry point.
+- A plist pointing at a worktree or checkout breaks when it moves: point it at a release.
+- `http.server.HTTPServer` resolves its FQDN between `bind()` and `listen()`: with a slow
+  resolver (a macOS CI runner, a Mac offline) the port is bound but silent. Use `fs.LoopbackHTTPServer`.
+- `logging.basicConfig` called twice: the second is a no-op, the server's log file
+  stays empty. Configure logging once, in the entry point.
 - Hand-made `.plist.bak` files in `~/Library/LaunchAgents` are never cleaned up; keep
   backups elsewhere.
 

@@ -16,6 +16,7 @@ The normative rules are the Fabric Agent Contract's, at the commit this plugin p
 - [Connecting a machine or a cloud to the estate](#connecting-a-machine-or-a-cloud-to-the-estate)
 - [Sharing an agent into an organization](#sharing-an-agent-into-an-organization)
 - [Running while the laptop is closed](#running-while-the-laptop-is-closed)
+- [Uptime: A or B](#uptime-a-or-b)
 - [Selling an agent](#selling-an-agent)
 - [The checklist](#the-checklist)
 
@@ -85,12 +86,32 @@ checked, and removes the instance from the next revision.
 ## Running while the laptop is closed
 
 A cloud agent keeps working with the laptop closed only if everything it needs is in the cloud: its worker, its
-secrets, its data, and a hub that can admit calls. The local Fabric hub is not a cloud hub. Design for it:
+secrets, its data, and, for the calls Fabric admits, a hub that can admit them. The local Fabric hub is not a cloud hub. Design for it:
 
 - Declare what each capability needs and where it is; a capability that needs the person's machine reports
   `pending` or `unavailable` instead of pretending, and queues within a deadline or declines.
 - Never charge for work it cannot deliver on the promised terms.
 - A test that passed on fixtures says nothing about uptime; measure the installed agent in its cloud.
+
+## Uptime: A or B
+
+Every new agent is given an uptime category on its first day, and the README names it:
+
+- **A, around the clock.** A capability must answer while the owner's machine is off or asleep: a schedule, a chat,
+  callers outside the machine. A cloud host is required from the first release; Heroku is the default, another host
+  only when a reason names it: an instance in the person's PassionCode cloud or an organization's cloud runs there
+  (the places above), and a paid agent stays in PassionCode's cloud (selling an agent, below). On a host with no
+  Fabric hub it answers what reaches its own origin (its schedule, its chat, its API); a call Fabric admits needs a
+  cloud hub, as running while the laptop is closed says. The agent is an online service (building-fabric-services, the remote placement), often
+  alongside its local instance, and starts from the cloud Fabric-server template once that template's repository
+  exists. Its data lives where the cloud reaches it, in a durable store (a database, an object store, the private
+  `<agent>-data` repository), never the host's own folder, which a platform such as Heroku does not keep across a
+  restart.
+- **B, local only.** Nothing needs it while the machine sleeps: a local service and no cloud. It reads an A agent's
+  data through that agent's MCP or API, never from its store.
+
+A B agent that gains a capability that must answer around the clock becomes A for that capability; record the change
+and move only that capability to the cloud.
 
 ## Selling an agent
 
@@ -108,6 +129,7 @@ secrets, its data, and a hub that can admit calls. The local Fabric hub is not a
 - Where does each instance run, and in which context? Write it in the knowledge pack.
 - Does any state, secret, log line or cache key cross contexts? It must not.
 - Which capabilities need the person's machine, and what do they answer when it is off?
+- Which uptime category is it, A (a cloud host from the first release) or B (local only)? The README names it.
 - Who pays for each call (which grant, which key)? The person's personal key never pays for an organization.
 - If it joins machines or applies the estate record: tokens from stdin or a 0600 file only, revisions verified with
   their parent.
