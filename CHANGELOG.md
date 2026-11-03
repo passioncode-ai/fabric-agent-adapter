@@ -24,6 +24,9 @@ names why a provider manifest is refused (FAA-193).
 - `pack`, `sign` and `verify` refused a provider manifest whose `costPresets` differ from the package's with only
   `provider-manifest` as the message; the message now names both causes (the `problem` code is unchanged) (not a JSON object, or `costPresets` that differ). Both kits (FAA-193, found by the
   FAA-124 pilot rehearsal). Python no longer refuses an empty provider manifest (`{}`), as Node never did (FAA-194 (1)).
+- Python's `pack`, `sign` and `verify` took `NaN`, `Infinity` and `-Infinity` in a plugin or provider manifest, a key file
+  or a trust file, which `JSON.parse` and the contract refuse, so a package the Node kit refused could pass Python's
+  `verify`. Python refuses them now too (older than 0.60.0, since 0.31.0; found by the 0.60.0 seam reading 11).
 
 ### Changed
 

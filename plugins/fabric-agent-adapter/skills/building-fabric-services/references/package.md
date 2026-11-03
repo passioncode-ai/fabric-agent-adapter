@@ -78,9 +78,9 @@ digest, each path once, every named file listed with the same SHA-256), `FAC-SEM
 `plugin-manifest`, `provider-manifest`, whose message names its two possible causes: a provider manifest that is not a JSON object,
 or `costPresets` that differ from the package's, FAA-193) and `path` (a listed or folder path holding a control character, U+2028 or
 U+2029, a `..` segment, a backslash, `//` or a colon, refused by the kit itself whatever the schema's pattern lets
-through, FAA-78). `fabric.package.json` and the trust file are read as strict UTF-8 and nested at most 256 levels; the plugin and
+through, FAA-78). `fabric.package.json`, the trust file and a JWK key file take no `NaN` or `Infinity`, and the first two are read as strict UTF-8 and nested at most 256 levels; the plugin and
 provider manifests the folder check reads are strict UTF-8 too (the contract's `checkPackageFolder` decodes them with
-replacement characters, so an invalid byte is no manifest here and is accepted there, FAA-194 (29)) and have no depth
+replacement characters, so an invalid byte inside a string value the check does not compare is no manifest here and is accepted there, FAA-194 (29)), take no `NaN` or `Infinity` either, as `JSON.parse` takes none, and have no depth
 limit of their own, as the contract's reference has none (Python 3.9's own recursion limit reads one nested about 990
 levels deep as no manifest, FAA-194 (27)); a folder entry the kit cannot
 read is refused as `Cannot read <path>`, and a link, FIFO or other non-regular file is never followed. With a problem,

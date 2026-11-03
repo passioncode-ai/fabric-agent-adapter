@@ -133,7 +133,7 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
     text = raw.decode("utf-8", "replace").strip(JS_WHITESPACE)  # as JavaScript's trim: a leading BOM goes too
     if text.startswith("{"):
         try:
-            jwk = json.loads(text)
+            jwk = json.loads(text, parse_constant=fd._no_constant)  # NaN and Infinity are no JSON, as JSON.parse says
         except ValueError:
             raise PackageError("The key file is neither a JWK nor a PEM private key.") from None
         if not isinstance(jwk, dict) or jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or not isinstance(jwk.get("d"), str):
@@ -394,8 +394,8 @@ def _parsed(data: Optional[bytes]) -> Optional[Dict[str, Any]]:
     if data is None:
         return None
     try:
-        value = json.loads(data.decode("utf-8"))
-    except (ValueError, RecursionError):  # invalid UTF-8 is no manifest, in both kits
+        value = json.loads(data.decode("utf-8"), parse_constant=fd._no_constant)
+    except (ValueError, RecursionError):  # invalid UTF-8, NaN or Infinity is no manifest, in both kits
         return None
     return value if isinstance(value, dict) else None
 
@@ -648,7 +648,7 @@ def _load_json(data: bytes, what: str) -> Dict[str, Any]:
     if _nesting(text) > MAX_NESTING:
         raise PackageError("%s nests deeper than %d levels." % (what, MAX_NESTING))
     try:
-        value = json.loads(text, object_pairs_hook=fd._no_duplicates)
+        value = json.loads(text, object_pairs_hook=fd._no_duplicates, parse_constant=fd._no_constant)
     except fd._Duplicate as exc:
         raise PackageError("%s names %s twice in one object." % (what, json.dumps(exc.args[0], ensure_ascii=False))) from None
     except (ValueError, RecursionError) as exc:
