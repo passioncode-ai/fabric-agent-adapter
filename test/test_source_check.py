@@ -913,7 +913,7 @@ class WhatIsRead(Tree):
         (self.outside / "a.txt").write_text(MAC_HOME + "\n", encoding="utf-8")
         os.symlink(str(self.outside), str(self.root / "dir"))
         code, result, _ = self.json_check()
-        self.assertEqual(code, 2)
+        self.assertEqual(code, 1 if result["findings"] else 2)  # r42 product: a TMPDIR in a home is a finding of its own
         self.assertNotIn(("dir/a.txt", 1), [(f["path"], f["line"]) for f in result["findings"]])
         self.assertIn({"path": "dir/a.txt", "why": "under a symbolic link"}, result["notRead"])
 
@@ -1393,8 +1393,6 @@ class Refusals(Tree):
         listing.parent.mkdir()
         for line in ("home: \u042f\u043d", "home: jo # mine", "home: /Users/jo", "home: _svc", "home: \u017fam",
                      "home\u00a0: jos\u00e9", "home:", "home: jo, al", "home: jo (work)",
-                     # reading 40, unit: a format character inside the name changes it, so the line is refused
-                     "home: a\u00adlice", "home: ad\u200bmin", "home: m\u00ade", "home: h\u200bome", "home: o\u00adme", "home: o\u200bm", "Home: h\u200bo",
                      # reading 34, unit: a control or a separator around the colon is no space
                      "home:\x0czq", "home:\u2028zq", "home\x1c: zq", "home:\x85zq", "home\u2029:zq"):
             listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
@@ -1403,6 +1401,14 @@ class Refusals(Tree):
             self.assertIn("line 2 of the owner's list", err)
             self.assertIn("a note goes on a line of its own, a path is written as its home name only", err)
             self.assertIn("declared too with `home:` written with '", err)  # reading 40, product
+        # reading 40, unit: a format character inside the name changes it, so the line is refused, and (r42, product)
+        # the refusal says what an editor may not show
+        for line in ("home: a\u00adlice", "home: ad\u200bmin", "home: m\u00ade", "home: h\u200bome", "home: o\u00adme",
+                     "home: o\u200bm", "Home: h\u200bo", "home: jane\u00addoe"):
+            listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+            self.assertEqual(code, 2, line)
+            self.assertIn("line 2 of the owner's list names a home that holds an invisible format character", err)
         # reading 35, seam: a byte-order mark or a zero-width space before `home:` (two lists joined) is dropped
         self.write("adm.txt", "/Users/admin/p\n")
         for mark in ("\ufeff", "\u200b", "\u200c", "\u200d", "\u200c\u200b", "\u200d\u2060", "\u200c\ufeff",
@@ -1462,6 +1468,23 @@ class Refusals(Tree):
             self.assertEqual(done.returncode, 2, done.stderr)
             self.assertIn("fabric_source_homes.py beside this file cannot be read", done.stderr)
             self.assertNotIn("Traceback", done.stderr)
+        for name, tail, said in (  # reading 42, unit: any exception at import, and an OSError about another file
+                ("fabric_secrets.py", '\nraise ValueError("newer shape")\n', "refused to load (ValueError: newer shape)"),
+                ("fabric_source_homes.py", "\nopen('/nonexistent-zq/settings.json')\n", "refused to load (FileNotFoundError"),
+                # reading 42, seam: a NUL byte is a ValueError before Python 3.11, a SyntaxError from it
+                ("fabric_source_ignore.py", "\n# \x00\n", "refused to load (")):
+            tools = self.tmp / ("raise-" + name)
+            tools.mkdir()
+            for sibling in ("fabric_source_check.py",) + siblings:
+                shutil.copy(SCRIPTS / sibling, tools / sibling)
+            with (tools / name).open("a", encoding="utf-8") as f:
+                f.write(tail)
+            done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
+                                  capture_output=True, text=True)
+            self.assertEqual(done.returncode, 2, done.stderr)
+            self.assertIn(said, done.stderr)
+            self.assertNotIn("settings.py", done.stderr)
+            self.assertNotIn("Traceback", done.stderr)
         # reading 41, unit: a sibling that raises its own ImportError names no module; the refusal quotes it
         tools = self.tmp / "raising"
         tools.mkdir()
@@ -1472,7 +1495,7 @@ class Refusals(Tree):
         done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
                               capture_output=True, text=True)
         self.assertEqual(done.returncode, 2, done.stderr)
-        self.assertIn("refused to load (needs a newer contract)", done.stderr)
+        self.assertIn("refused to load (ImportError: needs a newer contract)", done.stderr)
         self.assertNotIn("a module.py", done.stderr)
         self.assertNotIn("Traceback", done.stderr)
 
@@ -1582,11 +1605,18 @@ class Refusals(Tree):
         self.assertIn("(line 2)", out)
         self.assertIn("2 instance string(s) listed", out)
         # reading 41, seam: a direction mark, an isolate or a soft hyphen at a string's ends belongs to no string
-        for mark in ("\u200e", "\u200f", "\u2066", "\u202a", "\u00ad", "\ufeff\u200e"):
+        for mark in ("\u200e", "\u200f", "\u2066", "\u202a", "\u00ad", "\ufeff\u200e", "\u200f \u200f", "\u200e \u200b", "\u200e\t\u200e"):
             listing.write_text(mark + "zqcorpx" + ("\u2069" if mark == "\u2066" else "") + "\n", encoding="utf-8")
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 1, repr(mark) + out)
             self.assertIn("a.txt:1: instance-string", out)
+        for tail in ("\u200e \u200f", "\u00ad\u00a0\u00ad"):  # reading 42, unit and product: marks with a space between
+            listing.write_text("zqcorpx" + tail + "\n", encoding="utf-8")
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+            self.assertIn("a.txt:1: instance-string", out)
+        listing.write_text("\U0001F469\u200d\U0001F4BB\n", encoding="utf-8")  # an emoji's joiner counts toward three
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertIn("1 instance string(s) listed", out)
         listing.write_text("zq\u200dcx\u200d\n", encoding="utf-8")  # a joiner inside stays, one at the end goes
         self.write("a.txt", "zq\u200dcx\n")
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])

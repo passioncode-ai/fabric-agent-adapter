@@ -71,13 +71,18 @@ try:
         IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _readable_glob, ignore_globs)
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
-except (ImportError, SyntaxError, OSError) as _missing:  # a copy without its siblings: say so, as a refusal, never a finding's exit 1
-    _named = getattr(_missing, "name", None) or getattr(_missing, "filename", None) or getattr(_missing, "path", None)
-    _sibling = (Path(_named).stem if _named and not getattr(_missing, "name", None) else _named or "") + ".py"
+except Exception as _missing:  # a copy without its siblings, or mixed from two versions: a refusal, never exit 1
+    _HERE, _SIBLINGS = Path(__file__).resolve().parent, ("fabric_secrets", "fabric_source_ignore", "fabric_source_homes")
+    _file = getattr(_missing, "filename", None) if isinstance(_missing, (SyntaxError, OSError)) else None
+    _named = (getattr(_missing, "name", None) if isinstance(_missing, ImportError) else
+              Path(_file).stem if _file and Path(_file).resolve().parent == _HERE else None)
+    _sibling = (_named or "") + ".py"
     sys.stderr.write("fabric_source_check.py: %s\n" % (
-        ("a module beside this file refused to load (%s): copy the scripts folder whole, from one version" % _missing)
-        if not _named else "%s beside this file cannot be read" % _sibling if isinstance(_missing, OSError) else "%s beside this file is from another version: copy it with this one" % _sibling
-        if (Path(__file__).resolve().parent / _sibling).is_file() else "%s must sit beside this file" % _sibling))
+        "a module beside this file refused to load (%s: %s): copy the scripts folder whole, from one version"
+        % (type(_missing).__name__, _missing) if _named not in _SIBLINGS
+        else "%s beside this file cannot be read" % _sibling if isinstance(_missing, OSError)
+        else "%s beside this file is from another version: copy it with this one" % _sibling
+        if (_HERE / _sibling).is_file() else "%s must sit beside this file" % _sibling))
     sys.exit(2)
 finally:
     sys.dont_write_bytecode = _WROTE_BYTECODE
@@ -339,6 +344,10 @@ def read_list(path: Path) -> List[str]:
         if home and home.group(1).isascii() and home.group(1) in text.split(":", 1)[1]:
             entries.append(HOME_ENTRY + home.group(1).lower())
             continue
+        if home and home.group(1).isascii():  # visible as a home name, but an invisible character sits inside it
+            raise CheckError("line %d of the owner's list names a home that holds an invisible format character (a soft "
+                             "hyphen, a zero-width space or a direction mark, which an editor may not show): delete it "
+                             "and write the name again" % (len(entries) + 1))
         if _HOME_KEY.match(bare):  # meant as a home and not one: never kept as a string that cannot match
             raise CheckError("line %d of the owner's list starts with `home` and a colon but is not one ASCII home name "
                              "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`, "
@@ -349,11 +358,9 @@ def read_list(path: Path) -> List[str]:
                              % (len(entries) + 1))
         # a comment or a blank is judged without its invisible characters too, as a home line is (one rule per line)
         # a string keeps a joiner between its letters (an emoji needs one); one at either end belongs to no string
-        while text and unicodedata.category(text[0]) == "Cf":
-            text = text[1:]
-        while text and unicodedata.category(text[-1]) == "Cf":
-            text = text[:-1]
-        entries.append("" if not bare or bare.startswith("#") or len(bare) < 3 else _fold(text.strip()))
+        edge = [i for i, c in enumerate(text) if not (c.isspace() or unicodedata.category(c) == "Cf")]
+        text = text[edge[0]:edge[-1] + 1] if edge else ""  # ends taken in one slice, spaces between marks too
+        entries.append("" if not bare or bare.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
 
