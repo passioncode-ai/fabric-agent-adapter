@@ -168,7 +168,7 @@ def _spellings(found: Iterable[str], owner: Iterable[str]) -> Set[str]:
     printed path masks the other spellings of that home too."""
     names = set(found)
     for name in owner:
-        spelled = {name, name.replace(" ", "%20"), re.sub(r"[ ._]", "-", name)}
+        spelled = {name, name.replace(" ", "%20"), name.replace(" ", "+"), re.sub(r"[ ._]", "-", name)}
         if {n.lower() for n in names} & spelled:
             names |= spelled
     return names
@@ -183,7 +183,7 @@ def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
         def whole(spelling: str) -> str:
             return r"((?i:%s))(?![A-Za-z0-9])" % re.escape(spelling)
         patterns = [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_SLASHED
-                    for spelling in sorted({name, name.replace(" ", "%20")})]
+                    for spelling in sorted({name, name.replace(" ", "%20"), name.replace(" ", "+")})]
         patterns += [re.compile(prefix + whole(spelling), re.ASCII) for prefix in _DECLARED_DASHED
                      for spelling in sorted({re.sub(r"[ ._]", "-", name), name})]
         _DASHED[name] = tuple(patterns)
@@ -356,8 +356,9 @@ HOME_ENTRY = "\0"
 #: `home: <name>`: one ASCII name (a letter or digit first; letters, digits, `.`, `_`, `-` and spaces inside, as a
 #: Windows profile may hold), any space around the colon. The name is checked as ASCII apart: IGNORECASE alone would
 #: let `[A-Za-z]` take U+017F and U+212A.
-_HOME_LINE = re.compile(r"home\s*:\s*([A-Za-z0-9](?:[A-Za-z0-9._ -]*[A-Za-z0-9._-])?)", re.IGNORECASE)
-_HOME_KEY = re.compile(r"home\s*:", re.IGNORECASE)
+_GAP = "[ \t\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]*"  # a horizontal space only: never a control or a separator
+_HOME_LINE = re.compile(r"home%s:%s([A-Za-z0-9](?:[A-Za-z0-9._ -]*[A-Za-z0-9._-])?)" % (_GAP, _GAP), re.IGNORECASE)
+_HOME_KEY = re.compile(r"home\s*:", re.IGNORECASE)  # any white space, so a control or a separator is refused
 
 
 def read_list(path: Path) -> List[str]:
@@ -374,7 +375,8 @@ def read_list(path: Path) -> List[str]:
         if _HOME_KEY.match(text):  # meant as a home and not one: never kept as a string that cannot match
             raise CheckError("line %d of the owner's list starts with `home` and a colon but is not one ASCII home name "
                              "and nothing after it (a letter or digit first, then letters, digits, spaces, `.`, `_`, `-`): "
-                             "list a name outside ASCII as a plain string" % (len(entries) + 1))
+                             "list a name outside ASCII, or one holding another character such as an apostrophe, as a plain "
+                             "string" % (len(entries) + 1))
         entries.append("" if not text or text.startswith("#") or len(text) < 3 else _fold(text))
     return entries
 
@@ -541,6 +543,12 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     # every other occurrence of a found name, searched in the path itself: a lowered copy can change its length (U+0130),
     # and Unicode case matching also takes the letters that fold to ASCII ones (U+212A to `k`, U+017F to `s`); the names
     # found elsewhere in the tree are one compiled pattern, so the cost does not grow with names times paths
+    # a declared home of three or more characters is the owner's own name: masked wherever a printed path holds it,
+    # its parts joined by any separator a tool writes (a space, `.`, `_`, `-`, `+`, `%20`), found or not
+    for declared in _owner_homes(entries):
+        if len(declared) >= 3:
+            joined = r"(?:[ ._+-]|%20)".join(re.escape(part) for part in re.split(r"[ ._-]+", declared) if part)
+            marks += [(m.start(), m.end(), "<home>") for m in re.finditer(joined, path, re.IGNORECASE)]
     for name in _spellings({path[s:e] for s, e in found}, _owner_homes(entries)):
         marks += [(m.start(), m.end(), "<home>") for m in re.finditer(re.escape(name), path, re.IGNORECASE)]
     if seen is not None and seen.names:

@@ -43,7 +43,7 @@ import wait for the contract's decision on CT-194 (part 2).
   commit; every file but the dependency folders it names when Git lists none; or with `--every-file`, which reads
   what `pack` carries) and reports, by path, line and kind: a path inside a person's home folder
   (`home-path`: an ASCII home name in the macOS, Linux (`/home`, `/var/home`) and Windows forms (Git Bash's `/c/Users`
-  and WSL's `/mnt/c/Users` included), the dashed form of DEC-0105 (`C--Users-` on Windows; a name holding a dash, a dot or an underscore is declared with `home: <name>` to be read whole there) and the URL-encoded ones; a web route `/users/...`, a flag `--home-dir` or a CSS variable is not one), a
+  and WSL's `/mnt/c/Users` included), the dashed form of DEC-0105 (`C--Users-` on Windows; a name holding a space, a dash, a dot or an underscore is declared with `home: <name>` to be read whole there) and the URL-encoded ones; a web route `/users/...`, a flag `--home-dir` or a CSS variable is not one), a
   value shaped like a credential by the contract's detector read line by line, a long random value under a
   credential's name (a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, is public and not one; a storage URL's `sig=` is) or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` (JSON, escaped JSON or a Python dict), a URL carrying a password (8 or more characters with at least one letter and one digit) or a credential in its query (percent-encoded, JSON-escaped or nested), and a
   file that is a credential by its name as `pack` refuses it, or a kit credential file (`*.token`,
