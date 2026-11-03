@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -1369,6 +1370,13 @@ class Refusals(Tree):
         self.assertIn("a folder whose name holds `\u2019` is listed as a plain string with `\u2019` kept", flat)
         changelog = " ".join((ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split())
         self.assertNotIn("including container and cloud users", changelog)
+        # reading 39, product: the steps, the reference and the scenarios say one rule; an image's paths under a declared
+        # home are written through `$HOME`
+        for text in [flat] + [" ".join((SCRIPTS.parents[1] / s / "SKILL.md").read_text(encoding="utf-8").split())
+                              for s in ("creating-fabric-agents", "adapting-projects-to-fabric")]:
+            self.assertNotIn("a cloud machine's or a CI runner's user", text)
+            self.assertIn("a cloud image's or a CI runner's user that only the image uses", text)
+        self.assertIn("written through `$HOME` or a build argument", flat)
         # reading 31, unit: a `.` is dashed too, and the whole name is masked in a printed path
         listing.write_text("home: j.doe\nhome: bob-smith\n", encoding="utf-8")
         self.write("-Users-bob-smith-proj/.env", "X=1\n")
@@ -1393,11 +1401,15 @@ class Refusals(Tree):
             self.assertIn("a note goes on a line of its own, a path is written as its home name only", err)
         # reading 35, seam: a byte-order mark or a zero-width space before `home:` (two lists joined) is dropped
         self.write("adm.txt", "/Users/admin/p\n")
-        for mark in ("\ufeff", "\u200b", "\u200c", "\u200d", "\u200c\u200b", "\u200d\u2060", "\u200c\ufeff"):
+        for mark in ("\ufeff", "\u200b", "\u200c", "\u200d", "\u200c\u200b", "\u200d\u2060", "\u200c\ufeff",
+                     "\u200e", "\u2066", "\u00ad", "\u202e"):  # reading 39, seam: every format character
             listing.write_text("zqcorpx\n" + mark + "home: admin\n", encoding="utf-8")
             code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
             self.assertEqual(code, 1, repr(mark))
             self.assertIn("adm.txt:1: home-path", out)
+        listing.write_text("zqcorpx\nhome\u200b: admin\n", encoding="utf-8")  # inside the key too
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertEqual(code, 1)
         (self.root / "adm.txt").unlink()
         listing.write_text("home: admin\n", encoding="utf-8")  # only homes: the summary does not call the list empty
         code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
@@ -1489,6 +1501,18 @@ class Refusals(Tree):
             code, out, err = run(["check", str(root), "--instance-strings", str(listing), "--every-file"])
             self.assertEqual(code, 1)
             self.assertNotIn("zqdovski", out.lower())
+
+    def test_every_separator_a_declared_name_takes_also_starts_a_word_and_is_found_in_every_form(self):
+        # reading 39, seam: `_NAME_JOIN` and `_NAME_START` agree, one case per alternative of the join
+        homes = sc._NAME_JOIN[3:-1].split("|")  # the alternatives inside (?:...)
+        spelled = {"[ ._+'-]": [" ", ".", "_", "+", "'", "-"], "%2[07BbDdEe]": ["%20", "%27", "%2B", "%2d", "%2E"],
+                   "%5[Ff]": ["%5F"], "&#0?39;": ["&#39;", "&#039;"], "&#[xX]27;": ["&#x27;", "&#X27;"]}
+        seps = [s for alt in homes for s in spelled.get(alt, [alt.replace("\\\\", "\\")])]
+        self.assertGreaterEqual(len(seps), 16)
+        for sep in seps:
+            path = "q/a" + sep + "jzqd" + sep + "kvx.key"
+            self.assertNotIn("jzqd", sc.redact(path, [sc.HOME_ENTRY + "jzqd kvx"]).lower(), repr(sep))
+            self.assertTrue(sc._home_names("/Users/jzqd" + sep + "kvx/p", {"jzqd kvx"}), repr(sep))
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):

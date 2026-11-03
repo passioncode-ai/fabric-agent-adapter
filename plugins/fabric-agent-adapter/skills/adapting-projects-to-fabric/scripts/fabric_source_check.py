@@ -72,7 +72,10 @@ try:
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
 except ImportError as _missing:  # a copy without its siblings: say so, as a refusal, never a finding's exit 1
-    sys.stderr.write("fabric_source_check.py: %s.py must sit beside this file\n" % (_missing.name or "a module"))
+    _sibling = (_missing.name or "a module") + ".py"
+    sys.stderr.write("fabric_source_check.py: %s\n" % (
+        "%s beside this file is from another version: copy it with this one" % _sibling
+        if (Path(__file__).resolve().parent / _sibling).is_file() else "%s must sit beside this file" % _sibling))
     sys.exit(2)
 finally:
     sys.dont_write_bytecode = _WROTE_BYTECODE
@@ -325,9 +328,9 @@ def read_list(path: Path) -> List[str]:
     for raw in re.split(r"\r\n|\r|\n", path.read_bytes().decode("utf-8-sig")):
         # a byte-order mark or a zero-width character at a line's start (two lists joined) is no part of the line
         text = raw.strip().lstrip("\ufeff\u200b\u2060").strip().replace(HOME_ENTRY, "")  # no meaning at a start
-        # a joiner (U+200C, U+200D) at a start may belong to a string, never to `home:`: a home line is read or refused,
-        # whatever order the invisible characters before it come in
-        bare = re.sub(r"^[\s\ufeff\u200b-\u200d\u2060]+", "", text)
+        # a joiner (U+200C, U+200D) may belong to a string, never to `home:`: a home line is read or refused with every
+        # format character (Unicode Cf: a joiner, a direction mark, a soft hyphen) taken out, wherever it stands
+        bare = "".join(c for c in text if unicodedata.category(c) != "Cf").strip()
         home = _HOME_LINE.fullmatch(bare)
         if home and home.group(1).isascii():
             entries.append(HOME_ENTRY + home.group(1).lower())

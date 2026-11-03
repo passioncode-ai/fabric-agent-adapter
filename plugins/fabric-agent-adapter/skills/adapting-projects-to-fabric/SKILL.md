@@ -165,8 +165,7 @@ An agent's source (what its owner could hand over) and its instance (records, lo
 its configuration) are kept apart; load [the source and the instance](references/source-and-instance.md). First run
 [`scripts/fabric_source_check.py`](scripts/fabric_source_check.py) `check <project-root>`, with the owner's list of
 their own strings or a note that none was given (when the owner's own home name is neutral, has one or two letters,
-or holds a space, `.`, `_`, `-` or `'`, the list gains `home: <name>` first, the reference's rule; a container's, a
-cloud machine's or a CI runner's user, such as `node` or `vscode`, is never declared): it reports instance data by
+or holds a space, `.`, `_`, `-` or `'`, the list gains `home: <name>` first, the reference's rule; a container's, a cloud image's or a CI runner's user that only the image uses, such as `node` or `vscode`, is never declared): it reports instance data by
 path, line and kind, never repeating a value, and changes nothing. Then move each finding out in the source: an
 instance value into the instance configuration outside the repository, read through a named variable with a neutral
 default and a committed `*.example`; a key into the secret store, named only. Run the check again until it exits 0; it is a floor under the owner's review, not a secret scanner.

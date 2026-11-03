@@ -135,7 +135,7 @@ instance folder; fixtures use neutral ids. Its data has a home of its own from t
 checkout, or a private repository of that name), and the README names the data kind (U or O) and the uptime
 category (A or B) from the grill. Load [the source and the instance](references/source-and-instance.md). The
 sibling's `scripts/fabric_source_check.py check <project-root>` finds instance data in the tree without repeating it;
-run it with the owner's list of their own strings, or record that none was given (the owner's own home name, when it is neutral, has one or two letters, or holds a space, `.`, `_`, `-` or `'`, is declared there with `home: <name>` first; a container's, a cloud machine's or a CI runner's user, such as `node` or `vscode`, is never declared); the skeleton is done when it exits 0 and the owner has reviewed it (a floor, not a secret scanner; without the sibling or Python 3.9+, record the check as NOT_RUN, as in step 3). Handing the source over stays the owner's act.
+run it with the owner's list of their own strings, or record that none was given (the owner's own home name, when it is neutral, has one or two letters, or holds a space, `.`, `_`, `-` or `'`, is declared there with `home: <name>` first; a container's, a cloud image's or a CI runner's user that only the image uses, such as `node` or `vscode`, is never declared); the skeleton is done when it exits 0 and the owner has reviewed it (a floor, not a secret scanner; without the sibling or Python 3.9+, record the check as NOT_RUN, as in step 3). Handing the source over stays the owner's act.
 
 ## Step 3: scaffold the provider bundle
 
