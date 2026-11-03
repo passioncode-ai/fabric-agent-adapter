@@ -1171,6 +1171,13 @@ class Refusals(Tree):
         else:
             self.assertIn(b"could not restart in Python's UTF-8 mode", again.stderr)
         self.assertNotIn(b"M\xc3\xbcller", again.stdout + again.stderr)
+        # reading 31: -I and -E drop PYTHONIOENCODING, so the console's codec travels as an -X option
+        with open(os.path.join(os.fsencode(str(self.root)), b"x", b"caf\xc3\xa9.txt"), "wb") as f:
+            f.write(("/Users/" + "zqowner" + "/x\n").encode())
+        for flags in ([], [b"-I"], [b"-E"]):
+            shown = subprocess.run([os.fsencode(sys.executable)] + flags + [os.fsencode(str(SCRIPTS / "fabric_source_check.py")),
+                                    b"check", os.fsencode(str(self.root))], env=env, capture_output=True)
+            self.assertIn(b"x/caf\xe9.txt:1: home-path", shown.stdout, flags)
 
     def test_an_entry_typed_composed_finds_a_name_or_a_line_stored_decomposed(self):
         # reading 29, unit: macOS keeps a name in the form the writing app gave it, often NFD; the list is typed NFC
@@ -1191,6 +1198,10 @@ class Refusals(Tree):
                          [(0, "instance-string"), (1, "instance-string")])
         shown = unicodedata.normalize("NFC", out + err).casefold()
         self.assertNotIn(unicodedata.normalize("NFC", entry).casefold(), shown)
+        # reading 31, unit and seam: Hangul jamo and Indic vowel signs compose though their combining class is 0
+        for word in ("\ud55c\uac00\ub78c", "zq\u0995\u09cbzq"):
+            self.assertIsNotNone(sc._instance_finding(unicodedata.normalize("NFD", word), ["", sc._fold(word)]), word)
+            self.assertEqual(sc._fold(unicodedata.normalize("NFD", word)), sc._fold(word))
 
     def test_a_declared_home_is_found_in_every_form_and_the_bare_name_nowhere(self):
         # reading 30, product: listing a neutral home's paths missed forms and flagged `/users/admin/` routes; a
@@ -1260,6 +1271,52 @@ class Refusals(Tree):
         self.assertEqual(done.returncode, 1, done.stderr)
         done.stdout.decode("ascii")  # the reader's codec: no byte above 127
         self.assertIn(b"home-path", done.stdout)
+
+    def test_a_declared_home_with_a_dash_is_read_whole_in_the_dashed_forms(self):
+        # reading 31, product: the dashed forms end a name at its first dash, so `home: j-doe` read `j` there
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        listing.write_text("home: j-doe\n", encoding="utf-8")
+        self.write("notes.md", "-Users-j-doe-example-agent\nC--Users-j-doe-example-agent\n-var-home-j-doe-proj\n"
+                               "-Users-j-doer-x\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing), "--json"])
+        self.assertEqual(code, 1)
+        self.assertEqual(sorted(f["line"] for f in json.loads(out)["findings"]), [1, 2, 3])
+        self.assertNotIn("j-doe", out + err)
+        # reading 31, unit: a `.` is dashed too, and the whole name is masked in a printed path
+        listing.write_text("home: j.doe\nhome: bob-smith\n", encoding="utf-8")
+        self.write("-Users-bob-smith-proj/.env", "X=1\n")
+        self.write("notes.md", "~/.claude/projects/-Users-j-doe-proj/\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing), "--json"])
+        self.assertEqual(code, 1)
+        found = json.loads(out)["findings"]
+        self.assertIn(("notes.md", 1, "home-path"), [(f["path"], f["line"], f["kind"]) for f in found])
+        self.assertNotIn("bob-smith", out + err)
+
+    def test_a_home_line_that_cannot_be_read_is_refused(self):
+        listing = self.tmp / "cfg" / "list.txt"
+        listing.parent.mkdir()
+        for line in ("home: \u042f\u043d", "home: Admin User", "home: jo # mine", "home : jo", "home: /Users/jo",
+                     "home: _svc", "home: \u017fam"):
+            listing.write_text("zqcorpx\n" + line + "\n", encoding="utf-8")
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+            self.assertEqual(code, 2, line)
+            self.assertIn("line 2 of the owner's list", err)
+        listing.write_text("home: admin\n", encoding="utf-8")  # only homes: the summary does not call the list empty
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertNotIn("holds no string", out)
+        self.assertIn("1 home name(s) declared", out)
+
+    def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
+        tools = self.tmp / "tools"
+        tools.mkdir()
+        for name in ("fabric_source_check.py", "fabric_secrets.py"):  # fabric_source_ignore.py left behind
+            shutil.copy(SCRIPTS / name, tools / name)
+        done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root)],
+                              capture_output=True, text=True)
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("fabric_source_ignore.py must sit beside this file", done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
 
     def test_a_lone_surrogate_in_a_windows_name_is_one_wtf8_character(self):
         with mock.patch.object(sc.os, "name", "nt"):

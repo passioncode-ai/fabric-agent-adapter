@@ -45,7 +45,9 @@ import wait for the contract's decision on CT-194 (part 2).
   check. It is registered as a shared reference (`test_shared_references`).
 - creating-fabric-agents step 2 lays an agent out as source and instance and calls the skeleton done, once the owner has reviewed it (a floor, not a secret scanner), when the check
   exits 0; step 5 runs it again. adapting-projects-to-fabric step 4c runs the check first, moves each finding out and
-  runs it again; a value already in Git history needs a fresh history, which stays the owner's act.
+  runs it again; a value already in Git history needs a fresh history, which stays the owner's act. Step 7's report
+  names a contract checkout by its commit, never a home path, and the check runs again after it. The check's ignore-line
+  reading is `fabric_source_ignore.py` beside it, and the owner's list takes `home: <name>` for the owner's own home name.
 - Trigger and scenario evals for both (`source-apart-from-instance`, `move-instance-data-out-of-an-existing-agent`);
   the Windows CI job runs `test_source_check`; the release smoke checks the script is installed. README, AGENTS.md and
   SKILL-CARD name it.
