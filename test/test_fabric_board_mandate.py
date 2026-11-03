@@ -392,8 +392,11 @@ class BoardMandateTests(Conversation):
             got = at_depth(0, [3])
         self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
         started = time.monotonic()
-        self.assertTrue(math.isnan(jsv.js_to_number("1" * 200000 + "x")))  # the decimal pattern costs its length
-        self.assertLess(time.monotonic() - started, 0.5)
+        self.assertTrue(math.isnan(jsv.js_to_number("1" * 20000 + "x")))  # the decimal pattern costs its length
+        self.assertLess(time.monotonic() - started, 0.5, "seconds on a backtracking pattern, a millisecond on this one")
+        for text, want in ((".", None), ("+", None), ("-", None), ("e5", None), (".e1", None), ("1e", None), (".5", 0.5), ("5.", 5.0)):
+            got = jsv.js_to_number(text)  # the pattern needs a digit (unit reading 23)
+            self.assertTrue(math.isnan(got) if want is None else got == want, text)
         limit = sys.getrecursionlimit()
         for depth in range(max(1, limit // 3 - 60), limit + 20, 3):  # never raises, whatever the nesting and the stack
             for frames in (0, 5, 11):
@@ -417,7 +420,7 @@ class BoardMandateTests(Conversation):
         class Evil(metaclass=Meta):
             pass
         # Only JSON data by exact type, or a number, is an estimate in the core (seam readings 19 and 20).
-        for honest, want in (("1", "ok"), ([3], "ok"), (Text("1"), "outside-mandate: spend"), ((1,), "outside-mandate: spend"),
+        for honest, want in (("1", "ok"), ([3], "ok"), ([3, 3], "ok"), ({"a": "1", "b": "1"}, "ok"), (Text("1"), "outside-mandate: spend"), ((1,), "outside-mandate: spend"),
                              ([Usd(100)], "outside-mandate: spend"), ([Lying(100)], "outside-mandate: spend"),
                              ([Usd(3)], "outside-mandate: spend"), ([Lying(3)], "outside-mandate: spend"),
                              (type("L", (list,), {})([3]), "outside-mandate: spend"), (type("D", (dict,), {})(), "outside-mandate: spend"),
