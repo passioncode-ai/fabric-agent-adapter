@@ -98,10 +98,14 @@ class BoardMandateTests(Conversation):
 
     def test_a_broken_block_beside_a_mandate_cancels_nothing(self):
         m = mandate()
-        got, covered, _ = self.run_one(body(json.dumps(m), '{"frames": '))
-        self.assertEqual(got, m)
-        self.assertTrue(covered["ok"])
-        self.assertEqual([e for e in self.events if e[0] == "board.request.mandate_unread"], [])
+        for name, text in (("after", body(json.dumps(m), '{"frames": ')), ("before", body('{"frames": ', json.dumps(m)))):
+            with self.subTest(name):
+                self.tearDown()
+                self.setUp()
+                got, covered, _ = self.run_one(text)
+                self.assertEqual(got, m)
+                self.assertTrue(covered["ok"])
+                self.assertEqual([e for e in self.events if e[0] == "board.request.mandate_unread"], [])
 
     def test_a_json_block_that_is_no_mandate_is_ignored(self):
         got, covered, _ = self.run_one(body('{"frames": 24}'))

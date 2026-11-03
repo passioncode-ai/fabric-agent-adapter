@@ -107,14 +107,17 @@ for (const [name, text, code] of [['two blocks', body(JSON.stringify(mandate()),
   });
 }
 
-test('FAA-135: a broken block beside a mandate cancels nothing', async (t) => {
-  const h = await fakeHub(t);
-  const m = mandate();
-  const [got, covered] = await h.runOne(body(JSON.stringify(m), '{"frames": '));
-  assert.deepEqual(got, m);
-  assert.equal(covered.ok, true);
-  assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread'), []);
-});
+for (const order of ['after', 'before']) {
+  test(`FAA-135: a broken block ${order} a mandate cancels nothing`, async (t) => {
+    const h = await fakeHub(t);
+    const m = mandate();
+    const blocks = order === 'after' ? [JSON.stringify(m), '{"frames": '] : ['{"frames": ', JSON.stringify(m)];
+    const [got, covered] = await h.runOne(body(...blocks));
+    assert.deepEqual(got, m);
+    assert.equal(covered.ok, true);
+    assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread'), []);
+  });
+}
 
 test('FAA-135: a JSON block that is no mandate is ignored', async (t) => {
   const h = await fakeHub(t);

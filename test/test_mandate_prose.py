@@ -89,7 +89,7 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         for words in ("A link holding a four-agent chain hands on no mandate",
                       "through OA-3 (answer `adf0c61a`)",
                       "as the contract proposes, takes none for a task it already leads",
-                      "never asked in chat", "Fabric's `agent.call` (its hub cannot read `protocols` yet)"):
+                      "(handed over with its link and amount, never asked in chat)", "Fabric's `agent.call` (its hub cannot read `protocols` yet)"):
             self.assertIn(words, flat_rule, words)
         for words in ("from his own Project on the board or his local session", "never for a task it already leads (a proposed minimum",
                       "relays the scope in force at its link, never his wider one", "names its held `expiresAt`, which the receiver's `expiresAt` does not pass"):

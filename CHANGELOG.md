@@ -14,7 +14,7 @@ says that his approval holds for the whole task, at every link (FAA-195).
   `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1, the responder's wall clock (`wall=`,
   `time.time` by default; Node `Date.now`, milliseconds) and the sender Project as the `caller` of a covered answer's
   `recordAs`; None when no mandate travelled, and `{"fault": "now-unreadable"}` when the clock returns a value that is not a finite instant (one that raises passes its
-  error to the handler). A `source` in the block is dropped (OA-7). Two blocks, or one whose text holds
+  error to the handler). A `source` in the block is dropped (OA-7). Two `mandate/1` blocks, or one whose text holds
   `mandate/1` and is not JSON (an integer longer than 4300 digits included, on every Python), read as none, with a `board.request.mandate_unread` warning carrying the request id and its `reason`, never the block.
   Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
   mandate. Both kits (FAA-135).
@@ -40,11 +40,13 @@ says that his approval holds for the whole task, at every link (FAA-195).
   `7f372925` on board thread `118f95f9`; CT-205 is a row the contract proposes after this kit's pin, on its branch
   `agent/template-parity-20261103`); a link whose chain already holds four agents hands on no mandate and never restates its own: the four
   parts go as a relay through OA-3 (his own Project on the board or his local session), whose receiver states its own (OA-2),
-  as the contract confirmed on board thread `118f95f9` (message `adf0c61a`); the relay names the scope in force and the held
-  `expiresAt`, which the receiver's mandate does not pass (the kit's bound), and, as the contract proposes until CT-205,
+  as the contract confirmed on board thread `118f95f9` (message `adf0c61a`); references/project-board.md and building-fabric-services
+  references/interop.md say the relay names the scope in force and the held `expiresAt`, which the receiver's mandate
+  does not pass (the kit's bound); and, as the contract proposes until CT-205,
   no agent takes a relay for a task it already leads; references/interop.md says a service has no route past four agents until CT-205. `expiresAt` is counted from `at` and
   covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
-  source and spend sentences are reworded with no change in rule. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
+  source and spend sentences are reworded with no change in rule, and Step 5's lane-restart paragraph drops its reason
+  sentence ("The stop is usually stale by then.") for room, its rule unchanged. A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
 - working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`
   block fenced ` ```json ` at the start of its own lines, its chain ending in the service's registry agent id, never a
   decision block; and what comes back: `mandate-not-for-this-call` is handed on again to the right id without asking
