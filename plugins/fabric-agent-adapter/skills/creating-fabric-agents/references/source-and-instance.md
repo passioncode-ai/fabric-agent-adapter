@@ -111,7 +111,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   name instead (ASCII letters, digits, `.`, `_`, `-`, `'` and spaces, starting with a letter or a digit; a name holding a
   space, as a Windows profile may, is written whole, `home: Jane Doe`, and everything after the colon is the name, so
   a note goes on a line of its own (`# laptop`); spaces and tabs may stand around the colon; a line
-  that starts with `home` and a colon and holds anything else is refused, exit 2; such a line is never a string
+  that starts with `home` and a colon and holds anything else is refused, exit 2 (an invisible format character before
+  the name or inside `home` is dropped, one inside the name refuses the line); such a line is never a string
   entry, so list a string like `home: page` by a part of it, `ome: page`): the check then finds that home in every form the table names (it is never neutral, even with one or two
   letters), and the bare name is not looked for anywhere else, though a declared name of three or more letters and digits is
   masked wherever a printed path holds it as a word, its parts joined by none or any run of a space, `.`, `_`, `-`, `+`, `'`, their
@@ -148,8 +149,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   list; a container's, a cloud image's or a CI runner's user that only the image uses, such as `node` or `vscode`, is never declared, since
   its paths are the image's and stay in the source; the home of the owner's own machine is declared even when its
   name is an image's user, as `admin` or `ubuntu` on a cloud machine the owner works on; when that name is also the
-  user of an image in the tree, the image's paths are reported, and they are written through `$HOME` or a build
-  argument, `WORKDIR $HOME/app`, so no home path stands in the source) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
+  user of an image in the tree, the image's paths are reported, and they are written through a build argument that
+  names the user, `ARG APP_USER=ubuntu`, `USER ${APP_USER}`, `WORKDIR /home/${APP_USER}/app`, so no home path stands
+  in the source; `$HOME` serves only where a shell in the image expands it, a `RUN` line or a script, since a
+  Dockerfile's `WORKDIR` and `COPY` see only `ENV` and `ARG` values) and a value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) are
   not findings.
 
 The check finds the forms the table names, and only those: a credential in another shape (a bare token with no name
