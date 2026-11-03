@@ -234,8 +234,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   request left accepted on the board).
 - Then the slot is `moved`: the running handler is told to stop (`ctx.stopped`); a `claimed` entry is dropped (the move
   returned it to the queue); accepted work stays as `lapsed` and work whose effect began as `unknown` (only the slot's
-  holder, or the estate owner, reconciles it now). No `com.claim`, `com.renew`, `com.complete`, `com.enroll` or
-  `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
+  holder, or the estate owner, reconciles it now). No `com.claim` (but the one that asks about a move back, below),
+  `com.renew`, `com.complete`, `com.enroll` or `com.responder_replace` is sent for that capability again: not at recovery after a restart, and not when the new
   holder's lease lapses, nor when com.status later names no generation for the slot (a recorded move stays until
   take-back). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back (CT-175
   will hand them to the new holder). One `board.slot.moved` event (warning, notify) says so, once, also across restarts
@@ -248,7 +248,15 @@ held and not transferred). The responder keeps that move instead of undoing it:
   records its own generation. Only a replay the board refuses, or one that ran for the first time (`repeated: false`)
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
-- Only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
+- The operator may move the slot back to this session in Fabric (DEC-0140 PR-2), which this client cannot hear. While
+  a slot is moved the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the
+  recorded move, sends one `com.claim`, as PR-2's "Learning the slot is its own" says (FAA-165, 0.60.0). A claim that
+  lands is the slot held again: the record loses `moved`, the request it handed out is worked, accepted work left
+  `lapsed` comes back with a transfer, and a later move is said again. `lease_expired` (the move reached this session
+  and its lease lapsed first) enrolls again. `fenced` is another session's slot: recorded as `moved` at that generation,
+  so it is not asked about twice. It is never an enroll or a replace on a slot another session holds, and it waits
+  while other work runs.
+- Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
   being read at the same time: the move is written under the responder's lock (Node: on the fence queue, after any fenced
   call in flight) and only while the record is unchanged (FAA-158). Never edit the
   checkpoint's `slots` record by hand to undo a move. In the same board
@@ -269,9 +277,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
   `change-policy` (DEC-0125); the operator reaches it through an agent that relays their decision in `_meta`, the
-  service's page or its elicitation (Claude Code and Codex, which cannot set `_meta`, wait for CT-125's forwarding), and the service names it in its docs; otherwise a moved slot stays moved. A move back to this service's own session is not
-  detected yet: the receiving side and the hand-over of accepted requests (contract CT-175) wait for Fabric's session
-  surface.
+  service's page or its elicitation (Claude Code and Codex, which cannot set `_meta`, wait for CT-125's forwarding), and the service names it in its docs; otherwise a moved slot stays moved unless the operator moves it back to this session (above). The
+  hand-over of accepted requests to another session (contract CT-175) waits for Fabric's session surface.
 
 ## What a board session may call
 

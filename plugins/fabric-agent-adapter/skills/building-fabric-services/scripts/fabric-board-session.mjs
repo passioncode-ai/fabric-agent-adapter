@@ -528,7 +528,10 @@ export class Responder extends SlotKeeper {
       this.suspect.delete(capability);
     }
     for (const [capability, slot] of Object.entries(this.slots)) {
-      if (slot.state === 'moved') continue; // never enrolled again on its own, even when the new holder's lease lapses (FAA-155)
+      if (slot.state === 'moved') { // never enrolled again on its own, even when the new holder lapses (FAA-155)
+        if (this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.movedBack(capability); // unless com.status shows a later generation it may hold (FAA-165)
+        continue;
+      }
       if (slot.state === 'paused') {
         // still held: a longer pause; lifted: the slot is ours again
         if (capability !== heldByWork && this.now() >= (slot.retryAt ?? 0) && !(await this.gone(capability))) await this.enroll(capability); // a move is read first

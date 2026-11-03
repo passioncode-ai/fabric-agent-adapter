@@ -962,10 +962,85 @@ test('FAA-155: a live responder whose slot moved is not enrolled again when the 
     await h.advance(20);
   }
   const s = await h.state();
-  assert.deepEqual(s.calls.slice(seen), []);
+  assert.deepEqual([...new Set(s.calls.slice(seen))], ['com.status']); // read once a renewal for a move back (FAA-165), no more
   assert.equal(s.slots['video.render'].generation, 2);
   assert.equal(s.requests[rid].state, 'queued');
   assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+});
+
+async function movedOff(t) {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step(); // holds generation 1, idle
+  const mine = (await h.state()).slots['video.render'].holder;
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step(); // com.status shows generation 2: moved
+  assert.equal(r.slots['video.render'].state, 'moved');
+  return { hub, h, r, mine };
+}
+
+test('FAA-165: a slot the operator moves back is found by one com.claim, held again and kept', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine }); // generation 3, this session's
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.deepEqual(record(hub)['video.render'], { project: r.project, generation: 3 });
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+  await h.advance(20);
+  await r.step();
+  await h.advance(61); // its own enroll renewed the lease
+  await r.step();
+  let s = await h.state();
+  assert.equal(s.slots['video.render'].holder, mine);
+  assert.equal(s.slots['video.render'].generation, 3);
+  await hub.control({ op: 'move', capability: 'video.render' }); // a later move is said again
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 2);
+});
+
+test('FAA-165: a move to a third session is asked about once and never enrolled', async (t) => {
+  const { hub, h, r } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: 's-third' });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.equal(record(hub)['video.render'].moved, 3);
+  const seen = (await h.tools()).length;
+  await h.advance(61);
+  for (let i = 0; i < 4; i += 1) {
+    await r.step();
+    await h.advance(20);
+  }
+  const s = await h.state();
+  assert.deepEqual([...new Set(s.calls.slice(seen))], ['com.status']);
+  assert.equal(s.slots['video.render'].holder, 's-third');
+  assert.equal(h.kinds().filter((k) => k === 'board.slot.moved').length, 1);
+});
+
+test('FAA-165: a move back whose lease lapsed enrolls again', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await h.advance(61);
+  await r.step();
+  const s = await h.state();
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.equal(s.slots['video.render'].holder, mine);
+  assert.deepEqual(record(hub)['video.render'], { project: r.project, generation: s.slots['video.render'].generation });
+});
+
+test('FAA-165: a takeBack meanwhile wins over a move back', async (t) => {
+  const { hub, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const held = { ...record(hub)['video.render'] };
+  r.takeBack('video.render');
+  assert.equal(await r.back('video.render', held, 3), false);
+  assert.equal(record(hub)['video.render'], undefined);
 });
 
 test('FAA-155: work running when the slot moves stops, stays held, and is never completed or transferred', async (t) => {

@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.59.0"
+  version: "0.60.0"
 ---
 
 # Working with Fabric
@@ -283,15 +283,15 @@ build or test in flight is not a stall. Note each restart (what stopped, when, a
 
 ## Step 6: tasks link to backlog rows, never copy them
 
-A backlog row in a repository stays the status source. File the Fabric task that runs it with the row's address:
+A repository's backlog row stays the status source. File the Fabric task that runs it with the row's address:
 
 ```json
 {"title": "…", "source": {"repository": "passioncode-ai/fabric-agent-adapter", "path": "docs/backlog.md", "id": "FAA-18"}}
 ```
 
-through `fabric_task_create` (or `fabric_work_claim`, which files one when none exists). Do not paste the row's
-text or status into the task; edit the row in its repository under that repository's rules. A row that does not
-resolve (a repository the project does not hold) is refused, naming the part that failed.
+through `fabric_task_create` (or `fabric_work_claim`, which files one when none exists), and read its answer as in Step 4
+item 2: while you hold a claim, Fabric 0.3.14 links the row from it, so file an unrelated row after your release or
+say it is linked. Do not paste the row's text or status into the task; edit it in its repository.
 
 ## Step 7: at the end
 

@@ -470,6 +470,16 @@
         "says that once it does, it reads the last 512 KB of the transcript, earlier turns, message text and tool output included (which can hold a secret the session displayed, kept in memory only), and uses only the current turn's tool names and path arguments (Edit, Write, MultiEdit, NotebookEdit paths; cd and git -C in Bash)",
         "says what leaves the machine is each other repository's host, owner and name from its origin, at most 10 a turn, never a local path, a command or message text (on a self-hosted ssh remote owner is that server's folder path), and that a cd or a read-only git -C counts as touching a repository, and that the list can miss a repository (an edit pushed out of the 512 KB tail is not named, FAA-174) and, until FAA-184, name a wrong one (a relative git -C in a later Bash call is read against the session's folder)"
       ]
+    },
+    {
+      "id": "a-backlog-row-filed-while-a-claim-is-held",
+      "trap": "the agent files an unrelated backlog row's task with fabric_task_create while the person's request is claimed, never reads the answer, and reports it filed on its own, although Fabric 0.3.14 linked it as spawned from the claimed task or answered proposed: true with nothing filed",
+      "request": "While working on the person's request (claimed in Fabric), you notice an unrelated defect and want a Fabric task for its backlog row FAA-18 in passioncode-ai/fabric-agent-adapter docs/backlog.md. What do you do?",
+      "expected": [
+        "files it with the row's address as source {repository, path, id}, never the row's text or status",
+        "reads fabric_task_create's answer as Step 4 item 2 says: created false with a code filed nothing, proposed true filed nothing and waits for the operator, spawned_from names the parent Fabric chose",
+        "says that while a claim is held Fabric 0.3.14 links the new task as spawned from it, so it files the unrelated row after releasing its claim or tells the person the row is linked to the request"
+      ]
     }
   ]
 }

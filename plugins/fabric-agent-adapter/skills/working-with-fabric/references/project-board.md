@@ -100,6 +100,15 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    the files you would touch (`git ls-remote origin 'refs/agent-sync/leases/*'` in its repository). `noResponder` in
    the receipt says nobody serves the capability now. A capability or Project that is `held` is the operator's stop,
    not "nobody live": wait, and make no change there.
+   An `active` responder does not prove your request is being worked. A slot the operator moved to another session
+   (contract DEC-0140 PR-2) keeps the requests the old holder had accepted: they stay `accepted` with the old holder's
+   attempt, which nobody works until the new holder takes them over by a transfer, while Fabric's thread view shows the
+   new holder as "Answers it" and its "requests no agent answers now" leaves them out (FAA-172). The board shows a
+   requester no attempt or generation (`com.get` gives the request's `state` and `revision` only), so you cannot tell
+   this from slow work: when your request has stayed `accepted` with no progress note or reply past what the work
+   should take, ask on its thread (`com.reply`) whether it is being worked, and if nobody answers, treat it as nobody
+   live for that request (step 3 or 4) and tell the person. While its `effect` is still `not_started`, `com.cancel`
+   moves it to `cancelled` (nothing has happened yet), so cancelling and submitting it again is safe.
 2. **Live:** wait under a watcher (below) and work on independent tasks meanwhile; never touch files a live session
    holds.
 3. **Nobody live, and the change is small.** Small means all three:

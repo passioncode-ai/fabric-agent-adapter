@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.60.0 (unreleased)
+
+The board responder finds a slot the operator moves back to it (FAA-165), and three smaller fixes: working-with-fabric
+reads a filed row's answer (FAA-169) and says when an accepted request is left behind by a move (FAA-172), and `pack`
+names why a provider manifest is refused (FAA-193).
+
+### Fixed
+
+- A slot the operator moved to another session and then back to this one (contract DEC-0140 PR-2) was held but never
+  claimed or renewed: the responder skipped a `moved` slot until `take_back`, so its lease lapsed. Now, while a slot
+  is moved, the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the recorded
+  move, sends one `com.claim`, as PR-2's "Learning the slot is its own" says. A claim that lands holds the slot again
+  (the record loses `moved`, the request it handed out is worked, a later move is said again); `lease_expired` enrolls
+  again; `fenced` records the new generation, so the same move is not asked about twice. It never enrolls or replaces a
+  slot another session holds, and waits while other work runs. Both kits (`fabric_board_slots.py`,
+  `fabric-board-slots.mjs`). The `board.slot.moved` notice and references/board.md say so (FAA-165).
+- `pack` refused a provider manifest whose `costPresets` differ from the package's with only `provider-manifest`; the
+  message now names both causes (not a JSON object, or `costPresets` that differ). Both kits (FAA-193, found by the
+  FAA-124 pilot rehearsal).
+
+### Changed
+
+- working-with-fabric Step 6 reads `fabric_task_create`'s answer as Step 4 item 2 does: while a claim is held, Fabric
+  0.3.14 links what is filed as spawned from it, so an unrelated row is filed after the release, or the person is told
+  it is linked (FAA-169). A scenario eval `a-backlog-row-filed-while-a-claim-is-held`.
+- working-with-fabric references/project-board.md, "When nobody answers": an `active` responder does not prove a request
+  is worked; one the old holder accepted before its slot moved stays `accepted` with nobody on it, and a requester
+  cannot see that (`com.get` shows no attempt), so it asks on the thread and, with no answer, treats the request as
+  nobody live; while its `effect` is `not_started` it may cancel and submit again (FAA-172; question to Fabric and the contract on board thread `ab12642e`).
+- building-fabric-services SKILL.md: a moved slot stays moved until `take_back` or a move back to its session.
+
 ## 0.59.0 (2026-11-03)
 
 Portable from day 0 (FAA-191, RM-36): on top of 0.58.0's source and instance, every new agent gets a data home, a

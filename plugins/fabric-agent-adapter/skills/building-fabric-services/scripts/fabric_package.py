@@ -704,8 +704,16 @@ def _all_problems(pkg: Dict[str, Any], files: Dict[str, bytes]) -> List[Dict[str
     problems = [dict(p, rule="schema") for p in schema_problems(pkg)]
     problems += [dict(p, rule="path") for p in path_problems(pkg)]
     problems += [dict(p, rule=p["code"]) for p in package_findings(pkg)]
-    problems += [{"rule": "folder", "problem": p["problem"], "instancePath": p["path"], "message": p["problem"]} for p in check_package_folder(pkg, files)]
+    problems += [{"rule": "folder", "problem": p["problem"], "instancePath": p["path"], "message": FOLDER_MESSAGES.get(p["problem"], p["problem"])}
+                 for p in check_package_folder(pkg, files)]
     return problems
+
+
+#: What a folder problem means, where its code alone does not say what to change (FAA-193).
+FOLDER_MESSAGES = {
+    "provider-manifest": "provider-manifest: the provider manifest must be a JSON object, and when it carries costPresets "
+                         "fabric.package.json must carry the same costPresets (copy them; pack does not)",
+}
 
 
 def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:

@@ -1416,10 +1416,78 @@ class MovedSlotTests(Conversation):
         for _ in range(4):
             r.step()
             self.board.advance(20)
-        self.assertEqual(self.tools()[seen:], [])
+        self.assertEqual(set(self.tools()[seen:]), {"com.status"})  # read once a renewal for a move back (FAA-165), no more
         self.assertEqual(self.board.slots["video.render"]["generation"], 2)
         self.assertEqual(self.board.requests[rid]["state"], "queued")
         self.assertEqual(len(self.moved()), 1)
+
+    def _moved_off(self):
+        r = self.responder()
+        r.step()  # holds generation 1, idle
+        mine = self.board.slots["video.render"]["holder"]
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()  # com.status shows generation 2: moved
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        return r, mine
+
+    def test_a_slot_the_operator_moves_back_is_claimed_and_kept(self):
+        """FAA-165: a move back to this session (a later generation it holds) is found by one com.claim, as DEC-0140
+        PR-2's "Learning the slot is its own" says; the slot is held again, its record loses the move, work is done."""
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)  # generation 3, this session's
+        rid = self.board.queue("video.render")
+        self.board.advance(20)
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "held")
+        self.assertEqual(self.record()["video.render"], {"project": r.project, "generation": 3})
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.board.advance(20)
+        r.step()
+        self.board.advance(61)  # its own enroll renewed the lease: the slot did not lapse
+        r.step()
+        self.assertEqual(self.board.slots["video.render"]["holder"], mine)
+        self.assertGreater(self.board.slots["video.render"]["lease"], self.board.now)
+        self.assertEqual(self.board.slots["video.render"]["generation"], 3)
+        self.board.move("video.render")  # and a later move is said again
+        self.board.advance(20)
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertEqual(len(self.moved()), 2)
+
+    def test_a_move_to_a_third_session_is_asked_about_once(self):
+        r, _ = self._moved_off()
+        self.board.move("video.render", to="s-third")  # generation 3, not this session's
+        self.board.advance(20)
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "moved")
+        self.assertEqual(self.record()["video.render"]["moved"], 3)
+        seen = len(self.tools())
+        self.board.advance(61)  # the third session lapses: still never enrolled
+        for _ in range(4):
+            r.step()
+            self.board.advance(20)
+        self.assertEqual(set(self.tools()[seen:]), {"com.status"})
+        self.assertEqual(self.board.slots["video.render"]["holder"], "s-third")
+        self.assertEqual(len(self.moved()), 1)
+
+    def test_a_move_back_whose_lease_lapsed_enrolls_again(self):
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)
+        self.board.advance(61)  # this session missed its lease before it asked
+        r.step()
+        self.assertEqual(r.slots["video.render"]["state"], "held")
+        self.assertEqual(self.board.slots["video.render"]["holder"], mine)
+        self.assertEqual(self.record()["video.render"], {"project": r.project, "generation": self.board.slots["video.render"]["generation"]})
+        self.assertGreater(self.board.slots["video.render"]["lease"], self.board.now)
+
+    def test_a_take_back_meanwhile_wins_over_a_move_back(self):
+        r, mine = self._moved_off()
+        self.board.move("video.render", to=mine)
+        held = dict(self.record()["video.render"])
+        r.take_back("video.render")
+        self.assertFalse(r._back("video.render", held, 3))  # the record changed: nothing is rewritten
+        self.assertNotIn("video.render", self.record())
 
     def test_work_running_when_the_slot_moves_stops_and_stays_held(self):
         import time

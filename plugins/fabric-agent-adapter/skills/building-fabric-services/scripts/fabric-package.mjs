@@ -504,12 +504,17 @@ export function compose(draft, files) {
   return { pkg, notes };
 }
 
+/** What a folder problem means, where its code alone does not say what to change (FAA-193). */
+const FOLDER_MESSAGES = {
+  'provider-manifest': 'provider-manifest: the provider manifest must be a JSON object, and when it carries costPresets fabric.package.json must carry the same costPresets (copy them; pack does not)',
+};
+
 function allProblems(pkg, files) {
   return [
     ...schemaProblems(pkg).map((p) => ({ ...p, rule: 'schema' })),
     ...pathProblems(pkg).map((p) => ({ ...p, rule: 'path' })),
     ...packageFindings(pkg).map((p) => ({ ...p, rule: p.code })),
-    ...checkPackageFolder(pkg, files).map((p) => ({ rule: 'folder', problem: p.problem, instancePath: p.path, message: p.problem })),
+    ...checkPackageFolder(pkg, files).map((p) => ({ rule: 'folder', problem: p.problem, instancePath: p.path, message: FOLDER_MESSAGES[p.problem] ?? p.problem })),
   ];
 }
 

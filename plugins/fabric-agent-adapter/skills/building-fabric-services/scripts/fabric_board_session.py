@@ -588,8 +588,10 @@ class Responder(SlotKeeper):
             self._gone(capability)
             self._suspect.discard(capability)
         for capability, slot in list(self.slots.items()):
-            if slot.get("state") == "moved":
-                continue  # never enrolled again on its own, even when the new holder's lease lapses (FAA-155)
+            if slot.get("state") == "moved":  # never enrolled again on its own, even when the new holder lapses (FAA-155)
+                if self.now() - slot.get("renewed_at", 0) >= RENEW_SECONDS - 0.5:
+                    self._moved_back(capability)  # unless com.status shows a later generation it may hold (FAA-165)
+                continue
             if slot.get("state") == "paused":
                 if capability != held_by_work and self.now() >= slot.get("retry_at", 0.0) and not self._gone(capability):
                     self._enroll(capability)  # still held: a longer pause; lifted: the slot is ours again (moved: read first)

@@ -194,6 +194,14 @@ class PackTests(unittest.TestCase):
         write_agent(self.root, secrets=[{"name": "INBOX_TOKEN", "purpose": "reads the mailbox"}, {"name": "INBOX_TOKEN", "purpose": "again"}])
         self.assertIn("FAC-SEM-065", [p["rule"] for p in fp.pack(self.root)["problems"]])
 
+    def test_a_provider_manifest_refusal_names_its_cause(self):
+        """FAA-193: the provider manifest's costPresets differ from the package's: the problem says so."""
+        write_agent(self.root, costPresets=[{"id": "quick", "capability": "digest.write", "label": "Quick", "maxUsd": 0.5, "default": True}])
+        found = [p for p in fp.pack(self.root)["problems"] if p.get("problem") == "provider-manifest"]
+        self.assertEqual(len(found), 1)
+        self.assertIn("costPresets", found[0]["message"])
+        self.assertTrue(found[0]["message"].startswith("provider-manifest: "))
+
     def test_pack_refuses_a_chosen_agent_ref_and_a_stale_receipt(self):
         write_agent(self.root, agentRef="urn:fabric:agent:example:other")
         with self.assertRaisesRegex(fp.PackageError, "urn:fabric:agent:example:inbox-digest"):
