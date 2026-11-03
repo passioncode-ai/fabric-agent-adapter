@@ -240,18 +240,27 @@ def _member_of(items: Any, value: Any) -> bool:
 
 def _json_data(value: Any) -> bool:
     """Whether a value is JSON data as json.loads gives it, by exact type all the way down (never `==` or isinstance,
-    which a metaclass or `__class__` can answer); a structure too deep to walk is not."""
-    try:
-        kind = type(value)
-        if value is None or kind is bool or kind is str or kind is int or kind is float:
-            return True
+    which a metaclass or `__class__` can answer). Walked without recursion, each list or dict once (a shared or cyclic
+    structure costs its size, never more; 0.61.0 unit reading 21)."""
+    stack, seen = [value], set()
+    while stack:
+        item = stack.pop()
+        kind = type(item)
+        if item is None or kind is bool or kind is str or kind is int or kind is float:
+            continue
+        if kind is not list and kind is not dict:
+            return False
+        if id(item) in seen:
+            continue
+        seen.add(id(item))
         if kind is list:
-            return all(_json_data(item) for item in value)
-        if kind is dict:
-            return all(type(key) is str and _json_data(item) for key, item in value.items())
-    except RecursionError:
-        pass
-    return False
+            stack.extend(item)
+            continue
+        for key, sub in item.items():
+            if type(key) is not str:
+                return False
+            stack.append(sub)
+    return True
 
 
 def mandate_covers(inputs: Any) -> Dict[str, Any]:
@@ -310,8 +319,15 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     # way down, or an int or float (a subclass read by the number it stores); anything else (a mock or proxy, a
     # Decimal, a numpy.int64, a tuple, bytes, a str, list or dict subclass, a list holding one) is no estimate, which a
     # ceiling refuses (0.61.0 seam readings 19 and 20).
-    readable = is_number(spend) or _json_data(spend)
-    if ceiling is not MISSING and (spend is MISSING or not readable or js_to_number(spend) > ceiling):
+    readable = over = False
+    if ceiling is not MISSING and spend is not MISSING:  # read only when a ceiling asks (no walk without one)
+        readable = is_number(spend) or _json_data(spend)
+    if readable:
+        try:
+            over = js_to_number(spend) > ceiling
+        except RecursionError:  # a list too deep to read at this stack depth: no estimate (0.61.0 seam reading 21)
+            readable = False
+    if ceiling is not MISSING and (spend is MISSING or not readable or over):
         data: Dict[str, Any] = {"detail": "outside-mandate: spend"}
         if spend is not MISSING and readable:
             data["estimateUsd"] = real_number(spend) if is_number(spend) else spend

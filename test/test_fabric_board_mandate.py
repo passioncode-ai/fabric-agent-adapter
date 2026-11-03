@@ -359,6 +359,35 @@ class BoardMandateTests(Conversation):
                                  "call": {"capability": "video.render", "effect": "draft", "spendUsd": Lying(100), "project": "site-a"}})
         self.assertIs(type(got["data"]["estimateUsd"]), float, "the estimate travels as the plain number it stores")
 
+        def nested(depth):
+            value = [3]
+            for _ in range(depth):
+                value = [value]
+            return value
+
+        def at_depth(frames, spend):  # call the core with `frames` frames already on the stack
+            if frames:
+                return at_depth(frames - 1, spend)
+            return fm.mandate_covers({"mandate": m, "tier": "T1", "now": AT, "self": "example-agent",
+                                      "call": {"capability": "video.render", "effect": "draft", "spendUsd": spend, "project": "site-a"}})
+        cyclic = []
+        cyclic.append(cyclic)
+        self.assertEqual(at_depth(0, cyclic)["data"]["detail"], "outside-mandate: spend", "a cycle is answered, never a raise")
+        shared = [3]
+        for _ in range(40):  # 41 objects, 2**40 paths: read once each (unit reading 21)
+            shared = [shared, shared]
+        started = time.monotonic()
+        free = mandate(scope={"capabilities": ["video.render"], "effects": ["draft"]})
+        self.assertTrue(fm.mandate_covers({"mandate": free, "tier": "T1", "now": AT, "self": "example-agent",
+                                           "call": {"capability": "video.render", "effect": "draft", "spendUsd": shared}})["ok"])
+        self.assertTrue(fm._json_data(shared))
+        self.assertLess(time.monotonic() - started, 1.0, "no ceiling, no walk; a shared structure walked once")
+        limit = sys.getrecursionlimit()
+        for depth in range(max(1, limit // 3 - 60), limit + 20, 3):  # never raises, whatever the nesting and the stack
+            for frames in (0, 5, 11):
+                got = at_depth(frames, nested(depth))
+                self.assertIn("ok" if got.get("ok") else got.get("data", {}).get("detail"), ("ok", "outside-mandate: spend"))
+
         class ClaimsFloat(int):  # an int whose __class__ says float: read as the int it is (unit reading 20)
             @property
             def __class__(self):
@@ -378,6 +407,9 @@ class BoardMandateTests(Conversation):
         # Only JSON data by exact type, or a number, is an estimate in the core (seam readings 19 and 20).
         for honest, want in (("1", "ok"), ([3], "ok"), (Text("1"), "outside-mandate: spend"), ((1,), "outside-mandate: spend"),
                              ([Usd(100)], "outside-mandate: spend"), ([Lying(100)], "outside-mandate: spend"),
+                             ([Usd(3)], "outside-mandate: spend"), ([Lying(3)], "outside-mandate: spend"),
+                             (type("L", (list,), {})([3]), "outside-mandate: spend"), (type("D", (dict,), {})(), "outside-mandate: spend"),
+                             ({"a": Usd(3)}, "outside-mandate: spend"), ({1: 2}, "outside-mandate: spend"), ([2.5], "ok"), ({}, "ok"),
                              ([spoof], "outside-mandate: spend"), (Evil(), "outside-mandate: spend")):
             with self.subTest(honest=repr(honest)):
                 got = fm.mandate_covers({"mandate": m, "tier": "T1", "now": AT, "self": "example-agent",
