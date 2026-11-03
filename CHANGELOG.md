@@ -15,7 +15,10 @@ audit at every release until the contract's export (CT-194) replaces it.
 - Step 2 gives the data a home of its own, `<agent>-data` (a folder beside the checkout or a private repository of
   that name), and the README names the data kind and the uptime category; an agent someone builds for themselves gets
   a `LICENSE` naming the holder (all rights reserved unless the owner gives other terms).
-- Step 5: every release runs `fabric_source_check.py check` in Git mode and with `--every-file` as the transfer audit.
+- Step 5: every release runs `fabric_source_check.py check` as the transfer audit, in Git mode on the checkout and
+  with `--every-file` on a clean copy of what Git would commit (never the checkout, whose ignored configuration and
+  dependency folders `--every-file` reads too). A `LICENSE` whose holder is on the owner's list is named in
+  `.fabric-source-ignore`, since authorship travels with the source.
 - references/source-and-instance.md (both skills): *The data home and its kind*; references/where-agents-run.md:
   *Uptime: A or B* and a checklist line. building-fabric-services' Step 0 answers carry the same (data kind, data
   home, uptime, holder, the audit per release).
@@ -25,7 +28,11 @@ audit at every release until the contract's export (CT-194) replaces it.
 ### Changed
 
 - The eval `own-agent-licence-is-the-owners-choice` expects a `LICENSE` naming the holder; still no AGPL or
-  commercial licence files unasked.
+  commercial licence files unasked. The other homes of the rule (the shared operator-channel reference, building-fabric-services
+  and adapting-projects-to-fabric) say the same.
+- where-agents-run.md: Heroku is the default host of an A agent unless it runs in the person's or an organization's
+  PassionCode cloud or is sold; an A agent's data lives in a durable store, never the host's own folder.
+- building-fabric-services' gotchas are shorter (the same rules); `test_fabric_kit` runs its by-path load with `-B`.
 
 ### Upgrading
 

@@ -63,7 +63,7 @@ Answer before writing code, and record the answers in the project README:
 | Port | one number; run the claim check below before choosing it |
 | Who calls it | the named agents or people, and through which surface (Step 1) |
 | What it stores | the store, where it lives (Step 2, rule 5), and what survives uninstall |
-| Data and uptime | kind U or O, `<id>-data`, uptime A or B, `LICENSE` holder, transfer audit per release (creating-fabric-agents) |
+| Data and uptime | kind U or O, kit folders or `<id>-data`, uptime A or B, `LICENSE` holder, transfer audit per release (creating-fabric-agents) |
 | What it tells the operator | the events worth a notification (Step 5) |
 
 ## Step 1: choose the surfaces
@@ -354,9 +354,9 @@ first commit:
 
 Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
 (below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
-someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's
-choice, nothing about it is published or listed by the organization, and none of these files is
-required of it, though the verified MCP quick start is still how anyone learns to drive it.
+someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's choice, the organization
+lists nothing about it, of these files only a `LICENSE` naming its copyright holder is required, and the verified
+MCP quick start still teaches anyone to drive it.
 
 ## Online services: the remote placement
 

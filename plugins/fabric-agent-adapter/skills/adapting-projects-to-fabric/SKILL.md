@@ -242,7 +242,8 @@ relayed, DEC-0121). An agent with neither stops nor notify events skips this ste
 repository standard (`knowledge/repository-standard.md`) from its first commit: the licence files,
 the README quick start verified with a real client, `AGENTS.md` and `CLAUDE.md`, listed in the
 shared reference above. An agent someone builds for themselves is not a PassionCode.ai repository:
-its licence is its owner's choice and none of those files is required of it.
+its licence is its owner's choice and none of those files is required of it, except a `LICENSE` naming the copyright
+holder (all rights reserved unless the owner gives other terms).
 
 ## Completion format
 

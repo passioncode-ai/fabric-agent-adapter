@@ -46,6 +46,9 @@ class PortableFromDayZero(unittest.TestCase):
                       "all rights reserved unless the owner gives other terms", "a public product keeps its own licence"):
             self.assertIn(words, holder, words)
         self.assertLess(grill.index("**Where does it run, for whom?**"), grill.index("**Does it run around the clock?**"))
+        flat_grill = " ".join(grill.split())
+        self.assertIn(data, flat_grill)  # 0.59.0 unit r1: the rows are asked in the grill, not elsewhere
+        self.assertIn(holder, flat_grill)
 
     def test_the_skeleton_gives_the_data_a_home_and_a_licence(self):
         step_2 = " ".join(section("creating-fabric-agents", "Step 2: the project skeleton").split())
@@ -57,7 +60,9 @@ class PortableFromDayZero(unittest.TestCase):
 
     def test_every_release_runs_the_transfer_audit(self):
         step_5 = " ".join(section("creating-fabric-agents", "Step 5: check, report, and set the canary expectation").split())
-        self.assertIn("Every release of the agent runs it too, in Git mode and with `--every-file`, as the transfer audit "
+        self.assertIn("Every release of the agent runs it too, in Git mode on the checkout and with `--every-file` on the "
+                      "clean copy a transfer would carry (what Git would commit, as the packing step makes it), as the "
+                      "transfer audit "
                       "(each exit 0, with the owner's list or its absence recorded) until the contract's export (CT-194) "
                       "replaces it", step_5)
         for skill in ("creating-fabric-agents", "adapting-projects-to-fabric"):
@@ -67,7 +72,13 @@ class PortableFromDayZero(unittest.TestCase):
                           "`<AGENT>_DATA_DIR` names it (its default is `../<agent>-data`)",
                           "a separate private repository named `<agent>-data`, never to the source's repository",
                           "never connects to the original's", "When in doubt, the kind is U.",
-                          "**Every release runs the transfer audit.**"):
+                          "**Every release runs the transfer audit.**",
+                          "`check <clean-copy> --every-file` on a clean copy of what Git would commit (never the checkout "
+                          "itself",
+                          # 0.59.0 product r1: the holder's LICENSE meets the owner's list
+                          "The `LICENSE` is the other: its copyright line names the holder, which is authorship and "
+                          "travels with the source",
+                          "its real-trace corpus and replay samples live in the data home"):
                 self.assertIn(words, reference, (skill, words))
 
     def test_the_uptime_reference_and_its_checklist(self):
@@ -75,7 +86,11 @@ class PortableFromDayZero(unittest.TestCase):
         for words in ("[Uptime: A or B](#uptime-a-or-b)", "## Uptime: A or B", "**A, around the clock.**",
                       "**B, local only.**", "never from its store",
                       "becomes A for that capability; record the change and move only that capability to the cloud",
-                      "Which uptime category is it, A (a cloud host from the first release) or B (local only)?"):
+                      "Which uptime category is it, A (a cloud host from the first release) or B (local only)?",
+                      # 0.59.0 product r1: one answer per placement, and a durable data home on a cloud host
+                      "an instance in the person's PassionCode cloud or an organization's cloud runs there",
+                      "a paid agent stays in PassionCode's cloud",
+                      "never the host's own folder, which a platform such as Heroku does not keep across a restart"):
             self.assertIn(words, where, words)
 
     def test_a_new_service_records_the_same_answers(self):
@@ -84,6 +99,16 @@ class PortableFromDayZero(unittest.TestCase):
                       "creating-fabric-agents"):
             self.assertIn(words, row, words)
         self.assertIn(row, " ".join(section("building-fabric-services", "Step 0: is it a service?").split()))
+
+    def test_every_home_of_the_licence_rule_names_the_holders_licence(self):
+        # 0.59.0 seam r1: the reference and the kit skill still said no file is required of a self-built agent
+        for path in ("creating-fabric-agents/references/operator-channel-and-repository.md",
+                     "adapting-projects-to-fabric/references/operator-channel-and-repository.md",
+                     "adapting-projects-to-fabric/SKILL.md"):
+            self.assertIn("except a `LICENSE` naming the copyright holder (all rights reserved unless the owner gives "
+                          "other terms)", flat(path), path)
+        self.assertIn("of these files only a `LICENSE` naming its copyright holder is required",
+                      flat("building-fabric-services/SKILL.md"))
 
 
 if __name__ == "__main__":

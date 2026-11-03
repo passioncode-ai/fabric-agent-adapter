@@ -220,12 +220,12 @@
       "id": "portable-from-day-zero",
       "request": "Create example-agent, a Fabric agent that collects review replies for its owner's apps and posts a daily digest to a group chat; build it so it can be handed over later.",
       "expected": [
-        "asks the grill's uptime row and records category A: the digest must go out while the owner's machine is off, so a cloud host from the first release (Heroku unless a reason names another), built as an online service and started from the cloud Fabric-server template only once its repository exists",
+        "asks the grill's uptime row and records category A: the digest must go out while the owner's machine is off, so a cloud host from the first release (Heroku unless a reason names another: the person's or an organization's cloud, or PassionCode's for a paid agent), with its data in a durable store, never the host's own folder, built as an online service and started from the cloud Fabric-server template only once its repository exists",
         "asks the grill's data row and records kind U: the reviews are data of people outside the owner's team, so the source holds only the schema and synthetic fixtures, and a copy starts with an empty store of its own",
         "gives the data a home of its own in the first commit, <agent>-data (a folder beside the checkout or a private repository of that name), read through a named variable, never inside the source's repository",
-        "asks who holds the copyright and commits a LICENSE naming that holder",
+        "asks who holds the copyright and commits a LICENSE naming that holder; when the holder is on the owner's list, names LICENSE in .fabric-source-ignore with the reason that authorship travels with the source, and no other file",
         "names the data kind and the uptime category in the README",
-        "runs fabric_source_check.py check in Git mode and with --every-file as the transfer audit before each release, each exit 0, without repeating a value it found",
+        "runs fabric_source_check.py check in Git mode on the checkout and with --every-file on a clean copy of what Git would commit as the transfer audit before each release, each exit 0, without repeating a value it found",
         "does not create a remote, push or publish the source or its data: handing it over stays the owner's act"
       ],
       "trap": "the agent keeps the reviews in a fixtures folder of the source repository, runs only on the owner's laptop although the digest must go out at night, and has no LICENSE, so it cannot be handed over and misses the digest"

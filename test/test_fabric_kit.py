@@ -198,7 +198,7 @@ class Install(unittest.TestCase):
                 "for name in sys.argv[2:]:\n"
                 "    s = u.spec_from_file_location('by_path_' + name, sys.argv[1] + '/' + name + '.py')\n"
                 "    s.loader.exec_module(u.module_from_spec(s))\n")
-        out = subprocess.run([sys.executable, "-E", "-s", "-c", code, str(SCRIPTS)] + [e["module"] for e in KIT["python"]],
+        out = subprocess.run([sys.executable, "-B", "-E", "-s", "-c", code, str(SCRIPTS)] + [e["module"] for e in KIT["python"]],
                              capture_output=True, text=True, cwd=os.path.abspath(os.sep), timeout=120)
         self.assertEqual(out.returncode, 0, out.stderr[-500:])
 

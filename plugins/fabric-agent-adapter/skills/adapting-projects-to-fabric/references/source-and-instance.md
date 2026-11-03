@@ -32,7 +32,7 @@ on it.
   (an organization's) is a sibling instance, `<id>.<instance>`, never a folder inside the personal one
   (`references/estate-record.md` of that skill).
 - **Ignore the instance in the source**: `.gitignore` names the real configuration (`config/*.json` with
-  `!config/*.example.json`), an instance folder that sits inside the checkout during development, and what running
+  `!config/*.example.json`), an instance folder an existing project still keeps inside the checkout, and what running
   the agent leaves (`__pycache__/`, `*.pyc`), which the check would otherwise report as binary in Git mode.
 - **State documents are instance data.** A handoff, a decision log or a backlog about this codebase is source
   documentation; a record of what this installation did (runs, conversations, the owner's notes, a journal) lives in
@@ -57,10 +57,12 @@ on it.
   an empty home of its own and never connects to the original's.
 - **The README names the kind of the data.** **U**: the agent keeps data of people outside the owner's team
   (messages, support requests, reviews, customers' answers); it never enters the source, a copy or its tests, and the
-  source holds only the schema and synthetic fixtures. **O**: it keeps none (a tool or service for other agents, the
+  source holds only the schema and synthetic fixtures (its real-trace corpus and replay samples live in the data
+  home). **O**: it keeps none (a tool or service for other agents, the
   owner's reports, runs and media); its working data still goes to the data home. When in doubt, the kind is U.
-- **Every release runs the transfer audit.** `fabric_source_check.py check <project-root>` in Git mode and again with
-  `--every-file`, each exit 0, with the owner's list or its absence recorded, until the contract's export (CT-194)
+- **Every release runs the transfer audit.** `fabric_source_check.py check <project-root>` in Git mode, and
+  `check <clean-copy> --every-file` on a clean copy of what Git would commit (never the checkout itself, whose ignored
+  configuration and dependency folders `--every-file` reads too), each exit 0, with the owner's list or its absence recorded, until the contract's export (CT-194)
   replaces it.
 
 ## The check
@@ -140,7 +142,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   repository is not read; `--every-file` and a folder outside Git read its files, its `.git` left out. An exception line (`!`) is refused, since what it would
   bring back would go unread. Name the files, or a folder that holds
   only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
-  exception), and say why on the line above. A file `pack` refuses by its name cannot ship in a package: a public
+  exception), and say why on the line above. The `LICENSE` is the other: its copyright line names the holder, which is
+  authorship and travels with the source, so when the holder is on the owner's list `LICENSE` is named in the ignore
+  file with that reason (`# the copyright holder is authorship and travels with the source`); no other file of the
+  owner's is. A file `pack` refuses by its name cannot ship in a package: a public
   certificate is renamed `*.crt`; a project `.npmrc` that holds no credential may be named in the ignore file, with
   that reason, for the source check (the line then hides whatever is added to it later, so keep it credential-free),
   and `pack` still refuses it, so a package is made from a copy without it (its

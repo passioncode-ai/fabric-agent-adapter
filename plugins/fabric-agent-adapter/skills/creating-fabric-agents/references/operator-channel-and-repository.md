@@ -63,4 +63,5 @@ the project).
 org-index `scripts/check_format.py` reports 0 findings for it before it is called done. An agent
 someone builds for themselves is not a PassionCode.ai repository: its licence is its owner's
 choice, nothing about it is published or listed by the organization, and none of these files is
-required of it, though the verified MCP quick start is still how anyone learns to drive it.
+required of it, except a `LICENSE` naming the copyright holder (all rights reserved unless the owner gives other
+terms), and the verified MCP quick start is still how anyone learns to drive it.
