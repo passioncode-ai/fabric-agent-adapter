@@ -53,15 +53,19 @@ on it.
 - **The data has a home of its own from the first commit: `<agent>-data`.** For an agent that is not a kit service it
   is a folder beside the checkout, never inside it, and `<AGENT>_DATA_DIR` names it (its default is
   `../<agent>-data`); a kit service keeps the kit's folders above. When the owner keeps the data in Git, it goes to a
-  separate private repository named `<agent>-data`, never to the source's repository. A copy of the agent starts with
-  an empty home of its own and never connects to the original's.
+  separate private repository named `<agent>-data`, never to the source's repository. On a cloud host that does not
+  keep its disk across a restart (Heroku and the like, an uptime A agent's default), the data home is a durable store
+  the same variable names (a database, an object store, that private repository); the folder and the kit's folders
+  serve a machine whose disk persists. A copy of the agent starts with an empty home of its own and never connects
+  to the original's.
 - **The README names the kind of the data.** **U**: the agent keeps data of people outside the owner's team
   (messages, support requests, reviews, customers' answers); it never enters the source, a copy or its tests, and the
   source holds only the schema and synthetic fixtures (its real-trace corpus and replay samples live in the data
   home). **O**: it keeps none (a tool or service for other agents, the
   owner's reports, runs and media); its working data still goes to the data home. When in doubt, the kind is U.
 - **Every release runs the transfer audit.** `fabric_source_check.py check <project-root>` in Git mode, and
-  `check <clean-copy> --every-file` on a clean copy of what Git would commit (never the checkout itself, whose ignored
+  `check <clean-copy> --every-file` on a clean copy of what Git would commit (`git ls-files --cached --others
+  --exclude-standard`, as building-fabric-services' `references/package.md` makes it; never the checkout itself, whose ignored
   configuration and dependency folders `--every-file` reads too), each exit 0, with the owner's list or its absence recorded, until the contract's export (CT-194)
   replaces it.
 

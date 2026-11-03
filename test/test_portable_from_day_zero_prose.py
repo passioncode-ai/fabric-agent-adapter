@@ -23,6 +23,10 @@ class PortableFromDayZero(unittest.TestCase):
     def test_the_scenarios_and_the_trigger_exist(self):
         self.assertIn("portable-from-day-zero", scenario_ids("creating-fabric-agents"))
         self.assertIn("new-service-names-data-and-uptime", scenario_ids("building-fabric-services"))
+        building = json.loads((ROOT / "test/evals/building-fabric-services/scenarios.json").read_text(encoding="utf-8"))
+        audit = [e for s in building["scenarios"] if s["id"] == "new-service-names-data-and-uptime"
+                 for e in s["expected"] if "transfer audit" in e]
+        self.assertTrue(audit and "--every-file on a clean copy of what Git would commit" in audit[0], audit)
         queries = json.loads((ROOT / "test/evals/creating-fabric-agents/triggers.json").read_text(encoding="utf-8"))
         self.assertTrue(any(q["shouldTrigger"] and "переносимый с первого дня" in q["query"] for q in queries["queries"]))
 
@@ -39,7 +43,8 @@ class PortableFromDayZero(unittest.TestCase):
         for words in ("named in the README", "**U** when it keeps data of people outside the owner's team",
                       "never enters the source, a copy of it or its tests", "the schema and synthetic fixtures",
                       "a copy starts with an empty store of its own", "**O** when it keeps none", "In doubt, U.",
-                      "the data lives in `<agent>-data`, apart from the source, from the first commit"):
+                      "the data lives in `<agent>-data` (a kit service: the kit's folders; on a cloud host: a durable store), "
+                      "apart from the source, from the first commit"):
             self.assertIn(words, data, words)
         holder = one_row("creating-fabric-agents/SKILL.md", "**Who holds the copyright?**")
         for words in ("gets a `LICENSE` naming that holder in its first commit",
@@ -73,12 +78,15 @@ class PortableFromDayZero(unittest.TestCase):
                           "a separate private repository named `<agent>-data`, never to the source's repository",
                           "never connects to the original's", "When in doubt, the kind is U.",
                           "**Every release runs the transfer audit.**",
-                          "`check <clean-copy> --every-file` on a clean copy of what Git would commit (never the checkout "
-                          "itself",
+                          "`check <clean-copy> --every-file` on a clean copy of what Git would commit",
+                          "never the checkout itself, whose ignored configuration and dependency folders",
                           # 0.59.0 product r1: the holder's LICENSE meets the owner's list
                           "The `LICENSE` is the other: its copyright line names the holder, which is authorship and "
                           "travels with the source",
-                          "its real-trace corpus and replay samples live in the data home"):
+                          "its real-trace corpus and replay samples live in the data home",
+                          # 0.59.0 seam r2: a host that does not keep its disk
+                          "the data home is a durable store the same variable names",
+                          "as building-fabric-services' `references/package.md` makes it"):
                 self.assertIn(words, reference, (skill, words))
 
     def test_the_uptime_reference_and_its_checklist(self):
@@ -103,10 +111,16 @@ class PortableFromDayZero(unittest.TestCase):
     def test_every_home_of_the_licence_rule_names_the_holders_licence(self):
         # 0.59.0 seam r1: the reference and the kit skill still said no file is required of a self-built agent
         for path in ("creating-fabric-agents/references/operator-channel-and-repository.md",
-                     "adapting-projects-to-fabric/references/operator-channel-and-repository.md",
-                     "adapting-projects-to-fabric/SKILL.md"):
-            self.assertIn("except a `LICENSE` naming the copyright holder (all rights reserved unless the owner gives "
-                          "other terms)", flat(path), path)
+                     "adapting-projects-to-fabric/references/operator-channel-and-repository.md"):
+            for words in ("except that an agent built new carries a `LICENSE` naming the copyright holder (all rights "
+                          "reserved unless the owner gives other terms)",
+                          # 0.59.0 product r2: the kit files copied in keep their own licence
+                          "files the adapter copies in (the service kit, the dashboard kit) keep their own licence"):
+                self.assertIn(words, flat(path), (path, words))
+        # 0.59.0 seam and product r2: an existing project keeps what it has, as the CHANGELOG's Upgrading says
+        self.assertIn("an existing one keeps what it has", flat("adapting-projects-to-fabric/SKILL.md"))
+        self.assertIn("the kit files the adapter copies in keep their own licence",
+                      " ".join(section("creating-fabric-agents", "Step 2: the project skeleton").split()))
         self.assertIn("of these files only a `LICENSE` naming its copyright holder is required",
                       flat("building-fabric-services/SKILL.md"))
 

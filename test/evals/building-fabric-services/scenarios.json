@@ -638,7 +638,7 @@
       "request": "Make example-agent a local Fabric service; it keeps only the owner's own run reports and nobody calls it while the laptop sleeps.",
       "expected": [
         "records in the Step 0 answers the data kind O, the data home (the kit's folders; a private repository of the data is <id>-data), uptime category B (local only, no cloud) and the LICENSE holder",
-        "runs the transfer audit (fabric_source_check.py check in Git mode and with --every-file) at each release",
+        "runs the transfer audit (fabric_source_check.py check in Git mode on the checkout and with --every-file on a clean copy of what Git would commit) at each release",
         "adds no cloud host for a category B service"
       ]
     }

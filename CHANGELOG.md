@@ -28,15 +28,19 @@ audit at every release until the contract's export (CT-194) replaces it.
 ### Changed
 
 - The eval `own-agent-licence-is-the-owners-choice` expects a `LICENSE` naming the holder; still no AGPL or
-  commercial licence files unasked. The other homes of the rule (the shared operator-channel reference, building-fabric-services
-  and adapting-projects-to-fabric) say the same.
+  commercial licence files unasked. The shared operator-channel reference and building-fabric-services say the same
+  for an agent built new, and that the kit files the adapter copies in keep their own licence
+  (`AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`); adapting-projects-to-fabric leaves an existing agent's
+  licence as it is.
 - where-agents-run.md: Heroku is the default host of an A agent unless it runs in the person's or an organization's
-  PassionCode cloud or is sold; an A agent's data lives in a durable store, never the host's own folder.
+  PassionCode cloud or is sold; an A agent's data lives in a durable store, never the host's own folder, and the data
+  home section says the same for a host that does not keep its disk.
 - building-fabric-services' gotchas are shorter (the same rules); `test_fabric_kit` runs its by-path load with `-B`.
 
 ### Upgrading
 
-- Nothing to change for an existing agent. A new one answers the three grill rows before its first commit.
+- Nothing to change for an existing agent: an adapted project keeps its licence, data and release checks as they
+  are. A new one answers the three grill rows before its first commit.
 
 ## 0.58.0 (2026-11-03)
 

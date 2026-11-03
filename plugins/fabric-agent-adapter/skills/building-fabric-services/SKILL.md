@@ -355,7 +355,7 @@ first commit:
 Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
 (below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's choice, the organization
-lists nothing about it, of these files only a `LICENSE` naming its copyright holder is required, and the verified
+publishes and lists nothing about it, of these files only a `LICENSE` naming its copyright holder is required, and the verified
 MCP quick start still teaches anyone to drive it.
 
 ## Online services: the remote placement
