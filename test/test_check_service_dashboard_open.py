@@ -267,7 +267,12 @@ class LiveOpensInHostTests(LiveSample):
                              ("bot:fixture?pw@github.com:example-org/r", "github.com:example-org/r"),
                              ("deploy:fixture/pw@github.com:example-org/r", "github.com:example-org/r"),  # unit reading 6
                              ("bot:fix@tu-re-pw@github.com:example-org/r", "github.com:example-org/r"),  # unit reading 7
-                             ("repos/me@corp/r", "repos/me@corp/r"), ("./me@corp/r", "./me@corp/r"),
+                             ("repos/me@corp/r", "corp/r"), ("./me@corp/r", "./me@corp/r"),  # a relative path loses its user part
+                             ("https:bot:fixture-pw@github.com/example-org/r", "https://github.com/example-org/r"),  # unit reading 8
+                             ("http:bot:fixture-pw@h.example/o/r", "http://h.example/o/r"),
+                             ("bot:fixture-pw@github.com/example-org/r", "github.com/example-org/r"),
+                             ("bot:a@b:fixture-pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("/srv/me@h:x/r", "/srv/me@h:x/r"),
                              ("\\\\srv\\share\\me@corp\\r", "\\\\srv\\share\\me@corp\\r"), ("C:/git/me@corp/r", "C:/git/me@corp/r"),
                              ("git@github.com:example-org/task-pipeline-dashboard", "github.com:example-org/task-pipeline-dashboard"),
                              ("bot:fixture\\pw@github.com:example-org/r", "github.com:example-org/r"),

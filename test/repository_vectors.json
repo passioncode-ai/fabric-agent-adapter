@@ -1,0 +1,27 @@
+{
+  "note": "0.62.0 readings 7 and 8: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY is replaced at run time by a made-up key shape, never written here.",
+  "credential": [
+    "https://bot:pw@github.com/example-org/r",
+    "https://KEY@github.com/example-org/r",
+    "https://github.com/example-org/r?access_token=fixture",
+    "https://github.com/example-org/r?t=KEY",
+    "https://github.com/example-org/r#KEY",
+    "https://github.com/example-org/KEY",
+    "bot:fixture@github.com:example-org/r",
+    "bot:fixture@github.com:example-org/r?x=://",
+    "bot:fixture@github.com:example-org/r#://",
+    "https:fixture@github.com/example-org/r/x://y",
+    "git@github.com:example-org/r.git",
+    "mailto:someone@example.com"
+  ],
+  "name": [
+    "https://github.com/example-org/example-agent",
+    "https://github.com/example-org/task-pipeline-dashboard",
+    "https://github.com/Example-Org/Example-Agent",
+    "ssh://git@github.com/example-org/r.git",
+    "https://h.example/x?a=b:c@d",
+    "urn:example:task-pipeline-dashboard",
+    "https://[::1]:8080/x",
+    "https://github.com/Example-Org/Task-Pipeline-Dashboard"
+  ]
+}

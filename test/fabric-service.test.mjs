@@ -126,6 +126,8 @@ test('a new install names its repository; a reinstall without it warns (FAA-198)
   assert.deepEqual(k.validateDescriptor(named), [], 'a repository name is no key (0.62.0 seam reading 6)');
   const keyed = { ...named, source: { repository: `https://github.com/example-org/r?token=sk-${'Fx9k'.repeat(5)}` } };
   assert.ok(k.validateDescriptor(keyed).some((p) => p.includes('FAC-SEM-086')), 'a key in the query still is');
+  const named4 = { ...named, source: { repository: 'https://github.com/example-org/r?access_token=fixture' } };
+  assert.ok(k.validateDescriptor(named4).some((p) => p.includes('FAC-SEM-086')), 'a query named for a credential is one (readings 8)');
   for (const scp of ['bot:fixture@github.com:example-org/r', 'https:fixture@github.com/example-org/r', 'x-access-token:fixture@github.com:example-org/r']) {
     assert.ok(k.validateDescriptor({ ...named, source: { repository: scp } }).some((p) => p.includes('never an scp form')), scp); // readings 7
   }

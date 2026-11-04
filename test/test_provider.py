@@ -221,7 +221,8 @@ class SchemaParityTests(unittest.TestCase):
         self.assertEqual(fp.validate_provider_entry(entry(source={"repository": "ssh://git@example.com/a.git"})), [])
         for good in ("https://h/x?a=b:c@d", "https://github.com/a:b", "https://github.com/example-org/task-pipeline-dashboard"):
             self.assertEqual(fp.validate_provider_entry(entry(source={"repository": good})), [], good)
-        for opaque in ("https:u@h:443/a", "bot:fixture@github.com:example-org/r"):  # a user is an authority's (0.62.0 readings 7)
+        for opaque in ("https:u@h:443/a", "bot:fixture@github.com:example-org/r", "bot:fixture@github.com:example-org/r?x=://",
+                       "bot:fixture@github.com:example-org/r#://", "https:u@h/o/r/x://y"):  # a user is an authority's (readings 7, 8)
             self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": opaque})), [], opaque)
 
     def test_each_argument_is_at_most_1024_characters(self):

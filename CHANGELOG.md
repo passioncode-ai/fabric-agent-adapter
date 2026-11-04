@@ -29,8 +29,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `check_service.py` names a descriptor without it, or with one `descriptor.valid` refuses
   (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo, query or
   fragment (a URL through `redact_url`; a local path, one that starts with `/`, `~`, `.`, `\\` or a drive, by its name;
-  an scp form from its host, its user and password dropped whatever they hold; one with a piece shaped like a credential
-  that is no lower-case name not at all), as
+  a value of a URL scheme such as `https:` also without `//`, through `redact_url`; an scp form or any other value from
+  after its user and password, whatever they hold; one with a piece shaped like a credential that is no name not at
+  all), as
   `state.outside-code` and `dashboard.opens-in-host` now do too for the source and for the data checkout's origin (they
   printed them as found).
   `sample_service.py register` writes this repository, whose code its descriptor runs whatever `--id` names, takes
@@ -40,8 +41,8 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   organization follows from the repository (FAA-198). `source.repository` is read for a credential by one rule in both kits and
   in the provider entry's check (`repository_credential` / `repositoryCredential` in `fabric_secrets`): its user, its query
   and fragment as `secret_url` reads them (a parameter named for a credential, such as `access_token`, now counts), and
-  a path segment shaped like a key; a lower-case path segment is the repository's name, so `task-pipeline-dashboard`,
-  which reads as an `sk-` key, is accepted (a source with it was refused before). A user is accepted only in a URL's
+  a path segment shaped like a key; a path segment in lower case, or of letters with no digit, is the repository's
+  name, so `task-pipeline-dashboard` and `Task-Pipeline-Dashboard`, which read as an `sk-` key, are accepted (a source with it was refused before). A user is accepted only in a URL's
   authority (`https://user@host/path`): an scp form or an opaque URI holding an `@` (`bot:...@host:path`,
   `https:user@host/path`) is refused.
 
@@ -55,7 +56,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   a suite that runs with warnings as errors (`-W error`) sees the rewrite raise; filter that class there.
 - A `source.repository` (a service's or a provider entry's) that names a user outside a URL's authority (an scp form,
   `https:user@host/path`) or carries a query parameter named for a credential is refused: write it as
-  `https://github.com/owner/name`, with no user, query or fragment.
+  `https://github.com/owner/name`, with no user, query or fragment. A path segment of 40 or more characters that mixes
+  upper case, lower case and a digit still reads as a key: write the repository's name in lower case (hosts such as
+  GitHub take either).
 
 ## 0.61.0 (2026-11-04)
 
