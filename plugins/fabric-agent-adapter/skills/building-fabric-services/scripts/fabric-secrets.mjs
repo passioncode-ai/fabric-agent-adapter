@@ -99,15 +99,17 @@ export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_
 /** Every `%XX` escape of an ASCII character decoded, the rest as written (fabric_secrets.ascii_decoded, readings 11). */
 export const asciiDecoded = (text) => text.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 
-/** Whether a repository URI's user information holds a password, as written and as WHATWG reads a special scheme
+/** Whether a repository URI's user information holds a password, as written and with every slash after the colon skipped
  * (fabric_secrets.repository_password, 0.62.0 readings 10). */
 export function repositoryPassword(value) {
   const text = value.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
   const colon = text.indexOf(':');
-  const scheme = colon < 0 ? '' : text.slice(0, colon).toLowerCase();
   const rest = colon < 0 ? '' : text.slice(colon + 1); // as Python's partition leaves it (unit reading 12)
-  const authorities = rest.startsWith('//') ? [/^\/\/([^/?#]*)/.exec(rest)[1]] : [];
-  if (colon >= 0 && ['ftp', 'http', 'https', 'ws', 'wss', 'file'].includes(scheme)) authorities.push(/^[^/\\?#]*/.exec(rest.replace(/^[/\\]+/, ''))[0]);
+  const authorities = []; // the reading after `//` as written is the second one below, which subsumes it
+  if (colon >= 0) { // every scheme, and with a backslash kept in the user as curl reads it (seam reading 13)
+    const skipped = rest.replace(/^[/\\]+/, '');
+    authorities.push(/^[^/\\?#]*/.exec(skipped)[0], /^[^/?#]*/.exec(skipped)[0]);
+  }
   const users = authorities.map((authority) => authority.slice(0, Math.max(authority.lastIndexOf('@'), 0)));
   return [...users, ...users.map(asciiDecoded)].some((user) => user.includes(':') && user.slice(user.indexOf(':') + 1) !== '');
 }

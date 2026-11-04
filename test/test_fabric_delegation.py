@@ -300,7 +300,7 @@ class JwksCacheTests(unittest.TestCase):
                     # dialled 192.168.0.165 for one), and an empty userinfo (urllib dials `@127.0.0.1`).
                     "https://hub.example:99999/j", "http://127.0.0.1:65536/j", "https://:443/j", "https://",
                     "https://[1.2.3.4]/j", "http://[127.0.0.1]:7777/j", "http://@127.0.0.1:7777/j",
-                    "http://:@127.0.0.1:7777/j",
+                    "http://:@127.0.0.1:7777/j", "https://h\\u:p@hub.example/j",  # as written (0.62.0 seam reading 13)
                     # 0.56.0 product r16, unit r15: a tab or line break, which urlsplit drops and urllib sends.
                     "http://127.0.0.1\r/j", "http://loc\talhost:7777/j", "https://hub.exa\nmple/j",
                     "https://hub.example/a b", "https://hub.example/a\x00b", "https://hub.example/caf\u00e9",

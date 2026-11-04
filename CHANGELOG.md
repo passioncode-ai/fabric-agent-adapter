@@ -45,7 +45,7 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   name unless a key's shape (such as `sk-`, `ghp_`, `xoxb-`, `glpat-`, `AKIA`, `eyJ`) starts it or follows a `.`,
   `_` or `-` in it, so `task-pipeline-dashboard` and `Task-Pipeline-Dashboard`, which read as an `sk-` key, are accepted (a source with it was refused before). A user is accepted only in a URL's
   authority (`https://user@host/path`): an scp form or an opaque URI holding an `@` (`bot:...@host:path`,
-  `https:user@host/path`) is refused, and so is a password in the user information read either way a reader takes it:
+  `https:user@host/path`) is refused, and so is a password in the user information read any way a reader takes it:
   as written (`https://h\u:pw@x/r`, as git reads it) or as the URL standard does (`https:///u:pw@h/r`). Node reads
   the user information and parameters by hand, as Python does, so a special scheme written without `//`
   (`https:host/r?access_token=...`) or a host `new URL` refuses is read alike.
@@ -55,7 +55,12 @@ link each to its project and draw its chain (FAA-198, FAA-199).
 - `redact_url` / `redactUrl` (the URL an `HttpError` carries and `check_url` / `checkUrl` print) dropped a user
   information only as the URL standard reads it, so `https://h\u:pw@x/r`, which git and Python's `urllib` read as a
   password, printed `pw` in its path in both kits (0.61.0 too); they now drop the user information as
-  written first (0.62.0 seam reading 11).
+  written first, after any run of slashes or backslashes that follows the scheme (`https:/h\u:pw@x/r`,
+  `https:\\h\u:pw@x/r`; 0.62.0 seam readings 11 and 13).
+- Node's `checkUrl` sent `ht<tab>tps://h\u:pw@x/r` and `https:\/h\u:pw@x/r`, which Python's `check_url` refuses
+  (since 0.60.0): it now reads the written user information on the text `new URL` reads, after any run of slashes.
+- Node's key set cache (`JwksCache`) accepted `https://h\u:pw@x/j` and `https://@x/j`, which the Python twin refuses:
+  it now reads the authority as written too.
 
 ### Upgrading
 
@@ -73,8 +78,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   as GitHub take either). A segment that a key's shape starts, or follows a `.`, `_` or `-` in, is refused whatever
   its case and also percent-encoded (`%73k-` reads as `sk-`). The shapes are those of `fabric_secrets.SECRET_VALUE`,
   such as `sk-` and 16 more characters, `gh` and one of p, o, u, s, r then `_` and 20, `xox` and one of a, b, o, p, r,
-  s then `-` and 10 (so the word `xoxo-` counts), `glpat-` and 20, `AKIA` and 16, `bearer` and a space once decoded
-  (`Bearer%20Tracking`), and those of `JWT_SHAPE`: a repository such
+  s then `-` and 10 (so the word `xoxo-` counts), `glpat-` and 20, `AKIA` and 16, and a JWT as written (`eyJ` in
+  that case, `JWT_SHAPE`); `bearer` and a space counts only at a segment's start once decoded (`Bearer%20Tracking`
+  is refused, `team-Bearer%20Tracking` stays a name). A host is read the same way. A repository such
   as `sk-learn-` followed by a longer name has no spelling the kit accepts, so an agent built from it is not installed new, and
   an installed one keeps working by a rewrite in place that leaves the source out (FAA-200 (24)).
 

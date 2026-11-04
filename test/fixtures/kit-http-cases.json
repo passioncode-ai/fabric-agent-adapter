@@ -2,6 +2,22 @@
  "about": "FAA-65 REQ-06: one set of cases for fabric_http.py and fabric-http.mjs. Scenarios run with rand() = 0.5 (no jitter) and a clock that moves only when the client sleeps.",
  "redact": [
   [
+   "https:/h\\u:pass@x.example/r",
+   "https://x.example/r"
+  ],
+  [
+   "https:///h\\u:pass@x.example/r",
+   "https://x.example/r"
+  ],
+  [
+   "https:h\\u:pass@x.example/r",
+   "https://x.example/r"
+  ],
+  [
+   "https:\\\\h\\u:pass@x.example/r",
+   "https://x.example/r"
+  ],
+  [
    "https:/\t/h\\u:pass@x.example/r",
    "https://x.example/r"
   ],
@@ -215,6 +231,31 @@
   ]
  ],
  "checkUrl": [
+  [
+   "https:/h\\u:pass@x.example/r",
+   false,
+   true
+  ],
+  [
+   "https:///h\\u:pass@x.example/r",
+   false,
+   true
+  ],
+  [
+   "https:h\\u:pass@x.example/r",
+   false,
+   true
+  ],
+  [
+   "https:\\\\h\\u:pass@x.example/r",
+   false,
+   true
+  ],
+  [
+   "https:\\/h\\u:pass@x.example/r",
+   false,
+   true
+  ],
   [
    "https:/\t/h\\u:pass@x.example/r",
    false,

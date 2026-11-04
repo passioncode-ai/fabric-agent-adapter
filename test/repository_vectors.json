@@ -50,7 +50,10 @@
     "https://%67GHREST@github.com/example-org/r",
     "https://%73SKREST@github.com/example-org/r",
     "ssh://%67GLREST@github.com/example-org/r",
-    "https://dev.azure.com/example-org/Bearer%20Tracking/_git/portal"
+    "https://dev.azure.com/example-org/Bearer%20Tracking/_git/portal",
+    "git+https:///u:fixture@x.example/o/r.git",
+    "ssh:///u:fixture@x.example/o/r",
+    "https:///h\\u:fixture@x.example/o/r"
   ],
   "name": [
     "https://github.com/example-org/example-agent",
@@ -71,7 +74,8 @@
     "x-r:h.example/r?x=%zz'RUN40",
     "file:///srv/git/r",
     "https://github.com/example-org/my%20repo",
-    "https://u:\t@h.example/r"
+    "https://u:\t@h.example/r",
+    "https://github.com/example-org/team-Bearer%20Tracking"
   ],
   "no_password": [
     "//u%3Afixture@h.example/r",
@@ -81,6 +85,7 @@
   "password": [
     "https://u%3Afixture@h.example/r",
     "https://h\\u:fixture@x.example/r",
-    "https:///u:fixture@h.example/r"
+    "https:///u:fixture@h.example/r",
+    "ssh:///u:fixture@x.example/o/r"
   ]
 }
