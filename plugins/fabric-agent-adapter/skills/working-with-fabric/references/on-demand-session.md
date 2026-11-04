@@ -89,10 +89,10 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 5 minutes, no
      run comes before the deadline (Fabric starts none with less than 5 minutes left: 120 s of silence, a 60 s cycle
      and the launch) and an accepted request does not expire by itself: `com.complete` `failed_known` saying the
-     deadline came first, and steps 6 and 7 (Fabric's word on thread `b3e60686`, 2026-11-04; a request whose deadline
-     passed unsettled goes to «На проверке» with its workflow closed `blocked`; neither is in Fabric's spec or code
-     at `c560d97e` yet, so until they are a run can still start with less than 5 minutes left, and from which moment
-     Fabric counts its 5 minutes is asked on the same thread);
+     deadline came first, and steps 6 and 7 (Fabric's main at `f0dd20d6`, spec 3.1 and 3.6 and `boardDispatch`'s
+     `LAUNCH_MARGIN_MS`, in no release yet; a request whose deadline passed unsettled goes to the operator with its
+     workflow closed `blocked`; Fabric counts the 5 minutes from its own dispatch decision, which comes after the run's
+     end and its 120 s silence, so a deadline a few minutes later still finds no next run: asked on the same thread);
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
