@@ -401,6 +401,7 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   for (const responses of [[{ action: 'accept', content: {} }], 'a']) assert.deepEqual(store.answer(zero.id, responses), {});
   assert.equal(store.get(zero.id).status, 'input_required');
   assert.throws(() => store.requestInput(zero.id, [request], 'x'), i.InteropError); // requests that are no object are refused
+  assert.throws(() => store.requestInput(zero.id, Object.assign(() => {}, { pick: request }), 'x'), i.InteropError); // a function too (unit 39)
   assert.equal(store.get(job.id).status, 'input_required');
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);

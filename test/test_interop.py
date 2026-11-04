@@ -684,6 +684,9 @@ class InputActionTests(unittest.TestCase):
                 "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"pick": {"action": "accept"}}}}}))
         with self.assertRaises(fi.InteropError):  # requests that are no object are refused, never kept
             jobs.request_input(job_id, [fi.choice_request("Which?", "choice", [("a", "A")])])
+        for requests in (7, True, 1.5, ["pick"], {"pick": "x"}, {"pick": None}, {1: {"method": "elicitation/create"}}):
+            with self.assertRaises(fi.InteropError):  # first, with steps= too (readings 39)
+                jobs.request_input(job_id, requests, steps={"pick": {"effect": "reply"}})
 
     def test_off_by_default_the_answer_is_taken_as_before(self):
         server, jobs, job_id = self.start()

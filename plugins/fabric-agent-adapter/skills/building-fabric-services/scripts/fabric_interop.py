@@ -397,15 +397,15 @@ class JobStore:
         `steps` (DEC-0125) maps a request key to the approval step it asks for, {effect, spendUsd?, project?}, kept in the
         job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it).
         A step is kept as the gate reads it (kept_step), so a job's start and its answer agree."""
+        if not isinstance(input_requests, dict) or not input_requests:  # a JSON object of requests, first (readings 38, 39)
+            raise InteropError("input_required needs at least one input request.")
         kept: Dict[str, Dict[str, Any]] = {}
         for key, step in (steps or {}).items():  # the value checked is the value kept (seam reading 34)
-            kept[key] = kept_step(step) if key in (input_requests or {}) and isinstance(step, dict) else {}
+            kept[key] = kept_step(step) if key in input_requests and isinstance(step, dict) else {}
             if not (type(kept[key].get("effect")) is str and kept[key]["effect"] in EFFECT_CLASSES):
                 raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
-        if not isinstance(input_requests, dict) or not input_requests:  # a JSON object of requests (unit reading 38)
-            raise InteropError("input_required needs at least one input request.")
-        for key, request in input_requests.items():
-            if not _KEY.match(key) or request.get("method") != "elicitation/create":
+        for key, request in input_requests.items():  # each a keyed object, as Node refuses one (product reading 39)
+            if type(key) is not str or not _KEY.match(key) or not isinstance(request, dict) or request.get("method") != "elicitation/create":
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
@@ -805,7 +805,8 @@ class McpToolServer:
         agent_id, a step approval_step kept is read under the call's `_meta.mandate` too (C3.3)."""
         job_id = str(arguments.get("id", ""))
         job = self.jobs.get(job_id)
-        steps = self.jobs.private(job_id).get("steps") if isinstance(self.jobs.private(job_id).get("steps"), dict) else {}
+        private = self.jobs.private(job_id)  # one read of the job's private part (unit reading 39)
+        steps = private.get("steps") if isinstance(private.get("steps"), dict) else {}
         asked = job.get("inputRequests") if job["status"] == "input_required" and isinstance(job.get("inputRequests"), dict) else {}
         records: Dict[str, Any] = {}
         for key, value in arguments["inputResponses"].items():
@@ -816,7 +817,7 @@ class McpToolServer:
             if self.agent_id is not None and isinstance(step, dict):
                 # A kept step's mandate is read as approval_step read it, under the job's own capability, which must
                 # be a capability name (MJ-1); the action itself stays fabric.job.get, so it is a readable action.
-                capability = self.jobs.private(job_id).get("capability")
+                capability = private.get("capability")
                 agent = (verdict or {}).get("caller")
                 mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),
                            "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None,
