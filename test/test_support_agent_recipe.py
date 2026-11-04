@@ -492,6 +492,17 @@ class Recipe(unittest.TestCase):
         with self.assertRaises(sa.RecipeError):
             agent.answer("m-1-r2", "How do I reset my password?", repair=second)
 
+    def test_depth_is_refused_the_same_on_every_python(self):
+        # 0.63.0 product reading 9: 100 000 lists loaded on 3.14 and were refused on 3.9; now one cap for both
+        entry = json.loads((RECIPE / "knowledge.example.json").read_text())["entries"][0]
+        deep = dict(entry, note=json.loads("[" * 100 + "]" * 100))
+        (self.dir / "k.json").write_text(json.dumps({"entries": [deep]}))
+        with self.assertRaises(sa.RecipeError) as raised:
+            sa.Knowledge.load(self.dir / "k.json")
+        self.assertIn("nested too deep", str(raised.exception))
+        (self.dir / "k.json").write_text(json.dumps({"entries": [dict(entry, note=[[["fine"]]])]}))
+        self.assertEqual(len(sa.Knowledge.load(self.dir / "k.json").entries), 1)
+
     def test_a_tag_that_is_not_text_is_refused(self):
         example = json.loads((RECIPE / "knowledge.example.json").read_text())
         for tags in ([1], "refund", None):

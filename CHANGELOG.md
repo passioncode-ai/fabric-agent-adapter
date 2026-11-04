@@ -10,12 +10,14 @@
   earlier launcher); the prompt's first line `fabric-dispatch/1
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
   never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
-  exit contract in place of the preamble (naming the session's own `sessionId` when it is a UUID), also in a session
+  exit contract in place of the preamble (naming the session's own `sessionId` when it is a UUID, and after a `/clear`
+  that an accept already made stands), also in a session
   Fabric launched: `fabric_whoami`, the packet
   (`observatory_checkpoint_latest`), the request and its thread (`com.get`, `com.list`), the lease
   (`observatory_handoff_accept` with its owner, key and the executor the launcher names), `com.status` and the claim,
   a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
-  checkpoints, renewals about every 20 s (work that outlasts the run: a state reply and `failed_known`), the reply and `com.complete`, and the closing checkpoint with its
+  checkpoints, renewals about every 20 s (work that outlasts the run is left accepted, its state in a checkpoint and a thread message, for the next run;
+  `failed_known` would settle it), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
   nudge in such a session. Only the
@@ -48,7 +50,7 @@
     file as a source: read again when it changes (its time, size or inode), the last good version kept when a read fails or the file has the
     wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
     time;
-  - `Knowledge.load` refuses a file that is not an object with an `entries` list, an entry whose tags are not a list
+  - `Knowledge.load` refuses a file nested deeper than 32 levels on every Python, a file that is not an object with an `entries` list, an entry whose tags are not a list
     of text or whose question is not text, and a file nested too deep, each as a `RecipeError`;
   - `channel-agent.example.json`, one project's declaration under
     `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to

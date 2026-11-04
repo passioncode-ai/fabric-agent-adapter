@@ -134,8 +134,8 @@ DISPATCH_CONTRACT = (
     "`leaseId`). Every checkpoint you write repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
-    "and finish before run-ends-at; work that cannot end by then gets a `com.reply` with its state and `com.complete` "
-    "failed_known with the reason. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
+    "and finish before run-ends-at; work that cannot end by then is left accepted, its state in an in_progress "
+    "checkpoint and a `com.submit` message on the thread with no `replyTo`, never `failed_known`. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
@@ -198,6 +198,9 @@ def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Opti
 #: Observatory takes a sessionId only as a lowercase UUID (0.63.0 seam reading 8): one the hook was given is named.
 _SESSION_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 DISPATCH_SESSION = " This session's sessionId: {session}."
+#: After a /clear the accept, if one was made, was made under the session id the clear replaced (0.63.0 seam reading 9).
+DISPATCH_CLEARED = (" This session was cleared: a handoff already accepted stands (read its lease state with "
+                    "`observatory_checkpoint_latest`); never accept it again under the new id.")
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
@@ -296,6 +299,8 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
         prune_dispatch_records(env)  # Codex and Kimi have no turn or end hook to do it; the spools stay theirs
         if not dispatch_holder(dispatch, payload.get("session_id"), env, take_over=payload.get("source") == "clear"):
             return _host_output(host, "SessionStart", DISPATCH_NESTED.format(workflow=dispatch["workflow"]))
+        if payload.get("source") == "clear":
+            return _host_output(host, "SessionStart", dispatch_contract(dispatch) + DISPATCH_CLEARED)
         return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id=payload.get("session_id")))
     if fabric_launched(env):
         return None

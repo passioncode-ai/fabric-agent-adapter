@@ -129,6 +129,25 @@ def words(text: str) -> set:
     return {w for w in (m.lower() for m in _WORD.findall(text)) if len(w) > 1 and w not in STOPWORDS}
 
 
+#: How deep the knowledge file may nest (the file, its entries list, an entry, a member): far past any real entry.
+MAX_KNOWLEDGE_DEPTH = 32
+
+
+def _depth(value: Any) -> int:
+    """How deep a parsed JSON value nests, walked without recursion."""
+    deepest, stack = 0, [(value, 1)]
+    while stack:
+        item, level = stack.pop()
+        deepest = max(deepest, level)
+        if level > MAX_KNOWLEDGE_DEPTH:
+            return level
+        if isinstance(item, dict):
+            stack.extend((child, level + 1) for child in item.values())
+        elif isinstance(item, list):
+            stack.extend((child, level + 1) for child in item)
+    return deepest
+
+
 class Knowledge:
     """Entries `{id, question, answer, tags?}` from a JSON file (`{"entries": [...]}`); ids are unique."""
 
@@ -156,6 +175,8 @@ class Knowledge:
             raise RecipeError("the knowledge file is nested too deep to read") from None
         if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
             raise RecipeError("the knowledge file is an object with an `entries` list")  # never an empty set by mistake
+        if _depth(data) > MAX_KNOWLEDGE_DEPTH:  # the same verdict on every Python, whatever its parser's own limit
+            raise RecipeError("the knowledge file is nested too deep to read")
         return cls(data["entries"])
 
     def lookup(self, question: str, limit: int = 3) -> List[Dict[str, Any]]:

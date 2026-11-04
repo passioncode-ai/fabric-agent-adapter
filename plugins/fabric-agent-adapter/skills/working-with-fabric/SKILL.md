@@ -119,7 +119,7 @@ A dispatched session skips the `com.list` sweep, Step 4 and Step 7: [on-demand s
 
 `com.status` (can the board be read, how many unread), then `com.list` (`unread: true` where listed); `com.read_ack`
 only what you actually read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when
-every participant needs it (DEC-0135); an older board refuses it: send a new message to the thread. Answer whatever waits on your Project this turn (its state now, the result later); a request is your next task. Ask another Project
+every participant needs it (DEC-0135); an older board refuses it: post a new thread message. Answer what waits on your Project this turn (state now, result later; leave a responder's request queued); a request is your next task. Ask another Project
 only through `com.submit`, addressed to its Project id (never a session or a folder), the same idempotency key on a
 retry. When nobody answers (no `active` responder, no live claim, no agent-sync lease, nothing
 `held`): a change small as the reference defines it goes into the owner's repository by its AGENTS.md and you reply
@@ -335,7 +335,7 @@ backs the file up first, refuses a file of another shape or one that changed sin
 it out again. Hermes/OpenCode/OpenClaw/Pi use their native plugin loaders, not Claude hook JSON.
 Hermes also needs `hermes plugins enable fabric-agent-adapter`; removal uses `hermes plugins disable fabric-agent-adapter`.
 Read [native host hooks](references/native-host-hooks.md) for exact paths, permission behavior and verification.
-Registration and a loaded hook do not prove live Fabric admission. Never edit those files by hand. Without the hook, put the preamble into the first prompt
+Registration and a loaded hook do not prove admission. Never edit those files by hand. Without the hook, put the preamble into the first prompt
 yourself: "Call `fabric_whoami` first; `com.status` and `com.list`, answering what waits this turn; `fabric_work_list`,
 then `fabric_work_claim`; `fabric_work_release` when you stop." Without an MCP client at all there is no way in: say so,
 and do the work without claiming Fabric saw it.

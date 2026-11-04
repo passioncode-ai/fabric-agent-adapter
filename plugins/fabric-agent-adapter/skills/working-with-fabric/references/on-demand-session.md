@@ -64,7 +64,8 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
 2. **Take the lease.** `observatory_handoff_accept {owner, idempotencyKey, handoffId, executor?, sessionId?}`:
    pass this session's own `sessionId` (the same one on a retry); `owner` is `agent:<name>` (the same one for every write below); `executor` narrows the hand-over to the account the
    launcher chose: pass the `{provider, accountRef}` the launcher's prompt names, or leave it out when it names none.
-   Reading the packet before the accept, as step 1 does, is harmless. Keep the `leaseId` it returns: only its holder writes the workflow's checkpoints, and the dispatcher
+   Reading the packet before the accept, as step 1 does, is harmless; a launcher's prompt that asks for the accept
+   first is followed just as well, as long as `fabric_whoami` stays the first Fabric call. Keep the `leaseId` it returns: only its holder writes the workflow's checkpoints, and the dispatcher
    never passes a lease any other way.
 3. **Take the request.** `com.status` once, for the epoch every idempotency key names and the slot's generation.
    `com.enroll` for the request's capability, then `com.claim {idempotency, capability, request}`, `com.accept`, and
@@ -80,10 +81,12 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
    accept answer's `pack`: they carry each key's `state` and `use`, and Observatory refuses them in a body.
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
-   stops the run. Work that cannot end by then gets a `com.reply` with its state (what is done, where it lies, what is
-   left) and `com.complete` `failed_known` with that reason, before `run-ends-at`: a launcher that stops a run sends
-   SIGTERM and kills it about 5 s later (Switchboard), too short to answer; the next run or the operator takes it
-   from there. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
+   stops the run. Work that cannot end by then is left for the next run, before `run-ends-at`: its state (what is
+   done, where it lies, what is left) goes into an `in_progress` checkpoint and, as a message on the request's thread,
+   through `com.submit` `kind: "message"` with no `replyTo` (a reply would answer the request); the request stays
+   accepted, never `failed_known`, which settles it for good (spec 3.6: the dispatch then ends finished). The next
+   run takes it over with `com.responder_replace` (below). A launcher that stops a run gives no time to answer:
+   Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
    a typed secret or a payment is the person's: name it in the answer rather than wait.
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
    `completed`, or `failed_known` with the reason.

@@ -395,7 +395,19 @@ class Hooks(Base):
 
     def test_work_that_outlasts_the_run_gets_its_state_and_fails_known(self):
         text = cli.dispatch_contract(FULL)
-        self.assertIn("work that cannot end by then gets a `com.reply` with its state", text)
+        self.assertIn("work that cannot end by then is left accepted", text)
+        self.assertIn("never `failed_known`", text, "failed_known settles the request for good (spec 3.6)")
+
+    def test_a_cleared_holder_is_told_not_to_accept_again(self):
+        # 0.63.0 seam reading 9: the accept was made under the id the /clear replaced
+        uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
+        cleared = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
+        self.run_hook("session-start", {"session_id": uuid, "cwd": str(self.repo), "source": "startup"}, extra_env=ENV)
+        done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
+                                extra_env=ENV)
+        text = self.context(done)
+        self.assertIn("never accept it again under the new id", text)
+        self.assertNotIn(cleared, text)
 
     def test_the_contract_names_this_sessions_id_for_the_accept(self):
         # 0.63.0 seam reading 7: Observatory asks a retry of the acceptance to send the same sessionId

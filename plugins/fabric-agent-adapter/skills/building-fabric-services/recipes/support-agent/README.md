@@ -103,7 +103,8 @@ on its page and opens one alert when `stale` turns true: the recipe has no page 
 ## Declaring the channel-agent standard
 
 An agent that answers people on a channel declares what it follows under
-`https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, in its `fabric-agent.json` or its
+`https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (the contract's proposed DEC-0150, not
+merged yet, so the key and the form may change), in its `fabric-agent.json` or its
 well-known `extensions` (the standard's 11 and 13.6; the doctrine: creating-fabric-agents
 [practices](../../../creating-fabric-agents/references/practices.md#agents-on-a-channel-people-write-to)).
 `channel-agent.example.json` is one project's declaration in the standard's round 4 form: a required member that is

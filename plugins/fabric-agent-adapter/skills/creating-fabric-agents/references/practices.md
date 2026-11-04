@@ -130,7 +130,8 @@ draft-and-check step owns.
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.
 - **The declaration lives under the extension key**
-  `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, one entry per project. A required
+  `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, one entry per project (the contract's
+  proposed DEC-0150, not merged yet; the key and the form may change when it is). A required
   member is never null: a member not there yet is `{"none": "not_yet", "until": "<date>"}`, one not used
   `{"none": "not_used"}`; `recommendation` appears only with `answered_signal: "none"`. Example: the recipe's
   `channel-agent.example.json`. `check_service.py` reads it once the contract publishes its schema.
