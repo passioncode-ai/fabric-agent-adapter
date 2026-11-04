@@ -151,7 +151,7 @@ this repository both obeys it and ships its service layer
   whose release got no answer stays for the next worker), reads the board's unread
   count (`com.status`) after a turn, and exits. A session rejoins at most once a minute: a turn within 60 s of its
   last successful rejoin stays in the spool for the next worker; the end of a session always starts one (FAA-53). UserPromptSubmit reads small files in that spool (the count) and takes the nudges a
-  turn's answer carried by renaming their file away (FAA-142); it calls nothing. Every one is silent in a session Fabric launched (except the exit contract in one started on a board request, and the
+  turn's answer carried by renaming their file away (FAA-142), except in a session started on a board request or inside its run, where it reads neither; it calls nothing. Every one is silent in a session Fabric launched (except the exit contract in one started on a board request, and the
   dashboard-kit notice says nothing in such a session); a launched session is remembered by a marker so the process walk
   runs once, and a walk that cannot read the processes spools nothing (FAA-68). Measured 2026-10-11 under a load average of about 220,
   with the feature absent: medians 282 / 271 / 329 ms for start / stop / end, of which 65 ms is Python's own start

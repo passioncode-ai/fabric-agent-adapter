@@ -347,10 +347,10 @@ in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder 
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
 touched (read in memory from the transcript's last 512 KB, which can hold a secret the session displayed; only tool names and path arguments are used, only host/owner/name sent; `FABRIC_SESSION_NO_REPOSITORIES=1` turns it off); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (or tagged `Fabric reminder: `; a turn
-`watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
+`watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where it may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched; one Fabric started on a board request gets its exit contract instead (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched; one started on a board request gets its exit contract, no unread line or reminder (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
 hooks](references/session-hooks.md): what they do, log and need, and how to turn them off.
 
 ## Completion format

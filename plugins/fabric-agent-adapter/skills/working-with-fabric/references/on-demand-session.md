@@ -2,7 +2,9 @@
 
 When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
 project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
-does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person.
+does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person. The
+dispatcher is in no Fabric release yet (its wave 1 is off by default); the hooks recognise a dispatched session from
+adapter 0.63.0 on, so a launcher can start one today.
 
 ## Contents
 
@@ -78,7 +80,8 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
    accept answer's `pack`: they carry each key's `state` and `use`, and Observatory refuses them in a body.
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
-   stops the run. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
+   stops the run. Work that cannot end by then gets a `com.reply` with its state (what is done, where it lies, what is
+   left) and `com.complete` `failed_known` with that reason; the next run or the operator takes it from there. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
    a typed secret or a payment is the person's: name it in the answer rather than wait.
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
    `completed`, or `failed_known` with the reason.

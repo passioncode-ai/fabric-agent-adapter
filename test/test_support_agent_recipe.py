@@ -624,6 +624,13 @@ class Recipe(unittest.TestCase):
         path.write_text(json.dumps({"entries": entries}))
         os.utime(path, (1000.0, 1000.0))
         self.assertEqual(len(source.current().entries), 1, "the size changed at the same time")
+        same = json.loads(path.read_text())
+        same["entries"][0]["answer"] = same["entries"][0]["answer"][:-1] + "!"  # the same size, the same time
+        fresh = path.with_name("fresh.json")
+        fresh.write_text(json.dumps(same))
+        os.utime(fresh, (1000.0, 1000.0))
+        os.replace(fresh, path)  # a new inode: what a build that replaces the file leaves
+        self.assertTrue(next(iter(source.current().entries.values()))["answer"].endswith("!"))
         path.write_text("[]oops")
         os.utime(path, (1000.0, 1000.0))
         with mock.patch.object(sa.Knowledge, "load", wraps=sa.Knowledge.load) as load:

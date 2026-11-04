@@ -134,7 +134,7 @@ class Hooks(Base):
         (self.repo / "fabric-agent.json").write_text("{}")
         done, elapsed = self.start(ENV)
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(self.context(done), cli.dispatch_contract(FULL))
+        self.assertEqual(self.context(done), cli.dispatch_contract(FULL, session_id=SID))
         self.assertNotEqual(self.context(done), fs.PREAMBLE.format(host="Claude Code"))
         self.assertLess(elapsed, 2.0)
 
@@ -144,7 +144,7 @@ class Hooks(Base):
         (self.repo / "fabric-agent.json").write_text("{}")
         sb = {"FABRIC_DISPATCH_WORKFLOW": WF, "SWITCHBOARD_LAUNCH_ID": "launch-1"}
         done, _ = self.start(sb)
-        self.assertEqual(self.context(done), cli.dispatch_contract({"workflow": WF}))
+        self.assertEqual(self.context(done), cli.dispatch_contract({"workflow": WF}, session_id=SID))
         self.assertNotIn("fabric_work_claim", self.context(done))
         context = self.context(self.prompt(sb, LINE)[0])
         self.assertIn(HANDOFF, context, "the line adds the handoff the environment left out")
@@ -372,6 +372,30 @@ class Hooks(Base):
         self.assertIn(HANDOFF, text, "the line added the handoff: the contract again")
         self.assertNotIn("unread on the project board", text)
         self.assertIsNone(cli.hook_user_prompt_submit({"session_id": SID, "prompt": "go on"}, env))
+        # nor nudges, and the nudges file stays where it is; a session inside the run is the same (seam reading 8)
+        nudges = folder / fs.NUDGES_FILE
+        nudges.write_text(json.dumps(["claim your task"]))
+        self.assertIsNone(cli.hook_user_prompt_submit({"session_id": SID, "prompt": "go on"}, env))
+        self.assertTrue(nudges.exists())
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        inner = cli.session_dir(other, env)
+        inner.mkdir(parents=True, exist_ok=True)
+        (inner / "board.json").write_text(json.dumps({"unread": 5}))
+        self.assertIsNone(cli.hook_user_prompt_submit({"session_id": other, "prompt": "go on"}, env))
+
+    def test_session_start_names_a_uuid_session_id_and_no_other(self):
+        # 0.63.0 seam reading 8: Observatory takes a sessionId only as a lowercase UUID
+        uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
+        self.assertIn("This session's sessionId: %s." % uuid, cli.dispatch_contract(FULL, session_id=uuid))
+        self.assertNotIn("This session's sessionId", cli.dispatch_contract(FULL, session_id="s-aaa"))
+        self.assertLess(len(cli.dispatch_contract({"workflow": WF}, ["handoff", "request"], uuid)), 4000)
+        done, _ = self.run_hook("session-start", {"session_id": uuid, "cwd": str(self.repo), "source": "startup"},
+                                extra_env=ENV)
+        self.assertIn(uuid, self.context(done))
+
+    def test_work_that_outlasts_the_run_gets_its_state_and_fails_known(self):
+        text = cli.dispatch_contract(FULL)
+        self.assertIn("work that cannot end by then gets a `com.reply` with its state", text)
 
     def test_the_contract_names_this_sessions_id_for_the_accept(self):
         # 0.63.0 seam reading 7: Observatory asks a retry of the acceptance to send the same sessionId

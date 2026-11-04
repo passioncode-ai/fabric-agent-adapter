@@ -140,7 +140,7 @@
       "expected": [
         "runs fabric_session.py install-host-hooks --host codex in its default dry-run and shows the exact edit",
         "applies it with --apply only after the person agrees; the file is backed up first and a changed shape is refused",
-        "says the Codex and Kimi hooks only print the preamble (no turn observation, no unread count) and that Codex may ask to trust the new hook"
+        "says the Codex and Kimi hooks only print the preamble (or, in a session started on a board request, the exit contract, writing a dispatch record) (no turn observation, no unread count) and that Codex may ask to trust the new hook"
       ]
     },
     {
@@ -510,7 +510,7 @@
       "request": "FABRIC_DISPATCH_WORKFLOW is set and your prompt starts with `fabric-dispatch/1 workflow=wf_0123456789abcdef handoff=handoff:0123456789abcdef request=262ff4f7-6ba0-4a84-9704-cf830ace244d`. What do you do?",
       "expected": [
         "calls fabric_whoami first, then reads the packet with observatory_checkpoint_latest for that workflow and obeys its constraints first; reads the request with com.get {message} and its thread with com.list {thread}, since the packet carries references only",
-        "takes the lease with observatory_handoff_accept on that handoff (its owner and an idempotencyKey, and executor only when the launcher's prompt names one) and keeps the leaseId",
+        "takes the lease with observatory_handoff_accept on that handoff (its owner and an idempotencyKey, and executor only when the launcher's prompt names one) and keeps the leaseId, with this session's own sessionId (the same on a retry)",
         "claims and accepts the named request (com.enroll for its capability, com.claim, com.accept, com.effect_begin before an effect), renews about every 20 s in a long step, answers with com.reply and completes it with com.complete and an observed outcome",
         "never waits for a person inside the run: a sign-in, a typed secret or a payment is named in the answer, and money, deletion and publication still go through fabric_effect_request",
         "writes in_progress checkpoints after the lease, the claim and the reply, each repeating the packet's goal, constraints, artifacts and credentials unchanged; the closing one with workflowId, the lease and close true, the packet's body with done and notes added and no values: done for completed; for failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes; then ends the run",

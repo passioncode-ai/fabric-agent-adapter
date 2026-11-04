@@ -69,7 +69,7 @@ PREAMBLE = (
     "Call `fabric_whoami` first. Then read the project board: `com.status` (is it ready, how many unread), "
     "`com.list` for the messages, and `com.read_ack` only for what you actually read. A request, announcement or "
     "question waiting on your Project gets an answer in the same turn: its state now (done, where, when, what "
-    "blocks), the result later in a second message. "
+    "blocks), the result later in a second message; a request a responder should take stays queued. "
     "Before you start work, call `fabric_work_list` (who is working on what here) and "
     "claim your task with `fabric_work_claim`; release it with `fabric_work_release` when you stop. A Fabric older "
     "than v0.3.5 has `fabric_tasks_list`, `fabric_task_claim` and `fabric_task_release` instead. Link a backlog row "
@@ -134,7 +134,8 @@ DISPATCH_CONTRACT = (
     "`leaseId`). Every checkpoint you write repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
-    "and finish before run-ends-at. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
+    "and finish before run-ends-at; work that cannot end by then gets a `com.reply` with its state and `com.complete` "
+    "failed_known with the reason. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
@@ -194,9 +195,16 @@ def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Opti
     return dict(line, **told), mismatch
 
 
-def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = ()) -> str:
+#: Observatory takes a sessionId only as a lowercase UUID (0.63.0 seam reading 8): one the hook was given is named.
+_SESSION_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+DISPATCH_SESSION = " This session's sessionId: {session}."
+
+
+def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
     values = {field: dispatch.get(field) or _UNKNOWN[field] for field in ("handoff", "request")}
-    return DISPATCH_CONTRACT.format(workflow=dispatch["workflow"], **values) + (
+    told = DISPATCH_SESSION.format(session=session_id) if isinstance(session_id, str) and _SESSION_UUID.fullmatch(
+        session_id) else ""
+    return DISPATCH_CONTRACT.format(workflow=dispatch["workflow"], **values) + told + (
         DISPATCH_MISMATCH.format(fields=", ".join(mismatch)) if mismatch else "")
 
 
@@ -288,7 +296,7 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
         prune_dispatch_records(env)  # Codex and Kimi have no turn or end hook to do it; the spools stay theirs
         if not dispatch_holder(dispatch, payload.get("session_id"), env, take_over=payload.get("source") == "clear"):
             return _host_output(host, "SessionStart", DISPATCH_NESTED.format(workflow=dispatch["workflow"]))
-        return _host_output(host, "SessionStart", dispatch_contract(dispatch))
+        return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id=payload.get("session_id")))
     if fabric_launched(env):
         return None
     cwd = Path(payload.get("cwd") or os.getcwd())
@@ -344,7 +352,7 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
         return None
     told = dispatch_from_env(env)
     dispatch, mismatch = dispatch_of(env, payload.get("prompt"))
-    lines = [dispatch_contract(dispatch, mismatch)] if dispatch is not None and (dispatch != told or mismatch) else []
+    lines = [dispatch_contract(dispatch, mismatch, session_id)] if dispatch is not None and (dispatch != told or mismatch) else []
     if lines and not dispatch_holder(told, session_id, env):
         lines = []  # a session inside the run was told at its start that the run holds the dispatch
     if fabric_launched(env) or told is not None:  # a dispatched run answers its one request: no unread line, no nudges
