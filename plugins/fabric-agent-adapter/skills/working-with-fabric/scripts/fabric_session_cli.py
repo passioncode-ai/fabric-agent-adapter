@@ -135,7 +135,7 @@ DISPATCH_CONTRACT = (
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
     "and finish before run-ends-at; work that cannot end by then gives its state as a `com.progress` note on the "
-    "thread, then: when the request's deadline is not after run-ends-at, `com.complete` failed_known saying so and steps 6 and 7; "
+    "thread, then: when the request's deadline is not after run-ends-at plus 5 minutes (no run starts closer to it), `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "

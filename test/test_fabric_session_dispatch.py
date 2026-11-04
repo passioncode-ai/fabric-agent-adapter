@@ -397,7 +397,8 @@ class Hooks(Base):
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
         self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")
-        self.assertIn("when the request's deadline is not after run-ends-at, `com.complete` failed_known", text,
+        self.assertIn("when the request's deadline is not after run-ends-at plus 5 minutes (no run starts closer to it), "
+                      "`com.complete` failed_known", text,
                       "no run comes after the deadline (0.63.0 product reading 12)")
 
     def test_the_prompt_hooks_contract_names_the_session_id(self):

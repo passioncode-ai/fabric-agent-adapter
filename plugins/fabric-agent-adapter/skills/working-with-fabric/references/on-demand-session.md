@@ -84,9 +84,11 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    stops the run. Work that cannot end by then gives its state (what is done, where it lies, what is left), before
    `run-ends-at`, as the note of a `com.progress` on the request's thread (the slot holder's state, DEC-0152 SA-6,
    proposed). Then:
-   - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at`, the deadline cut the
-     run, no run comes after the deadline and the board holds an accepted request past it: `com.complete` `failed_known` saying the
-     deadline came first, and steps 6 and 7;
+   - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 5 minutes, no
+     run comes before the deadline (Fabric starts none with less than 5 minutes left: 120 s of silence, a 60 s cycle
+     and the launch) and an accepted request does not expire by itself: `com.complete` `failed_known` saying the
+     deadline came first, and steps 6 and 7 (Fabric's word on thread `b3e60686`, 2026-11-04; a request whose deadline
+     passed unsettled goes to «На проверке» with its workflow closed `blocked`);
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
