@@ -663,6 +663,16 @@ class InputActionTests(unittest.TestCase):
                 self.assertEqual(answer["error"]["code"], -32602, responses)
                 self.assertEqual(jobs.answer(job_id, responses), {})
             self.assertEqual(jobs.get(job_id)["status"], "input_required")
+            self.assertEqual(server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+                "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": []}}})["error"]["code"], -32602)
+        path = next(Path(self.temp.name).rglob("%s.json" % job_id))  # a hand-edited file: requests that are no object
+        for asked in (["pick"], "pick-x", None, 7):
+            record = json.loads(path.read_text())
+            record["job"]["inputRequests"] = asked
+            path.write_text(json.dumps(record))
+            self.assertEqual(jobs.answer(job_id, {"pick": {"action": "accept"}, "ick": {"action": "accept"}}), {}, asked)
+        with self.assertRaises(fi.InteropError):  # requests that are no object are refused, never kept
+            jobs.request_input(job_id, [fi.choice_request("Which?", "choice", [("a", "A")])])
 
     def test_off_by_default_the_answer_is_taken_as_before(self):
         server, jobs, job_id = self.start()

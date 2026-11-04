@@ -275,7 +275,7 @@ export class JobStore {
       if (!EFFECT_CLASSES.includes(kept[key].effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
     }
     const entries = Object.entries(inputRequests ?? {});
-    if (!entries.length) throw new InteropError('input_required needs at least one input request.');
+    if (!entries.length || Array.isArray(inputRequests) || typeof inputRequests !== 'object') throw new InteropError('input_required needs at least one input request.'); // a JSON object of requests (unit 38)
     for (const [key, request] of entries) if (!KEY.test(key) || request?.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
     const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
     if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);

@@ -395,6 +395,12 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
     fs.writeFileSync(file, JSON.stringify(record));
     assert.deepEqual(store.answer(job.id, { length: { action: 'accept', content: {} }, 0: { action: 'accept', content: {} } }), {});
   }
+  // A job asking key '0' answered with an array or a string answers nothing (unit reading 38).
+  const { job: zero } = store.create('reviews.approve', {}, { traceparent: PARENT });
+  store.requestInput(zero.id, { 0: request }, 'Publish it?');
+  for (const responses of [[{ action: 'accept', content: {} }], 'a']) assert.deepEqual(store.answer(zero.id, responses), {});
+  assert.equal(store.get(zero.id).status, 'input_required');
+  assert.throws(() => store.requestInput(zero.id, [request], 'x'), i.InteropError); // requests that are no object are refused
   assert.equal(store.get(job.id).status, 'input_required');
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);

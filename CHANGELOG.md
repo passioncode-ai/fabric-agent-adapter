@@ -65,8 +65,13 @@ says that his approval holds for the whole task, at every link (FAA-195).
   keyed by an inherited name (`constructor`, `toString`) as an asked question and cleared the real one; it matches an
   own key only, as Python does (older than 0.61.0; 0.61.0 seam reading 36). Both stores' `answer` match nothing when
   the answer's `inputResponses` or the job's `inputRequests` is not a plain object (a hand-edited file, an array), and
-  McpToolServer answers a `fabric.job.get` whose `inputResponses` is not a JSON object with `-32602`, where it raised
-  out of `handle()` and the transport sent no reply (older than 0.61.0; 0.61.0 seam and unit readings 37). The same split held for an
+  McpToolServer answers a `fabric.job.get` whose `inputResponses` is present and not a JSON object with `-32602`:
+  0.60.0 raised out of `handle()` for a non-empty one on a job waiting `input_required` (the transport sent no reply)
+  and read an empty list or string, `0`, `false`, or any non-object on another job or an unknown id, as no answer or
+  `unknown-job` (a client that writes an empty map as `[]` now gets `-32602`). Both stores' `request_input` /
+  `requestInput` refuse requests that are not a JSON object with `InteropError` (Python raised `AttributeError`, Node
+  kept an array no answer could then match), and McpToolServer's answer gate reads only an object of requests (older
+  than 0.61.0; 0.61.0 seam and unit readings 37 and 38). The same split held for an
   effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
   file wrote as a plain string the answer covered; `job_step` (when a mandate travelled), `request_input(steps=)` and
   `add_tool` (with an action) now admit an effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),
@@ -118,11 +123,12 @@ says that his approval holds for the whole task, at every link (FAA-195).
   a `String` object project (under a mandate limited to projects) or a `Number` object spend (under a `perCallMaxUsd`)
   is likewise asked at the answer: pass the primitive value.
 - A kept step holds only `effect`, `spendUsd` and `project`, read as the step's accessors answer them (Node property
-  access, Python `.get`), where 0.60.0 kept the step's JSON form (Node `JSON.stringify`, Python the dict's storage): a
+  access, Python `.get`), where 0.60.0 kept the step's JSON form (Node `JSON.stringify`, Python `json.dumps`, which reads a
+  `dict` subclass through its `items()`): a
   service that put its own keys in `steps=` keeps them elsewhere. The two differ for a Node step that is a function
   (0.60.0 kept no step), an array, an object whose members are inherited (a class's getters included) or not
-  enumerable, or one with its own `toJSON`, and for a Python `dict` subclass whose `.get` answers otherwise than its
-  storage: such a step is now kept as its accessors answer, and an accessor that throws for the spend or the project,
+  enumerable, or one with its own `toJSON`, and for a Python `dict` subclass whose `.get` or `items()` answers otherwise
+  than its storage: such a step is now kept as its accessors answer, and an accessor that throws for the spend or the project,
   which 0.60.0 never called, now throws from `requestInput` / `request_input` (the job stays `working`).
 - A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it: a `str`-subclass
   project or effect, or a Node `String` or `Number` object, as its plain value, and the step kinds above in their JSON

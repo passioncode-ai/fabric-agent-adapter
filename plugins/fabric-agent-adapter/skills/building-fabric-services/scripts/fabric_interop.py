@@ -402,7 +402,7 @@ class JobStore:
             kept[key] = kept_step(step) if key in (input_requests or {}) and isinstance(step, dict) else {}
             if not (type(kept[key].get("effect")) is str and kept[key]["effect"] in EFFECT_CLASSES):
                 raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
-        if not input_requests:
+        if not isinstance(input_requests, dict) or not input_requests:  # a JSON object of requests (unit reading 38)
             raise InteropError("input_required needs at least one input request.")
         for key, request in input_requests.items():
             if not _KEY.match(key) or request.get("method") != "elicitation/create":
@@ -806,7 +806,7 @@ class McpToolServer:
         job_id = str(arguments.get("id", ""))
         job = self.jobs.get(job_id)
         steps = self.jobs.private(job_id).get("steps") or {}
-        asked = job.get("inputRequests", {}) if job["status"] == "input_required" else {}
+        asked = job.get("inputRequests") if job["status"] == "input_required" and isinstance(job.get("inputRequests"), dict) else {}
         records: Dict[str, Any] = {}
         for key, value in arguments["inputResponses"].items():
             if key not in asked or not isinstance(value, dict) or value.get("action") not in ("accept", "decline", "cancel"):
