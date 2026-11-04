@@ -467,8 +467,10 @@ class Recipe(unittest.TestCase):
         with self.assertRaises(sa.RecipeError):
             agent.answer("m-1-r2", "How do I reset my password?", repair=second)  # one repair, then a person
 
-    def test_a_repair_that_hands_off_for_another_reason_is_no_fallback(self):
-        for said, reasons in (("HANDOFF", ["model-unsure"]), (None, ["model:failed"])):
+    def test_a_repair_the_model_declines_spends_it_and_an_outage_does_not(self):
+        # 0.63.0 unit r4: a repair that ends in HANDOFF is marked, so its one repair shows as spent; model:* is
+        # infrastructure, not a refusal of the draft
+        for said, reasons, fallback in (("HANDOFF", ["model-unsure"], True), (None, ["model:failed"], None)):
             with self.subTest(reasons=reasons):
                 shutil.rmtree(self.dir, ignore_errors=True)
                 model = model_says("Open Settings.", *([said] if said else [None, None]))
@@ -476,7 +478,13 @@ class Recipe(unittest.TestCase):
                 first = agent.answer("m-1", "How do I reset my password?")
                 second = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
                 self.assertEqual((second["action"], second["reasons"]), ("handoff", reasons))
-                self.assertNotIn("fallback", second)
+                self.assertEqual(second.get("fallback"), fallback)
+
+    def test_a_tag_that_is_not_text_is_refused(self):
+        example = json.loads((RECIPE / "knowledge.example.json").read_text())
+        for tags in ([1], "refund", None):
+            with self.subTest(tags=tags), self.assertRaises(sa.RecipeError):
+                sa.Knowledge([dict(example["entries"][0], tags=tags)])
 
     def test_only_a_refused_draft_is_repaired(self):
         agent, _ = self.agent(model_says("unused"))
@@ -613,6 +621,22 @@ class Recipe(unittest.TestCase):
                 (self.dir / "config.json").write_text(json.dumps(config))
                 with self.assertRaises(sa.RecipeError):
                     sa.from_config(self.dir / "config.json")
+
+    def test_a_refused_file_says_what_to_fix_with_a_maximum_age_too(self):
+        # 0.63.0 product reading 4: the source path said "could not be read" and hid which entry was refused
+        entries = json.loads((RECIPE / "knowledge.example.json").read_text())["entries"]
+        entries[0]["tags"] = None
+        (self.dir / "k.json").write_text(json.dumps({"entries": entries}))
+        config = json.loads((RECIPE / "config.example.json").read_text())
+        for age in (3600, None):
+            with self.subTest(age=age):
+                config.update(knowledge=str(self.dir / "k.json"), stateDir=str(self.dir / "state"),
+                              knowledgeMaxAgeSeconds=age)
+                (self.dir / "config.json").write_text(json.dumps(config))
+                with self.assertRaises(sa.RecipeError) as raised:
+                    sa.from_config(self.dir / "config.json")
+                self.assertIn(entries[0]["id"], str(raised.exception))
+                self.assertNotIn("could not be read", str(raised.exception))
 
     def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
         config = json.loads((RECIPE / "config.example.json").read_text())

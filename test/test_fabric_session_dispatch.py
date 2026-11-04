@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 import unittest
 from pathlib import Path
 
@@ -86,19 +87,26 @@ class Parsing(unittest.TestCase):
         text = cli.dispatch_contract(FULL)
         step6 = text[text.index(" 6. "):text.index(" 7. ")]
         self.assertIn("`workflowId` %s" % WF, step6)
-        for word in ("`com.get` {message: <request>}", "`com.list` {thread: <board-thread>}", "`com.status`",
+        for word in ("`com.get` {message: <request>}", "`com.list` {thread: <the `thread` com.get answered>}", "`com.status`",
                      "expectedGeneration", "in_progress checkpoint", "the launcher's prompt names"):
             self.assertIn(word, text)
         self.assertNotIn("earlier checkpoints", text, "Observatory has no tool that reads them")
-        for word in ("repeats the packet's `goal`, `constraints`, `artifacts` and `credentials`", "its goal names the request",
-                     "the packet's body with `done` and `notes` added"):
+        for word in ("repeats `goal`, `constraints`, `artifacts` and `credentials` of `checkpoint.body`",
+                     "its goal describes the request", "the packet's body with `done` and `notes` added"):
             self.assertIn(word, text, "Observatory keeps only the latest body (0.63.0 readings 3)")
+        # 0.63.0 seam reading 4: Observatory's write redacts board-request:, board-thread: and fabric-project: refs,
+        # and refuses the decorated credentials of the top-level answer or the accept's pack
+        self.assertNotIn("<board-thread>", text)
+        self.assertNotIn("its goal names the request", text)
+        self.assertIn("never its top-level `credentials` or the accept answer's `pack`", text)
 
     def test_the_contract_points_at_the_packet_for_what_the_environment_left_out(self):
         text = cli.dispatch_contract({"workflow": WF})
         self.assertIn(WF, text)
         self.assertIn("the handoff the packet names", text)
-        self.assertIn("the request the packet names", text)
+        self.assertIn("the request the launcher's prompt names", text)
+        self.assertIn("close the workflow blocked saying so", text)
+        self.assertNotIn("board-request:", text, "Observatory's write redacts it")
 
     def test_the_statuses_the_contract_names_are_observatorys(self):
         # Observatory's checkpoint_write takes in_progress, done and blocked today; failed arrives with OBS-323
@@ -221,6 +229,44 @@ class Hooks(Base):
                                 extra_env=again)
         self.assertIn("observatory_handoff_accept", self.context(done), "a new dispatch is a new holder")
 
+    def test_a_clear_moves_the_record_only_in_the_holders_process(self):
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        nested, nested2, cleared = ("4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", "5d2e3f40-1b2c-4d6e-9fa0-123456789abc",
+                                    "6e3f4051-2c3d-4e7f-8a0b-23456789abcd")
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            self.assertTrue(cli.dispatch_holder(FULL, SID, env))
+        with mock.patch.object(cli.os, "getppid", return_value=222):
+            self.assertFalse(cli.dispatch_holder(FULL, nested, env))
+            self.assertFalse(cli.dispatch_holder(FULL, nested2, env, take_over=True), "a nested session's /clear")
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            self.assertTrue(cli.dispatch_holder(FULL, cleared, env, take_over=True), "the holder's /clear")
+            self.assertTrue(cli.dispatch_holder(FULL, cleared, env), "the record moved: the cleared session holds it")
+            self.assertFalse(cli.dispatch_holder(FULL, SID, env))
+
+    def test_a_malformed_dispatch_id_falls_back_to_the_launch_id(self):
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        for bad in ("a/b", "x" * 65, "a:b"):  # Switchboard's --dispatch-id form, [A-Za-z0-9._-]{1,64}
+            with self.subTest(bad=bad[:5]):
+                env = dict(self.env, **ENV)
+                env["FABRIC_DISPATCH_ID"] = bad
+                self.assertTrue(cli.dispatch_holder(FULL, SID, dict(env, SWITCHBOARD_LAUNCH_ID="l-%d" % len(bad))))
+                self.assertTrue(cli.dispatch_holder(FULL, other, dict(env, SWITCHBOARD_LAUNCH_ID="l2-%d" % len(bad))),
+                                "another launch id is another holder")
+
+    def test_a_cut_short_write_leaves_no_temporary_file_past_the_prune(self):
+        from unittest import mock
+        import time
+        env = dict(self.env, **ENV)
+        cli.dispatch_holder(FULL, SID, env)
+        env_module = importlib.import_module("fabric_session_env")
+        with mock.patch.object(env_module.os, "replace", side_effect=OSError(28, "No space left on device")):
+            cli.dispatch_holder(FULL, "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", env, take_over=True)
+        folder = cli.state_root(env=env) / "dispatch"
+        self.assertTrue(list(folder.glob(".*.tmp")), "the cut-short write left its temporary file")
+        fs.prune_stale_sessions(env=env, now=time.time() + fs.SESSION_STALE_S + 60)
+        self.assertEqual(list(folder.glob(".*.tmp")), [])
+
     def test_the_holder_fails_open(self):
         from unittest import mock
         env = dict(self.env, **ENV)
@@ -250,6 +296,17 @@ class Hooks(Base):
         fs.prune_stale_sessions(env=env, now=time.time())
         self.assertEqual(list(folder.glob("*.json")), [fresh])
 
+    def test_a_session_start_on_a_request_prunes_old_records(self):
+        # 0.63.0 product reading 4: a machine where only Codex or Kimi run dispatched sessions has no turn or end hook
+        import os
+        env = dict(self.env, **ENV)
+        cli.dispatch_holder(dict(FULL, handoff="handoff:ffffffffffffffff"), SID, env)
+        old = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
+        os.utime(old, (1, 1))
+        self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
+                      extra_env=ENV, args=("--host", "codex"))
+        self.assertFalse(old.exists())
+
     def test_a_clear_in_the_holder_keeps_the_contract(self):
         # 0.63.0 seam r3: /clear gives the same run a new session id; a nested claude -p starts with `startup`
         cleared, nested = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", "5d2e3f40-1b2c-4d6e-9fa0-123456789abc"
@@ -260,6 +317,14 @@ class Hooks(Base):
         done, _ = self.run_hook("session-start", {"session_id": nested, "cwd": str(self.repo), "source": "startup"},
                                 extra_env=ENV)
         self.assertEqual(self.context(done), cli.DISPATCH_NESTED.format(workflow=WF))
+
+    def test_the_reference_says_a_codex_run_needs_the_hook_trusted(self):
+        # 0.63.0 seam reading 4: Codex runs a hooks.json hook only when the home's config.toml trusts it, and
+        # Switchboard links hooks.json, not config.toml, into its isolated homes
+        text = (Path(cli.__file__).resolve().parents[1] / "references" / "on-demand-session.md").read_text()
+        flat = " ".join(text.split())
+        self.assertIn("that run's `CODEX_HOME` trusts it", flat)
+        self.assertNotRegex(flat, r"Switchboard 0\.7\.8 on|from 0\.7\.8 on", "no Switchboard release says so yet")
 
     def test_one_workflow_pattern_for_every_reader(self):
         dashboard_kit = (Path(cli.__file__).resolve().parents[2] / "building-fabric-services/scripts/dashboard_kit.py")

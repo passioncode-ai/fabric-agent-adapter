@@ -199,6 +199,8 @@ class KnowledgeSource:
             knowledge = Knowledge.load(self.path)
         except (OSError, ValueError, RecursionError, RecipeError) as err:  # RecursionError: JSON nested too deep
             if self._knowledge is None:
+                if isinstance(err, RecipeError):  # read, and refused: its message names the entry (ids are safe text)
+                    raise
                 raise RecipeError("the knowledge file %s could not be read (%s)" % (self.path.name,
                                                                                    err.__class__.__name__))
             self._seen, self._degraded = seen, True
@@ -512,7 +514,8 @@ class SupportAgent:
         knowledge = self.knowledge.current() if isinstance(self.knowledge, KnowledgeSource) else self.knowledge
         entries = knowledge.lookup(text, self.lookup_limit)
         if not entries:
-            return dict(base, action="handoff", reasons=["no-knowledge"])
+            gone = dict(base, action="handoff", reasons=["no-knowledge"])
+            return dict(gone, fallback=True) if repair is not None else gone
         messages = build_messages(text, entries)
         if repair is not None:
             messages += [{"role": "assistant", "content": repair["draft"]},
@@ -524,7 +527,8 @@ class SupportAgent:
             return dict(base, action="handoff", reasons=["model:" + err.kind])
         base["costUsd"] = got["receipt"].get("costUsd")
         if got["content"].strip() == "HANDOFF":
-            return dict(base, action="handoff", reasons=["model-unsure"])
+            unsure = dict(base, action="handoff", reasons=["model-unsure"])
+            return dict(unsure, fallback=True) if repair is not None else unsure  # the repair was spent
         checked = check_reply(got["content"], text, [e["id"] for e in entries], max_chars=self.max_chars,
                               sources={e["id"]: entry_text(e) for e in entries})
         if not checked["ok"]:

@@ -598,7 +598,8 @@ def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[flo
         except OSError:
             continue
     try:  # FAA-201: the dispatch records (which session holds a dispatch) go stale the same way
-        records = list((state_root(env=env) / "dispatch").glob("*.json"))
+        folder = state_root(env=env) / "dispatch"
+        records = list(folder.glob("*.json")) + list(folder.glob(".*.tmp"))  # a write a full disk cut short
     except OSError:
         records = []
     for record in records:

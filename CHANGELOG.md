@@ -6,7 +6,8 @@
 
 - working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `1329b60f`).
   `FABRIC_DISPATCH_WORKFLOW` tells it, with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST` (Switchboard's
-  `dispatch` sets all three from 0.7.8, board thread `b3e60686`) or alone (an earlier launcher); the prompt's first line `fabric-dispatch/1
+  `dispatch` sets all three, SB-247 on its main at `7ac2a5b`, not yet released, board thread `b3e60686`) or alone (an
+  earlier launcher); the prompt's first line `fabric-dispatch/1
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
   never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
   exit contract in place of the preamble, also in a session Fabric launched: `fabric_whoami`, the packet
@@ -18,9 +19,12 @@
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it. Only the
   run's first session holds the dispatch: a session the run starts itself inherits the environment and gets one line
   telling it not to accept, claim, complete or close (the dispatch is told by its `FABRIC_DISPATCH_ID` when the
-  launcher sets one), and a `/clear` in the holding session keeps the contract (the
-  hooks keep one record per run under `dispatch/`, pruned after 7 days). Every checkpoint the session writes repeats
-  the packet's goal, constraints, artifacts and credentials, since Observatory keeps only the latest body.
+  launcher sets one in the form `[A-Za-z0-9._-]{1,64}`, as Switchboard's PR #379 plans for its 0.7.8), and a `/clear` in the holding session keeps the contract (the
+  hooks keep one record per run under `dispatch/`, pruned after 7 days by the Claude Code turn and end hooks and by the next session start on a board request). Every
+  checkpoint the session writes repeats the goal, constraints, artifacts and credentials of the packet's
+  `checkpoint.body`, since Observatory keeps only the latest body; the session takes the request from the environment
+  or the first line and its thread from `com.get`, since Observatory's write redacts the packet's board references. A
+  Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes do not yet).
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.
 - The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
@@ -43,9 +47,12 @@
 
 ### Upgrading
 
-- A recopied `support_agent.py` refuses a knowledge file that is not an object with an `entries` list, or an entry
-  whose `tags` is not a list of text or whose `question` is not text: the agent stops at start (exit 1), where 0.62.0
-  handed every message off as `no-knowledge`. Fix the file.
+- A recopied `support_agent.py` refuses at start (exit 1, a `RecipeError` naming the entry) a knowledge file 0.62.0
+  took in other ways, so an agent that ran on 0.62.0 can stop at start now. Per shape, 0.62.0: a file that is not an
+  object with an `entries` list (`[]`, `{}`, a string) loaded as an empty set and handed every message off as
+  `no-knowledge`; `{"entries": null}` or a number stopped it at start with a `TypeError`; an entry with `tags: null`
+  failed each message with a `TypeError`; an entry whose `tags` is a string or holds something other than text, or
+  whose `question` is not text, was read and answered from. Fix the file before upgrading.
 - A custom `on_handoff` that stores the row it is given now receives the refused `draft`, which can echo what the
   customer wrote: drop `draft` before storing it (the default outbox does).
 - A session carrying `FABRIC_DISPATCH_WORKFLOW` now gets the exit contract at session start even when Fabric launched

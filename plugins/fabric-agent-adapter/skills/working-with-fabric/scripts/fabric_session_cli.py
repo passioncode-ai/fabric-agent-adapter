@@ -102,21 +102,24 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 #: environment names the workflow, the handoff and the request; the prompt's first line `fabric-dispatch/1
 #: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order) names them too,
 #: and the environment wins. FABRIC_DISPATCH_WORKFLOW alone is enough to tell the session: a launcher that sets only it
-#: (Switchboard before 0.7.8) leaves the handoff and the request to the packet. A line with no workflow in the
+#: (one older than Switchboard's 7ac2a5b) leaves the handoff and the request to the packet. A line with no workflow in the
 #: environment is quoted text, never a dispatch.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
 _DISPATCH_VALUE = {"workflow": DISPATCH_WORKFLOW, "handoff": r"handoff:[A-Za-z0-9._:-]{1,120}",
                    "request": r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"}
+#: Fabric's dispatch id, a UUID, within the form Switchboard's `--dispatch-id` takes (board thread b3e60686): a value
+#: outside it keys nothing, and the holder falls back to the workflow, the handoff and the launcher's run id.
+DISPATCH_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 DISPATCH_LINE = re.compile(r"fabric-dispatch/1 workflow=(%(workflow)s) handoff=(%(handoff)s) request=(%(request)s)"
                            % _DISPATCH_VALUE)
 DISPATCH_CONTRACT = (
     "[fabric-agent-adapter] Fabric started this session on one board request ({request}; workflow {workflow}). Do that "
     "request and end: nobody watches this run, so never wait for a person. 1. `fabric_whoami`, then read the packet "
-    "with `observatory_checkpoint_latest` {{workflowId: {workflow}}}: obey its constraints first; its goal names the "
-    "request; its artifacts are "
-    "references (the request, the thread, the capability, the project, the deadline, run-ends-at). Read the request with "
-    "`com.get` {{message: <request>}} and its thread with `com.list` {{thread: <board-thread>}}. 2. "
+    "with `observatory_checkpoint_latest` {{workflowId: {workflow}}}: obey its constraints first; its goal describes "
+    "the request; its artifacts are references (the capability, the deadline, run-ends-at; Observatory's write redacts "
+    "the board ones). Read the request with `com.get` {{message: <request>}} and its thread with `com.list` "
+    "{{thread: <the `thread` com.get answered>}}. 2. "
     "`observatory_handoff_accept` with {handoff}, your `owner` (`agent:<name>`), an `idempotencyKey` and the `executor` "
     "the launcher's prompt names, if any, takes the workflow's lease; keep the `leaseId`. 3. `com.status` once for the "
     "epoch and the slot's generation; `com.enroll` for the capability, then `com.claim` (`idempotency`, `capability`, "
@@ -124,8 +127,9 @@ DISPATCH_CONTRACT = (
     "progress (an earlier run), take an accepted one over with `com.responder_replace` (`expectedGeneration`) and its "
     "transfer, settle `outcome_unknown` only with `com.reconcile` and an observed result, and never complete what you "
     "did not observe. After the lease, the claim and the reply, write an in_progress checkpoint (`workflowId`, "
-    "`leaseId`). Every checkpoint you write repeats the packet's `goal`, `constraints`, `artifacts` and `credentials` "
-    "unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
+    "`leaseId`). Every checkpoint you write repeats `goal`, `constraints`, `artifacts` and `credentials` of "
+    "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
+    "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
     "and finish before run-ends-at. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
@@ -145,7 +149,8 @@ DISPATCH_NESTED = (
 DISPATCH_MISMATCH = (" The prompt's first line disagrees with the environment on {fields}: the environment's values "
                      "above are the ones to use; say so in the closing checkpoint's notes.")
 _UNKNOWN = {"handoff": "the handoff the packet names (`observatory_checkpoint_latest` shows it pending)",
-            "request": "the request the packet names (its `board-request:` artifact)"}
+            "request": "the request the launcher's prompt names (Observatory's write redacts it from the packet); when no "
+                       "prompt names it, close the workflow blocked saying so and end"}
 
 
 def dispatch_from_env(env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, str]]:
@@ -195,7 +200,8 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
                     take_over: bool = False) -> bool:
     """Whether this session holds the dispatch: the first session id seen for the dispatch (its FABRIC_DISPATCH_ID when
     the launcher sets one, else the workflow, the handoff and the launcher's run id) holds it, recorded once in the hooks' folder (0600, created exclusively). `take_over` (a `/clear`, which gives
-    the same run a new session id; a nested `claude -p` starts with `startup`) moves the record to this id. A session
+    the same run a new session id; a nested `claude -p` starts with `startup`) moves the record to this id when the
+    record was written under this hook's parent (the agent's own process, which a `/clear` keeps). A session
     id that is not one, or a folder that cannot be written, counts as the holder: better the contract twice than
     never."""
     env = os.environ if env is None else env
@@ -203,19 +209,26 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
         return True
     import hashlib
     dispatch_id = env.get("FABRIC_DISPATCH_ID") or ""
-    if SESSION_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch (Switchboard 0.7.8 sets it)
+    if DISPATCH_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch, a UUID (Switchboard's PR #379 sets it)
         run = "|".join((dispatch["workflow"], "dispatch", dispatch_id))
     else:
         run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
     key = hashlib.sha256(run.encode("utf-8")).hexdigest()[:32]  # a new launch is a new holder
     folder = state_root(env=env) / "dispatch"
+    record = {"session": session_id, "at": int(time.time()), "host": os.getppid()}
     if take_over:
         try:
-            folder.mkdir(parents=True, exist_ok=True, mode=0o700)
-            _write_private(folder / (key + ".json"), json.dumps({"session": session_id, "at": int(time.time())}))
-        except OSError:
-            pass
-        return True
+            held = json.loads(read_small(folder / (key + ".json")) or "null")
+        except ValueError:
+            held = None
+        if not isinstance(held, dict) or held.get("host") == record["host"]:
+            try:
+                folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+                _write_private(folder / (key + ".json"), json.dumps(record))
+            except OSError:
+                pass
+            return True
+        # another agent process holds it: this is a session inside the run that cleared, still nested
     try:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd = os.open(str(folder / (key + ".json")), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -229,7 +242,7 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
         return True
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(json.dumps({"session": session_id, "at": int(time.time())}))
+            handle.write(json.dumps(record))
     except OSError:  # a full disk: no half record that would make this session a stranger later
         try:
             (folder / (key + ".json")).unlink()
@@ -265,6 +278,8 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
         return None
     dispatch = dispatch_from_env(env)
     if dispatch is not None:  # FAA-201: before the launch check, so a run shown in Fabric's console is told too
+        if isinstance(payload.get("session_id"), str) and SESSION_ID.fullmatch(payload["session_id"]):
+            prune_stale_sessions(env, keep=payload["session_id"])  # Codex and Kimi have no turn or end hook to do it
         if not dispatch_holder(dispatch, payload.get("session_id"), env, take_over=payload.get("source") == "clear"):
             return _host_output(host, "SessionStart", DISPATCH_NESTED.format(workflow=dispatch["workflow"]))
         return _host_output(host, "SessionStart", dispatch_contract(dispatch))

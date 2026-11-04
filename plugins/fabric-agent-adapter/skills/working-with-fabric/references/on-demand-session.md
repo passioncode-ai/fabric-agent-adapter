@@ -29,28 +29,33 @@ fabric-dispatch/1 workflow=wf_<16 hex> handoff=<handoff id> request=<request uui
 The environment decides that the session was dispatched and wins on every value it names; the line fills a value the
 environment left out, for the same workflow only, and a disagreement is said in the closing checkpoint's notes. A line
 with no `FABRIC_DISPATCH_WORKFLOW` in the environment is quoted text (a board message pasted into a session), never a
-dispatch. Switchboard's `dispatch` sets all three and writes the line from 0.7.8 on (SB-247, `7ac2a5b`, board thread
-`b3e60686`); with an earlier launcher that sets the workflow alone, the session reads the handoff and the request from
-the packet.
+dispatch. Switchboard's `dispatch` sets all three and writes the line (SB-247, on Switchboard's main at `7ac2a5b`, not
+yet in a release; board thread `b3e60686`). With a launcher that sets the workflow alone, the session reads the handoff
+from the packet and the request from the launcher's prompt; when neither names the request, it closes the workflow
+`blocked` saying so and ends (Observatory's write redacts the packet's board references, below).
 
 The plugin's session-start hook prints the exit contract (the steps below, with the values filled in or pointed at the
 packet) in place of the usual preamble, whatever the folder shows, and also in a session Fabric launched (a run shown
 in Fabric's console). In Claude Code the prompt hook prints it again when the first line adds a value the environment
 left out or disagrees with it. A resumed or compacted session prints nothing. The plugin's hooks reach a Claude Code
-run Switchboard starts (its isolated home carries the operator's plugins), and a Codex run from Switchboard 0.7.8 on
-(its isolated `CODEX_HOME` links the person's `hooks.json`); before that, a Codex run had no adapter hook and the
-appended exit contract alone told it.
+run Switchboard starts (its isolated home carries the operator's plugins). A Codex run gets the adapter's hook only when
+the person installed it with `install-host-hooks` and that run's `CODEX_HOME` trusts it: Codex runs a `hooks.json` hook
+only when the home's own `config.toml` trusts it, and Switchboard links the person's `hooks.json` into its isolated
+homes but not `config.toml` (0.63.0 seam reading 4, measured with codex-cli 0.165.0). Until then the launcher's
+appended exit contract alone tells a Codex run.
 
 ## What the session does
 
 1. **Look, then read the packet.** `fabric_whoami` first, as in any session: until it, the session holds no other
    Fabric tool, and it returns the session's rules. Then `observatory_checkpoint_latest {workflowId}`. Its `goal`
-   names the request (its text is on the board); its `constraints` carry the exit contract, the three floors and the operator's mandate when the
-   request has one: obey them first. Its `artifacts` are references only, `kind: "other"` with `ref`
-   `board-request:<uuid>`, `board-thread:<uuid>`, `capability:<name>`, `fabric-project:<uuid>`,
-   `deadline:<time>` and `run-ends-at:<time>`. No message body travels in the packet: read the request with `com.get
-   {message: <request>}` (a request's id is its message's) and its thread with `com.list {thread: <board-thread>}`,
-   under the session's own credential. The folder is the working directory. The body's `credentials` block names the
+   describes the request (its text is on the board); its `constraints` carry the exit contract, the three floors and
+   the operator's mandate when the request has one: obey them first. Its `artifacts` are references only,
+   `kind: "other"` with `ref` `board-request:<uuid>`, `board-thread:<uuid>`, `capability:<name>`,
+   `fabric-project:<uuid>`, `deadline:<time>` and `run-ends-at:<time>`; Observatory's write redacts the three board
+   ones (and a UUID in `goal`) today, so take the request from the environment or the first line, never from the
+   packet. No message body travels in the packet: read the request with `com.get {message: <request>}` (a request's id
+   is its message's) and its thread with `com.list {thread: <thread>}`, the `thread` `com.get` answered, under the
+   session's own credential. The folder is the working directory. The body's `credentials` block names the
    keys the request needs, by name only; reach them with `use_secret.py run`. `observatory_checkpoint_latest` also
    shows the pending handoff, for a session whose launcher passed none.
 2. **Take the lease.** `observatory_handoff_accept {owner, idempotencyKey, handoffId, executor?, sessionId?}`:
@@ -66,9 +71,10 @@ appended exit contract alone told it.
    attempt). An `outcome_unknown` one is settled only by `com.reconcile` with an observed result. Never complete what
    you did not observe. After the lease, after the claim or the takeover, and after the reply, write an `in_progress`
    checkpoint (`workflowId`, `leaseId`), so a later run has something to read. Observatory keeps only the latest
-   body, so every checkpoint the session writes repeats the packet's `goal`, `constraints`, `artifacts` and
-   `credentials` unchanged and adds `open`, `done` or `notes`, never a value: a body of `done` and `notes` alone would
-   leave the next run a packet with no request and no constraints.
+   body, so every checkpoint the session writes repeats `goal`, `constraints`, `artifacts` and `credentials` of
+   `checkpoint.body` (from `observatory_checkpoint_latest`, or the accept answer's `checkpoint`) unchanged and adds `open`, `done` or `notes`, never a value: a body of `done` and `notes` alone would
+   leave the next run a packet with no request and no constraints. Never write back the top-level `credentials` or the
+   accept answer's `pack`: they carry each key's `state` and `use`, and Observatory refuses them in a body.
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
    stops the run. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
@@ -101,7 +107,8 @@ and ends `timed-out`.
 
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
 environment. Only the run's first session holds the dispatch: the hooks record the first session id for the
-dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one; Switchboard sets it from 0.7.8), else by the
+dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID; Switchboard's PR #379, planned for its
+0.7.8, sets it; a value outside `[A-Za-z0-9._-]{1,64}` is ignored), else by the
 workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new dispatch of the same workflow is a
 new holder; a launcher that sets the workflow alone gives each run a distinct run id. A `/clear` in the holding
 session keeps the contract (the record moves to the new session id). Any other session gets one line in place of the
@@ -109,7 +116,8 @@ contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says
 nothing there. The election counts sessions whose hook ran: in a run whose own session has no adapter hook (a Codex
-run Switchboard before 0.7.8 started), the first nested session the run starts is taken as the holder.
+run whose home does not trust the hook, which is every Switchboard Codex run today), the first nested session the run
+starts is taken as the holder.
 
 The plugin tells a dispatched session from 0.63.0 on; an older one prints its ordinary preamble there, and only the
 launcher's appended exit contract tells the run what to do.

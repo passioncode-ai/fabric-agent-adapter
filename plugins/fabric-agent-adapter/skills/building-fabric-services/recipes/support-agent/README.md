@@ -28,7 +28,8 @@ gets its draft and the reasons, and a pass comes back as a reply with `repaired:
 with `fallback: true` (the channel-agent standard's 4.4 and its ticket's `fallback`, FAA-197). It calls under a new
 message id, since the stored decision answers any repeat of the same id; `repair=` takes only a hand-off the checks
 made (not `no-knowledge`, `model-unsure` or `model:*`), and never a repeat: a repeat of the id returns the stored
-decision, which has no draft, so the repair step keeps the decision it was handed. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
+decision, which has no draft, so the repair step keeps the decision it was handed and passes each first decision to
+`repair=` once. A repair the model declines (`HANDOFF`) is marked `fallback: true` too; a `model:*` outage is not. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
 hand-off and returns: since 0.55.0 a call to `answer` from inside it, on the same thread, is refused with
 `ReentryError` (a `RecipeError`), and unless `on_handoff` catches it the first call raises it too, its draft paid and
 nothing saved or delivered. A call it hands to another thread and waits for waits for the lock forever, so it never
@@ -91,7 +92,7 @@ python3 <adapter>/.../fabric_kit.py status <service>/support      # current, old
 
 ## The knowledge file as a source
 
-The channel-agent standard declares every source with its owner, cadence and maximum age, and a source that fails
+The channel-agent standard declares every source with its owner, how it is read, its cadence and its maximum age, and a source that fails
 keeps its last good version and says so (its 7.1 and 7.4). `KnowledgeSource(path, max_age_s=...)` is the knowledge
 file read that way: it reads the file again when it changes, keeps the last good version when a read fails, and
 `state()` gives `{id, age_s, max_age_s, stale, degraded}`. The age is the last good version's, from its file's
