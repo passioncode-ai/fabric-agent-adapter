@@ -259,6 +259,11 @@ class Hooks(Base):
         other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
         with mock.patch.object(cli.os, "getppid", return_value=222), mock.patch.object(cli, "_WINDOWS", True):
             self.assertTrue(cli.dispatch_holder(FULL, other, env, take_over=True), "a new Git Bash every hook")
+        record = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
+        self.assertEqual(json.loads(record.read_text())["session"], other, "the record moved")
+        with mock.patch.object(cli.os, "getppid", return_value=333):
+            self.assertTrue(cli.dispatch_holder(FULL, other, env), "the cleared session holds it at its next prompt")
+            self.assertFalse(cli.dispatch_holder(FULL, SID, env))
 
     def test_a_clear_moves_the_record_only_in_the_holders_process(self):
         from unittest import mock
@@ -344,6 +349,18 @@ class Hooks(Base):
         self.assertFalse(old.exists())
         self.assertTrue(spool.exists(), "a Claude Code spool stays the turn and end hooks' (0.63.0 seam reading 5)")
 
+    def test_the_turn_hook_prunes_in_a_session_fabric_launched_too(self):
+        # 0.63.0 product reading 6: "the turn and end hooks always prune" held only outside a launched session
+        import os
+        env = dict(self.env, **ENV)
+        cli.dispatch_holder(FULL, SID, env)
+        old = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
+        os.utime(old, (1, 1))
+        said = cli.hook_spool({"session_id": "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", "cwd": str(self.repo)}, "turn",
+                              env=dict(env, FABRIC_LAUNCHED_SESSION="1"), spawn=lambda *a, **k: None)
+        self.assertEqual(said, "skipped: launched by Fabric")
+        self.assertFalse(old.exists())
+
     def test_a_clear_in_the_holder_keeps_the_contract(self):
         # 0.63.0 seam r3: /clear gives the same run a new session id; a nested claude -p starts with `startup`
         cleared, nested = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", "5d2e3f40-1b2c-4d6e-9fa0-123456789abc"
@@ -378,6 +395,14 @@ class Hooks(Base):
         with contextlib.redirect_stderr(err):
             self.assertEqual(mail.watch_mail_cli(["--session-id", SID, "--cwd", str(self.repo)], env=env), 2)
         self.assertIn("started on a board request", err.getvalue())
+        for junk in ("wf_xyz", "1"):  # 0.63.0 unit reading 6: a malformed workflow is no dispatch, as for the hooks
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err):
+                code = mail.watch_mail_cli(["--session-id", SID, "--cwd", str(self.repo)],
+                                           env=dict(env, FABRIC_DISPATCH_WORKFLOW=junk))
+            self.assertEqual(code, 2, "stopped further on: no fabric registered in this home")
+            self.assertNotIn("started on a board request", err.getvalue(), junk)
+            self.assertIn("no MCP server named fabric", err.getvalue())
 
     def test_a_dispatch_line_the_environment_already_told_adds_nothing(self):
         self.assertEqual(self.prompt(ENV, LINE)[0].stdout, "", "session start already printed the contract")

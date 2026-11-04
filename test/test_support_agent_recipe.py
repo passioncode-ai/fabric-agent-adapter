@@ -602,6 +602,18 @@ class Recipe(unittest.TestCase):
         self.assertEqual(source.state()["age_s"], 1)
         self.assertFalse(source.state()["stale"], "exactly at the maximum age is not past it")
 
+    def test_an_unchanged_file_is_not_read_again(self):
+        # 0.63.0 unit reading 6: the modification time decides; an answer does not re-parse an unchanged file
+        from unittest import mock
+        path, now, source = self.source_at(1000.0)
+        with mock.patch.object(sa.Knowledge, "load", wraps=sa.Knowledge.load) as load:
+            source.current()
+            source.current()
+            self.assertEqual(load.call_count, 1)
+            os.utime(path, (2000.0, 2000.0))
+            source.current()
+            self.assertEqual(load.call_count, 2)
+
     def test_a_source_that_never_read_well_is_an_error(self):
         path = self.dir / "knowledge.json"
         path.write_text("[]oops")

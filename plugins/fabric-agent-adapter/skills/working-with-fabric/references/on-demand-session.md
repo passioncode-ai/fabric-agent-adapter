@@ -99,7 +99,8 @@ run unchanged.
 
 Fabric watches the request and the run (spec 3.6). The request keeps the state the board contract gives it: `queued`
 stays queued, `claimed` is taken again under a new attempt, `accepted` is held until a responder takes it over, and
-`in_progress` turns `outcome_unknown`, which only a reconcile settles. Fabric may start one more run; after two runs
+`in_progress` stays until the next holder registers, when the board records the lost result; an `outcome_unknown`
+attempt is settled only by `com.reconcile` with an observed result. Fabric may start one more run; after two runs
 with no answer it shows the request to the operator in «На проверке», unchanged. A run past its time limit is stopped
 and ends `timed-out`.
 

@@ -207,7 +207,8 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     the same run a new session id; a nested `claude -p` starts with `startup`) moves the record to this id when the
     record was written under this hook's parent (the agent's own process, which a `/clear` keeps). A session
     id that is not one, or a folder that cannot be written, counts as the holder: better the contract twice than
-    never."""
+    never. A record that cannot be read (damaged by hand, or created and not yet written by a hook running at the same
+    moment) counts as held by another session, outside a take-over: the session it names may be at work."""
     env = os.environ if env is None else env
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return True
@@ -366,9 +367,9 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
     session_id = payload.get("session_id")
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return "skipped: no session id"
+    prune_stale_sessions(env, keep=session_id)  # before the launch check: "always prune" holds in a launched run too
     if fabric_launched(env):
         return "skipped: launched by Fabric"
-    prune_stale_sessions(env, keep=session_id)
     hub = locate_hub(fabric_root(env=env))
     if hub["state"] != "running":
         return "inert: Fabric is not running"

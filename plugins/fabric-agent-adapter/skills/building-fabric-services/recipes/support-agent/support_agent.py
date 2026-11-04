@@ -480,8 +480,9 @@ class SupportAgent:
                repair: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         """The decision for one message: `{messageId, action: reply|handoff, reply?, citations, reasons, costUsd}`; a
         hand-off the checks made also carries the refused `draft`. `repair=` that decision (under a new message id)
-        rewrites the draft once with the refusal's reasons: a pass is a reply with `repaired: true`, a second refusal
-        a hand-off with `fallback: true` (the channel-agent standard's 4.4 and 13.2, FAA-197)."""
+        rewrites the draft once with the refusal's reasons: a pass is a reply with `repaired: true`, and a repair that
+        does not end in a reply (a second refusal, a model `HANDOFF`, no knowledge on the retry; not a `model:*`
+        outage) a hand-off with `fallback: true` (the channel-agent standard's 4.4 and 13.2, FAA-197)."""
         if not isinstance(message_id, str) or not _ID.fullmatch(message_id):
             raise RecipeError("message id: letters, digits, '.', '_', ':' or '-', up to 128")
         if not isinstance(text, str) or not text.strip():
