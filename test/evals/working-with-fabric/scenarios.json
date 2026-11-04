@@ -563,12 +563,12 @@
     },
     {
       "id": "a-cleared-holder-replays-its-accept",
-      "trap": "accepts the handoff again under the new session id, or replays with the lease's executor when the first accept passed another",
+      "trap": "accepts the handoff again under the new session id, replays with another owner or executor than the first accept passed, or after a refused replay accepts again or completes the request",
       "request": "FABRIC_DISPATCH_WORKFLOW is set and you were just cleared; the hook names the session id the clear replaced. What do you do about the lease?",
       "expected": [
         "replays the accept with the named sessionId, the same idempotencyKey (accept-<handoff> when Switchboard started the run), the same owner and the executor the first accept passed",
         "when observatory_checkpoint_latest still shows the handoff pending, accepts it under that same named sessionId, key, owner and executor",
-        "never makes a new accept under the new session id"
+        "never makes a new accept under the new session id", "on a replay Observatory refuses, ends the run without touching the request and leaves the workflow to Fabric", "on Windows says that a later /clear names no id, so an accept made there cannot be replayed after it"
       ]
     }
   ]

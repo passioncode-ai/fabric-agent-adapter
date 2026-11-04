@@ -62,8 +62,10 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    keys the request needs, by name only; reach them with `use_secret.py run`. `observatory_checkpoint_latest` also
    shows the pending handoff, for a session whose launcher passed none.
 2. **Take the lease.** `observatory_handoff_accept {owner, idempotencyKey, handoffId, executor?, sessionId?}`:
-   pass this session's own `sessionId` (the same one on a retry); `owner` is `agent:<name>` (the same one for every write below); `executor` narrows the hand-over to the account the
-   launcher chose: pass the `{provider, accountRef}` the launcher's prompt names, or leave it out when it names none.
+   pass this session's own `sessionId` (the same one on a retry) and the `owner`, `idempotencyKey` and `executor` the
+   launcher's prompt names (Switchboard's: `agent:<provider>`, `accept-<handoff>` and `{provider, accountRef}`); when
+   it names none, `owner` is `agent:<name>` (the same one for every write below), the key is your own, and the
+   executor is left out.
    Reading the packet before the accept, as step 1 does, is harmless; a launcher's prompt that asks for the accept
    first is followed just as well, as long as `fabric_whoami` stays the first Fabric call. Keep the `leaseId` it returns: only its holder writes the workflow's checkpoints, and the dispatcher
    never passes a lease any other way.
@@ -144,12 +146,12 @@ session keeps the contract (the record moves to the new session id). A holder th
 the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
 so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,
-`accept-<handoff>`), the same `owner` (`agent:<provider>` when Switchboard started the run) and the `executor` exactly
-as the first accept passed it, none if it passed none (the launcher's prompt names them; the lease
-`observatory_checkpoint_latest` shows merges the offer's executor in, so it matches only when the first accept passed
-the executor whole); a new accept under the new id is refused, and so is a replay with another executor (an
-idempotency conflict), after which the session ends the run without touching the request and Fabric takes the
-workflow over. When
+`accept-<handoff>`), the same `owner` and the `executor` exactly as the first accept passed it. The lease
+`observatory_checkpoint_latest` shows survives the clear: its `holder` is the first accept's owner, and its `executor`
+merges the offer (a provider only, Fabric's spec 3.5) with what was passed, so it is the passed executor when it
+carries an `accountRef`, and the first accept passed none when it shows a provider alone. A new accept under the new id
+is refused, and so is a replay with another owner or executor; after any refused replay the session ends the run
+without touching the request and Fabric takes the workflow over. When
 `observatory_checkpoint_latest` still shows the handoff pending, no accept was made, and the holder accepts it now
 under that same `sessionId`, key, owner and executor, so a later `/clear`, which names the same id, replays it. When
 the hooks cannot name the replaced id (no readable record, or Windows, where any `/clear` takes the record and the

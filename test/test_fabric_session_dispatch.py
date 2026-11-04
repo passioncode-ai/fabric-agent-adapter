@@ -449,13 +449,19 @@ class Hooks(Base):
         text = cli.dispatch_cleared(uuid, HANDOFF)
         for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF,
                       "still shows the handoff pending, no accept was made", "Never accept it under the new id",
-                      "exactly as the first accept passed it, none if it passed none", "is no guide",
-                      "`agent:<provider>` when Switchboard started the run", "an idempotency conflict"):
+                      "exactly as the first accept passed it", "the lease's `holder`", "carries an `accountRef`",
+                      "`agent:<provider>` when Switchboard started the run", "A replay Observatory refuses"):
             self.assertIn(words, text)
         for previous in (None, "", "S-ABC", uuid.upper()):
             with self.subTest(previous=previous):
                 self.assertIn("the sessionId the clear replaced", cli.dispatch_cleared(previous))
         self.assertIn("the key the first accept used", cli.dispatch_cleared(uuid))
+        # 0.63.0 unit reading 15: the owner with no launcher named, the conflict's ending, and a pending accept with no
+        # handoff known that presumes no first accept's key
+        self.assertIn("the lease's `holder` in `observatory_checkpoint_latest`; the one step 2 names)", cli.dispatch_cleared(uuid))
+        self.assertIn("the `owner`, `idempotencyKey` and `executor` the launcher's prompt names", cli.dispatch_contract(FULL))
+        self.assertIn("gets no lease back: end the run without touching the request", text)
+        self.assertIn("with an idempotencyKey of its own and this session's own sessionId", cli.dispatch_cleared(None))
         self.assertIn("observatory_lesson", cli.dispatch_contract(FULL), "step 7's retro")
         self.assertIn("insight/1", cli.dispatch_contract(FULL), "step 7's retro (0.63.0 unit reading 12)")
 
@@ -513,6 +519,18 @@ class Hooks(Base):
         done, _ = self.run_hook("user-prompt-submit", {"session_id": again, "cwd": str(self.repo), "prompt": LINE},
                                 extra_env=sb)
         self.assertIn("this session's own sessionId (%s)" % again, self.context(done))
+
+    def test_on_windows_a_reused_process_id_names_no_holder(self):
+        # 0.63.0 unit reading 15: Windows reuses process ids, so the same parent proves nothing there
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        holder, nested = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab", "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
+        with mock.patch.object(cli.os, "getppid", return_value=777), mock.patch.object(cli, "_WINDOWS", True):
+            cli.dispatch_holder(FULL, holder, env)
+            cli.dispatch_holder(FULL, nested, env, take_over=True)
+            self.assertEqual(cli.dispatch_cleared_from(FULL, env), "")
+            self.assertIn("On Windows a later /clear names no id either",
+                          cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env), HANDOFF, nested))
 
     def test_on_windows_the_new_id_is_said_not_to_be_named_again(self):
         # 0.63.0 unit reading 14: a later clear on Windows names no id, so the notice does not promise a replay

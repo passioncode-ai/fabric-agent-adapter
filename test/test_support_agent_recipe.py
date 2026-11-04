@@ -667,16 +667,15 @@ class Recipe(unittest.TestCase):
         self.assertTrue(next(iter(source.current().entries.values()))["answer"].endswith("!"))
         # 0.63.0 unit reading 13: in place, the same size and the same inode, the time set back (`rsync --inplace -t`);
         # POSIX only: on Windows st_ctime is the creation time (unit reading 14)
-        if os.name == "nt":
-            return
-        inode = path.stat().st_ino
-        with open(path, "r+") as handle:
-            text = handle.read()
-            handle.seek(0)
-            handle.write(text.replace('!"', '?"', 1))
-        os.utime(path, (1000.0, 1000.0))
-        self.assertEqual(path.stat().st_ino, inode)
-        self.assertTrue(next(iter(source.current().entries.values()))["answer"].endswith("?"))
+        if os.name != "nt":
+            inode = path.stat().st_ino
+            with open(path, "r+") as handle:
+                text = handle.read()
+                handle.seek(0)
+                handle.write(text.replace('!"', '?"', 1))
+            os.utime(path, (1000.0, 1000.0))
+            self.assertEqual(path.stat().st_ino, inode)
+            self.assertTrue(next(iter(source.current().entries.values()))["answer"].endswith("?"))
         path.write_text("[]oops")
         os.utime(path, (1000.0, 1000.0))
         with mock.patch.object(sa.Knowledge, "load", wraps=sa.Knowledge.load) as load:

@@ -64,8 +64,15 @@ def problems(declaration) -> list:
             for member in ("quiet_window", "late_answer_window"):
                 if channel.get(member) is not None and not DURATION.fullmatch(str(channel[member])):
                     found.append("%s.%s is not ISO 8601" % (channel.get("id"), member))
+            texts = channel.get("texts") or {}
+            if isinstance(texts.get("holding"), dict) and "none" in texts["holding"]:
+                found.append("%s.texts.holding takes no none form" % channel.get("id"))
+            # FAC-SEM-164 (the contract at 45d741b5): a channel that sends a holding reply owes a final one
+            if channel.get("replies_enabled") and channel.get("holding_reply") and texts.get("final") == {
+                    "none": "not_used"}:
+                found.append("%s: a holding reply owes a final text" % channel.get("id"))
             for name in ("holding", "final"):
-                text = (channel.get("texts") or {}).get(name)
+                text = texts.get(name)
                 if text is None or (isinstance(text, dict) and "none" in text and not none_form(text)) or (
                         isinstance(text, dict) and "none" not in text
                         and (not text or any(not isinstance(v, str) or not v.strip() for v in text.values()))):
@@ -127,6 +134,10 @@ class Example(unittest.TestCase):
             ("a budget without a record", lambda d: project(d)["evals"].update(judge_budget_usd=5)),
             ("a bad slot", lambda d: project(d)["tickets"].update(token_slot="prod/token")),
             ("a unit outside round 4's", lambda d: project(d)["channels"][0].update(items_seen_unit="threads")),
+            ("a holding reply with no final text (FAC-SEM-164)",
+             lambda d: project(d)["channels"][0]["texts"].update(final={"none": "not_used"})),
+            ("a none form at the holding text", lambda d: project(d)["channels"][0]["texts"].update(
+                holding={"none": "not_used"})),
             ("a recommendation that is prose", lambda d: project(d)["handoff_queues"][0].update(
                 recommendation="board thread of the request to the queue's owner")),
         ]

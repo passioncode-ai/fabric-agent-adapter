@@ -96,7 +96,9 @@ The channel-agent standard declares every source with its owner, how it is read,
 keeps its last good version and says so (its 7.1 and 7.4). `KnowledgeSource(path, max_age_s=...)` is the knowledge
 file read that way: it reads the file again when it changes, keeps the last good version when a read fails, and
 `state()` gives `{id, age_s, max_age_s, stale, degraded}`. The age is the last good version's, from its file's
-modification time: a file nobody rebuilt grows old however often it is read, and a restart does not make it new. Pass it as `knowledge=`, or set
+modification time: a file nobody rebuilt grows old however often it is read, and a restart does not make it new.
+The standard ages a source from its last finished sync, so the knowledge build writes or touches the file at every
+successful rebuild, unchanged or not, and never keeps the source's time (`cp -p`, `rsync -t`). Pass it as `knowledge=`, or set
 `knowledgeMaxAgeSeconds` in the config, which reads the file at once (a file never read well fails there). The calling service shows `state()`
 on its page and opens one alert when `stale` turns true: the recipe has no page and sends no alert itself.
 

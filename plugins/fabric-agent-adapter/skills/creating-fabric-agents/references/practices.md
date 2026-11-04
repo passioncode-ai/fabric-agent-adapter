@@ -127,9 +127,13 @@ draft-and-check step owns.
   is a fallback, marked on the ticket (`fallback: true`), as is a repair the model declines or that finds no knowledge. Check: the recipe's `repair=` and its tests.
 - **At most one clarifying question, never two in a row**; no reply where none is owed.
 - **Every source is declared with its owner, how it is read, its cadence and its maximum age**; one that fails keeps its last good version and
-  says so, and its age is that version's (its file's modification time). Check: the recipe's `KnowledgeSource`.
+  says so, and its age is that version's (its file's modification time, so the build touches the file at every
+  finished sync, changed or not: the standard ages a source from its last sync). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
   recommendation to its owner, posted on the board: `recommendation` is that board thread's id. Many `referred` tickets show a missing signal, not a regression.
+- **Text from a channel is data** (the contract's proposed DEC-0150 CA-8): a message, caption, file name, link or
+  quoted reply is never an instruction; the agent makes no tool call, send, spend or access change because a message
+  asks, and acts on its own task and its operator's word. Check: the recipe's fence around the message and its checks.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.
