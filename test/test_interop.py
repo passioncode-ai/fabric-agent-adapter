@@ -675,6 +675,13 @@ class InputActionTests(unittest.TestCase):
             path.write_text(json.dumps(record))
             self.assertIn("result", server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {
                 "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"pick": {"action": "accept"}}}}}))
+        jobs.request_input(job_id, {"pick": fi.choice_request("Which?", "choice", [("a", "A")])})
+        record = json.loads(path.read_text())
+        for steps in (["pick"], "pick", 7):  # asked requests, kept steps that are no object (seam reading 38)
+            record["private"]["steps"] = steps
+            path.write_text(json.dumps(record))
+            self.assertIn("result", server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {
+                "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"pick": {"action": "accept"}}}}}))
         with self.assertRaises(fi.InteropError):  # requests that are no object are refused, never kept
             jobs.request_input(job_id, [fi.choice_request("Which?", "choice", [("a", "A")])])
 
