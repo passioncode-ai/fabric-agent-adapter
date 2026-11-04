@@ -394,7 +394,7 @@ def mandate_spend(value: Any) -> Any:
 
 def kept_step(step: Dict[str, Any]) -> Dict[str, Any]:
     """A job's approval step {effect, spendUsd?, project?} as a job file keeps it: read as the gate reads it, so a job's
-    start and its answer agree (0.61.0 seam reading 32, product reading 33): a spend through mandate_spend (dropped
+    start and its answer agree (0.61.0 seam reading 32, readings 33 and 34): a spend through mandate_spend (dropped
     when none), a project as an exact str, else UNREADABLE_PROJECT (dropped when None); each member read once."""
     effect, spend, project = step.get("effect"), mandate_spend(step.get("spendUsd")), step.get("project")
     return {"effect": effect, **({"spendUsd": spend} if spend is not None else {}),

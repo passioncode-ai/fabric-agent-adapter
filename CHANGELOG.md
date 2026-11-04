@@ -61,7 +61,7 @@ says that his approval holds for the whole task, at every link (FAA-195).
   reads it (`kept_step` / `keptStep`: a spend through `mandate_spend`, a project as an exact `str` or a primitive
   string, else `UNREADABLE_PROJECT`), and `job_step`, `action_gate` and McpToolServer read a project as an exact `str`
   too, as the board path does, so the start and the answer agree, and a value that only claims `str` never reaches the
-  job file (older than 0.61.0; 0.61.0 seam reading 32, unit and product readings 33). The same split held for an
+  job file (older than 0.61.0; 0.61.0 seam reading 32, readings 33). The same split held for an
   effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
   file wrote as a plain string the answer covered; `job_step`, `request_input(steps=)` and `add_tool` now admit an
   effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),
@@ -109,7 +109,8 @@ says that his approval holds for the whole task, at every link (FAA-195).
 - A Python service that passes a job or tool project as a `(str, Enum)` member or another `str` subclass, under a
   mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
   An effect passed that way to `approval_step`, `job_step`, `request_input(steps=)` or `add_tool` now raises
-  `InteropError`: pass `member.value` there too.
+  `InteropError`: pass `member.value` there too. A Node service that keeps a step through `requestInput({steps})` with
+  a `String` object project or a `Number` object spend is likewise asked at the answer: pass the primitive value.
 - A kept step holds only `effect`, `spendUsd` and `project`: a service that put its own keys in `steps=` keeps them
   elsewhere.
 - A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it (a `str`-subclass

@@ -381,7 +381,7 @@
     "fabric_mandate",
     "fabric_time"
    ],
-   "sha256": "1e18efe3f34d485d12e68228e53298ccc2bd2594d29efdc97189491c12fdc4dd"
+   "sha256": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5"
   },
   {
    "module": "fabric_interop",
@@ -870,7 +870,7 @@
     "fabric-jsvalue",
     "fabric-mandate"
    ],
-   "sha256": "1fc4421c80162ad3b3cd5aeb3c6b107afbb801d9f6c3134a14c4fd788348472d"
+   "sha256": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458"
   },
   {
    "module": "fabric-interop",
@@ -4630,7 +4630,7 @@
    "fabric_supervisors.py": "3c5b2e8c310738720b1c1b779be4710e90251013d9be4c68f9952edc0bf55d5f",
    "fabric_service.py": "a2e813469a47d4d3eea996628635c8903007498bdb6a1ae032a7a5ce6f49fe2f",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
-   "fabric_interop_rules.py": "1e18efe3f34d485d12e68228e53298ccc2bd2594d29efdc97189491c12fdc4dd",
+   "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
    "fabric_interop.py": "06d2fd6510081e9adb8713395ac645f0fba1cb5db835da58869f5d4c88df426e",
    "fabric_hub.py": "b9ac852e601b1d54cf61351677a628afc69faeed7d1fc74ebe541c1cf38e0c2a",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
@@ -4673,7 +4673,7 @@
    "fabric-supervisors.mjs": "d45c38de0cb3ed85e083496c2d3c51dab004454accdd87f4762a512a6d442573",
    "fabric-service.mjs": "6aa673657427211b491a9b63f94b9847a7e6aa3ee1b7353e1af11f46469803a3",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
-   "fabric-interop-rules.mjs": "1fc4421c80162ad3b3cd5aeb3c6b107afbb801d9f6c3134a14c4fd788348472d",
+   "fabric-interop-rules.mjs": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458",
    "fabric-interop.mjs": "2b021c11f1b8e84979b4a98424aec5c049845306b5d805cb6312136adadb2905",
    "fabric-hub.mjs": "c005115a864cfd67daa4862097bb14acfe5a60bf653897e5bf8a570dd80f1070",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",

@@ -283,7 +283,7 @@ export function mandateSpend(value) {
 }
 
 /** A job's approval step {effect, spendUsd?, project?} as a job file keeps it: read as the gate reads it, so a job's
- * start and its answer agree (0.61.0 product reading 33): a spend through mandateSpend (dropped when none), a project
+ * start and its answer agree (0.61.0 seam reading 32, readings 33 and 34): a spend through mandateSpend (dropped when none), a project
  * as a primitive string, else UNREADABLE_PROJECT (dropped when null or undefined). */
 export function keptStep(step) {
   const { effect, spendUsd, project } = step; // each member read once (seam reading 34)
