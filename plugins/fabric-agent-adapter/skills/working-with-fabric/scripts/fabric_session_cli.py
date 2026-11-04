@@ -134,9 +134,10 @@ DISPATCH_CONTRACT = (
     "`leaseId`). Every checkpoint you write repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
-    "and finish before run-ends-at; work that cannot end by then is left accepted for the next run: its state as a "
-    "`com.progress` note on the thread and an in_progress checkpoint without `close`, steps 5 and 6 skipped, never "
-    "failed_known. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
+    "and finish before run-ends-at; work that cannot end by then gives its state as a `com.progress` note on the "
+    "thread, then: when run-ends-at is the request's deadline, `com.complete` failed_known saying so and steps 6 and 7; "
+    "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
+    "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
@@ -204,9 +205,10 @@ DISPATCH_SESSION = " This session's sessionId: {session}."
 #: After a /clear the accept, if one was made, was made under the session id the clear replaced (0.63.0 seam readings
 #: 9 and 10): Observatory replays an accept, with its leaseId, only for that sessionId and the same idempotencyKey.
 DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, and its leaseId comes back only by "
-                    "replaying it exactly: {session}, the same idempotencyKey ({key}), and the `owner` and `executor` "
-                    "`observatory_checkpoint_latest` shows in `lease.holder` and `lease.executor`; never accept it anew "
-                    "under the new id.")
+                    "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` and the `executor` "
+                    "the first accept passed (the launcher's prompt names it). When `observatory_checkpoint_latest` "
+                    "still shows the handoff pending, no accept was made: accept it as step 2 says. Never accept it "
+                    "anew under the new id.")
 _CLEARED_UNKNOWN = "the sessionId the clear replaced"
 
 

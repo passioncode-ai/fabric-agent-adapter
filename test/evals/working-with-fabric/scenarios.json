@@ -549,6 +549,27 @@
         "hands the operator only a human gate (a sign-in, a one-time code, a payment, a tool that refuses the agent) with its reason, after its own routes",
         "keeps money limits and secrets as they are"
       ]
+    },
+    {
+      "id": "a-dispatched-run-whose-work-outlasts-it",
+      "trap": "completes the request failed_known though another run could carry on, or leaves it accepted when the run was cut by the request's deadline, so nobody ever takes it",
+      "request": "FABRIC_DISPATCH_WORKFLOW is set. The work the request asks for will not end before run-ends-at. What do you do before the run stops?",
+      "expected": [
+        "gives its state (what is done, where it lies, what is left) as a com.progress note on the request's thread",
+        "when run-ends-at is the request's deadline, completes it failed_known saying the deadline came first and closes the workflow",
+        "otherwise leaves the request accepted for the next run: an in_progress checkpoint without close, no com.complete",
+        "writes the retro fabric_whoami asks for before it ends"
+      ]
+    },
+    {
+      "id": "a-cleared-holder-replays-its-accept",
+      "trap": "accepts the handoff again under the new session id, or replays with the lease's executor when the first accept passed another",
+      "request": "FABRIC_DISPATCH_WORKFLOW is set and you were just cleared; the hook names the session id the clear replaced. What do you do about the lease?",
+      "expected": [
+        "replays the accept with the named sessionId, the same idempotencyKey (accept-<handoff> when Switchboard started the run), the same owner and the executor the first accept passed",
+        "accepts as step 2 says when observatory_checkpoint_latest still shows the handoff pending",
+        "never makes a new accept under the new session id"
+      ]
     }
   ]
 }

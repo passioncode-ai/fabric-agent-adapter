@@ -81,14 +81,19 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
    accept answer's `pack`: they carry each key's `state` and `use`, and Observatory refuses them in a body.
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
-   stops the run. Work that cannot end by then is left for the next run, before `run-ends-at`: its state (what is
-   done, where it lies, what is left) goes onto the request's thread as the note of a `com.progress` (the slot
-   holder's state, DEC-0152 SA-6, proposed) and into an `in_progress` checkpoint without `close`; steps 5 and 6 are
-   skipped and the request stays accepted, never `failed_known`, which would settle it for good. Fabric's dispatcher
-   starts the next run for an accepted request whose holder is gone, which takes it over with
-   `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main at
-   `fff4b6d9`, in no release yet; a Fabric before it dispatches no accepted request, so there the work waits for a
-   responder or the operator). A launcher that stops a run gives no time to answer:
+   stops the run. Work that cannot end by then gives its state (what is done, where it lies, what is left), before
+   `run-ends-at`, as the note of a `com.progress` on the request's thread (the slot holder's state, DEC-0152 SA-6,
+   proposed). Then:
+   - when `run-ends-at` is the request's `deadline` (the packet's `deadline:` artifact is not after it), no run comes
+     after the deadline and the board holds an accepted request past it: `com.complete` `failed_known` saying the
+     deadline came first, and steps 6 and 7;
+   - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
+     6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
+     with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
+     at `fff4b6d9`, in no release yet; a Fabric before it dispatches no accepted request). How the next run takes the
+     open workflow over in Observatory (its lease is this run's) is still being agreed (thread `b3e60686`).
+
+   A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
    a typed secret or a payment is the person's: name it in the answer rather than wait.
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
@@ -132,8 +137,9 @@ session keeps the contract (the record moves to the new session id). A holder th
 the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
 so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,
-`accept-<handoff>`), and the `owner` and `executor` `observatory_checkpoint_latest` shows in `lease.holder` and
-`lease.executor`; a new accept under the new id is refused. On Windows, where any `/clear` takes the record, the hooks
+`accept-<handoff>`), the same `owner` and the `executor` the first accept passed (the launcher's prompt names it);
+a new accept under the new id is refused. When `observatory_checkpoint_latest` still shows the handoff pending, no
+accept was made, and the holder accepts it as step 2 says. On Windows, where any `/clear` takes the record, the hooks
 name no id. Any other session gets one line in place of the
 contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the

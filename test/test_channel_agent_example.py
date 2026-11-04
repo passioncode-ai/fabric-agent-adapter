@@ -16,6 +16,8 @@ EXAMPLE = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/r
 KEY = "https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1"
 DURATION = re.compile(r"P(?=\d|T\d)(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+S)?)?")
 KINDS = {"telegram_dm", "telegram_group", "mail", "store_review", "public_comment", "team_chat", "account"}
+UNITS = {"mails", "updates", "messages", "reviews"}  # round 4's items_seen_unit
+THREAD_ID = re.compile(r"[A-Za-z0-9_-]{8,128}")  # a recommendation names the board thread by its id
 REQUIRED = ("project", "side", "lead_agent", "adopted_at", "taxonomy", "tiers", "question_route", "gap_registry",
             "channels", "sources", "declined_sources", "handoff_queues", "evals", "tickets", "recorded_decisions")
 
@@ -54,6 +56,8 @@ def problems(declaration) -> list:
         for channel in project.get("channels") or []:
             if channel.get("kind") not in KINDS:
                 found.append("channel kind %r" % channel.get("kind"))
+            if "items_seen_unit" in channel and channel["items_seen_unit"] not in UNITS:
+                found.append("%s.items_seen_unit %r" % (channel.get("id"), channel["items_seen_unit"]))
             for member in ("final_limit", "first_reply_limit"):
                 if not DURATION.fullmatch(str(channel.get(member))):
                     found.append("%s.%s is not ISO 8601" % (channel.get("id"), member))
@@ -75,6 +79,8 @@ def problems(declaration) -> list:
                 found.append("queue %s.limit is not ISO 8601" % queue.get("id"))
             if (queue.get("answered_signal") == "none") != ("recommendation" in queue):
                 found.append("queue %s: recommendation only with answered_signal none" % queue.get("id"))
+            if "recommendation" in queue and not THREAD_ID.fullmatch(str(queue["recommendation"])):
+                found.append("queue %s: recommendation is a board thread's id" % queue.get("id"))
         evals = project.get("evals") or {}
         if evals.get("spend_record") is None and (evals.get("judge_budget_usd") or evals.get("replay_budget_usd")):
             found.append("a budget above 0 without its spend record")
@@ -120,6 +126,9 @@ class Example(unittest.TestCase):
             ("a bad tier rule", lambda d: project(d)["tiers"][0].update(rule="open_orders is big")),
             ("a budget without a record", lambda d: project(d)["evals"].update(judge_budget_usd=5)),
             ("a bad slot", lambda d: project(d)["tickets"].update(token_slot="prod/token")),
+            ("a unit outside round 4's", lambda d: project(d)["channels"][0].update(items_seen_unit="threads")),
+            ("a recommendation that is prose", lambda d: project(d)["handoff_queues"][0].update(
+                recommendation="board thread of the request to the queue's owner")),
         ]
         for name, change in cases:
             with self.subTest(name):

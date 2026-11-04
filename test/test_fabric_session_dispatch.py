@@ -396,8 +396,9 @@ class Hooks(Base):
 
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
-        self.assertIn("work that cannot end by then is left accepted for the next run", text)
-        self.assertIn("never failed_known", text, "Fabric dispatches an accepted request since fff4b6d9")
+        self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")
+        self.assertIn("when run-ends-at is the request's deadline, `com.complete` failed_known", text,
+                      "no run comes after the deadline (0.63.0 product reading 12)")
 
     def test_the_prompt_hooks_contract_names_the_session_id(self):
         # 0.63.0 unit reading 9: the reprint after the line adds the handoff carries the id too
@@ -423,7 +424,7 @@ class Hooks(Base):
         done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
                                 extra_env=ENV)
         text = self.context(done)
-        self.assertIn("never accept it anew under the new id", text)
+        self.assertIn("Never accept it anew under the new id", text)
         self.assertIn("sessionId %s" % uuid, text, "the id the accept was made under (0.63.0 seam reading 10)")
         self.assertNotIn(cleared, text)
         # the prompt hook's reprint after the clear says the same, never the new id (unit and seam readings 10): a
@@ -436,15 +437,15 @@ class Hooks(Base):
                                 extra_env=sb)
         text = self.context(done)
         self.assertIn("sessionId %s" % first, text)
-        self.assertIn("never accept it anew under the new id", text)
+        self.assertIn("Never accept it anew under the new id", text)
         self.assertNotIn(again, text)
 
     def test_the_cleared_notice_names_the_whole_replay(self):
         # 0.63.0 readings 11: Observatory replays only the same sessionId, key, owner and executor
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
         text = cli.dispatch_cleared(uuid, HANDOFF)
-        for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF, "lease.holder", "lease.executor",
-                      "never accept it anew"):
+        for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF, "the `executor` the first accept passed",
+                      "still shows the handoff pending, no accept was made", "Never accept it anew"):
             self.assertIn(words, text)
         for previous in (None, "", "S-ABC", uuid.upper()):
             with self.subTest(previous=previous):

@@ -53,7 +53,7 @@
             "clarifying_question": true,
             "quiet_window": null,
             "late_answer_window": null,
-            "items_seen_unit": "threads",
+            "items_seen_unit": "mails",
             "texts": {
               "holding": {
                 "en": "Thank you, we are looking into it and will answer here."
@@ -80,7 +80,7 @@
             "owner": "example-team",
             "limit": "P2D",
             "answered_signal": "none",
-            "recommendation": "board thread of the request to the queue's owner"
+            "recommendation": "5d1f0a3c-8b2e-4c7a-9e6f-1a2b3c4d5e6f"
           }
         ],
         "evals": {
