@@ -107,7 +107,7 @@ and ends `timed-out`.
 
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
 environment. Only the run's first session holds the dispatch: the hooks record the first session id for the
-dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID; Switchboard's PR #379, planned for its
+dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard's PR #379, planned for its
 0.7.8, sets it; a value outside `[A-Za-z0-9._-]{1,64}` is ignored), else by the
 workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new dispatch of the same workflow is a
 new holder; a launcher that sets the workflow alone gives each run a distinct run id. A `/clear` in the holding
@@ -115,7 +115,8 @@ session keeps the contract (the record moves to the new session id). Any other s
 contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says
-nothing there. The election counts sessions whose hook ran: in a run whose own session has no adapter hook (a Codex
+nothing there. A host whose hook gets no session id (the native bridges: Hermes, OpenCode, OpenClaw, Pi) is always
+told the full contract, since the hooks cannot tell its sessions apart. The election counts sessions whose hook ran: in a run whose own session has no adapter hook (a Codex
 run whose home does not trust the hook, which is every Switchboard Codex run today), the first nested session the run
 starts is taken as the holder.
 

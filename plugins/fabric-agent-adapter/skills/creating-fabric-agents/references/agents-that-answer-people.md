@@ -20,7 +20,7 @@ default) and the rest of its checks that caught real defects, and the practices'
 P8. Read both sources before you design the reply pipeline. The kit's support-agent recipe (building-fabric-services,
 `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: used alone it hands the message
 to a person at the first refusal; with a repairing `on_handoff` it rewrites a refused draft once (`repair=`, a
-second refusal being `fallback: true`), and research and the hold stay this page's.
+a spent repair being `fallback: true`, whatever ended it: a second refusal, a declined repair or no knowledge on the retry), and research and the hold stay this page's.
 
 ## Contents
 

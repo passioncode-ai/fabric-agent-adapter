@@ -29,7 +29,7 @@ with `fallback: true` (the channel-agent standard's 4.4 and its ticket's `fallba
 message id, since the stored decision answers any repeat of the same id; `repair=` takes only a hand-off the checks
 made (not `no-knowledge`, `model-unsure` or `model:*`), and never a repeat: a repeat of the id returns the stored
 decision, which has no draft, so the repair step keeps the decision it was handed and passes each first decision to
-`repair=` once. A repair the model declines (`HANDOFF`) is marked `fallback: true` too; a `model:*` outage is not. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
+`repair=` once. A repair the model declines (`HANDOFF`) or that finds no knowledge is marked `fallback: true` too: it marks a spent repair, whatever ended it; a `model:*` outage is not. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
 hand-off and returns: since 0.55.0 a call to `answer` from inside it, on the same thread, is refused with
 `ReentryError` (a `RecipeError`), and unless `on_handoff` catches it the first call raises it too, its draft paid and
 nothing saved or delivered. A call it hands to another thread and waits for waits for the lock forever, so it never
@@ -141,8 +141,8 @@ python3 support_agent.py answer ...`); a long-running
 service gets it the same way from its service manager. The decision
 prints as JSON: `{"messageId", "action": "reply"|"handoff", "reply"?, "citations", "reasons", "costUsd", "repeated"}`,
 with `"draft"` on a hand-off the checks made, `"repaired": true` on a reply after `repair=` and `"fallback": true` on
-a second refusal. Two meanings of the word: the config's `fallback` is the second model; a decision's `fallback: true`
-is the channel-agent standard's second refusal. `repair=` refuses a decision that is already `fallback: true`.
+a repair that did not end in a reply. Two meanings of the word: the config's `fallback` is the second model; a decision's `fallback: true`
+is the channel-agent standard's fallback, a spent repair (a second refusal, a declined repair or no knowledge on the retry). `repair=` refuses a decision that is already `fallback: true`.
 Exit 1 on a broken config or knowledge file. A missing key is not a crash: the message is handed off with
 `model:config`.
 

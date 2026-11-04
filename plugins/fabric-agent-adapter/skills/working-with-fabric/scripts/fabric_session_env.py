@@ -597,7 +597,15 @@ def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[flo
                 removed += 1
         except OSError:
             continue
-    try:  # FAA-201: the dispatch records (which session holds a dispatch) go stale the same way
+    return removed + prune_dispatch_records(env, now)
+
+
+def prune_dispatch_records(env: Optional[Dict[str, str]] = None, now: Optional[float] = None) -> int:
+    """FAA-201: remove the dispatch records (which session holds a dispatch) older than SESSION_STALE_S, and the
+    temporary file of a write a full disk cut short; nothing else. Returns how many. Never raises."""
+    now = time.time() if now is None else now
+    removed = 0
+    try:
         folder = state_root(env=env) / "dispatch"
         records = list(folder.glob("*.json")) + list(folder.glob(".*.tmp"))  # a write a full disk cut short
     except OSError:

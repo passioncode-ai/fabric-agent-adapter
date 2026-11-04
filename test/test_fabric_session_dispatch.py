@@ -229,6 +229,27 @@ class Hooks(Base):
                                 extra_env=again)
         self.assertIn("observatory_handoff_accept", self.context(done), "a new dispatch is a new holder")
 
+    def test_a_clear_with_no_record_or_a_corrupt_one_takes_it(self):
+        # 0.63.0 unit reading 5: the take-over branch over nothing, or over a record that is not one
+        env = dict(self.env, **ENV)
+        self.assertTrue(cli.dispatch_holder(FULL, SID, env, take_over=True))
+        record = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
+        held = json.loads(record.read_text())
+        self.assertEqual((held["session"], held["host"]), (SID, os.getppid()))
+        record.write_text("not json")
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        self.assertTrue(cli.dispatch_holder(FULL, other, env, take_over=True))
+        self.assertEqual(json.loads(record.read_text())["session"], other)
+
+    def test_on_windows_any_clear_takes_the_record(self):
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            cli.dispatch_holder(FULL, SID, env)
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        with mock.patch.object(cli.os, "getppid", return_value=222), mock.patch.object(cli, "_WINDOWS", True):
+            self.assertTrue(cli.dispatch_holder(FULL, other, env, take_over=True), "a new Git Bash every hook")
+
     def test_a_clear_moves_the_record_only_in_the_holders_process(self):
         from unittest import mock
         env = dict(self.env, **ENV)
@@ -303,9 +324,15 @@ class Hooks(Base):
         cli.dispatch_holder(dict(FULL, handoff="handoff:ffffffffffffffff"), SID, env)
         old = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
         os.utime(old, (1, 1))
+        spool = cli.state_root(env=env) / "sessions" / "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        spool.mkdir(parents=True)
+        (spool / "end.json").write_text("{}")
+        for path in (spool / "end.json", spool):
+            os.utime(path, (1, 1))
         self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
                       extra_env=ENV, args=("--host", "codex"))
         self.assertFalse(old.exists())
+        self.assertTrue(spool.exists(), "a Claude Code spool stays the turn and end hooks' (0.63.0 seam reading 5)")
 
     def test_a_clear_in_the_holder_keeps_the_contract(self):
         # 0.63.0 seam r3: /clear gives the same run a new session id; a nested claude -p starts with `startup`

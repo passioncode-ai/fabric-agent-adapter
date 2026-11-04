@@ -48,7 +48,7 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   removed only by a worker that sees a schema without the field, so after Fabric is downgraded
   the turns that end before a worker next reaches the running Fabric (about a minute; longer while
   rejoins fail) are still read; none of their names is sent. They write their spool and log under the user's cache folder (0600), and, in a session
-  started on a board request (FAA-201), one record of which session holds that dispatch (a session id and a time, 0600,
+  started on a board request (FAA-201), one record of which session holds that dispatch (a session id, the agent's process id and a time, 0600,
   pruned after 7 days),
   and the delivery worker starts `fabric-mcp` in its own process group and ends that group
   (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no Fabric token. An

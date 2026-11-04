@@ -38,6 +38,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     take_nudges,
     nudge_shown,
     project_uses_fabric,
+    prune_dispatch_records,
     prune_stale_sessions,
     read_small,
     rejoined_recently,
@@ -111,6 +112,7 @@ _DISPATCH_VALUE = {"workflow": DISPATCH_WORKFLOW, "handoff": r"handoff:[A-Za-z0-
 #: Fabric's dispatch id, a UUID, within the form Switchboard's `--dispatch-id` takes (board thread b3e60686): a value
 #: outside it keys nothing, and the holder falls back to the workflow, the handoff and the launcher's run id.
 DISPATCH_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
+_WINDOWS = os.name == "nt"
 DISPATCH_LINE = re.compile(r"fabric-dispatch/1 workflow=(%(workflow)s) handoff=(%(handoff)s) request=(%(request)s)"
                            % _DISPATCH_VALUE)
 DISPATCH_CONTRACT = (
@@ -221,7 +223,9 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
             held = json.loads(read_small(folder / (key + ".json")) or "null")
         except ValueError:
             held = None
-        if not isinstance(held, dict) or held.get("host") == record["host"]:
+        # On Windows the hook's parent is the Git Bash a hook runs in, a new one each time (0.63.0 unit reading 5):
+        # there any /clear takes the record, the contract twice rather than never
+        if not isinstance(held, dict) or held.get("host") == record["host"] or _WINDOWS:
             try:
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _write_private(folder / (key + ".json"), json.dumps(record))
@@ -278,8 +282,7 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
         return None
     dispatch = dispatch_from_env(env)
     if dispatch is not None:  # FAA-201: before the launch check, so a run shown in Fabric's console is told too
-        if isinstance(payload.get("session_id"), str) and SESSION_ID.fullmatch(payload["session_id"]):
-            prune_stale_sessions(env, keep=payload["session_id"])  # Codex and Kimi have no turn or end hook to do it
+        prune_dispatch_records(env)  # Codex and Kimi have no turn or end hook to do it; the spools stay theirs
         if not dispatch_holder(dispatch, payload.get("session_id"), env, take_over=payload.get("source") == "clear"):
             return _host_output(host, "SessionStart", DISPATCH_NESTED.format(workflow=dispatch["workflow"]))
         return _host_output(host, "SessionStart", dispatch_contract(dispatch))

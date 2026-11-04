@@ -120,7 +120,7 @@ draft-and-check step owns.
 - **Answer, do not route**: hand to a person only what only a person may do, and what the checks the agent already
   gave did not fix. "A person will reply" inside an ordinary answer is a defect.
 - **Repair before hand-off**: a draft the checker refuses is rewritten once with the refusal's reason; a second refusal
-  is a fallback, marked on the ticket (`fallback: true`). Check: the recipe's `repair=` and its tests.
+  is a fallback, marked on the ticket (`fallback: true`), as is a repair the model declines or that finds no knowledge. Check: the recipe's `repair=` and its tests.
 - **At most one clarifying question, never two in a row**; no reply where none is owed.
 - **Every source is declared with its owner, how it is read, its cadence and its maximum age**; one that fails keeps its last good version and
   says so, and its age is that version's (its file's modification time). Check: the recipe's `KnowledgeSource`.

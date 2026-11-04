@@ -24,7 +24,8 @@
   checkpoint the session writes repeats the goal, constraints, artifacts and credentials of the packet's
   `checkpoint.body`, since Observatory keeps only the latest body; the session takes the request from the environment
   or the first line and its thread from `com.get`, since Observatory's write redacts the packet's board references. A
-  Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes do not yet).
+  Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes do not yet); a host whose hook gets no session id (the native bridges) is always told
+  the full contract; on Windows any `/clear` keeps the contract, since each hook runs under a new Git Bash.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.
 - The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
@@ -33,8 +34,9 @@
   signal, metadata only, the declaration's form). The support-agent recipe:
   - a hand-off its checks made carries the refused `draft` in the returned decision and to an `on_handoff` the agent
     passes, never into a file (`decisions.jsonl` or the default outbox), so a repeat of the id returns it without; `answer(new_id, text, repair=decision)` rewrites it once with the refusal's reasons: a pass is
-    a reply with `repaired: true`, a second refusal a hand-off with `fallback: true` (the standard's 4.4 and its
-    ticket's `fallback`), which `repair=` then refuses;
+    a reply with `repaired: true`, and a repair that ends otherwise (a second refusal, a model `HANDOFF`, no knowledge on
+    the retry; not a `model:*` outage) a hand-off with `fallback: true` (the standard's 4.4 and its ticket's
+    `fallback`), which `repair=` then refuses;
   - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config, which reads the file at once) reads the knowledge
     file as a source: read again when it changes, the last good version kept when a read fails or the file has the
     wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
@@ -47,10 +49,10 @@
 
 ### Upgrading
 
-- A recopied `support_agent.py` refuses at start (exit 1, a `RecipeError` naming the entry) a knowledge file 0.62.0
+- A recopied `support_agent.py` refuses at start (exit 1, a `RecipeError` naming the entry or the file's shape) a knowledge file 0.62.0
   took in other ways, so an agent that ran on 0.62.0 can stop at start now. Per shape, 0.62.0: a file that is not an
   object with an `entries` list (`[]`, `{}`, a string) loaded as an empty set and handed every message off as
-  `no-knowledge`; `{"entries": null}` or a number stopped it at start with a `TypeError`; an entry with `tags: null`
+  `no-knowledge`; `{"entries": null}` or `{"entries": <number>}` stopped it at start with a `TypeError`; an entry with `tags: null`
   failed each message with a `TypeError`; an entry whose `tags` is a string or holds something other than text, or
   whose `question` is not text, was read and answered from. Fix the file before upgrading.
 - A custom `on_handoff` that stores the row it is given now receives the refused `draft`, which can echo what the

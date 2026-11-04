@@ -159,7 +159,7 @@ this repository both obeys it and ships its service layer
   [FAA-12a's raw](docs/reports/2026-10-12-faa-12a-board-participants/raw/hook-timing.log).
 - Codex and Kimi Code: `fabric_session.py hook session-start --host codex|kimi`, only where the person added it with
   `install-host-hooks --apply`; it prints the preamble and exits. In a session started on a board request it prints the
-  exit contract instead and also writes the dispatch record (a session id and a time, 0600) in the user's cache folder,
+  exit contract instead and also writes the dispatch record (a session id, the agent's process id and a time, 0600) in the user's cache folder,
   pruning such records after 7 days.
 
 No `.mcp.json`, no launchd job, no port, no per-session server, no login item. Nothing idles on its own; the one

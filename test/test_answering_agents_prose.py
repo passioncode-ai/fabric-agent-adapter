@@ -154,7 +154,8 @@ RECIPE_PARAGRAPH = (
     'id; `repair=` takes only a hand-off the checks made (not `no-knowledge`, `model-unsure` or `model:*`), and never'
     ' a repeat: a repeat of the id returns the stored decision, which has no draft, so the repair step keeps the '
     'decision it was handed and passes each first decision to `repair=` once. A repair the model declines (`HANDOFF`)'
-    " is marked `fallback: true` too; a `model:*` outage is not. `on_handoff` runs under the agent's lock, before the"
+    " or that finds no knowledge is marked `fallback: true` too: it marks a spent repair, whatever ended it; a"
+    " `model:*` outage is not. `on_handoff` runs under the agent's lock, before the"
     ' decision is saved, so it queues the hand-off and returns: since 0.55.0 a call to `answer` from inside it, on '
     'the same thread, is refused with `ReentryError` (a `RecipeError`), and unless `on_handoff` catches it the first '
     'call raises it too, its draft paid and nothing saved or delivered. A call it hands to another thread and waits '

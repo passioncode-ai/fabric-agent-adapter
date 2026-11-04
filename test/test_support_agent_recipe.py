@@ -480,6 +480,17 @@ class Recipe(unittest.TestCase):
                 self.assertEqual((second["action"], second["reasons"]), ("handoff", reasons))
                 self.assertEqual(second.get("fallback"), fallback)
 
+    def test_a_repair_that_finds_no_knowledge_is_a_fallback(self):
+        # 0.63.0 unit reading 5: the knowledge changed between the first answer and its repair
+        agent, _ = self.agent(model_says("Open Settings."))
+        first = agent.answer("m-1", "How do I reset my password?")
+        self.assertIn("draft", first)
+        agent.knowledge = sa.Knowledge([])
+        second = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+        self.assertEqual((second["reasons"], second.get("fallback")), (["no-knowledge"], True))
+        with self.assertRaises(sa.RecipeError):
+            agent.answer("m-1-r2", "How do I reset my password?", repair=second)
+
     def test_a_tag_that_is_not_text_is_refused(self):
         example = json.loads((RECIPE / "knowledge.example.json").read_text())
         for tags in ([1], "refund", None):
