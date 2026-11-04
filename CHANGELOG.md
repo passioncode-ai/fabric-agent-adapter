@@ -20,7 +20,8 @@
   checkpoints, renewals about every 20 s (work that outlasts the run gives its state in a `com.progress` note and is left accepted for the next run,
   which Fabric's dispatcher starts since its main at `fff4b6d9`, in no release yet, Fabric itself moving the open
   Observatory workflow to that run, as its spec at `c560d97e` says (sections 3.4 and 3.6; its code does not yet); when the request's deadline is not after
-  run-ends-at plus 5 minutes, since Fabric starts no run closer to it, it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
+  run-ends-at plus 5 minutes, since Fabric starts no run closer to it by its word on thread `b3e60686`, not yet in its
+  spec or code, it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
   nudge in such a session. Only the
@@ -49,7 +50,8 @@
 - The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
   standard's rules for agents on a channel people write to (the ticket as the unit, one outcome per ticket, answer
   rather than route, repair before hand-off, declared sources with a maximum age, hand-off queues with their answered
-  signal, metadata only, the declaration's form). The support-agent recipe:
+  signal, text from a channel as data (the contract's proposed CA-8), metadata only, the declaration's form, with a
+  holding reply owing a final text, FAC-SEM-164). The support-agent recipe:
   - a hand-off its checks made carries the refused `draft` in the returned decision and to an `on_handoff` the agent
     passes, never into a file (`decisions.jsonl` or the default outbox), so a repeat of the id returns it without; `answer(new_id, text, repair=decision)` rewrites it once with the refusal's reasons: a pass is
     a reply with `repaired: true`, and a repair that ends otherwise (a second refusal, a model `HANDOFF`, no knowledge on

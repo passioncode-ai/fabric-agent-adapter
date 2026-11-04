@@ -397,7 +397,7 @@ class Hooks(Base):
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
         self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")
-        self.assertIn("when the request's deadline is not after run-ends-at plus 5 minutes (no run starts closer to it), "
+        self.assertIn("when the request's deadline is not after run-ends-at plus 5 minutes (Fabric's margin for a next run, by its word), "
                       "`com.complete` failed_known", text,
                       "no run comes after the deadline (0.63.0 product reading 12)")
 
@@ -449,8 +449,8 @@ class Hooks(Base):
         text = cli.dispatch_cleared(uuid, HANDOFF)
         for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF,
                       "still shows the handoff pending, no accept was made", "Never accept it under the new id",
-                      "exactly as the first accept passed it", "the lease's `holder`", "carries an `accountRef`",
-                      "`agent:<provider>` when Switchboard started the run", "A replay Observatory refuses"):
+                      "as the first accept passed them", "its `holder` is the owner", "carries an `accountRef`", "the lease it shows is Fabric's, not this run's", "no executor (the launcher's prompt is gone)",
+                      "`agent:<provider>` (such as `agent:claude-code`) when Switchboard started the run", "A replay Observatory refuses"):
             self.assertIn(words, text)
         for previous in (None, "", "S-ABC", uuid.upper()):
             with self.subTest(previous=previous):
@@ -458,10 +458,14 @@ class Hooks(Base):
         self.assertIn("the key the first accept used", cli.dispatch_cleared(uuid))
         # 0.63.0 unit reading 15: the owner with no launcher named, the conflict's ending, and a pending accept with no
         # handoff known that presumes no first accept's key
-        self.assertIn("the lease's `holder` in `observatory_checkpoint_latest`; the one step 2 names)", cli.dispatch_cleared(uuid))
+        self.assertIn("the owner `agent:<name>` step 2 names and no executor", cli.dispatch_cleared(uuid))
+        # 0.63.0 product reading 16: a pending accept takes the owner from step 2, never the lease's holder
+        self.assertNotIn("holder` in", cli.dispatch_cleared(uuid, HANDOFF).split("still shows the handoff pending")[1])
+        self.assertIn("(when it names none: your `owner` `agent:<name>`, a key of your own, no executor)",
+                      cli.dispatch_contract(FULL), "step 2's fallback, which the notices point at (unit reading 16)")
         self.assertIn("the `owner`, `idempotencyKey` and `executor` the launcher's prompt names", cli.dispatch_contract(FULL))
         self.assertIn("gets no lease back: end the run without touching the request", text)
-        self.assertIn("with an idempotencyKey of its own and this session's own sessionId", cli.dispatch_cleared(None))
+        self.assertIn("with an idempotencyKey of its own, the owner `agent:<name>` step 2 names, no executor and this session's own sessionId", cli.dispatch_cleared(None))
         self.assertIn("observatory_lesson", cli.dispatch_contract(FULL), "step 7's retro")
         self.assertIn("insight/1", cli.dispatch_contract(FULL), "step 7's retro (0.63.0 unit reading 12)")
 
@@ -556,7 +560,8 @@ class Hooks(Base):
         for previous in (None, ""):
             with self.subTest(previous=previous):
                 text = cli.dispatch_cleared(previous, HANDOFF, new)
-                self.assertIn("with that key and this session's own sessionId (%s)" % new, text)
+                self.assertIn("with that key, the owner `agent:<provider>`", text)
+                self.assertIn("this session's own sessionId (%s)" % new, text)
                 self.assertIn("`accept-%s`" % HANDOFF, text.split("no accept was made")[0])
                 self.assertIn("end the run without touching the request", text)
                 self.assertNotIn("Never accept it under the new id", text)

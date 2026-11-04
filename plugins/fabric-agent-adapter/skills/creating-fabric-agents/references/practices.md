@@ -143,6 +143,7 @@ draft-and-check step owns.
   member is never null, except where nothing is decided (a channel's `decision`, and the optional `quiet_window`,
   `late_answer_window` and `evals.spend_record`): a member not there yet is `{"none": "not_yet", "until": "<date>"}`,
   one not used `{"none": "not_used"}` (only `question_route`, `gap_registry`, `tickets.pd_check` and a channel's
-  `texts.final` take that form); `recommendation` appears only with `answered_signal: "none"`; what each channel
+  `texts.final` take that form, and a final text is never `not_used` beside a holding reply with replies on: a holding
+  reply owes a final one, the contract's FAC-SEM-164); `recommendation` appears only with `answered_signal: "none"`; what each channel
   counts (`channels[].items_seen_unit`) is one of `mails`, `updates`, `messages` or `reviews`. Example: the recipe's
   `channel-agent.example.json`. `check_service.py` reads it once the contract publishes its schema.

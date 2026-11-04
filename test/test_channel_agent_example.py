@@ -147,6 +147,24 @@ class Example(unittest.TestCase):
                 change(broken)
                 self.assertNotEqual(problems(broken), [], name)
 
+    def test_a_final_text_owes_nothing_without_a_holding_reply(self):
+        # 0.63.0 unit reading 16: FAC-SEM-164 finds not_used only beside a holding reply with replies on; a not_yet
+        # final owes nothing there
+        project = lambda d: d[KEY]["projects"][0]  # noqa: E731
+        cases = [
+            ("no holding reply", lambda d: (project(d)["channels"][0].update(holding_reply=False),
+                                            project(d)["channels"][0]["texts"].update(final={"none": "not_used"}))),
+            ("replies off", lambda d: (project(d)["channels"][0].update(replies_enabled=False),
+                                       project(d)["channels"][0]["texts"].update(final={"none": "not_used"}))),
+            ("a final not yet there", lambda d: project(d)["channels"][0]["texts"].update(
+                final={"none": "not_yet", "until": "2026-12-01"})),
+        ]
+        for name, change in cases:
+            with self.subTest(name):
+                fine = copy.deepcopy(self.declaration)
+                change(fine)
+                self.assertEqual(problems(fine), [], name)
+
 
 if __name__ == "__main__":
     unittest.main()

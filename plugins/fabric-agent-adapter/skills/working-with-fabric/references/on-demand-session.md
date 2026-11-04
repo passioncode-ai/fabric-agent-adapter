@@ -90,7 +90,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      run comes before the deadline (Fabric starts none with less than 5 minutes left: 120 s of silence, a 60 s cycle
      and the launch) and an accepted request does not expire by itself: `com.complete` `failed_known` saying the
      deadline came first, and steps 6 and 7 (Fabric's word on thread `b3e60686`, 2026-11-04; a request whose deadline
-     passed unsettled goes to «На проверке» with its workflow closed `blocked`);
+     passed unsettled goes to «На проверке» with its workflow closed `blocked`; neither is in Fabric's spec or code
+     at `c560d97e` yet, so until they are a run can still start with less than 5 minutes left, and from which moment
+     Fabric counts its 5 minutes is asked on the same thread);
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
@@ -146,14 +148,17 @@ session keeps the contract (the record moves to the new session id). A holder th
 the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
 so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,
-`accept-<handoff>`), the same `owner` and the `executor` exactly as the first accept passed it. The lease
-`observatory_checkpoint_latest` shows survives the clear: its `holder` is the first accept's owner, and its `executor`
-merges the offer (a provider only, Fabric's spec 3.5) with what was passed, so it is the passed executor when it
-carries an `accountRef`, and the first accept passed none when it shows a provider alone. A new accept under the new id
-is refused, and so is a replay with another owner or executor; after any refused replay the session ends the run
-without touching the request and Fabric takes the workflow over. When
-`observatory_checkpoint_latest` still shows the handoff pending, no accept was made, and the holder accepts it now
-under that same `sessionId`, key, owner and executor, so a later `/clear`, which names the same id, replays it. When
+`accept-<handoff>`), the same `owner` and the `executor` as the first accept passed them. Once the handoff is no
+longer pending, the lease `observatory_checkpoint_latest` shows is that accept's and survives the clear: its `holder`
+is the first accept's owner, and its `executor` merges the offer (a provider only, Fabric's spec 3.5) with what was
+passed, so it is the passed executor when it carries an `accountRef`, and the first accept passed none when it shows
+a provider alone. A new accept under the new id is refused, and so is a replay with another owner or executor; after
+any refused replay the session ends the run without touching the request and Fabric takes the workflow over. When
+`observatory_checkpoint_latest` still shows the handoff pending, no accept was made and the lease it shows is
+Fabric's own (the workflow's creator, or its `restart` hand-over to `service:fabric`), not the run's: the holder
+accepts it now under that same `sessionId` and key, with the owner step 2 names (`agent:<provider>`, such as
+`agent:claude-code`, when Switchboard started the run, else `agent:<name>`) and no executor, since the launcher's
+prompt is gone, so a later `/clear`, which names the same id, replays it with no executor. When
 the hooks cannot name the replaced id (no readable record, or Windows, where any `/clear` takes the record and the
 hooks name no id), the notice gives the new id instead: a pending handoff is accepted under it, and the next `/clear`
 names it, except on Windows, where it names no id either, so an accept made there cannot be replayed after another

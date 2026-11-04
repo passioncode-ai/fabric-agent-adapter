@@ -136,7 +136,7 @@ DISPATCH_CONTRACT = (
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
     "and finish before run-ends-at; work that cannot end by then gives its state as a `com.progress` note on the "
-    "thread, then: when the request's deadline is not after run-ends-at plus 5 minutes (no run starts closer to it), `com.complete` failed_known saying so and steps 6 and 7; "
+    "thread, then: when the request's deadline is not after run-ends-at plus 5 minutes (Fabric's margin for a next run, by its word), `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
@@ -206,41 +206,46 @@ DISPATCH_SESSION = " This session's sessionId: {session}."
 #: After a /clear the accept, if one was made, was made under the session id the clear replaced (0.63.0 seam readings
 #: 9 and 10): Observatory replays an accept, with its leaseId, only for that sessionId and the same idempotencyKey. A
 #: pending handoff is accepted under that same id, so every later replay matches it (0.63.0 seam reading 13).
-#: Observatory keys the replay on the owner and the executor as passed. The lease checkpoint_latest shows survives the
-#: clear: its `holder` is the first accept's owner, and its `executor` merges the offer (a provider only, Fabric's spec
-#: 3.5) with what was passed, so it is that executor when it carries an accountRef (0.63.0 seam readings 14 and 15).
+#: Observatory keys the replay on the owner and the executor as passed. Once this dispatch's handoff is accepted, the
+#: lease checkpoint_latest shows survives the clear: its `holder` is the first accept's owner, and its `executor` merges
+#: the offer (a provider only, Fabric's spec 3.5) with what was passed, so it is that executor when it carries an
+#: accountRef (0.63.0 seam readings 14 and 15). While the handoff is pending the lease is Fabric's own (its creator,
+#: or its restart hand-over to service:fabric), never the run's (0.63.0 product reading 16).
 DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, and its leaseId comes back only by "
-                    "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` (the lease's "
-                    "`holder` in `observatory_checkpoint_latest`; {owner}) and the `executor` exactly as the first "
-                    "accept passed it: the lease's `executor` when it carries an `accountRef`, none when it shows a "
-                    "provider alone and the first accept passed none. A replay Observatory refuses gets no lease back: "
-                    "end the run without touching the request; Fabric takes the workflow over after it. When "
-                    "`observatory_checkpoint_latest` still shows the handoff pending, no accept was made: {pending}")
+                    "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` and the "
+                    "`executor` as the first accept passed them. Once the handoff is no longer pending, the lease "
+                    "`observatory_checkpoint_latest` shows is that accept's: its `holder` is the owner, and its "
+                    "`executor` the one passed when it carries an `accountRef`, none when it shows a provider alone. "
+                    "A replay Observatory refuses gets no lease back: end the run without touching the request; Fabric "
+                    "takes the workflow over after it. When `observatory_checkpoint_latest` still shows the handoff "
+                    "pending, no accept was made and the lease it shows is Fabric's, not this run's: {pending}")
 _CLEARED_UNKNOWN = "the sessionId the clear replaced"
-_PENDING_NAMED = ("accept it now with that same sessionId, key, owner and executor. Never accept it under the new "
-                  "id.")
+_PENDING_NAMED = ("accept it now with that same sessionId, that key, the owner {owner} and no executor (the launcher's "
+                  "prompt is gone). Never accept it under the new id.")
 _PENDING_WINDOWS = " On Windows a later /clear names no id either: an accept made now cannot be replayed after it."
-_PENDING_UNKNOWN = ("accept it as step 2 says, with {pkey} and this session's own sessionId{session}. An accept already made "
-                    "under an id these hooks could not name cannot be replayed: end the run without touching the "
-                    "request; Fabric takes the workflow over after it.")
+_PENDING_UNKNOWN = ("accept it as step 2 says, with {pkey}, the owner {owner}, no executor and this session's own "
+                    "sessionId{session}. An accept already made under an id these hooks could not name cannot be "
+                    "replayed: end the run without touching the request; Fabric takes the workflow over after it.")
 
 
 def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None) -> str:
     """The cleared holder's notice: replay under the id the clear replaced when it is known, and accept a pending
-    handoff under that same id; when it is not known, a pending handoff is accepted under this session's id."""
+    handoff under that same id; when it is not known, a pending handoff is accepted under this session's id. A pending
+    accept takes its owner and key from step 2, never from the lease, which is Fabric's until the handoff is taken."""
     named = isinstance(previous, str) and _SESSION_UUID.fullmatch(previous)
     switchboard = isinstance(handoff, str) and bool(handoff)
     key = "`accept-%s` when Switchboard started the run" % handoff if switchboard else "the key the first accept used"
-    owner = "`agent:<provider>` when Switchboard started the run" if switchboard else "the one step 2 names"
+    owner = ("`agent:<provider>` (such as `agent:claude-code`) when Switchboard started the run, else `agent:<name>`"
+             if switchboard else "`agent:<name>` step 2 names")
     if named:
-        pending = _PENDING_NAMED
+        pending = _PENDING_NAMED.format(owner=owner)
     else:
         own = isinstance(session_id, str) and _SESSION_UUID.fullmatch(session_id)
         pending = _PENDING_UNKNOWN.format(pkey="that key" if switchboard else "an idempotencyKey of its own",
-                                          session=" (%s)" % session_id if own else "") + (
+                                          owner=owner, session=" (%s)" % session_id if own else "") + (
             _PENDING_WINDOWS if _WINDOWS else "")
     return DISPATCH_CLEARED.format(session="sessionId %s" % previous if named else _CLEARED_UNKNOWN, key=key,
-                                   owner=owner, pending=pending)
+                                   pending=pending)
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
