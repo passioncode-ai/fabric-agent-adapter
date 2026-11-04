@@ -132,7 +132,8 @@ delivered the session's end, which removes the folder. More than five pending, o
 the rest from this output (Fabric keeps them for `fabric_work_list`): the log names how many (`dropped=`, `lost=`), never
 what they say; those the Stop worker delivered wait for the next prompt (FAA-142). While Fabric is down or
 the board unreadable it says so once and backs off, doubling to at most 15 minutes. It exits on its stdin's end (when started with a pipe), SIGTERM, SIGINT or SIGHUP,
-or when its parent is gone. It refuses to start in a session Fabric launched, and without a `fabric` registration.
+or when its parent is gone. It refuses to start in a session Fabric launched, in a session started on a board request, and without a `fabric`
+registration.
 
 ## A session Fabric launched
 
@@ -159,7 +160,8 @@ handoff=... request=...`. SessionStart prints the exit contract in place of the 
 without reading Fabric's files, and also in a session Fabric launched: there the contract is the one thing it prints.
 The prompt hook prints it again when the line adds the handoff or the request the environment left out, or disagrees
 with it (the environment wins, and the contract says so); a line with no workflow in the environment is quoted text.
-The turn and end hooks work as in any other session (silent in a launched one). What the session then does:
+Only the run's first session holds the dispatch (a record in `dispatch/`, below; a `/clear` keeps it): a session the
+run starts itself gets one line instead, telling it not to accept, claim, complete or close. The turn and end hooks work as in any other session (silent in a launched one). What the session then does:
 [on-demand session](on-demand-session.md).
 
 ## What they never do

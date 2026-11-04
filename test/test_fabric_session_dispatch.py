@@ -1,4 +1,4 @@
-"""FAA-201: a session Fabric started on a board request (Fabric's spec at 77bf16ac, sections 3.4 to 3.6). The session is
+"""FAA-201: a session Fabric started on a board request (Fabric's spec at 1329b60f, sections 3.4 to 3.6). The session is
 told by FABRIC_DISPATCH_WORKFLOW (alone is enough: Switchboard's SB-247 sets only it), with FABRIC_DISPATCH_HANDOFF and
 FABRIC_DISPATCH_REQUEST when the launcher sets them; the prompt's first line `fabric-dispatch/1 workflow=... handoff=...
 request=...` fills what the environment left out and never wins over it. A line with no workflow in the environment is
@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib
 import json
 import unittest
+from pathlib import Path
 
 from test_fabric_session import Base, SID, fs
 
@@ -89,6 +90,9 @@ class Parsing(unittest.TestCase):
                      "expectedGeneration", "in_progress checkpoint", "the launcher's prompt names"):
             self.assertIn(word, text)
         self.assertNotIn("earlier checkpoints", text, "Observatory has no tool that reads them")
+        for word in ("repeats the packet's `goal`, `constraints`, `artifacts` and `credentials`", "its goal names the request",
+                     "the packet's body with `done` and `notes` added"):
+            self.assertIn(word, text, "Observatory keeps only the latest body (0.63.0 readings 3)")
 
     def test_the_contract_points_at_the_packet_for_what_the_environment_left_out(self):
         text = cli.dispatch_contract({"workflow": WF})
@@ -232,6 +236,24 @@ class Hooks(Base):
         os.utime(old, (1, 1))
         fs.prune_stale_sessions(env=env, now=time.time())
         self.assertEqual(list(folder.glob("*.json")), [fresh])
+
+    def test_a_clear_in_the_holder_keeps_the_contract(self):
+        # 0.63.0 seam r3: /clear gives the same run a new session id; a nested claude -p starts with `startup`
+        cleared, nested = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", "5d2e3f40-1b2c-4d6e-9fa0-123456789abc"
+        self.assertIn("observatory_handoff_accept", self.context(self.start(ENV)[0]))
+        done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
+                                extra_env=ENV)
+        self.assertIn("observatory_handoff_accept", self.context(done))
+        done, _ = self.run_hook("session-start", {"session_id": nested, "cwd": str(self.repo), "source": "startup"},
+                                extra_env=ENV)
+        self.assertEqual(self.context(done), cli.DISPATCH_NESTED.format(workflow=WF))
+
+    def test_one_workflow_pattern_for_every_reader(self):
+        dashboard_kit = (Path(cli.__file__).resolve().parents[2] / "building-fabric-services/scripts/dashboard_kit.py")
+        env_module = importlib.import_module("fabric_session_env")
+        self.assertIn('re.fullmatch(r"%s"' % env_module.DISPATCH_WORKFLOW, dashboard_kit.read_text())
+        mail = importlib.import_module("fabric_session_mail")
+        self.assertIs(mail.DISPATCH_WORKFLOW, env_module.DISPATCH_WORKFLOW)
 
     def test_watch_mail_refuses_a_dispatched_session(self):
         mail = importlib.import_module("fabric_session_mail")

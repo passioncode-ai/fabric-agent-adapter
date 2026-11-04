@@ -1,7 +1,7 @@
 # A session started on a board request (FAA-201)
 
 When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
-project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `77bf16ac`). That session
+project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person.
 
 ## Contents
@@ -43,8 +43,8 @@ adapter hook (its isolated `CODEX_HOME` holds no `hooks.json`), so there the app
 ## What the session does
 
 1. **Look, then read the packet.** `fabric_whoami` first, as in any session: until it, the session holds no other
-   Fabric tool, and it returns the session's rules. Then `observatory_checkpoint_latest {workflowId}`. Its `goal` is
-   the request's text; its `constraints` carry the exit contract, the three floors and the operator's mandate when the
+   Fabric tool, and it returns the session's rules. Then `observatory_checkpoint_latest {workflowId}`. Its `goal`
+   names the request (its text is on the board); its `constraints` carry the exit contract, the three floors and the operator's mandate when the
    request has one: obey them first. Its `artifacts` are references only, `kind: "other"` with `ref`
    `board-request:<uuid>`, `board-thread:<uuid>`, `capability:<name>`, `fabric-project:<uuid>`,
    `deadline:<time>` and `run-ends-at:<time>`. No message body travels in the packet: read the request with `com.get
@@ -64,7 +64,10 @@ adapter hook (its isolated `CODEX_HOME` holds no `hooks.json`), so there the app
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
    attempt). An `outcome_unknown` one is settled only by `com.reconcile` with an observed result. Never complete what
    you did not observe. After the lease, after the claim or the takeover, and after the reply, write an `in_progress`
-   checkpoint (`workflowId`, `leaseId`, no values), so a later run has something to read.
+   checkpoint (`workflowId`, `leaseId`), so a later run has something to read. Observatory keeps only the latest
+   body, so every checkpoint the session writes repeats the packet's `goal`, `constraints`, `artifacts` and
+   `credentials` unchanged and adds `open`, `done` or `notes`, never a value: a body of `done` and `notes` alone would
+   leave the next run a packet with no request and no constraints.
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
    stops the run. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
@@ -72,7 +75,7 @@ adapter hook (its isolated `CODEX_HOME` holds no `hooks.json`), so there the app
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
    `completed`, or `failed_known` with the reason.
 6. **Close the workflow.** `observatory_checkpoint_write {workflowId, owner, idempotencyKey, stepId, status, body,
-   leaseId, close: true}`, with `body` `{goal, done[], notes}` and no values in it. Without `workflowId` Observatory
+   leaseId, close: true}`, with the packet's body and `done[]` and `notes` added, no values in it. Without `workflowId` Observatory
    reads the write as the start of a new workflow and refuses it. The status is `done` for `completed`; for
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
@@ -96,11 +99,15 @@ and ends `timed-out`.
 ## A session inside the run
 
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
-environment. Only the run's first session holds the dispatch: the hooks record the first session id for the workflow
-and the handoff (or the launcher's run id), and any other session gets one line in place of the contract: do the task
+environment. Only the run's first session holds the dispatch: the hooks record the first session id for the
+workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new launch of the same workflow is a
+new holder; a launcher that sets the workflow alone gives each run a distinct run id. A `/clear` in the holding
+session keeps the contract (the record moves to the new session id). Any other session gets one line in place of the
+contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says
-nothing there.
+nothing there. The election counts sessions whose hook ran: in a run whose own session has no adapter hook (a Codex
+run Switchboard starts, until SB-247), the first nested session the run starts is taken as the holder.
 
 The plugin tells a dispatched session from 0.63.0 on; an older one prints its ordinary preamble there, and only the
 launcher's appended exit contract tells the run what to do.

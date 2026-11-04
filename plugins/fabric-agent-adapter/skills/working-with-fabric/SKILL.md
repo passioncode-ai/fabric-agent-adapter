@@ -115,7 +115,7 @@ session; the tool list changes. Follow those rules: they outrank this skill wher
 
 ### Then the project board
 
-A dispatched session skips this, Step 4 and Step 7: [on-demand session](references/on-demand-session.md).
+A dispatched session skips the `com.list` sweep, Step 4 and Step 7: [on-demand session](references/on-demand-session.md).
 
 `com.status` (can the board be read, how many unread), then `com.list` (`unread: true` where listed); `com.read_ack`
 only what you actually read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when

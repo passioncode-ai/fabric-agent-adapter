@@ -114,15 +114,15 @@ draft-and-check step owns.
 - **The unit is the ticket, and a channel rule bounds it**: a private chat until 24 hours of silence, a group's one
   root message, a mail thread, one review. A message after a ticket ended opens a new one linked to the old. One
   ticket has one writing agent.
-- **Every ticket ends with one outcome** (answered, closed by a person, answered elsewhere, no reply owed, customer
-  silent, referred, expired, unanswered, and the open ones); an ended outcome stays, except a late signal that turns
-  a referral into a person's answer within 30 days.
+- **Every ticket ends with one outcome** (the standard's section 3 lists them all, the ended and the open ones); an
+  ended outcome stays, except that within 30 days a late signal from a hand-off queue may turn a referred or an expired
+  ticket into a person's answer (a promotion, marked as one).
 - **Answer, do not route**: hand to a person only what only a person may do, and what the checks the agent already
   gave did not fix. "A person will reply" inside an ordinary answer is a defect.
 - **Repair before hand-off**: a draft the checker refuses is rewritten once with the refusal's reason; a second refusal
   is a fallback, marked on the ticket (`fallback: true`). Check: the recipe's `repair=` and its tests.
 - **At most one clarifying question, never two in a row**; no reply where none is owed.
-- **Every source is declared with its owner, cadence and maximum age**; one that fails keeps its last good version and
+- **Every source is declared with its owner, how it is read, its cadence and its maximum age**; one that fails keeps its last good version and
   says so, and its age is that version's (its file's modification time). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
   recommendation to its owner. Many `referred` tickets show a missing signal, not a regression.

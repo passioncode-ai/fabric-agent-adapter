@@ -158,7 +158,8 @@ number or a card number. It stays until it is pruned. Choose a retention the pro
 as written, and `prune` takes any `--keep-days`, so such an agent passes an `on_handoff` that redacts what it stores,
 which replaces the outbox, and keeps 30 days or fewer. A refused `draft`, which can echo what the customer wrote,
 reaches the returned decision and an `on_handoff` the agent passes, never a file: neither `decisions.jsonl` nor the
-default outbox stores it. Prune on a schedule:
+default outbox stores it. A capability handler returns the decision without it: a kit job's result is written to
+the job's file (`fabric_interop`'s job store), so pass `draft` only to the repair step. Prune on a schedule:
 
 ```bash
 python3 support_agent.py prune --config config.json --keep-days 30

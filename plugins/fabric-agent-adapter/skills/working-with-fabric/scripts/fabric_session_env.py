@@ -77,6 +77,11 @@ LAUNCH_MARKER = "FABRIC_LAUNCHED_SESSION"
 LAUNCH_SIGNALS = ("FABRIC_ACP_SESSION", "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT")
 
 
+#: FAA-201: the workflow id a launcher names in FABRIC_DISPATCH_WORKFLOW (Observatory's WORKFLOW_ID); the one copy the
+#: session modules read. dashboard_kit.py keeps its own (it is a kit module) and a test holds the two equal.
+DISPATCH_WORKFLOW = r"wf_[0-9a-f]{16}"
+
+
 #: Files that make a folder a Fabric project: the provider manifest and the contract pin adapt_project.py writes, and
 #: a fabric-package/1 folder's manifest.
 FABRIC_MARKERS = ("fabric-agent.json", "fabric-contract.lock.json", "fabric.package.json")

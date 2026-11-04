@@ -133,7 +133,8 @@ this repository both obeys it and ships its service layer
   project-bound registration, or, read last, a service descriptor naming the checkout's origin, one `git config`
   call); in a folder with no such sign, one line pointing at `fabric_whoami` (FAA-60); when Fabric is down, one line,
   and only in a project that uses Fabric; in a session Fabric started on a board request (`FABRIC_DISPATCH_WORKFLOW`),
-  the exit contract instead, read from the environment only (FAA-201), which the prompt hook prints again when the
+  the exit contract instead, read from the environment, with one record per run in the hooks' folder
+  (`dispatch/`, 0600, pruned after 7 days; a session the run starts itself gets one line instead) (FAA-201), which the prompt hook prints again when the
   prompt's first line adds to it. Stop and SessionEnd first remove
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s);

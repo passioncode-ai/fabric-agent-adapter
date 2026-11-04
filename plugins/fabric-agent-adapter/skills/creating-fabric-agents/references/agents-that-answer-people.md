@@ -1,7 +1,8 @@
 # Agents that answer people: what they carry from the first release
 
 **Load this when the agent you are building answers people**: private chats, mail, store reviews, group chats, any
-channel where a person asks and the agent writes back. Every item below is a part of the agent, built and tested in its
+channel where a person asks and the agent writes back. An agent on such a channel also follows the channel-agent
+standard: [practices](practices.md#agents-on-a-channel-people-write-to). Every item below is a part of the agent, built and tested in its
 first release, not a later improvement. Each comes from the sources below: what the quality standard requires (A1,
 A5), and what an audit of five production agents found working or failing (P1 to P8). The practices are field
 evidence: one estate, five agents, no control; their numbers are that estate's, never a forecast.

@@ -4,7 +4,7 @@
 
 ### Added
 
-- working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `77bf16ac`).
+- working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `1329b60f`).
   `FABRIC_DISPATCH_WORKFLOW` tells it, alone (as Switchboard's `dispatch` sets it today, board thread `b3e60686`) or
   with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`; the prompt's first line `fabric-dispatch/1
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
@@ -17,8 +17,10 @@
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it. Only the
   run's first session holds the dispatch: a session the run starts itself inherits the environment and gets one line
-  telling it not to accept, claim, complete or close. `watch-mail` refuses to start in a dispatched session, and the
-  dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
+  telling it not to accept, claim, complete or close, and a `/clear` in the holding session keeps the contract (the
+  hooks keep one record per run under `dispatch/`, pruned after 7 days). Every checkpoint the session writes repeats
+  the packet's goal, constraints, artifacts and credentials, since Observatory keeps only the latest body.
+  `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.
 - The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
   standard's rules for agents on a channel people write to (the ticket as the unit, one outcome per ticket, answer
@@ -32,10 +34,21 @@
     file as a source: read again when it changes, the last good version kept when a read fails or the file has the
     wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
     time;
-  - `Knowledge.load` refuses a file that is not an object with an `entries` list, where it took an empty set before;
+  - `Knowledge.load` refuses a file that is not an object with an `entries` list, an entry whose tags are not a list
+    of text or whose question is not text, and a file nested too deep, each as a `RecipeError`;
   - `channel-agent.example.json`, one project's declaration under
     `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to
     the example config's maximum age by `test/test_channel_agent_example.py`.
+
+### Upgrading
+
+- A recopied `support_agent.py` refuses a knowledge file that is not an object with an `entries` list, or an entry
+  whose `tags` is not a list of text or whose `question` is not text: the agent stops at start (exit 1), where 0.62.0
+  handed every message off as `no-knowledge`. Fix the file.
+- A custom `on_handoff` that stores the row it is given now receives the refused `draft`, which can echo what the
+  customer wrote: drop `draft` before storing it (the default outbox does).
+- A session carrying `FABRIC_DISPATCH_WORKFLOW` now gets the exit contract at session start even when Fabric launched
+  it, and `watch-mail` refuses to start there.
 
 ### Fixed
 

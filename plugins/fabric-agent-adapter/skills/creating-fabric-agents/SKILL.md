@@ -91,7 +91,7 @@ prior art of its own:
 
 - [practices.md](references/practices.md): the rules production agents taught us, each with
   the check that catches it (judges and evals, numbers, money, people in the loop,
-  reliability, shipping). Organization members also read the knowledge base's
+  reliability, shipping, agents on a channel people write to). Organization members also read the knowledge base's
   `knowledge/agent-practices.md` and add to it what this agent learns.
 - [where-agents-run.md](references/where-agents-run.md): this machine, a personal cloud, an
   organization; contexts; connecting a machine; sharing into an organization; selling.

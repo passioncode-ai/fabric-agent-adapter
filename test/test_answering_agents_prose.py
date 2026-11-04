@@ -187,7 +187,9 @@ RECIPE_RETENTION = (
     'redacted: the outbox keeps it as written, and `prune` takes any `--keep-days`, so such an agent passes an '
     '`on_handoff` that redacts what it stores, which replaces the outbox, and keeps 30 days or fewer. A refused '
     '`draft`, which can echo what the customer wrote, reaches the returned decision and an `on_handoff` the agent '
-    'passes, never a file: neither `decisions.jsonl` nor the default outbox stores it. Prune on a schedule:')
+    'passes, never a file: neither `decisions.jsonl` nor the default outbox stores it. A capability handler returns '
+    "the decision without it: a kit job's result is written to the job's file (`fabric_interop`'s job store), so pass"
+    ' `draft` only to the repair step. Prune on a schedule:')
 CHANGELOG_ENTRY = (
     '- **creating-fabric-agents: agents that answer people** (FAA-162, board request `1ad39d4e`). A new reference, '
     '`references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, '
@@ -326,6 +328,7 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
                       "neither `decisions.jsonl` nor the default outbox stores it", "a repeat of the id returns the stored decision"):
             self.assertIn(words, recipe, words)
         self.assertIn("recipes/support-agent/", flat(REFERENCE))
+        self.assertIn("practices.md#agents-on-a-channel-people-write-to", text(REFERENCE), "the channel doctrine is reached")
         self.assertIn("agents-that-answer-people.md", flat("building-fabric-services/SKILL.md"))
         self.assertNotIn("](../../", text(REFERENCE), "the reference names a sibling skill's page in prose")
 

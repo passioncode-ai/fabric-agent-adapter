@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
+    DISPATCH_WORKFLOW,
     BOARD_STATUS_TOOL,
     HOOK_FEATURE,
     SESSION_ID,
@@ -180,7 +181,7 @@ def watch_mail_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = None) ->
     if fabric_launched(env):
         sys.stderr.write("watch-mail: this session was launched by Fabric; call com.status with your own tools.\n")
         return 2
-    if re.fullmatch(r"wf_[0-9a-f]{16}", env.get("FABRIC_DISPATCH_WORKFLOW") or ""):
+    if re.fullmatch(DISPATCH_WORKFLOW, env.get("FABRIC_DISPATCH_WORKFLOW") or ""):
         sys.stderr.write("watch-mail: this session was started on a board request; it does that request and ends "
                          "(working-with-fabric references/on-demand-session.md).\n")
         return 2
