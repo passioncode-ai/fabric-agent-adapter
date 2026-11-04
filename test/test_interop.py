@@ -1171,6 +1171,19 @@ class JobApprovalStepTests(unittest.TestCase):
             "approve-reply": {"effect": "reply", "spendUsd": float("nan"), "project": Site.ALPHA}})
         self.assertEqual(self.jobs.private(job_id)["steps"], {"approve-reply": {"effect": "reply", "project": fi.UNREADABLE_PROJECT}})
 
+        class Effect(str, enum.Enum):  # seam and unit readings 34: an effect is admitted as an exact str, never kept as given
+            REPLY = "reply"
+        self.start({"mandate": scoped})
+        job_id = self.contexts[-1][0]
+        for effect in (Effect.REPLY, Text("reply")):
+            with self.assertRaises(fi.InteropError):
+                self.step(effect=effect)
+            with self.assertRaises(fi.InteropError):
+                self.jobs.request_input(job_id, {"approve-reply": request}, "Publish it?", steps={"approve-reply": {"effect": effect}})
+            with self.assertRaises(fi.InteropError):
+                fi.job_step(scoped, spend_usd=0.5, project="alpha", **dict(call, effect=effect))
+        self.assertNotEqual(self.jobs.get(job_id)["status"], "input_required", "nothing was kept")
+
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",
                                      expires_at="2026-10-24T09:20:00Z")

@@ -366,6 +366,14 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   store.working(job.id);
   store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': { effect: 'reply', spendUsd: 0.5, project: 'alpha' } } });
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply', spendUsd: 0.5, project: 'alpha' } });
+  // Each member is read once and the value checked is the value kept (seam reading 34).
+  store.working(job.id);
+  const reads = { effect: 0, project: 0 };
+  const step = { get effect() { reads.effect += 1; return reads.effect === 1 ? 'reply' : 'deploy'; },
+    get project() { reads.project += 1; return reads.project === 1 ? 'alpha' : 'beta'; } };
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': step } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply', project: 'alpha' } });
+  assert.deepEqual(reads, { effect: 1, project: 1 });
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);
   store.requestInput(job.id, { 'approve-reply': request }, 'Publish another?');

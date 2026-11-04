@@ -342,7 +342,7 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
       it reads as mandate-malformed here as it does at the answer (FAA-178; McpToolServer does)."""
     if mandate is None:
         return {"covered": False, "message": None}
-    if not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+    if not (type(effect) is str and effect in EFFECT_CLASSES):  # exact, as the core compares it (seam reading 34)
         raise InteropError("A job's approval step names its effect class (one of %s; DEC-0125)." % ", ".join(EFFECT_CLASSES))
     call: Dict[str, Any] = {"capability": capability, "action": key, "effect": effect}
     spend = mandate_spend(spend_usd)  # read as action_gate reads it, so the start and the answer agree (FAA-139)
@@ -395,9 +395,9 @@ def mandate_spend(value: Any) -> Any:
 def kept_step(step: Dict[str, Any]) -> Dict[str, Any]:
     """A job's approval step {effect, spendUsd?, project?} as a job file keeps it: read as the gate reads it, so a job's
     start and its answer agree (0.61.0 seam reading 32, product reading 33): a spend through mandate_spend (dropped
-    when none), a project as an exact str, else UNREADABLE_PROJECT (dropped when None)."""
-    spend, project = mandate_spend(step.get("spendUsd")), step.get("project")
-    return {"effect": step["effect"], **({"spendUsd": spend} if spend is not None else {}),
+    when none), a project as an exact str, else UNREADABLE_PROJECT (dropped when None); each member read once."""
+    effect, spend, project = step.get("effect"), mandate_spend(step.get("spendUsd")), step.get("project")
+    return {"effect": effect, **({"spendUsd": spend} if spend is not None else {}),
             **({"project": project if type(project) is str else UNREADABLE_PROJECT} if project is not None else {})}
 
 

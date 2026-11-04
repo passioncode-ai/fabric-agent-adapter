@@ -61,7 +61,11 @@ says that his approval holds for the whole task, at every link (FAA-195).
   reads it (`kept_step` / `keptStep`: a spend through `mandate_spend`, a project as an exact `str` or a primitive
   string, else `UNREADABLE_PROJECT`), and `job_step`, `action_gate` and McpToolServer read a project as an exact `str`
   too, as the board path does, so the start and the answer agree, and a value that only claims `str` never reaches the
-  job file (older than 0.61.0; 0.61.0 seam reading 32, unit and product readings 33). `js_to_number`'s decimal
+  job file (older than 0.61.0; 0.61.0 seam reading 32, unit and product readings 33). The same split held for an
+  effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
+  file wrote as a plain string the answer covered; `job_step`, `request_input(steps=)` and `add_tool` now admit an
+  effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),
+  and both stores read each member of a step once and keep the value they checked (0.61.0 seam and unit readings 34). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
   (0.61.0 seam reading 22).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
@@ -104,6 +108,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
   0.60.0): reinstall with `fabric_kit.py install` and check with `status`, never by copying `fabric_board_link` alone.
 - A Python service that passes a job or tool project as a `(str, Enum)` member or another `str` subclass, under a
   mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
+  An effect passed that way to `approval_step`, `job_step`, `request_input(steps=)` or `add_tool` now raises
+  `InteropError`: pass `member.value` there too.
+- A kept step holds only `effect`, `spendUsd` and `project`: a service that put its own keys in `steps=` keeps them
+  elsewhere.
 - A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it (a `str`-subclass
   project as its plain string), so its answer may still be covered: answer or cancel such jobs before upgrading.
 

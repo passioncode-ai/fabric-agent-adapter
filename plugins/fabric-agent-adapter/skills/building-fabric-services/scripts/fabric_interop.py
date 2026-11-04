@@ -397,8 +397,10 @@ class JobStore:
         `steps` (DEC-0125) maps a request key to the approval step it asks for, {effect, spendUsd?, project?}, kept in the
         job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it).
         A step is kept as the gate reads it (kept_step), so a job's start and its answer agree."""
-        for key, step in (steps or {}).items():
-            if key not in (input_requests or {}) or not isinstance(step, dict) or step.get("effect") not in EFFECT_CLASSES:
+        kept: Dict[str, Dict[str, Any]] = {}
+        for key, step in (steps or {}).items():  # the value checked is the value kept (seam reading 34)
+            kept[key] = kept_step(step) if key in (input_requests or {}) and isinstance(step, dict) else {}
+            if not (type(kept[key].get("effect")) is str and kept[key]["effect"] in EFFECT_CLASSES):
                 raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
         if not input_requests:
             raise InteropError("input_required needs at least one input request.")
@@ -407,7 +409,6 @@ class JobStore:
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
-        kept = {key: kept_step(step) for key, step in (steps or {}).items()}
         return self._transition(job_id, "input_required", {"steps": kept},
                                 inputRequests=input_requests, statusMessage=message)
 
@@ -714,9 +715,9 @@ class McpToolServer:
                 raise InteropError("Tool %s: a human step needs its link, an https URL or a path (DEC-0121 AP-4)." % tool["name"])
             if not (target is None or isinstance(target, str) or callable(target)):
                 raise InteropError("Tool %s: target is an argument's name or a function of the arguments." % tool["name"])
-            if self.agent_id is not None and action["gate"] == "relayed" and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+            if self.agent_id is not None and action["gate"] == "relayed" and not (type(effect) is str and effect in EFFECT_CLASSES):
                 raise InteropError("Tool %s: a relayed action on a server that reads mandates names its effect class (DEC-0125)." % tool["name"])
-            if effect is not None and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+            if effect is not None and not (type(effect) is str and effect in EFFECT_CLASSES):
                 raise InteropError("Tool %s: effect is one of %s." % (tool["name"], ", ".join(EFFECT_CLASSES)))
             if not (spend is None or callable(spend) or (isinstance(spend, (int, float)) and not isinstance(spend, bool))):
                 raise InteropError("Tool %s: spend is a number of USD or a function of the arguments." % tool["name"])

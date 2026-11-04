@@ -269,15 +269,16 @@ export class JobStore {
   // job's private part (the format fabric_interop.py writes) so a service reads an answer's _meta.mandate for that step.
   // A step is kept as the gate reads it (keptStep), so a job's start and its answer agree.
   requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
+    const kept = {}; // the value checked is the value kept (seam reading 34)
     for (const [key, step] of Object.entries(steps ?? {})) {
-      if (!Object.hasOwn(inputRequests ?? {}, key) || !EFFECT_CLASSES.includes(step?.effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
+      kept[key] = Object.hasOwn(inputRequests ?? {}, key) && step !== null && typeof step === 'object' ? keptStep(step) : {};
+      if (!EFFECT_CLASSES.includes(kept[key].effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
     }
     const entries = Object.entries(inputRequests ?? {});
     if (!entries.length) throw new InteropError('input_required needs at least one input request.');
     for (const [key, request] of entries) if (!KEY.test(key) || request?.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
     const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
     if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);
-    const kept = Object.fromEntries(Object.entries(steps ?? {}).map(([key, step]) => [key, keptStep(step)]));
     return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, { steps: kept });
   }
 

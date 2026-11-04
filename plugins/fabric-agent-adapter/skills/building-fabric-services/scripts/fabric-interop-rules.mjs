@@ -286,9 +286,10 @@ export function mandateSpend(value) {
  * start and its answer agree (0.61.0 product reading 33): a spend through mandateSpend (dropped when none), a project
  * as a primitive string, else UNREADABLE_PROJECT (dropped when null or undefined). */
 export function keptStep(step) {
-  const spend = mandateSpend(step.spendUsd);
-  return { effect: step.effect, ...(spend !== undefined ? { spendUsd: spend } : {}),
-    ...(step.project !== undefined && step.project !== null ? { project: typeof step.project === 'string' ? step.project : UNREADABLE_PROJECT } : {}) };
+  const { effect, spendUsd, project } = step; // each member read once (seam reading 34)
+  const spend = mandateSpend(spendUsd);
+  return { effect, ...(spend !== undefined ? { spendUsd: spend } : {}),
+    ...(project !== undefined && project !== null ? { project: typeof project === 'string' ? project : UNREADABLE_PROJECT } : {}) };
 }
 
 export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
