@@ -8,7 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VECTORS = json.loads((Path(__file__).resolve().parent / "repository_vectors.json").read_text(encoding="utf-8"))
 KEY = "ghp_" + "Fx9k" * 9  # made up at run time: shaped like a key, never one
-LETTERS = {"SKLETTERS": "sk-" + "AbCd" * 10, "GHLETTERS": "ghp_" + "AbCd" * 9, "AKLETTERS": "AKIA" + "ABCD" * 4}  # made up, no digit
+LETTERS = {"SKLETTERS": "sk-" + "AbCd" * 10, "GHLETTERS": "ghp_" + "AbCd" * 9, "AKLETTERS": "AKIA" + "ABCD" * 4,  # made up, no digit
+           "SKUPPER": "SK-" + "AbCd" * 10, "JWTLETTERS": "eyJ" + "abcd" + ".eyJ" + "efgh" + ".ijkl", "RUN40": "AbCd" * 10}
 
 
 def made(value):
@@ -35,7 +36,7 @@ class RepositoryCredential(unittest.TestCase):
                     self.assertTrue(secrets.repository_credential(made(value)))
             for value in VECTORS["name"]:
                 with self.subTest(copy=path.parent.parent.name, name=value):
-                    self.assertFalse(secrets.repository_credential(value))
+                    self.assertFalse(secrets.repository_credential(made(value)))
 
 
 if __name__ == "__main__":

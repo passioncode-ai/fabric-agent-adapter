@@ -47,8 +47,10 @@ same objects (well-known document, events feed, login code) at the same paths.
   kit checks it as the schema's URI (RFC 3986 characters, a host and a valid port when it names an
   authority) and refuses a `user:password@`, a user outside a URL's authority (an scp form), and a value shaped like a
   credential in its user, query or fragment or as a path segment; a path segment in lower case, or of letters with no
-  digit, is the repository's name unless it starts with a key's shape (since 0.62.0, so `task-pipeline-dashboard` and
-  `Task-Pipeline-Dashboard` are accepted, `sk-` with letters only is not).
+  digit, is the repository's name unless a key's shape starts it or follows a `.`, `_` or `-` in it (since 0.62.0, so
+  `task-pipeline-dashboard` and `Task-Pipeline-Dashboard` are accepted, a name that starts with `sk-` and 16 more
+  characters is not, in any case). A password is read in the user information as written and as the URL standard reads
+  it (`https://h\u:pw@x/r` is refused).
 - `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or
   `{by, role?, tool}` where `by` is `person`, `node` or `organization` and `role` (`operator`, `administrator`) is a
   person's only. There is no `agent` kind: an agent that registers a service writes the string form, or

@@ -288,12 +288,16 @@ class LiveOpensInHostTests(LiveSample):
                              ("bot:fixture-pw@github.com/example-org/r/x://y", "github.com/example-org/r/x://y"),
                              ("HTTPS:bot:fixture-pw@h.example/o/r", "https://h.example/o/r"),
                              ("ws:bot:fixture-pw@h.example/o/r", "ws:<redacted>"),
+                             ("https://h\\u:fixture-pw@x.example/o/r", "https://x.example/o/r"),  # seam reading 10
+                             ("https://u\\:fixture-pw@h.example/o/r", "https://h.example/o/r"),
                              ("https://github.com/Example-Org/Task-Pipeline-Dashboard",
                               "https://github.com/Example-Org/Task-Pipeline-Dashboard")):
             self.assertEqual(rules.shown_repository(value), shown, value)
         self.assertEqual(rules.shown_repository("https://github.com/example-org/task-pipeline-dashboard"),
                          "https://github.com/example-org/task-pipeline-dashboard", "a name is no key (seam reading 6)")
-        for fake in ("ghp_" + "Fx9k" * 9 + ":example-org/r", "https://github.com/example-org/ghp_" + "Fx9k" * 9):  # made up
+        letters = "sk-" + "AbCd" * 10  # made up, no digit: a key all the same, never a name (seam and unit readings 10)
+        for fake in ("ghp_" + "Fx9k" * 9 + ":example-org/r", "https://github.com/example-org/ghp_" + "Fx9k" * 9,
+                     "https://github.com/example-org/" + letters, "git@github.com:example-org/" + letters):  # made up
             self.assertEqual(rules.shown_repository(fake), "<a repository shaped like a credential>")
         token = "glpat-" + "Ab1" * 7  # made up, built here; a user that is a token never shows (unit reading 9)
         for value in (token + ":x@github.com:example-org/r#://", "deploy:" + token + "@github.com:example-org/r?x=://"):

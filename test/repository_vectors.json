@@ -1,5 +1,5 @@
 {
-  "note": "0.62.0 readings 7 to 9: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY, SKLETTERS, GHLETTERS and AKLETTERS are replaced at run time by a made-up key shape, never written here.",
+  "note": "0.62.0 readings 7 to 10: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY and the upper-case marks (SKLETTERS, RUN40, ...) are replaced at run time by a made-up key shape, never written here.",
   "credential": [
     "https://bot:pw@github.com/example-org/r",
     "https://KEY@github.com/example-org/r",
@@ -23,7 +23,21 @@
     "https://u:fixture@%00/r",
     "https://github.com/example-org/SKLETTERS",
     "https://github.com/example-org/GHLETTERS",
-    "https://github.com/example-org/AKLETTERS"
+    "https://github.com/example-org/AKLETTERS",
+    "https://h\\u:fixture@x.example/o/r",
+    "https://u\\:fixture@h.example/o/r",
+    "https://github.com/example-org/sk-learn-tutorial-notebooks",
+    "https://github.com/example-org/JWTLETTERS",
+    "https://github.com/example-org/SKUPPER",
+    "https://h.example/r?x=%zz\"RUN40",
+    "https://h.example/r?x=%zz'RUN40",
+    "https://h.example/r#x=%zz`RUN40",
+    "file://u:fixture@h.example/r",
+    "http:///bot:fixture@github.com/example-org/r",
+    "https:\\\\u:fixture@h.example/r",
+    "https://github.com/example-org/x-AKLETTERS",
+    "https://github.com/example-org/.SKLETTERS",
+    "file:///u:fixture@h.example/r"
   ],
   "name": [
     "https://github.com/example-org/example-agent",
@@ -38,6 +52,10 @@
     "https://github.com/Example-Org/Agent-V2",
     "https://github.com/example-org/Desk-Assistant-V2",
     "x-r:h.example/o/r?q=fixture",
-    "https://github.com/example-org/r?ref=main"
+    "https://github.com/example-org/r?ref=main",
+    "https://h.example/r?token= ",
+    "https://h.example/r?token=\u0001",
+    "x-r:h.example/r?x=%zz'RUN40",
+    "file:///srv/git/r"
   ]
 }

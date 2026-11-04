@@ -6,10 +6,13 @@ import { repositoryCredential } from '../plugins/fabric-agent-adapter/skills/bui
 
 const vectors = JSON.parse(fs.readFileSync(new URL('./repository_vectors.json', import.meta.url), 'utf8'));
 const KEY = `ghp_${'Fx9k'.repeat(9)}`; // made up at run time: shaped like a key, never one
-const LETTERS = { SKLETTERS: `sk-${'AbCd'.repeat(10)}`, GHLETTERS: `ghp_${'AbCd'.repeat(9)}`, AKLETTERS: `AKIA${'ABCD'.repeat(4)}` }; // made up, no digit
+const LETTERS = { // made up, no digit
+  SKLETTERS: `sk-${'AbCd'.repeat(10)}`, GHLETTERS: `ghp_${'AbCd'.repeat(9)}`, AKLETTERS: `AKIA${'ABCD'.repeat(4)}`,
+  SKUPPER: `SK-${'AbCd'.repeat(10)}`, JWTLETTERS: `eyJabcd.eyJefgh.ijkl`, RUN40: 'AbCd'.repeat(10),
+};
 const made = (value) => Object.entries(LETTERS).reduce((text, [mark, key]) => text.replaceAll(mark, key), value).replace('KEY', KEY);
 
 test('repositoryCredential reads the shared vectors as Python does', () => {
   for (const value of vectors.credential) assert.equal(repositoryCredential(made(value)), true, value);
-  for (const value of vectors.name) assert.equal(repositoryCredential(value), false, value);
+  for (const value of vectors.name) assert.equal(repositoryCredential(made(value)), false, value);
 });

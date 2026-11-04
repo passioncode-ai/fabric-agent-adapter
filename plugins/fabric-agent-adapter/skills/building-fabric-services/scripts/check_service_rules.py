@@ -24,17 +24,21 @@ from fabric_secrets import repository_name, secret_argument  # noqa: E402
 _LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
 _SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path
 _SPECIAL = re.compile(r"(?:https?|wss?|ftp):", re.I)  # the URL standard's special schemes, read with or without `//`
-_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the value; a later `://` is path text (unit reading 9)
+_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
+_URL_AUTHORITY = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)([^/?#]*)")  # a scheme that starts the value; a later `://` is path text (unit reading 9)
 
 
 def shown_repository(value: str) -> str:
-    """A repository or git origin as evidence: a URL through redact_url; a local path (one that starts with `/`, `~`, `.`,
+    """A repository or git origin as evidence: a URL through redact_url, its user information as written dropped first
+    (git's reading, `https://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
     `\\` or a drive) by its name; an scp form (user[:password]@host:path) from its host, its user and password dropped
     whatever they hold, up to the last `@` that a host and `:` follow; anything else by its name. Then a query and a
-    fragment. A value with a piece shaped like a credential that is no name (lower case, or letters with no digit) is not
-    printed (0.62.0 readings 2
-    to 7)."""
+    fragment. A value with a piece shaped like a credential that is no name (fabric_secrets.repository_name) is not
+    printed (0.62.0 readings 2 to 10)."""
     if _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
+        written = _URL_AUTHORITY.match(value)  # the user information as written goes first, as git reads it, so
+        if written and "@" in written.group(2):  # `https://h\\u:pw@x/r` loses `h\\u:pw` (seam reading 10)
+            value = written.group(1) + written.group(2).rpartition("@")[2] + value[written.end():]
         shown = redact_url(value)
     else:
         cut = 0

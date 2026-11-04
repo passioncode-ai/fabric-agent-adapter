@@ -42,10 +42,13 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   in the provider entry's check (`repository_credential` / `repositoryCredential` in `fabric_secrets`): its user, its query
   and fragment as `secret_url` reads them (a parameter named for a credential, such as `access_token`, now counts), and
   a path segment shaped like a key; a path segment in lower case, or of letters with no digit, is the repository's
-  name unless it starts with a key's shape (`sk-`, `ghp_`, `AKIA`), so `task-pipeline-dashboard` and `Task-Pipeline-Dashboard`, which read as an `sk-` key, are accepted (a source with it was refused before). A user is accepted only in a URL's
+  name unless a key's shape (such as `sk-`, `ghp_`, `xoxb-`, `glpat-`, `AKIA`, `eyJ`) starts it or follows a `.`,
+  `_` or `-` in it, so `task-pipeline-dashboard` and `Task-Pipeline-Dashboard`, which read as an `sk-` key, are accepted (a source with it was refused before). A user is accepted only in a URL's
   authority (`https://user@host/path`): an scp form or an opaque URI holding an `@` (`bot:...@host:path`,
-  `https:user@host/path`) is refused. Node reads the user information and parameters by hand, as Python does, so a
-  special scheme written without `//` (`https:host/r?access_token=...`) or a host `new URL` refuses is read alike.
+  `https:user@host/path`) is refused, and so is a password in the user information read either way a reader takes it:
+  as written (`https://h\u:pw@x/r`, as git reads it) or as the URL standard does (`https:///u:pw@h/r`). Node reads
+  the user information and parameters by hand, as Python does, so a special scheme written without `//`
+  (`https:host/r?access_token=...`) or a host `new URL` refuses is read alike.
 
 ### Upgrading
 
@@ -60,7 +63,10 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `https://github.com/owner/name`, with no user, query or fragment. A path segment that mixes upper case with a digit
   is read for a key's shape (`sk-` and 16 more characters, a `ghp_` run, 40 characters of mixed case and digits), so
   `Task-Pipeline-Dashboard2` is refused while `Agent-V2` is not: write the repository's name in lower case (hosts such
-  as GitHub take either).
+  as GitHub take either). A segment that a key's shape starts, or follows a `.`, `_` or `-` in (`sk-` and 16 more
+  characters, `ghp_`, `xoxb-`, `glpat-`, `AKIA` and 16, in any case), is refused whatever its case: a repository such
+  as `sk-learn-tutorial-notebooks` has no spelling the kit accepts, so an agent built from it is not installed new, and
+  an installed one keeps working by a rewrite in place that leaves the source out (FAA-200 (24)).
 
 ## 0.61.0 (2026-11-04)
 

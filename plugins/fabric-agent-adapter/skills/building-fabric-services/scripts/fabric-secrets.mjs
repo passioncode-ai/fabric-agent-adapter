@@ -88,21 +88,33 @@ export function secretUrl(value) {
 const REPOSITORY_URI = /^([A-Za-z][A-Za-z0-9+.-]*:(?:\/\/[^/?#]*)?)([^?#]*)([\s\S]*)$/;
 const REPOSITORY_NAME = /^(?:[a-z0-9._-]+|[A-Za-z._-]+)$/; // lower case, or letters with no digit (readings 8)
 const REPOSITORY_AUTHORITY = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
-const KEY_AT_START = new RegExp(`^(?:${SECRET_VALUE.source})`, 'i');
-const JWT_AT_START = new RegExp(`^${JWT_SHAPE.source}`);
+const KEY_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))(?:${SECRET_VALUE.source})`, 'i');
+const JWT_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))${JWT_SHAPE.source}`);
 const SPECIAL_QUERY = /^(?:https?|wss?|ftp|file):/i; // whose query also encodes `'`, as the URL standard does
 
-/** Whether a path segment reads as a repository's name: lower case, or letters with no digit, and not starting with a
- * provider key's or a JWT's shape (0.62.0 readings 9), so a letters-only key is still a key. */
-export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_START.test(piece) && !JWT_AT_START.test(piece);
+/** Whether a path segment reads as a repository's name: lower case, or letters with no digit, with no provider key's
+ * or JWT's shape at its start or after a `.`, `_` or `-` (0.62.0 readings 9 and 10), so a letters-only key is a key. */
+export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_A_WORD.test(piece) && !JWT_AT_A_WORD.test(piece);
 
-// A repository's user information and parameters, read as fabric_secrets.secret_url reads them, by hand: `new URL`
+/** Whether a repository URI's user information holds a password, as written and as WHATWG reads a special scheme
+ * (fabric_secrets.repository_password, 0.62.0 readings 10). */
+export function repositoryPassword(value) {
+  const text = value.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+  const colon = text.indexOf(':');
+  const scheme = colon < 0 ? '' : text.slice(0, colon).toLowerCase();
+  const rest = colon < 0 ? text : text.slice(colon + 1);
+  const authorities = rest.startsWith('//') ? [/^\/\/([^/?#]*)/.exec(rest)[1]] : [];
+  if (colon >= 0 && ['ftp', 'http', 'https', 'ws', 'wss', 'file'].includes(scheme)) authorities.push(/^[^/\\?#]*/.exec(rest.replace(/^[/\\]+/, ''))[0]);
+  return authorities.some((authority) => {
+    const userinfo = authority.slice(0, Math.max(authority.lastIndexOf('@'), 0));
+    return userinfo.includes(':') && userinfo.slice(userinfo.indexOf(':') + 1) !== '';
+  });
+}
+
+// A repository's parameters, read as fabric_secrets.secret_url reads them, by hand: `new URL`
 // refuses a host it cannot parse and a special scheme written without `//` (`https:host/r?access_token=...`), where
 // the Python twin still reads them (0.62.0 readings 8 and 9, FAA-200 (17)).
 function repositoryParts(head, tail) {
-  const authority = (/^[^:]*:\/\/([^/?#]*)/.exec(head)?.[1] ?? '').replace(/[\t\n\r]/g, '');
-  const userinfo = /^file:/i.test(head) ? '' : authority.slice(0, Math.max(authority.lastIndexOf('@'), 0));
-  const password = userinfo.includes(':') ? userinfo.slice(userinfo.indexOf(':') + 1) : '';
   const text = tail.replace(/[\x00-\x20]+$/, '').replace(/[\t\n\r]/g, '');
   const hash = text.indexOf('#');
   const before = hash < 0 ? text : text.slice(0, hash);
@@ -110,8 +122,8 @@ function repositoryParts(head, tail) {
   const fragment = hash < 0 ? '' : text.slice(hash + 1);
   try { // percent-encode them as `new URL` does, on a host it always reads
     const url = new URL(`${SPECIAL_QUERY.test(head) ? 'https://h.invalid/' : 'x-repository://h/'}?${query}#${fragment}`);
-    return [password, url.search.slice(1), url.hash.slice(1)];
-  } catch { return [password, query, fragment]; }
+    return [url.search.slice(1), url.hash.slice(1)];
+  } catch { return [query, fragment]; }
 }
 
 // FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
@@ -125,8 +137,7 @@ export function repositoryCredential(value) {
   if (!match) return secretArgument(value);
   const [, head, path, tail] = match;
   const odd = path.split(/[/\\:]/).filter((piece) => piece && !repositoryName(piece));
-  if (secretArgument(head + tail) || odd.some((piece) => secretArgument(piece))) return true;
-  const [password, ...parts] = repositoryParts(head, tail);
-  return password !== '' || parts.some((part) => [...rawValues(part)].some(([name, values]) =>
+  if (repositoryPassword(value) || secretArgument(head + tail) || odd.some((piece) => secretArgument(piece))) return true;
+  return repositoryParts(head, tail).some((part) => [...rawValues(part)].some(([name, values]) =>
     values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))));
 }

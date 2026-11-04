@@ -190,13 +190,30 @@ def secret_url(value: str) -> bool:
 _REPOSITORY_URI = re.compile(r"\A([A-Za-z][A-Za-z0-9+.-]*:(?://[^/?#]*)?)([^?#]*)(.*)\Z", re.S)
 _REPOSITORY_NAME = re.compile(r"(?:[a-z0-9._-]+|[A-Za-z._-]+)\Z")  # lower case, or letters with no digit (readings 8)
 _REPOSITORY_AUTHORITY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
+_KEY_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))(?:%s)" % SECRET_VALUE.pattern, re.IGNORECASE | re.ASCII)
+_JWT_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))%s" % JWT_SHAPE.pattern)
 
 
 def repository_name(piece: str) -> bool:
-    """Whether a path segment reads as a repository's name: lower case, or letters with no digit, and not starting with
-    a provider key's or a JWT's shape (`sk-`, `ghp_`, `xoxb-`, `AKIA`, `eyJ`: 0.62.0 readings 9), so a letters-only key
-    is still a key while `task-pipeline-dashboard`, which holds an `sk-` shape inside, is a name."""
-    return bool(_REPOSITORY_NAME.match(piece)) and not SECRET_VALUE.match(piece) and not JWT_SHAPE.match(piece)
+    """Whether a path segment reads as a repository's name: lower case, or letters with no digit, with no provider
+    key's or JWT's shape (`sk-`, `ghp_`, `xoxb-`, `AKIA`, `eyJ`) at its start or after a `.`, `_` or `-` (0.62.0
+    readings 9 and 10), so a letters-only key is still a key while `task-pipeline-dashboard`, which holds an `sk-` shape
+    inside a word, is a name."""
+    return bool(_REPOSITORY_NAME.match(piece)) and not _KEY_AT_A_WORD.search(piece) and not _JWT_AT_A_WORD.search(piece)
+
+
+def repository_password(value: str) -> bool:
+    """Whether a repository URI's user information holds a password, read both ways a reader may: as written (after
+    `scheme://`, up to the first `/`, `?` or `#`, as git reads `https://h\\u:pw@x/r`) and as WHATWG reads a special
+    scheme (every slash and backslash after the colon skipped, up to the next one, `?` or `#`, as `https:///u:pw@h`
+    reads), in any scheme, `file` too (0.62.0 readings 10). The user information ends at the last `@`; a password
+    follows its first `:`. The Node twin is repositoryPassword."""
+    value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
+    scheme, colon, rest = value.partition(":")
+    authorities = [re.match(r"//([^/?#]*)", rest).group(1)] if rest.startswith("//") else []
+    if colon and scheme.lower() in _SPECIAL + ("file",):
+        authorities.append(re.match(r"[^/\\?#]*", rest.lstrip("/\\")).group(0))
+    return any(authority.rpartition("@")[0].partition(":")[2] for authority in authorities)
 
 
 def repository_credential(value: str) -> bool:
@@ -211,5 +228,7 @@ def repository_credential(value: str) -> bool:
     if not match:
         return secret_argument(value)
     head, path, tail = match.groups()
+    if repository_password(value):
+        return True
     odd = [piece for piece in re.split(r"[/\\:]", path) if piece and not repository_name(piece)]
     return secret_url(head + tail) or any(secret_argument(piece) for piece in odd)

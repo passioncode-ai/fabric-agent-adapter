@@ -215,7 +215,8 @@ class SchemaParityTests(unittest.TestCase):
         # FAA-120, as the service kit: a repository is named, never reached with a credential in its URI.
         for bad in ("https://bot:hunter2@github.com/a/b", "https:bot:hunter2@github.com/a/b", "https:/bot:hunter2@github.com/a/b",
                     "https://me@corp.example:hunter2@github.com/a/b", "wss:u@x:pw@h/a", "ssh://a\\b:pw@host/r",
-                    "https://github.com/a/b?t=ghp_" + "a1B2" * 9):
+                    "https://github.com/a/b?t=ghp_" + "a1B2" * 9,
+                    "https://h\\u:hunter2@x.example/o/r", "https://u\\:hunter2@h.example/o/r"):  # as git reads it (seam r10)
             self.assertIn("source.repository carries no password or credential: it names the repository",
                           fp.validate_provider_entry(entry(source={"repository": bad})), bad)
         self.assertEqual(fp.validate_provider_entry(entry(source={"repository": "ssh://git@example.com/a.git"})), [])
