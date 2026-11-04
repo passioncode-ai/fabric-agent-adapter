@@ -59,6 +59,8 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `https:\\h\u:pw@x/r`; 0.62.0 seam readings 11 and 13).
 - Node's `checkUrl` sent `ht<tab>tps://h\u:pw@x/r` and `https:\/h\u:pw@x/r`, which Python's `check_url` refuses
   (since 0.60.0): it now reads the written user information on the text `new URL` reads, after any run of slashes.
+- Node's `redactUrl` printed `<unparseable url>` for a URL of a scheme that is not special (`ssh://h:99999/r`,
+  `git://\u:pw@h/r`) that `new URL` cannot parse, where Python keeps the scheme: both now print `<scheme>:<redacted>`.
 - Node's key set cache (`JwksCache`) accepted `https://h\u:pw@x/j` and `https://@x/j`, which the Python twin refuses:
   it now reads the authority as written too.
 
@@ -79,10 +81,11 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   its case and also percent-encoded (`%73k-` reads as `sk-`). The shapes are those of `fabric_secrets.SECRET_VALUE`,
   such as `sk-` and 16 more characters, `gh` and one of p, o, u, s, r then `_` and 20, `xox` and one of a, b, o, p, r,
   s then `-` and 10 (so the word `xoxo-` counts), `glpat-` and 20, `AKIA` and 16, and a JWT as written (`eyJ` in
-  that case, `JWT_SHAPE`); `bearer` and a space counts only at a segment's start once decoded (`Bearer%20Tracking`
-  is refused, `team-Bearer%20Tracking` stays a name). A host is read for a key's shape anywhere in it, inside a word
-  too, so `task-pipeline-dashboard.example.com` is refused although the same path segment is a name (FAA-200 (32)),
-  and `bearer` is not read in a host. Such a host, like a repository such
+  that case, `JWT_SHAPE`); `bearer` and a space counts at a segment's start once decoded (`Bearer%20Tracking` is
+  refused, `team-Bearer%20Tracking` stays a name), and anywhere in a segment or a host when 12 or more token
+  characters with a digit follow it and no letter, digit or `_` comes before it (`x-Bearer%20<a token>` is refused).
+  A host is read for a key's shape anywhere in it, inside a word too, so `task-pipeline-dashboard.example.com` is
+  refused although the same path segment is a name (FAA-200 (32)). Such a host, like a repository such
   as `sk-learn-` followed by a longer name, has no spelling the kit accepts, so an agent built from it is not installed
   new, and
   an installed one keeps working by a rewrite in place that leaves the source out (FAA-200 (24)).

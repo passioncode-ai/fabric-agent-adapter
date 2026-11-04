@@ -2,6 +2,14 @@
  "about": "FAA-65 REQ-06: one set of cases for fabric_http.py and fabric-http.mjs. Scenarios run with rand() = 0.5 (no jitter) and a clock that moves only when the client sleeps.",
  "redact": [
   [
+   "file://h:1/x",
+   "file:<redacted>"
+  ],
+  [
+   "SSH://h:99999/r",
+   "ssh:<redacted>"
+  ],
+  [
    "ssh://h:99999/r",
    "ssh:<redacted>"
   ],
