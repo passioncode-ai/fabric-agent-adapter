@@ -102,7 +102,7 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 #: environment names the workflow, the handoff and the request; the prompt's first line `fabric-dispatch/1
 #: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order) names them too,
 #: and the environment wins. FABRIC_DISPATCH_WORKFLOW alone is enough to tell the session: a launcher that sets only it
-#: (Switchboard's SB-247 at e0309b2) leaves the handoff and the request to the packet. A line with no workflow in the
+#: (Switchboard before 0.7.8) leaves the handoff and the request to the packet. A line with no workflow in the
 #: environment is quoted text, never a dispatch.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))

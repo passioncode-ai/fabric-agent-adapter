@@ -29,16 +29,17 @@ fabric-dispatch/1 workflow=wf_<16 hex> handoff=<handoff id> request=<request uui
 The environment decides that the session was dispatched and wins on every value it names; the line fills a value the
 environment left out, for the same workflow only, and a disagreement is said in the closing checkpoint's notes. A line
 with no `FABRIC_DISPATCH_WORKFLOW` in the environment is quoted text (a board message pasted into a session), never a
-dispatch. Fabric's spec has the launcher set all three; Switchboard's `dispatch` at `e0309b2` sets only the workflow
-(and `SWITCHBOARD_LAUNCH_ID`), so the session then reads the handoff and the request from the packet. Aligning the two
-is board thread `b3e60686`.
+dispatch. Switchboard's `dispatch` sets all three and writes the line from 0.7.8 on (SB-247, `7ac2a5b`, board thread
+`b3e60686`); with an earlier launcher that sets the workflow alone, the session reads the handoff and the request from
+the packet.
 
 The plugin's session-start hook prints the exit contract (the steps below, with the values filled in or pointed at the
 packet) in place of the usual preamble, whatever the folder shows, and also in a session Fabric launched (a run shown
 in Fabric's console). In Claude Code the prompt hook prints it again when the first line adds a value the environment
 left out or disagrees with it. A resumed or compacted session prints nothing. The plugin's hooks reach a Claude Code
-run Switchboard starts (its isolated home carries the operator's plugins); a Codex run Switchboard starts has no
-adapter hook (its isolated `CODEX_HOME` holds no `hooks.json`), so there the appended exit contract alone tells it.
+run Switchboard starts (its isolated home carries the operator's plugins), and a Codex run from Switchboard 0.7.8 on
+(its isolated `CODEX_HOME` links the person's `hooks.json`); before that, a Codex run had no adapter hook and the
+appended exit contract alone told it.
 
 ## What the session does
 
@@ -107,7 +108,7 @@ contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says
 nothing there. The election counts sessions whose hook ran: in a run whose own session has no adapter hook (a Codex
-run Switchboard starts, until SB-247), the first nested session the run starts is taken as the holder.
+run Switchboard before 0.7.8 started), the first nested session the run starts is taken as the holder.
 
 The plugin tells a dispatched session from 0.63.0 on; an older one prints its ordinary preamble there, and only the
 launcher's appended exit contract tells the run what to do.

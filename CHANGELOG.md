@@ -5,8 +5,8 @@
 ### Added
 
 - working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `1329b60f`).
-  `FABRIC_DISPATCH_WORKFLOW` tells it, alone (as Switchboard's `dispatch` sets it today, board thread `b3e60686`) or
-  with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`; the prompt's first line `fabric-dispatch/1
+  `FABRIC_DISPATCH_WORKFLOW` tells it, with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST` (Switchboard's
+  `dispatch` sets all three from 0.7.8, board thread `b3e60686`) or alone (an earlier launcher); the prompt's first line `fabric-dispatch/1
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
   never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
   exit contract in place of the preamble, also in a session Fabric launched: `fabric_whoami`, the packet
