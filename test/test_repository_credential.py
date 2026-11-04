@@ -10,7 +10,7 @@ VECTORS = json.loads((Path(__file__).resolve().parent / "repository_vectors.json
 KEY = "ghp_" + "Fx9k" * 9  # made up at run time: shaped like a key, never one
 LETTERS = {"SKLETTERS": "sk-" + "AbCd" * 10, "GHLETTERS": "ghp_" + "AbCd" * 9, "AKLETTERS": "AKIA" + "ABCD" * 4,  # made up, no digit
            "SKUPPER": "SK-" + "AbCd" * 10, "JWTLETTERS": "eyJ" + "abcd" + ".eyJ" + "efgh" + ".ijkl", "RUN40": "AbCd" * 10,
-           "SKNAME": "sk-" + "learn-tutorial-notebooks"}  # a real-looking name a key's shape starts (FAA-200 (24))
+           "SKNAME": "sk-" + "learn-tutorial-notebooks", "SKWORD": "sk-" + "dictionary-extension"}  # a real-looking name a key's shape starts (FAA-200 (24))
 
 
 def made(value):

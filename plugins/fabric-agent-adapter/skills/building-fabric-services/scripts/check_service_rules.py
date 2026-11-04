@@ -24,13 +24,12 @@ from fabric_secrets import ascii_decoded, repository_name, secret_argument  # no
 _LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
 _SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path
 _SPECIAL = re.compile(r"(?:https?|wss?|ftp|file):", re.I)  # the URL standard's special schemes, read with or without `//`
-_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
-_URL_AUTHORITY = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)([^/?#]*)")  # a scheme that starts the value; a later `://` is path text (unit reading 9)
+_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the value; a later `://` is path text (unit reading 9)
 
 
 def shown_repository(value: str) -> str:
-    """A repository or git origin as evidence: a URL through redact_url, its user information as written dropped first
-    (git's reading, `https://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
+    """A repository or git origin as evidence: a URL through redact_url, which drops its user information as written
+    first (git's reading, `https://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
     `\\` or a drive) by its name; an scp form (user[:password]@host:path) from its host, its user and password dropped
     whatever they hold, up to the last `@` that a host and `:` follow; anything else by its name. Then a query and a
     fragment. A value with a piece shaped like a credential that is no name (fabric_secrets.repository_name) is not
@@ -38,10 +37,7 @@ def shown_repository(value: str) -> str:
     CR and LF out, so `https:/<tab>/u:pw@h` is the URL it is (unit reading 11)."""
     value = re.sub(r"[\t\n\r]", "", value.strip("".join(map(chr, range(0x21)))))
     if _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
-        written = _URL_AUTHORITY.match(value)  # the user information as written goes first, as git reads it, so
-        if written and "@" in written.group(2):  # `https://h\\u:pw@x/r` loses `h\\u:pw` (seam reading 10)
-            value = written.group(1) + written.group(2).rpartition("@")[2] + value[written.end():]
-        shown = redact_url(value)
+        shown = redact_url(value)  # which drops the user information as written first (seam readings 10 and 11)
     else:
         cut = 0
         if not _LOCAL_PATH.match(value):

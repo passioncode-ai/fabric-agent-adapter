@@ -45,7 +45,8 @@
     "https://me@corp.example:fixture@github.com/example-org/r",
     "https:///me@corp.example:fixture@h.example/r",
     "https://github.com/example-org/x-JWTLETTERS",
-    "https://github.com/example-org/x.JWTLETTERS"
+    "https://github.com/example-org/x.JWTLETTERS",
+    "https://github.com/example-org/libreoffice-SKWORD"
   ],
   "name": [
     "https://github.com/example-org/example-agent",

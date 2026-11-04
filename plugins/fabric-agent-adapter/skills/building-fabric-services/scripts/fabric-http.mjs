@@ -52,8 +52,13 @@ export class Response {
 
 // The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or fragment.
 export function redactUrl(url) {
+  let text = String(url).replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+  // The user information as written goes first, as the Python twin drops it: `https://h\\u:pw@x/r` would print `pw` in
+  // its path, a backslash being a slash to WHATWG (0.62.0 seam reading 11).
+  const written = /^([A-Za-z][A-Za-z0-9+.-]*:\/\/)([^/?#]*)/.exec(text);
+  if (written && written[2].includes('@')) text = written[1] + written[2].slice(written[2].lastIndexOf('@') + 1) + text.slice(written[0].length);
   let parts;
-  try { parts = new URL(String(url)); } catch { return '<unparseable url>'; }
+  try { parts = new URL(text); } catch { return '<unparseable url>'; }
   // Only http and https are sent; any other scheme keeps no more than its name (0.56.0 product r10).
   if (parts.protocol !== 'http:' && parts.protocol !== 'https:') return `${parts.protocol}<redacted>`;
   return `${parts.protocol}//${parts.host}${parts.pathname}`;

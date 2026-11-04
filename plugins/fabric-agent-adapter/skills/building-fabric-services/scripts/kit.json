@@ -484,7 +484,7 @@
    "imports": [
     "fabric_jsvalue"
    ],
-   "sha256": "80e22ae0bba91de13a94d64b595108b39c58f16f7b4137f3a48bdd9503f424fe"
+   "sha256": "9bc5cce531bc88b5f7a60ec071e16d5c8d0888426e2249a715e09afffdbf2528"
   },
   {
    "module": "fabric_openrouter",
@@ -967,7 +967,7 @@
    "file": "fabric-http.mjs",
    "layer": "L4",
    "imports": [],
-   "sha256": "9f899829073470b9c2b449605a9371b773848eec4e3a0122ed4ccde5eddcdb4b"
+   "sha256": "a14a7cd7a06d40c7a2f99f1792b120c2835e808edc69e8d858e59a45ececc721"
   },
   {
    "module": "fabric-openrouter",
@@ -4729,7 +4729,7 @@
    "fabric_board_session.py": "1fd3c3884f3044b56a40f78b33ff88dcac9272284f6681ea359c662879826f7e",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "f86c40b8291f8c818f6924910f4022b013d5fd107abaf8825dd0aa6c5e418638",
-   "fabric_http.py": "80e22ae0bba91de13a94d64b595108b39c58f16f7b4137f3a48bdd9503f424fe",
+   "fabric_http.py": "9bc5cce531bc88b5f7a60ec071e16d5c8d0888426e2249a715e09afffdbf2528",
    "fabric_openrouter.py": "d06a40f83f2fb8bd441ab3485ae882f1fbdd9cd7a9c1ec175eb47cb8ae2cce81",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
@@ -4772,7 +4772,7 @@
    "fabric-board-session.mjs": "18555962e5f6d18080a3e7971c4c6640452542f6042d07917e7ebc073721c415",
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
    "fabric-board.mjs": "15fbb4441fcf7d2f285375b75de64ad6cffea129c515084c110245376b07775f",
-   "fabric-http.mjs": "9f899829073470b9c2b449605a9371b773848eec4e3a0122ed4ccde5eddcdb4b",
+   "fabric-http.mjs": "a14a7cd7a06d40c7a2f99f1792b120c2835e808edc69e8d858e59a45ececc721",
    "fabric-openrouter.mjs": "6041f3ab30f516658e1dbab4897a651cc8509b2136cfa8e769802c6b40ec2f35",
    "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
    "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0"

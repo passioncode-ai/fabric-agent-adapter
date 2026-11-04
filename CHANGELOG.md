@@ -50,6 +50,13 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   the user information and parameters by hand, as Python does, so a special scheme written without `//`
   (`https:host/r?access_token=...`) or a host `new URL` refuses is read alike.
 
+### Fixed
+
+- `redact_url` / `redactUrl` (the URL an `HttpError` carries and `check_url` / `checkUrl` print) dropped a user
+  information only as the URL standard reads it, so `https://h\u:pw@x/r`, which git and Python's `urllib` read as a
+  password, printed `pw` in its path in both kits (0.61.0 too); they now drop the user information as
+  written first (0.62.0 seam reading 11).
+
 ### Upgrading
 
 - An installer that writes a descriptor for a new install passes `source: {"repository": "https://github.com/owner/name"}`
