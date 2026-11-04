@@ -185,3 +185,19 @@ def secret_url(value: str) -> bool:
             if any((raw != "" and credential_name(name)) or secret_value(raw) for raw in raws):
                 return True
     return False
+
+
+_REPOSITORY_URI = re.compile(r"\A([A-Za-z][A-Za-z0-9+.-]*:(?://[^/?#]*)?)([^?#]*)(.*)\Z", re.S)
+_REPOSITORY_NAME = re.compile(r"[a-z0-9._-]+\Z")
+
+
+def repository_credential(value: str) -> bool:
+    """FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
+    user), in its query or fragment as secret_url reads them, or as a path segment shaped like a key. A lower-case path
+    segment such as task-pipeline-dashboard is the repository's name, never a key, though it reads as an `sk-` shape."""
+    match = _REPOSITORY_URI.match(value)
+    if not match:
+        return secret_argument(value)
+    head, path, tail = match.groups()
+    odd = [piece for piece in re.split(r"[/\\:]", path) if piece and not _REPOSITORY_NAME.match(piece)]
+    return secret_url(head + tail) or any(secret_argument(piece) for piece in odd)

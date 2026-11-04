@@ -266,6 +266,10 @@ class LiveOpensInHostTests(LiveSample):
                              ("bot:fixture-pw@github.com:example-org/r", "github.com:example-org/r"),
                              ("bot:fixture?pw@github.com:example-org/r", "github.com:example-org/r"),
                              ("deploy:fixture/pw@github.com:example-org/r", "github.com:example-org/r"),  # unit reading 6
+                             ("bot:fix@tu-re-pw@github.com:example-org/r", "github.com:example-org/r"),  # unit reading 7
+                             ("repos/me@corp/r", "repos/me@corp/r"), ("./me@corp/r", "./me@corp/r"),
+                             ("\\\\srv\\share\\me@corp\\r", "\\\\srv\\share\\me@corp\\r"), ("C:/git/me@corp/r", "C:/git/me@corp/r"),
+                             ("git@github.com:example-org/task-pipeline-dashboard", "github.com:example-org/task-pipeline-dashboard"),
                              ("bot:fixture\\pw@github.com:example-org/r", "github.com:example-org/r"),
                              ("C:\\git\\me@corp\\r", "C:\\git\\me@corp\\r"),
                              ("~/git/me@corp/r", "~/git/me@corp/r"),
@@ -277,8 +281,8 @@ class LiveOpensInHostTests(LiveSample):
             self.assertEqual(rules.shown_repository(value), shown, value)
         self.assertEqual(rules.shown_repository("https://github.com/example-org/task-pipeline-dashboard"),
                          "https://github.com/example-org/task-pipeline-dashboard", "a name is no key (seam reading 6)")
-        fake = "ghp_" + "Fx9k" * 9 + ":x@github.com:example-org/r"  # made up: shaped like a key, as the user
-        self.assertNotIn("Fx9k", rules.shown_repository(fake))
+        for fake in ("ghp_" + "Fx9k" * 9 + ":example-org/r", "https://github.com/example-org/ghp_" + "Fx9k" * 9):  # made up
+            self.assertEqual(rules.shown_repository(fake), "<a repository shaped like a credential>")
 
     def test_a_found_checkout_is_named_without_its_key(self):
         rules = importlib.import_module("check_service_rules")  # the found message too (0.62.0 unit reading 5)

@@ -312,9 +312,10 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
                 problems.append("source.repository carries no password: it names the repository, never a credential")
             elif not _authority_ok(repository):
                 problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
-            # The path is the repository's name (`task-pipeline-dashboard` reads as an `sk-` key): a credential rides in
-            # the user, the query or the fragment, so only those are read for one (0.62.0 seam reading 6).
-            places.append(("/source/repository", _URI_PATH.sub(r"\1\2", repository) if isinstance(repository, str) else repository))
+            elif "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
+                problems.append("source.repository with a user is a URL with an authority (https://user@host/path), never an scp form")
+            elif fabric_secrets.repository_credential(repository):  # its name is no key (0.62.0 seam reading 6)
+                problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository")
     if "peer" in descriptor:
         peer = descriptor.get("peer")
         if not isinstance(peer, dict):
@@ -451,7 +452,7 @@ def names_repository(descriptor: Any) -> bool:
     return isinstance(source, dict) and isinstance(source.get("repository"), str) and bool(source["repository"])
 
 
-_URI_PATH = re.compile(r"\A([A-Za-z][A-Za-z0-9+.-]*:(?://[^/?#]*)?)[^?#]*(.*)\Z", re.S)  # scheme and authority, then the rest
+_HIERARCHICAL = re.compile(r"\A[A-Za-z][A-Za-z0-9+.-]*://")
 
 
 def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Optional[str]:

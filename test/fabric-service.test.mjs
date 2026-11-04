@@ -126,6 +126,11 @@ test('a new install names its repository; a reinstall without it warns (FAA-198)
   assert.deepEqual(k.validateDescriptor(named), [], 'a repository name is no key (0.62.0 seam reading 6)');
   const keyed = { ...named, source: { repository: `https://github.com/example-org/r?token=sk-${'Fx9k'.repeat(5)}` } };
   assert.ok(k.validateDescriptor(keyed).some((p) => p.includes('FAC-SEM-086')), 'a key in the query still is');
+  for (const scp of ['bot:fixture@github.com:example-org/r', 'https:fixture@github.com/example-org/r', 'x-access-token:fixture@github.com:example-org/r']) {
+    assert.ok(k.validateDescriptor({ ...named, source: { repository: scp } }).some((p) => p.includes('never an scp form')), scp); // readings 7
+  }
+  const pathKey = { ...named, source: { repository: `https://github.com/example-org/ghp_${'Fx9k'.repeat(9)}` } };
+  assert.ok(k.validateDescriptor(pathKey).some((p) => p.includes('FAC-SEM-086')), 'a path piece shaped like a key still is');
   assert.ok(k.sourceRefusal({ ...bare, instance: ['default'] }, dir), 'a list instance names no file');
   assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: { repository: [] } }, dir));
   fs.symlinkSync(path.join(dir, 'missing.json'), path.join(dir, 'gone.default.json'));

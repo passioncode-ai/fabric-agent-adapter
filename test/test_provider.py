@@ -219,8 +219,10 @@ class SchemaParityTests(unittest.TestCase):
             self.assertIn("source.repository carries no password or credential: it names the repository",
                           fp.validate_provider_entry(entry(source={"repository": bad})), bad)
         self.assertEqual(fp.validate_provider_entry(entry(source={"repository": "ssh://git@example.com/a.git"})), [])
-        for good in ("https:u@h:443/a", "https://h/x?a=b:c@d", "https://github.com/a:b"):
+        for good in ("https://h/x?a=b:c@d", "https://github.com/a:b", "https://github.com/example-org/task-pipeline-dashboard"):
             self.assertEqual(fp.validate_provider_entry(entry(source={"repository": good})), [], good)
+        for opaque in ("https:u@h:443/a", "bot:fixture@github.com:example-org/r"):  # a user is an authority's (0.62.0 readings 7)
+            self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": opaque})), [], opaque)
 
     def test_each_argument_is_at_most_1024_characters(self):
         self.assertNotEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x", "a" * 1025]}}})), [])

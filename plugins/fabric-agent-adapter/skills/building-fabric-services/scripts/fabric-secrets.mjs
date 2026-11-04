@@ -84,3 +84,17 @@ export function secretUrl(value) {
   }
   return false;
 }
+
+const REPOSITORY_URI = /^([A-Za-z][A-Za-z0-9+.-]*:(?:\/\/[^/?#]*)?)([^?#]*)([\s\S]*)$/;
+const REPOSITORY_NAME = /^[a-z0-9._-]+$/;
+
+// FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
+// user), in its query or fragment as secretUrl reads them, or as a path segment shaped like a key. A lower-case path
+// segment such as task-pipeline-dashboard is the repository's name, never a key, though it reads as an `sk-` shape.
+export function repositoryCredential(value) {
+  const match = REPOSITORY_URI.exec(value);
+  if (!match) return secretArgument(value);
+  const [, head, path, tail] = match;
+  const odd = path.split(/[/\\:]/).filter((piece) => piece && !REPOSITORY_NAME.test(piece));
+  return secretUrl(head + tail) || odd.some((piece) => secretArgument(piece));
+}

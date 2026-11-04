@@ -225,10 +225,15 @@ class DescriptorTests(unittest.TestCase):
             self.assertIsNotNone(fs.source_refusal(dict(bare, instance=["default"]), root), "a list instance names no file")
             (root / "True.default.json").write_text("{}")  # only the type check refuses this one (unit reading 4)
             self.assertIsNotNone(fs.source_refusal(dict(bare, id=True), root), "an id that is no string names no file")
+            for scp in ("bot:fixture@github.com:example-org/r", "https:fixture@github.com/example-org/r",
+                        "x-access-token:fixture@github.com:example-org/r"):  # a user only in an authority (0.62.0 readings 7)
+                self.assertTrue(any("never an scp form" in p for p in fs.validate_descriptor(dict(descriptor(47188), source={"repository": scp}))), scp)
             named = dict(descriptor(47188), source={"repository": "https://github.com/example-org/task-pipeline-dashboard"})
             self.assertEqual(fs.validate_descriptor(named), [], "a repository name is no key (0.62.0 seam reading 6)")
             keyed = dict(named, source={"repository": "https://github.com/example-org/r?token=sk-" + "Fx9k" * 5})
             self.assertTrue(any("FAC-SEM-086" in p for p in fs.validate_descriptor(keyed)), "a key in the query still is")
+            path_key = dict(named, source={"repository": "https://github.com/example-org/ghp_" + "Fx9k" * 9})
+            self.assertTrue(any("FAC-SEM-086" in p for p in fs.validate_descriptor(path_key)), "a path piece shaped like a key still is")
             for odd in ([], ["a"], 1, True):  # a repository is a non-empty string, in Python as in Node (unit reading 3)
                 self.assertIsNotNone(fs.source_refusal(dict(bare, id="other", origin="http://127.0.0.1:47197", source={"repository": odd}), root), odd)
             if os.name != "nt" and os.geteuid() != 0:  # an unsearchable folder reads as not installed, on 3.9 too (unit reading 2)
@@ -271,10 +276,13 @@ class DescriptorTests(unittest.TestCase):
             p.descriptor_rules()
             self.assertEqual({r["rule"]: r for r in p.results}["descriptor.source-repository"]["verdict"], "PASS", "seam reading 3")
             d["paths"] = json.loads(path.read_text())["paths"]
-            for kept in ("https://fixture-token@github.com/example-org/example-agent",  # valid, yet a key rides in them
-                         "https://github.com/example-org/example-agent?access_token=fixture-token",
-                         "bot:fixture-token@github.com:example-org/example-agent",  # an scp form the kit accepts (FAA-200 (11))
-                         "deploy:fixture-token/x@github.com:example-org/example-agent"):
+            d["source"] = {"repository": "https://github.com/example-org/example-agent?access_token=fixture-token"}
+            p = checker.Probe(path, d, root, True)  # a query named for a credential is one (0.62.0 readings 7): refused, unprinted
+            p.descriptor_rules()
+            self.assertEqual({r["rule"]: r for r in p.results}["descriptor.source-repository"]["verdict"], "NOT_RUN")
+            self.assertFalse(any("fixture-token" in r["evidence"] for r in p.results))
+            for kept in ("https://fixture-token@github.com/example-org/example-agent",  # valid, yet a key rides in it
+                         ):
                 d["source"] = {"repository": kept}
                 p = checker.Probe(path, d, root, True)
                 p.descriptor_rules()

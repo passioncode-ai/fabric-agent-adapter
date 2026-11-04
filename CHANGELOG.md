@@ -29,17 +29,21 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `check_service.py` names a descriptor without it, or with one `descriptor.valid` refuses
   (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo, query or
   fragment (a URL through `redact_url`; a local path, one that starts with `/`, `~`, `.`, `\\` or a drive, by its name;
-  anything else without the text up to its first `@`, a user and a password whatever they hold; one whose host is
-  shaped like a credential not at all), as
+  an scp form from its host, its user and password dropped whatever they hold; one with a piece shaped like a credential
+  that is no lower-case name not at all), as
   `state.outside-code` and `dashboard.opens-in-host` now do too for the source and for the data checkout's origin (they
   printed them as found).
   `sample_service.py register` writes this repository, whose code its descriptor runs whatever `--id` names, takes
   `--repository`, and writes its manifest only after the descriptor, so a refusal of any kind leaves none naming it, and
   a manifest it cannot write takes a new descriptor back with it, or puts an installed one's bytes back; an installed
   descriptor it cannot read is never replaced (it refuses before writing anything). No owner field is added: the
-  organization follows from the repository (FAA-198). FAC-SEM-086 reads a `source.repository` for a credential in its
-  user, query and fragment, never in its path, which is the repository's name: a name such as
-  `task-pipeline-dashboard`, which reads as an `sk-` key, is accepted (a source with it was refused before).
+  organization follows from the repository (FAA-198). `source.repository` is read for a credential by one rule in both kits and
+  in the provider entry's check (`repository_credential` / `repositoryCredential` in `fabric_secrets`): its user, its query
+  and fragment as `secret_url` reads them (a parameter named for a credential, such as `access_token`, now counts), and
+  a path segment shaped like a key; a lower-case path segment is the repository's name, so `task-pipeline-dashboard`,
+  which reads as an `sk-` key, is accepted (a source with it was refused before). A user is accepted only in a URL's
+  authority (`https://user@host/path`): an scp form or an opaque URI holding an `@` (`bot:...@host:path`,
+  `https:user@host/path`) is refused.
 
 ### Upgrading
 
@@ -49,6 +53,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   place keeps working: an update that removes the descriptor before it writes it again, a new instance (a preview) and a
   moved services directory are new installs. In Python the warning is `NoSourceRepositoryWarning` (a `UserWarning`), so
   a suite that runs with warnings as errors (`-W error`) sees the rewrite raise; filter that class there.
+- A `source.repository` (a service's or a provider entry's) that names a user outside a URL's authority (an scp form,
+  `https:user@host/path`) or carries a query parameter named for a credential is refused: write it as
+  `https://github.com/owner/name`, with no user, query or fragment.
 
 ## 0.61.0 (2026-11-04)
 

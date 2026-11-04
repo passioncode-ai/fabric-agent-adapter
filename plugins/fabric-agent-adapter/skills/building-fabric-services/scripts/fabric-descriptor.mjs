@@ -2,7 +2,7 @@
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_descriptor.py. Node 20+, no dependency.
 import fs from 'node:fs';
 import path from 'node:path';
-import { credentialName, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
+import { credentialName, repositoryCredential, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 import { ID, INSTANCE, LOCAL_PATH, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { protocolsFindings } from './fabric-protocols.mjs';
@@ -194,9 +194,8 @@ export function descriptorMemberProblems(d) {
       if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
       else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential'); // before the host
       else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
-      // The path is the repository's name (`task-pipeline-dashboard` reads as an `sk-` key): a credential rides in the
-      // user, the query or the fragment, so only those are read for one (0.62.0 seam reading 6).
-      places.push(['/source/repository', typeof repository === 'string' ? repository.replace(URI_PATH, '$1$2') : repository]);
+      else if (repository.includes('@') && !HIERARCHICAL.test(repository)) problems.push('source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'); // readings 7
+      else if (repositoryCredential(repository)) problems.push('FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository'); // its name is no key (seam 6)
     }
   }
   if ('peer' in d) {
@@ -295,7 +294,7 @@ export function portOf(origin) {
 export const NO_SOURCE_REPOSITORY = 'names no source.repository, the repository its code is built from '
   + '(https://github.com/owner/name): it links the agent to its project (FAA-198)';
 
-const URI_PATH = /^([A-Za-z][A-Za-z0-9+.-]*:(?:\/\/[^/?#]*)?)[^?#]*([\s\S]*)$/; // scheme and authority, then the rest
+const HIERARCHICAL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
 
 // FAA-198: why a new install of this (valid) descriptor is refused, or null: it names no source.repository and no
 // descriptor of its id.instance is installed yet. An installer checks it before it writes anything else.
