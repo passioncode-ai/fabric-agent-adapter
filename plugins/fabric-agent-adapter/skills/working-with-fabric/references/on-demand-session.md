@@ -94,8 +94,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      to move, not the run's: after the run ends, and no sooner than 120 s of the executor's silence, Fabric hands it to
      itself (`observatory_handoff_create` with reason `restart`, or `crash` when Switchboard names the run crashed,
      to `service:fabric`), takes the new lease and routes it to the next run; when the request goes to «На проверке» or
-     its deadline passes, Fabric closes it `blocked` the same way (Fabric's decision on thread `b3e60686`, message
-     `b1ccb1be`, 2026-11-04). This run only leaves it open.
+     its deadline passes, Fabric closes it `blocked` the same way (Fabric's spec at `c560d97e`, sections 3.4 and 3.6;
+     its decision on thread `b3e60686`, 2026-11-04). This run only leaves it open.
 
    A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,

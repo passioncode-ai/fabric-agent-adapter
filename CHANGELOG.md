@@ -19,7 +19,7 @@
   a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
   checkpoints, renewals about every 20 s (work that outlasts the run gives its state in a `com.progress` note and is left accepted for the next run,
   which Fabric's dispatcher starts since its main at `fff4b6d9`, in no release yet, Fabric itself moving the open
-  Observatory workflow to that run by its decision on thread `b3e60686`; when the request's deadline is not after
+  Observatory workflow to that run, as its spec at `c560d97e` says (sections 3.4 and 3.6); when the request's deadline is not after
   run-ends-at, it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
