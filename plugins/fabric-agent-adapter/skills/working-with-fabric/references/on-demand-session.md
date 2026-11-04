@@ -97,8 +97,9 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
    reads the write as the start of a new workflow and refuses it. The status is `done` for `completed`; for
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
-7. **End the run.** The one write left is the retro Fabric's `fabric_whoami` asks for after work (an
-   `observatory_lesson`, no values; ADR-0188's `retro-after-work`); nothing more: no board sweep, no work claim, no
+7. **End the run.** The one write left is the retro Fabric's `fabric_whoami` asks for after work
+   (`observatory_lesson` and insight/1 lines, or one line that there is nothing; no values; ADR-0188's
+   `retro-after-work`); nothing more: no board sweep, no work claim, no
    `watch-mail`, no question to the operator.
 
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
@@ -129,8 +130,10 @@ new holder; a launcher that sets the workflow alone gives each run a distinct ru
 session keeps the contract (the record moves to the new session id). A holder that accepted the handoff before
 the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
-so the holder replays the accept with it (Switchboard's prompt fixes the key, `accept-<handoff>`); a new accept under
-the new id is refused. Any other session gets one line in place of the
+so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,
+`accept-<handoff>`), and the `owner` and `executor` `observatory_checkpoint_latest` shows in `lease.holder` and
+`lease.executor`; a new accept under the new id is refused. On Windows, where any `/clear` takes the record, the hooks
+name no id. Any other session gets one line in place of the
 contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says

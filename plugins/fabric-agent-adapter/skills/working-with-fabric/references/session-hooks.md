@@ -207,7 +207,8 @@ check and a delete),
 removed at the session's end.
 `dispatch/<key>.json` beside it records which session holds a dispatch (FAA-201: the first session id for its
 `FABRIC_DISPATCH_ID` when set, else for the workflow, the handoff and `SWITCHBOARD_LAUNCH_ID`, with the agent's process
-id, 0600; a `/clear` in that process moves it to the new session id; on Windows, where each hook's parent is a new Git Bash, any `/clear` moves it; on a host whose shell does not exec the hook command (dash before 0.5.11) the holder's own `/clear` is told it is nested, unmeasured), a hook given no session id (a native bridge) always holds it; removed after 7 days by the Stop and SessionEnd hooks and by the next session start on a board request (Codex and Kimi have only that hook).
+id, 0600; a `/clear` in that process moves it to the new session id and keeps
+`cleared_from`, the id the first clear replaced, for a replayed accept; on Windows, where each hook's parent is a new Git Bash, any `/clear` moves it; on a host whose shell does not exec the hook command (dash before 0.5.11) the holder's own `/clear` is told it is nested, unmeasured), a hook given no session id (a native bridge) always holds it; removed after 7 days by the Stop and SessionEnd hooks and by the next session start on a board request (Codex and Kimi have only that hook).
 
 Turn only the transcript read off with `FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file in the folder
 above (FAA-160). That folder is a cache: a cache cleaner may remove the file, and the read is on again; the variable,

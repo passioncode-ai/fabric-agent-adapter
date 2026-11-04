@@ -55,7 +55,7 @@
     wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
     time;
   - `Knowledge.load` refuses a file that is not JSON, one nested deeper than 32 levels (on every Python), a file that is not an object with an `entries` list, an entry whose tags are not a list
-    of text or whose question is not text, and a file nested too deep, each as a `RecipeError`;
+    of text or whose question is not text, each as a `RecipeError`;
   - `channel-agent.example.json`, one project's declaration under
     `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to
     the example config's maximum age by `test/test_channel_agent_example.py`.

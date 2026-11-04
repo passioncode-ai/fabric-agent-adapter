@@ -439,6 +439,45 @@ class Hooks(Base):
         self.assertIn("never accept it anew under the new id", text)
         self.assertNotIn(again, text)
 
+    def test_the_cleared_notice_names_the_whole_replay(self):
+        # 0.63.0 readings 11: Observatory replays only the same sessionId, key, owner and executor
+        uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
+        text = cli.dispatch_cleared(uuid, HANDOFF)
+        for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF, "lease.holder", "lease.executor",
+                      "never accept it anew"):
+            self.assertIn(words, text)
+        for previous in (None, "", "S-ABC", uuid.upper()):
+            with self.subTest(previous=previous):
+                self.assertIn("the sessionId the clear replaced", cli.dispatch_cleared(previous))
+        self.assertIn("the key the first accept used", cli.dispatch_cleared(uuid))
+        self.assertIn("observatory_lesson", cli.dispatch_contract(FULL), "step 7's retro")
+
+    def test_a_second_clear_names_the_first_holder(self):
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        a, b, c = ("1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab", "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc",
+                   "3c4d5e6f-2c3d-4e7f-8a0b-23456789abcd")
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            cli.dispatch_holder(FULL, a, env)
+            cli.dispatch_holder(FULL, b, env, take_over=True)
+            cli.dispatch_holder(FULL, c, env, take_over=True)
+        self.assertEqual(cli.dispatch_cleared_from(FULL, env), a)
+
+    def test_a_clear_with_no_readable_record_still_reads_as_cleared(self):
+        env = dict(self.env, **ENV)
+        self.assertTrue(cli.dispatch_holder(FULL, SID, env, take_over=True))
+        self.assertEqual(cli.dispatch_cleared_from(FULL, env), "", "cleared, the replaced id unknown")
+
+    def test_on_windows_a_clear_names_no_holder(self):
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        holder, nested = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab", "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            cli.dispatch_holder(FULL, holder, env)
+        with mock.patch.object(cli.os, "getppid", return_value=222), mock.patch.object(cli, "_WINDOWS", True):
+            cli.dispatch_holder(FULL, nested, env, take_over=True)
+        self.assertEqual(cli.dispatch_cleared_from(FULL, env), "", "a nested session must not learn the holder's id")
+
     def test_the_contract_names_this_sessions_id_for_the_accept(self):
         # 0.63.0 seam reading 7: Observatory asks a retry of the acceptance to send the same sessionId
         self.assertIn("this session's own `sessionId` (the same on a retry)", cli.dispatch_contract({"workflow": WF}))
