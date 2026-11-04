@@ -13,6 +13,7 @@ finished. Organization members have the full page with every receipt: the Passio
 - [People in the loop](#people-in-the-loop)
 - [Reliability](#reliability)
 - [Shipping](#shipping)
+- [Agents on a channel people write to](#agents-on-a-channel-people-write-to)
 
 ## Judges and evals
 
@@ -101,3 +102,34 @@ finished. Organization members have the full page with every receipt: the Passio
 - **A changed default model is not a changed installed agent.**
 - **Start a long verification suite only above a disk floor.**
 - **Agents that number rows in one register need a gate that fails on a duplicate id.**
+
+## Agents on a channel people write to
+
+The channel-agent standard v1 (`channel-agent-standard/1`, its round 4 of 2026-11-04; the neutral copy travels with its
+owner on the Fabric board, FAA-197) sets what every agent answering people on a channel does, so two agents count
+alike. The support-agent recipe (`building-fabric-services/recipes/support-agent`) carries the parts of it a
+draft-and-check step owns.
+
+- **The unit is the ticket, and a channel rule bounds it**: a private chat until 24 hours of silence, a group's one
+  root message, a mail thread, one review. A message after a ticket ended opens a new one linked to the old. One
+  ticket has one writing agent.
+- **Every ticket ends with one outcome** (answered, closed by a person, answered elsewhere, no reply owed, customer
+  silent, referred, expired, unanswered, and the open ones); an ended outcome stays, except a late signal that turns
+  a referral into a person's answer within 30 days.
+- **Answer, do not route**: hand to a person only what only a person may do, and what the checks the agent already
+  gave did not fix. "A person will reply" inside an ordinary answer is a defect.
+- **Repair before hand-off**: a draft the checker refuses is rewritten once with the refusal's reason; a second refusal
+  is a fallback, marked on the ticket (`fallback: true`). Check: the recipe's `repair=` and its tests.
+- **At most one clarifying question, never two in a row**; no reply where none is owed.
+- **Every source is declared with its owner, cadence and maximum age**; one that fails keeps its last good version and
+  says so, and its age counts from that read. Check: the recipe's `KnowledgeSource`.
+- **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
+  recommendation to its owner. Many `referred` tickets show a missing signal, not a regression.
+- **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
+  80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
+  reply's text.
+- **The declaration lives under the extension key**
+  `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, one entry per project. A required
+  member is never null: a member not there yet is `{"none": "not_yet", "until": "<date>"}`, one not used
+  `{"none": "not_used"}`; `recommendation` appears only with `answered_signal: "none"`. Example: the recipe's
+  `channel-agent.example.json`. `check_service.py` reads it once the contract publishes its schema.

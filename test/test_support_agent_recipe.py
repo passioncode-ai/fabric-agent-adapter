@@ -52,7 +52,8 @@ class Recipe(unittest.TestCase):
                            prices=PRICES, environ={"OPENROUTER_API_KEY": KEY}, transport=transport,
                            sleep=lambda s: None)
         handoffs = []
-        agent = sa.SupportAgent(knowledge=self.knowledge, client=client, model="a/one", fallback="b/two",
+        kwargs.setdefault("knowledge", self.knowledge)
+        agent = sa.SupportAgent(client=client, model="a/one", fallback="b/two",
                                 state_dir=self.dir, on_handoff=handoffs.append, **kwargs)
         return agent, handoffs
 
@@ -432,6 +433,98 @@ class Recipe(unittest.TestCase):
         self.assertEqual(len((self.dir / "decisions.jsonl").read_text().splitlines()), 2, "one line per message id decided")
         self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "handoff",
                          "the original id stays a hand-off")
+
+    def test_a_refusal_carries_its_draft_and_a_repair_gets_the_reason(self):
+        """FAA-197, the channel-agent standard's 4.4: a draft the checks refuse is rewritten once with the refusal's
+        reason; a second refusal is a fallback (13.2 `fallback`)."""
+        model = model_says("Open Settings.", "Open Settings, then Account [KB:password-reset].")
+        agent, handoffs = self.agent(model)
+        first = agent.answer("m-1", "How do I reset my password?")
+        self.assertEqual((first["action"], first["reasons"], first["draft"]), ("handoff", ["no-citation"], "Open Settings."))
+        self.assertNotIn("fallback", first)
+        repaired = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+        self.assertEqual(repaired["action"], "reply")
+        self.assertTrue(repaired["repaired"])
+        self.assertNotIn("fallback", repaired)
+        sent = model.calls[1]["messages"]
+        self.assertEqual([m["role"] for m in sent[-2:]], ["assistant", "user"])
+        self.assertEqual(sent[-2]["content"], "Open Settings.")
+        self.assertIn("no-citation", sent[-1]["content"])
+        self.assertIn("HANDOFF", sent[-1]["content"])
+
+    def test_a_second_refusal_is_a_fallback(self):
+        model = model_says("Open Settings.", "Open Settings again.")
+        agent, handoffs = self.agent(model)
+        first = agent.answer("m-1", "How do I reset my password?")
+        second = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+        self.assertEqual((second["action"], second["reasons"], second["fallback"]), ("handoff", ["no-citation"], True))
+        self.assertEqual(second["draft"], "Open Settings again.")
+        self.assertEqual(len(model.calls), 2)
+        self.assertTrue(handoffs[-1]["fallback"], "the hand-off names the fallback for the ticket's `fallback`")
+        saved = [json.loads(line) for line in (self.dir / "decisions.jsonl").read_text().splitlines()]
+        self.assertEqual([row["decision"].get("fallback") for row in saved], [None, True])
+
+    def test_a_repair_that_hands_off_for_another_reason_is_no_fallback(self):
+        for said, reasons in (("HANDOFF", ["model-unsure"]), (None, ["model:failed"])):
+            with self.subTest(reasons=reasons):
+                shutil.rmtree(self.dir, ignore_errors=True)
+                model = model_says("Open Settings.", *([said] if said else [None, None]))
+                agent, _ = self.agent(model)
+                first = agent.answer("m-1", "How do I reset my password?")
+                second = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+                self.assertEqual((second["action"], second["reasons"]), ("handoff", reasons))
+                self.assertNotIn("fallback", second)
+
+    def test_only_a_refused_draft_is_repaired(self):
+        agent, _ = self.agent(model_says("unused"))
+        for repair in ({"reasons": ["no-citation"]}, {"draft": "", "reasons": ["no-citation"]},
+                       {"draft": "x", "reasons": []}, {"draft": "x", "reasons": ["model-unsure"]}, "x"):
+            with self.subTest(repair=repair):
+                with self.assertRaises(sa.RecipeError):
+                    agent.answer("m-9", "How do I reset my password?", repair=repair)
+
+    def test_the_knowledge_file_is_a_source_with_an_age_from_its_last_good_read(self):
+        """FAA-197, the channel-agent standard's 7.1 and 7.4: a source keeps its last good version when a read fails,
+        says so, and its age counts from the last good read."""
+        path = self.dir / "knowledge.json"
+        shutil.copy(RECIPE / "knowledge.example.json", path)
+        now = [1000.0]
+        source = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+        first = source.current()
+        self.assertEqual(source.state(), {"id": "knowledge", "age_s": 0, "max_age_s": 600, "stale": False,
+                                          "degraded": False})
+        now[0] = 1300.0
+        path.write_text("{not json")
+        os.utime(path, (now[0], now[0]))
+        self.assertIs(source.current(), first, "a failed read keeps the last good version")
+        self.assertEqual(source.state()["age_s"], 300)
+        self.assertTrue(source.state()["degraded"])
+        now[0] = 1700.0
+        self.assertTrue(source.state()["stale"], "older than its maximum age")
+        shutil.copy(RECIPE / "knowledge.example.json", path)
+        os.utime(path, (now[0] + 1, now[0] + 1))
+        source.current()
+        self.assertEqual((source.state()["age_s"], source.state()["degraded"]), (0, False), "a good read clears both")
+        agent, _ = self.agent(model_says("Open Settings, then Account [KB:password-reset]."), knowledge=source)
+        self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "reply")
+
+    def test_a_source_that_never_read_well_is_an_error(self):
+        path = self.dir / "knowledge.json"
+        path.write_text("[]oops")
+        with self.assertRaises(sa.RecipeError):
+            sa.KnowledgeSource(path, max_age_s=600).current()
+
+    def test_from_config_makes_a_source_when_the_config_names_a_maximum_age(self):
+        config = json.loads((RECIPE / "config.example.json").read_text())
+        config.update(knowledge=str(RECIPE / "knowledge.example.json"), stateDir=str(self.dir / "state"),
+                      knowledgeMaxAgeSeconds=3600)
+        (self.dir / "config.json").write_text(json.dumps(config))
+        agent = sa.from_config(self.dir / "config.json")
+        self.assertIsInstance(agent.knowledge, sa.KnowledgeSource)
+        self.assertEqual(agent.knowledge.max_age_s, 3600)
+        del config["knowledgeMaxAgeSeconds"]
+        (self.dir / "config.json").write_text(json.dumps(config))
+        self.assertIsInstance(sa.from_config(self.dir / "config.json").knowledge, sa.Knowledge)
 
     def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
         config = json.loads((RECIPE / "config.example.json").read_text())

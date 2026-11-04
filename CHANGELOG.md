@@ -11,6 +11,18 @@
   packet, take the lease with `observatory_handoff_accept`, claim, answer, complete, close the workflow, end; on an
   error `failed_known` with the reason), and the prompt hook prints it when only the line names the dispatch or the
   two disagree. `references/on-demand-session.md` holds the steps.
+- The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section for agents
+  on a channel people write to (the ticket as the unit, one outcome per ticket, answer rather than route, repair
+  before hand-off, declared sources with a maximum age, hand-off queues with their answered signal, metadata only, the
+  declaration's form). The support-agent recipe:
+  - a hand-off its checks made carries the refused `draft`, and `answer(new_id, text, repair=decision)` rewrites it
+    once with the refusal's reasons: a pass is a reply with `repaired: true`, a second refusal a hand-off with
+    `fallback: true` (the standard's 4.4 and its ticket's `fallback`);
+  - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config) reads the knowledge file as a source: read again when
+    it changes, the last good version kept when a read fails, `state()` with its age from the last good read;
+  - `channel-agent.example.json`, one project's declaration under
+    `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it by
+    `test/test_channel_agent_example.py`.
 
 ### Fixed
 
