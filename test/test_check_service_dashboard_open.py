@@ -230,30 +230,8 @@ class CheckoutTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("git"), "git is not installed")
-class LiveOpensInHostTests(LiveSample):
-    """The sample service, probed with --repo pointing at a checkout built here."""
-
-    def checkout(self, files):
-        repo = Path(self.temp.name) / "checkout"
-        repo.mkdir()
-        git(repo, "init", "-q")
-        git(repo, "config", "user.email", "agent@example.com")
-        git(repo, "config", "user.name", "Example")
-        for name, text in files.items():
-            (repo / name).write_text(text)
-        git(repo, "add", "-A")
-        git(repo, "commit", "-q", "-m", "files")
-        return repo
-
-    def probe(self, *extra):
-        out = subprocess.run([sys.executable, str(SCRIPTS / "check_service.py"), "sample", "--services-dir",
-                              str(self.services), "--json", *extra], capture_output=True, text=True)
-        return {r["rule"]: r for r in json.loads(out.stdout)["results"]}["dashboard.opens-in-host"]
-
-    def test_no_checkout_is_not_run(self):
-        result = self.probe()
-        self.assertEqual(result["verdict"], "NOT_RUN")
-        self.assertIn("pass --repo", result["evidence"])  # the sample names its source.repository since 0.62.0 (FAA-198)
+class ShownRepositoryTests(unittest.TestCase):
+    """How a repository is printed as evidence: a pure function, so no sample runs (0.62.0 unit reading 11)."""
 
     def test_a_repository_in_the_evidence_carries_no_key(self):
         rules = importlib.import_module("check_service_rules")
@@ -297,12 +275,46 @@ class LiveOpensInHostTests(LiveSample):
                          "https://github.com/example-org/task-pipeline-dashboard", "a name is no key (seam reading 6)")
         letters = "sk-" + "AbCd" * 10  # made up, no digit: a key all the same, never a name (seam and unit readings 10)
         for fake in ("ghp_" + "Fx9k" * 9 + ":example-org/r", "https://github.com/example-org/ghp_" + "Fx9k" * 9,
-                     "https://github.com/example-org/" + letters, "git@github.com:example-org/" + letters):  # made up
+                     "https://github.com/example-org/" + letters, "git@github.com:example-org/" + letters,
+                     "https://github.com/example-org/%73" + letters[1:],
+                     "https://github.com/example-org/%73k-" + "abcd" * 10):  # made up; decoded too (product reading 11)
             self.assertEqual(rules.shown_repository(fake), "<a repository shaped like a credential>")
+        for value in ("https:/\t/h\\u:fixture-pw@x.example/o/r", " https://a@u:fixture-pw@h.example/o/r",
+                      "ssh:/\t/a@u:fixture-pw@h.example/o/r", "x-r:\t//@u:fixture-pw@o", "https:/\n/u:fixture-pw@h.example/r",
+                      "file:@u:fixture-pw@/", "file:\\\\a@u:fixture-pw@h/r"):  # read as redact_url reads it (unit reading 11)
+            self.assertNotIn("fixture-pw", rules.shown_repository(value), repr(value))
+            _, reason = rules.service_checkout({"source": {"repository": value}, "paths": {"data": "/nonexistent"}}, None)
+            self.assertNotIn("fixture-pw", reason, repr(value))
         token = "glpat-" + "Ab1" * 7  # made up, built here; a user that is a token never shows (unit reading 9)
         for value in (token + ":x@github.com:example-org/r#://", "deploy:" + token + "@github.com:example-org/r?x=://"):
             self.assertNotIn(token.lower(), rules.shown_repository(value).lower(), "a later :// is no scheme")
             self.assertNotIn("deploy", rules.shown_repository(value))
+
+
+class LiveOpensInHostTests(LiveSample):
+    """The sample service, probed with --repo pointing at a checkout built here."""
+
+    def checkout(self, files):
+        repo = Path(self.temp.name) / "checkout"
+        repo.mkdir()
+        git(repo, "init", "-q")
+        git(repo, "config", "user.email", "agent@example.com")
+        git(repo, "config", "user.name", "Example")
+        for name, text in files.items():
+            (repo / name).write_text(text)
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "files")
+        return repo
+
+    def probe(self, *extra):
+        out = subprocess.run([sys.executable, str(SCRIPTS / "check_service.py"), "sample", "--services-dir",
+                              str(self.services), "--json", *extra], capture_output=True, text=True)
+        return {r["rule"]: r for r in json.loads(out.stdout)["results"]}["dashboard.opens-in-host"]
+
+    def test_no_checkout_is_not_run(self):
+        result = self.probe()
+        self.assertEqual(result["verdict"], "NOT_RUN")
+        self.assertIn("pass --repo", result["evidence"])  # the sample names its source.repository since 0.62.0 (FAA-198)
 
     def test_a_found_checkout_is_named_without_its_key(self):
         rules = importlib.import_module("check_service_rules")  # the found message too (0.62.0 unit reading 5)

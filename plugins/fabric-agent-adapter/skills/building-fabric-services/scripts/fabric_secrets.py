@@ -202,25 +202,34 @@ def repository_name(piece: str) -> bool:
     return bool(_REPOSITORY_NAME.match(piece)) and not _KEY_AT_A_WORD.search(piece) and not _JWT_AT_A_WORD.search(piece)
 
 
+def ascii_decoded(text: str) -> str:
+    """Every `%XX` escape of an ASCII character decoded, the rest left as written: how a repository's path and user
+    information are read as well as written, since git and hosts decode them (`%73k-` is `sk-`, `u%3Apw` is `u:pw`;
+    0.62.0 readings 11). The Node twin is asciiDecoded."""
+    return re.sub(r"%([0-7][0-9A-Fa-f])", lambda escape: chr(int(escape.group(1), 16)), text)
+
+
 def repository_password(value: str) -> bool:
     """Whether a repository URI's user information holds a password, read both ways a reader may: as written (after
     `scheme://`, up to the first `/`, `?` or `#`, as git reads `https://h\\u:pw@x/r`) and as WHATWG reads a special
     scheme (every slash and backslash after the colon skipped, up to the next one, `?` or `#`, as `https:///u:pw@h`
     reads), in any scheme, `file` too (0.62.0 readings 10). The user information ends at the last `@`; a password
-    follows its first `:`. The Node twin is repositoryPassword."""
+    follows its first `:`, as written or ascii_decoded (readings 11). The Node twin is repositoryPassword."""
     value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
     scheme, colon, rest = value.partition(":")
     authorities = [re.match(r"//([^/?#]*)", rest).group(1)] if rest.startswith("//") else []
     if colon and scheme.lower() in _SPECIAL + ("file",):
         authorities.append(re.match(r"[^/\\?#]*", rest.lstrip("/\\")).group(0))
-    return any(authority.rpartition("@")[0].partition(":")[2] for authority in authorities)
+    users = [authority.rpartition("@")[0] for authority in authorities]
+    return any(user.partition(":")[2] for user in users + [ascii_decoded(user) for user in users])
 
 
 def repository_credential(value: str) -> bool:
     """FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
     user), in its query or fragment as secret_url reads them, or as a path segment shaped like a key. A path segment in
     lower case, or of letters with no digit (task-pipeline-dashboard, Task-Pipeline-Dashboard), is the repository's
-    name, never a key, though it reads as an `sk-` shape, unless it starts with a key's shape (repository_name). A
+    name, never a key, though it reads as an `sk-` shape, unless a key's shape starts it or follows a `.`, `_` or `-` in
+    it (repository_name); a segment is read as written and ascii_decoded. A
     user outside a URL's authority (an scp form, `https:user@host/path`) counts as one: a user is an authority's."""
     if "@" in value and not _REPOSITORY_AUTHORITY.match(value):
         return True
@@ -230,5 +239,6 @@ def repository_credential(value: str) -> bool:
     head, path, tail = match.groups()
     if repository_password(value):
         return True
-    odd = [piece for piece in re.split(r"[/\\:]", path) if piece and not repository_name(piece)]
+    odd = [piece for written in (path, ascii_decoded(path)) for piece in re.split(r"[/\\:]", written)
+           if piece and not repository_name(piece)]
     return secret_url(head + tail) or any(secret_argument(piece) for piece in odd)

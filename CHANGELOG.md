@@ -63,8 +63,10 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `https://github.com/owner/name`, with no user, query or fragment. A path segment that mixes upper case with a digit
   is read for a key's shape (`sk-` and 16 more characters, a `ghp_` run, 40 characters of mixed case and digits), so
   `Task-Pipeline-Dashboard2` is refused while `Agent-V2` is not: write the repository's name in lower case (hosts such
-  as GitHub take either). A segment that a key's shape starts, or follows a `.`, `_` or `-` in (`sk-` and 16 more
-  characters, `ghp_`, `xoxb-`, `glpat-`, `AKIA` and 16, in any case), is refused whatever its case: a repository such
+  as GitHub take either). A segment that a key's shape starts, or follows a `.`, `_` or `-` in, is refused whatever
+  its case and also percent-encoded (`%73k-` reads as `sk-`). The shapes are those of `fabric_secrets.SECRET_VALUE`,
+  such as `sk-` and 16 more characters, `gh` and one of p, o, u, s, r then `_` and 20, `xox` and one of a, b, o, p, r,
+  s then `-` and 10 (so the word `xoxo-` counts), `glpat-` and 20, `AKIA` and 16, and a JWT: a repository such
   as `sk-learn-` followed by a longer name has no spelling the kit accepts, so an agent built from it is not installed new, and
   an installed one keeps working by a rewrite in place that leaves the source out (FAA-200 (24)).
 

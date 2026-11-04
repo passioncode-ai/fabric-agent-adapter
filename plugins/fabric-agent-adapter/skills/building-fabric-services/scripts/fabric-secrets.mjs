@@ -96,6 +96,9 @@ const SPECIAL_QUERY = /^(?:https?|wss?|ftp|file):/i; // whose query also encodes
  * or JWT's shape at its start or after a `.`, `_` or `-` (0.62.0 readings 9 and 10), so a letters-only key is a key. */
 export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_A_WORD.test(piece) && !JWT_AT_A_WORD.test(piece);
 
+/** Every `%XX` escape of an ASCII character decoded, the rest as written (fabric_secrets.ascii_decoded, readings 11). */
+export const asciiDecoded = (text) => text.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
 /** Whether a repository URI's user information holds a password, as written and as WHATWG reads a special scheme
  * (fabric_secrets.repository_password, 0.62.0 readings 10). */
 export function repositoryPassword(value) {
@@ -105,10 +108,8 @@ export function repositoryPassword(value) {
   const rest = colon < 0 ? text : text.slice(colon + 1);
   const authorities = rest.startsWith('//') ? [/^\/\/([^/?#]*)/.exec(rest)[1]] : [];
   if (colon >= 0 && ['ftp', 'http', 'https', 'ws', 'wss', 'file'].includes(scheme)) authorities.push(/^[^/\\?#]*/.exec(rest.replace(/^[/\\]+/, ''))[0]);
-  return authorities.some((authority) => {
-    const userinfo = authority.slice(0, Math.max(authority.lastIndexOf('@'), 0));
-    return userinfo.includes(':') && userinfo.slice(userinfo.indexOf(':') + 1) !== '';
-  });
+  const users = authorities.map((authority) => authority.slice(0, Math.max(authority.lastIndexOf('@'), 0)));
+  return [...users, ...users.map(asciiDecoded)].some((user) => user.includes(':') && user.slice(user.indexOf(':') + 1) !== '');
 }
 
 // A repository's parameters, read as fabric_secrets.secret_url reads them, by hand: `new URL`
@@ -129,14 +130,15 @@ function repositoryParts(head, tail) {
 // FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
 // user), in its query or fragment as secretUrl reads them, or as a path segment shaped like a key. A path segment in
 // lower case, or of letters with no digit (task-pipeline-dashboard, Task-Pipeline-Dashboard), is the repository's
-// name, never a key, though it reads as an `sk-` shape, unless it starts with a key's shape (repositoryName). A
+// name, never a key, though it reads as an `sk-` shape, unless a key's shape starts it or follows a `.`, `_` or `-` in
+// it (repositoryName); a segment is read as written and asciiDecoded. A
 // user outside a URL's authority (an scp form, `https:user@host/path`) counts as one: a user is an authority's.
 export function repositoryCredential(value) {
   if (value.includes('@') && !REPOSITORY_AUTHORITY.test(value)) return true;
   const match = REPOSITORY_URI.exec(value);
   if (!match) return secretArgument(value);
   const [, head, path, tail] = match;
-  const odd = path.split(/[/\\:]/).filter((piece) => piece && !repositoryName(piece));
+  const odd = [path, asciiDecoded(path)].flatMap((written) => written.split(/[/\\:]/)).filter((piece) => piece && !repositoryName(piece));
   if (repositoryPassword(value) || secretArgument(head + tail) || odd.some((piece) => secretArgument(piece))) return true;
   return repositoryParts(head, tail).some((part) => [...rawValues(part)].some(([name, values]) =>
     values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))));

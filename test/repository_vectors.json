@@ -1,5 +1,5 @@
 {
-  "note": "0.62.0 readings 7 to 10: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY and the upper-case marks (SKLETTERS, RUN40, ...) are replaced at run time by a made-up key shape, never written here.",
+  "note": "0.62.0 readings 7 to 11: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY and the upper-case marks (SKLETTERS, RUN40, ...) are replaced at run time by a made-up key shape, never written here.",
   "credential": [
     "https://bot:pw@github.com/example-org/r",
     "https://KEY@github.com/example-org/r",
@@ -37,7 +37,15 @@
     "https:\\\\u:fixture@h.example/r",
     "https://github.com/example-org/x-AKLETTERS",
     "https://github.com/example-org/.SKLETTERS",
-    "file:///u:fixture@h.example/r"
+    "file:///u:fixture@h.example/r",
+    "https://github.com/example-org/%73k-learn-tutorial-notebooks",
+    "https://github.com/example-org/%73k-RUN40",
+    "https://u%3Afixture@h.example/r",
+    "https://github.com/example-org/x%2DAKLETTERS",
+    "https://me@corp.example:fixture@github.com/example-org/r",
+    "https:///me@corp.example:fixture@h.example/r",
+    "https://github.com/example-org/x-JWTLETTERS",
+    "https://github.com/example-org/x.JWTLETTERS"
   ],
   "name": [
     "https://github.com/example-org/example-agent",
@@ -56,6 +64,8 @@
     "https://h.example/r?token= ",
     "https://h.example/r?token=\u0001",
     "x-r:h.example/r?x=%zz'RUN40",
-    "file:///srv/git/r"
+    "file:///srv/git/r",
+    "https://github.com/example-org/my%20repo",
+    "https://u:\t@h.example/r"
   ]
 }

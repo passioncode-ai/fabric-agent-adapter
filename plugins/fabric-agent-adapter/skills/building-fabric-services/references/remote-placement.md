@@ -49,8 +49,9 @@ same objects (well-known document, events feed, login code) at the same paths.
   credential in its user, query or fragment or as a path segment; a path segment in lower case, or of letters with no
   digit, is the repository's name unless a key's shape starts it or follows a `.`, `_` or `-` in it (since 0.62.0, so
   `task-pipeline-dashboard` and `Task-Pipeline-Dashboard` are accepted, a name that starts with `sk-` and 16 more
-  characters is not, in any case). A password is read in the user information as written and as the URL standard reads
-  it (`https://h\u:pw@x/r` is refused).
+  characters is not, in any case, nor `%73k-` and the rest). A path and a user information are read as written and with
+  their ASCII escapes decoded, and a password as written and as the URL standard reads it (`https://h\u:pw@x/r` is
+  refused).
 - `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or
   `{by, role?, tool}` where `by` is `person`, `node` or `organization` and `role` (`operator`, `administrator`) is a
   person's only. There is no `agent` kind: an agent that registers a service writes the string form, or
