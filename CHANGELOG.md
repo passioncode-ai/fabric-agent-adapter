@@ -64,7 +64,8 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   included) that `new URL` cannot parse (`ssh://[zz]/r`, `ssh://h:99999/r`, `file://h:1/r`), where Python keeps the
   scheme: both now print `<scheme>:<redacted>`.
 - A subscription `runner.kind` that is no string (a list or an object) raised `TypeError` in Python's
-  `validate_descriptor`, `write_descriptor` and `check_service.py` (0.61.0 too), and Node named only one of its two
+  `validate_descriptor`, `write_descriptor` and `check_service.py` (0.61.0 too), and Node, for a list whose text is a
+  subscription runner's name (`["claude-code"]`, which `Object.hasOwn` reads as that key), named only one of its two
   problems: both kits now name both as descriptor problems.
 - Node's key set cache (`JwksCache`) accepted `https://h\u:pw@x/j` and `https://@x/j`, which the Python twin refuses:
   it now reads the authority as written too.
