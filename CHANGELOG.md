@@ -11,14 +11,16 @@
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
   never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
   exit contract in place of the preamble (naming the session's own `sessionId` when it is a UUID, and after a `/clear`
-  the session id the clear replaced, which a replayed accept needs for its `leaseId`), a retro before the run ends, also in a session
+  the session id the clear replaced, which a replayed accept needs for its `leaseId` and a pending handoff is accepted
+  under, or the new id when the replaced one is unknown), a retro before the run ends, also in a session
   Fabric launched: `fabric_whoami`, the packet
   (`observatory_checkpoint_latest`), the request and its thread (`com.get`, `com.list`), the lease
   (`observatory_handoff_accept` with its owner, key and the executor the launcher names), `com.status` and the claim,
   a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
   checkpoints, renewals about every 20 s (work that outlasts the run gives its state in a `com.progress` note and is left accepted for the next run,
-  which Fabric's dispatcher starts since its main at `fff4b6d9`, in no release yet; when the run was cut by the
-  request's deadline, it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
+  which Fabric's dispatcher starts since its main at `fff4b6d9`, in no release yet, Fabric itself moving the open
+  Observatory workflow to that run by its decision on thread `b3e60686`; when the request's deadline is not after
+  run-ends-at, it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
   nudge in such a session. Only the

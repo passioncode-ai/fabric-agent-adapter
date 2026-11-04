@@ -129,7 +129,8 @@ draft-and-check step owns.
 - **Every source is declared with its owner, how it is read, its cadence and its maximum age**; one that fails keeps its last good version and
   says so, and its age is that version's (its file's modification time). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
-  recommendation to its owner. Many `referred` tickets show a missing signal, not a regression.
+  recommendation to its owner, posted on the board: `recommendation` is that board thread's id. What the queue counts
+  (`items_seen_unit`) is one of `mails`, `updates`, `messages` or `reviews`. Many `referred` tickets show a missing signal, not a regression.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.

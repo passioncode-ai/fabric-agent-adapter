@@ -109,7 +109,8 @@ well-known `extensions` (the standard's 11 and 13.6; the doctrine: creating-fabr
 [practices](../../../creating-fabric-agents/references/practices.md#agents-on-a-channel-people-write-to)).
 `channel-agent.example.json` is one project's declaration in the standard's round 4 form: a required member that is
 not there yet reads `{"none": "not_yet", "until": "<date>"}`, one not used `{"none": "not_used"}`, never null;
-`recommendation` only with `answered_signal: "none"`; durations in ISO 8601; the knowledge file as a source with its
+`recommendation` only with `answered_signal: "none"`, the id of the board thread where the queue's owner was told;
+`items_seen_unit` one of `mails`, `updates`, `messages`, `reviews`; durations in ISO 8601; the knowledge file as a source with its
 maximum age. `test/test_channel_agent_example.py` holds the example to that form; `check_service.py` reads the
 declaration once the contract publishes its schema.
 

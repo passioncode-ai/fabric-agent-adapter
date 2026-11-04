@@ -238,7 +238,7 @@
         "counts the ticket as the unit (one mail thread) with one writing agent and one outcome per ticket",
         "rewrites a draft the checks refused once with the refusal's reason, and marks a second refusal as the ticket's fallback (the recipe's repair=)",
         "declares each source with its owner, how it is read, its cadence and its maximum age, keeps the last good version when a read fails and says so (the recipe's KnowledgeSource)",
-        "declares each hand-off queue with its answered signal, or with none and a recommendation to its owner",
+        "declares each hand-off queue with its answered signal, or with none and a recommendation to its owner, posted on the board and named by that thread's id",
         "sends only metadata off its side (an opaque ticket id, times, outcome, category, at most an 80-character paraphrase that passed a personal-data check)",
         "declares under the channel-agent extension key with no null in a required member ({\"none\": \"not_yet\", \"until\": ...} or {\"none\": \"not_used\"})"
       ]

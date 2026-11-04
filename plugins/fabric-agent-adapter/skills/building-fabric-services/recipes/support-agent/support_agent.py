@@ -208,13 +208,14 @@ class KnowledgeSource:
         self.path, self.max_age_s, self._clock = Path(path), max_age_s, clock
         self._knowledge: Optional[Knowledge] = None
         self._good_mtime = 0.0
-        self._seen: Optional[Tuple[int, int, int]] = None
+        self._seen: Optional[Tuple[int, int, int, int]] = None
         self._degraded = False
 
     def current(self) -> Knowledge:
-        try:  # the time, the size and the inode: a rewrite in one coarse tick, or a copy that kept the time, still shows
+        try:  # the time, the size, the inode and the status-change time, which no copy or `touch -r` can set back: a
+            # rewrite in one coarse tick, a copy that kept the time, or one in place with the same size still shows
             stat = self.path.stat()
-            seen: Optional[Tuple[int, int, int]] = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+            seen: Optional[Tuple[int, int, int, int]] = (stat.st_mtime_ns, stat.st_size, stat.st_ino, stat.st_ctime_ns)
         except OSError:
             seen = None
         if self._knowledge is not None and seen is not None and seen == self._seen:

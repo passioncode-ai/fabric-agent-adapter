@@ -135,7 +135,7 @@ DISPATCH_CONTRACT = (
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
     "and finish before run-ends-at; work that cannot end by then gives its state as a `com.progress` note on the "
-    "thread, then: when run-ends-at is the request's deadline, `com.complete` failed_known saying so and steps 6 and 7; "
+    "thread, then: when the request's deadline is not after run-ends-at, `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
@@ -203,20 +203,34 @@ def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Opti
 _SESSION_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 DISPATCH_SESSION = " This session's sessionId: {session}."
 #: After a /clear the accept, if one was made, was made under the session id the clear replaced (0.63.0 seam readings
-#: 9 and 10): Observatory replays an accept, with its leaseId, only for that sessionId and the same idempotencyKey.
+#: 9 and 10): Observatory replays an accept, with its leaseId, only for that sessionId and the same idempotencyKey. A
+#: pending handoff is accepted under that same id, so every later replay matches it (0.63.0 seam reading 13).
 DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, and its leaseId comes back only by "
-                    "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` and the `executor` "
-                    "the first accept passed (the launcher's prompt names it). When `observatory_checkpoint_latest` "
-                    "still shows the handoff pending, no accept was made: accept it as step 2 says. Never accept it "
-                    "anew under the new id.")
+                    "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` and `executor` "
+                    "the first accept passed (the launcher's prompt names both; `observatory_checkpoint_latest` shows "
+                    "the workflow's executor). When `observatory_checkpoint_latest` still shows the handoff pending, no "
+                    "accept was made: {pending}")
 _CLEARED_UNKNOWN = "the sessionId the clear replaced"
+_PENDING_NAMED = ("accept it now with that same sessionId, key, owner and executor. Never accept it under the new "
+                  "id.")
+_PENDING_UNKNOWN = ("accept it as step 2 says, with this session's own sessionId{session}. An accept already made "
+                    "under an id these hooks could not name cannot be replayed: end the run without touching the "
+                    "request; Fabric takes the workflow over after it.")
 
 
-def dispatch_cleared(previous: Any, handoff: Any = None) -> str:
+def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None) -> str:
+    """The cleared holder's notice: replay under the id the clear replaced when it is known, and accept a pending
+    handoff under that same id; when it is not known, a pending handoff is accepted under this session's id."""
     named = isinstance(previous, str) and _SESSION_UUID.fullmatch(previous)
     key = "`accept-%s` when Switchboard started the run" % handoff if isinstance(handoff, str) and handoff else (
         "the key the first accept used")
-    return DISPATCH_CLEARED.format(session="sessionId %s" % previous if named else _CLEARED_UNKNOWN, key=key)
+    if named:
+        pending = _PENDING_NAMED
+    else:
+        own = isinstance(session_id, str) and _SESSION_UUID.fullmatch(session_id)
+        pending = _PENDING_UNKNOWN.format(session=" (%s)" % session_id if own else "")
+    return DISPATCH_CLEARED.format(session="sessionId %s" % previous if named else _CLEARED_UNKNOWN, key=key,
+                                   pending=pending)
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
@@ -275,15 +289,12 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
         # there any /clear takes the record, the contract twice rather than never
         if not isinstance(held, dict) or held.get("host") == record["host"] or _WINDOWS:
             # the session the clear replaced, the one an earlier accept named: only when this hook's parent wrote the
-            # record (on Windows, where any /clear takes it, a nested session must not learn the holder's id); a record
-            # already cleared keeps what it said, "" (the replaced id unknown) included (0.63.0 unit reading 12)
+            # record (on Windows, where any /clear takes it, a nested session must not learn the holder's id). A record
+            # already cleared keeps the id it named; one cleared with the id unknown names the session it started, which
+            # was told to accept a pending handoff under its own id (0.63.0 seam reading 13)
             same = isinstance(held, dict) and held.get("host") == record["host"]
-            if not same:
-                record["cleared_from"] = ""
-            elif "cleared_from" in held:
-                record["cleared_from"] = held["cleared_from"] if isinstance(held["cleared_from"], str) else ""
-            else:
-                record["cleared_from"] = held.get("session") if isinstance(held.get("session"), str) else ""
+            named = held.get("cleared_from") or held.get("session") if same else ""
+            record["cleared_from"] = named if isinstance(named, str) else ""
             try:
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _write_private(folder / (key + ".json"), json.dumps(record))
@@ -345,7 +356,7 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
             return _host_output(host, "SessionStart", DISPATCH_NESTED.format(workflow=dispatch["workflow"]))
         if payload.get("source") == "clear":
             return _host_output(host, "SessionStart", dispatch_contract(dispatch) + dispatch_cleared(
-                dispatch_cleared_from(dispatch, env), dispatch.get("handoff")))
+                dispatch_cleared_from(dispatch, env), dispatch.get("handoff"), payload.get("session_id")))
         return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id=payload.get("session_id")))
     if fabric_launched(env):
         return None
@@ -408,7 +419,7 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     elif lines:
         previous = dispatch_cleared_from(told, env)
         if previous is not None:  # a cleared holder: the accept keeps the old id
-            lines = [dispatch_contract(dispatch, mismatch) + dispatch_cleared(previous, dispatch.get("handoff"))]
+            lines = [dispatch_contract(dispatch, mismatch) + dispatch_cleared(previous, dispatch.get("handoff"), session_id)]
     if fabric_launched(env) or told is not None:  # a dispatched run answers its one request: no unread line, no nudges
         return _host_output("claude", "UserPromptSubmit", "\n".join(lines)) if lines else None
     directory = session_dir(session_id, env)

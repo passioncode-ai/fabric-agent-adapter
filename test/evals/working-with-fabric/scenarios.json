@@ -556,7 +556,7 @@
       "request": "FABRIC_DISPATCH_WORKFLOW is set. The work the request asks for will not end before run-ends-at. What do you do before the run stops?",
       "expected": [
         "gives its state (what is done, where it lies, what is left) as a com.progress note on the request's thread",
-        "when run-ends-at is the request's deadline, completes it failed_known saying the deadline came first and closes the workflow",
+        "when the request's deadline is not after run-ends-at, completes it failed_known saying the deadline came first and closes the workflow",
         "otherwise leaves the request accepted for the next run: an in_progress checkpoint without close, no com.complete",
         "writes the retro fabric_whoami asks for before it ends"
       ]
@@ -567,7 +567,7 @@
       "request": "FABRIC_DISPATCH_WORKFLOW is set and you were just cleared; the hook names the session id the clear replaced. What do you do about the lease?",
       "expected": [
         "replays the accept with the named sessionId, the same idempotencyKey (accept-<handoff> when Switchboard started the run), the same owner and the executor the first accept passed",
-        "accepts as step 2 says when observatory_checkpoint_latest still shows the handoff pending",
+        "when observatory_checkpoint_latest still shows the handoff pending, accepts it under that same named sessionId, key, owner and executor",
         "never makes a new accept under the new session id"
       ]
     }

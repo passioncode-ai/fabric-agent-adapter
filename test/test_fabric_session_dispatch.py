@@ -1,5 +1,5 @@
 """FAA-201: a session Fabric started on a board request (Fabric's spec at 1329b60f, sections 3.4 to 3.6). The session is
-told by FABRIC_DISPATCH_WORKFLOW (alone is enough: Switchboard's SB-247 sets only it), with FABRIC_DISPATCH_HANDOFF and
+told by FABRIC_DISPATCH_WORKFLOW (alone is enough: an early Switchboard main set only it), with FABRIC_DISPATCH_HANDOFF and
 FABRIC_DISPATCH_REQUEST when the launcher sets them; the prompt's first line `fabric-dispatch/1 workflow=... handoff=...
 request=...` fills what the environment left out and never wins over it. A line with no workflow in the environment is
 quoted text. The hooks print the exit contract in place of the usual preamble, launched by Fabric or not."""
@@ -28,7 +28,7 @@ class Parsing(unittest.TestCase):
         self.assertEqual(cli.dispatch_from_env(ENV), FULL)
 
     def test_the_workflow_alone_names_a_dispatch(self):
-        # Switchboard's SB-247 (e0309b2) sets FABRIC_DISPATCH_WORKFLOW and SWITCHBOARD_LAUNCH_ID only (0.63.0 seam r1)
+        # Switchboard's main at e0309b2, never released, set FABRIC_DISPATCH_WORKFLOW and SWITCHBOARD_LAUNCH_ID only
         self.assertEqual(cli.dispatch_from_env({"FABRIC_DISPATCH_WORKFLOW": WF, "SWITCHBOARD_LAUNCH_ID": "l-1"}),
                          {"workflow": WF})
         for name, value in (("FABRIC_DISPATCH_HANDOFF", "5f0e9c2a"), ("FABRIC_DISPATCH_HANDOFF", "handoff:a b"),
@@ -397,7 +397,7 @@ class Hooks(Base):
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
         self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")
-        self.assertIn("when run-ends-at is the request's deadline, `com.complete` failed_known", text,
+        self.assertIn("when the request's deadline is not after run-ends-at, `com.complete` failed_known", text,
                       "no run comes after the deadline (0.63.0 product reading 12)")
 
     def test_the_prompt_hooks_contract_names_the_session_id(self):
@@ -424,7 +424,7 @@ class Hooks(Base):
         done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
                                 extra_env=ENV)
         text = self.context(done)
-        self.assertIn("Never accept it anew under the new id", text)
+        self.assertIn("Never accept it under the new id", text)
         self.assertIn("sessionId %s" % uuid, text, "the id the accept was made under (0.63.0 seam reading 10)")
         self.assertIn("`accept-%s`" % HANDOFF, text, "the key, from the handoff (0.63.0 unit reading 12)")
         self.assertNotIn(cleared, text)
@@ -439,15 +439,16 @@ class Hooks(Base):
         text = self.context(done)
         self.assertIn("sessionId %s" % first, text)
         self.assertIn("`accept-%s`" % HANDOFF, text, "the handoff the line gave (0.63.0 unit reading 12)")
-        self.assertIn("Never accept it anew under the new id", text)
+        self.assertIn("Never accept it under the new id", text)
         self.assertNotIn(again, text)
 
     def test_the_cleared_notice_names_the_whole_replay(self):
         # 0.63.0 readings 11: Observatory replays only the same sessionId, key, owner and executor
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
         text = cli.dispatch_cleared(uuid, HANDOFF)
-        for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF, "the `executor` the first accept passed",
-                      "still shows the handoff pending, no accept was made", "Never accept it anew"):
+        for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF, "the same `owner` and `executor` the first accept passed",
+                      "still shows the handoff pending, no accept was made", "Never accept it under the new id",
+                      "`observatory_checkpoint_latest` shows the workflow's executor"):
             self.assertIn(words, text)
         for previous in (None, "", "S-ABC", uuid.upper()):
             with self.subTest(previous=previous):
@@ -467,16 +468,59 @@ class Hooks(Base):
             cli.dispatch_holder(FULL, c, env, take_over=True)
         self.assertEqual(cli.dispatch_cleared_from(FULL, env), a)
 
-    def test_a_second_clear_keeps_the_unknown_id_unknown(self):
-        # 0.63.0 unit reading 12: the first clear found no record, so the second must not name the session it started
+    def test_after_an_unknown_id_the_next_clear_names_the_session_told_to_accept(self):
+        # 0.63.0 seam reading 13: the first clear found no record, so it told the session it started to accept a
+        # pending handoff under its own id; the next clear names that session (unit reading 12 had kept "")
         from unittest import mock
         env = dict(self.env, **ENV)
         b, c = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc", "3c4d5e6f-2c3d-4e7f-8a0b-23456789abcd"
         with mock.patch.object(cli.os, "getppid", return_value=111):
             cli.dispatch_holder(FULL, b, env, take_over=True)
             cli.dispatch_holder(FULL, c, env, take_over=True)
-        self.assertEqual(cli.dispatch_cleared_from(FULL, env), "")
-        self.assertIn("the sessionId the clear replaced", cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env)))
+        self.assertEqual(cli.dispatch_cleared_from(FULL, env), b)
+        self.assertIn("sessionId %s" % b, cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env), HANDOFF, c))
+        self.assertNotIn(c, cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env), HANDOFF, c))
+
+    def test_a_pending_handoff_is_accepted_under_the_id_every_later_clear_names(self):
+        # 0.63.0 seam and unit readings 13: the cleared holder is never told to accept under its own new id when the
+        # replaced one is known, and the id it accepts under is the one the next clear names
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        a, b, c = ("1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab", "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc",
+                   "3c4d5e6f-2c3d-4e7f-8a0b-23456789abcd")
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            cli.dispatch_holder(FULL, a, env)
+            cli.dispatch_holder(FULL, b, env, take_over=True)
+            told = cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env), HANDOFF, b)
+            cli.dispatch_holder(FULL, c, env, take_over=True)
+        self.assertIn("accept it now with that same sessionId", told)
+        self.assertNotIn(b, told)
+        self.assertNotIn("as step 2 says", told)
+        self.assertEqual(cli.dispatch_cleared_from(FULL, env), a, "the id the pending accept was made under")
+
+    def test_both_hooks_give_a_cleared_session_its_new_id_when_the_replaced_one_is_unknown(self):
+        # 0.63.0 seam reading 13: a clear with no readable record names the new id for a pending handoff, at session
+        # start and in the prompt hook's reprint
+        new = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
+        done, _ = self.run_hook("session-start", {"session_id": new, "cwd": str(self.repo), "source": "clear"},
+                                extra_env=ENV)
+        self.assertIn("with this session's own sessionId (%s)" % new, self.context(done))
+        sb = {"FABRIC_DISPATCH_WORKFLOW": WF}
+        again = "4d5e6f70-3d4e-4f80-9b1c-3456789abcde"
+        self.run_hook("session-start", {"session_id": again, "cwd": str(self.repo), "source": "clear"}, extra_env=sb)
+        done, _ = self.run_hook("user-prompt-submit", {"session_id": again, "cwd": str(self.repo), "prompt": LINE},
+                                extra_env=sb)
+        self.assertIn("with this session's own sessionId (%s)" % again, self.context(done))
+
+    def test_an_unknown_id_gives_the_new_one_for_a_pending_handoff(self):
+        new = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
+        for previous in (None, ""):
+            with self.subTest(previous=previous):
+                text = cli.dispatch_cleared(previous, HANDOFF, new)
+                self.assertIn("with this session's own sessionId (%s)" % new, text)
+                self.assertIn("end the run without touching the request", text)
+                self.assertNotIn("Never accept it under the new id", text)
+        self.assertNotIn("(", cli.dispatch_cleared(None, None, "not-a-uuid").split("own sessionId")[1].split(".")[0])
 
     def test_a_clear_with_no_readable_record_still_reads_as_cleared(self):
         env = dict(self.env, **ENV)
