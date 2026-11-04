@@ -190,6 +190,49 @@ class Hooks(Base):
                                 extra_env=sb)
         self.assertEqual(done.stdout, "", "the line adds nothing to a nested session")
 
+    def test_a_new_launch_of_the_same_workflow_is_a_new_holder(self):
+        # 0.63.0 unit r3: spec 3.6 lets the next cycle dispatch the same workflow once more
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        first = dict(ENV, SWITCHBOARD_LAUNCH_ID="launch-1")
+        second = dict(ENV, SWITCHBOARD_LAUNCH_ID="launch-2")
+        self.assertIn("observatory_handoff_accept", self.context(self.start(first)[0]))
+        done, _ = self.run_hook("session-start", {"session_id": other, "cwd": str(self.repo), "source": "startup"},
+                                extra_env=second)
+        self.assertIn("observatory_handoff_accept", self.context(done))
+        wf_only = {"FABRIC_DISPATCH_WORKFLOW": WF, "SWITCHBOARD_LAUNCH_ID": "launch-3"}
+        done, _ = self.run_hook("session-start", {"session_id": other, "cwd": str(self.repo), "source": "startup"},
+                                extra_env=wf_only)
+        self.assertIn("observatory_handoff_accept", self.context(done))
+
+    def test_the_holder_fails_open(self):
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        self.assertTrue(cli.dispatch_holder(FULL, "../not one", env), "an id that is not one")
+        self.assertTrue(cli.dispatch_holder(FULL, None, env))
+        with mock.patch.object(cli.os, "fdopen", side_effect=OSError(28, "No space left on device")):
+            self.assertTrue(cli.dispatch_holder(FULL, SID, env), "a full disk")
+        folder = cli.state_root(env=env) / "dispatch"
+        self.assertEqual([p for p in folder.glob("*.json") if p.stat().st_size == 0], [], "no half record is left")
+        self.assertTrue(cli.dispatch_holder(FULL, SID, env), "the same session holds it after the failed write")
+        blocked = dict(env, HOME=str(self.base / "nowhere-file"))
+        (self.base / "nowhere-file").write_text("x")  # a file where the home folder should be: nothing can be made
+        self.assertTrue(cli.dispatch_holder(FULL, SID, blocked), "a folder that cannot be made")
+        record = next(folder.glob("*.json"))
+        record.write_text("not json")
+        self.assertFalse(cli.dispatch_holder(FULL, "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", env),
+                         "an unreadable record is held by someone else")
+
+    def test_old_dispatch_records_are_pruned(self):
+        import os, time
+        env = dict(self.env, **ENV)
+        cli.dispatch_holder(FULL, SID, env)
+        cli.dispatch_holder(dict(FULL, handoff="handoff:ffffffffffffffff"), SID, env)
+        folder = cli.state_root(env=env) / "dispatch"
+        old, fresh = sorted(folder.glob("*.json"))
+        os.utime(old, (1, 1))
+        fs.prune_stale_sessions(env=env, now=time.time())
+        self.assertEqual(list(folder.glob("*.json")), [fresh])
+
     def test_watch_mail_refuses_a_dispatched_session(self):
         mail = importlib.import_module("fabric_session_mail")
         env = {"HOME": str(self.home), "FABRIC_DISPATCH_WORKFLOW": WF}

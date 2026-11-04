@@ -139,13 +139,21 @@ class Knowledge:
                 raise RecipeError("every knowledge entry has an id of letters, digits, '.', '_', ':' or '-'")
             if not isinstance(entry.get("answer"), str) or not entry["answer"].strip():
                 raise RecipeError("knowledge entry %s has no answer" % entry["id"])
+            if "question" in entry and not isinstance(entry["question"], str):
+                raise RecipeError("knowledge entry %s has a question that is not text" % entry["id"])
+            tags = entry.get("tags", [])
+            if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+                raise RecipeError("knowledge entry %s has tags that are not a list of text" % entry["id"])
             if entry["id"] in self.entries:
                 raise RecipeError("knowledge entry %s appears twice" % entry["id"])
             self.entries[entry["id"]] = dict(entry)
 
     @classmethod
     def load(cls, path: Path) -> "Knowledge":
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        except RecursionError:
+            raise RecipeError("the knowledge file is nested too deep to read") from None
         if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
             raise RecipeError("the knowledge file is an object with an `entries` list")  # never an empty set by mistake
         return cls(data["entries"])
@@ -544,10 +552,12 @@ def from_config(config_path: Path, *, on_handoff: Optional[Callable[[Dict[str, A
                                       ledger=fabric_usage.JsonlUsageLedger(state / "usage.jsonl"), prices=prices,
                                       key_env=config.get("keyEnv", "OPENROUTER_API_KEY"),
                                       project_id=config.get("projectId"), **overrides)
-    knowledge: Union[Knowledge, KnowledgeSource] = Knowledge.load(home / config["knowledge"])
+    knowledge: Union[Knowledge, KnowledgeSource]
     if config.get("knowledgeMaxAgeSeconds") is not None:  # the file as a source with an age (FAA-197)
         knowledge = KnowledgeSource(home / config["knowledge"], max_age_s=config["knowledgeMaxAgeSeconds"])
-        knowledge.current()  # read now: state() is fresh from the start, and a bad file fails here
+        knowledge.current()  # read once, now: a bad file fails here as a RecipeError
+    else:
+        knowledge = Knowledge.load(home / config["knowledge"])
     return SupportAgent(knowledge=knowledge, client=client, model=config["model"],
                         fallback=config["fallback"], state_dir=state, max_tokens=int(config.get("maxTokens", 600)),
                         max_chars=int(config.get("maxChars", 1200)), on_handoff=on_handoff)

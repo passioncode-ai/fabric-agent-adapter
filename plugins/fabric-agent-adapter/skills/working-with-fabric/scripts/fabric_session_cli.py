@@ -196,8 +196,8 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return True
     import hashlib
-    run = dispatch.get("handoff") or env.get("SWITCHBOARD_LAUNCH_ID") or ""
-    key = hashlib.sha256(("%s|%s" % (dispatch["workflow"], run)).encode("utf-8")).hexdigest()[:32]
+    run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
+    key = hashlib.sha256(run.encode("utf-8")).hexdigest()[:32]  # a new launch is a new holder
     folder = state_root(env=env) / "dispatch"
     try:
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -210,8 +210,14 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
             return False
     except OSError:
         return True
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(json.dumps({"session": session_id, "at": int(time.time())}))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps({"session": session_id, "at": int(time.time())}))
+    except OSError:  # a full disk: no half record that would make this session a stranger later
+        try:
+            (folder / (key + ".json")).unlink()
+        except OSError:
+            pass
     return True
 
 

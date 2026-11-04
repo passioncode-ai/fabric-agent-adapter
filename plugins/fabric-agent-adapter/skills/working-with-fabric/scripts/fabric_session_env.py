@@ -574,14 +574,14 @@ def spool(directory: Path, entry: Dict[str, Any]) -> Path:
 def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[float] = None,
                          keep: Optional[str] = None) -> int:
     """Remove session folders whose newest file is older than SESSION_STALE_S (a running worker's lock is a fresh file,
-    so its folder is never stale); never the folder of the session `keep`. Returns how many were removed. Never
-    raises."""
+    so its folder is never stale), and dispatch records as old (FAA-201); never the folder of the session `keep`.
+    Returns how many were removed. Never raises."""
     now = time.time() if now is None else now
     removed = 0
     try:
         folders = list((state_root(env=env) / "sessions").iterdir())
     except OSError:
-        return 0
+        folders = []
     for folder in folders:
         try:
             if folder.name == keep or not SESSION_ID.fullmatch(folder.name) or not folder.is_dir():
@@ -589,6 +589,17 @@ def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[flo
             newest = max([folder.stat().st_mtime] + [f.stat().st_mtime for f in folder.iterdir()])
             if now - newest > SESSION_STALE_S:
                 _remove_tree(folder)
+                removed += 1
+        except OSError:
+            continue
+    try:  # FAA-201: the dispatch records (which session holds a dispatch) go stale the same way
+        records = list((state_root(env=env) / "dispatch").glob("*.json"))
+    except OSError:
+        records = []
+    for record in records:
+        try:
+            if now - record.stat().st_mtime > SESSION_STALE_S:
+                record.unlink()
                 removed += 1
         except OSError:
             continue

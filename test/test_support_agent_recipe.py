@@ -544,7 +544,10 @@ class Recipe(unittest.TestCase):
         path, now, source = self.source_at(1000.0)
         first = source.current()
         deep = '{"entries": ' + "[" * 200000 + "]" * 200000 + "}"
-        for n, shape in enumerate(('{"entries": null}', '{"entries": 5}', "[]", "{}", '"x"', deep), 1):
+        example = json.loads((RECIPE / "knowledge.example.json").read_text())
+        nulled = json.dumps({"entries": [dict(example["entries"][0], tags=None)] + example["entries"][1:]})
+        numbered = json.dumps({"entries": [dict(example["entries"][0], question=7)] + example["entries"][1:]})
+        for n, shape in enumerate(('{"entries": null}', '{"entries": 5}', "[]", "{}", '"x"', deep, nulled, numbered), 1):
             with self.subTest(shape=shape[:20]):
                 path.write_text(shape)
                 os.utime(path, (now[0] + n, now[0] + n))
@@ -599,6 +602,17 @@ class Recipe(unittest.TestCase):
         del config["knowledgeMaxAgeSeconds"]
         (self.dir / "config.json").write_text(json.dumps(config))
         self.assertIsInstance(sa.from_config(self.dir / "config.json").knowledge, sa.Knowledge)
+
+    def test_from_config_refuses_a_file_nested_too_deep_with_a_recipe_error(self):
+        (self.dir / "k.json").write_text('{"entries": ' + "[" * 200000 + "]" * 200000 + "}")
+        config = json.loads((RECIPE / "config.example.json").read_text())
+        for age in (3600, None):
+            with self.subTest(age=age):
+                config.update(knowledge=str(self.dir / "k.json"), stateDir=str(self.dir / "state"),
+                              knowledgeMaxAgeSeconds=age)
+                (self.dir / "config.json").write_text(json.dumps(config))
+                with self.assertRaises(sa.RecipeError):
+                    sa.from_config(self.dir / "config.json")
 
     def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
         config = json.loads((RECIPE / "config.example.json").read_text())

@@ -203,6 +203,8 @@ Stop or SessionEnd hook, even while the hooks are inert; an end entry whose rele
 for the next worker, and the folder goes only once the end is delivered; a stale worker lock is taken by renaming it, never by a
 check and a delete),
 removed at the session's end.
+`dispatch/<key>.json` beside it records which session holds a dispatch (FAA-201: the first session id for the
+workflow, the handoff and the launcher's run id, 0600), removed with stale session folders after 7 days.
 
 Turn only the transcript read off with `FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file in the folder
 above (FAA-160). That folder is a cache: a cache cleaner may remove the file, and the read is on again; the variable,
