@@ -56,9 +56,12 @@ says that his approval holds for the whole task, at every link (FAA-195).
   a number subclass's own `__class__`: one claiming `bool` was read as 1 under a ceiling, and one whose `__class__`
   raised made the core raise (older than 0.61.0); it tests a bool by identity now (0.61.0 unit reading 30). A job's approval step kept a `str`-subclass project (a `(str, Enum)` member included) as given, which
   the start refused by the core's exact-type compare but the job file then wrote as its plain string, so the answer
-  covered it; the kept step, `job_step`, `action_gate` and McpToolServer now read a project as an exact `str`, as the
-  board path does, so the start and the answer agree, and a value that only claims `str` never reaches the job file
-  (older than 0.61.0; 0.61.0 seam reading 32). `js_to_number`'s decimal
+  covered it, and the same held for a step a service keeps itself through `request_input(steps=)` or Node's
+  `requestInput({steps})` (a `String` object project, a `Number` object spend); both stores now keep a step as the gate
+  reads it (`kept_step` / `keptStep`: a spend through `mandate_spend`, a project as an exact `str` or a primitive
+  string, else `UNREADABLE_PROJECT`), and `job_step`, `action_gate` and McpToolServer read a project as an exact `str`
+  too, as the board path does, so the start and the answer agree, and a value that only claims `str` never reaches the
+  job file (older than 0.61.0; 0.61.0 seam reading 32, unit and product readings 33). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
   (0.61.0 seam reading 22).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
@@ -99,6 +102,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
 - `fabric_board_link` (and `fabric-board-link.mjs`) now imports `fabric_interop_rules`, so a board responder's install
   brings it and its `fabric_delegation` too (`fabric_kit.py install --module fabric_board` copies 33 modules, 31 in
   0.60.0): reinstall with `fabric_kit.py install` and check with `status`, never by copying `fabric_board_link` alone.
+- A Python service that passes a job or tool project as a `(str, Enum)` member or another `str` subclass, under a
+  mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
+- A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it (a `str`-subclass
+  project as its plain string), so its answer may still be covered: answer or cancel such jobs before upgrading.
 
 ## 0.60.0 (2026-11-03)
 

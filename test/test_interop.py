@@ -848,7 +848,11 @@ class ActionGateMandateTests(unittest.TestCase):
                 result = fd.refusal_tool_result(answer["refusal"])
                 json.dumps(result, allow_nan=False)
                 self.assertEqual(result["structuredContent"]["error"]["data"]["detail"], "outside-mandate: spend")
-        for project in (7, ["alpha"], {"id": "alpha"}):
+        class ClassRaises(str):  # read by its type, never by its own __class__: refused, not raised (seam reading 33)
+            @property
+            def __class__(self):
+                raise RuntimeError("__class__ ran")
+        for project in (7, ["alpha"], {"id": "alpha"}, ClassRaises("alpha")):
             with self.subTest(project=project):
                 answer = self.gate(meta={"mandate": scoped}, spend_usd=0.5, project=project)
                 self.assertEqual(fd.refusal_error(answer["refusal"])["error"]["data"]["detail"], "outside-mandate: project")
@@ -865,7 +869,11 @@ class ActionGateMandateTests(unittest.TestCase):
             with self.subTest(spend=repr(spend)[:12]):
                 step = fi.job_step(tight, spend_usd=spend, **call)
                 self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: spend"))
-        for project in (7, ["alpha"]):
+        class ClassRaises(str):
+            @property
+            def __class__(self):
+                raise RuntimeError("__class__ ran")
+        for project in (7, ["alpha"], ClassRaises("alpha")):
             with self.subTest(project=project):
                 step = fi.job_step(scoped, spend_usd=0.5, project=project, **call)
                 self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: project"))
@@ -1155,6 +1163,13 @@ class JobApprovalStepTests(unittest.TestCase):
                 self.assertEqual(fi.job_step(scoped, spend_usd=0.5, project=project, **call)["detail"], "outside-mandate: project")
         self.start({"mandate": scoped})
         self.assertIsNotNone(self.step(project="alpha")[1], "a plain str is read as before")
+        # A service's own request_input(steps=) after job_step keeps a step as the gate reads it too (product reading 33).
+        self.start({"mandate": scoped})
+        job_id = self.contexts[-1][0]
+        request = fi.choice_request("Publish the reply?", "choice", [("yes", "Yes"), ("no", "No")])
+        self.jobs.request_input(job_id, {"approve-reply": request}, "Publish it?", steps={
+            "approve-reply": {"effect": "reply", "spendUsd": float("nan"), "project": Site.ALPHA}})
+        self.assertEqual(self.jobs.private(job_id)["steps"], {"approve-reply": {"effect": "reply", "project": fi.UNREADABLE_PROJECT}})
 
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",

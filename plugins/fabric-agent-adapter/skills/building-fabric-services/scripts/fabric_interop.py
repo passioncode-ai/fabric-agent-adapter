@@ -41,6 +41,7 @@ from fabric_page_links import (  # noqa: E402 - DEC-0123
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     _days_from_civil,
     UNREADABLE_PROJECT,
+    kept_step,
     mandate_spend,
     PROTOCOL,
     EXTENSION_KEY,
@@ -394,7 +395,8 @@ class JobStore:
                       steps: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:
         """input_required with MCP elicitation requests, keyed; build them with choice_request / form_request / url_request.
         `steps` (DEC-0125) maps a request key to the approval step it asks for, {effect, spendUsd?, project?}, kept in the
-        job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it)."""
+        job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it).
+        A step is kept as the gate reads it (kept_step), so a job's start and its answer agree."""
         for key, step in (steps or {}).items():
             if key not in (input_requests or {}) or not isinstance(step, dict) or step.get("effect") not in EFFECT_CLASSES:
                 raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
@@ -405,7 +407,8 @@ class JobStore:
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
-        return self._transition(job_id, "input_required", {"steps": dict(steps or {})},
+        kept = {key: kept_step(step) for key, step in (steps or {}).items()}
+        return self._transition(job_id, "input_required", {"steps": kept},
                                 inputRequests=input_requests, statusMessage=message)
 
     def answer(self, job_id: str, input_responses: Dict[str, Any]) -> Dict[str, Any]:
@@ -533,9 +536,7 @@ class CallContext:
             if step["covered"]:
                 return step["record"]
             self.server._fault(capability, step)  # the start hears it as the answer does, under the same name (MJ-1)
-        spend = mandate_spend(spend_usd)  # a NaN or infinity reads as no estimate, and json would write a bare NaN
-        kept = {"effect": effect, **({"spendUsd": spend} if spend is not None else {}),
-                **({"project": project if type(project) is str else UNREADABLE_PROJECT} if project is not None else {})}
+        kept = {"effect": effect, "spendUsd": spend_usd, "project": project}  # request_input keeps it as the gate reads it
         self.server.jobs.request_input(job_id, {key: request}, step["message"] or message, steps={key: kept})
         return None
 

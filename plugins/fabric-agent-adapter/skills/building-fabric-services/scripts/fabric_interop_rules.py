@@ -392,6 +392,15 @@ def mandate_spend(value: Any) -> Any:
         return None
 
 
+def kept_step(step: Dict[str, Any]) -> Dict[str, Any]:
+    """A job's approval step {effect, spendUsd?, project?} as a job file keeps it: read as the gate reads it, so a job's
+    start and its answer agree (0.61.0 seam reading 32, product reading 33): a spend through mandate_spend (dropped
+    when none), a project as an exact str, else UNREADABLE_PROJECT (dropped when None)."""
+    spend, project = mandate_spend(step.get("spendUsd")), step.get("project")
+    return {"effect": step["effect"], **({"spendUsd": spend} if spend is not None else {}),
+            **({"project": project if type(project) is str else UNREADABLE_PROJECT} if project is not None else {})}
+
+
 def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target: Optional[str] = None,
                 elicited: bool = False, approval: Any = None, action_digest: Optional[str] = None,
                 human_step_url: Optional[str] = None, now: Any = None, self_id: Optional[str] = None,

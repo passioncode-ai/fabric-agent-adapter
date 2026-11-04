@@ -41,6 +41,7 @@ export {
   jobStep,
   actionGate,
   mandateSpend,
+  keptStep,
   UNREADABLE_PROJECT,
   actionRefusalToolResult,
   usageFindings,
@@ -49,7 +50,7 @@ export {
   pauseMessage,
   repeatedKeyDecision,
 } from './fabric-interop-rules.mjs';
-import { PROTOCOL, EXTENSION_KEY, MCP_REVISION, TERMINAL, CONTRACT_VERSION, JOB_HANDLE_SCHEMA, InteropError, UnknownJob, parseTraceparent, childTraceparent, traceIds, QUOTA_EXHAUSTED, QUEUE_FULL, OUTCOME_UNKNOWN, LIMIT_REACHED, INTEROP_NULL_USAGE, PROTOCOLS_READ, utcTime, quotaDataOk, readJobPause, jobCallerAction, intentIdempotencyKey, readsNullUsage, requestMeta, usageFindings, usageToward, jobLimitRules, pauseMessage, repeatedKeyDecision, OUTCOMES, ENVELOPE_REQUIRED, JOB_ID, KEY, SECRET_WORDS } from './fabric-interop-rules.mjs'; // the rule layer (FAA-92)
+import { PROTOCOL, EXTENSION_KEY, MCP_REVISION, TERMINAL, CONTRACT_VERSION, JOB_HANDLE_SCHEMA, InteropError, UnknownJob, parseTraceparent, childTraceparent, traceIds, QUOTA_EXHAUSTED, QUEUE_FULL, OUTCOME_UNKNOWN, LIMIT_REACHED, INTEROP_NULL_USAGE, PROTOCOLS_READ, utcTime, quotaDataOk, readJobPause, jobCallerAction, intentIdempotencyKey, readsNullUsage, requestMeta, usageFindings, usageToward, jobLimitRules, pauseMessage, repeatedKeyDecision, keptStep, OUTCOMES, ENVELOPE_REQUIRED, JOB_ID, KEY, SECRET_WORDS } from './fabric-interop-rules.mjs'; // the rule layer (FAA-92)
 
 // --- C3.1 capabilities as tools ----------------------------------------------------------
 export function expectedAnnotations(effect, idempotency) {
@@ -266,6 +267,7 @@ export class JobStore {
 
   // `steps` (DEC-0125) maps a request key to the approval step it asks for, {effect, spendUsd?, project?}, kept in the
   // job's private part (the format fabric_interop.py writes) so a service reads an answer's _meta.mandate for that step.
+  // A step is kept as the gate reads it (keptStep), so a job's start and its answer agree.
   requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
     for (const [key, step] of Object.entries(steps ?? {})) {
       if (!Object.hasOwn(inputRequests ?? {}, key) || !EFFECT_CLASSES.includes(step?.effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
@@ -275,7 +277,8 @@ export class JobStore {
     for (const [key, request] of entries) if (!KEY.test(key) || request?.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
     const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
     if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);
-    return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, { steps: { ...(steps ?? {}) } });
+    const kept = Object.fromEntries(Object.entries(steps ?? {}).map(([key, step]) => [key, keptStep(step)]));
+    return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, { steps: kept });
   }
 
   answer(jobId, inputResponses) {

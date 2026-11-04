@@ -315,7 +315,8 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   server with `agent_id`) answers the record when the mandate covers the step `{capability: the job's, action: key,
   effect}` and asks nothing, the job going on as the operator's decision; otherwise the job waits `input_required` on
   `request`, its message naming the part not covered (`outside-mandate: <part>`) or saying the mandate expired, and the
-  step is kept in the job's private part (`request_input(..., steps=)`). An answer's `_meta.mandate` that covers that
+  step is kept in the job's private part (`request_input(..., steps=)`), as the gate reads it (`kept_step` /
+  `keptStep`: a spend through `mandate_spend`, a project as an exact `str` or a primitive string, else unreadable). An answer's `_meta.mandate` that covers that
   step is then read when `input_actions=True`, beside a decision for the key. The rule alone is `job_step(mandate, ...)`
   / `jobStep({mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project})`; Node's
   `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Node has no

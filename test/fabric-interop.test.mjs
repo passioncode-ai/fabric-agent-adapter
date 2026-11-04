@@ -259,7 +259,7 @@ test('FAA-139: actionGate reads spend and project failing closed, as the Python 
     assert.equal(refusalError(refusal).error.data.detail, 'outside-mandate: spend', String(spendUsd).slice(0, 12));
     JSON.stringify(refusalError(refusal)); // nothing a JSON writer refuses
   }
-  for (const project of [7, ['alpha'], { id: 'alpha' }]) {
+  for (const project of [7, ['alpha'], { id: 'alpha' }, new String('alpha')]) { // a String object is no string (r33)
     assert.equal(refusalError(gate(scoped, { spendUsd: 0.5, project }).refusal).error.data.detail, 'outside-mandate: project');
   }
   assert.equal(gate(scoped, { spendUsd: 0.5, project: 'alpha' }).ok, true);
@@ -274,7 +274,7 @@ test('0.56.0 seam r1: jobStep reads spend and project as actionGate does, failin
     const step = i.jobStep({ ...call, mandate: tight, spendUsd });
     assert.deepEqual([step.covered, step.detail], [false, 'outside-mandate: spend'], String(spendUsd));
   }
-  for (const project of [7, ['alpha']]) {
+  for (const project of [7, ['alpha'], new String('alpha')]) {
     const step = i.jobStep({ ...call, mandate: scoped, spendUsd: 0.5, project });
     assert.deepEqual([step.covered, step.detail], [false, 'outside-mandate: project']);
   }
@@ -358,6 +358,14 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   assert.deepEqual(onDisk.private.steps, { 'approve-reply': { effect: 'reply', spendUsd: 0 } });
   assert.equal(onDisk.job.status, 'input_required');
   assert.equal(JSON.stringify(onDisk.job).includes('steps'), false);
+  // A step is kept as the gate reads it (0.61.0 product reading 33): a String object project is unreadable, a Number
+  // object spend is none, a primitive string stays; so the answer refuses what the start refused.
+  store.working(job.id);
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': { effect: 'reply', spendUsd: new Number(0.5), project: new String('alpha') } } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply', project: i.UNREADABLE_PROJECT } });
+  store.working(job.id);
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': { effect: 'reply', spendUsd: 0.5, project: 'alpha' } } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply', spendUsd: 0.5, project: 'alpha' } });
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);
   store.requestInput(job.id, { 'approve-reply': request }, 'Publish another?');
