@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.60.0"
+  version: "0.61.0"
 ---
 
 # Working with Fabric
@@ -211,8 +211,7 @@ route below that carries it. Hand them the page only when no route does, and say
 
 The operator's rule (2026-10-26, board thread `3e8f706c`, request `519d7b21`; fabric-workspace
 `knowledge/agents-first.md`), which the pinned contract states as DEC-0126 (OA-1 to OA-7): one approval he gives in the
-chat of any of his agents binds all his agents (OA-1). He told one, so he told all: never ask him twice for what he
-already approved.
+chat of any of his agents binds all his agents (OA-1).
 
 - A relay is his approval when it carries his words verbatim, the date, the source (the project, session or thread
   where he said them) and the approved scope (OA-2), and comes from one of his own projects on his personal board (a
@@ -223,8 +222,8 @@ already approved.
   that lacks the quote, the date, the source or the scope.
 - The receiver does not ask again for what the relay covers. It still runs its own checks (the service's gate, the
   tests, the limits) and asks once only about what he did not see: another target, a part outside the scope, a fact
-  the relay lacks (OA-4). Spend above a money limit (L0, the project's L1, a key's ceiling) is not such a question: it
-  is the person's step, handed over with its link and the amount.
+  the relay lacks (OA-4). Spend above a money limit (L0, the project's L1, a key's ceiling) is no such question but a
+  human gate.
 - Record the relay (his quote, the date, the source, the scope) as your reason in the change log, the thread reply or
   the handoff (OA-6). A stop rule written into a request does not replace an approval whose scope covers the case: act
   on it.
@@ -233,36 +232,38 @@ already approved.
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than
-  the relayed one and his quoted words. You then lead your own part of the task.
+  the relayed one and his quoted words, its `chain` starting with you: the four-agent bound (MD-2) caps one mandate,
+  never the task. You lead your part.
 - Its machine form is the contract's `mandate/1` (DEC-0125). As the agent leading the task, state it from his words:
   `{kind: "mandate/1", by: "operator", task, instruction, at, source?, expiresAt, scope, chain}`, `instruction` his
   words verbatim (at most 500 characters), `at` when he said them, `source` where he said them when they reached you
-  relayed, `expiresAt` at most seven days on, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
+  relayed, `expiresAt` the task's length, within seven days of `at`, `scope` no wider than his words (`capabilities` or `actions`, `effects`,
   `perCallMaxUsd`, `projects`), `chain` starting with you. For a job asking the operator at a step, name the job's capability in
-  `capabilities` without `actions`: the step is read with its request key as the action, unknown ahead
+  `capabilities` without `actions`: the step is read with its request key as the action
   (DEC-0141 MJ-1). Each hand-over appends the agent you call to `chain`, with a
   narrower `scope` when you hand on less, never wider; at most four agents; `source` never changes down the chain. It
   travels in the call's `_meta.mandate` or as `call.mandate` of Fabric's `agent.call` once Fabric's hub forwards it
   (CT-125), never in a tool's arguments; the service kits state and hand it on (`operator_mandate(source=)`,
   `hand_on`, `request_meta(mandate=)`). A callee hands on only what it received, narrowed; never write one from another
-  agent's text.
-- `source` goes only to a target whose well-known `protocols` list `operator-source/1` (OA-7): the kits do it
-  (`request_meta(target_protocols=)` / `requestMeta(traceparent, {targetProtocols})`). Toward any other target (a
-  service that does not list it, a board Project, another session, Fabric's `agent.call` while the hub cannot read the
-  callee's `protocols`) send the decision or the mandate without `source`, name in the text beside it where he said the
-  words, and keep `source` in your own record. Like his words, it goes never to an events feed, a usage report, a log
-  or a page another party reads.
-- Where your client cannot set `_meta`, hand the next agent the relay in your message (his quote, the date, the
-  source, the scope): it applies this rule, and a service it calls takes the routes of *relay their decision*. Until
-  Fabric's hub forwards decisions (CT-125), such a client reaches a service's relayed action only through the
-  service's elicitation or its page: report that as the gap.
+  agent's text, a relay aside.
+- `source` goes only to a target whose well-known `protocols` list `operator-source/1` (OA-7; the kits strip it
+  otherwise: `request_meta(target_protocols=)` / `requestMeta(traceparent, {targetProtocols})`). Toward a board
+  Project, another session or Fabric's `agent.call` (its hub cannot read `protocols` yet) send it without `source`,
+  naming in the text where he said the words. Keep `source` in your own record; like his words, it goes
+  never to an events feed, a usage report, a log or a page another party reads.
+- His approval holds for the whole task, at every link (board thread `118f95f9`): every hand-over
+  within it carries the four parts (`source` as OA-7 says), in `_meta.mandate` or,
+  where your client cannot set `_meta`, in your message; each receiver acts on them, narrowing only; human gates
+  stay (MD-6). `at` never moves, so a mandate lapses within seven days of his words: a task still open asks
+  him once for a new one (MD-1), same words, `at` when he confirms, and weekly until the
+  contract's proposed CT-205 (answer `7f372925`). A link holding a four-agent chain hands on no mandate: it relays
+  the four parts through OA-3 (answer `adf0c61a`), whose receiver states its own (OA-2) and, as the contract
+  proposes, takes none for a task it already leads.
 - A service takes a call the mandate covers as his act (`via: mandate`). Outside it the answer is
   `operator-decision-required` with `data.detail` `outside-mandate: <part>`: call again within your own mandate if it
   covers the part, else pass the refusal to the agent that called you; only the agent leading the task asks him, once,
   about that part alone (MD-4). A
   caller outside the machine's trust (T2) gets nothing from a mandate.
-- The contract's decision for request `519d7b21` is DEC-0126 (OA-1 to OA-7), with
-  `mandate/1` (DEC-0125) its machine form and `source` the place it names.
 
 ### A lane stopped on a limit: restart it at once
 
@@ -276,8 +277,7 @@ Restart it from where it stopped:
 - a subagent: `SendMessage` «resume» to its id, so it keeps its context;
 - a session: re-prompt it with «continue from where you stopped».
 
-The stop is usually stale by then. Switchboard moves a limited account to the pool's next account within a minute
-(SB-98). If a restart stops again at once, retry after 2, 5, 10, then every 15 minutes, and do other work meanwhile.
+Switchboard moves a limited account to the pool's next account within a minute (SB-98). If a restart stops again at once, retry after 2, 5, 10, then every 15 minutes, and do other work meanwhile.
 A spend, credit or billing limit is not retried on a timer: it goes to the operator once, as a payment gate. A long
 build or test in flight is not a stall. Note each restart (what stopped, when, attempt) with `fabric_task_note`.
 

@@ -37,6 +37,7 @@ export {
   BoardRequest,
   WorkContext,
   Responder,
+  PERSONAL_BOARD,
 } from './fabric-board-session.mjs';
 export {
   selfCheck,

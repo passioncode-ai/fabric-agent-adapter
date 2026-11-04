@@ -150,6 +150,7 @@ def _own(value: Any, key: str) -> Any:
     return value.get(key, _ABSENT) if isinstance(value, dict) else _ABSENT
 
 
+import fabric_jsvalue as _jsvalue  # noqa: E402 - the core's (FAA-65)
 from fabric_time import days_from_civil as _days_from_civil  # noqa: E402 - the core's (FAA-65)
 
 
@@ -341,14 +342,14 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
       it reads as mandate-malformed here as it does at the answer (FAA-178; McpToolServer does)."""
     if mandate is None:
         return {"covered": False, "message": None}
-    if not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+    if not (type(effect) is str and effect in EFFECT_CLASSES):  # exact, as the core compares it (seam reading 34)
         raise InteropError("A job's approval step names its effect class (one of %s; DEC-0125)." % ", ".join(EFFECT_CLASSES))
     call: Dict[str, Any] = {"capability": capability, "action": key, "effect": effect}
     spend = mandate_spend(spend_usd)  # read as action_gate reads it, so the start and the answer agree (FAA-139)
     if spend is not None:
         call["spendUsd"] = spend
     if project is not None:
-        call["project"] = project if isinstance(project, str) else UNREADABLE_PROJECT
+        call["project"] = project if type(project) is str else UNREADABLE_PROJECT  # exact, as the kept step (seam r32)
     covers: Dict[str, Any] = {"mandate": mandate, "tier": tier, "now": now, "self": self_id, "call": call}
     if isinstance(caller_agent, str) and caller_agent:
         covers["callerAgent"] = caller_agent
@@ -379,13 +380,25 @@ UNREADABLE_PROJECT = "\x00unreadable"
 def mandate_spend(value: Any) -> Any:
     """A spend estimate as a mandate reads it (FAA-139): a number read as a double, as the contract does; one that is
     not a finite double (an int past the float range, NaN, infinity) or not a number is none, which a mandate's
-    ceiling refuses (fail closed). A finite number stays as given (25 stays 25)."""
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
+    ceiling refuses (fail closed). A finite number stays as given (25 stays 25). A subclass of int or float is read by
+    the number it holds, never by an overridden `float()` or `int()` (numpy.float64 3.0 reads 3.0; one whose `float()`
+    answers 0.0 for 100 reads 100); a bool is none."""
+    value = _jsvalue.real_number(value)  # a bool, a mock that claims a number, or not a number: none
+    if value is None:
         return None
     try:
         return value if math.isfinite(float(value)) else None
     except OverflowError:
         return None
+
+
+def kept_step(step: Dict[str, Any]) -> Dict[str, Any]:
+    """A job's approval step {effect, spendUsd?, project?} as a job file keeps it: read as the gate reads it, so a job's
+    start and its answer agree (0.61.0 seam reading 32, readings 33 and 34): a spend through mandate_spend (dropped
+    when none), a project as an exact str, else UNREADABLE_PROJECT (dropped when None); each member read once."""
+    effect, spend, project = step.get("effect"), mandate_spend(step.get("spendUsd")), step.get("project")
+    return {"effect": effect, **({"spendUsd": spend} if spend is not None else {}),
+            **({"project": project if type(project) is str else UNREADABLE_PROJECT} if project is not None else {})}
 
 
 def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target: Optional[str] = None,
@@ -408,7 +421,7 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     per-agent credential; never a name the call carries), `spend_usd` (its own estimate), `project`, and `mandate_capability` (a job's kept step: the job's capability
     the mandate is read under, DEC-0141 MJ-1; unusable, the refusal is operator-decision-required). Both are read failing
     closed, as McpToolServer reads them (FAA-139): a spend that is not a finite double is none (`mandate_spend`), a
-    project that is not a string is UNREADABLE_PROJECT, which a mandate limited to projects refuses. A covered call
+    project that is not an exact str (a subclass included) is UNREADABLE_PROJECT, which a mandate limited to projects refuses. A covered call
     answers {ok: True, record: {by: operator, via: mandate, task, chain, caller}, decision: None, mandate}; without
     `self_id` the mandate is not read and the call is answered as before it existed."""
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19
@@ -421,7 +434,7 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     if self_id is not None and isinstance(meta, dict) and "mandate" in meta:
         inputs.update({"mandate": meta["mandate"], "self": self_id})
         spend_usd = mandate_spend(spend_usd)
-        project = project if project is None or isinstance(project, str) else UNREADABLE_PROJECT
+        project = project if project is None or type(project) is str else UNREADABLE_PROJECT
         for name, value in (("effect", effect), ("callerAgent", caller_agent), ("spendUsd", spend_usd), ("project", project),
                             ("mandateCapability", mandate_capability)):
             if value is not None:

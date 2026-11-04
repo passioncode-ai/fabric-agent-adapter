@@ -18,8 +18,9 @@ class EvalsComeFirst(unittest.TestCase):
         wanted = {
             "working-with-fabric": {"operator-approval-binds-all-his-agents", "board-relay-from-a-trusted-project",
                                     "lead-hands-on-a-narrowed-mandate", "outside-mandate-asks-once-for-that-part",
-                                    "relay-source-goes-only-where-it-is-read", "lead-covers-a-job-step-by-its-capability"},
-            "building-fabric-services": {"service-reads-the-operators-mandate"},
+                                    "relay-source-goes-only-where-it-is-read", "lead-covers-a-job-step-by-its-capability",
+                                    "an-approval-holds-for-the-whole-task"},
+            "building-fabric-services": {"service-reads-the-operators-mandate", "board-request-carries-the-operators-mandate"},
         }
         for skill, ids in wanted.items():
             self.assertEqual(ids - scenario_ids(skill), set(), skill)
@@ -74,6 +75,34 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         self.assertNotIn("ahead of the pinned contract", board)
         for words in ("OA-2", "OA-7", "without `source`"):
             self.assertIn(words, board, words)
+
+    def test_an_approval_holds_for_the_whole_task(self):  # an-approval-holds-for-the-whole-task (FAA-195)
+        flat_rule = " ".join(self.rule.split())
+        for words in ("holds for the whole task, at every link", "`118f95f9`", "narrowing only", "never the task",
+                      "asks him once for a new one (MD-1)", "`at` when he confirms", "CT-205", "`7f372925`"):
+            self.assertIn(words, flat_rule, words)
+        board = flat("working-with-fabric/references/project-board.md")
+        for words in ("`mandate-not-for-this-call` means you handed it on to the wrong agent id", "never asking him",
+                      "`mandate-expired` means your lead asks him once for a new one (MD-1)", "`-widened`",
+                      "no machine\nhand-over is left".replace("\n", " "), "never for a task it already leads"):
+            self.assertIn(words, board, words)
+        for words in ("A link holding a four-agent chain hands on no mandate",
+                      "through OA-3 (answer `adf0c61a`)",
+                      "as the contract proposes, takes none for a task it already leads",
+                      "(handed over with its link and amount, never asked in chat)", "Fabric's `agent.call` (its hub cannot read `protocols` yet)"):
+            self.assertIn(words, flat_rule, words)
+        for words in ("from his own Project on the board or his local session", "never for a task it already leads (a proposed minimum",
+                      "relays the scope in force at its link, never his wider one", "names its held `expiresAt`, which the receiver's `expiresAt` does not pass"):
+            self.assertIn(words, board, words)
+        interop = flat("building-fabric-services/references/interop.md")
+        for words in ("takes no fifth (MD-2)", "never restate a held mandate to start a new chain",
+                      "has no route past four agents until the contract's CT-205", "Projects or his local session (OA-3)",
+                      "naming the scope in force at the relaying link and its held `expiresAt`", "never for a task it already leads", "message `adf0c61a`"):
+            self.assertIn(words, interop, words)
+        # the route the contract refused (board thread 118f95f9, adf0c61a) stays out of every home
+        for text, gone in ((flat_rule, "restates its own mandate"), (interop, "is restated instead of handed on"),
+                           (board, "with four agents in the chain already, restate")):
+            self.assertNotIn(gone, text, gone)
 
     def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)
         self.assertIn("pass the refusal to the agent that called you", self.rule)

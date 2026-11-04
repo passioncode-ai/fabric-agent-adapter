@@ -4,18 +4,26 @@ names. Standard library only, Python 3.9+."""
 from __future__ import annotations
 
 import json
+import math
+import re
+from collections.abc import Mapping
 import threading
 from pathlib import Path
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import List
 from typing import Optional
+from typing import Tuple
 
 import sys as _sys  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_hub as _hub
+import fabric_interop_rules as _rules
+import fabric_mandate as _mandate
+from fabric_time import format_rfc3339 as _format_rfc3339  # noqa: E402 - the core's (FAA-65)
 import fabric_service as _fs
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
     BoardError,
@@ -210,3 +218,141 @@ class BoardRequest:
 
     def __repr__(self) -> str:  # never the body
         return "BoardRequest(%r, %r)" % (self.request_id, self.capability)
+
+
+# -- the operator's mandate in a board request (FAA-135; contract project-comms.md, DEC-0125 MD-3) ---------------------
+
+#: `mandate_from` naming every trusted sender of the board the service is installed on: the operator's personal board.
+PERSONAL_BOARD = "personal-board"
+_OPENER = re.compile(r"```json[ \t]*")
+_CLOSER = re.compile(r"```[ \t]*")
+
+
+def _json_blocks(body: str) -> List[str]:
+    """The bodies of the ```json blocks, each fence on its own line: one pass over the lines, so linear in the body
+    (an anchored regex rescanned to the end from every unclosed opener). Lines end at "\\n" alone, one "\\r" before it
+    dropped, as in the Node twin; an unclosed opener ends the scan."""
+    lines = [line[:-1] if line.endswith("\r") else line for line in body.split("\n")]
+    blocks: List[str] = []
+    i = 0
+    while i < len(lines):
+        if _OPENER.fullmatch(lines[i]):
+            j = i + 1
+            while j < len(lines) and not _CLOSER.fullmatch(lines[j]):
+                j += 1
+            if j == len(lines):
+                break
+            blocks.append("\n".join(lines[i + 1:j]))
+            i = j
+        i += 1
+    return blocks
+
+
+def _no_constant(name: str) -> Any:
+    raise ValueError(name)  # NaN and Infinity are not JSON
+
+
+def _bounded_int(literal: str) -> int:
+    """An integer of at most 4300 digits on every Python: 3.9 without int_max_str_digits converts a longer one in
+    quadratic time, and later ones refuse it, so all of them now refuse it alike."""
+    if len(literal) - literal.startswith("-") > 4300:
+        raise ValueError("an integer longer than 4300 digits")
+    return int(literal)
+
+
+def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """The mandate a request carries, read only when the service opted in (`agent_id` and `mandate_from` set), the board
+    verified the sender (`provenance: trusted`) and its Project is one `mandate_from` names (or `PERSONAL_BOARD`): a T1
+    caller by project-comms. Answers `(mandate, None)`, `(None, None)` when none is read, or `(None, code)` for a body
+    that carries one the kit will not read: `mandate-blocks` (more than one) or `mandate-unreadable` (a block naming
+    `mandate/1` that is not JSON). A `source` in the block is dropped: a board block carries none (OA-7). Whether it
+    covers a call is `covers`' answer, never this one's."""
+    if agent_id is None or mandate_from is None or not isinstance(request.body, str):
+        return None, None
+    sender = request.sender if isinstance(request.sender, dict) else {}
+    principal = sender.get("principal") if isinstance(sender.get("principal"), dict) else {}
+    if principal.get("provenance") != "trusted":
+        return None, None
+    if not isinstance(sender.get("project"), str) or not sender["project"]:  # comms-message requires it; the caller
+        return None, None
+    if mandate_from != PERSONAL_BOARD and _fold(sender["project"]) not in mandate_from:
+        return None, None
+    found = []
+    for block in _json_blocks(request.body):
+        try:
+            value = json.loads(block, parse_constant=_no_constant, parse_int=_bounded_int)
+        except (ValueError, RecursionError):
+            if "mandate/1" in block:
+                return None, "mandate-unreadable"
+            continue
+        if isinstance(value, dict) and value.get("kind") == "mandate/1":
+            value.pop("source", None)  # a Project declares no protocols: a board block carries no source (OA-7)
+            found.append(value)
+    if len(found) > 1:
+        return None, "mandate-blocks"
+    return (found[0], None) if found else (None, None)
+
+
+CALL_MEMBERS = ("capability", "action", "effect", "spendUsd", "project")  # what mandate_covers reads of a call
+
+
+def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str], wall: Callable[[], float],
+           caller: Any = None) -> Optional[Dict[str, Any]]:
+    """`mandate_covers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
+    board names a Project's principal, not an agent the chain can bind; the chain's end alone binds it, MD-3). A covered
+    answer's `recordAs` names `caller`, the sender Project the board verified (MD-3 records the caller, as the action
+    path does). None when no mandate travelled: the handler asks the operator as it would without one. The call's
+    `spendUsd` and `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend
+    that is not a finite number is none, which a ceiling refuses; a `project` that is not a string, None included (the
+    contract's mandateCovers refuses a null project), is unreadable, which a mandate limited to projects refuses; a call
+    that names none leaves `project` out. Only the five members `mandate_covers` reads are read, each once, the way the
+    handler's own `call[name]` reads it (a `__getitem__` or a default answers, never the mapping's storage), and the
+    rest of the call is never touched."""
+    if mandate is None or agent_id is None:
+        return None
+    if isinstance(call, Mapping):
+        read: Dict[str, Any] = {}
+        for name in CALL_MEMBERS:
+            try:
+                value = call[name]
+            except KeyError:  # not named; any other error the mapping raises passes to the handler
+                continue
+            if name == "spendUsd":
+                value = _rules.mandate_spend(value)
+                if value is None:
+                    continue
+            elif name == "project":
+                value = value if type(value) is str else _rules.UNREADABLE_PROJECT
+            read[name] = value
+        call = read
+    clock, now = wall(), ""
+    if isinstance(clock, (int, float)) and not isinstance(clock, bool):
+        try:
+            now = _format_rfc3339(clock * 1000) if math.isfinite(clock) else ""
+        except (OverflowError, ValueError):  # finite but outside the dates a clock can name
+            now = ""
+    answer = _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": now, "self": agent_id, "call": call})
+    if "recordAs" in answer:
+        answer = {"ok": True, "recordAs": dict(answer["recordAs"], caller=caller)}
+    return answer
+
+
+def mandate_options(agent_id: Any, mandate_from: Any) -> Any:
+    """The responder's opt-in, checked: an agent id the registry accepts, and `mandate_from` either `PERSONAL_BOARD` or
+    a collection of Project ids (strings). Answers `mandate_from` as the responder keeps it (a frozenset or the string)."""
+    if agent_id is not None and not _mandate.is_agent_id(agent_id):
+        raise BoardError("invalid_arguments", "agent_id must be the service's registry agent id.")
+    if mandate_from is None or mandate_from == PERSONAL_BOARD:
+        return mandate_from
+    try:
+        projects = None if isinstance(mandate_from, (str, bytes, Mapping)) else list(mandate_from)
+    except TypeError:
+        projects = None
+    if projects is None or not all(isinstance(p, str) and p for p in projects):
+        raise BoardError("invalid_arguments", "mandate_from is %r or a collection of Project ids." % PERSONAL_BOARD)
+    return frozenset(_fold(p) for p in projects)
+
+
+def _fold(project: str) -> str:
+    """A Project id as Fabric's board compares it: a uuid lower-cased, any other id as written (_hub._project)."""
+    return project.lower() if _hub.UUID.fullmatch(project) else project

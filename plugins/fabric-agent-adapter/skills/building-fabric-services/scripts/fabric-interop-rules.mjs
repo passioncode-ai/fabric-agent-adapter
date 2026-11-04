@@ -282,6 +282,16 @@ export function mandateSpend(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+/** A job's approval step {effect, spendUsd?, project?} as a job file keeps it: read as the gate reads it, so a job's
+ * start and its answer agree (0.61.0 seam reading 32, readings 33 and 34): a spend through mandateSpend (dropped when none), a project
+ * as a primitive string, else UNREADABLE_PROJECT (dropped when null or undefined). */
+export function keptStep(step) {
+  const { effect, spendUsd, project } = step; // each member read once (seam reading 34)
+  const spend = mandateSpend(spendUsd);
+  return { effect, ...(spend !== undefined ? { spendUsd: spend } : {}),
+    ...(project !== undefined && project !== null ? { project: typeof project === 'string' ? project : UNREADABLE_PROJECT } : {}) };
+}
+
 export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };
   if (isObject(meta) && Object.hasOwn(meta, 'decision')) inputs.decision = meta.decision;

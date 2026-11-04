@@ -17,6 +17,7 @@ import sys as _sys  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+import fabric_board_link as _link
 import fabric_hub as _hub
 import fabric_service as _fs
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
@@ -26,6 +27,7 @@ from fabric_board_link import (  # noqa: E402,F401 - re-exported: callers import
     BoardRequest,
     BoardSession,
     Checkpoint,
+    PERSONAL_BOARD,
 )
 from fabric_board_slots import (  # noqa: E402,F401 - the slot records (FAA-155, FAA-163); the constants re-exported
     HOLD_RETRY_MAX_SECONDS,
@@ -63,11 +65,17 @@ NOT_OURS = frozenset(["queued", "claimed", "answered"])
 class WorkContext:
     """What a handler may do while it works: `progress(note)` posts a note on the request's thread (and renews the
     lease); `begin_effect(summary)` must be called (and must return) before the handler spends or acts outside
-    the service; `stopped` is set when the attempt is no longer this responder's. Both raise `Stopped` then."""
+    the service; `stopped` is set when the attempt is no longer this responder's. Both raise `Stopped` then.
+    `mandate` is the operator's mandate the request carried, when the responder reads one (FAA-135), and
+    `mandate_covers(call)` whether it covers a call (`mandate_covers`' answer), None when none travelled."""
 
-    def __init__(self, responder: "Responder", entry: Dict[str, Any]):
-        self._responder, self._entry = responder, entry
+    def __init__(self, responder: "Responder", entry: Dict[str, Any], mandate: Optional[Dict[str, Any]] = None,
+                 caller: Optional[str] = None):
+        self._responder, self._entry, self.mandate, self._caller = responder, entry, mandate, caller
         self.stopped = threading.Event()
+
+    def mandate_covers(self, call: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        return _link.covers(self.mandate, call, self._responder.agent_id, self._responder.wall, self._caller)
 
     def progress(self, note: Optional[str] = None) -> None:
         if self.stopped.is_set():
@@ -133,13 +141,16 @@ class Responder(SlotKeeper):
                  observe: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = None,
                  emit: Optional[Callable[..., Any]] = None, service: str = "service",
                  now: Callable[[], float] = time.monotonic, rand: Callable[[], float] = random.random,
-                 spawn: Optional[Callable[[Callable[[], None]], Any]] = None, session_factory: Optional[Callable[..., BoardSession]] = None):
+                 spawn: Optional[Callable[[Callable[[], None]], Any]] = None, session_factory: Optional[Callable[..., BoardSession]] = None,
+                 agent_id: Optional[str] = None, mandate_from: Any = None, wall: Callable[[], float] = time.time):
         if admit is None or handler is None:
             raise BoardError("invalid_arguments", "A responder needs the service's own input gate (admit) and a handler.")
         caps = list(capabilities)
         if not caps or any(not isinstance(c, str) or not _CAPABILITY.fullmatch(c) for c in caps) or len(set(caps)) != len(caps):
             raise BoardError("invalid_arguments", "Name each capability once, [a-z][a-z0-9._-]{1,127}.")
         self.hub, self.project = hub, _hub._project(project_id)
+        #: FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; None reads none).
+        self.mandate_from, self.agent_id, self.wall = _link.mandate_options(agent_id, mandate_from), agent_id, wall
         self.capabilities = caps
         self.credential_file, self.handler, self.admit, self.observe = Path(credential_file), handler, admit, observe
         self.checkpoint = Checkpoint(Path(checkpoint_file))
@@ -735,7 +746,11 @@ class Responder(SlotKeeper):
         return True
 
     def _run(self, entry: Dict[str, Any], request: BoardRequest) -> None:
-        ctx = WorkContext(self, entry)
+        mandate, unread = _link.read_mandate(request, self.mandate_from, self.agent_id)
+        if unread:  # by its code alone: the block holds the operator's words
+            self._emit("board.request.mandate_unread", "warning", "Request %s carries a mandate the kit does not read (%s); "
+                       "it is worked without one." % (entry["request"], unread), request=entry["request"], reason=unread)
+        ctx = WorkContext(self, entry, mandate, request.sender.get("project") if isinstance(request.sender, dict) else None)
         work = _Work(entry, request, ctx)
         work.renewed_at = self.now()
         self.current = work

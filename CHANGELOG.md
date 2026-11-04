@@ -1,5 +1,147 @@
 # Changelog
 
+## 0.61.0 (2026-11-04)
+
+The board responder reads the operator's mandate from a request of his own Project (FAA-135), and working-with-fabric
+says that his approval holds for the whole task, at every link (FAA-195).
+
+### Added
+
+- `Responder(..., agent_id=, mandate_from=)`: with both set, a request whose sender the board verified
+  (`provenance: trusted`) and whose Project `mandate_from` names (a uuid in any case; or every such sender,
+  `mandate_from="personal-board"`, only on the personal board's responder) is read for one `mandate/1` block fenced
+  ` ```json `, each fence at the start of its own line with no indent, in its body (contract project-comms.md, DEC-0125 MD-3). The handler gets it as `ctx.mandate`, and
+  `ctx.mandate_covers(call)` answers `mandate_covers` with the sender placed as T1, the responder's wall clock (`wall=`,
+  `time.time` by default; Node `Date.now`, milliseconds) and the sender Project as the `caller` of a covered answer's
+  `recordAs`; None when no mandate travelled, and `{"fault": "now-unreadable"}` when the clock returns a value that is not a finite instant (one that raises passes its
+  error to the handler). A `source` in the block is dropped (OA-7). Two `mandate/1` blocks, or one whose text holds
+  `mandate/1` and is not JSON (an integer longer than 4300 digits included, on every Python), read as none, with a `board.request.mandate_unread` warning carrying the request id and its `reason`, never the block.
+  Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
+  mandate. Both kits (FAA-135). `ctx.mandate_covers` reads the call's `spendUsd` and `project` failing closed, as the
+  kit's MCP and job mandate readers do (FAA-139): a spend that is not a finite number is none, which a `perCallMaxUsd`
+  refuses, and a `project` that is not a string (in Python an exact `str`, so a subclass too: the core compares a
+  project by exact type, so every Python reader refuses one there; the board path marks it unreadable first), None (Node null) included, is refused by a mandate limited to
+  projects, as the contract's `mandateCovers` refuses a null project (the MCP and job readers read None as naming
+  none; leave `project` out on the board) (a draft of this release passed them as given; 0.61.0 seam reading 14). Only
+  the five members `mandate_covers` reads are read, each once, as the contract reads them (`call[name]` in Python; a
+  plain property read in Node, inherited, getter and Proxy members included), but for a Node spend, read as the call's
+  own member; the rest of a call is never touched (0.61.0 seam readings 16 and 17).
+
+### Fixed
+
+- The Python mandate readers (McpToolServer and `action_gate`, the job step, and the core `mandate_covers` and
+  `action_decision` beneath them; a draft of this release's board path too) read a spend estimate that is an `int` or
+  `float` subclass through its own `float()` and comparisons, so a subclass whose `float()` answered 0.0 for 100, or
+  whose `>` lied about an integer past the double range, passed a `perCallMaxUsd` of 5. A number is now an `int` or
+  `float` by its real type (`fabric_jsvalue.is_number`, never `__class__`) and is read by the number it stores
+  (`real_number`: `float.__float__`, `int.__int__`), in `mandate_spend`, `js_to_number`, `double` and McpToolServer's
+  estimate: an honest subclass such as `numpy.float64` keeps its number, a lying one is read as what it holds. A value
+  that only claims a number through `__class__` (a mock with `spec=float`, a lazy proxy), a `Decimal` or a
+  `numpy.int64` is no estimate: the call is answered and a `perCallMaxUsd` refuses it, in every reader. The core
+  `mandate_covers` reads a spend only when it is a number or JSON data as `json.loads` gives it, by exact type all the
+  way down, so for its direct callers a tuple, bytes, a `str`, `list` or `dict` subclass, or a list holding a number
+  subclass is no estimate either, a stricter reading than 0.60.0's (checked only under a ceiling, without recursion in one
+  pass, then read as `Number()` reads it, in time linear in the structure (a list is never joined: two or more items are
+  NaN, one is read for itself); a shared or cyclic list or dict, which `json.loads` never gives, is no estimate, and a spend whose lists nest in
+  lists more than 100 deep (`MAX_SPEND_DEPTH`, a dict between them ends the count) is no estimate, so the spend a
+  refusal carries as `estimateUsd` is one a serialiser writes: that nesting is what `String()` of a list recurses
+  through, so 0.60.0 raised RecursionError a few hundred deep (about 500 on Python 3.14, 330 on 3.9) and Node's
+  `mandateCovers` and the contract throw RangeError a few thousand deep, and between 100 and those depths the core is
+  stricter than all three, a fail-closed twin split that no board, MCP or job reader reaches, since they take no list
+  or dict spend; under a dict there is no bound, since `Number()` never descends a dict, NaN at any depth in all of
+  them; a dict with an own `toString`, at the top or reached through lists alone, is no estimate too, where 0.60.0
+  read it as NaN and Node and the contract throw TypeError). A bool is none in `mandate_spend`, `action_decision` and McpToolServer as before, while
+  the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
+  seam readings 17 to 22, 24 and 26 to 29, product readings 18 to 20 and 22 to 27, unit readings 19, 21, 24, 26 and 28 to 30). `js_to_number` tested a bool with `isinstance`, which asks
+  a number subclass's own `__class__`: one claiming `bool` was read as 1 under a ceiling, and one whose `__class__`
+  raised made the core raise (older than 0.61.0); it tests a bool by identity now (0.61.0 unit reading 30). A job's approval step kept a `str`-subclass project (a `(str, Enum)` member included) as given, which
+  the start refused by the core's exact-type compare but the job file then wrote as its plain string, so the answer
+  covered it, and the same held for a step a service keeps itself through `request_input(steps=)` or Node's
+  `requestInput({steps})` (a `String` object project, a `Number` object spend); both stores now keep a step as the gate
+  reads it (`kept_step` / `keptStep`: a spend through `mandate_spend`, a project as an exact `str` or a primitive
+  string, else `UNREADABLE_PROJECT`), and `job_step`, `action_gate` and McpToolServer read a project as an exact `str`
+  too, as the board path does, so the start and the answer agree, and a value that only claims `str` never reaches the
+  job file (older than 0.61.0; 0.61.0 seam reading 32, readings 33). Node's `JobStore.answer` matched an answer
+  keyed by an inherited name (`constructor`, `toString`) as an asked question and cleared the real one; it matches an
+  own key only, as Python does (older than 0.61.0; 0.61.0 seam reading 36). Both stores' `answer` match nothing when
+  the answer's `inputResponses` or the job's `inputRequests` is not a plain object (a hand-edited file, an array), and
+  McpToolServer answers a `fabric.job.get` whose `inputResponses` is present, not `null` (read as a poll, as before)
+  and not a JSON object with `-32602`:
+  0.60.0 raised out of `handle()` for a non-empty one on a job waiting `input_required` (the transport sent no reply)
+  and read an empty list or string, `0`, `false`, or any non-object on another job or an unknown id, as no answer or
+  `unknown-job` (a client that writes an empty map as `[]` now gets `-32602`; for an unknown id on a server without
+  `authorize`, `-32602` comes before `unknown-job`, where a server with `authorize` answers `unknown-job` first). Both stores' `request_input` /
+  `requestInput` refuse requests that are not a JSON object (before they read a step), and a request that is
+  not a keyed object (under a string key, a dict in Python, in Node an object that is not null, an array or a function), with `InteropError` (0.60.0 Python raised `AttributeError` or `TypeError`, by the shape and whether
+  `steps=` was passed; Node kept an array, which an answer keyed by an index or `length` then matched), and McpToolServer's answer gate reads only an object of requests (older
+  than 0.61.0; 0.61.0 seam and unit readings 37 and 38). The same split held for an
+  effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
+  file wrote as a plain string the answer covered; `job_step` (when a mandate travelled), `request_input(steps=)` and
+  `add_tool` (with an action) now admit an effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),
+  and both stores read each member of a step once and keep the value they checked (0.61.0 seam and unit readings 34). `js_to_number`'s decimal
+  pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
+  (0.61.0 seam reading 22).
+- `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
+  I/O error, an interrupt), the descriptor stayed held, and the lock name too, since the caller drops the object
+  (`release()` would have freed only the name, on Linux and Windows), so the same process could not start the service
+  again. The lock now lets both go and re-raises the first error, even when the
+  close itself fails; the Node twin
+  (`fabric-lock.mjs`), whose caller drops a lock that failed to start, does the same for its descriptor or its name,
+  the first error standing in both.
+  Found by a service that vendors the kit, on the board.
+
+### Changed
+
+- working-with-fabric's mandate section: every hand-over within a task carries the four parts of the operator's
+  approval (`source` only where OA-7 lets it), and each receiver acts on them without asking him again, narrowing only
+  (human gates stay, MD-6); a relayed receiver's chain starts with it (OA-2), so the four-agent bound limits one
+  mandate, never the task; a mandate lapses within seven days of his words, and a task still open asks him once for a
+  new one, his same words with `at` when he confirms (MD-1), then weekly until the contract's CT-205 (its answer
+  `7f372925` on board thread `118f95f9`; CT-205 is a row the contract proposes after this kit's pin, on its branch
+  `agent/template-parity-20261103`); a link whose chain already holds four agents hands on no mandate and never restates its own: the four
+  parts go as a relay through OA-3 (his own Project on the board or his local session), whose receiver states its own (OA-2),
+  as the contract confirmed on board thread `118f95f9` (message `adf0c61a`); references/project-board.md and building-fabric-services
+  references/interop.md say the relay names the scope in force and the held `expiresAt`, which the receiver's mandate
+  does not pass (the kit's bound); and, as the contract proposes until CT-205,
+  no agent takes a relay for a task it already leads; references/interop.md says a service has no route past four agents until CT-205. `expiresAt` is counted from `at` and
+  covers the task's length (the kit's `operator_mandate` defaults to a day; references/interop.md says to pass it); the
+  source and spend sentences are reworded with no change in rule, and Step 5's lane-restart paragraph drops its reason
+  sentence ("The stop is usually stale by then.") for room, its rule unchanged; the paragraph for a client without `_meta`
+  leaves the mandate section for Step 5's routes (CT-125), and two sentences that restated rules kept elsewhere in the
+  section are dropped (FAA-196 (6)). A scenario eval `an-approval-holds-for-the-whole-task` (FAA-195).
+- working-with-fabric references/project-board.md says what a kit service reads from a board request: one `mandate/1`
+  block fenced ` ```json ` at the start of its own lines, its chain ending in the service's registry agent id, never a
+  decision block; and what comes back: `mandate-not-for-this-call` is handed on again to the right id without asking
+  him, `mandate-expired` asks him once for a new one.
+
+### Upgrading
+
+- `fabric_board_link` (and `fabric-board-link.mjs`) now imports `fabric_interop_rules`, so a board responder's install
+  brings it and its `fabric_delegation` too (`fabric_kit.py install --module fabric_board` copies 33 modules, 31 in
+  0.60.0): reinstall with `fabric_kit.py install` and check with `status`, never by copying `fabric_board_link` alone.
+- A Python service that passes a job or tool project as a `(str, Enum)` member or another `str` subclass, under a
+  mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
+  An effect passed that way to `approval_step`, `job_step` (when the start call carried a mandate), `request_input(steps=)` or `add_tool` with an action now raises
+  `InteropError`: pass `member.value` there too. A Node service that keeps a step through `requestInput({steps})` with
+  a `String` object project (under a mandate limited to projects) or a `Number` object spend (under a `perCallMaxUsd`)
+  is likewise asked at the answer: pass the primitive value.
+- A kept step holds only `effect`, `spendUsd` and `project`, read as the step's accessors answer them (Node property
+  access, Python `.get`), where 0.60.0 kept the step's JSON form (Node `JSON.stringify`, Python `json.dumps`, which reads a
+  `dict` subclass through its `items()`): a
+  service that put its own keys in `steps=` keeps them elsewhere. The two differ for a Node step that is a function
+  (0.60.0 kept no step), an array, an object whose members are inherited (a class's getters included) or not
+  enumerable, or one with its own `toJSON`, and for a Python `dict` subclass whose `.get` or `items()` answers otherwise
+  than its storage: such a step is now kept as its accessors answer, and an accessor that throws for the spend or the project,
+  which 0.60.0 never called, now throws from `requestInput` / `request_input` (the job stays `working`).
+- A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it: a `str`-subclass
+  project or effect, or a Node `String` or `Number` object, as its plain value, and the step kinds above in their JSON
+  form. A step so kept with its effect but no project is covered at a 0.61.0 answer by a mandate limited to projects;
+  one kept with no effect waits for the operator (`effect-missing` where a step is kept, `no-decision` where none is),
+  and a Node job whose requests 0.60.0 kept as an array can no longer be answered. Answer or cancel such jobs before
+  upgrading.
+- Python McpToolServer answers a `fabric.job.get` whose `inputResponses` is not a JSON object (`[]` and `""`
+  included), on any job the caller may read, `-32602` (Node has no tool server): send an object, or leave it out (or `null`) to poll.
+
 ## 0.60.0 (2026-11-03)
 
 The board responder is ready to find a slot the operator moves back to it, once Fabric offers the move (FAA-165), and four smaller fixes: working-with-fabric

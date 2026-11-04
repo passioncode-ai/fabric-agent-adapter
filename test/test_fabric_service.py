@@ -73,6 +73,56 @@ class LockTests(unittest.TestCase):
             first.release()
             fs.InstanceLock(Path(temp)).acquire().release()
 
+    def test_a_failed_pid_write_lets_the_lock_go(self):
+        """A board finding of 2026-11-03 from a service that vendors the kit: os.ftruncate, os.write or os.fsync raising after the lock was taken
+        left it held with no descriptor kept, so release() freed nothing and the same process could not start again."""
+        from unittest import mock
+        lock_module = sys.modules[fs.InstanceLock.__module__]
+        for call in ("ftruncate", "write", "fsync"):
+            with self.subTest(call=call), tempfile.TemporaryDirectory() as temp:
+                failed = fs.InstanceLock(Path(temp))
+                with mock.patch.object(lock_module.os, call, side_effect=OSError(28, "No space left on device")):
+                    with self.assertRaises(OSError):
+                        failed.acquire()
+                failed.release()  # a no-op: nothing is closed twice (a reused descriptor number belongs to someone else)
+                self.assertIsNone(failed._name)
+                fs.InstanceLock(Path(temp)).acquire().release()
+
+    def test_a_close_that_fails_too_still_lets_the_name_go(self):
+        """0.61.0 seam reading 6: a deferred write error at os.close (NFS) kept the lock name held."""
+        from unittest import mock
+        lock_module = sys.modules[fs.InstanceLock.__module__]
+        dropped = []
+        with tempfile.TemporaryDirectory() as temp, \
+                mock.patch.object(lock_module, "_hold_lock_name", return_value="held-name"), \
+                mock.patch.object(lock_module, "_drop_lock_name", side_effect=dropped.append), \
+                mock.patch.object(lock_module.os, "fsync", side_effect=OSError(28, "No space left on device")):
+            real_close = lock_module.os.close
+
+            def close(fd):
+                real_close(fd)
+                raise OSError(5, "Input/output error")
+
+            with mock.patch.object(lock_module.os, "close", side_effect=close):
+                with self.assertRaises(OSError) as caught:
+                    fs.InstanceLock(Path(temp)).acquire()
+            self.assertEqual(caught.exception.errno, 28, "the first error stands")
+            self.assertEqual(dropped, ["held-name"])
+
+    def test_a_name_that_fails_to_drop_keeps_the_first_error(self):
+        """0.61.0 unit reading 7: an error from _drop_lock_name replaced the first one and left _name set."""
+        from unittest import mock
+        lock_module = sys.modules[fs.InstanceLock.__module__]
+        with tempfile.TemporaryDirectory() as temp, \
+                mock.patch.object(lock_module, "_hold_lock_name", return_value="held-name"), \
+                mock.patch.object(lock_module, "_drop_lock_name", side_effect=OSError(9, "Bad file descriptor")), \
+                mock.patch.object(lock_module.os, "fsync", side_effect=OSError(28, "No space left on device")):
+            lock = fs.InstanceLock(Path(temp))
+            with self.assertRaises(OSError) as caught:
+                lock.acquire()
+        self.assertEqual(caught.exception.errno, 28)
+        self.assertIsNone(lock._name)
+
 
 class LoopbackServerTests(unittest.TestCase):
     """http.server's server_bind() calls socket.getfqdn() between bind() and listen(); a Mac

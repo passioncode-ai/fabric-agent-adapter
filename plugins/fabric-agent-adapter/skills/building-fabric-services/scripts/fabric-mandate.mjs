@@ -45,6 +45,9 @@ export const OPERATOR_SOURCE_PROTOCOL = 'operator-source/1';
 const SCOPE_MEMBERS = new Set(['capabilities', 'actions', 'effects', 'perCallMaxUsd', 'projects']);
 const STEP_MEMBERS = new Set(['agent', 'at', 'scope']);
 const AGENT_ID = /^[a-z][a-z0-9-]{1,62}(\.[a-z][a-z0-9-]{0,31})?$/; // common.schema.json agentId
+
+/** A registry agent id (common.schema.json agentId): a provider or service id, optionally `.instance`. */
+export const isAgentId = (value) => typeof value === 'string' && AGENT_ID.test(value);
 const CAPABILITY = /^[a-z][a-z0-9._-]{1,127}$/; // common.schema.json capabilityName
 const REQUEST_KEY = /^[A-Za-z0-9_.-]{1,64}$/; // interop-common.schema.json requestKey
 const PROJECT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;

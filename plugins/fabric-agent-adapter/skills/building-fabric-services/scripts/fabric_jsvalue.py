@@ -145,11 +145,29 @@ def get_string(value: Any, key: str) -> str:
 
 
 def is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """An int or a float by its real type, a subclass's included; a bool, or a value that only claims a number through
+    `__class__` (a mock, a proxy), is not one (0.61.0 seam reading 19)."""
+    kind = type(value)
+    return kind is not bool and issubclass(kind, (int, float))
+
+
+def real_number(value: Any) -> Any:
+    """The plain int or float a number holds (is_number), read by what it stores, never by its own float(), int() or
+    comparisons; None for anything else (0.61.0 seam reading 18, unit and product readings 19)."""
+    if not is_number(value):
+        return None
+    return float.__float__(value) if issubclass(type(value), float) else int.__int__(value)
+
+
+def held(value: Any) -> Any:
+    """A number by what it stores (real_number); any other value as given, so it reads as it did before."""
+    number = real_number(value)
+    return value if number is None else number
 
 
 def double(value: Any) -> float:
     """A JSON number as JavaScript holds it: the nearest double, and an integer beyond the double range ±Infinity."""
+    value = held(value)
     try:
         return float(value)
     except OverflowError:
@@ -184,7 +202,8 @@ def set_has(items: List[Any], value: Any) -> bool:
 _JS_SPACE = "\t\n\v\f\r                  　﻿"
 
 
-_JS_DECIMAL = re.compile(r"[+-]?(?:(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|Infinity)", re.ASCII)
+# One way to split the digits, so a long string that fails to match costs its length (0.61.0 seam reading 22).
+_JS_DECIMAL = re.compile(r"[+-]?(?:(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?|Infinity)", re.ASCII)
 
 
 _JS_RADIX = re.compile(r"0(?:[xX](?P<x>[0-9a-fA-F]+)|[oO](?P<o>[0-7]+)|[bB](?P<b>[01]+))", re.ASCII)
@@ -196,9 +215,10 @@ def js_to_number(value: Any) -> float:
         return math.nan
     if value is None:
         return 0.0
-    if isinstance(value, bool):
+    if value is True or value is False:  # by identity: isinstance asks a number subclass's own __class__ (unit reading 30)
         return 1.0 if value else 0.0
     if is_number(value):
+        value = held(value)  # by the number it holds: a subclass's own float() or comparison is never asked
         try:
             return float(value)
         except OverflowError:

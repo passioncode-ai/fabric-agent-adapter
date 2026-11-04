@@ -259,7 +259,7 @@ test('FAA-139: actionGate reads spend and project failing closed, as the Python 
     assert.equal(refusalError(refusal).error.data.detail, 'outside-mandate: spend', String(spendUsd).slice(0, 12));
     JSON.stringify(refusalError(refusal)); // nothing a JSON writer refuses
   }
-  for (const project of [7, ['alpha'], { id: 'alpha' }]) {
+  for (const project of [7, ['alpha'], { id: 'alpha' }, new String('alpha')]) { // a String object is no string (r33)
     assert.equal(refusalError(gate(scoped, { spendUsd: 0.5, project }).refusal).error.data.detail, 'outside-mandate: project');
   }
   assert.equal(gate(scoped, { spendUsd: 0.5, project: 'alpha' }).ok, true);
@@ -274,7 +274,7 @@ test('0.56.0 seam r1: jobStep reads spend and project as actionGate does, failin
     const step = i.jobStep({ ...call, mandate: tight, spendUsd });
     assert.deepEqual([step.covered, step.detail], [false, 'outside-mandate: spend'], String(spendUsd));
   }
-  for (const project of [7, ['alpha']]) {
+  for (const project of [7, ['alpha'], new String('alpha')]) {
     const step = i.jobStep({ ...call, mandate: scoped, spendUsd: 0.5, project });
     assert.deepEqual([step.covered, step.detail], [false, 'outside-mandate: project']);
   }
@@ -358,6 +358,56 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   assert.deepEqual(onDisk.private.steps, { 'approve-reply': { effect: 'reply', spendUsd: 0 } });
   assert.equal(onDisk.job.status, 'input_required');
   assert.equal(JSON.stringify(onDisk.job).includes('steps'), false);
+  // A step is kept as the gate reads it (0.61.0 product reading 33): a String object project is unreadable, a Number
+  // object spend is none, a primitive string stays; so the answer refuses what the start refused.
+  store.working(job.id);
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': { effect: 'reply', spendUsd: new Number(0.5), project: new String('alpha') } } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply', project: i.UNREADABLE_PROJECT } });
+  store.working(job.id);
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': { effect: 'reply', spendUsd: 0.5, project: 'alpha' } } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply', spendUsd: 0.5, project: 'alpha' } });
+  // Each member is read once and the value checked is the value kept (seam reading 34).
+  store.working(job.id);
+  const reads = { effect: 0, project: 0 };
+  const step = { get effect() { reads.effect += 1; return reads.effect === 1 ? 'reply' : 'deploy'; },
+    get project() { reads.project += 1; return reads.project === 1 ? 'alpha' : 'beta'; } };
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': step } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply', project: 'alpha' } });
+  assert.deepEqual(reads, { effect: 1, project: 1 });
+  // A null step is refused and nothing is kept; a step that is a function is read as an object, as 0.60.0 read it (unit 35).
+  store.working(job.id);
+  assert.throws(() => store.requestInput(job.id, { 'approve-reply': request }, 'x', { steps: { 'approve-reply': null } }), i.InteropError);
+  assert.throws(() => store.requestInput(job.id, { 'approve-reply': request }, 'x', { steps: { 'approve-reply': undefined } }), i.InteropError);
+  assert.equal(store.get(job.id).status, 'working');
+  store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': Object.assign(() => {}, { effect: 'reply' }) } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply' } });
+  // A request key `__proto__` is a key like any other: its step is kept, never set as a prototype (seam reading 35).
+  store.working(job.id);
+  store.requestInput(job.id, JSON.parse('{"__proto__": ' + JSON.stringify(request) + '}'), 'Publish it?', { steps: JSON.parse('{"__proto__": {"effect": "reply"}}') });
+  assert.deepEqual(Object.entries(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps), [['__proto__', { effect: 'reply' }]]);
+  // An answer keyed by an inherited name answers nothing: the asked question and its step stay (seam reading 36).
+  for (const name of ['constructor', 'toString', 'hasOwnProperty']) assert.deepEqual(store.answer(job.id, { [name]: { action: 'accept', content: {} } }), {});
+  for (const responses of [[{ action: 'accept' }], 'accept', 7]) assert.deepEqual(store.answer(job.id, responses), {}); // no object, no match (seam 37)
+  const file = path.join(dir, `${job.id}.json`); // a hand-edited file whose inputRequests is no object answers nothing
+  for (const asked of [[request], 'approve-reply']) {
+    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+    record.job.inputRequests = asked;
+    fs.writeFileSync(file, JSON.stringify(record));
+    assert.deepEqual(store.answer(job.id, { length: { action: 'accept', content: {} }, 0: { action: 'accept', content: {} } }), {});
+  }
+  // A job asking key '0' answered with an array or a string answers nothing (unit reading 38).
+  const { job: zero } = store.create('reviews.approve', {}, { traceparent: PARENT });
+  store.requestInput(zero.id, { 0: request }, 'Publish it?');
+  for (const responses of [[{ action: 'accept', content: {} }], 'a']) assert.deepEqual(store.answer(zero.id, responses), {});
+  assert.equal(store.get(zero.id).status, 'input_required');
+  assert.throws(() => store.requestInput(zero.id, [request], 'x'), /a JSON object of at least one input request/); // requests that are no object are refused (unit 42)
+  assert.throws(() => store.requestInput(zero.id, Object.assign(() => {}, { pick: request }), 'x'), i.InteropError); // a function too (unit 39)
+  const throwing = { get 0() { throw new RangeError('step read'); } }; // the requests are refused before a step is read (unit 40)
+  assert.throws(() => store.requestInput(zero.id, [request], 'x', { steps: throwing }), i.InteropError);
+  for (const bad of [Object.assign([], { method: 'elicitation/create' }), Object.assign(() => {}, { method: 'elicitation/create' }), null]) { // a request is a plain object (product 40)
+    assert.throws(() => store.requestInput(zero.id, { pick: bad }, 'x'), i.InteropError);
+  }
+  assert.equal(store.get(job.id).status, 'input_required');
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);
   store.requestInput(job.id, { 'approve-reply': request }, 'Publish another?');

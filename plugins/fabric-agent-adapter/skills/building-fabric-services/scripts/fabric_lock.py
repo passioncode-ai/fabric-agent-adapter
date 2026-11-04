@@ -97,9 +97,23 @@ class InstanceLock:
         except BaseException:
             os.close(fd)
             raise
-        os.ftruncate(fd, 0)
-        os.write(fd, str(os.getpid()).encode())
-        os.fsync(fd)
+        try:
+            os.ftruncate(fd, 0)
+            os.write(fd, str(os.getpid()).encode())
+            os.fsync(fd)
+        except BaseException:  # a full disk or an I/O error: let the lock go, or release() frees nothing
+            try:
+                os.close(fd)
+            except OSError:  # a deferred write error (NFS) at the close: the name still goes, the first error stands
+                pass
+            finally:
+                name, self._name = self._name, None
+                if name is not None:
+                    try:
+                        _drop_lock_name(name)
+                    except OSError:  # as with the close: nothing to add to the first error
+                        pass
+            raise
         self._fd = fd
         return self
 

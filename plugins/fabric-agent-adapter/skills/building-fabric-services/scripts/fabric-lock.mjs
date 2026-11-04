@@ -43,9 +43,19 @@ export class InstanceLock {
         if (error.code === 'EAGAIN' || error.code === 'EWOULDBLOCK') throw new AlreadyRunning(readPid(this.path), this.path);
         throw error;
       }
-      fs.ftruncateSync(this.fd, 0);
-      fs.writeSync(this.fd, String(process.pid));
-      fs.fsyncSync(this.fd);
+      try {
+        fs.ftruncateSync(this.fd, 0);
+        fs.writeSync(this.fd, String(process.pid));
+        fs.fsyncSync(this.fd);
+      } catch (error) { // a full disk or an I/O error: let the lock go, or nobody can (the caller drops this object)
+        const fd = this.fd;
+        this.fd = null;
+        try {
+          fs.closeSync(fd);
+        } catch { // a deferred write error (NFS) at the close: the lock still goes, the first error stands
+        }
+        throw error;
+      }
       return this;
     }
     // Linux: an abstract unix socket; Windows: a named pipe. Each is exclusive, has no file, and dies
@@ -66,7 +76,17 @@ export class InstanceLock {
       this.server.listen(name, resolve);
     });
     this.server.unref();
-    atomicWrite(this.path, String(process.pid));
+    try {
+      atomicWrite(this.path, String(process.pid));
+    } catch (error) { // as on macOS: the name is let go with the failed write, the first error standing
+      const server = this.server;
+      this.server = null;
+      try {
+        server.close();
+      } catch { // nothing to add to the first error
+      }
+      throw error;
+    }
     return this;
   }
 

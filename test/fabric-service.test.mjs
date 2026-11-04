@@ -29,6 +29,51 @@ test('second holder of the instance lock is refused with the pid', { skip: noLin
   (await new k.InstanceLock(dir).acquire()).release();
 });
 
+test('a failed pid write lets the instance lock go (a board finding of 2026-11-03)', { skip: noLinuxLock }, async () => {
+  // The caller (holdSingleInstance) drops a lock whose acquire threw, so acquire itself must let the lock go.
+  for (const call of ['ftruncateSync', 'writeSync', 'fsyncSync']) {
+    const dir = temp();
+    const original = fs[call];
+    let thrown = false;
+    fs[call] = (...args) => {
+      if (thrown) return original(...args);
+      thrown = true;
+      throw Object.assign(new Error('No space left on device'), { code: 'ENOSPC' });
+    };
+    let lock = null;
+    const attempt = new k.InstanceLock(dir);
+    try {
+      lock = await attempt.acquire();
+    } catch (error) {
+      assert.equal(error.code, 'ENOSPC', call);
+      assert.equal(attempt.fd ?? null, null, `${call}: no descriptor kept`);
+      assert.equal(attempt.server ?? null, null, `${call}: no name kept (Linux, Windows)`);
+    } finally {
+      fs[call] = original;
+    }
+    if (lock) lock.release(); // ftruncateSync off macOS: the pid goes through atomicWrite, which does not call it
+    (await new k.InstanceLock(dir).acquire()).release();
+  }
+});
+
+test('a close that fails too still lets the lock go, the first error standing (0.61.0 seam reading 7)', { skip: process.platform !== 'darwin' }, async () => {
+  const dir = temp();
+  const { fsyncSync, closeSync } = fs;
+  let lock = null;
+  fs.fsyncSync = () => { throw Object.assign(new Error('No space left on device'), { code: 'ENOSPC' }); };
+  fs.closeSync = (fd) => { closeSync(fd); throw Object.assign(new Error('Input/output error'), { code: 'EIO' }); };
+  try {
+    lock = new k.InstanceLock(dir);
+    await assert.rejects(lock.acquire(), (e) => e.code === 'ENOSPC');
+  } finally {
+    fs.fsyncSync = fsyncSync;
+    fs.closeSync = closeSync;
+  }
+  assert.equal(lock.fd, null, 'no closed descriptor number is kept for a later release');
+  lock.release();
+  (await new k.InstanceLock(dir).acquire()).release();
+});
+
 test('the Node lock and the Python lock exclude each other', { skip: process.platform !== 'darwin' }, async () => {
   const dir = temp();
   const lock = await new k.InstanceLock(dir).acquire();

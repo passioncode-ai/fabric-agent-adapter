@@ -199,8 +199,21 @@ class Building(unittest.TestCase):
         self.assertIs(fd.effect_closure.__module__, fm.effect_closure.__module__)
 
 
-if __name__ == "__main__":
-    unittest.main()
+
+
+class AFullChainTakesNoFifth(unittest.TestCase):
+    """MD-2 at the pin: a chain holds at most four agents, and a link never restates its held mandate to start a new
+    one (the contract on board thread 118f95f9, 2026-11-03): past four the parts travel only as an OA-3 relay."""
+
+    def test_a_fifth_hand_on_is_refused(self):
+        at = "2026-11-03T10:00:00Z"
+        held = fm.operator_mandate("task-timetable", "update the timetable page", {"capabilities": ["page.update"], "effects": ["draft"]},
+                                   "agent-a", at=at, expires_at="2026-11-09T10:00:00Z")
+        for agent in ("agent-b", "agent-c", "agent-d"):
+            held = fm.hand_on(held, agent, at)
+        with self.assertRaises(fm.ServiceError) as caught:
+            fm.hand_on(held, "agent-e", at)
+        self.assertEqual(str(caught.exception).rsplit(": ", 1)[-1], "mandate-malformed")  # the 1..4 chain bound
 
 
 class NamingListsMd2a(unittest.TestCase):
@@ -212,3 +225,7 @@ class NamingListsMd2a(unittest.TestCase):
         for case in cases:
             with self.subTest(case["name"]):
                 self.assertIs(fm.scope_within(case["child"], case["parent"]), case["within"])
+
+
+if __name__ == "__main__":
+    unittest.main()

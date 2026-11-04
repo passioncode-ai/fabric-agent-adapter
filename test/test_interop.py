@@ -652,6 +652,53 @@ class InputActionTests(unittest.TestCase):
     def key_decision(self, key):
         return {"by": "operator", "via": "relayed-instruction", "action": key, "instruction": "Agent: Which? Operator: a", "at": NOW}
 
+    def test_an_answer_that_is_no_json_object_is_refused_never_a_crash(self):
+        """0.61.0 seam reading 37: a list, a string or a number as inputResponses raised out of handle() (the transport
+        sent no reply); it is -32602 now, and JobStore.answer matches nothing for a non-object, as Node's does."""
+        for actions in (False, True):
+            server, jobs, job_id = self.start(input_actions=actions) if actions else self.start()
+            for responses in ([{"action": "accept"}], "accept", 7):
+                answer = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+                    "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": responses}}})
+                self.assertEqual(answer["error"]["code"], -32602, responses)
+                self.assertEqual(jobs.answer(job_id, responses), {})
+            self.assertEqual(jobs.get(job_id)["status"], "input_required")
+            self.assertEqual(server.handle({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+                "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": []}}})["error"]["code"], -32602)
+        path = next(Path(self.temp.name).rglob("%s.json" % job_id))  # a hand-edited file: requests that are no object
+        for asked in (["pick"], "pick-x", None, 7):
+            record = json.loads(path.read_text())
+            record["job"]["inputRequests"] = asked
+            path.write_text(json.dumps(record))
+            self.assertEqual(jobs.answer(job_id, {"pick": {"action": "accept"}, "ick": {"action": "accept"}}), {}, asked)
+            record["private"]["steps"] = asked  # the answer gate too, input_actions on: an answer, never a crash
+            path.write_text(json.dumps(record))
+            self.assertIn("result", server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {
+                "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"pick": {"action": "accept"}}}}}))
+        jobs.request_input(job_id, {"pick": fi.choice_request("Which?", "choice", [("a", "A")])})
+        record = json.loads(path.read_text())
+        for steps in (["pick"], "pick", 7):  # asked requests, kept steps that are no object (seam reading 38)
+            record["private"]["steps"] = steps
+            path.write_text(json.dumps(record))
+            self.assertIn("result", server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {
+                "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"pick": {"action": "accept"}}}}}))
+        with self.assertRaisesRegex(fi.InteropError, "a JSON object of at least one input request"):  # never kept (unit 42)
+            jobs.request_input(job_id, [fi.choice_request("Which?", "choice", [("a", "A")])])
+        for requests in (7, True, 1.5, ["pick"], {"pick": "x"}, {"pick": None}, {1: {"method": "elicitation/create"}}):
+            with self.assertRaises(fi.InteropError):  # first, with steps= too (readings 39)
+                jobs.request_input(job_id, requests, steps={"pick": {"effect": "reply"}})
+        for key in (1, ("a", "b"), ()):  # a key that is no str, with no step to refuse it first (unit, seam 40; a tuple, unit 41)
+            with self.assertRaises(fi.InteropError):
+                jobs.request_input(job_id, {key: fi.choice_request("Which?", "choice", [("a", "A")])})
+        with self.assertRaises(fi.InteropError):  # a tuple step key is named, not formatted (unit 41)
+            jobs.request_input(job_id, {"pick": fi.choice_request("Which?", "choice", [("a", "A")])}, steps={("a", "b"): {}})
+        enum = importlib.import_module("enum")
+
+        class Key(str, enum.Enum):  # a (str, Enum) key is a str, as 0.60.0 took it (product reading 40)
+            PICK = "pick"
+        jobs.request_input(job_id, {Key.PICK: fi.choice_request("Which?", "choice", [("a", "A")])})
+        self.assertEqual(jobs.answer(job_id, {"pick": {"action": "accept"}}), {"pick": {"action": "accept"}})
+
     def test_off_by_default_the_answer_is_taken_as_before(self):
         server, jobs, job_id = self.start()
         result = self.answer(server, job_id, {"pick": {"action": "accept", "content": {"choice": "a"}}})
@@ -811,6 +858,32 @@ class ActionGateMandateTests(unittest.TestCase):
             error = answer["result"]["structuredContent"]["error"]
             self.assertEqual((error["code"], error["data"]["detail"]), ("operator-decision-required", "outside-mandate: spend"))
 
+    def test_a_spend_subclass_is_read_by_the_number_it_holds(self):
+        # 0.61.0 seam reading 18, unit and product readings 19: a subclass's own float() is never asked, and a value that
+        # only claims a number through __class__ (a mock) is no estimate; the call is answered either way.
+        from unittest import mock
+
+        class NanFloat(float):
+            def __float__(self):
+                return float("nan")
+
+        class RaisingFloat(float):
+            def __float__(self):
+                raise ValueError("unreadable")
+        tight = lead_mandate(dict(REPLY_SCOPE, perCallMaxUsd=1))
+        for estimate, covered in ((NanFloat(0.5), True), (RaisingFloat(0.5), True), (mock.MagicMock(spec=float), False)):
+            server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
+            server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
+                            target="reply", effect="reply", spend=lambda a, e=estimate: e)
+            params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"}, "_meta": {"traceparent": PARENT, "mandate": tight}}
+            answer = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, None, tier="T0")
+            error = answer["result"].get("structuredContent", {}).get("error")
+            with self.subTest(estimate=type(estimate).__name__):
+                if covered:
+                    self.assertIsNone(error, answer)
+                else:
+                    self.assertEqual(error["data"]["detail"], "outside-mandate: spend")
+
     def test_the_direct_gate_reads_spend_and_project_failing_closed(self):
         """FAA-139: action_gate reads as McpToolServer does: a spend past the float range, NaN or infinite is none (a
         ceiling refuses it, and no 5000-digit number reaches the refusal), a project that is no string is unreadable."""
@@ -822,7 +895,11 @@ class ActionGateMandateTests(unittest.TestCase):
                 result = fd.refusal_tool_result(answer["refusal"])
                 json.dumps(result, allow_nan=False)
                 self.assertEqual(result["structuredContent"]["error"]["data"]["detail"], "outside-mandate: spend")
-        for project in (7, ["alpha"], {"id": "alpha"}):
+        class ClassRaises(str):  # read by its type, never by its own __class__: refused, not raised (seam reading 33)
+            @property
+            def __class__(self):
+                raise RuntimeError("__class__ ran")
+        for project in (7, ["alpha"], {"id": "alpha"}, ClassRaises("alpha")):
             with self.subTest(project=project):
                 answer = self.gate(meta={"mandate": scoped}, spend_usd=0.5, project=project)
                 self.assertEqual(fd.refusal_error(answer["refusal"])["error"]["data"]["detail"], "outside-mandate: project")
@@ -839,7 +916,11 @@ class ActionGateMandateTests(unittest.TestCase):
             with self.subTest(spend=repr(spend)[:12]):
                 step = fi.job_step(tight, spend_usd=spend, **call)
                 self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: spend"))
-        for project in (7, ["alpha"]):
+        class ClassRaises(str):
+            @property
+            def __class__(self):
+                raise RuntimeError("__class__ ran")
+        for project in (7, ["alpha"], ClassRaises("alpha")):
             with self.subTest(project=project):
                 step = fi.job_step(scoped, spend_usd=0.5, project=project, **call)
                 self.assertEqual((step["covered"], step["detail"]), (False, "outside-mandate: project"))
@@ -855,6 +936,17 @@ class ActionGateMandateTests(unittest.TestCase):
                  (dict(spend=lambda a: 10 ** 5000), tight, "outside-mandate: spend"),
                  (dict(spend=0.5, project=lambda a: 1 / 0), scoped, "outside-mandate: project"),
                  (dict(spend=0.5, project=lambda a: 7), scoped, "outside-mandate: project"))
+        enum = importlib.import_module("enum")
+
+        class Site(str, enum.Enum):
+            ALPHA = "alpha"
+
+        class Text(str):
+            pass
+        # 0.61.0 unit reading 33: a str subclass is no exact str, so it is unreadable, never "no project" a scoped
+        # mandate would cover, even when it spells a listed project.
+        cases += tuple((dict(spend=0.5, project=(lambda value: lambda a: value)(value)), scoped, "outside-mandate: project")
+                       for value in (Text("beta"), Text("alpha"), Site.ALPHA))
         for options, mandate, detail in cases:
             server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
             server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,
@@ -1088,6 +1180,74 @@ class JobApprovalStepTests(unittest.TestCase):
         self.step(project=float("nan"))  # 0.56.0 seam r5: a project that is no string is kept as the gate read it
         for path in Path(self.temp.name, "jobs").rglob("*.json"):
             json.loads(path.read_text(), parse_constant=lambda c: self.fail("%s in %s" % (c, path.name)))
+
+    def test_a_project_that_is_no_exact_str_is_refused_at_the_start_and_at_the_answer(self):
+        """0.61.0 seam reading 32: a str subclass (a (str, Enum) member included) was refused at the start, by the core's
+        exact-type compare, but kept as given, written as its plain string, and then covered at the answer. The kept step
+        now holds it as unreadable, as the board path does, and a value that only claims str never reaches json.dumps."""
+        enum = importlib.import_module("enum")
+
+        class Site(str, enum.Enum):
+            ALPHA = "alpha"
+
+        class Text(str):
+            pass
+
+        class ClaimsStr:
+            @property
+            def __class__(self):
+                return str
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        for project in (Site.ALPHA, Text("alpha"), ClaimsStr()):
+            with self.subTest(project=type(project).__name__):
+                self.start({"mandate": scoped})
+                job_id, record = self.step(project=project)
+                self.assertIsNone(record)
+                self.assertIn("outside-mandate: project", self.jobs.get(job_id)["statusMessage"])
+                self.assertEqual(self.jobs.private(job_id)["steps"]["approve-reply"]["project"], fi.UNREADABLE_PROJECT)
+                call = dict(tier="T0", now=NOW, self_id="example-agent", capability="reviews.approve", key="approve-reply",
+                            effect="reply")
+                self.assertEqual(fi.job_step(scoped, spend_usd=0.5, project=project, **call)["detail"], "outside-mandate: project")
+        self.start({"mandate": scoped})
+        self.assertIsNotNone(self.step(project="alpha")[1], "a plain str is read as before")
+        # A service's own request_input(steps=) after job_step keeps a step as the gate reads it too (product reading 33).
+        self.start({"mandate": scoped})
+        job_id = self.contexts[-1][0]
+        request = fi.choice_request("Publish the reply?", "choice", [("yes", "Yes"), ("no", "No")])
+        self.jobs.request_input(job_id, {"approve-reply": request}, "Publish it?", steps={
+            "approve-reply": {"effect": "reply", "spendUsd": float("nan"), "project": Site.ALPHA}})
+        self.assertEqual(self.jobs.private(job_id)["steps"], {"approve-reply": {"effect": "reply", "project": fi.UNREADABLE_PROJECT}})
+
+        class Effect(str, enum.Enum):  # seam and unit readings 34: an effect is admitted as an exact str, never kept as given
+            REPLY = "reply"
+        self.start({"mandate": scoped})
+        job_id = self.contexts[-1][0]
+        for effect in (Effect.REPLY, Text("reply")):
+            with self.assertRaises(fi.InteropError):
+                self.step(effect=effect)
+            with self.assertRaises(fi.InteropError):
+                self.jobs.request_input(job_id, {"approve-reply": request}, "Publish it?", steps={"approve-reply": {"effect": effect}})
+            with self.assertRaises(fi.InteropError):
+                fi.job_step(scoped, spend_usd=0.5, project="alpha", **dict(call, effect=effect))
+        self.assertNotEqual(self.jobs.get(job_id)["status"], "input_required", "nothing was kept")
+        for agent in ({"agent_id": "example-agent"}, {}):  # add_tool with an action too (seam and unit readings 35)
+            server = fi.McpToolServer("example-agent", "1.0.0", **agent)
+            for effect in (Effect.REPLY, Text("reply")):
+                with self.assertRaises(fi.InteropError):
+                    server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {}, action=RELAYED,
+                                    target="reply", effect=effect)
+            self.assertNotIn("reviews.approve", server.handlers, "a refused tool is not served")
+
+        class Flip(dict):  # a step whose effect answers differently on a second read: kept as read once
+            reads = 0
+
+            def get(self, key, default=None):
+                if key == "effect":
+                    Flip.reads += 1
+                    return "reply" if Flip.reads == 1 else "deploy"
+                return dict.get(self, key, default)
+        self.jobs.request_input(job_id, {"approve-reply": request}, "Publish it?", steps={"approve-reply": Flip()})
+        self.assertEqual((self.jobs.private(job_id)["steps"], Flip.reads), ({"approve-reply": {"effect": "reply"}}, 1))
 
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",

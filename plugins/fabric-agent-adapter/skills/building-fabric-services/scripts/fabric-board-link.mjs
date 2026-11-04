@@ -6,6 +6,9 @@ import path from 'node:path';
 import { HubError, MCP_PROTOCOL_VERSION, postMcp, toolAnswer } from './fabric-hub.mjs';
 import { atomicWrite, ensurePrivateDir } from './fabric-service.mjs';
 import { BoardError, RESPOND_TOOLS, isObj, refusalProblems } from './fabric-board-shapes.mjs';
+import { UNREADABLE_PROJECT, mandateSpend } from './fabric-interop-rules.mjs'; // FAA-139
+import { isAgentId, mandateCovers } from './fabric-mandate.mjs';
+import { formatRfc3339 } from './fabric-time.mjs';
 
 /** MCP over HTTP with a board session's one-session bearer; calls are serialised; close() sends the session's DELETE. */
 export class BoardSession {
@@ -179,4 +182,118 @@ export class BoardRequest {
   toJSON() {
     return { requestId: this.requestId, capability: this.capability }; // never the body
   }
+  [Symbol.for('nodejs.util.inspect.custom')]() {
+    return this.toJSON(); // console.log(request) prints no body either
+  }
 }
+
+// -- the operator's mandate in a board request (FAA-135; contract project-comms.md, DEC-0125 MD-3) ---------------------
+
+/** `mandateFrom` naming every trusted sender of the board the service is installed on: the operator's personal board. */
+export const PERSONAL_BOARD = 'personal-board';
+const OPENER = /^```json[ \t]*$/;
+const CLOSER = /^```[ \t]*$/;
+
+/**
+ * The bodies of the ```json blocks, each fence on its own line: one pass over the lines, linear in the body. Lines end
+ * at "\\n" alone, one "\\r" before it dropped, as in the Python twin (never U+2028 or a lone "\\r"); an unclosed
+ * opener ends the scan.
+ */
+function jsonBlocks(body) {
+  const lines = body.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+  const blocks = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!OPENER.test(lines[i])) continue;
+    let j = i + 1;
+    while (j < lines.length && !CLOSER.test(lines[j])) j += 1;
+    if (j === lines.length) break;
+    blocks.push(lines.slice(i + 1, j).join('\n'));
+    i = j;
+  }
+  return blocks;
+}
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+/** A Project id as Fabric's board compares it: a uuid lower-cased, any other id as written (normalProject). */
+const fold = (project) => (UUID.test(project) ? project.toLowerCase() : project);
+
+/**
+ * The mandate a request carries, read only when the service opted in (`agentId` and `mandateFrom` set), the board
+ * verified the sender (`provenance: trusted`) and its Project is one `mandateFrom` names (or `PERSONAL_BOARD`): a T1
+ * caller by project-comms. Answers `{ mandate, unread }`: `mandate` null when none is read, `unread` `mandate-blocks`
+ * (more than one) or `mandate-unreadable` (a block naming `mandate/1` that is not JSON). A `source` in the block is
+ * dropped: a board block carries none (OA-7).
+ */
+export function readMandate(request, mandateFrom, agentId) {
+  const none = { mandate: null, unread: null };
+  if (agentId == null || mandateFrom == null || typeof request.body !== 'string') return none;
+  const sender = isObj(request.sender) ? request.sender : {};
+  const principal = isObj(sender.principal) ? sender.principal : {};
+  if (principal.provenance !== 'trusted') return none;
+  if (typeof sender.project !== 'string' || !sender.project) return none; // comms-message requires it; the caller
+  if (mandateFrom !== PERSONAL_BOARD && !mandateFrom.has(fold(sender.project))) return none;
+  const found = [];
+  for (const block of jsonBlocks(request.body)) {
+    let value;
+    try {
+      value = JSON.parse(block);
+    } catch {
+      if (block.includes('mandate/1')) return { mandate: null, unread: 'mandate-unreadable' };
+      continue;
+    }
+    if (isObj(value) && value.kind === 'mandate/1') {
+      delete value.source; // a Project declares no protocols: a board block carries no source (OA-7)
+      found.push(value);
+    }
+  }
+  if (found.length > 1) return { mandate: null, unread: 'mandate-blocks' };
+  return found.length ? { mandate: found[0], unread: null } : none;
+}
+
+/**
+ * `mandateCovers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
+ * chain's end alone binds it, MD-3). A covered answer's `recordAs` names `caller`, the sender Project the board
+ * verified (MD-3 records the caller). `wall` answers milliseconds. Null when no mandate travelled. `spendUsd` and
+ * `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend that is not a
+ * finite number is none (a ceiling refuses it), a `project` that is not a string, null included (the contract's
+ * mandateCovers refuses a null project), unreadable; a call that names none leaves `project` out. Only the five
+ * members mandateCovers reads are read, each once: a spend as an own member (an inherited one is none, which a ceiling
+ * refuses), a capability, action, effect and project as the contract reads them, a plain [[Get]] whose undefined is
+ * absent (an inherited, non-enumerable, getter or Proxy member included); the rest of the call is never touched. A
+ * getter whose value changes is answered on its one read.
+ */
+export function covers(mandate, call, agentId, wall, caller = null) {
+  if (mandate == null || agentId == null) return null;
+  if (call !== null && typeof call === 'object' && !Array.isArray(call)) {
+    const read = {};
+    for (const key of ['capability', 'action', 'effect']) {
+      const value = call[key]; // the contract's read: whatever [[Get]] answers, undefined being absent
+      if (value !== undefined) read[key] = value;
+    }
+    const spend = mandateSpend(Object.hasOwn(call, 'spendUsd') ? call.spendUsd : undefined);
+    if (spend !== undefined) read.spendUsd = spend;
+    const project = call.project;
+    if (project !== undefined) read.project = typeof project === 'string' ? project : UNREADABLE_PROJECT;
+    call = read;
+  }
+  const clock = wall();
+  let now = '';
+  try {
+    if (typeof clock === 'number' && Number.isFinite(clock)) now = formatRfc3339(clock);
+  } catch { // finite but outside the dates a clock can name
+    now = '';
+  }
+  const answer = mandateCovers({ mandate, tier: 'T1', now, self: agentId, call });
+  return answer.recordAs ? { ok: true, recordAs: { ...answer.recordAs, caller } } : answer;
+}
+
+/** The responder's opt-in, checked: answers `mandateFrom` as the responder keeps it (a Set or the string). */
+export function mandateOptions(agentId, mandateFrom) {
+  if (agentId != null && !isAgentId(agentId)) throw new BoardError('invalid_arguments', 'agentId must be the service\'s registry agent id.');
+  if (mandateFrom == null || mandateFrom === PERSONAL_BOARD) return mandateFrom ?? null;
+  const projects = typeof mandateFrom === 'string' || mandateFrom instanceof String || typeof mandateFrom?.[Symbol.iterator] !== 'function' ? null : [...mandateFrom];
+  if (projects === null || !projects.every((p) => typeof p === 'string' && p)) {
+    throw new BoardError('invalid_arguments', `mandateFrom is '${PERSONAL_BOARD}' or a collection of Project ids.`);
+  }
+  return new Set(projects.map(fold));
+}
+

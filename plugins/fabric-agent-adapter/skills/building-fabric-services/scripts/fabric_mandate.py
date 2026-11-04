@@ -2,8 +2,11 @@
 the task, narrowed at each hand-over. Part of the service kit (layer L2); the twin of fabric-mandate.mjs.
 
 - ``mandate_covers(inputs)``: whether a callee takes one call as the operator's decision under a mandate (MD-3 to
-  MD-5), exactly as the contract's ``mandateCovers`` answers. ``inputs`` holds ``mandate``, ``tier``, ``now``, ``self``
-  (the callee's own agent id), ``callerAgent`` (only when the callee authenticated one) and ``call`` ({capability,
+  MD-5), as the contract's ``mandateCovers`` answers, but for a spend that is no JSON data a ``json.loads`` gives
+  (shared or cyclic), whose lists nest in lists more than MAX_SPEND_DEPTH deep, or that holds a dict with an own
+  ``toString`` at its top or through lists alone: the core refuses all three, where the contract reads the first,
+  reads or throws on the second and throws on the third (FAA-196 (22)). ``inputs`` holds ``mandate``, ``tier``, ``now``,
+  ``self`` (the callee's own agent id), ``callerAgent`` (only when the callee authenticated one) and ``call`` ({capability,
   action?, effect, spendUsd?, project?}).
 - ``mandate_problem(mandate)``: ``mandate-malformed``, ``mandate-widened`` or None (FAC-SEM-144);
   ``mandate_shape(mandate)``: ``mandate.schema.json`` alone; ``mandate_rules(kind, value)``: the findings.
@@ -18,7 +21,9 @@ the task, narrowed at each hand-over. Part of the service kit (layer L2); the tw
   ``instruction`` it stays in the receiver's own record: never an event, a usage report, a log line or a page.
 
 The kit has no JSON Schema validator: the shape is written here from the schema, lengths in code points and patterns
-over the whole string, as the contract's validator reads them. Never raises on what it reads. Standard library only.
+over the whole string, as the contract's validator reads them. Never raises on JSON as json.loads gives it (a direct
+caller's key or value that is not exactly the JSON type, with its own methods (__eq__, __hash__, __len__, __class__, a
+dict subclass's get), in the input, the call, the mandate or its scope, is used as given: FAA-196 (21), (22)). Standard library only.
 """
 from __future__ import annotations
 
@@ -33,7 +38,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 from fabric_base import ServiceError  # noqa: E402
-from fabric_jsvalue import MISSING, get, is_number, js_to_number, same, set_has  # noqa: E402
+from fabric_jsvalue import MISSING, get, is_number, js_string, js_to_number, real_number, same, set_has  # noqa: E402
 from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
 
 #: The longest a mandate stands after the operator gave it (FAC-SEM-144).
@@ -238,6 +243,66 @@ def _member_of(items: Any, value: Any) -> bool:
     return set_has(items, value)
 
 
+#: A spend whose lists nest in one another more deeply than this, with no dict between them, is no estimate: that
+#: nesting is what JavaScript's String() of a list recurses through (Node and the contract throw RangeError a few
+#: thousand deep, 0.60.0 raised RecursionError a few hundred deep), and the spend a refusal carries as estimateUsd is
+#: then one a serialiser writes. Under a dict there is no bound: Number() never descends a dict, which is NaN at any
+#: depth in all three, but for one with an own toString at the top or through lists alone, on which Node and the
+#: contract throw (0.60.0 read it as NaN; the core refuses it, see _json_data). Stricter than all three between 100
+#: and their limit: FAA-196 (22); no JSON reader of the kit reaches it (0.61.0 readings 25 to 30).
+MAX_SPEND_DEPTH = 100
+
+
+def _json_data(value: Any) -> bool:
+    """Whether a value is JSON data as json.loads gives it, by exact type all the way down (never `==` or isinstance,
+    which a metaclass or `__class__` can answer), walked without recursion in one pass, its lists nested in lists at
+    most MAX_SPEND_DEPTH deep (a dict ends the count: its members are walked at any depth), and no dict at its top or
+    reached through lists alone with an own toString, on which Number() throws, as strict_string reads it (0.61.0 seam
+    reading 28). json.loads never shares a list or dict, so a structure that meets one twice (shared or cyclic) is not
+    JSON data (0.61.0 unit reading 21, seam reading 22, readings 25 to 27)."""
+    stack, seen = [(value, 0)], set()
+    while stack:
+        item, depth = stack.pop()
+        kind = type(item)
+        if item is None or kind is bool or kind is str or kind is int or kind is float:
+            continue
+        if kind is not list and kind is not dict:
+            return False
+        if id(item) in seen:
+            return False
+        seen.add(id(item))
+        if kind is list:
+            if depth is not None:
+                depth += 1
+                if depth > MAX_SPEND_DEPTH:
+                    return False
+            stack.extend((sub, depth) for sub in item)
+            continue
+        for key, sub in item.items():
+            if type(key) is not str:  # before any comparison: a key's own __eq__ never runs (unit reading 29)
+                return False
+            if depth is not None and key == "toString":  # Number() reaches it: a member of data is never callable
+                return False
+            stack.append((sub, None))
+    return True
+
+
+def _spend_number(spend: Any) -> float:
+    """Number(spend) for JSON data, without the join JavaScript builds for a list: [] is 0, a list of two or more items
+    is NaN (the comma never reads as a number), one item is read for itself, all in one descent (0.61.0 seam
+    reading 24: a list repeating one long string cost its length times its references)."""
+    value = spend
+    while type(value) is list:
+        if not value:
+            return 0.0
+        if len(value) > 1:
+            return math.nan
+        value = value[0]
+    if value is spend:
+        return js_to_number(value)
+    return 0.0 if value is None else js_to_number(js_string(value))
+
+
 def mandate_covers(inputs: Any) -> Dict[str, Any]:
     """Whether a callee takes one call as the operator's decision under a mandate (DEC-0125 MD-3 to MD-5), after it has
     placed the caller's tier (DL-25), as the contract's mandateCovers answers.
@@ -290,10 +355,24 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     if not set_has(list(_READS_AND_DRAFTS), effect) and capabilities is MISSING and (action is MISSING or actions is MISSING):
         return _outside("outside-mandate: capability")
     ceiling, spend = get(scope, "perCallMaxUsd"), get(call, "spendUsd")
-    if ceiling is not MISSING and (spend is MISSING or js_to_number(spend) > ceiling):
+    # A spend is read as the contract reads it only when it is JSON data as json.loads gives it, by exact type all the
+    # way down, or an int or float (a subclass read by the number it stores); anything else (a mock or proxy, a
+    # Decimal, a numpy.int64, a tuple, bytes, a str, list or dict subclass, a list holding one) is no estimate, which a
+    # ceiling refuses (0.61.0 seam readings 19 and 20), as is JSON data the core does not read as Number() does: lists
+    # nested more than MAX_SPEND_DEPTH deep (stricter than Number() between 100 and its limit), or a dict with an own
+    # toString Number() reaches, on which it throws (readings 25 to 29).
+    readable = over = False
+    if ceiling is not MISSING and spend is not MISSING:  # read only when a ceiling asks (no walk without one)
+        readable = is_number(spend) or _json_data(spend)
+    if readable:
+        try:
+            over = _spend_number(spend) > ceiling
+        except RecursionError:  # the number's read at the stack's edge: no estimate, never a raise (seam reading 21)
+            readable = False
+    if ceiling is not MISSING and (spend is MISSING or not readable or over):
         data: Dict[str, Any] = {"detail": "outside-mandate: spend"}
-        if spend is not MISSING:
-            data["estimateUsd"] = spend
+        if spend is not MISSING and readable:
+            data["estimateUsd"] = real_number(spend) if is_number(spend) else spend
         data["perCallMaxUsd"] = ceiling
         return {"ok": False, "code": OUTSIDE_MANDATE, "data": data}
     project, projects = get(call, "project"), get(scope, "projects")

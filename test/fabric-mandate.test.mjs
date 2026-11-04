@@ -162,3 +162,11 @@ test('DEC-0136 MD-2a: a hand-over adds no naming list the scope in force leaves 
   const cases = JSON.parse(fs.readFileSync(new URL('./fixtures/kit-mandate-md2a-cases.json', import.meta.url), 'utf8')).cases;
   for (const c of cases) assert.equal(scopeWithin(c.child, c.parent), c.within, c.name);
 });
+
+test('a full chain takes no fifth agent (MD-2; the contract on board thread 118f95f9)', () => {
+  const at = '2026-11-03T10:00:00Z';
+  let held = operatorMandate({ task: 'task-timetable', instruction: 'update the timetable page', scope: { capabilities: ['page.update'], effects: ['draft'] },
+    lead: 'agent-a', at, expiresAt: '2026-11-09T10:00:00Z' });
+  for (const agent of ['agent-b', 'agent-c', 'agent-d']) held = handOn(held, agent, at);
+  assert.throws(() => handOn(held, 'agent-e', at), (e) => e instanceof ServiceError && e.message.endsWith(': mandate-malformed'));
+});

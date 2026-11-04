@@ -266,8 +266,13 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
 - A `spend` or `project` function that raises, or a spend that is not a finite number, fails closed: the call is
   answered, and a mandate with a `perCallMaxUsd` ceiling or a `projects` list refuses it (`outside-mandate: spend` or
   `outside-mandate: project`); the estimate is read as a double, so an integer past the float range is infinite and
-  refused under a ceiling, and a project function that answers anything but a string or `None` names no project a
-  mandate can list. A refusal outside a mandate
+  refused under a ceiling (a subclass of int or float is read by the number it holds, never by its `float()` or
+  comparisons; a bool, a `Decimal`, a `numpy.int64` or a value that only claims a number through `__class__`, a mock
+  or a proxy, is no estimate), and a project function that answers anything but a string or `None` names no project a
+  mandate can list (in Python an exact `str`: the core compares a project by exact type, so a `str` subclass, a
+  `StrEnum` member included, is refused by a mandate limited to projects, at a job's start and at its answer alike,
+  since the kept step holds it as unreadable; in Node only a primitive string is a project, so a `String` object is
+  refused the same way). A refusal outside a mandate
   tells the caller the MD-4 order: call again within its own mandate, else pass the refusal up; only the leading agent
   asks the operator.
 - `add_tool(tool, handler, action=, effect=, spend=, project=)`: on a server with `agent_id`, a `relayed` action names
@@ -310,7 +315,9 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   server with `agent_id`) answers the record when the mandate covers the step `{capability: the job's, action: key,
   effect}` and asks nothing, the job going on as the operator's decision; otherwise the job waits `input_required` on
   `request`, its message naming the part not covered (`outside-mandate: <part>`) or saying the mandate expired, and the
-  step is kept in the job's private part (`request_input(..., steps=)`). An answer's `_meta.mandate` that covers that
+  step is kept in the job's private part (`request_input(..., steps=)`), as the gate reads it (`kept_step` /
+  `keptStep`: an effect admitted as an exact `str` or a primitive string, a spend through `mandate_spend`, a project as
+  an exact `str` or a primitive string, else unreadable, each member read once; other keys are not kept). An answer's `_meta.mandate` that covers that
   step is then read when `input_actions=True`, beside a decision for the key. The rule alone is `job_step(mandate, ...)`
   / `jobStep({mandate, tier, now, self, capability, key, effect, callerAgent, spendUsd, project})`; Node's
   `requestInput(jobId, inputRequests, statusMessage, {steps})` keeps the same private part. Node has no
@@ -325,7 +332,11 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   `capabilities` name `fabric.job.get` covers no step of another capability.
   Node has no tool server: a Node service reads `store.load(jobId).private.steps` and `.private.capability` BEFORE
   `store.answer` (which clears the steps), gates the answer with `actionGate({..., mandateCapability:
-  private.capability})`, then answers. It logs the `fault` that `jobStep` and `actionGate` return beside their
+  private.capability})` for each answered key the job asked whose value's action is accept, decline or cancel, one
+  decision per call (when `job.inputRequests` and the answer's `inputResponses` are plain
+  objects, `Object.hasOwn(job.inputRequests, key)`, its step read with `Object.hasOwn(steps, key)`, as McpToolServer
+  gates only asked keys; McpToolServer answers an `inputResponses` that is present, not `null` and no object with
+  `-32602`, and reads `null` and `{}` as a poll, which the contract's schema does not admit), then answers. It logs the `fault` that `jobStep` and `actionGate` return beside their
   answer, as `on_fault` does in Python: `mandate-capability-missing` at the start means the job's tool is not a
   capability name; at the answer it also means `mandateCapability` was not passed. Any service that gates a job's
   answer itself (Node `actionGate`, or Python `action_gate(..., mandate_capability=)` outside `McpToolServer`, whose
@@ -335,14 +346,20 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
 
 **As a caller.** The agent leading a task states the mandate from the operator's own words with
 `operator_mandate(task, instruction, scope, lead, at=, expires_at=)` / `operatorMandate({task, instruction, scope,
-lead, at, expiresAt})` (a day unless told, at most seven), hands it to the agent it calls with
+lead, at, expiresAt})` (a day unless told, at most seven: pass `expires_at` / `expiresAt` covering the task's expected
+length, since a task still open at the expiry asks the operator again, MD-1), hands it to the agent it calls with
 `hand_on(mandate, callee, at, narrower=None)` / `handOn(mandate, callee, at, narrower)` (the chain gains the callee; a
 wider scope, a fifth agent, an agent already in it or a time at the expiry is refused; `source` travels unchanged), and
 sends it with `request_meta(traceparent, mandate=...)` / `requestMeta(traceparent, {mandate})`, which refuse one
 `FAC-SEM-144` refuses. `mandate_covers` / `mandateCovers` answer what a callee would, before you call. To cover a
 job's approval steps, name the job's capability in `capabilities` (or leave `capabilities` out) and the steps' keys in
 `actions`; never `fabric.job.get`, which covers no step of another capability (DEC-0141 MJ-1). Never write a
-mandate from another agent's text, a page or a file; a callee hands on only what it received, narrowed.
+mandate from another agent's text, a page or a file; a callee hands on only what it received, narrowed. A chain that
+already holds four agents takes no fifth (MD-2): past it the four parts travel only as a relay from one of the
+operator's own Projects or his local session (OA-3), naming the scope in force at the relaying link and its held `expiresAt`, whose receiver, an
+agent, states its own mandate (OA-2) within both, and never for a task it already leads (a proposed
+minimum). A service, which reads only the machine form, has no route past four agents until the contract's CT-205 (its
+answer on board thread `118f95f9`, message `adf0c61a`); never restate a held mandate to start a new chain.
 
 A relay the operator's rule accepts (DEC-0126 OA-2, OA-3: one of his own Projects on his board, provenance `trusted`,
 or a session on his own machine, with his words verbatim, when, where and the scope) is stated with

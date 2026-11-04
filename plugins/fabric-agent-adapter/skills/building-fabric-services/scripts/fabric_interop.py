@@ -33,6 +33,7 @@ import fabric_service as _fs  # noqa: E402
 from fabric_base import store_lock  # noqa: E402 - one lock per store path (R3)
 from fabric_actions import action_caller, readable_action  # noqa: E402 - DEC-0121
 from fabric_mandate import EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, is_agent_id  # noqa: E402 - DEC-0125, DEC-0126
+from fabric_jsvalue import real_number as _real_number  # noqa: E402 - the core's (FAA-65)
 from fabric_time import format_rfc3339  # noqa: E402 - the core's (FAA-65)
 from fabric_page_links import (  # noqa: E402 - DEC-0123
     PageLinkError, dashboards_link, input_request_link_findings, page_link_findings, parse_dashboards_link)
@@ -40,6 +41,7 @@ from fabric_page_links import (  # noqa: E402 - DEC-0123
 from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     _days_from_civil,
     UNREADABLE_PROJECT,
+    kept_step,
     mandate_spend,
     PROTOCOL,
     EXTENSION_KEY,
@@ -393,30 +395,33 @@ class JobStore:
                       steps: Optional[Dict[str, Dict[str, Any]]] = None) -> Dict[str, Any]:
         """input_required with MCP elicitation requests, keyed; build them with choice_request / form_request / url_request.
         `steps` (DEC-0125) maps a request key to the approval step it asks for, {effect, spendUsd?, project?}, kept in the
-        job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it)."""
-        for key, step in (steps or {}).items():
-            if key not in (input_requests or {}) or not isinstance(step, dict) or step.get("effect") not in EFFECT_CLASSES:
-                raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
-        if not input_requests:
-            raise InteropError("input_required needs at least one input request.")
-        for key, request in input_requests.items():
-            if not _KEY.match(key) or request.get("method") != "elicitation/create":
-                raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
+        job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it).
+        A step is kept as the gate reads it (kept_step), so a job's start and its answer agree."""
+        if not isinstance(input_requests, dict) or not input_requests:  # a JSON object of requests, first (readings 38, 39)
+            raise InteropError("input_required needs a JSON object of at least one input request.")
+        kept: Dict[str, Dict[str, Any]] = {}
+        for key, step in (steps or {}).items():  # the value checked is the value kept (seam reading 34)
+            kept[key] = kept_step(step) if key in input_requests and isinstance(step, dict) else {}
+            if not (type(kept[key].get("effect")) is str and kept[key]["effect"] in EFFECT_CLASSES):
+                raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % (key,))
+        for key, request in input_requests.items():  # each a keyed object, as Node refuses one (product reading 39)
+            if not isinstance(key, str) or not _KEY.match(key) or not isinstance(request, dict) or request.get("method") != "elicitation/create":
+                raise InteropError("Input request %r must be a keyed elicitation/create request." % (key,))
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
-        return self._transition(job_id, "input_required", {"steps": dict(steps or {})},
+        return self._transition(job_id, "input_required", {"steps": kept},
                                 inputRequests=input_requests, statusMessage=message)
 
     def answer(self, job_id: str, input_responses: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply inputResponses to an input_required job; unknown keys are ignored (MCP Tasks rule).
+        """Apply inputResponses (a JSON object, a dict) to an input_required job; unknown keys are ignored (MCP Tasks rule).
 
         Returns the responses that matched; when any did, the job is working again."""
         with self._lock:
             job = self.get(job_id)
             if job["status"] != "input_required":
                 return {}
-            matched = {key: value for key, value in (input_responses or {}).items()
-                       if key in job.get("inputRequests", {}) and isinstance(value, dict)
+            matched = {key: value for key, value in (input_responses if isinstance(input_responses, dict) else {}).items()
+                       if isinstance(job.get("inputRequests"), dict) and key in job["inputRequests"] and isinstance(value, dict)
                        and value.get("action") in ("accept", "decline", "cancel")}
             if matched:  # the answered question's kept steps go in the same write: none outlives its answer
                 self._transition(job_id, "working", {"steps": {}})
@@ -532,9 +537,7 @@ class CallContext:
             if step["covered"]:
                 return step["record"]
             self.server._fault(capability, step)  # the start hears it as the answer does, under the same name (MJ-1)
-        spend = mandate_spend(spend_usd)  # a NaN or infinity reads as no estimate, and json would write a bare NaN
-        kept = {"effect": effect, **({"spendUsd": spend} if spend is not None else {}),
-                **({"project": project if isinstance(project, str) else UNREADABLE_PROJECT} if project is not None else {})}
+        kept = {"effect": effect, "spendUsd": spend_usd, "project": project}  # request_input keeps it as the gate reads it
         self.server.jobs.request_input(job_id, {key: request}, step["message"] or message, steps={key: kept})
         return None
 
@@ -712,9 +715,9 @@ class McpToolServer:
                 raise InteropError("Tool %s: a human step needs its link, an https URL or a path (DEC-0121 AP-4)." % tool["name"])
             if not (target is None or isinstance(target, str) or callable(target)):
                 raise InteropError("Tool %s: target is an argument's name or a function of the arguments." % tool["name"])
-            if self.agent_id is not None and action["gate"] == "relayed" and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+            if self.agent_id is not None and action["gate"] == "relayed" and not (type(effect) is str and effect in EFFECT_CLASSES):
                 raise InteropError("Tool %s: a relayed action on a server that reads mandates names its effect class (DEC-0125)." % tool["name"])
-            if effect is not None and not (isinstance(effect, str) and effect in EFFECT_CLASSES):
+            if effect is not None and not (type(effect) is str and effect in EFFECT_CLASSES):
                 raise InteropError("Tool %s: effect is one of %s." % (tool["name"], ", ".join(EFFECT_CLASSES)))
             if not (spend is None or callable(spend) or (isinstance(spend, (int, float)) and not isinstance(spend, bool))):
                 raise InteropError("Tool %s: spend is a number of USD or a function of the arguments." % tool["name"])
@@ -772,18 +775,20 @@ class McpToolServer:
         caller_agent = (verdict or {}).get("caller")
         # The estimate is read as a double, as the contract does: an int past the float range is infinite, and an
         # estimate that is not a finite number reads as none, which a mandate's ceiling refuses (fail closed).
+        number = _real_number(spend)  # by what it stores; a bool, a mock or not a number is none (seam reading 18)
         try:
-            double = float(spend) if isinstance(spend, (int, float)) and not isinstance(spend, bool) else math.nan
+            double = float(number) if number is not None else math.nan
         except OverflowError:
             double = math.inf
+        spend = number
         finite = math.isfinite(double)  # the service's own number goes on when it is finite (25 stays 25)
-        if project is _UNREADABLE or not (project is None or isinstance(project, str)):
-            project = _UNREADABLE_PROJECT  # a function that raised or named no string: a scoped mandate refuses
+        if project is _UNREADABLE or not (project is None or type(project) is str):  # an exact str, as the core compares
+            project = _UNREADABLE_PROJECT  # a function that raised or named no exact str: a scoped mandate refuses
         return {"self_id": self.agent_id, "effect": entry.get("effect"),
                 "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
                 # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
                 "spend_usd": spend if finite else None,
-                "project": project if isinstance(project, str) else None}
+                "project": project}  # None or an exact str, read once above: never re-decided into no project (unit r33)
 
     @staticmethod
     def _read(value: Any, arguments: Dict[str, Any]) -> Any:
@@ -800,8 +805,9 @@ class McpToolServer:
         agent_id, a step approval_step kept is read under the call's `_meta.mandate` too (C3.3)."""
         job_id = str(arguments.get("id", ""))
         job = self.jobs.get(job_id)
-        steps = self.jobs.private(job_id).get("steps") or {}
-        asked = job.get("inputRequests", {}) if job["status"] == "input_required" else {}
+        private = self.jobs.private(job_id)  # one read of the job's private part (unit reading 39)
+        steps = private.get("steps") if isinstance(private.get("steps"), dict) else {}
+        asked = job.get("inputRequests") if job["status"] == "input_required" and isinstance(job.get("inputRequests"), dict) else {}
         records: Dict[str, Any] = {}
         for key, value in arguments["inputResponses"].items():
             if key not in asked or not isinstance(value, dict) or value.get("action") not in ("accept", "decline", "cancel"):
@@ -811,7 +817,7 @@ class McpToolServer:
             if self.agent_id is not None and isinstance(step, dict):
                 # A kept step's mandate is read as approval_step read it, under the job's own capability, which must
                 # be a capability name (MJ-1); the action itself stays fabric.job.get, so it is a readable action.
-                capability = self.jobs.private(job_id).get("capability")
+                capability = private.get("capability")
                 agent = (verdict or {}).get("caller")
                 mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),
                            "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None,
@@ -917,6 +923,8 @@ class McpToolServer:
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
             caller, inputs = self._caller(headers, tier, verdict), None
             responses = arguments.get("inputResponses")
+            if name == "fabric.job.get" and responses is not None and not isinstance(responses, dict):  # seam r37: never a crash
+                return self._error(rid, -32602, "fabric.job.get takes inputResponses as a JSON object (interop C3.3).")
             if name == "fabric.job.get" and self.input_actions and isinstance(responses, dict) and responses:
                 try:
                     inputs = self._gate_inputs(arguments, headers, tier, meta, caller, verdict)

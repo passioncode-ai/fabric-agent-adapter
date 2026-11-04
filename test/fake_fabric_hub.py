@@ -91,14 +91,14 @@ class Board:
 
     # -- test setup ----------------------------------------------------------------------------------------------
     def queue(self, capability: str, text: str = "Render the attached composition.", sender: str = OTHER_PROJECT,
-              message_digest: Optional[str] = None) -> str:
+              message_digest: Optional[str] = None, provenance: str = "trusted") -> str:
         rid = oid("req")
         mid = oid("msg")
         body = {"text": text}
         d = digest("com.submit", {"body": body, "request": {"target": self.project, "capability": capability}})
         self.requests[rid] = {"id": rid, "message": mid, "capability": capability, "state": "queued", "effect": "not_started",
                               "revision": 1, "digest": d, "message_digest": message_digest or d, "body": body,
-                              "sender": sender, "attempt": None, "thread": oid("thr")}
+                              "sender": sender, "provenance": provenance, "attempt": None, "thread": oid("thr")}
         self.order.append(rid)
         return rid
 
@@ -248,7 +248,7 @@ class Board:
         for r in self.requests.values():
             if r["message"] == args.get("message"):
                 return {"id": r["message"], "thread": r["thread"], "kind": "request",
-                        "sender": {"project": r["sender"], "principal": {"kind": "agent", "id": "s-1", "provenance": "trusted"}},
+                        "sender": {"project": r["sender"], "principal": {"kind": "agent", "id": "s-1", "provenance": r.get("provenance", "trusted")}},
                         "at": iso(BASE_TIME), "digest": r["message_digest"], "body": r["body"],
                         "request": {"id": r["id"], "target": self.project, "capability": r["capability"], "state": r["state"],
                                     "effect": r["effect"], "revision": r["revision"]}}
@@ -682,7 +682,7 @@ class FakeHub:
         b = self.board
         if op == "queue":
             return {"request": b.queue(cmd["capability"], cmd.get("text", "Render the attached composition."),
-                                       message_digest=cmd.get("messageDigest"))}
+                                       message_digest=cmd.get("messageDigest"), provenance=cmd.get("provenance", "trusted"))}
         if op == "advance":
             b.advance(float(cmd["seconds"]))
         elif op == "set":
