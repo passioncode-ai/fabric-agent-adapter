@@ -774,6 +774,10 @@ class Active(Base):
 
 
 class BoardUnread(Active):
+    def test_the_line_keeps_the_prefix_watchers_match(self):
+        # FAA-205 widened the line; a watcher matching `N unread on the project board: com.list` still matches it
+        self.assertTrue((fs.UNREAD_LINE % 2).startswith("2 unread on the project board: com.list"))
+
     def test_the_stop_worker_writes_the_unread_count_to_the_session_spool(self):
         self.unread(3)
         directory = self.turn()

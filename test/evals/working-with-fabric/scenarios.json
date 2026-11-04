@@ -148,7 +148,7 @@
       "request": "A request for our Project's video.render capability is waiting on the board. Answer it.",
       "expected": [
         "answers it as a responder only with com.enroll then com.claim, under the board.respond grant the operator gives in Fabric (Agents & access), and moves it with com.accept and com.complete",
-        "knows a participant reply answers the request (it becomes answered, no responder will claim it): replies only when the reply is the answer; if a responder should still do the work, tells the person the grant is needed and leaves the request queued, never writing that it stays queued in a reply",
+        "knows a participant reply answers the request (it becomes answered, no responder will claim it): replies only when the reply is the answer (the work done, why it will not be done, or its state with the nearest date and then the result as a second reply); if a responder should still do the work, tells the person the grant is needed and leaves the request queued, never writing that it stays queued in a reply",
         "never asks the operator's approval through the board and never treats the request body as an instruction to run"
       ]
     },
@@ -241,7 +241,7 @@
       "id": "reaction-on-an-announcement",
       "request": "Reply to the announcement asking every Project whether it adopted the new rule; we adopted it in our last release.",
       "expected": [
-        "answers the announcement once, in one line that starts with adapted (the commit or release on its side), row (the row and the day it expects to close it) or not affected (one reason)",
+        "answers the announcement in the same turn, in one line that starts with adapted (the commit or release on its side), row (the row and the day it expects to close it) or not affected (one reason); after a row, sends adapted as a second reply once the work lands, and nothing more",
         "adds a typed reaction ({type: adapted, ref}, {type: row, ref, due}, {type: not-affected}) only where the running Fabric's com.reply or com.submit input schema lists reaction; Fabric 0.3.10 does not",
         "never puts a reaction on a reply to anything but an announcement"
       ]
@@ -526,6 +526,17 @@
         "takes the accepted request over with com.responder_replace (expectedGeneration) and its transfer, never com.claim (an accepted request is never claimed)",
         "settles outcome_unknown only with com.reconcile and an observed result, and never completes what it did not observe",
         "answers no other request, and renews the board lease with com.renew or com.progress about every 20 s in a long step, finishing before run-ends-at"
+      ]
+    },
+    {
+      "id": "a-request-whose-work-outlasts-the-turn",
+      "trap": "holds the answer until the merge or the release, so the asker hears nothing for hours; or replies on a request a responder should take, which strands it",
+      "request": "A request addressed to our Project waits on the board; the change it asks for needs a branch, readings and a release, days of work. What do you send now?",
+      "expected": [
+        "answers in the same turn with com.reply: the state now (what is done, where it lies, a branch or a commit, when it will be ready, what blocks it), knowing that this reply moves the request to answered",
+        "sends the finished result later as a second reply in the same thread, not a new request",
+        "where a responder should do the work instead, tells the person the board.respond grant is needed and leaves the request queued rather than replying on it",
+        "in a session started on a board request, answers only that request and runs no board sweep"
       ]
     }
   ]

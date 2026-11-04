@@ -105,7 +105,7 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 #: environment names the workflow, the handoff and the request; the prompt's first line `fabric-dispatch/1
 #: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order) names them too,
 #: and the environment wins. FABRIC_DISPATCH_WORKFLOW alone is enough to tell the session: a launcher that sets only it
-#: (one older than Switchboard's 7ac2a5b) leaves the handoff and the request to the packet. A line with no workflow in the
+#: (Switchboard before its 7ac2a5b) leaves the handoff and the request to the packet. A line with no workflow in the
 #: environment is quoted text, never a dispatch.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
@@ -124,8 +124,8 @@ DISPATCH_CONTRACT = (
     "the request; its artifacts are references (the capability, the deadline, run-ends-at; Observatory's write redacts "
     "the board ones). Read the request with `com.get` {{message: <request>}} and its thread with `com.list` "
     "{{thread: <the `thread` com.get answered>}}. 2. "
-    "`observatory_handoff_accept` with {handoff}, your `owner` (`agent:<name>`), an `idempotencyKey` and the `executor` "
-    "the launcher's prompt names, if any, takes the workflow's lease; keep the `leaseId`. 3. `com.status` once for the "
+    "`observatory_handoff_accept` with {handoff}, your `owner` (`agent:<name>`), an `idempotencyKey`, this session's own `sessionId` "
+    "(the same on a retry) and the `executor` the launcher's prompt names, if any, takes the workflow's lease; keep the `leaseId`. 3. `com.status` once for the "
     "epoch and the slot's generation; `com.enroll` for the capability, then `com.claim` (`idempotency`, `capability`, "
     "`request`), `com.accept` and `com.effect_begin` before an effect. When `com.get` shows the request accepted or in "
     "progress (an earlier run), take an accepted one over with `com.responder_replace` (`expectedGeneration`) and its "
@@ -214,7 +214,7 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
         return True
     import hashlib
     dispatch_id = env.get("FABRIC_DISPATCH_ID") or ""
-    if DISPATCH_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch, a UUID (Switchboard's PR #379 sets it)
+    if DISPATCH_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch, a UUID (Switchboard sets it since 0ad56cb)
         run = "|".join((dispatch["workflow"], "dispatch", dispatch_id))
     else:
         run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
@@ -347,7 +347,7 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     lines = [dispatch_contract(dispatch, mismatch)] if dispatch is not None and (dispatch != told or mismatch) else []
     if lines and not dispatch_holder(told, session_id, env):
         lines = []  # a session inside the run was told at its start that the run holds the dispatch
-    if fabric_launched(env):
+    if fabric_launched(env) or told is not None:  # a dispatched run answers its one request: no unread line, no nudges
         return _host_output("claude", "UserPromptSubmit", "\n".join(lines)) if lines else None
     directory = session_dir(session_id, env)
     lines += [line for line in [_unread_line(directory)] if line] + [nudge_shown(line) for line in take_nudges(directory)]

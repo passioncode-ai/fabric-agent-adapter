@@ -442,7 +442,8 @@ class Recipe(unittest.TestCase):
         first = agent.answer("m-1", "How do I reset my password?")
         self.assertEqual((first["action"], first["reasons"], first["draft"]), ("handoff", ["no-citation"], "Open Settings."))
         self.assertNotIn("fallback", first)
-        repaired = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+        self.assertEqual(handoffs[0]["draft"], "Open Settings.", "the repair step gets it through on_handoff (0.63.0 unit r7)")
+        repaired = agent.answer("m-1-r1", "How do I reset my password?", repair=handoffs[0])
         self.assertEqual(repaired["action"], "reply")
         self.assertTrue(repaired["repaired"])
         self.assertNotIn("fallback", repaired)
@@ -613,6 +614,23 @@ class Recipe(unittest.TestCase):
             os.utime(path, (2000.0, 2000.0))
             source.current()
             self.assertEqual(load.call_count, 2)
+
+    def test_a_rewrite_that_keeps_the_time_is_read_and_a_failed_read_is_not_parsed_again(self):
+        # 0.63.0 unit and seam readings 7: a coarse clock or `cp -p` keeps the time; a broken file is parsed once
+        from unittest import mock
+        path, now, source = self.source_at(1000.0)
+        self.assertEqual(len(source.current().entries), 3)
+        entries = json.loads(path.read_text())["entries"][:1]
+        path.write_text(json.dumps({"entries": entries}))
+        os.utime(path, (1000.0, 1000.0))
+        self.assertEqual(len(source.current().entries), 1, "the size changed at the same time")
+        path.write_text("[]oops")
+        os.utime(path, (1000.0, 1000.0))
+        with mock.patch.object(sa.Knowledge, "load", wraps=sa.Knowledge.load) as load:
+            source.current()
+            source.current()
+            self.assertEqual(load.call_count, 1)
+        self.assertTrue(source.state()["degraded"])
 
     def test_a_source_that_never_read_well_is_an_error(self):
         path = self.dir / "knowledge.json"

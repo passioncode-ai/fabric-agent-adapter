@@ -41,7 +41,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
 if str(Path(__file__).resolve().parent) not in sys.path:  # the kit installed beside it, under `python3 -I` too
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -185,12 +185,13 @@ class KnowledgeSource:
         self.path, self.max_age_s, self._clock = Path(path), max_age_s, clock
         self._knowledge: Optional[Knowledge] = None
         self._good_mtime = 0.0
-        self._seen: Optional[int] = None
+        self._seen: Optional[Tuple[int, int, int]] = None
         self._degraded = False
 
     def current(self) -> Knowledge:
-        try:
-            seen: Optional[int] = self.path.stat().st_mtime_ns
+        try:  # the time, the size and the inode: a rewrite in one coarse tick, or a copy that kept the time, still shows
+            stat = self.path.stat()
+            seen: Optional[Tuple[int, int, int]] = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
         except OSError:
             seen = None
         if self._knowledge is not None and seen is not None and seen == self._seen:
@@ -206,7 +207,7 @@ class KnowledgeSource:
             self._seen, self._degraded = seen, True
         else:
             self._knowledge, self._seen, self._degraded = knowledge, seen, False
-            self._good_mtime = seen / 1e9 if seen is not None else self._clock()
+            self._good_mtime = seen[0] / 1e9 if seen is not None else self._clock()
         return self._knowledge
 
     def state(self) -> Dict[str, Any]:

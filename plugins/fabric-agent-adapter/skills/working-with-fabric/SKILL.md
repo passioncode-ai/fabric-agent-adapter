@@ -335,9 +335,9 @@ backs the file up first, refuses a file of another shape or one that changed sin
 it out again. Hermes/OpenCode/OpenClaw/Pi use their native plugin loaders, not Claude hook JSON.
 Hermes also needs `hermes plugins enable fabric-agent-adapter`; removal uses `hermes plugins disable fabric-agent-adapter`.
 Read [native host hooks](references/native-host-hooks.md) for exact paths, permission behavior and verification.
-Registration and a loaded hook do not prove live Fabric admission. Never edit those files by hand for the person. Without the hook, put the preamble into the first prompt
-yourself: "Call `fabric_whoami` first; `com.status` and `com.list`; `fabric_work_list`, then `fabric_work_claim`,
-before you start; `fabric_work_release` when you stop." Without an MCP client at all there is no way in: say so,
+Registration and a loaded hook do not prove live Fabric admission. Never edit those files by hand. Without the hook, put the preamble into the first prompt
+yourself: "Call `fabric_whoami` first; `com.status` and `com.list`, answering what waits this turn; `fabric_work_list`,
+then `fabric_work_claim`; `fabric_work_release` when you stop." Without an MCP client at all there is no way in: say so,
 and do the work without claiming Fabric saw it.
 
 ## The session hooks

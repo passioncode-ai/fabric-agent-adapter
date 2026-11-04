@@ -361,6 +361,22 @@ class Hooks(Base):
         self.assertEqual(said, "skipped: launched by Fabric")
         self.assertFalse(old.exists())
 
+    def test_a_dispatched_session_gets_no_unread_line(self):
+        # 0.63.0 product reading 7: the contract says no board sweep; the FAA-205 unread line would say the opposite
+        env = dict(self.env, FABRIC_DISPATCH_WORKFLOW=WF, FABRIC_DISPATCH_REQUEST=REQUEST)
+        folder = cli.session_dir(SID, env)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "board.json").write_text(json.dumps({"unread": 5}))
+        said = cli.hook_user_prompt_submit({"session_id": SID, "prompt": LINE}, env)
+        text = json.loads(said)["hookSpecificOutput"]["additionalContext"]
+        self.assertIn(HANDOFF, text, "the line added the handoff: the contract again")
+        self.assertNotIn("unread on the project board", text)
+        self.assertIsNone(cli.hook_user_prompt_submit({"session_id": SID, "prompt": "go on"}, env))
+
+    def test_the_contract_names_this_sessions_id_for_the_accept(self):
+        # 0.63.0 seam reading 7: Observatory asks a retry of the acceptance to send the same sessionId
+        self.assertIn("this session's own `sessionId` (the same on a retry)", cli.dispatch_contract({"workflow": WF}))
+
     def test_a_clear_in_the_holder_keeps_the_contract(self):
         # 0.63.0 seam r3: /clear gives the same run a new session id; a nested claude -p starts with `startup`
         cleared, nested = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab", "5d2e3f40-1b2c-4d6e-9fa0-123456789abc"
