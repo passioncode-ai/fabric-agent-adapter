@@ -22,7 +22,8 @@ the task, narrowed at each hand-over. Part of the service kit (layer L2); the tw
 
 The kit has no JSON Schema validator: the shape is written here from the schema, lengths in code points and patterns
 over the whole string, as the contract's validator reads them. Never raises on JSON as json.loads gives it (a direct
-caller's key with its own __eq__ in a mandate or scope is compared as given: FAA-196 (22)). Standard library only.
+caller's key or value with its own __eq__ or __class__, in the input, the call, the mandate or its scope, is compared
+as given: FAA-196 (22)). Standard library only.
 """
 from __future__ import annotations
 

@@ -269,7 +269,8 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   refused under a ceiling (a subclass of int or float is read by the number it holds, never by its `float()` or
   comparisons; a bool, a `Decimal`, a `numpy.int64` or a value that only claims a number through `__class__`, a mock
   or a proxy, is no estimate), and a project function that answers anything but a string or `None` names no project a
-  mandate can list. A refusal outside a mandate
+  mandate can list (in Python an exact `str`: the core compares a project by exact type, so a `str` subclass, a
+  `StrEnum` member included, is refused by a mandate limited to projects, where the Node kit reads it as its string). A refusal outside a mandate
   tells the caller the MD-4 order: call again within its own mandate, else pass the refusal up; only the leading agent
   asks the operator.
 - `add_tool(tool, handler, action=, effect=, spend=, project=)`: on a server with `agent_id`, a `relayed` action names

@@ -485,9 +485,11 @@ class BoardMandateTests(Conversation):
             @property
             def __class__(self):
                 raise RuntimeError("__class__ ran")
-        for spend in (ClaimsBool(500), ClassRaises(500.0), [ClaimsBool(500)][0]):
+        for spend in (ClaimsBool(500), ClassRaises(500.0)):
             got = at_depth(0, spend)
             self.assertEqual((got["data"]["detail"], got["data"]["estimateUsd"]), ("outside-mandate: spend", 500), type(spend))
+        got = at_depth(0, [ClaimsBool(500)])  # inside a list it is no JSON data: no estimate (unit reading 31)
+        self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
         self.assertEqual((jsv.js_to_number(ClaimsBool(500)), jsv.js_to_number(True)), (500.0, 1.0))
 
         class Text(str):

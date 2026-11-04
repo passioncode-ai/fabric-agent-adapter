@@ -19,8 +19,8 @@ says that his approval holds for the whole task, at every link (FAA-195).
   Off by default: a responder that names neither reads nothing, as before. Node's `WorkContext` serialises without the
   mandate. Both kits (FAA-135). `ctx.mandate_covers` reads the call's `spendUsd` and `project` failing closed, as the
   kit's MCP and job mandate readers do (FAA-139): a spend that is not a finite number is none, which a `perCallMaxUsd`
-  refuses, and a `project` that is not a string (in Python an exact `str`, so a subclass too, where McpToolServer
-  takes a subclass), None (Node null) included, is refused by a mandate limited to
+  refuses, and a `project` that is not a string (in Python an exact `str`, so a subclass too: the core compares a
+  project by exact type, so every Python reader refuses one there; the board path marks it unreadable first), None (Node null) included, is refused by a mandate limited to
   projects, as the contract's `mandateCovers` refuses a null project (the MCP and job readers read None as naming
   none; leave `project` out on the board) (a draft of this release passed them as given; 0.61.0 seam reading 14). Only
   the five members `mandate_covers` reads are read, each once, as the contract reads them (`call[name]` in Python; a
