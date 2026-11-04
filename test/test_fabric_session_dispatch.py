@@ -160,6 +160,16 @@ class Hooks(Base):
             text = done.stdout if plain else self.context(done)
             self.assertIn("observatory_handoff_accept", text, host)
 
+    def test_a_native_bridge_is_always_told_the_contract_and_writes_no_record(self):
+        # 0.63.0 seam reading 6: the bridges pass {cwd} and no session id, so they cannot be told apart
+        for host in ("opencode", "hermes"):
+            for _ in range(2):
+                done, _ = self.run_hook("session-start", {"cwd": str(self.repo)},
+                                        extra_env=dict(ENV, FABRIC_LAUNCHED_SESSION="1"), args=("--host", host))
+                self.assertIn("observatory_handoff_accept", done.stdout, host)
+        self.assertFalse((cli.state_root(env=self.env) / "dispatch").exists())
+        self.assertLess(len(cli.dispatch_contract({"workflow": WF})), 4000, "Hermes' MAX_CONTEXT_CHARS")
+
     def test_a_resumed_dispatch_is_quiet(self):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "resume"},
                                 extra_env=ENV)

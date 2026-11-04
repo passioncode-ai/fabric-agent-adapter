@@ -28,6 +28,11 @@
   the full contract; on Windows any `/clear` keeps the contract, since each hook runs under a new Git Bash.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.
+- working-with-fabric: whatever waits on the Project is answered in the same turn (FAA-205, the operator's rule of
+  2026-11-04, board thread `11646774`): the session-start preamble, the unread line (`N unread on the project board:
+  com.list; answer what waits on you in this turn: ...`, its prefix unchanged for watchers) and the skill's board step
+  say to answer a request, an announcement or a question with its state now (done, where, when, what blocks) and send
+  the result later in a second message; `references/project-board.md` gains "Answering at once".
 - The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
   standard's rules for agents on a channel people write to (the ticket as the unit, one outcome per ticket, answer
   rather than route, repair before hand-off, declared sources with a maximum age, hand-off queues with their answered

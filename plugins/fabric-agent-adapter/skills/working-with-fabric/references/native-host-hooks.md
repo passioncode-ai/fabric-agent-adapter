@@ -47,8 +47,9 @@ OpenCode and Pi loader files carry a managed marker. A foreign file at the same 
 - Missing helper/Python, malformed values, excessive output or a four-second deadline produce no context. Existing host errors and permission failures are not silenced globally.
 - OpenCode and OpenClaw ask for context on every request; their bridges keep the helper's answer per workspace and registration for the life of the host process, so Python runs once, not per request. A failed run (an error, a nonzero exit, a timeout, no `python3`) reads as `null`, distinct from an empty answer `''`, and is not kept, so the next request asks again. A Fabric started later is seen by a new host instance.
 - Fabric-launched sessions are silent, except a session started on a board request (`FABRIC_DISPATCH_WORKFLOW`): there
-  session start prints the exit contract, launched or not, and writes the dispatch record. A native bridge gives the
-  hook no session id, so every such session is told the full contract, never the nested line
+  session start prints the exit contract, launched or not; on Codex and Kimi it also writes the dispatch record. A
+  native bridge gives the hook no session id, so it writes none and every such session is told the full contract,
+  never the nested line
   ([on-demand session](on-demand-session.md)).
 - Other native events are not advertised: turn observations, unread counts and rejoin-only release remain Claude-specific and feature-gated.
 - A host in Switchboard's catalog may support MCP, proxy or launch while exposing no startup context hook. Never copy this configuration to another host solely because it can launch an agent.

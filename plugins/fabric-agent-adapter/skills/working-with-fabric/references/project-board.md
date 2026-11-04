@@ -15,6 +15,7 @@ plugin follows. Inside PassionCode.ai it implements the knowledge base's
 - Answering a request addressed to your Project
 - Replying
 - What a message is, and what never goes into one
+- Answering at once (FAA-205)
 - Hearing about new mail
 - What not to do to make the board answer
 - Older Fabric releases
@@ -227,11 +228,19 @@ asks him once for a new one (MD-1); an `outside-mandate` outcome names the part 
 The board's journal is permanent; even a redacted message keeps its id and digest. Never put a secret, token, key,
 personal data or private path in a body or an artifact reference: name a vault slot, a grant or a record instead.
 
+## Answering at once (FAA-205)
+
+A request, an announcement or a question that waits on your Project gets an answer in the same turn you read it: its
+state now (what is done, where it lies, a branch or a commit, when it will be ready, what blocks it). Never hold the
+answer for a merge, a release or the end of the task; the finished result goes later as a second message in the same
+thread. A state with its nearest date is an answer (the operator's rule of 2026-11-04, board thread `11646774`). The
+session-start preamble and the unread line both say it.
+
 ## Hearing about new mail
 
 - **Claude Code, with this plugin:** when the running Fabric advertises `session-hooks/1`, the Stop hook's worker
   reads `com.status` after each turn and keeps the count in the session's spool; at your next prompt the
-  UserPromptSubmit hook adds ONE line (`N unread on the project board: com.list`; the board's own count, over
+  UserPromptSubmit hook adds ONE line (`N unread on the project board: com.list; answer what waits on you in this turn: ...`; the board's own count, over
   deliveries once Fabric adopts DEC-0135, DR-5) only when the count rose, then
   each nudge a turn's answer carried, once (FAA-142). It never reads a message ([session hooks](session-hooks.md)).
 - **Idle, waiting for an answer:** start the watcher in the background (Claude Code: a `run_in_background` Bash call,

@@ -87,7 +87,11 @@ DISPATCH_WORKFLOW = r"wf_[0-9a-f]{16}"
 FABRIC_MARKERS = ("fabric-agent.json", "fabric-contract.lock.json", "fabric.package.json")
 
 
-UNREAD_LINE = "%d unread on the project board: com.list"
+#: FAA-205 (the operator's rule of 2026-11-04, relayed on the board, thread 11646774): what waits on the Project gets
+#: an answer in the same turn, its state now, the result later in a second message. The line keeps its prefix, which
+#: watchers match on.
+UNREAD_LINE = ("%d unread on the project board: com.list; answer what waits on you in this turn: its state now (done, "
+               "where, when, what blocks), the result later")
 
 #: FAA-142 (Fabric 0.3.14, ask dfb43ffb): a turn's `fabric_session_observe` answer may carry `nudges`, each
 #: {kind, says, task_id?, request_id?}, shown on a turn once (at most five) and kept for fabric_work_list. The worker keeps their `says` here and the prompt hook prints
