@@ -16,7 +16,8 @@
   (`observatory_checkpoint_latest`), the request and its thread (`com.get`, `com.list`), the lease
   (`observatory_handoff_accept` with its owner, key and the executor the launcher names), `com.status` and the claim,
   a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
-  checkpoints, renewals about every 20 s (work that outlasts the run is left accepted, its state in a checkpoint and a thread message, for the next run;
+  checkpoints, renewals about every 20 s (work that outlasts the run is left accepted, its state in a checkpoint and a `com.progress` note, for the next
+  run;
   `failed_known` would settle it), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
@@ -45,12 +46,12 @@
     passes, never into a file (`decisions.jsonl` or the default outbox), so a repeat of the id returns it without; `answer(new_id, text, repair=decision)` rewrites it once with the refusal's reasons: a pass is
     a reply with `repaired: true`, and a repair that ends otherwise (a second refusal, a model `HANDOFF`, no knowledge on
     the retry; not a `model:*` outage) a hand-off with `fallback: true` (the standard's 4.4 and its ticket's
-    `fallback`), which `repair=` then refuses;
+    `fallback`), which `repair=` then refuses, as it refuses a repair under the refused decision's own message id;
   - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config, which reads the file at once) reads the knowledge
     file as a source: read again when it changes (its time, size or inode), the last good version kept when a read fails or the file has the
     wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
     time;
-  - `Knowledge.load` refuses a file nested deeper than 32 levels on every Python, a file that is not an object with an `entries` list, an entry whose tags are not a list
+  - `Knowledge.load` refuses a file that is not JSON, one nested deeper than 32 levels on every Python, a file that is not an object with an `entries` list, an entry whose tags are not a list
     of text or whose question is not text, and a file nested too deep, each as a `RecipeError`;
   - `channel-agent.example.json`, one project's declaration under
     `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to

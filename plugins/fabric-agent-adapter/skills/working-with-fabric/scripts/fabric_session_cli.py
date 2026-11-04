@@ -135,7 +135,7 @@ DISPATCH_CONTRACT = (
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
     "and finish before run-ends-at; work that cannot end by then is left accepted, its state in an in_progress "
-    "checkpoint and a `com.submit` message on the thread with no `replyTo`, never `failed_known`. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
+    "checkpoint and a `com.progress` note on the thread, never `failed_known`. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "

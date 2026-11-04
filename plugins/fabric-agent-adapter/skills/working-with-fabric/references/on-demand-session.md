@@ -82,8 +82,8 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
    stops the run. Work that cannot end by then is left for the next run, before `run-ends-at`: its state (what is
-   done, where it lies, what is left) goes into an `in_progress` checkpoint and, as a message on the request's thread,
-   through `com.submit` `kind: "message"` with no `replyTo` (a reply would answer the request); the request stays
+   done, where it lies, what is left) goes into an `in_progress` checkpoint and onto the request's thread as the note of
+   a `com.progress` (the slot holder's state, DEC-0152 SA-6, proposed); the request stays
    accepted, never `failed_known`, which settles it for good (spec 3.6: the dispatch then ends finished). The next
    run takes it over with `com.responder_replace` (below). A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,

@@ -503,6 +503,17 @@ class Recipe(unittest.TestCase):
         (self.dir / "k.json").write_text(json.dumps({"entries": [dict(entry, note=[[["fine"]]])]}))
         self.assertEqual(len(sa.Knowledge.load(self.dir / "k.json").entries), 1)
 
+    def test_a_repair_under_the_same_id_and_a_file_that_is_not_json_are_refused(self):
+        # 0.63.0 unit reading 9: the same id returned the stored refusal silently; a broken file raised JSONDecodeError
+        agent, _ = self.agent(model_says("Open Settings."))
+        first = agent.answer("m-1", "How do I reset my password?")
+        with self.assertRaises(sa.RecipeError):
+            agent.answer("m-1", "How do I reset my password?", repair=first)
+        (self.dir / "k.json").write_text("{broken")
+        with self.assertRaises(sa.RecipeError) as raised:
+            sa.Knowledge.load(self.dir / "k.json")
+        self.assertNotIn("broken", str(raised.exception))
+
     def test_a_tag_that_is_not_text_is_refused(self):
         example = json.loads((RECIPE / "knowledge.example.json").read_text())
         for tags in ([1], "refund", None):

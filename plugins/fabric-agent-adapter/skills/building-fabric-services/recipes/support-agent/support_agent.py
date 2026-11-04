@@ -173,6 +173,8 @@ class Knowledge:
             data = json.loads(Path(path).read_text(encoding="utf-8"))
         except RecursionError:
             raise RecipeError("the knowledge file is nested too deep to read") from None
+        except ValueError:  # not JSON at all: refused like every other wrong shape, its content never quoted
+            raise RecipeError("the knowledge file %s is not JSON" % Path(path).name) from None
         if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
             raise RecipeError("the knowledge file is an object with an `entries` list")  # never an empty set by mistake
         if _depth(data) > MAX_KNOWLEDGE_DEPTH:  # the same verdict on every Python, whatever its parser's own limit
@@ -512,6 +514,8 @@ class SupportAgent:
         if repair is not None and not repairable(repair):
             raise RecipeError("repair= takes a hand-off the checks made, with its draft and reasons: the first call's "
                               "decision or the on_handoff copy (a repeat returns no draft, and a fallback had its repair)")
+        if repair is not None and repair.get("messageId") == message_id:
+            raise RecipeError("repair= runs under a new message id: the refused one returns its stored decision")
         if getattr(self._local, "in_handoff", False):
             raise ReentryError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
                               "this call returns")

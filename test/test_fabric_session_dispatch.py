@@ -388,6 +388,7 @@ class Hooks(Base):
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
         self.assertIn("This session's sessionId: %s." % uuid, cli.dispatch_contract(FULL, session_id=uuid))
         self.assertNotIn("This session's sessionId", cli.dispatch_contract(FULL, session_id="s-aaa"))
+        self.assertNotIn("This session's sessionId", cli.dispatch_contract(FULL, session_id=uuid.upper()))
         self.assertLess(len(cli.dispatch_contract({"workflow": WF}, ["handoff", "request"], uuid)), 4000)
         done, _ = self.run_hook("session-start", {"session_id": uuid, "cwd": str(self.repo), "source": "startup"},
                                 extra_env=ENV)
@@ -397,6 +398,22 @@ class Hooks(Base):
         text = cli.dispatch_contract(FULL)
         self.assertIn("work that cannot end by then is left accepted", text)
         self.assertIn("never `failed_known`", text, "failed_known settles the request for good (spec 3.6)")
+
+    def test_the_prompt_hooks_contract_names_the_session_id(self):
+        # 0.63.0 unit reading 9: the reprint after the line adds the handoff carries the id too
+        sb = {"FABRIC_DISPATCH_WORKFLOW": WF}
+        text = self.context(self.prompt(sb, LINE)[0])
+        self.assertIn("This session's sessionId: %s." % SID, text)
+
+    def test_a_record_just_inside_seven_days_stays(self):
+        import os, time
+        env = dict(self.env, **ENV)
+        cli.dispatch_holder(FULL, SID, env)
+        record = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
+        now = time.time()
+        os.utime(record, (now - fs.SESSION_STALE_S + 60,) * 2)
+        importlib.import_module("fabric_session_env").prune_dispatch_records(env=env, now=now)
+        self.assertTrue(record.exists())
 
     def test_a_cleared_holder_is_told_not_to_accept_again(self):
         # 0.63.0 seam reading 9: the accept was made under the id the /clear replaced
